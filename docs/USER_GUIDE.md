@@ -252,7 +252,7 @@ Bridge 登记的是 `agy` CLI，不是 Antigravity Desktop App：
 1. 按 Antigravity CLI 的官方方式安装。
 2. 在终端运行 `command -v agy`，记录输出的真实可执行文件路径；再运行 `agy --version` 和 `agy --help`。
 3. 在准备交给 Bridge 的项目根目录启动一次交互式 `agy`，用同一个 macOS 用户完成 CLI 登录。不要用临时或隔离 `HOME` 做登录测试，否则可能重新触发浏览器 OAuth。
-4. 在 AGY 交互界面输入 `/settings`（或 `/config`），把 **Tool Permission** 设为 `proceed-in-sandbox`。Bridge 始终传入 `--sandbox`，这是日常 Shell 任务的推荐起点。
+4. 在 AGY 交互界面输入 `/settings`（或 `/config`），确认 **Tool Permission** 为 `proceed-in-sandbox`（沙箱内终端命令自动执行）。这是正常使用前的关键配置；Bridge 始终传入 `--sandbox`，设置页显示 Sandbox Mode 被命令行覆盖为开启属于正常现象。
 5. 输入 `/permissions`，优先选择 **Project** 作用域，在 allow 页添加任务确实需要的窄规则，例如 `command(git status)`、`command(swift test)`、`read_url(developer.apple.com)` 或 `mcp(server/tool)`。Web 域名、Shell 与 MCP 是不同规则；`deny > ask > allow`，更宽的 ask/deny 规则可能覆盖 allow。
 6. 打开 `连接 → 本机 Agent 引擎连接 → 登记 Agent → Antigravity`，选择第 2 步得到的真实 `agy` 文件。如果路径位于隐藏目录，在文件选择器按 `⌘⇧G` 粘贴绝对路径。
 7. 点击“登记并 Probe”，确认状态为“可用”，再打开“启用”。

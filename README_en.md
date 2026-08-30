@@ -115,7 +115,7 @@ After registering an external provider, enable it, then refresh its model catalo
 
 - Workbench `Read Only / Write` controls new ChatGPT/Qwen tasks; the provider Settings value is only a fallback default.
 - DSH keeps `approval.policy: ask`. Resolve each runtime `session/request_permission` in Workbench with one-shot allow or deny; `full-access` and automatic task-start approval do not bypass it.
-- AGY runs through headless `stream-json`, so Bridge cannot answer its interactive tool prompts. Configure `proceed-in-sandbox` and narrow Project-scoped allow rules in interactive `agy` first.
+- Before normal AGY use, confirm **Tool Permission = `proceed-in-sandbox`** in interactive `agy /settings`, then add narrow Project-scoped allow rules through `/permissions`. Bridge already forces `--sandbox`.
 - The project network selector is not a packet-level firewall for external providers. Network tasks require explicit `network_access=true`, while actual access remains governed by AGY/DSH native configuration and tool policy.
 
 ### 5. Connect clients

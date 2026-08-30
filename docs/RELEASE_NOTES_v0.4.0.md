@@ -15,7 +15,7 @@
 - Codex 仍是默认 Provider，Supervisor 当前仍只支持 Codex。
 - OpenCode、DeepSeek Harness 与 Antigravity 都是用户自行安装或构建并明确登记的外部运行时，不随 App 打包，也不由 Bridge 保存其账号凭据。
 - DeepSeek Harness 当前每个任务创建新 Session，不支持历史 Session 续接；运行中的工具请求需要在工作台逐次选择“仅本次允许”或拒绝。
-- Antigravity 使用 headless `agy`。首次使用前请在交互式 CLI 中完成登录，并通过 `/settings`、`/permissions` 配置项目所需的命令、URL 和 MCP 规则。
+- Antigravity 使用 headless `agy`。首次使用前请在交互式 CLI 中完成登录，在 `/settings` 中确认 Tool Permission 为 `proceed-in-sandbox`，再通过 `/permissions` 配置项目所需的命令、URL 和 MCP 规则。
 - 外部 Provider 的网络、文件和工具执行使用各自原生策略；Bridge 负责项目准入、明确网络意图、任务启动审批与 Provider permission 回传，不宣称逐包网络隔离。
 
 ## 下载与安装

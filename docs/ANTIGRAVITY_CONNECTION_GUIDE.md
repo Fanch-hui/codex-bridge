@@ -34,6 +34,8 @@ agy CLI 原生 Sandbox + Permissions
 
 “自动批准远程 Agent 启动请求”只跳过启动批准，不批准 AGY 工具。Antigravity Desktop 的自动执行设置也不等于 CLI 的权限设置。
 
+> **正常使用前必须确认**：在交互式 `agy` 中打开 `/settings`（或 `/config`），将 **Tool Permission** 设为 `proceed-in-sandbox`，也就是允许沙箱内终端命令自动执行。Bridge 启动 AGY 时已经强制传入 `--sandbox`；如果设置页显示 Sandbox Mode 被命令行覆盖为开启，这是预期行为。
+
 ## 2. 兼容要求
 
 当前 Bridge 接受：
@@ -114,7 +116,7 @@ agy
 
 ## 5. 正确配置 AGY 原生权限
 
-### 5.1 设置推荐的 Tool Permission
+### 5.1 正常使用前确认 Tool Permission
 
 在目标项目根目录启动交互式 `agy`，输入：
 
@@ -128,13 +130,13 @@ agy
 /config
 ```
 
-找到 **Tool Permission**，日常 Bridge 使用建议选择：
+找到 **Tool Permission**，将其设为：
 
 ```text
 proceed-in-sandbox
 ```
 
-Bridge 每次启动 AGY 都会传入 `--sandbox`，所以该模式可让符合 Sandbox 条件的命令自动执行；不能进入 Sandbox 的命令仍会按权限规则处理。
+这就是“沙箱内终端命令自动执行”。Bridge 每次启动 AGY 都会传入 `--sandbox`，所以不需要再依赖 Desktop 的 Sandbox 设置；AGY 设置页可能显示 Sandbox Mode 被命令行参数覆盖为开启。不能进入 Sandbox 的命令仍会按权限规则处理。
 
 其他模式的含义：
 

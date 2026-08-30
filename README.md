@@ -115,7 +115,7 @@ Bridge 只接受已登记项目。项目硬策略优先于 Workbench 默认和�
 
 - ChatGPT/Qwen 的 `Read Only / Write` 由工作台决定；Provider 设置页中的访问权限只是后备默认。
 - DSH 保持 `approval.policy: ask`，运行中在工作台对每个 `session/request_permission` 选择“仅本次允许”或拒绝。`full-access` 和自动批准任务启动都不会跳过该步骤。
-- AGY 运行在 headless `stream-json` 中，不能把交互式工具确认回传到 App。日常使用应在交互式 `agy` 中选择 `proceed-in-sandbox`，再用 Project 作用域的 `/permissions` 添加窄 allow 规则。
+- AGY 正常使用前，必须在交互式 `agy` 的 `/settings` 中确认 **Tool Permission = `proceed-in-sandbox`**（沙箱内终端命令自动执行），再用 Project 作用域的 `/permissions` 添加窄 allow 规则。Bridge 已强制传入 `--sandbox`。
 - 项目网络选择器不是外部 Provider 的网络包级防火墙；联网任务需显式 `network_access=true`，真实网络仍由 AGY/DSH 原生配置和工具权限负责。
 
 ### 5. 连接 Chat 客户端
