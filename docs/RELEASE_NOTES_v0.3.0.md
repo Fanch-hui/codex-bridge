@@ -16,17 +16,17 @@
 
 OpenCode 是用户自行安装的本机运行时，不随 App 打包。当前适配器支持 `1.18.20 <= OpenCode < 1.19.0`，从当前项目根启动 `opencode acp`，模型目录以 ACP `session/new.configOptions` 为准。
 
-`read-only` 映射 OpenCode Plan，`workspace-write` 映射 OpenCode Build。当前 OpenCode ACP 没有 Bridge 级逐任务网络沙箱，`network_access=true` 会被拒绝，网络行为由 OpenCode 原生权限控制。所有远程任务和 ACP 权限请求仍需本机用户批准。
+`read-only` 映射 OpenCode Plan，`workspace-write` 映射 OpenCode Build。OpenCode ACP 没有 Bridge 级逐任务网络沙箱；用户明确要求网络任务时应设置 `network_access=true`，实际网络行为继续由 OpenCode 原生权限控制。远程任务默认需要本机启动批准，ACP 执行期权限请求仍由本机用户处理。
 
 完整安装、MCP 请求示例、任务轮询和排障步骤见：[OpenCode 连接指南](./OPENCODE_CONNECTION_GUIDE.md)。
 
 ## 发布包
 
-- `CodexBridge-0.3.0-macos.dmg`
-- `CodexBridge-0.3.0-macos.zip`
+- `CodexBridge-0.3.0-macos-arm64.dmg` / `.zip`
+- `CodexBridge-0.3.0-macos-x86_64.dmg` / `.zip`
 - `SBOM.spdx.json`
 - `SHA256SUMS`
 
-本版本保持 Universal 2（arm64 + x86_64）。由于未配置 Apple Developer ID 证书，发布包未签名、未公证，也没有 Gatekeeper 放行票据。首次打开时请在 Finder 中右键 App 选择“打开”，或在“系统设置 → 隐私与安全性”中选择“仍要打开”。
+当前发布工具按 `arm64` 与 `x86_64` 分别打包，每个包只包含匹配架构的 App、Service 与 Tunnel Helper。由于未配置 Apple Developer ID 证书，发布包未签名、未公证，也没有 Gatekeeper 放行票据。首次打开时请在 Finder 中右键 App 选择“打开”，或在“系统设置 → 隐私与安全性”中选择“仍要打开”。
 
 发布包不包含测试夹具、测试目录、原型、内部架构计划、审查稿、交接文件、个人配置或任何凭据。

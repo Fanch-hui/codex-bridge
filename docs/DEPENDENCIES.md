@@ -10,6 +10,8 @@ Evidence checked on 2026-08-17 against official repositories and releases. Versi
 | apple/swift-nio | 2.101.3 | `NIOCore`, `NIOHTTP1`, `NIOPosix` | Apache-2.0 + NOTICE | only the hardened `BridgeMCP` loopback HTTP adapter; direct dependency, never an assumed transitive product | [release](https://github.com/apple/swift-nio/releases/tag/2.101.3) |
 | openai/tunnel-client | 0.0.10 | helper executable | Apache-2.0 + NOTICE | `BridgeTunnel` process boundary; not an SPM binary target | [release](https://github.com/openai/tunnel-client/releases/tag/v0.0.10) |
 | OpenCode | user-selected compatible installation (`1.18.20 <= version < 1.19.0`) | external ACP executable | OpenCode's own distribution terms | `BridgeOpenCodeACP` process boundary; never bundled and never an SPM dependency | [OpenCode connection guide](./OPENCODE_CONNECTION_GUIDE.md) |
+| DeepSeek Harness | user-built pinned source tag `dsh-v0.1.1-rc.2` | external ACP executable | upstream project terms | `BridgeDeepSeekHarnessACP` process boundary; Bridge bundles only its validated `cordis.yml` template and never bundles Harness or reads its `.env` | [DeepSeek Harness guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) |
+| Antigravity CLI | user-selected compatible installation (`1.1.21 <= version < 1.2.0`) | external `agy` executable | provider distribution terms | `BridgeAntigravityCLI` process boundary; never bundled or authenticated by Bridge | [user guide](./USER_GUIDE.md#54-antigravity) |
 | @modelcontextprotocol/inspector | 2.1.0 | development CLI | MIT | test-only Streamable HTTP acceptance gate; never bundled in the App | [release](https://github.com/modelcontextprotocol/inspector/releases/tag/2.1.0) |
 
 ## Version and platform facts
@@ -20,6 +22,8 @@ Evidence checked on 2026-08-17 against official repositories and releases. Versi
 - swift-nio 2.101.3 supplies the listener, HTTP/1 codec and explicit write-backpressure primitives; it is pinned directly because `BridgeMCP` imports its products.
 - tunnel-client v0.0.10 is the current public stable release. Its macOS release assets are separate arm64/amd64 executables, not Universal 2. The Platform Tunnels page remains the source of truth for the version supported by the control plane. The integration and secret-passing contract is recorded in [`TUNNEL_CLIENT_INTEGRATION.md`](./TUNNEL_CLIENT_INTEGRATION.md).
 - OpenCode is not downloaded, embedded, or authenticated by Bridge. The user selects an absolute executable path, Bridge probes the ACP handshake, and each task uses isolated runtime/cache/state/database directories while inheriting OpenCode's own configuration and plugins. See [`OPENCODE_CONNECTION_GUIDE.md`](./OPENCODE_CONNECTION_GUIDE.md).
+- DeepSeek Harness is not downloaded or bundled. The user checks out and builds the pinned official tag, selects `packages/examples/acp-demo/lib/bin.js`, and provides an external Bridge-matched profile. Bridge validates the source/runtime/config identity; Harness loads its own adjacent `.env`. See [`DEEPSEEK_HARNESS_CONNECTION_GUIDE.md`](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md).
+- Antigravity is not downloaded, bundled, or authenticated by Bridge. The user registers a compatible `agy` CLI; Bridge verifies the current command surface and uses provider-native modes, sandbox, configuration, and authentication.
 - MCP Inspector 2.1.0 requires Node 22.19.0+; the repository invokes that exact package version without a global installation and never passes a production Keychain secret to it.
 
 ## Tunnel helper supply-chain contract

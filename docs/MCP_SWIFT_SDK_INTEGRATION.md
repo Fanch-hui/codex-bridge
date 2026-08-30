@@ -12,7 +12,7 @@ The checkout is build output, not a source dependency path. Production code must
 
 ## 2. Decision
 
-Use the SDK for MCP protocol messages, server lifecycle, method dispatch, initialization negotiation, cancellation notifications, and Streamable HTTP session transport. Build a small production HTTP adapter around it for loopback binding, the secret route, session ownership, resource limits, deadlines, backpressure, and shutdown.
+Use the SDK for MCP protocol messages, server lifecycle, method dispatch, initialization negotiation, cancellation notifications, and Streamable HTTP session transport. Build a small production HTTP adapter around it for loopback binding, exact routing and header authentication, session ownership, resource limits, deadlines, backpressure, and shutdown.
 
 The first real ChatGPT/Tunnel path uses `StatefulHTTPServerTransport`. It is the 0.12.1 path exercised by upstream server conformance and supports POST response SSE, GET SSE, session deletion, and `Last-Event-ID` replay. `StatelessHTTPServerTransport` remains useful for direct-JSON unit tests, but it is not the initial production default: a single `Server` actor can initialize only once, while the stateless transport has no public client/session identity with which an outer adapter can safely support reconnecting clients.
 
@@ -148,23 +148,24 @@ The `MCP` library product does not open a listening socket. Upstream has an NIO 
 
 The upstream example is architectural evidence for the server-per-session factory and NIO-to-`HTTPRequest` conversion only. It must not be copied as production code because it buffers request bodies without a limit, has no admission limit, writes SSE chunks without explicit writability backpressure, and relies only on an idle cleanup loop.
 
-### 4.1 Listener and secret route
+### 4.1 Listener and production authentication
 
 The production adapter contract is:
 
 ```text
 bind address       127.0.0.1 only, never localhost/::/0.0.0.0
-port               0 by default; persist the actual bound port after bind
-route              /mcp/<43-character base64url 256-bit secret>
+port               use the persisted port; on first bind use 0 and persist the OS-selected port
+route              /mcp
+authentication     X-Codex-Bridge-Token: <43-character per-client secret>
 query string       rejected
 other routes       empty 404 before JSON parsing
 methods            POST, GET, DELETE only; 405 otherwise
 TLS                 none on the loopback hop
 ```
 
-The 256-bit secret is obtained from Keychain by the composition layer. The HTTP adapter receives it as an opaque value, compares the raw URL path exactly in constant time, and never logs the route, URL, query, session ID, request body, or authorization headers. Base64url without padding ensures the route has no percent-encoding ambiguity.
+The composition layer obtains independent ChatGPT and Qwen credentials from Keychain and injects a bounded client authenticator. The HTTP adapter receives only opaque values, compares the raw header value in constant time, resolves the authenticated client profile, and never logs the secret, URL, query, session ID, request body, or authorization headers. Base64url without padding keeps the credential format bounded and unambiguous.
 
-Route rejection occurs before allocating a request body or invoking SDK validation. `Server.currentHandlerContext` may be used for audit metadata, but it is not the primary route authorization boundary.
+Exact-route and authentication rejection occur before allocating a request body or invoking SDK validation. `Server.currentHandlerContext` may be used for audit metadata, but it is not the primary authorization boundary. `MCPHTTPConfiguration(pathSecret:)` remains only for bounded compatibility tests and the default Inspector fixture; `/mcp/<secret>` is not the production Service contract.
 
 Use SwiftNIO for this thin adapter, following the upstream example's `NIOCore`, `NIOPosix`, and `NIOHTTP1` products. `swift-nio` is only transitive through swift-sdk today; `BridgeCore/Package.swift` must declare it directly at exact version `2.101.3` before `BridgeMCP` imports those products. Do not rely on access to a transitive package.
 
@@ -288,7 +289,7 @@ Tests/BridgeMCPTests/
 
 ### 8.1 SDK-client integration
 
-Start BridgeMCP with an ephemeral path secret and port, then connect using the same pinned SDK's public client surface:
+For the compatibility test, start BridgeMCP with an ephemeral path secret and port. Production-boundary tests separately start it with independent ChatGPT/Qwen header credentials. Connect using the same pinned SDK's public client surface:
 
 - `HTTPClientTransport(endpoint:configuration:streaming:sseInitializationTimeout:protocolVersion:requestModifier:logger:)` from `Sources/MCP/Base/Transports/HTTPClientTransport.swift`;
 - `Client.connect(transport:)`, `listTools(cursor:)`, and the `callTool` overload returning `RequestContext<CallTool.Result>` from `Sources/MCP/Client/Client.swift`.
@@ -300,19 +301,19 @@ Use the `RequestContext` overload when asserting `structuredContent`; the conven
 Use real loopback sockets, not only `InMemoryTransport`, to prove:
 
 - the listener is IPv4 `127.0.0.1` and the OS-selected port is reported correctly;
-- a wrong, missing, percent-encoded, or query-bearing secret path returns empty 404 before JSON parsing;
+- production `/mcp` rejects a wrong or missing `X-Codex-Bridge-Token`, an unknown client credential, and a query-bearing route with an empty 404 before JSON parsing; the compatibility fixture separately covers wrong and percent-encoded path secrets;
 - oversized target, headers, fixed/chunked body, concurrent requests, and sessions hit their exact limits;
 - bad Host/Origin, Accept, Content-Type, protocol version, and session headers are rejected;
 - SSE writes respect channel backpressure; client disconnect releases the connection/writer while a resumable session remains only until its configured expiry;
-- logs and support data contain no path secret, session ID, body, authorization value, project root, or file content.
+- logs and support data contain no path/header secret, session ID, body, authorization value, project root, or file content.
 
 ### 8.3 MCP Inspector
 
-`Scripts/verify-mcp-inspector.sh` runs the official MCP Inspector CLI pinned to `2.1.0` against a fixture endpoint with an ephemeral 256-bit path secret. It verifies initialization negotiation, the five tools and their annotations/schemas, a successful call, a structured `isError` result with text parity, and a fresh independent connection. The command requires Node 22.19.0 or newer.
+`Scripts/verify-mcp-inspector.sh` runs the official MCP Inspector CLI pinned to `2.1.0` against a compatibility fixture endpoint with an ephemeral 256-bit path secret. It verifies initialization negotiation, the current 14-tool read-only catalog and its annotations/schemas, a successful call, a structured `isError` result with text parity, and a fresh independent connection. Separate Service/host tests cover the production `/mcp` header-authentication profiles. The command requires Node 22.19.0 or newer.
 
 Inspector 2.1.0 writes the complete tool result to stdout, emits a `tool_is_error` diagnostic to stderr, and exits with status 5 when a tool returns `isError: true`; the gate checks all three surfaces. The CLI is a one-shot client and exposes no deterministic MCP request-cancellation or same-session reconnect command. Separate real-loopback pinned-SDK/NIO tests prove that cancellation reaches the running query and that GET SSE resumes the same session with `Last-Event-ID`; a second CLI call proves only that a fresh connection succeeds.
 
-Never invoke an unpinned `latest` Inspector in a release gate, and never expose the production Keychain path secret in shell history; the fixture must generate a test-only secret for every run.
+Never invoke an unpinned `latest` Inspector in a release gate, and never expose any production Keychain credential in shell history; the fixture must generate a test-only secret for every run.
 
 ### 8.4 Official conformance
 

@@ -35,7 +35,7 @@ Scripts/build-release-candidate.sh \
 
 The generated files use the product version in their names and include a `RELEASE-CANDIDATE.txt` warning. v0.3.0 上传 Release 时只上传 DMG、ZIP、SBOM 和 `SHA256SUMS`；警告文件不作为下载资产上传。
 
-OpenCode is a user-installed external runtime. The App does not bundle it; the release only contains the `BridgeOpenCodeACP` adapter and the registration/probe UI.
+OpenCode、DeepSeek Harness 与 Antigravity 都是用户自行安装或构建并明确登记的外部运行时，发布包不包含它们。App 只包含对应适配器、登记/Probe UI，以及 DSH 所需的受验证 `cordis.yml` 模板；不包含或读取 Provider 凭据与 DSH `.env`。
 
 ## 3. Optional Developer ID signing (not used for v0.3.0)
 
@@ -57,12 +57,12 @@ The Xcode helper build phase performs steps 1–2 when a real expanded signing i
 Submit only a signed artifact using a release-owned `notarytool` Keychain profile. After success, staple the App or DMG and verify:
 
 ```bash
-xcrun notarytool submit CodexBridge-0.3.0-macos.dmg \
+xcrun notarytool submit CodexBridge-0.3.0-macos-arm64.dmg \
   --keychain-profile PROFILE_NAME --wait
-xcrun stapler staple CodexBridge-0.3.0-macos.dmg
-xcrun stapler validate CodexBridge-0.3.0-macos.dmg
+xcrun stapler staple CodexBridge-0.3.0-macos-arm64.dmg
+xcrun stapler validate CodexBridge-0.3.0-macos-arm64.dmg
 spctl --assess --type open --context context:primary-signature --verbose=2 \
-  CodexBridge-0.3.0-macos.dmg
+  CodexBridge-0.3.0-macos-arm64.dmg
 ```
 
 Recompute published checksums after stapling. Save notary output, `codesign` verification, `spctl` results, SBOM and checksums with the release record.
