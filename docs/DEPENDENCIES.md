@@ -45,13 +45,13 @@ Release packaging must:
 1. download only the pinned archives and validate the official hashes;
 2. combine both `tunnel-client` Mach-O files into a derived Universal 2 helper;
 3. keep both archive hashes, thin-binary hashes, the pinned LICENSE hash and the unsigned Universal 2 hash (`1f1d76a01673bd2037178c8e9c8829a6bf18ed7b3260c6fa373bf1aa66e9e371`) in the supply record;
-4. sign the helper explicitly before the main App with Developer ID and Hardened Runtime, then recompute its post-sign SHA-256 into an App-signature-covered resource used by `TunnelConfiguration`;
-5. notarize and run Gatekeeper verification on the final App;
+4. for an unsigned preview package, ad-hoc sign the selected architecture slice and recompute its post-sign SHA-256 into an App resource used by `TunnelConfiguration`;
+5. for a Developer ID release, sign the helper explicitly before the main App with the same identity and Hardened Runtime, then notarize and run Gatekeeper verification on the final App;
 6. retain all required LICENSE/NOTICE texts.
 
 `verify-tunnel-helper.sh` requires the trusted unsigned hash as a separate argument and performs static checks without executing its input; the manifest cannot self-attest. On Apple Silicon, `test-tunnel-helper-config.sh` separately pins both the official arm64 archive hash and its embedded linker-signed helper hash, then executes that exact image through the production suspended-process/CDHash boundary to prove official `doctor` accepts the non-secret `/mcp` URL plus fd-backed static header. These are pre-sign supply/compatibility gates, not substitutes for the final Developer ID signature and post-sign runtime hash.
 
-Do not publish either thin release executable unchanged: the arm64 file is ad-hoc linker-signed with no Team Identifier and the final App requires a same-Team signed Universal 2 helper. The v0.0.10 platform archives contain only `tunnel-client`; no adjacent `cloudflared` binary is bundled.
+Do not publish either upstream thin executable unchanged. The release pipeline first verifies the Universal 2 supply artifact, extracts the matching package architecture, signs that staged helper according to the selected release mode, and records its final digest. The v0.0.10 platform archives contain only `tunnel-client`; no adjacent `cloudflared` binary is bundled.
 
 ## Component Decision Register note
 
