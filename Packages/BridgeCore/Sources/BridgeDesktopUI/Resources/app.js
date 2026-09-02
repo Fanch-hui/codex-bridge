@@ -197,4 +197,5 @@
     });
   }
   setIcons(document);
+  emit("ready");
 }());

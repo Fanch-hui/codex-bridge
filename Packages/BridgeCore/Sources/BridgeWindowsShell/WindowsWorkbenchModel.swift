@@ -6,6 +6,31 @@
 
   /// Value snapshot the Win32 message-loop thread renders. Updated only by the
   /// model on the main actor; consumed through `WorkbenchDisplayBox`.
+  public struct WindowsRecentTaskPresentation: Equatable, Sendable {
+    public let taskID: String
+    public let title: String
+    public let projectName: String
+    public let source: String
+    public let status: String
+    public let updatedAt: String
+
+    public init(
+      taskID: String,
+      title: String,
+      projectName: String,
+      source: String,
+      status: String,
+      updatedAt: String
+    ) {
+      self.taskID = taskID
+      self.title = title
+      self.projectName = projectName
+      self.source = source
+      self.status = status
+      self.updatedAt = updatedAt
+    }
+  }
+
   public struct WindowsWorkbenchDisplay: Equatable, Sendable {
     public enum ConnectionState: Equatable, Sendable {
       case idle
@@ -16,6 +41,7 @@
 
     public var connectionState: ConnectionState
     public var mcpAddress: String
+    public var mcpState: String
     public var taskCount: Int
     public var runningTaskCount: Int
     public var pendingApprovalCount: Int
@@ -25,6 +51,7 @@
     public var selectedPermissionIndex: Int?
     public var taskRows: [String]
     public var recentTaskRows: [String]
+    public var recentTasks: [WindowsRecentTaskPresentation] = []
     public var selectedTaskID: String?
     public var selectedTaskIndex: Int?
     public var taskMetadata: String
@@ -51,6 +78,7 @@
     private var value = WindowsWorkbenchDisplay(
       connectionState: .idle,
       mcpAddress: "—",
+      mcpState: "未知",
       taskCount: 0,
       runningTaskCount: 0,
       pendingApprovalCount: 0,
@@ -60,6 +88,7 @@
       selectedPermissionIndex: 1,
       taskRows: [],
       recentTaskRows: [],
+      recentTasks: [],
       selectedTaskID: nil,
       selectedTaskIndex: nil,
       taskMetadata: "未选择任务",

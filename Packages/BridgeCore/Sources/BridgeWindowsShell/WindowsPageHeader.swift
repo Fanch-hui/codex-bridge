@@ -48,6 +48,12 @@
       WindowsUIFoundation.setText(subtitle, statusDetail ?? page.subtitle)
     }
 
+    static func setVisible(_ visible: Bool) {
+      for control in [title, subtitle, refreshButton] {
+        _ = ShowWindow(control, visible ? SW_SHOW : SW_HIDE)
+      }
+    }
+
     static func layout(in bounds: RECT) -> RECT {
       let padding = Int32(24)
       let width = bounds.right - bounds.left

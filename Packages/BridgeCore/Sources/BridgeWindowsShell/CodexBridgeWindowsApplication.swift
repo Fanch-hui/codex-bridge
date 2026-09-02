@@ -16,7 +16,11 @@
       let management = WindowsManagementModel(client: model.client)
       let auxiliary = WindowsAuxiliaryRuntime(client: model.client)
       let ui = WindowsUIThread.shared
-      guard ui.start(), let chat = ui.chatWebView() else { return }
+      guard
+        ui.start(),
+        let chat = ui.chatWebView(),
+        let desktopUI = ui.desktopUIWebView()
+      else { return }
 
       // Startup path per platform contract: launch the service when the pipe
       // is not connectable, then connect and load tasks.
@@ -29,7 +33,12 @@
         for command in WindowsMainWindow.takePendingCommands() {
           run(command, model: model, management: management, auxiliary: auxiliary)
         }
-        applyDisplay(model: model, management: management, chat: chat)
+        applyDisplay(
+          model: model,
+          management: management,
+          chat: chat,
+          desktopUI: desktopUI
+        )
         auxiliary.applyDisplay()
         try? await Task.sleep(nanoseconds: 10_000_000)
       }
@@ -78,6 +87,10 @@
         )
       case .openRecentTask(let index):
         model.selectTask(at: index)
+        selectedPage = .workbench
+        onUI { WindowsMainWindow.selectPage(.workbench) }
+      case .openTask(let id):
+        model.selectTask(id: id)
         selectedPage = .workbench
         onUI { WindowsMainWindow.selectPage(.workbench) }
       case .browserBack:

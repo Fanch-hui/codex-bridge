@@ -280,6 +280,11 @@ var macOSOnlyTargets: [Target] = []
       dependencies: ["BridgeDirectCommand"],
       path: "Tests/BridgeDirectCommandWindowsTests"
     ),
+    .testTarget(
+      name: "BridgeWindowsShellTests",
+      dependencies: ["BridgeDesktopUI", "BridgeWindowsShell"],
+      path: "Tests/BridgeWindowsShellTests"
+    ),
   ]
 #endif
 

@@ -10,6 +10,10 @@ final class BridgeDesktopUITests: XCTestCase {
     }
 
     XCTAssertTrue(try BridgeDesktopUIResources.read(.indexHTML).contains("Codex Bridge"))
+    let script = try BridgeDesktopUIResources.read(.appJS)
+    XCTAssertTrue(script.contains(#"emit("ready")"#))
+    XCTAssertTrue(script.contains("window.chrome.webview.addEventListener"))
+    XCTAssertFalse(script.contains("https://"))
   }
 
   func testStateRoundTripsThroughJSON() throws {

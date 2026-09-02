@@ -85,6 +85,12 @@
       _ = SendMessageW(list, UINT(LB_SETCURSEL), WPARAM(page.rawValue), 0)
     }
 
+    static func setVisible(_ visible: Bool) {
+      for control in [title, list, footer] {
+        _ = ShowWindow(control, visible ? SW_SHOW : SW_HIDE)
+      }
+    }
+
     static func update(
       state: WindowsWorkbenchDisplay.ConnectionState,
       taskCount: Int,

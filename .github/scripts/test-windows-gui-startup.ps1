@@ -34,6 +34,8 @@ public static class CodexBridgeGuiSmoke {
   private static extern int GetClassName(IntPtr window, System.Text.StringBuilder text, int count);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)]
   private static extern int GetWindowText(IntPtr window, System.Text.StringBuilder text, int count);
+  [DllImport("user32.dll")]
+  private static extern bool IsWindowVisible(IntPtr window);
   [DllImport("user32.dll", EntryPoint = "SendMessageW")]
   private static extern IntPtr SendMessage(
     IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
@@ -56,7 +58,7 @@ public static class CodexBridgeGuiSmoke {
     return IntPtr.Zero;
   }
 
-  public static bool HasMacNavigation(IntPtr parent) {
+  public static bool HasHiddenLegacyNavigation(IntPtr parent) {
     string[] expected = { "概览", "工作台", "项目", "日志", "连接", "设置" };
     bool found = false;
     EnumChildWindows(parent, delegate(IntPtr child, IntPtr parameter) {
@@ -77,6 +79,7 @@ public static class CodexBridgeGuiSmoke {
           return true;
         }
       }
+      if (IsWindowVisible(child)) return true;
       found = true;
       return false;
     }, IntPtr.Zero);
@@ -135,17 +138,17 @@ function Wait-MainWindow([System.Diagnostics.Process]$Process, [int]$Seconds) {
   throw "Timed out waiting for the Codex Bridge main window."
 }
 
-function Wait-MacInterface([IntPtr]$Window, [int]$Seconds) {
+function Wait-SharedInterface([IntPtr]$Window, [int]$Seconds) {
   $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
   while ([DateTime]::UtcNow -lt $deadline) {
-    if ([CodexBridgeGuiSmoke]::HasMacNavigation($Window) -and
+    if ([CodexBridgeGuiSmoke]::HasHiddenLegacyNavigation($Window) -and
         [CodexBridgeGuiSmoke]::HasControlText($Window, "概览") -and
         [CodexBridgeGuiSmoke]::HasControlText($Window, "关键指标")) {
       return
     }
     Start-Sleep -Milliseconds 200
   }
-  throw "Windows application did not finish presenting the macOS-aligned Overview."
+  throw "Windows application did not replace the legacy Overview with the shared UI."
 }
 
 function Wait-WebView2Module([System.Diagnostics.Process]$Process, [int]$Seconds) {
@@ -216,10 +219,8 @@ if (@(Get-ExactProcess "codex-bridge-windows-app" $appPath).Count -ne 0 -or
 try {
   $app = Start-Process -FilePath $appPath -WorkingDirectory $portableFull -PassThru
   $mainWindow = Wait-MainWindow $app 30
-  Wait-MacInterface $mainWindow 30
-  if ($RequireWebView2) {
-    Wait-WebView2Module $app 30
-  }
+  Wait-WebView2Module $app 30
+  Wait-SharedInterface $mainWindow 30
   $service = Wait-ExactProcess "codex-bridge-service" $servicePath 30
   Wait-ServiceConnection $mainWindow $service 30
 

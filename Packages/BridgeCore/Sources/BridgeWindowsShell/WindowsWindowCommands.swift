@@ -9,6 +9,7 @@
     case selectSettingsSection(index: Int)
     case refreshCurrentPage
     case openRecentTask(index: Int)
+    case openTask(id: String)
     case browserBack
     case browserForward
     case browserReload

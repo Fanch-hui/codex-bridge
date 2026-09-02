@@ -90,12 +90,14 @@ try {
         "BridgeAgentCoreTests",
         "BridgeSecurityTests",
         "BridgeCodexRPCTests",
+        "BridgeDesktopUITests",
         "BridgeServiceAppCoreTests",
         "BridgeServiceHostWindowsTests",
         "BridgeCodexServiceWindowsTests",
         "BridgeServiceApplicationWindowsTests",
         "BridgeServiceCoreWindowsTests",
-        "BridgeDirectCommandWindowsTests")) {
+        "BridgeDirectCommandWindowsTests",
+        "BridgeWindowsShellTests")) {
       swift test @swiftArguments --filter $testFilter
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }

@@ -246,6 +246,7 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
 }
 
 public enum BridgeDesktopCommand: String, Codable, Sendable {
+  case ready
   case refresh
   case selectPage
   case openWorkbench

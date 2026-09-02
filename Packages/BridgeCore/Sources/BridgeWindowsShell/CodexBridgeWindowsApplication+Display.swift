@@ -6,27 +6,42 @@
     static func applyDisplay(
       model: WindowsWorkbenchModel,
       management: WindowsManagementModel,
-      chat: WindowsChatWebView
+      chat: WindowsChatWebView,
+      desktopUI: WindowsDesktopUIWebView
     ) {
       model.refreshDisplaySnapshot()
       management.refreshDisplaySnapshot()
       let display = model.displayBox.current()
       let managementDisplay = management.displayBox.current()
       WindowsUIThread.shared.enqueue {
-        applyOnUI(workbench: display, management: managementDisplay, chat: chat)
+        applyOnUI(
+          workbench: display,
+          management: managementDisplay,
+          chat: chat,
+          desktopUI: desktopUI
+        )
       }
     }
 
     private nonisolated static func applyOnUI(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
-      chat: WindowsChatWebView
+      chat: WindowsChatWebView,
+      desktopUI: WindowsDesktopUIWebView
     ) {
       WindowsMainWindow.updateNavigation(workbench: workbench, management: management)
       WindowsMainWindow.updateOverview(workbench: workbench, management: management)
       applyWorkbench(workbench)
       applyManagement(management)
       applyBrowser(chat)
+      desktopUI.setState(
+        WindowsDesktopUIStateBuilder.build(
+          workbench: workbench,
+          management: management,
+          selectedNavigation: WindowsMainWindow.currentPage().desktopNavigation
+        )
+      )
+      WindowsMainWindow.refreshSurfaceVisibility()
     }
 
     private nonisolated static func applyWorkbench(_ display: WindowsWorkbenchDisplay) {

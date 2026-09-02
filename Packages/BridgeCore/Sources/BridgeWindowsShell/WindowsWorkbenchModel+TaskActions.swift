@@ -13,7 +13,15 @@
 
     public func selectTask(at index: Int) {
       guard tasks.indices.contains(index) else { return }
-      let task = tasks[index]
+      selectTask(tasks[index])
+    }
+
+    public func selectTask(id: String) {
+      guard let task = tasks.first(where: { $0.taskID == id }) else { return }
+      selectTask(task)
+    }
+
+    private func selectTask(_ task: MCPServiceTaskSnapshot) {
       guard selectedTaskID != task.taskID else {
         publishDisplay()
         return

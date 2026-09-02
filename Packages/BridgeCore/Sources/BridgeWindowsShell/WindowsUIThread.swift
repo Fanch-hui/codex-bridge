@@ -16,6 +16,7 @@
     private var started = false
     private var creationSucceeded = false
     private var chat: WindowsChatWebView?
+    private var desktopUI: WindowsDesktopUIWebView?
 
     private init() {}
 
@@ -53,8 +54,17 @@
       lock.withLock { chat }
     }
 
+    func desktopUIWebView() -> WindowsDesktopUIWebView? {
+      lock.withLock { desktopUI }
+    }
+
     private func run() {
       let activeChat = WindowsChatWebView()
+      let activeDesktopUI = WindowsDesktopUIWebView { envelope in
+        guard let command = WindowsDesktopUICommandRouter.command(for: envelope) else { return }
+        WindowsMainWindow.enqueue(command)
+      }
+      WindowsMainWindow.desktopUI = activeDesktopUI
       guard let window = WindowsMainWindow.create() else {
         ready.signal()
         return
@@ -62,8 +72,10 @@
       WindowsMainWindow.chat = activeChat
       activeChat.attach(to: window)
       activeChat.setVisible(false)
+      activeDesktopUI.attach(to: window)
       lock.withLock {
         chat = activeChat
+        desktopUI = activeDesktopUI
         running = true
         creationSucceeded = true
       }
@@ -76,6 +88,7 @@
         drainActions()
       }
       drainActions()
+      activeDesktopUI.shutdown()
       activeChat.shutdown()
       WindowsApprovalWindow.shutdown()
       WindowsProjectManagementWindow.shutdown()
@@ -88,6 +101,7 @@
       lock.withLock {
         actions.removeAll(keepingCapacity: false)
         chat = nil
+        desktopUI = nil
         running = false
       }
     }

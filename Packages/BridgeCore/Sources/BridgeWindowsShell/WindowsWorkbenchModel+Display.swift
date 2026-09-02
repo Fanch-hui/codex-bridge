@@ -49,6 +49,7 @@
         WindowsWorkbenchDisplay(
           connectionState: connectionState,
           mcpAddress: serviceStatus?.localMCPURL ?? "—",
+          mcpState: serviceStatus?.status.mcpState ?? "未知",
           taskCount: tasks.count,
           runningTaskCount: runningCount,
           pendingApprovalCount: approvalItems.count,
@@ -61,6 +62,9 @@
             of: workbenchPermissionMode),
           taskRows: workbenchRows,
           recentTaskRows: tasks.map(Self.rowText),
+          recentTasks: tasks.map {
+            Self.recentTaskPresentation($0, projectName: projectName(for: $0.projectID))
+          },
           selectedTaskID: selectedTaskID,
           selectedTaskIndex: selectedIndex,
           taskMetadata: metadata(for: task),
@@ -121,6 +125,21 @@
 
     private static func threadRowText(_ thread: MCPThreadSummary) -> String {
       "Codex · \(thread.title ?? thread.preview ?? thread.threadID) — \(thread.status)"
+    }
+
+    private static func recentTaskPresentation(
+      _ task: MCPServiceTaskSnapshot,
+      projectName: String
+    ) -> WindowsRecentTaskPresentation {
+      let status = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
+      return WindowsRecentTaskPresentation(
+        taskID: task.taskID,
+        title: task.workbenchTitle,
+        projectName: projectName,
+        source: task.sourceDisplayName,
+        status: status,
+        updatedAt: task.updatedAt
+      )
     }
 
     private static func threadConversationText(_ page: MCPThreadReadPage) -> String {

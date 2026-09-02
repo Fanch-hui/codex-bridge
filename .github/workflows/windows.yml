@@ -247,6 +247,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeCodexRPCTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeDesktopUITests"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceAppCoreTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceHostWindowsTests"
@@ -258,6 +260,8 @@ jobs:
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceCoreWindowsTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeDirectCommandWindowsTests"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeWindowsShellTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install pinned Inno Setup 7.1.0
         shell: pwsh

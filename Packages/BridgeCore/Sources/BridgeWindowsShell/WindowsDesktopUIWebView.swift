@@ -12,6 +12,7 @@
     private var snapshot = Snapshot(state: .loading, errorDetail: nil)
     private var worker: WindowsWebViewThread?
     private var latestState: BridgeDesktopUIState?
+    private var isPageReady = false
 
     init(commandHandler: @escaping CommandHandler) {
       self.commandHandler = commandHandler
@@ -25,6 +26,10 @@
       lock.withLock { snapshot.errorDetail }
     }
 
+    var isReady: Bool {
+      lock.withLock { snapshot.state == .active && isPageReady }
+    }
+
     func attach(to window: HWND?) {
       guard let window, let url = BridgeDesktopUI.indexURL() else {
         store(state: .failed, errorDetail: "缺少随应用安装的 Desktop UI 资源。")
@@ -36,7 +41,6 @@
         profileName: "DesktopUI",
         updateState: { [weak self] state, detail in
           self?.store(state: state, errorDetail: detail)
-          if state == .active { self?.sendLatestState() }
         },
         onWebMessage: { [weak self] message in
           self?.receive(message)
@@ -61,8 +65,12 @@
     }
 
     func setState(_ state: BridgeDesktopUIState) {
-      lock.withLock { latestState = state }
-      sendLatestState()
+      let shouldSend = lock.withLock { () -> Bool in
+        guard latestState != state else { return false }
+        latestState = state
+        return isPageReady
+      }
+      if shouldSend { sendLatestState() }
     }
 
     func beginShutdown(notifying window: HWND, message: UINT) -> Bool {
@@ -92,13 +100,22 @@
         let data = message.data(using: .utf8),
         let envelope = try? JSONDecoder().decode(BridgeDesktopCommandEnvelope.self, from: data),
         envelope.version == BridgeDesktopCommandEnvelope.currentVersion,
-        !envelope.requestID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !envelope.requestID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        envelope.requestID.count <= 128
       else { return }
+      if envelope.command == .ready {
+        lock.withLock { isPageReady = true }
+        sendLatestState()
+        return
+      }
       commandHandler(envelope)
     }
 
     private func store(state: State, errorDetail: String?) {
-      lock.withLock { snapshot = Snapshot(state: state, errorDetail: errorDetail) }
+      lock.withLock {
+        snapshot = Snapshot(state: state, errorDetail: errorDetail)
+        if state != .active { isPageReady = false }
+      }
     }
 
     private struct Snapshot {

@@ -203,6 +203,28 @@ try {
   Assert-Directory $resourceCandidates[0].FullName | Out-Null
   Copy-Item -LiteralPath $resourceCandidates[0].FullName -Destination (Join-Path $outFull $resourceCandidates[0].Name) -Recurse -Force
 
+  $desktopUIResourceCandidates = @(Get-ChildItem -LiteralPath $binFull -Directory -Recurse |
+      Where-Object { $_.Name -in @("BridgeCore_BridgeDesktopUI.bundle", "BridgeCore_BridgeDesktopUI.resources") })
+  if ($desktopUIResourceCandidates.Count -ne 1) {
+    throw "Expected exactly one production BridgeDesktopUI resource directory."
+  }
+  $desktopUIResourceDirectory = $desktopUIResourceCandidates[0].FullName
+  Assert-Directory $desktopUIResourceDirectory | Out-Null
+  $desktopUIReparseItems = @(Get-ChildItem -LiteralPath $desktopUIResourceDirectory -Force -Recurse |
+      Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 })
+  if ($desktopUIReparseItems.Count -ne 0) {
+    throw "BridgeDesktopUI resources cannot contain reparse points."
+  }
+  foreach ($resourceName in @("index.html", "styles.css", "app.js")) {
+    Assert-RegularFile (Join-Path $desktopUIResourceDirectory $resourceName) | Out-Null
+  }
+  $stagedDesktopUIResourceDirectory = Join-Path $outFull $desktopUIResourceCandidates[0].Name
+  Copy-Item -LiteralPath $desktopUIResourceDirectory -Destination $stagedDesktopUIResourceDirectory -Recurse -Force
+  Assert-Directory $stagedDesktopUIResourceDirectory | Out-Null
+  foreach ($resourceName in @("index.html", "styles.css", "app.js")) {
+    Assert-RegularFile (Join-Path $stagedDesktopUIResourceDirectory $resourceName) | Out-Null
+  }
+
   $packagePath = Join-Path $temporaryRoot "webview2-package.zip"
   $packageUri = "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$webView2Version/microsoft.web.webview2.$webView2Version.nupkg"
   Invoke-WebRequest -UseBasicParsing -Uri $packageUri -OutFile $packagePath

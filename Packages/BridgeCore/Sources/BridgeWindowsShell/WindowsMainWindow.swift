@@ -17,14 +17,18 @@
     private static let standardResourceID = 32_512
     private static let timerID: UINT_PTR = 1
     private static let timerIntervalMs: UINT = 250
-    private static let webViewStoppedMessage = UINT(WM_APP + 40)
+    private static let chatWebViewStoppedMessage = UINT(WM_APP + 40)
+    private static let desktopWebViewStoppedMessage = UINT(WM_APP + 41)
 
     private static let commandLock = NSLock()
     nonisolated(unsafe) private static var pendingCommands: [MainWindowCommand] = []
-    nonisolated(unsafe) private static var selectedPage = WindowsMainPage.overview
-    nonisolated(unsafe) private static var chatBounds = RECT()
+    nonisolated(unsafe) static var selectedPage = WindowsMainPage.overview
+    nonisolated(unsafe) static var chatBounds = RECT()
     nonisolated(unsafe) private static var waitingForWebViewShutdown = false
+    nonisolated(unsafe) private static var pendingWebViewShutdownCount = 0
+    nonisolated(unsafe) static var sharedOverviewPresented = false
     nonisolated(unsafe) static var chat: WindowsChatWebView?
+    nonisolated(unsafe) static var desktopUI: WindowsDesktopUIWebView?
     nonisolated(unsafe) static var window: HWND?
 
     static func create() -> HWND? {
@@ -81,7 +85,12 @@
       WindowsBrowserToolbar.setVisible(page == .workbench)
       WindowsEmbeddedPages.select(page)
       chat?.setVisible(page == .workbench)
+      applySurfaceVisibility()
       layout()
+    }
+
+    static func refreshSurfaceVisibility() {
+      if applySurfaceVisibility() { layout() }
     }
 
     static func updateNavigation(
@@ -140,10 +149,6 @@
     ) -> LRESULT {
       switch message {
       case UINT(WM_COMMAND):
-        if WindowsMainWindowChrome.isExitCommand(wParam) {
-          requestClose(window)
-          return 0
-        }
         let command =
           WindowsNavigationSidebar.command(for: wParam)
           ?? WindowsPageHeader.command(for: wParam)
@@ -151,7 +156,6 @@
           ?? WindowsBrowserToolbar.command(for: wParam)
           ?? WindowsTaskInspector.command(for: wParam)
           ?? WindowsEmbeddedPageTabs.command(for: wParam)
-          ?? WindowsMainWindowChrome.command(for: wParam)
         if let command { enqueue(command) }
         return 0
       case UINT(WM_SIZE):
@@ -167,14 +171,21 @@
       case UINT(WM_CLOSE):
         requestClose(window)
         return 0
-      case webViewStoppedMessage:
+      case chatWebViewStoppedMessage:
         chat?.shutdown()
-        _ = DestroyWindow(window)
+        finishWebViewShutdown(window)
+        return 0
+      case desktopWebViewStoppedMessage:
+        desktopUI?.shutdown()
+        finishWebViewShutdown(window)
         return 0
       case UINT(WM_DESTROY):
         WindowsMainWindowChrome.removeTrayIcon()
         WindowsUIFoundation.shutdown()
         waitingForWebViewShutdown = false
+        pendingWebViewShutdownCount = 0
+        sharedOverviewPresented = false
+        desktopUI = nil
         Self.window = nil
         PostQuitMessage(0)
         return 0
@@ -185,57 +196,27 @@
 
     private static func requestClose(_ window: HWND?) {
       guard !waitingForWebViewShutdown else { return }
-      if let window, chat?.beginShutdown(notifying: window, message: webViewStoppedMessage) == true
+      guard let window else { return }
+      var shutdownCount = 0
+      if chat?.beginShutdown(notifying: window, message: chatWebViewStoppedMessage) == true {
+        shutdownCount += 1
+      }
+      if desktopUI?.beginShutdown(notifying: window, message: desktopWebViewStoppedMessage) == true
       {
+        shutdownCount += 1
+      }
+      if shutdownCount > 0 {
         waitingForWebViewShutdown = true
+        pendingWebViewShutdownCount = shutdownCount
         _ = EnableWindow(window, false)
         return
       }
       _ = DestroyWindow(window)
     }
 
-    private static func layout() {
-      var area = RECT()
-      guard GetClientRect(window, &area) else { return }
-      let navigationWidth = Int32(WindowLayout.navigationWidth)
-      WindowsNavigationSidebar.layout(height: area.bottom, width: navigationWidth)
-      let detailBounds = RECT(
-        left: navigationWidth,
-        top: area.top,
-        right: area.right,
-        bottom: area.bottom
-      )
-      let contentBounds = WindowsPageHeader.layout(in: detailBounds)
-      WindowsOverviewPane.layout(in: contentBounds)
-      if selectedPage == .workbench {
-        layoutWorkbench(in: contentBounds)
-      } else {
-        WindowsEmbeddedPages.layout(page: selectedPage, in: contentBounds)
-      }
-    }
-
-    private static func layoutWorkbench(in bounds: RECT) {
-      let width = bounds.right - bounds.left
-      let inspectorWidth = min(
-        Int32(WindowLayout.inspectorIdealWidth),
-        max(Int32(WindowLayout.inspectorMinimumWidth), width / 3)
-      )
-      let inspector = RECT(
-        left: bounds.right - inspectorWidth,
-        top: bounds.top,
-        right: bounds.right,
-        bottom: bounds.bottom
-      )
-      let browser = RECT(
-        left: bounds.left,
-        top: bounds.top,
-        right: inspector.left - 1,
-        bottom: bounds.bottom
-      )
-      chatBounds = WindowsBrowserToolbar.layout(in: browser)
-      WindowsTaskInspector.layoutChatPlaceholder(in: chatBounds)
-      WindowsTaskInspector.layoutInspector(in: inspector)
-      chat?.resize(to: chatBounds)
+    private static func finishWebViewShutdown(_ window: HWND?) {
+      pendingWebViewShutdownCount = max(0, pendingWebViewShutdownCount - 1)
+      if pendingWebViewShutdownCount == 0 { _ = DestroyWindow(window) }
     }
 
     private static func createWindow(instance: HINSTANCE?) -> HWND? {
