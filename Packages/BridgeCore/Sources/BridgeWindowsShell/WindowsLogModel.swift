@@ -143,24 +143,8 @@
     }
 
     private var filteredItems: [TaskLogPresentation.Item] {
-      let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-      let project =
-        selectedProjectIndex > 0 && projectNames.indices.contains(selectedProjectIndex - 1)
-        ? projectNames[selectedProjectIndex - 1]
-        : nil
-      let kind =
-        Self.kindRows.indices.contains(selectedKindIndex) && selectedKindIndex > 0
-        ? Self.kindRows[selectedKindIndex]
-        : nil
-      return items.filter { item in
-        if let project, !item.rowText.contains("· \(project) ·") { return false }
-        if let kind, !item.rowText.contains("· \(kind) ·") { return false }
-        if !query.isEmpty {
-          return item.rowText.lowercased().contains(query)
-            || item.detailText.lowercased().contains(query)
-        }
-        return true
-      }
+      let visibleIDs = Set(filteredDesktopRows.map(\.id))
+      return items.filter { visibleIDs.contains($0.id) }
     }
 
     private var filteredDesktopRows: [BridgeDesktopLogRow] {
@@ -190,8 +174,7 @@
       switch selectedKindIndex {
       case 1: "command"
       case 2: "file"
-      case 3: "error"
-      case 4: "event"
+      case 3: "other"
       default: "all"
       }
     }
@@ -210,7 +193,7 @@
             projectID: task.projectID,
             projectName: projectNames[task.projectID] ?? task.projectID,
             kind: category,
-            kindLabel: kindLabel(category),
+            kindLabel: kindLabel(category, rawKind: event.kind, summary: event.summary),
             summary: event.summary,
             timestamp: event.occurredAt
           )
@@ -219,28 +202,36 @@
     }
 
     private static func category(kind: String, summary: String) -> String {
-      let value = "\(kind) \(summary)".lowercased()
-      if value.contains("command") || value.contains("exec") || value.contains("run") {
-        return "command"
-      }
-      if value.contains("file") || value.contains("edit") || value.contains("write") {
+      let rawKind = kind.lowercased()
+      let detail = summary.lowercased()
+      if rawKind.contains("file") || detail.contains("file") || detail.contains("edit")
+        || detail.contains("write")
+      {
         return "file"
       }
-      if value.contains("failed") || value.contains("error") {
-        return "error"
+      if rawKind.contains("command") || detail.contains("command") || detail.contains("exec")
+        || detail.contains("run")
+      {
+        return "command"
       }
-      return "event"
+      return "other"
     }
 
-    private static func kindLabel(_ kind: String) -> String {
+    private static func kindLabel(
+      _ kind: String,
+      rawKind: String,
+      summary: String
+    ) -> String {
       switch kind {
       case "command": "命令"
       case "file": "文件"
-      case "error": "错误"
-      default: "事件"
+      default:
+        "\(rawKind) \(summary)".lowercased().contains("error")
+          || "\(rawKind) \(summary)".lowercased().contains("failed")
+          ? "错误" : "事件"
       }
     }
 
-    private static let kindRows = ["全部类型", "命令", "文件", "错误", "事件"]
+    private static let kindRows = ["全部类型", "命令", "文件", "其他"]
   }
 #endif

@@ -66,7 +66,7 @@
     element.type = "button";
     element.appendChild(S.node("span", "mono muted", "#" + row.sequence));
     element.appendChild(S.node("span", "row-detail", row.projectName));
-    element.appendChild(S.badge(row.kindLabel || row.kind, row.kind === "error" ? "error" : "neutral"));
+    element.appendChild(S.badge(row.kindLabel || row.kind, row.kindLabel === "错误" ? "error" : "neutral"));
     element.appendChild(S.node("span", "log-summary mono", row.summary));
     element.appendChild(S.node("span", "log-time mono muted", row.timestamp));
     element.addEventListener("click", function () { emit("selectLog", { logID: row.id, taskID: row.taskID }); });

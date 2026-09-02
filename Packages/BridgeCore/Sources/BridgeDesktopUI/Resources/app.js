@@ -220,7 +220,12 @@
     if (!action) return;
     if (action.dataset.action === "refresh") emit("refresh");
     if (action.dataset.action === "select-page") emit("selectPage", { navigation: action.dataset.page });
-    if (action.dataset.action === "toggle-sidebar") document.getElementById("app-shell").classList.toggle("sidebar-collapsed");
+    if (action.dataset.action === "toggle-sidebar") {
+      document.getElementById("app-shell").classList.toggle("sidebar-collapsed");
+      if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) {
+        window.requestAnimationFrame(function () { window.CodexBridgeDesktopPages.measureBrowserViewport(emit); });
+      }
+    }
   });
   window.addEventListener("resize", function () {
     if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) window.CodexBridgeDesktopPages.measureBrowserViewport(emit);

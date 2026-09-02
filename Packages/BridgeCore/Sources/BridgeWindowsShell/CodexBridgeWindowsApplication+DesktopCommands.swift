@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeIPC
+  import BridgeMCP
   import BridgeServiceAppCore
 
   extension CodexBridgeWindowsApplication {
@@ -10,7 +11,8 @@
       auxiliary: WindowsAuxiliaryRuntime
     ) -> Bool {
       switch command {
-      case .setBrowserEnabled:
+      case .setBrowserEnabled(let enabled):
+        model.setChatBrowserEnabled(enabled)
         return true
       case .loadEarlierConversation(let taskID):
         guard model.selectedTaskID == taskID else { return true }
@@ -48,8 +50,9 @@
         Task { @MainActor in await model.deleteSelectedTask() }
         return true
       case .steerTask(let taskID, let input, let mode):
-        guard model.selectedTaskID == taskID, mode == "queued" else { return true }
-        Task { @MainActor in _ = await model.submitSteer(input: input) }
+        guard model.selectedTaskID == taskID, let steerMode = MCPTaskSteerMode(rawValue: mode)
+        else { return true }
+        Task { @MainActor in _ = await model.submitSteer(input: input, mode: steerMode) }
         return true
       case .resolveTaskApproval(let approvalID, let taskID, let decision):
         return resolveTaskApproval(
@@ -90,7 +93,7 @@
         auxiliary.logs.setProjectFilter(index)
         return true
       case .setLogKindFilter(let kind):
-        guard let index = ["all", "command", "file", "error", "event"].firstIndex(of: kind) else {
+        guard let index = ["all", "command", "file", "other"].firstIndex(of: kind) else {
           return true
         }
         auxiliary.logs.setKindFilter(index)

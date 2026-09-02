@@ -27,8 +27,7 @@
       choice("all", "全部类型"),
       choice("command", "命令"),
       choice("file", "文件"),
-      choice("error", "错误"),
-      choice("event", "事件"),
+      choice("other", "其他"),
     ]
   }
 #endif

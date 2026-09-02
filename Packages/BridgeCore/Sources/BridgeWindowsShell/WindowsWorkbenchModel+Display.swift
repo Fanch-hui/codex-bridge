@@ -123,9 +123,18 @@
           detailText: errorMessage,
           taskItems: taskItems,
           selectedTaskDetail: selectedTaskDetail,
-          approvalItems: typedApprovals
+          approvalItems: typedApprovals,
+          browserEnabled: isChatBrowserEnabled,
+          supportsImmediateSteer: task?.installationID.flatMap { installationID in
+            agentInstallations.first(where: { $0.installationID == installationID })
+          }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
         )
       )
+    }
+
+    func setChatBrowserEnabled(_ enabled: Bool) {
+      isChatBrowserEnabled = enabled
+      publishDisplay()
     }
 
     func providerSupportsSteer(for task: MCPServiceTaskSnapshot?) -> Bool {

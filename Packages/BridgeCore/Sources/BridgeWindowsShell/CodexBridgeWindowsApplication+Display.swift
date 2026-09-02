@@ -37,7 +37,7 @@
       WindowsMainWindow.updateOverview(workbench: workbench, management: management)
       applyWorkbench(workbench)
       applyManagement(management)
-      applyBrowser(chat)
+      applyBrowser(chat, workbench: workbench)
       desktopUI.setState(
         WindowsDesktopUIStateBuilder.build(
           workbench: workbench,
@@ -47,7 +47,8 @@
           connections: auxiliary.connections,
           settings: auxiliary.settings,
           agentDefaults: auxiliary.agentDefaults,
-          selectedNavigation: WindowsMainWindow.currentPage().desktopNavigation
+          selectedNavigation: WindowsMainWindow.currentPage().desktopNavigation,
+          browserAvailable: chat.state == .active
         )
       )
       WindowsMainWindow.refreshSurfaceVisibility()
@@ -113,7 +114,10 @@
       lastAppliedManagementDisplay = display
     }
 
-    private nonisolated static func applyBrowser(_ chat: WindowsChatWebView) {
+    private nonisolated static func applyBrowser(
+      _ chat: WindowsChatWebView,
+      workbench: WindowsWorkbenchDisplay
+    ) {
       let placeholder: String?
       switch chat.state {
       case .unsupported:
@@ -126,7 +130,13 @@
         placeholder = nil
       }
       WindowsBrowserToolbar.setBrowserActionsEnabled(chat.state == .active)
-      chat.setVisible(chat.state == .active && WindowsMainWindow.currentPage() == .workbench)
+      if !WindowsMainWindow.sharedDesktopPresented {
+        chat.setVisible(
+          chat.state == .active && workbench.browserEnabled
+            && WindowsMainWindow.currentPage() == .workbench)
+      } else if !workbench.browserEnabled {
+        chat.setVisible(false)
+      }
       if placeholder != lastPlaceholderText {
         WindowsMainWindow.setChatPlaceholder(placeholder)
         lastPlaceholderText = placeholder

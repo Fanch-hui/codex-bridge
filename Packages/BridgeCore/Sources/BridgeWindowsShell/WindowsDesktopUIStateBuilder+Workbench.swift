@@ -4,7 +4,8 @@
   extension WindowsDesktopUIStateBuilder {
     static func workbenchPage(
       _ display: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay
+      management: WindowsManagementDisplay,
+      browserAvailable: Bool
     ) -> BridgeDesktopWorkbenchState {
       let projects = management.project.projectItems.map {
         choice($0.projectID, $0.name, detail: $0.detail)
@@ -30,24 +31,35 @@
         selectedTaskID: display.selectedTaskID,
         selectedTask: display.selectedTaskDetail,
         approvals: display.approvalItems,
-        steerModes: [choice("queued", "当前轮结束后继续")],
-        browser: browserSlot(for: display)
+        steerModes: steerModes(for: display),
+        browser: browserSlot(for: display, available: browserAvailable)
       )
     }
 
-    private static func browserSlot(
+    private static func steerModes(
       for display: WindowsWorkbenchDisplay
+    ) -> [BridgeDesktopChoice] {
+      var modes = [choice("queued", "当前轮结束后继续")]
+      if display.supportsImmediateSteer {
+        modes.append(choice("interrupt-current-then-continue", "中断当前轮并继续"))
+      }
+      return modes
+    }
+
+    private static func browserSlot(
+      for display: WindowsWorkbenchDisplay,
+      available: Bool
     ) -> BridgeDesktopBrowserSlot {
-      let available = display.connectionState == .connected
+      let enabled = available && display.browserEnabled
       return BridgeDesktopBrowserSlot(
         visible: true,
-        enabled: available,
-        status: available ? "由宿主加载真实 ChatGPT 工作区" : "等待本机 Service 与浏览器状态",
-        canToggle: false,
+        enabled: enabled,
+        status: available ? "由宿主加载真实 ChatGPT 工作区" : "内置 WebView2 浏览器不可用",
+        canToggle: available,
         canOpenExternally: true,
-        canGoBack: available,
-        canGoForward: available,
-        canReload: available,
+        canGoBack: enabled,
+        canGoForward: enabled,
+        canReload: enabled,
         canLoadEarlierConversation: display.selectedTaskDetail != nil
       )
     }

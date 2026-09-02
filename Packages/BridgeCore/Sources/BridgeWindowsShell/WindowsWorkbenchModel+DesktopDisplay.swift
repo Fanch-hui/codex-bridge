@@ -142,9 +142,19 @@
     }
 
     private static func desktopStatusLabel(_ task: MCPServiceTaskSnapshot) -> String {
-      if task.isRunning { return "运行中" }
-      if task.isTerminal { return "已结束" }
-      return task.status
+      switch task.status {
+      case "awaiting_local_approval": return "等待本机批准"
+      case "starting": return "正在启动"
+      case "running": return "运行中"
+      case "waiting_for_codex_approval": return "等待 Codex 审批"
+      case "completed": return "已完成"
+      case "failed": return "失败"
+      case "interrupted": return "已中断"
+      default:
+        if task.isRunning { return "运行中" }
+        if task.isTerminal { return "已结束" }
+        return task.status
+      }
     }
   }
 #endif

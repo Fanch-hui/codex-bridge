@@ -47,7 +47,13 @@
     var state = S.node("div", "inline-status");
     state.appendChild(S.badge(page.localMCPState, page.localMCPState === "ready" ? "success" : "neutral"));
     if (page.canCopyLocalMCPURL) state.appendChild(S.button("复制 Endpoint", "copyLocalMCPEndpoint", {}, emit, "small", false));
-    if (page.canRotateLocalMCPEndpoint) state.appendChild(S.button("重新生成 Endpoint", "rotateLocalMCPEndpoint", {}, emit, "small danger", false));
+    if (page.canRotateLocalMCPEndpoint) {
+      var rotateEndpoint = S.button("重新生成 Endpoint", null, {}, emit, "small danger", false);
+      rotateEndpoint.addEventListener("click", function () {
+        if (global.confirm("重新生成本地 MCP Endpoint？现有客户端地址将立即失效。")) emit("rotateLocalMCPEndpoint", {});
+      });
+      state.appendChild(rotateEndpoint);
+    }
     card.appendChild(state);
     section.appendChild(card);
   }
@@ -125,7 +131,13 @@
       }, "");
       controls.appendChild(exposure.control);
       if (client.canCopyConfiguration) controls.appendChild(S.button("复制 JSON", "copyMCPClientConfiguration", { clientID: client.clientID }, emit, "small", !client.enabled));
-      if (client.canRotateCredential) controls.appendChild(S.button("重新生成凭证", "rotateMCPClientCredential", { clientID: client.clientID }, emit, "small danger", !client.enabled));
+      if (client.canRotateCredential) {
+        var rotateCredential = S.button("重新生成凭证", null, {}, emit, "small danger", !client.enabled);
+        rotateCredential.addEventListener("click", function () {
+          if (global.confirm("重新生成这个 MCP 客户端的凭证？现有配置将立即失效。")) emit("rotateMCPClientCredential", { clientID: client.clientID });
+        });
+        controls.appendChild(rotateCredential);
+      }
       row.appendChild(controls);
       card.appendChild(row);
     });

@@ -74,6 +74,8 @@
     public var taskItems: [BridgeDesktopTaskRow] = []
     public var selectedTaskDetail: BridgeDesktopTaskDetail?
     public var approvalItems: [BridgeDesktopApprovalRow] = []
+    public var browserEnabled: Bool = true
+    public var supportsImmediateSteer: Bool = false
   }
 
   /// Lock-guarded bridge between main-actor model updates and the
@@ -140,12 +142,14 @@
     var serviceStatus: IPCServiceStatusResponse?
     var projects: [MCPProjectSummary] = []
     var agentProviders: [IPCAgentProviderSummary] = []
+    var agentInstallations: [IPCAgentInstallationSummary] = []
     var tasks: [MCPServiceTaskSnapshot] = []
     var threads: [MCPThreadSummary] = []
     var selectedProjectID: String?
     var selectedThreadID: String?
     var selectedThreadPage: MCPThreadReadPage?
     var workbenchPermissionMode = "workspace-write"
+    var isChatBrowserEnabled = true
     var selectedTaskID: String?
     var conversation: TaskConversationModel?
     var conversationWasTerminal = false
@@ -186,7 +190,13 @@
         let status = try await client.status()
         serviceStatus = status
         projects = (try? await client.projects()) ?? projects
-        agentProviders = (try? await client.agentCatalog())?.providers ?? []
+        if let catalog = try? await client.agentCatalog() {
+          agentProviders = catalog.providers
+          agentInstallations = catalog.installations
+        } else {
+          agentProviders = []
+          agentInstallations = []
+        }
         selectedProjectID =
           projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID
           ?? selectedProjectID

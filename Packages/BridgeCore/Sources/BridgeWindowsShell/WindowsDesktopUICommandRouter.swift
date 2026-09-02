@@ -32,7 +32,7 @@
       case .openBrowserExternally:
         return .openChatExternally
       case .setBrowserEnabled:
-        return nil
+        return payload.enabled.map(MainWindowCommand.setBrowserEnabled)
       case .loadEarlierConversation:
         return nonEmpty(payload.taskID).map(MainWindowCommand.loadEarlierConversation)
       case .refreshConversation:
@@ -51,7 +51,8 @@
         return nonEmpty(payload.taskID).map(MainWindowCommand.deleteTask)
       case .steerTask:
         guard let taskID = nonEmpty(payload.taskID), let input = payload.input,
-          let mode = nonEmpty(payload.mode), mode == "queued"
+          let mode = nonEmpty(payload.mode),
+          ["queued", "interrupt-current-then-continue"].contains(mode)
         else { return nil }
         return .steerTask(id: taskID, input: input, mode: mode)
       case .resolveApproval:
@@ -133,7 +134,7 @@
         return .setLogProjectFilter(projectID: optionalValue(payload.projectID))
       case .setLogKindFilter:
         guard let kind = nonEmpty(payload.kind),
-          ["all", "command", "file", "error", "event"].contains(kind)
+          ["all", "command", "file", "other"].contains(kind)
         else { return nil }
         return .setLogKindFilter(kind: kind)
       case .copyLogs:

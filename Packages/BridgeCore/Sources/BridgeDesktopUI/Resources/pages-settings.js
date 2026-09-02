@@ -42,6 +42,7 @@
     var grid = S.node("div", "form-grid");
     var executionModel = modelSelect("执行模型", page.executionModel, page.models);
     var executionEffort = S.selectField("执行推理强度", page.executionEffort, S.choices(page.executionEffort, page.effortOptions), function () {}, "");
+    bindModelEffort(executionModel, executionEffort, page.models, false);
     var access = S.selectField("访问模式", page.accessMode, S.choices(page.accessMode, page.accessOptions), function () {}, "");
     grid.appendChild(executionModel.wrapper);
     grid.appendChild(executionEffort.wrapper);
@@ -65,6 +66,7 @@
     var grid = S.node("div", "form-grid");
     var model = modelSelect("Supervisor 模型", page.supervisorModel, page.models);
     var effort = S.selectField("Supervisor 推理强度", page.supervisorEffort, S.choices(page.supervisorEffort, page.supervisorEffortOptions.length ? page.supervisorEffortOptions : page.effortOptions), function () {}, "");
+    bindModelEffort(model, effort, page.models, false);
     var enabled = check("启用 Supervisor", page.supervisorEnabled);
     grid.appendChild(model.wrapper);
     grid.appendChild(effort.wrapper);
@@ -143,6 +145,7 @@
     var models = item.modelOptions.map(function (model) { return { id: model.modelID, title: model.displayName }; });
     var model = S.selectField("默认模型", item.model || "", S.choices(item.model || "", models, "Provider 默认"), function () {}, "");
     var effort = S.selectField("推理强度", item.effort || "", S.choices(item.effort || "", item.effortOptions, "Provider 默认"), function () {}, "");
+    bindModelEffort(model, effort, item.modelOptions, true);
     var permission = S.selectField("访问权限", item.permissionMode, S.choices(item.permissionMode, item.permissionOptions), function () {}, "");
     grid.appendChild(model.wrapper);
     grid.appendChild(effort.wrapper);
@@ -193,6 +196,26 @@
   function modelSelect(label, value, models) {
     var choices = S.safeArray(models).map(function (model) { return { id: model.modelID, title: model.displayName }; });
     return S.selectField(label, value, S.choices(value, choices), function () {}, "");
+  }
+
+  function bindModelEffort(modelField, effortField, models, includeDefault) {
+    modelField.control.addEventListener("change", function () {
+      var selected = S.safeArray(models).find(function (item) { return item.modelID === modelField.control.value; });
+      if (!selected || !selected.reasoningEfforts || selected.reasoningEfforts.length === 0) return;
+      var current = effortField.control.value;
+      S.clear(effortField.control);
+      var choices = selected.reasoningEfforts.slice();
+      if (includeDefault) choices.unshift({ id: "", title: "Provider 默认" });
+      choices.forEach(function (item) {
+        var option = S.node("option");
+        option.value = item.id;
+        option.textContent = item.title;
+        option.disabled = item.enabled === false;
+        effortField.control.appendChild(option);
+      });
+      var keepsCurrent = choices.some(function (item) { return item.id === current && item.enabled !== false; });
+      effortField.control.value = keepsCurrent ? current : choices[0].id;
+    });
   }
 
   function check(label, value) {

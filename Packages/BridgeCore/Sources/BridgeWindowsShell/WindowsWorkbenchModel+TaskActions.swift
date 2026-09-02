@@ -130,7 +130,10 @@
       }
     }
 
-    public func submitSteer(input: String) async -> Bool {
+    public func submitSteer(
+      input: String,
+      mode: MCPTaskSteerMode = .queued
+    ) async -> Bool {
       guard connectionState == .connected else {
         setActionText("后台 Service 未连接，无法发送 Steer。")
         return false
@@ -148,6 +151,16 @@
         setActionText("当前任务不支持 Steer。")
         return false
       }
+      if mode == .interruptCurrentThenContinue {
+        let supportsImmediate =
+          task.installationID.flatMap { installationID in
+            agentInstallations.first(where: { $0.installationID == installationID })
+          }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
+        guard supportsImmediate else {
+          setActionText("当前 Agent 不支持立即 Steer。")
+          return false
+        }
+      }
       guard let validationMessage = TaskInspectorPresentation.steerValidationMessage(input)
       else {
         actionText = "正在发送 Steer…"
@@ -162,7 +175,7 @@
             taskID: requestTaskID,
             expectedTurnID: expectedTurnID,
             input: input,
-            mode: .queued
+            mode: mode
           )
           await refreshTasks()
           guard shouldApplyActionResult(for: requestTaskID) else { return false }

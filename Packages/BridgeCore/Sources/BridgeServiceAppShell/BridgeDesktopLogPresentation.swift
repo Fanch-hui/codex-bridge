@@ -17,7 +17,7 @@ enum BridgeDesktopLogPresentation {
     return model.tasks
       .flatMap { task in
         task.recentEvents.compactMap { event in
-          let category = category(for: event.kind)
+          let category = category(for: event.kind, summary: event.summary)
           guard
             matches(
               task: task,
@@ -36,7 +36,7 @@ enum BridgeDesktopLogPresentation {
             projectID: task.projectID,
             projectName: model.projectName(for: task.projectID),
             kind: category,
-            kindLabel: label(for: category),
+            kindLabel: label(for: category, rawKind: event.kind, summary: event.summary),
             summary: event.summary,
             timestamp: event.occurredAt
           )
@@ -54,22 +54,29 @@ enum BridgeDesktopLogPresentation {
     }.joined(separator: "\n")
   }
 
-  static func category(for rawKind: String) -> String {
-    switch rawKind {
-    case "execution.command_completed":
-      return "command"
-    case "execution.file_changed":
+  static func category(for rawKind: String, summary: String = "") -> String {
+    let kind = rawKind.lowercased()
+    let detail = summary.lowercased()
+    if kind.contains("file") || detail.contains("file") || detail.contains("edit")
+      || detail.contains("write")
+    {
       return "file"
-    default:
-      return "other"
     }
+    if kind.contains("command") || detail.contains("command") || detail.contains("exec")
+      || detail.contains("run")
+    {
+      return "command"
+    }
+    return "other"
   }
 
-  static func label(for category: String) -> String {
+  static func label(for category: String, rawKind: String = "", summary: String = "") -> String {
     switch category {
     case "command": return "命令"
     case "file": return "文件"
-    default: return "其他"
+    default:
+      let value = "\(rawKind) \(summary)".lowercased()
+      return value.contains("failed") || value.contains("error") ? "错误" : "事件"
     }
   }
 

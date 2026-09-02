@@ -33,6 +33,7 @@ enum BridgeDesktopUIStateBuilder {
     let enabledAgents = model.agentInstallations.filter {
       $0.isEnabled && $0.availability == "available"
     }.count
+    let approvalCount = model.approvals.count + model.directApprovals.count
     let metrics = [
       BridgeDesktopMetric(
         id: "running-tasks",
@@ -46,10 +47,10 @@ enum BridgeDesktopUIStateBuilder {
       BridgeDesktopMetric(
         id: "pending-approvals",
         title: "待审批项",
-        value: String(model.approvals.count),
+        value: String(approvalCount),
         symbol: "shield.lefthalf.filled",
-        subtitle: model.approvals.isEmpty ? "无阻断事项" : "点击立即处理审批",
-        tone: model.approvals.isEmpty ? .neutral : .warning,
+        subtitle: approvalCount == 0 ? "无阻断事项" : "点击立即处理审批",
+        tone: approvalCount == 0 ? .neutral : .warning,
         destination: .workbench
       ),
       BridgeDesktopMetric(
@@ -212,12 +213,13 @@ enum BridgeDesktopUIStateBuilder {
         )
       )
     }
-    if !model.approvals.isEmpty {
+    let approvalCount = model.approvals.count + model.directApprovals.count
+    if approvalCount > 0 {
       result.append(
         BridgeDesktopNotice(
           id: "local-approvals",
           title: "待处理本机审批",
-          message: "当前有 \(model.approvals.count) 个远程任务或执行器操作等待你本机确认或拒绝。",
+          message: "当前有 \(approvalCount) 个远程任务或执行器操作等待你本机确认或拒绝。",
           symbol: "shield.lefthalf.filled",
           tone: .warning,
           destination: .workbench
@@ -233,7 +235,8 @@ enum BridgeDesktopUIStateBuilder {
   ) -> Int? {
     switch navigation {
     case .workbench:
-      if !model.approvals.isEmpty { return model.approvals.count }
+      let approvalCount = model.approvals.count + model.directApprovals.count
+      if approvalCount > 0 { return approvalCount }
       return model.runningTaskCount > 0 ? model.runningTaskCount : nil
     case .projects:
       return model.projects.isEmpty ? nil : model.projects.count

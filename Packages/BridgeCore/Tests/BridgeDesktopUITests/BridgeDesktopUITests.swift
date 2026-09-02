@@ -16,6 +16,8 @@ final class BridgeDesktopUITests: XCTestCase {
     let script = try BridgeDesktopUIResources.read(.appJS)
     XCTAssertTrue(script.contains(#"emit("ready")"#))
     XCTAssertTrue(script.contains("window.chrome.webview.addEventListener"))
+    XCTAssertTrue(script.contains("toggle-sidebar"))
+    XCTAssertTrue(script.contains("measureBrowserViewport"))
     XCTAssertFalse(script.contains("https://"))
     XCTAssertTrue(try BridgeDesktopUIResources.read(.pagesJS).contains("updateBrowserViewport"))
     let workbenchScript = try BridgeDesktopUIResources.read(.pagesWorkbenchJS)
@@ -27,9 +29,12 @@ final class BridgeDesktopUITests: XCTestCase {
     let connectionsScript = try BridgeDesktopUIResources.read(.pagesConnectionsJS)
     XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
     XCTAssertTrue(connectionsScript.contains("acceptReplacement: true"))
+    XCTAssertTrue(connectionsScript.contains("现有客户端地址将立即失效"))
+    XCTAssertTrue(connectionsScript.contains("现有配置将立即失效"))
     let settingsScript = try BridgeDesktopUIResources.read(.pagesSettingsJS)
     XCTAssertTrue(settingsScript.contains("settings-stack"))
     XCTAssertTrue(settingsScript.contains("TextEncoder"))
+    XCTAssertTrue(settingsScript.contains("bindModelEffort"))
   }
 
   func testStateRoundTripsThroughJSON() throws {

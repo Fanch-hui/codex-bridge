@@ -80,6 +80,34 @@
         command: .connectTunnel
       )
       XCTAssertNil(WindowsDesktopUICommandRouter.command(for: unsupportedTunnel))
+
+      let browser = BridgeDesktopCommandEnvelope(
+        requestID: "browser-1",
+        command: .setBrowserEnabled,
+        payload: .init(enabled: false)
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: browser),
+        .setBrowserEnabled(enabled: false)
+      )
+
+      let immediateSteer = BridgeDesktopCommandEnvelope(
+        requestID: "steer-1",
+        command: .steerTask,
+        payload: .init(
+          taskID: "task-42",
+          input: "修正方向",
+          mode: "interrupt-current-then-continue"
+        )
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: immediateSteer),
+        .steerTask(
+          id: "task-42",
+          input: "修正方向",
+          mode: "interrupt-current-then-continue"
+        )
+      )
     }
 
     private func makeWorkbench(

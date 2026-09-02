@@ -14,7 +14,8 @@
       settings: WindowsSettingsDisplay? = nil,
       agentDefaults: WindowsAgentDefaultsDisplay? = nil,
       selectedNavigation: BridgeDesktopNavigation = .overview,
-      isRefreshing: Bool = false
+      isRefreshing: Bool = false,
+      browserAvailable: Bool = true
     ) -> BridgeDesktopUIState {
       BridgeDesktopUIState(
         selectedNavigation: selectedNavigation,
@@ -25,7 +26,11 @@
           workbench: workbench,
           management: management
         ),
-        workbench: workbenchPage(workbench, management: management),
+        workbench: workbenchPage(
+          workbench,
+          management: management,
+          browserAvailable: browserAvailable
+        ),
         projects: projectsPage(
           management: management,
           workspace: workspace
@@ -117,7 +122,7 @@
             destination: .settings
           ),
         ],
-        recentTasks: workbench.recentTasks.map {
+        recentTasks: workbench.recentTasks.prefix(4).map {
           BridgeDesktopRecentTask(
             id: $0.taskID,
             title: $0.title,
