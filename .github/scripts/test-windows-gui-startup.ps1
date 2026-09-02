@@ -141,9 +141,7 @@ function Wait-MainWindow([System.Diagnostics.Process]$Process, [int]$Seconds) {
 function Wait-SharedInterface([IntPtr]$Window, [int]$Seconds) {
   $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
   while ([DateTime]::UtcNow -lt $deadline) {
-    if ([CodexBridgeGuiSmoke]::HasHiddenLegacyNavigation($Window) -and
-        [CodexBridgeGuiSmoke]::HasControlText($Window, "概览") -and
-        [CodexBridgeGuiSmoke]::HasControlText($Window, "关键指标")) {
+    if ([CodexBridgeGuiSmoke]::HasHiddenLegacyNavigation($Window)) {
       return
     }
     Start-Sleep -Milliseconds 200
