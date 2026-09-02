@@ -172,7 +172,8 @@
           await management.registerAgent(
             providerID: providerID,
             executablePath: executablePath,
-            configurationPath: configurationPath ?? ""
+            configurationPath: configurationPath ?? "",
+            displayName: displayName
           )
         }
         return true

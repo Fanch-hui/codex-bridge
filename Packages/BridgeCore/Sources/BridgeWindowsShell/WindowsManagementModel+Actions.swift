@@ -92,7 +92,8 @@
     func registerAgent(
       providerID: String,
       executablePath: String,
-      configurationPath: String
+      configurationPath: String,
+      displayName: String? = nil
     ) async {
       let executable = executablePath.trimmingCharacters(in: .whitespacesAndNewlines)
       let configuration = configurationPath.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -100,6 +101,12 @@
         setAgentStatus("请选择有效的 Provider。")
         return
       }
+      let requestedName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      guard !requestedName.contains("\0"), requestedName.utf8.count <= 256 else {
+        setAgentStatus("Agent 显示名称无效。")
+        return
+      }
+      let effectiveName = requestedName.isEmpty ? provider.displayName : requestedName
       guard !executable.isEmpty else {
         setAgentStatus("Agent 可执行文件路径不能为空。")
         return
@@ -120,7 +127,7 @@
         let installation = try await client.registerAgentInstallation(
           IPCAgentRegistrationRequest(
             providerID: provider.providerID,
-            displayName: provider.displayName,
+            displayName: effectiveName,
             executablePath: executable,
             configurationPath: configuration.isEmpty ? nil : configuration
           )
