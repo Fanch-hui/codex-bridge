@@ -6,7 +6,10 @@
       var area = RECT()
       guard GetClientRect(window, &area) else { return }
       desktopUI?.resize(to: area)
-      if usesSharedOverview { return }
+      if usesSharedDesktop {
+        layoutSharedDesktop(in: area)
+        return
+      }
       let navigationWidth = Int32(WindowLayout.navigationWidth)
       WindowsNavigationSidebar.layout(height: area.bottom, width: navigationWidth)
       let detailBounds = RECT(
@@ -22,6 +25,25 @@
       } else {
         WindowsEmbeddedPages.layout(page: selectedPage, in: contentBounds)
       }
+    }
+
+    private static func layoutSharedDesktop(in bounds: RECT) {
+      guard selectedPage == .workbench else {
+        chatBounds = RECT()
+        chat?.resize(to: RECT())
+        chat?.setVisible(false)
+        return
+      }
+      let width = max(Int32(0), bounds.right - bounds.left)
+      let chatWidth = min(Int32(520), max(Int32(360), width / 3))
+      chatBounds = RECT(
+        left: max(bounds.left, bounds.right - chatWidth),
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom
+      )
+      chat?.resize(to: chatBounds)
+      chat?.setVisible(true)
     }
 
     private static func layoutWorkbench(in bounds: RECT) {
@@ -48,19 +70,24 @@
       chat?.resize(to: chatBounds)
     }
 
-    private static var usesSharedOverview: Bool {
-      selectedPage == .overview && desktopUI?.isReady == true
+    private static var usesSharedDesktop: Bool {
+      desktopUI?.isReady == true
     }
 
     @discardableResult
     static func applySurfaceVisibility() -> Bool {
-      let sharedOverview = usesSharedOverview
-      guard sharedOverview != sharedOverviewPresented else { return false }
-      sharedOverviewPresented = sharedOverview
-      WindowsNavigationSidebar.setVisible(!sharedOverview)
-      WindowsPageHeader.setVisible(!sharedOverview)
-      WindowsOverviewPane.setVisible(selectedPage == .overview && !sharedOverview)
-      desktopUI?.setVisible(sharedOverview)
+      let sharedDesktop = usesSharedDesktop
+      guard sharedDesktop != sharedDesktopPresented else { return false }
+      sharedDesktopPresented = sharedDesktop
+      WindowsNavigationSidebar.setVisible(!sharedDesktop)
+      WindowsPageHeader.setVisible(!sharedDesktop)
+      WindowsOverviewPane.setVisible(!sharedDesktop && selectedPage == .overview)
+      WindowsTaskInspector.setVisible(!sharedDesktop && selectedPage == .workbench)
+      WindowsTaskInspector.setChatPlaceholderPageVisible(
+        !sharedDesktop && selectedPage == .workbench)
+      WindowsBrowserToolbar.setVisible(!sharedDesktop && selectedPage == .workbench)
+      WindowsEmbeddedPages.setNativeVisible(!sharedDesktop)
+      desktopUI?.setVisible(sharedDesktop)
       return true
     }
   }

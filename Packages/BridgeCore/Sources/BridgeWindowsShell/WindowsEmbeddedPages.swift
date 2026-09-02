@@ -5,6 +5,8 @@
     nonisolated(unsafe) private static var projectsSection = 0
     nonisolated(unsafe) private static var connectionsSection = 0
     nonisolated(unsafe) private static var settingsSection = 0
+    nonisolated(unsafe) private static var selectedPage = WindowsMainPage.overview
+    nonisolated(unsafe) private static var nativeVisible = true
 
     static func prepare(in parent: HWND?) {
       WindowsProjectManagementWindow.show(owner: parent)
@@ -26,32 +28,43 @@
     }
 
     static func select(_ page: WindowsMainPage) {
+      selectedPage = page
+      let visible = nativeVisible
       WindowsUIFoundation.show(
         WindowsProjectManagementWindow.window,
-        page == .projects && projectsSection == 0
+        visible && page == .projects && projectsSection == 0
       )
       WindowsUIFoundation.show(
         WindowsWorkspaceWindow.window,
-        page == .projects && projectsSection == 1
+        visible && page == .projects && projectsSection == 1
       )
-      WindowsUIFoundation.show(WindowsLogWindow.window, page == .logs)
+      WindowsUIFoundation.show(WindowsLogWindow.window, visible && page == .logs)
       WindowsUIFoundation.show(
         WindowsAgentManagementWindow.window,
-        page == .connections && connectionsSection == 1
+        visible && page == .connections && connectionsSection == 1
       )
       WindowsUIFoundation.show(
         WindowsConnectionWindow.window,
-        page == .connections && connectionsSection == 0
+        visible && page == .connections && connectionsSection == 0
       )
       WindowsUIFoundation.show(
         WindowsSettingsWindow.window,
-        page == .settings && settingsSection == 0
+        visible && page == .settings && settingsSection == 0
       )
       WindowsUIFoundation.show(
         WindowsAgentDefaultsWindow.window,
-        page == .settings && settingsSection == 1
+        visible && page == .settings && settingsSection == 1
       )
-      WindowsEmbeddedPageTabs.apply(page: page, selectedIndex: selectedSection(for: page))
+      if visible {
+        WindowsEmbeddedPageTabs.apply(page: page, selectedIndex: selectedSection(for: page))
+      } else {
+        WindowsEmbeddedPageTabs.setVisible(false)
+      }
+    }
+
+    static func setNativeVisible(_ visible: Bool) {
+      nativeVisible = visible
+      select(selectedPage)
     }
 
     static func selectSection(page: WindowsMainPage, index: Int) {

@@ -67,7 +67,7 @@
         left: bounds.left, top: bounds.top + 44, right: bounds.right, bottom: bounds.bottom)
     }
 
-    private static func setVisible(_ visible: Bool) {
+    static func setVisible(_ visible: Bool) {
       WindowsUIFoundation.show(firstButton, visible)
       WindowsUIFoundation.show(secondButton, visible)
     }

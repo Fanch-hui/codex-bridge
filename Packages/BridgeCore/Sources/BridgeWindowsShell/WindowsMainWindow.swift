@@ -26,7 +26,7 @@
     nonisolated(unsafe) static var chatBounds = RECT()
     nonisolated(unsafe) private static var waitingForWebViewShutdown = false
     nonisolated(unsafe) private static var pendingWebViewShutdownCount = 0
-    nonisolated(unsafe) static var sharedOverviewPresented = false
+    nonisolated(unsafe) static var sharedDesktopPresented = false
     nonisolated(unsafe) static var chat: WindowsChatWebView?
     nonisolated(unsafe) static var desktopUI: WindowsDesktopUIWebView?
     nonisolated(unsafe) static var window: HWND?
@@ -184,7 +184,7 @@
         WindowsUIFoundation.shutdown()
         waitingForWebViewShutdown = false
         pendingWebViewShutdownCount = 0
-        sharedOverviewPresented = false
+        sharedDesktopPresented = false
         desktopUI = nil
         Self.window = nil
         PostQuitMessage(0)
