@@ -2,7 +2,7 @@
   import Foundation
   import WinSDK
 
-  enum WindowsSecureFileError: Error {
+  package enum WindowsSecureFileError: Error {
     case openFailed(Int32)
   }
 
@@ -13,10 +13,10 @@
   /// points before the final target is opened, refusing symlink/junction
   /// escapes; the residual TOCTOU window is narrower than the trust boundary
   /// enforced by the user profile ACLs and is documented in docs/WINDOWS_PORT.md.
-  enum WindowsSecureFile {
-    struct Identity: Equatable {
-      let device: UInt64
-      let inode: UInt64
+  package enum WindowsSecureFile {
+    package struct Identity: Equatable {
+      package let device: UInt64
+      package let inode: UInt64
 
       init(info: BY_HANDLE_FILE_INFORMATION) {
         device = UInt64(info.dwVolumeSerialNumber)
@@ -24,20 +24,20 @@
       }
     }
 
-    struct Metadata {
-      let identity: Identity
-      let isDirectory: Bool
-      let isRegularFile: Bool
-      let size: Int
+    package struct Metadata {
+      package let identity: Identity
+      package let isDirectory: Bool
+      package let isRegularFile: Bool
+      package let size: Int
     }
 
-    static func close(_ handle: HANDLE) {
+    package static func close(_ handle: HANDLE) {
       _ = CloseHandle(handle)
     }
 
     /// Opens every path component in turn and rejects reparse points. The
     /// final component is opened with `desiredAccess`/`creationDisposition`.
-    static func openResolving(
+    package static func openResolving(
       rootPath: String,
       components: [String],
       desiredAccess: UInt32,
@@ -76,7 +76,7 @@
       }
     }
 
-    static func metadata(of handle: HANDLE) throws -> Metadata {
+    package static func metadata(of handle: HANDLE) throws -> Metadata {
       var info = BY_HANDLE_FILE_INFORMATION()
       guard GetFileInformationByHandle(handle, &info) else {
         throw WindowsSecureFileError.openFailed(Int32(GetLastError()))
@@ -138,7 +138,7 @@
       }
     }
 
-    static func readFile(_ handle: HANDLE, maximumBytes: Int) throws -> Data {
+    package static func readFile(_ handle: HANDLE, maximumBytes: Int) throws -> Data {
       var result = Data()
       var buffer = [UInt8](repeating: 0, count: min(16 * 1024, maximumBytes + 1))
       while result.count <= maximumBytes {

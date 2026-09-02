@@ -286,6 +286,15 @@ var macOSOnlyTargets: [Target] = []
       dependencies: ["BridgeDesktopUI", "BridgeWindowsShell"],
       path: "Tests/BridgeWindowsShellTests"
     ),
+    .testTarget(
+      name: "BridgeTunnelWindowsTests",
+      dependencies: [
+        "BridgeSecurity",
+        "BridgeTunnel",
+        .product(name: "Crypto", package: "swift-crypto"),
+      ],
+      path: "Tests/BridgeTunnelWindowsTests"
+    ),
   ]
 #endif
 

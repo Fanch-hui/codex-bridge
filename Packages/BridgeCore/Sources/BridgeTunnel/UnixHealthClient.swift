@@ -74,9 +74,11 @@ struct LoopbackHealthClient: Sendable {
 
   #if os(Windows)
     private func request(path: String, baseURL: URL) throws -> HTTPResponse {
-      // The tunnel helper is not available on Windows, so no health endpoint
-      // can ever be listening on loopback.
-      throw TunnelHealthError.unavailable
+      try WindowsHealthSocket.request(
+        path: path,
+        baseURL: baseURL,
+        maximumResponseBytes: maximumResponseBytes
+      )
     }
   #else
     private func request(path: String, baseURL: URL) throws -> HTTPResponse {
@@ -184,7 +186,7 @@ struct LoopbackHealthClient: Sendable {
 
   #if os(Windows)
     private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {
-      false
+      WindowsHealthPortOwner.owns(port: port, processID: processID)
     }
   #else
     private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {

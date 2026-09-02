@@ -353,12 +353,19 @@ public actor TunnelManager {
     let directory = context.directory
     let urlFile = context.healthURLFile.path
     let pidFile = directory.appendingPathComponent("tunnel.pid").path
+    #if os(Windows)
+      let apiKeyReference = "env:\(WindowsTunnelEnvironment.runtimeKeyVariable)"
+      let headerSecretReference = "env:\(WindowsTunnelEnvironment.headerSecretVariable)"
+    #else
+      let apiKeyReference = "file:/dev/fd/3"
+      let headerSecretReference = "file:/dev/fd/4"
+    #endif
     return [
       command,
       "--control-plane.tunnel-id", configuration.tunnelID.rawValue,
-      "--control-plane.api-key=file:/dev/fd/3",
+      "--control-plane.api-key=\(apiKeyReference)",
       "--mcp.server-url", configuration.helperMCPURL.absoluteString,
-      "--mcp.extra-headers", "X-Codex-Bridge-Token: file:/dev/fd/4",
+      "--mcp.extra-headers", "X-Codex-Bridge-Token: \(headerSecretReference)",
       "--harpoon.allow-plaintext-http=true",
       "--health.listen-addr", "127.0.0.1:0",
       "--health.url-file", urlFile,

@@ -62,10 +62,10 @@ public struct TunnelConfiguration: Sendable {
     metricsFreshness: Duration = .seconds(70),
     expectedHelperSHA256: String
   ) throws {
-    guard helperExecutable.isFileURL, helperExecutable.path.hasPrefix("/") else {
+    guard Self.isValidPlatformFileURL(helperExecutable) else {
       throw TunnelConfigurationError.invalidHelperExecutable
     }
-    guard runtimeDirectory.isFileURL, runtimeDirectory.path.hasPrefix("/") else {
+    guard Self.isValidPlatformFileURL(runtimeDirectory) else {
       throw TunnelConfigurationError.invalidRuntimeDirectory
     }
     guard Self.isValidLocalMCPURL(localMCPURL) else {
@@ -109,10 +109,10 @@ public struct TunnelConfiguration: Sendable {
     metricsFreshness: Duration = .seconds(70),
     expectedHelperSHA256: String
   ) throws {
-    guard helperExecutable.isFileURL, helperExecutable.path.hasPrefix("/") else {
+    guard Self.isValidPlatformFileURL(helperExecutable) else {
       throw TunnelConfigurationError.invalidHelperExecutable
     }
-    guard runtimeDirectory.isFileURL, runtimeDirectory.path.hasPrefix("/") else {
+    guard Self.isValidPlatformFileURL(runtimeDirectory) else {
       throw TunnelConfigurationError.invalidRuntimeDirectory
     }
     guard Self.isValidHeaderMCPURL(localMCPURL) else {
@@ -141,6 +141,15 @@ public struct TunnelConfiguration: Sendable {
     self.metricsFreshness = metricsFreshness
     self.expectedHelperSHA256 = expectedHelperSHA256
     helperMCPURL = localMCPURL
+  }
+
+  private static func isValidPlatformFileURL(_ url: URL) -> Bool {
+    guard url.isFileURL else { return false }
+    #if os(Windows)
+      return WindowsTunnelPathRules.isLocalAbsolutePath(WindowsTunnelPathRules.normalize(url.path))
+    #else
+      return url.path.hasPrefix("/")
+    #endif
   }
 
   private static func isValidLocalMCPURL(_ url: URL) -> Bool {

@@ -37,7 +37,7 @@ Actions 原生编译并运行冒烟测试；ARM64 在同一 x64 runner 上交叉
 | 文件安全边界 | openat + O_NOFOLLOW 相对 fd 遍历 | `SecureFileReader` / `SecureProjectFileWriter` / `SecureProjectDirectoryMutation` | 逐组件 reparse-point 校验 + CreateFileW（CREATE_NEW / 暂存替换 / MoveFileExW） |
 | Provider 路径与工件 | POSIX 路径、fd/stat 身份 | `AgentPathSemantics` / `SecureFileArtifactSnapshot` / `SecureFileArtifactReader` | 盘符、UNC、大小写与 `;` PATH 语义；逐组件 reparse 校验后按句柄读取身份与摘要 |
 | Codex app-server 发现 | App bundle / Homebrew / 用户工具目录，最后经 `/usr/bin/env` | `AppServerConfiguration` | `PATH`、用户安装目录与 npm/Bun/standalone 包；`.cmd` 只解析到真实 `codex.exe`，并校验 PE 架构；找不到时明确失败 |
-| 代码签名校验 | SecCode（SecStaticCode/SecCode） | `TunnelCodeSignatureVerifier` | 隧道未接入 Windows 产品链路（见已知限制 1） |
+| 代码签名校验 | SecCode（SecStaticCode/SecCode） | `TunnelCodeSignatureVerifier` | SHA-256 固定摘要 + PE/COFF 架构校验（`WindowsTunnelExecutable`），动态校验复查进程主镜像；无 Authenticode（见已知限制 1） |
 | SHA-256 | swift-crypto（macOS 上转发 CryptoKit） | `import Crypto` | swift-crypto（BoringSSL 后端） |
 
 ## 构建
@@ -128,15 +128,45 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 
 ## 已知限制与语义差异
 
-1. **Secure Tunnel 尚未接入 Windows 产品链路**。上游 `openai/tunnel-client` 从当前 pin
-   的 v0.0.10 起就提供 `windows-amd64`/`windows-arm64` 归档，v0.0.12 起另有
-   `tunnel-client-runtime-*` 与 `tunnel-client-runtime-cloudflared-*` 载荷；tag `v0.2.3`
-   保留过完整的 Swift 侧实现（`WindowsTunnel*`、
-   `BundledWindowsServiceTunnelManagerFactory`、
-   `.github/scripts/stage-windows-tunnel-client.ps1`）。缺口在本分支的接缝上：
-   `BridgeTunnel` 无 Windows 实现、服务组装根不提供 Windows tunnel 工厂、桌面 UI 六处
-   固定显示"不可用"且命令路由丢弃 tunnel 指令，行为保持 fail-closed。Darwin 的 SecCode
-   校验在 Windows 由 PE 架构校验与签名校验承担。
+1. **Secure Tunnel Windows 移植已完成（win 分支当前状态）**。UI 已在 4136eca 接入
+   Service 状态；四个 BridgeTunnel Windows 接缝已实现并有真实环境门禁：
+   - `TunnelDirectoryHandle`（`SecureRunDirectory+Windows.swift`）：复用
+     `WindowsSecureFile.openResolving` 的逐组件 reparse 校验 + device/index 身份固定；
+     目录安全依赖用户目录 ACL（无 openat）。
+   - `TunnelProcessLauncher`/`TunnelSpawnedProcess`
+     （`TunnelProcessLauncher+Windows.swift`）：CreateProcessW + 继承管道
+     （`CreatePipe` + `STARTF_USESTDHANDLES`）+ 可继承 NUL stdin + 环境块注入
+     （继承当前环境并 upsert `CODEX_BRIDGE_TUNNEL_API_KEY` /
+     `CODEX_BRIDGE_TUNNEL_TOKEN` / `TMP` / `TEMP` / `CODEX_HOME`，密钥不落
+     argv/磁盘）；job 对象（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）保证树终止；
+     后台线程读管道到 EOF/断管。helper 参数里 macOS `file:/dev/fd/{3,4}` 在
+     Windows 改为 `env:VARNAME` 引用（v0.0.10 起 tunnel-client 的
+     `--control-plane.api-key` 与 `--mcp.extra-headers` 值均支持 `env:` 前缀，
+     已在上游源码与真实 exe 验证）。
+   - `TunnelHelperVerifier`（`TunnelHelperVerifier+Windows.swift`）：静态 =
+     SHA-256 固定摘要 + PE/COFF 架构（`WindowsTunnelExecutable`，ARM64X 仅
+     ARM64 接受）；动态 = `OpenProcess` + `QueryFullProcessImageNameW` 定位
+     进程主镜像，重解析安全句柄重读并比对摘要；无 Authenticode（发布保持未签名
+     开发构建）。
+   - `LoopbackHealthClient`（`UnixHealthClient+Windows.swift`）：winsock
+     （WSAStartup 惰性一次 + SO_RCVTIMEO/SO_SNDTIMEO 毫秒 + inet_pton +
+     send/recv），端口属主用 `GetExtendedTcpTable` IPv4
+     `TCP_TABLE_OWNER_PID_ALL`（MIB_TCP_STATE_LISTEN + ntohs(port) + pid）。
+   - 组装根：`BundledServiceTunnelManagerFactory` 在 Windows 从可执行文件目录
+     派生 `tunnel-client.exe` + `tunnel-client.sha256`（portable/安装目录）；
+     macOS bundle 路径不变。
+   - 载荷：`Scripts/stage-windows-tunnel-client.ps1` 固定下载并校验
+     openai/tunnel-client **v0.0.10** windows-amd64/arm64 归档（每归档单
+     `tunnel-client.exe`），生成 `tunnel-client.sha256` 与
+     `tunnel-client.manifest.json`；`stage-windows-portable.ps1` 新增
+     `-TunnelClientDir` 钩子校验 PE 架构与摘要后并入 payload 与 SHA256SUMS；
+     `BundledServiceTunnelManagerFactory.helperAvailable()` 缺载荷时保持
+     fail-closed。Windows 门禁测试 `BridgeTunnelWindowsTests`（20 例：
+     路径校验、PE/词法规则、真实目录身份、真实系统 exe 静态/动态校验、
+     真实 spawn + env 注入 + 脱敏 + 树终止、真实 winsock HTTP + 端口属主）
+     已加入 CI x64 矩阵；VM（Parallels ARM64）全 13 套件通过。剩余：真实
+     OAuth 凭据的 end-to-end 验收与 x64 CI 门禁（`env:` 引用已由真实
+     v0.0.10 exe 冒烟确认可启动并输出 doctor JSON，exit 2 为无凭据预期）。
 2. **路径安全遍历的 TOCTOU 差异**。Win32 没有 `openat`，Windows 分支在打开
    前逐组件校验 reparse point（拒绝符号链接/junction 逃逸），但存在理论上的
    检查-打开窗口；隐私主要依赖用户目录 ACL。macOS 分支的相对 fd 遍历语义
@@ -174,8 +204,7 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 10. **Windows UI 与功能以 macOS 为产品基准**。Windows 使用 Win32/WebView2 承载相同的
    概览、工作台、项目、日志、连接和设置导航；页面状态、文案、操作后果与 Service API
    闭环必须一致，不能用独立工具窗口、占位页或静态指标代替。平台原生控件允许存在渲染
-   差异。Windows Supervisor 按已确认边界保持不可用；Skills 与 macOS 一样只读；Secure
-   Tunnel 在 Windows helper 可用前明确 fail-closed。主窗口现已统一概览、工作台、项目、
+   差异。Windows Supervisor 按已确认边界保持不可用；Skills 与 macOS 一样只读。主窗口现已统一概览、工作台、项目、
    日志、连接和设置六页；工作台接通项目/权限/任务/Thread/审批与控制动作，项目页接通
    权限、Direct、黑名单、Skills、Threads，连接页接通本地 MCP/Qwen 与 Agent，日志和设置
    复用同一 Service API 与状态语义。Swift Windows 的 `MainActor` 与入口线程不绑定；

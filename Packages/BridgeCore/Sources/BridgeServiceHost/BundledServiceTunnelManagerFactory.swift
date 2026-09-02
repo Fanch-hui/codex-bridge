@@ -54,12 +54,38 @@ public struct BundledServiceTunnelManagerFactory: ServiceTunnelManagerBuilding {
   }
 
   private var helperURL: URL {
-    appBundleURL.appending(path: Self.helperRelativePath)
+    #if os(Windows)
+      return Self.executableDirectoryURL.appending(path: Self.windowsHelperName)
+    #else
+      return appBundleURL.appending(path: Self.helperRelativePath)
+    #endif
   }
 
   private var digestURL: URL {
-    appBundleURL.appending(path: Self.digestRelativePath)
+    #if os(Windows)
+      return Self.executableDirectoryURL.appending(path: Self.windowsDigestName)
+    #else
+      return appBundleURL.appending(path: Self.digestRelativePath)
+    #endif
   }
+
+  #if os(Windows)
+    private static let windowsHelperName = "tunnel-client.exe"
+    private static let windowsDigestName = "tunnel-client.sha256"
+
+    /// Windows has no `.app` bundle; the staged helper lives next to the
+    /// service executable in the portable/installation directory.
+    private static var executableDirectoryURL: URL {
+      var buffer = [WCHAR](repeating: 0, count: 32_768)
+      let length = GetModuleFileNameW(nil, &buffer, DWORD(buffer.count))
+      guard length > 0, length < DWORD(buffer.count) else { return URL(fileURLWithPath: "/") }
+      let executable = String(decoding: buffer.prefix(Int(length)), as: UTF16.self)
+      guard let directoryEnd = executable.lastIndex(of: "\\") else {
+        return URL(fileURLWithPath: "/")
+      }
+      return URL(fileURLWithPath: String(executable[..<directoryEnd]), isDirectory: true)
+    }
+  #endif
 
   private static func readDigest(from url: URL) throws -> String {
     let bytes = try readDigestBytes(from: url)

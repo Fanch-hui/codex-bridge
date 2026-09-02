@@ -195,6 +195,15 @@ jobs:
           $binPath = ($binPathOutput | Select-Object -Last 1).ToString().Trim()
           if (-not $binPath) { throw "Swift build output directory was empty." }
           Add-Content $env:GITHUB_ENV "SWIFT_BIN_PATH=$binPath"
+      - name: Stage Windows tunnel client
+        shell: pwsh
+        run: |
+          $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
+          & "$env:GITHUB_WORKSPACE\Scripts\stage-windows-tunnel-client.ps1" `
+            -Architecture "${{ matrix.architecture }}" `
+            -Destination $tunnelClientDir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content $env:GITHUB_ENV "TUNNEL_CLIENT_DIR=$tunnelClientDir"
       - name: Stage Windows portable package
         shell: pwsh
         run: |
@@ -205,6 +214,7 @@ jobs:
             OutDir = $portableDir
             Architecture = "${{ matrix.architecture }}"
             VcpkgTriplet = "${{ matrix.triplet }}"
+            TunnelClientDir = $env:TUNNEL_CLIENT_DIR
           }
           if ($targetTriple) {
             $stageArguments["TargetTriple"] = $targetTriple
@@ -252,6 +262,8 @@ jobs:
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceAppCoreTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceHostWindowsTests"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeTunnelWindowsTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeCodexServiceWindowsTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
