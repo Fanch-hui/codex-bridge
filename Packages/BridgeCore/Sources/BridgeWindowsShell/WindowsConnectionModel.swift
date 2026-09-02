@@ -122,7 +122,7 @@
 
     func refreshDisplaySnapshot() { publishDisplay() }
 
-    private func mutate(_ progress: String, action: () async throws -> Void) async {
+    func mutate(_ progress: String, action: () async throws -> Void) async {
       guard connectionState == .connected, !busy else { return }
       busy = true
       statusText = progress
@@ -197,7 +197,8 @@
           rotateCredentialEnabled: isQwen && enabled && !busy,
           rotateEndpointEnabled: connectionState == .connected && !busy,
           statusText: statusText,
-          clientItems: desktopClients
+          clientItems: desktopClients,
+          tunnel: projectedTunnel
         )
       )
     }
@@ -215,8 +216,6 @@
         profile.exposureMode == .full
           ? "暴露任务与 Direct 工具；项目权限、workspace gate 与本机审批仍然生效。"
           : "仅暴露项目、文件、任务、Thread、模型与 Skill 查询工具。",
-        "",
-        "Secure Tunnel 在 Windows 版不可用；本地 MCP 与 Qwen Studio 不受影响。",
       ].joined(separator: "\r\n")
     }
 

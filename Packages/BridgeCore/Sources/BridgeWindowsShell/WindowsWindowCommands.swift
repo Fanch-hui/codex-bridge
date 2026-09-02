@@ -42,6 +42,10 @@
     case copySelectedMCPConfiguration
     case rotateSelectedMCPCredential
     case rotateLocalMCPEndpoint
+    case configureTunnel(tunnelID: String, runtimeKey: String)
+    case connectTunnel
+    case disconnectTunnel
+    case clearTunnel
     case selectProject(index: Int)
     case refreshProjects
     case registerProject(name: String, path: String)

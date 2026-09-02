@@ -129,6 +129,8 @@
         auxiliary.connections.selectClient(at: index)
         Task { @MainActor in await auxiliary.connections.rotateSelectedCredential() }
         return true
+      case .configureTunnel, .connectTunnel, .disconnectTunnel, .clearTunnel:
+        return runTunnelCommand(command, connections: auxiliary.connections)
       case .selectAgent(let id):
         if let index = management.agentInstallations.firstIndex(where: { $0.installationID == id })
         {

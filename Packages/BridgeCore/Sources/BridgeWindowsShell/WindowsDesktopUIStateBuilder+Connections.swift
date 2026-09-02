@@ -9,6 +9,7 @@
     ) -> BridgeDesktopConnectionsState? {
       guard let connections else { return nil }
       let service = statusLabel(workbench.connectionState)
+      let tunnel = connections.tunnel ?? tunnelWithoutServiceStatus
       let mcpReady = workbench.connectionState == .connected && workbench.mcpState == "ready"
       let availableAgents = management.availableAgentCount
       let registeredAgents = management.agent.installationItems.count
@@ -18,7 +19,7 @@
       return BridgeDesktopConnectionsState(
         header: header(
           "连接",
-          "管理本地 MCP 通道与本机 Agent 引擎。",
+          "管理本地 MCP、Secure Tunnel 和已登记 Agent 安装。",
           "point.3.connected.trianglepath.dotted"
         ),
         summaryRows: [
@@ -36,13 +37,7 @@
             symbol: mcpReady ? "checkmark.circle.fill" : "circle.dashed",
             tone: mcpReady ? .success : .neutral
           ),
-          BridgeDesktopServiceRow(
-            id: "secure-tunnel",
-            title: "远程 Secure Tunnel",
-            value: "Windows 不可用",
-            symbol: "circle.dashed",
-            tone: .neutral
-          ),
+          connectionsTunnelRow(tunnel),
           BridgeDesktopServiceRow(
             id: "agents",
             title: "本机 Agent 引擎",
@@ -56,18 +51,7 @@
         canCopyLocalMCPURL: connections.connectionState == .connected
           && connections.endpointText.hasPrefix("http"),
         canRotateLocalMCPEndpoint: connections.rotateEndpointEnabled,
-        tunnel: BridgeDesktopTunnelState(
-          configured: false,
-          enabled: false,
-          helperAvailable: false,
-          lifecycle: "Windows 不可用",
-          acceptsRemoteSubmissions: false,
-          actionRequired: false,
-          canConfigure: false,
-          canConnect: false,
-          canDisconnect: false,
-          canClear: false
-        ),
+        tunnel: tunnel,
         clients: connections.clientItems,
         providers: management.agent.providerItems,
         installations: management.agent.installationItems,

@@ -163,8 +163,17 @@
         return nonEmpty(payload.clientID).map(MainWindowCommand.rotateMCPClientCredential)
       case .rotateLocalMCPEndpoint:
         return .rotateLocalMCPEndpoint
-      case .configureTunnel, .connectTunnel, .disconnectTunnel, .clearTunnel:
-        return nil
+      case .configureTunnel:
+        guard let tunnelID = nonEmpty(payload.tunnelID), let runtimeKey = payload.runtimeKey,
+          !runtimeKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return .configureTunnel(tunnelID: tunnelID, runtimeKey: runtimeKey)
+      case .connectTunnel:
+        return .connectTunnel
+      case .disconnectTunnel:
+        return .disconnectTunnel
+      case .clearTunnel:
+        return .clearTunnel
       case .registerAgent:
         guard let providerID = nonEmpty(payload.providerID),
           let executable = nonEmpty(payload.executable),

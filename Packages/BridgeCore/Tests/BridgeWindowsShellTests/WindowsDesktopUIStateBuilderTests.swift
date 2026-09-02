@@ -34,7 +34,7 @@
       XCTAssertEqual(state.overview?.recentTasks.map(\.id), ["task-42"])
       XCTAssertEqual(
         state.overview?.services.first(where: { $0.id == "secure-tunnel" })?.value,
-        "Windows 不可用"
+        "未配置"
       )
       XCTAssertEqual(
         state.navigation.first(where: { $0.navigation == .workbench })?.badge,
@@ -97,12 +97,6 @@
         .copyLocalMCPEndpoint
       )
 
-      let unsupportedTunnel = BridgeDesktopCommandEnvelope(
-        requestID: "tunnel-1",
-        command: .connectTunnel
-      )
-      XCTAssertNil(WindowsDesktopUICommandRouter.command(for: unsupportedTunnel))
-
       let browser = BridgeDesktopCommandEnvelope(
         requestID: "browser-1",
         command: .setBrowserEnabled,
@@ -153,83 +147,50 @@
       )
     }
 
-    private func makeWorkbench(
-      taskCount: Int = 0,
-      runningTaskCount: Int = 0,
-      pendingApprovalCount: Int = 0,
-      projectRows: [String] = [],
-      recentTaskRows: [String] = [],
-      recentTasks: [WindowsRecentTaskPresentation] = []
-    ) -> WindowsWorkbenchDisplay {
-      WindowsWorkbenchDisplay(
-        connectionState: .connected,
-        mcpAddress: "http://127.0.0.1:58720/mcp",
-        mcpState: "ready",
-        taskCount: taskCount,
-        runningTaskCount: runningTaskCount,
-        pendingApprovalCount: pendingApprovalCount,
-        projectRows: projectRows,
-        selectedProjectIndex: nil,
-        permissionRows: ["只读", "可写"],
-        selectedPermissionIndex: 1,
-        taskRows: [],
-        recentTaskRows: recentTaskRows,
-        recentTasks: recentTasks,
-        selectedTaskID: nil,
-        selectedTaskIndex: nil,
-        taskMetadata: "未选择任务",
-        conversationText: "",
-        interruptEnabled: false,
-        stopEnabled: false,
-        deleteEnabled: false,
-        steerEnabled: false,
-        actionText: nil,
-        approvalRows: [],
-        selectedApprovalIndex: nil,
-        approvalDetailText: "",
-        approvalAllowDecisions: [],
-        approvalAllowEnabled: false,
-        approvalDenyEnabled: false,
-        approvalStatusText: nil,
-        detailText: nil
+    func testTunnelCommandsRouteToServiceBackedWindowCommands() {
+      let connect = BridgeDesktopCommandEnvelope(
+        requestID: "tunnel-1",
+        command: .connectTunnel
+      )
+      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: connect), .connectTunnel)
+
+      let disconnect = BridgeDesktopCommandEnvelope(
+        requestID: "tunnel-2",
+        command: .disconnectTunnel
+      )
+      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: disconnect), .disconnectTunnel)
+
+      let clear = BridgeDesktopCommandEnvelope(
+        requestID: "tunnel-3",
+        command: .clearTunnel
+      )
+      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: clear), .clearTunnel)
+
+      let configure = BridgeDesktopCommandEnvelope(
+        requestID: "tunnel-4",
+        command: .configureTunnel,
+        payload: .init(tunnelID: " tunnel-9 ", runtimeKey: "runtime-key")
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: configure),
+        .configureTunnel(tunnelID: "tunnel-9", runtimeKey: "runtime-key")
       )
     }
 
-    private func makeManagement(
-      availableAgentCount: Int = 0,
-      installationCount: Int = 0
-    ) -> WindowsManagementDisplay {
-      WindowsManagementDisplay(
-        connectionState: .connected,
-        availableAgentCount: availableAgentCount,
-        project: WindowsProjectManagementDisplay(
-          rows: ["Bridge"],
-          selectedIndex: 0,
-          detailText: "",
-          policy: nil,
-          registerEnabled: false,
-          removeEnabled: false,
-          savePolicyEnabled: false,
-          statusText: ""
-        ),
-        agent: WindowsAgentManagementDisplay(
-          providerRows: [],
-          providerIDs: [],
-          selectedProviderIndex: nil,
-          providerDetailText: "",
-          providerRequiresConfiguration: false,
-          installationRows: Array(repeating: "Agent", count: installationCount),
-          selectedInstallationIndex: nil,
-          installationDetailText: "",
-          registerEnabled: false,
-          enableEnabled: false,
-          disableEnabled: false,
-          reprobeEnabled: false,
-          acceptReplacementEnabled: false,
-          removeEnabled: false,
-          statusText: ""
+    func testConfigureTunnelWithoutUsablePayloadIsDropped() {
+      for payload in [
+        BridgeDesktopCommandPayload(),
+        BridgeDesktopCommandPayload(tunnelID: "tunnel-9"),
+        BridgeDesktopCommandPayload(tunnelID: "tunnel-9", runtimeKey: "   "),
+        BridgeDesktopCommandPayload(runtimeKey: "runtime-key"),
+      ] {
+        let envelope = BridgeDesktopCommandEnvelope(
+          requestID: "tunnel-5",
+          command: .configureTunnel,
+          payload: payload
         )
-      )
+        XCTAssertNil(WindowsDesktopUICommandRouter.command(for: envelope))
+      }
     }
   }
 #endif

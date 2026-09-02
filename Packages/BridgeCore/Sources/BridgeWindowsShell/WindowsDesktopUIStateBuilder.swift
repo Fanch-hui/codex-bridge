@@ -29,7 +29,8 @@
         isRefreshing: isRefreshing,
         overview: overview(
           workbench: workbench,
-          management: management
+          management: management,
+          tunnel: connections?.tunnel
         ),
         workbench: workbenchPage(
           workbench,
@@ -56,7 +57,8 @@
 
     private static func overview(
       workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay
+      management: WindowsManagementDisplay,
+      tunnel: BridgeDesktopTunnelState?
     ) -> BridgeDesktopOverviewState {
       let projectCount = management.project.rows.count
       let installationCount = management.agent.installationRows.count
@@ -113,7 +115,11 @@
         subtitle: "全景监控后台 Service、本地 MCP、Secure Tunnel 与任务执行状态。",
         notices: notices(workbench: workbench),
         metrics: metrics,
-        services: services(workbench: workbench, management: management),
+        services: services(
+          workbench: workbench,
+          management: management,
+          tunnel: tunnel
+        ),
         serviceActions: [
           BridgeDesktopActionLink(
             id: "manage-connections",
@@ -164,7 +170,8 @@
 
     private static func services(
       workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay
+      management: WindowsManagementDisplay,
+      tunnel: BridgeDesktopTunnelState?
     ) -> [BridgeDesktopServiceRow] {
       let serviceState = connectionStatePresentation(workbench.connectionState)
       let mcpState = mcpPresentation(for: workbench)
@@ -187,14 +194,7 @@
           tone: mcpState.tone,
           destination: .connections
         ),
-        BridgeDesktopServiceRow(
-          id: "secure-tunnel",
-          title: "远程 Secure Tunnel",
-          value: "Windows 不可用",
-          symbol: "circle.dashed",
-          tone: .neutral,
-          destination: .connections
-        ),
+        overviewTunnelRow(tunnel),
         BridgeDesktopServiceRow(
           id: "local-agents",
           title: "本机 Agent 引擎",

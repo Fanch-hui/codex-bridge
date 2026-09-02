@@ -18,5 +18,6 @@
     let rotateEndpointEnabled: Bool
     let statusText: String
     var clientItems: [BridgeDesktopMCPClientRow] = []
+    var tunnel: BridgeDesktopTunnelState? = nil
   }
 #endif

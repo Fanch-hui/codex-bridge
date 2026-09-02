@@ -37,7 +37,7 @@ Actions 原生编译并运行冒烟测试；ARM64 在同一 x64 runner 上交叉
 | 文件安全边界 | openat + O_NOFOLLOW 相对 fd 遍历 | `SecureFileReader` / `SecureProjectFileWriter` / `SecureProjectDirectoryMutation` | 逐组件 reparse-point 校验 + CreateFileW（CREATE_NEW / 暂存替换 / MoveFileExW） |
 | Provider 路径与工件 | POSIX 路径、fd/stat 身份 | `AgentPathSemantics` / `SecureFileArtifactSnapshot` / `SecureFileArtifactReader` | 盘符、UNC、大小写与 `;` PATH 语义；逐组件 reparse 校验后按句柄读取身份与摘要 |
 | Codex app-server 发现 | App bundle / Homebrew / 用户工具目录，最后经 `/usr/bin/env` | `AppServerConfiguration` | `PATH`、用户安装目录与 npm/Bun/standalone 包；`.cmd` 只解析到真实 `codex.exe`，并校验 PE 架构；找不到时明确失败 |
-| 代码签名校验 | SecCode（SecStaticCode/SecCode） | `TunnelCodeSignatureVerifier` | 不可用（见下节 Tunnel 限制） |
+| 代码签名校验 | SecCode（SecStaticCode/SecCode） | `TunnelCodeSignatureVerifier` | 隧道未接入 Windows 产品链路（见已知限制 1） |
 | SHA-256 | swift-crypto（macOS 上转发 CryptoKit） | `import Crypto` | swift-crypto（BoringSSL 后端） |
 
 ## 构建
@@ -78,8 +78,9 @@ powershell -File Scripts\build-windows.ps1 -Installer `
 `codex-bridge-service.exe --shutdown`，服务先返回自身 PID，再完成任务、子进程和存储清理；
 控制进程等待该 PID 真正退出后才允许替换文件。portable 目录随附的是
 与应用架构匹配的 `WebView2Loader.dll`；Windows 仍必须预先安装系统级 WebView2
-Evergreen Runtime，这是 WebView2 native app 的运行前置条件。缺少 Runtime 或 loader
-时壳保留任务管理功能并明确显示聊天页不可用。按
+Evergreen Runtime，这是 WebView2 native app 的运行前置条件。聊天槽位加载失败时，共享 UI
+内显示具体原因，其余五页照常工作；共享桌面 UI 自身无法加载时，宿主直接给出点名缺失
+运行时的 fail-closed 提示，任务与本地 MCP 服务继续在后台运行。按
 [Swift Windows toolchain packaging](https://github.com/swiftlang/swift/blob/main/docs/WindowsToolchain.md)，
 Swift 工具链安装器只安装宿主架构的 runtime，
 因此 staging 从 SDK `Redistributables` 中对应的 Swift 6.3.3
@@ -127,10 +128,15 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 
 ## 已知限制与语义差异
 
-1. **Secure Tunnel 在 Windows 上不可用**。pinned 的 OpenAI `tunnel-client`
-   helper 只有 darwin amd64/arm64 构建，Windows 侧启动一律 fail-closed
-   （`TunnelManagerError.launchFailed`）。等上游提供 Windows 构建后，在
-   `TunnelProcessLauncher` 的 Windows 分支接入即可。
+1. **Secure Tunnel 尚未接入 Windows 产品链路**。上游 `openai/tunnel-client` 从当前 pin
+   的 v0.0.10 起就提供 `windows-amd64`/`windows-arm64` 归档，v0.0.12 起另有
+   `tunnel-client-runtime-*` 与 `tunnel-client-runtime-cloudflared-*` 载荷；tag `v0.2.3`
+   保留过完整的 Swift 侧实现（`WindowsTunnel*`、
+   `BundledWindowsServiceTunnelManagerFactory`、
+   `.github/scripts/stage-windows-tunnel-client.ps1`）。缺口在本分支的接缝上：
+   `BridgeTunnel` 无 Windows 实现、服务组装根不提供 Windows tunnel 工厂、桌面 UI 六处
+   固定显示"不可用"且命令路由丢弃 tunnel 指令，行为保持 fail-closed。Darwin 的 SecCode
+   校验在 Windows 由 PE 架构校验与签名校验承担。
 2. **路径安全遍历的 TOCTOU 差异**。Win32 没有 `openat`，Windows 分支在打开
    前逐组件校验 reparse point（拒绝符号链接/junction 逃逸），但存在理论上的
    检查-打开窗口；隐私主要依赖用户目录 ACL。macOS 分支的相对 fd 遍历语义
