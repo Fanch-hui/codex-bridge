@@ -180,6 +180,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let summaryRows: [BridgeDesktopServiceRow]
   public let localMCPURL: String?
   public let localMCPState: String
+  public let canCopyLocalMCPURL: Bool
+  public let canRotateLocalMCPEndpoint: Bool
   public let tunnel: BridgeDesktopTunnelState
   public let clients: [BridgeDesktopMCPClientRow]
   public let providers: [BridgeDesktopAgentProviderRow]
@@ -192,6 +194,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     summaryRows: [BridgeDesktopServiceRow] = [],
     localMCPURL: String? = nil,
     localMCPState: String = "unknown",
+    canCopyLocalMCPURL: Bool = false,
+    canRotateLocalMCPEndpoint: Bool = false,
     tunnel: BridgeDesktopTunnelState,
     clients: [BridgeDesktopMCPClientRow] = [],
     providers: [BridgeDesktopAgentProviderRow] = [],
@@ -203,6 +207,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.summaryRows = summaryRows
     self.localMCPURL = localMCPURL
     self.localMCPState = localMCPState
+    self.canCopyLocalMCPURL = canCopyLocalMCPURL
+    self.canRotateLocalMCPEndpoint = canRotateLocalMCPEndpoint
     self.tunnel = tunnel
     self.clients = clients
     self.providers = providers

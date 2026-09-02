@@ -16,11 +16,10 @@
       var section = document.getElementById(name + "-page");
       if (section) section.hidden = !state || state.selectedNavigation !== name;
     });
-    if (!state || state.selectedNavigation === "overview") {
-      lastViewport = "";
-      return;
+    if (!state || state.selectedNavigation !== "workbench") {
+      emitBrowserViewport(emit, { x: 0, y: 0, width: 0, height: 0, visible: false });
     }
-    if (state.selectedNavigation !== "workbench") lastViewport = "";
+    if (!state || state.selectedNavigation === "overview") return;
     var page = pages[state.selectedNavigation];
     if (page) page.render(state[state.selectedNavigation], emit);
     if (state.selectedNavigation === "workbench") {
@@ -40,6 +39,10 @@
       height: rect.height,
       visible: visible
     };
+    emitBrowserViewport(emit, viewport);
+  }
+
+  function emitBrowserViewport(emit, viewport) {
     var signature = [viewport.x, viewport.y, viewport.width, viewport.height, viewport.visible].join(":");
     if (signature === lastViewport) return;
     lastViewport = signature;

@@ -46,6 +46,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setMCPClientEnabled
   case setMCPClientExposure
   case copyMCPClientConfiguration
+  case copyLocalMCPEndpoint
   case rotateMCPClientCredential
   case rotateLocalMCPEndpoint
   case configureTunnel

@@ -46,7 +46,8 @@
     card.appendChild(S.node("div", "page-message mono", page.localMCPURL || "Endpoint 尚未就绪"));
     var state = S.node("div", "inline-status");
     state.appendChild(S.badge(page.localMCPState, page.localMCPState === "ready" ? "success" : "neutral"));
-    state.appendChild(S.button("重新生成 Endpoint", "rotateLocalMCPEndpoint", {}, emit, "small", false));
+    if (page.canCopyLocalMCPURL) state.appendChild(S.button("复制 Endpoint", "copyLocalMCPEndpoint", {}, emit, "small", false));
+    if (page.canRotateLocalMCPEndpoint) state.appendChild(S.button("重新生成 Endpoint", "rotateLocalMCPEndpoint", {}, emit, "small danger", false));
     card.appendChild(state);
     section.appendChild(card);
   }
@@ -69,7 +70,13 @@
     var actions = S.node("div", "form-actions");
     if (tunnel.canConnect) actions.appendChild(S.button("连接", "connectTunnel", {}, emit, "small primary", false));
     if (tunnel.canDisconnect) actions.appendChild(S.button("断开", "disconnectTunnel", {}, emit, "small", false));
-    if (tunnel.canClear) actions.appendChild(S.button("清除配置", "clearTunnel", {}, emit, "small danger", false));
+    if (tunnel.canClear) {
+      var clear = S.button("清除配置", null, {}, emit, "small danger", false);
+      clear.addEventListener("click", function () {
+        if (global.confirm("清除 Secure Tunnel 配置？\n这会移除已保存的 Runtime Key 并重置 Tunnel 绑定。")) emit("clearTunnel", {});
+      });
+      actions.appendChild(clear);
+    }
     card.appendChild(actions);
     section.appendChild(card);
   }
@@ -156,7 +163,18 @@
     enabled.appendChild(S.node("span", null, "启用"));
     actions.appendChild(enabled);
     actions.appendChild(S.button("Probe", "reprobeAgent", { installationID: installation.installationID, acceptReplacement: false }, emit, "small", !installation.canReprobe));
-    actions.appendChild(S.button("移除", "removeAgent", { installationID: installation.installationID }, emit, "small danger", !installation.canRemove));
+    if (installation.availability === "needs_review" && installation.canReprobe) {
+      var accept = S.button("接受替换并 Probe", null, {}, emit, "small primary", false);
+      accept.addEventListener("click", function () {
+        if (global.confirm("接受新的 Agent 可执行文件并重新 Probe？")) emit("reprobeAgent", { installationID: installation.installationID, acceptReplacement: true });
+      });
+      actions.appendChild(accept);
+    }
+    var remove = S.button("移除", null, {}, emit, "small danger", !installation.canRemove);
+    remove.addEventListener("click", function () {
+      if (global.confirm("移除这个 Agent 登记？本机可执行文件不会被删除。")) emit("removeAgent", { installationID: installation.installationID });
+    });
+    actions.appendChild(remove);
     row.appendChild(actions);
     return row;
   }

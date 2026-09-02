@@ -225,6 +225,14 @@
   window.addEventListener("resize", function () {
     if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) window.CodexBridgeDesktopPages.measureBrowserViewport(emit);
   });
+  var contentScroller = document.querySelector(".content-scroll");
+  if (contentScroller) {
+    contentScroller.addEventListener("scroll", function () {
+      if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) {
+        window.requestAnimationFrame(function () { window.CodexBridgeDesktopPages.measureBrowserViewport(emit); });
+      }
+    }, { passive: true });
+  }
 
   window.CodexBridgeDesktopUI = { setState: renderState, getState: function () { return state; }, sendCommand: emit };
   if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {

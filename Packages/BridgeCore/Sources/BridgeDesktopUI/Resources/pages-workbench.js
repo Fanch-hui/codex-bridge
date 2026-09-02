@@ -2,6 +2,7 @@
   "use strict";
 
   var S = global.CodexBridgeDesktopPageSupport;
+  var inspectorVisible = true;
 
   function toneForStatus(status) {
     if (status === "running" || status === "starting") return "running";
@@ -106,8 +107,16 @@
     var actions = S.node("div", "form-actions");
     if (row.canInterrupt) actions.appendChild(S.button("中断", "interruptTask", { taskID: detail.taskID }, emit, "small danger", false));
     if (row.canStop) actions.appendChild(S.button("停止", "stopTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (!row.isRunning && !row.isActive) actions.appendChild(S.button("删除记录", "deleteTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (row.canSteer) actions.appendChild(S.button("刷新任务", "refreshTasks", {}, emit, "small", false));
+    if (row.canDelete || (!row.isRunning && !row.isActive)) {
+      var remove = S.button("删除会话", null, {}, emit, "small danger", false);
+      remove.addEventListener("click", function () {
+        if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的任务、事件和对话记录，无法撤销。")) {
+          emit("deleteTask", { taskID: detail.taskID });
+        }
+      });
+      actions.appendChild(remove);
+    }
+    actions.appendChild(S.button("刷新任务", "refreshTasks", {}, emit, "small", false));
     card.appendChild(actions);
     if (row.canSteer) card.appendChild(steerForm(card, page, detail.taskID, emit));
     if (detail.resultSummary) addTextBlock(card, "结果摘要", detail.resultSummary);
@@ -238,12 +247,39 @@
     }
     S.pageHeader(header, page.header);
     renderPermissionPicker(header, page, emit);
+    renderInspectorToggle(header, page, emit);
     renderBrowser(page, emit);
     renderProjectPicker(page, emit);
     S.clear(content);
     renderTaskList(content, page, emit);
     renderTaskDetail(content, page, emit);
     renderApprovals(content, page, emit);
+  }
+
+  function renderInspectorToggle(header, page, emit) {
+    var layout = document.querySelector(".workbench-layout");
+    var hasApprovals = !!(page.approvals && page.approvals.length);
+    if (hasApprovals) inspectorVisible = true;
+    layout.classList.toggle("inspector-hidden", !inspectorVisible);
+    var toggle = S.button(
+      inspectorVisible ? "隐藏右侧面板" : "显示右侧面板",
+      null,
+      {},
+      emit,
+      "small inspector-toggle",
+      hasApprovals
+    );
+    toggle.addEventListener("click", function () {
+      inspectorVisible = !inspectorVisible;
+      layout.classList.toggle("inspector-hidden", !inspectorVisible);
+      toggle.textContent = inspectorVisible ? "隐藏右侧面板" : "显示右侧面板";
+      global.requestAnimationFrame(function () {
+        if (global.CodexBridgeDesktopPages) {
+          global.CodexBridgeDesktopPages.measureBrowserViewport(emit);
+        }
+      });
+    });
+    header.appendChild(toggle);
   }
 
   global.CodexBridgeDesktopWorkbenchPage = { render: render };

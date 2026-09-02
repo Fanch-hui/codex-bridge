@@ -67,7 +67,13 @@
     title.appendChild(S.node("h3", null, selected.name));
     title.appendChild(S.node("p", "muted mono", selected.projectID));
     header.appendChild(title);
-    header.appendChild(S.button("移除项目", "removeProject", { projectID: selected.projectID }, emit, "small danger", !page.canRemove));
+    var removeProject = S.button("移除项目", null, {}, emit, "small danger", !page.canRemove);
+    removeProject.addEventListener("click", function () {
+      if (global.confirm("从 Codex Bridge 移除项目“" + selected.name + "”？\n本地磁盘文件不会受到影响。")) {
+        emit("removeProject", { projectID: selected.projectID });
+      }
+    });
+    header.appendChild(removeProject);
     panel.appendChild(header);
     var body = S.node("div", "detail-body");
     if (page.selectedProjectDetail) body.appendChild(S.node("p", "muted", page.selectedProjectDetail));
@@ -101,10 +107,15 @@
   function renderWorkspace(container, workspace, projectID, emit) {
     var card = S.node("div", "page-card");
     card.appendChild(S.node("h3", null, "Direct 工作区"));
-    var mode = S.selectField("命令模式", workspace.commandMode, S.choices(workspace.commandMode, workspace.commandModeOptions), function (value) {
-      emit("setProjectCommandMode", { projectID: projectID, mode: value });
-    }, "");
+    var mode = S.selectField("命令模式", workspace.commandMode, S.choices(workspace.commandMode, workspace.commandModeOptions), function () {}, "");
     card.appendChild(mode.wrapper);
+    var modeActions = S.node("div", "form-actions");
+    var saveMode = S.button("保存命令模式", null, {}, emit, "small", !workspace.canSaveMode);
+    saveMode.addEventListener("click", function () {
+      emit("setProjectCommandMode", { projectID: projectID, mode: mode.control.value });
+    });
+    modeActions.appendChild(saveMode);
+    card.appendChild(modeActions);
     var commandTitle = S.node("div", "section-heading-row");
     commandTitle.appendChild(S.node("h4", null, "已登记命令"));
     var newButton = S.button("新建命令", null, {}, emit, "small", !workspace.canSaveCommand);
@@ -141,13 +152,14 @@
   function commandForm(command, workspace, projectID, emit) {
     var wrapper = S.node("div", "command-editor page-message");
     var grid = S.node("div", "form-grid");
-    var id = S.textField("命令 ID", command ? command.commandID : "", "新命令可留空");
     var name = S.textField("名称", command ? command.name : "", "例如：测试");
     var executable = S.textField("可执行文件", command ? command.executable : "", "例如：swift");
     var args = multilineField("参数（每行一个参数）", command ? command.arguments.join("\n") : "", "例如：--configuration\npath with spaces");
     var cwd = S.textField("工作目录", command ? command.workingDirectory : "", "可选");
-    var risk = S.textField("风险等级", command ? command.risk : "normal", "normal");
-    [id, name, executable, args, cwd, risk].forEach(function (field) { grid.appendChild(field.wrapper); });
+    var risk = S.selectField("风险等级", command ? command.risk : "normal", [
+      { id: "normal", title: "普通" }, { id: "elevated", title: "高风险" }
+    ], function () {}, "");
+    [name, executable, args, cwd, risk].forEach(function (field) { grid.appendChild(field.wrapper); });
     var network = S.node("label", "check-field");
     var checkbox = S.node("input");
     checkbox.type = "checkbox";
@@ -159,10 +171,16 @@
     var actions = S.node("div", "form-actions");
     var save = S.button("保存命令", null, {}, emit, "small primary", !workspace.canSaveCommand);
     save.addEventListener("click", function () {
-      emit("saveProjectCommand", { projectID: projectID, commandID: id.control.value || null, name: name.control.value, executable: executable.control.value, arguments: splitLines(args.control.value), workingDirectory: cwd.control.value || null, requiresNetwork: checkbox.checked, risk: risk.control.value || "normal" });
+      emit("saveProjectCommand", { projectID: projectID, commandID: command ? command.commandID : null, name: name.control.value, executable: executable.control.value, arguments: splitLines(args.control.value), workingDirectory: cwd.control.value || null, requiresNetwork: checkbox.checked, risk: risk.control.value || "normal" });
     });
     actions.appendChild(save);
-    if (command) actions.appendChild(S.button("删除命令", "removeProjectCommand", { projectID: projectID, commandID: command.commandID }, emit, "small danger", !workspace.canRemoveCommand));
+    if (command) {
+      var remove = S.button("删除命令", null, {}, emit, "small danger", !workspace.canRemoveCommand);
+      remove.addEventListener("click", function () {
+        if (global.confirm("删除 Direct 命令“" + command.name + "”？")) emit("removeProjectCommand", { projectID: projectID, commandID: command.commandID });
+      });
+      actions.appendChild(remove);
+    }
     wrapper.appendChild(actions);
     return { wrapper: wrapper };
   }
@@ -212,18 +230,23 @@
   function blacklistForm(rule, workspace, projectID, emit) {
     var wrapper = S.node("div", "blacklist-editor page-message");
     var grid = S.node("div", "form-grid");
-    var id = S.textField("规则 ID", rule ? rule.ruleID : "", "新规则可留空");
     var executable = S.textField("可执行文件", rule ? rule.executable : "", "可选");
     var pattern = S.textField("匹配模式", rule ? rule.pattern : "", "可选");
-    [id, executable, pattern].forEach(function (field) { grid.appendChild(field.wrapper); });
+    [executable, pattern].forEach(function (field) { grid.appendChild(field.wrapper); });
     wrapper.appendChild(grid);
     var actions = S.node("div", "form-actions");
     var save = S.button("保存规则", null, {}, emit, "small primary", !workspace.canSaveBlacklist);
     save.addEventListener("click", function () {
-      emit("saveProjectBlacklist", { projectID: projectID, ruleID: id.control.value || null, executable: executable.control.value || null, pattern: pattern.control.value || null });
+      emit("saveProjectBlacklist", { projectID: projectID, ruleID: rule ? rule.ruleID : null, executable: executable.control.value || null, pattern: pattern.control.value || null });
     });
     actions.appendChild(save);
-    if (rule) actions.appendChild(S.button("删除规则", "removeProjectBlacklist", { projectID: projectID, ruleID: rule.ruleID }, emit, "small danger", !workspace.canRemoveBlacklist));
+    if (rule) {
+      var remove = S.button("删除规则", null, {}, emit, "small danger", !workspace.canRemoveBlacklist);
+      remove.addEventListener("click", function () {
+        if (global.confirm("删除这条 Direct 命令黑名单规则？")) emit("removeProjectBlacklist", { projectID: projectID, ruleID: rule.ruleID });
+      });
+      actions.appendChild(remove);
+    }
     wrapper.appendChild(actions);
     return { wrapper: wrapper };
   }

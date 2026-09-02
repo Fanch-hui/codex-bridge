@@ -18,9 +18,18 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(script.contains("window.chrome.webview.addEventListener"))
     XCTAssertFalse(script.contains("https://"))
     XCTAssertTrue(try BridgeDesktopUIResources.read(.pagesJS).contains("updateBrowserViewport"))
-    XCTAssertTrue(try BridgeDesktopUIResources.read(.pagesWorkbenchJS).contains("resolveApproval"))
+    let workbenchScript = try BridgeDesktopUIResources.read(.pagesWorkbenchJS)
+    XCTAssertTrue(workbenchScript.contains("resolveApproval"))
+    XCTAssertTrue(workbenchScript.contains("deleteTask"))
+    XCTAssertTrue(workbenchScript.contains("confirm("))
     XCTAssertTrue(
       try BridgeDesktopUIResources.read(.pagesProjectsJS).contains("saveProjectBlacklist"))
+    let connectionsScript = try BridgeDesktopUIResources.read(.pagesConnectionsJS)
+    XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
+    XCTAssertTrue(connectionsScript.contains("acceptReplacement: true"))
+    let settingsScript = try BridgeDesktopUIResources.read(.pagesSettingsJS)
+    XCTAssertTrue(settingsScript.contains("settings-stack"))
+    XCTAssertTrue(settingsScript.contains("TextEncoder"))
   }
 
   func testStateRoundTripsThroughJSON() throws {

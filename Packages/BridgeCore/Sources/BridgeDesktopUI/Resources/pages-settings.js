@@ -18,15 +18,22 @@
     var header = S.node("div");
     S.pageHeader(header, page.header);
     container.appendChild(header);
-    var grid = S.node("div", "settings-grid");
-    grid.appendChild(preferencesCard(page, emit));
-    if (page.supervisorAvailable) grid.appendChild(supervisorCard(page, emit));
-    grid.appendChild(approvalCard(page, emit));
-    grid.appendChild(instructionsCard(page, emit));
-    grid.appendChild(agentDefaultsCard(page, emit));
-    grid.appendChild(serviceCard(page, emit));
-    container.appendChild(grid);
+    var modelCards = [preferencesCard(page, emit)];
+    if (page.supervisorAvailable) modelCards.push(supervisorCard(page, emit));
+    modelCards.push(agentDefaultsCard(page, emit));
+    appendGroup(container, "模型与执行默认偏好", modelCards);
+    appendGroup(container, "安全策略与全局指令", [
+      approvalCard(page, emit), instructionsCard(page, emit)
+    ]);
+    appendGroup(container, "后台运行与远程授权", [serviceCard(page, emit)]);
     if (page.statusMessage) container.appendChild(S.node("div", "page-message", page.statusMessage));
+  }
+
+  function appendGroup(container, title, cards) {
+    var section = S.section(container, title);
+    var stack = S.node("div", "settings-stack");
+    cards.forEach(function (card) { stack.appendChild(card); });
+    section.appendChild(stack);
   }
 
   function preferencesCard(page, emit) {
@@ -96,12 +103,24 @@
     text.value = page.customInstructions || "";
     text.placeholder = "可选。保存后由本机 Service 应用。";
     field.appendChild(text);
+    var counter = S.node("div", "hint");
+    field.appendChild(counter);
     card.appendChild(field);
     var actions = S.node("div", "form-actions");
     var save = S.button("保存指令", null, {}, emit, "small primary", !page.canSaveInstructions);
-    save.addEventListener("click", function () { emit("saveCustomInstructions", { text: text.value }); });
+    function validate() {
+      var bytes = new TextEncoder().encode(text.value).length;
+      var valid = text.value.indexOf("\u0000") < 0 && bytes <= 32768;
+      counter.textContent = bytes + " / 32768 字节" + (valid ? "" : " · 内容过长或包含 NUL 字符");
+      save.disabled = !page.canSaveInstructions || !valid;
+    }
+    text.addEventListener("input", validate);
+    save.addEventListener("click", function () {
+      if (!save.disabled) emit("saveCustomInstructions", { value: text.value });
+    });
     actions.appendChild(save);
     card.appendChild(actions);
+    validate();
     return card;
   }
 
@@ -154,7 +173,19 @@
     card.appendChild(keep.wrapper);
     card.appendChild(S.badge(page.serviceRegistered ? "已注册" : "未注册", page.serviceRegistered ? "success" : "warning"));
     var actions = S.node("div", "form-actions");
-    if (page.canChangeService) actions.appendChild(S.button(page.serviceRegistered ? "注销后台服务" : "注册后台服务", page.serviceRegistered ? "unregisterService" : "registerService", {}, emit, page.serviceRegistered ? "small danger" : "small primary", false));
+    if (page.canChangeService) {
+      if (page.serviceRegistered) {
+        var unregister = S.button("注销后台服务", null, {}, emit, "small danger", false);
+        unregister.addEventListener("click", function () {
+          if (global.confirm("停用后台 Service？退出 App 后将无法继续响应远程请求。")) {
+            emit("unregisterService", {});
+          }
+        });
+        actions.appendChild(unregister);
+      } else {
+        actions.appendChild(S.button("注册后台服务", "registerService", {}, emit, "small primary", false));
+      }
+    }
     card.appendChild(actions);
     return card;
   }

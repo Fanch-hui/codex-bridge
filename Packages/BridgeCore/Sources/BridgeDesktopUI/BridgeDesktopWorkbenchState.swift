@@ -15,6 +15,7 @@ public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
   public let canInterrupt: Bool
   public let canStop: Bool
   public let canSteer: Bool
+  public let canDelete: Bool
 
   public init(
     taskID: String,
@@ -30,7 +31,8 @@ public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
     isActive: Bool = false,
     canInterrupt: Bool = false,
     canStop: Bool = false,
-    canSteer: Bool = false
+    canSteer: Bool = false,
+    canDelete: Bool = false
   ) {
     self.taskID = taskID
     self.title = title
@@ -46,6 +48,7 @@ public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
     self.canInterrupt = canInterrupt
     self.canStop = canStop
     self.canSteer = canSteer
+    self.canDelete = canDelete
   }
 }
 

@@ -32,7 +32,13 @@
     search.type = "search";
     search.value = page.searchText || "";
     search.placeholder = "搜索日志摘要、命令或文件…";
-    search.addEventListener("change", function () { emit("setLogSearch", { searchText: search.value }); });
+    var searchTimer = null;
+    search.addEventListener("input", function () {
+      global.clearTimeout(searchTimer);
+      searchTimer = global.setTimeout(function () {
+        emit("setLogSearch", { searchText: search.value });
+      }, 180);
+    });
     bar.appendChild(search);
     var projects = page.projectOptions && page.projectOptions.length ? page.projectOptions : [{ id: "all", title: "全部项目" }];
     var project = S.selectField("项目", page.selectedProjectID || "all", projects, function (value) {
@@ -44,7 +50,13 @@
       emit("setLogKindFilter", { kind: value });
     }, "");
     bar.appendChild(kind.control);
-    bar.appendChild(S.button("复制日志", "copyLogs", {}, emit, "small", !page.canCopy));
+    var copy = S.button("复制日志", null, {}, emit, "small", !page.canCopy);
+    copy.addEventListener("click", function () {
+      emit("copyLogs", {});
+      copy.textContent = "已复制";
+      global.setTimeout(function () { copy.textContent = "复制日志"; }, 1500);
+    });
+    bar.appendChild(copy);
     bar.appendChild(S.button("刷新", "refreshLogs", {}, emit, "small primary", !page.canRefresh));
     return bar;
   }

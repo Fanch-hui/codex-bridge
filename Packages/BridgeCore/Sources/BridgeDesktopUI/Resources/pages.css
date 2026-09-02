@@ -57,6 +57,9 @@
 .detail-item dt { color: var(--text-secondary); font-size: 11px; }
 .detail-item dd { margin: 3px 0 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .workbench-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(340px, .75fr); gap: 14px; margin-top: 24px; min-height: 540px; }
+.workbench-layout.inspector-hidden { grid-template-columns: minmax(0, 1fr); }
+.workbench-layout.inspector-hidden .inspector-pane { display: none; }
+.inspector-toggle { margin: 12px 0 0 auto; }
 .browser-pane, .inspector-pane { min-width: 0; min-height: 0; border: 1px solid var(--separator); border-radius: var(--radius); background: var(--surface); }
 .browser-pane { display: flex; flex-direction: column; overflow: hidden; }
 .browser-pane-header, .inspector-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 12px 16px; border-bottom: 1px solid var(--separator); }
@@ -103,6 +106,7 @@
 .agent-row { align-items: flex-start; }
 .agent-row .row-detail { white-space: normal; }
 .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+.settings-stack { display: grid; gap: 12px; }
 .settings-card { min-width: 0; }
 .settings-card h3 { margin: 0 0 13px; font-size: 15px; }
 .settings-card .field + .field, .settings-card .check-field + .field { margin-top: 11px; }
