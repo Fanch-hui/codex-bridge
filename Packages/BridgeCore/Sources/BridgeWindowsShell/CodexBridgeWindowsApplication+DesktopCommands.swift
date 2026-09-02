@@ -22,11 +22,9 @@
         }
         return true
       case .refreshConversation(let taskID):
-        guard model.selectedTaskID == taskID else { return true }
-        Task { @MainActor in
-          await model.conversation?.reloadAuthoritativeSnapshot()
-          model.refreshDisplaySnapshot()
-        }
+        guard model.selectedTaskID == taskID, let task = model.selectedTask else { return true }
+        model.openConversation(for: task)
+        model.refreshDisplaySnapshot()
         return true
       case .setWorkbenchPermissionMode(let mode):
         guard let index = ["read-only", "workspace-write"].firstIndex(of: mode) else {
@@ -34,7 +32,7 @@
         }
         Task { @MainActor in await model.selectWorkbenchPermission(at: index) }
         return true
-      case .selectTask(id: let taskID):
+      case .selectTaskByID(id: let taskID):
         model.selectTask(id: taskID)
         return true
       case .interruptTask(let taskID):
@@ -67,7 +65,7 @@
           decision: decision,
           model: model
         )
-      case .selectProject, .beginProjectRegistration, .removeProject, .saveProjectPolicy,
+      case .selectProjectByID, .beginProjectRegistration, .removeProject, .saveProjectPolicyByID,
         .setProjectCommandMode, .saveProjectCommand, .removeProjectCommand,
         .saveProjectBlacklist, .removeProjectBlacklist, .openThread:
         return runDesktopProjectCommand(
@@ -76,7 +74,7 @@
           management: management,
           auxiliary: auxiliary
         )
-      case .selectLog(let id, _):
+      case .selectLogByID(let id, _):
         guard
           let index = auxiliary.logs.displayBox.current().rowsTyped.firstIndex(where: {
             $0.id == id
@@ -84,7 +82,7 @@
         else { return true }
         auxiliary.logs.selectItem(at: index)
         return true
-      case .setLogProjectFilter(let projectID):
+      case .setLogProjectFilterByID(let projectID):
         let display = auxiliary.logs.displayBox.current()
         let target = projectID ?? "all"
         guard let index = display.projectOptions.firstIndex(where: { $0.id == target }) else {
@@ -92,7 +90,7 @@
         }
         auxiliary.logs.setProjectFilter(index)
         return true
-      case .setLogKindFilter(let kind):
+      case .setLogKindFilterByID(let kind):
         guard let index = ["all", "command", "file", "other"].firstIndex(of: kind) else {
           return true
         }
@@ -178,7 +176,7 @@
           )
         }
         return true
-      case .refreshAgentModels(let providerID, let installationID):
+      case .refreshAgentModelsByID(let providerID, let installationID):
         guard auxiliary.agentDefaults.selectedProviderID == providerID,
           auxiliary.agentDefaults.selectedInstallationID == installationID
         else { return true }

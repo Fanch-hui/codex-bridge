@@ -9,7 +9,7 @@
       auxiliary: WindowsAuxiliaryRuntime
     ) -> Bool {
       switch command {
-      case .selectProject(let projectID):
+      case .selectProjectByID(let projectID):
         guard let index = management.projects.firstIndex(where: { $0.projectID == projectID })
         else {
           return true
@@ -28,7 +28,7 @@
           await model.connectAndRefresh()
           auxiliary.run(.refreshWorkspace)
         }
-      case .saveProjectPolicy(let projectID, let read, let write, let network):
+      case .saveProjectPolicyByID(let projectID, let read, let write, let network):
         guard management.selectedProjectID == projectID else { return true }
         Task { @MainActor in
           await management.saveSelectedProjectPolicy(read: read, write: write, network: network)

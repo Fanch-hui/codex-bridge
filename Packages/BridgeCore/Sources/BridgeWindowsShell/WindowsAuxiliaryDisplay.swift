@@ -36,17 +36,17 @@
     let saveBlacklistEnabled: Bool
     let removeBlacklistEnabled: Bool
     let statusText: String
-    let selectedProjectID: String? = nil
-    let selectedCommandID: String? = nil
-    let selectedSkillID: String? = nil
-    let selectedThreadID: String? = nil
-    let fileWritePermission: String = "denied"
-    let commands: [BridgeDesktopWorkspaceCommand] = []
-    let blacklist: [BridgeDesktopBlacklistRule] = []
-    let skills: [BridgeDesktopSkillRow] = []
-    let threads: [BridgeDesktopThreadRow] = []
-    let verificationCommands: [String] = []
-    let threadCount: Int? = nil
+    var selectedProjectID: String? = nil
+    var selectedCommandID: String? = nil
+    var selectedSkillID: String? = nil
+    var selectedThreadID: String? = nil
+    var fileWritePermission: String = "denied"
+    var commands: [BridgeDesktopWorkspaceCommand] = []
+    var blacklist: [BridgeDesktopBlacklistRule] = []
+    var skills: [BridgeDesktopSkillRow] = []
+    var threads: [BridgeDesktopThreadRow] = []
+    var verificationCommands: [String] = []
+    var threadCount: Int? = nil
   }
 
   struct WindowsAgentDefaultsDisplay: Equatable, Sendable {
@@ -66,15 +66,15 @@
     let refreshModelsEnabled: Bool
     let saveEnabled: Bool
     let statusText: String
-    let providerItems: [BridgeDesktopAgentProviderRow] = []
-    let installationItems: [BridgeDesktopAgentInstallationRow] = []
-    let selectedProviderID: String? = nil
-    let selectedInstallationID: String? = nil
-    let selectedModelID: String? = nil
-    let selectedEffort: String = ""
-    let selectedPermissionMode: String = ""
-    let defaultErrorMessage: String? = nil
-    let modelOptions: [BridgeDesktopModelOption] = []
+    var providerItems: [BridgeDesktopAgentProviderRow] = []
+    var installationItems: [BridgeDesktopAgentInstallationRow] = []
+    var selectedProviderID: String? = nil
+    var selectedInstallationID: String? = nil
+    var selectedModelID: String? = nil
+    var selectedEffort: String = ""
+    var selectedPermissionMode: String = ""
+    var defaultErrorMessage: String? = nil
+    var modelOptions: [BridgeDesktopModelOption] = []
   }
 
   struct WindowsLogDisplay: Equatable, Sendable {
@@ -91,11 +91,11 @@
     let copyEnabled: Bool
     let copyText: String
     let statusText: String
-    let rowsTyped: [BridgeDesktopLogRow] = []
-    let projectOptions: [BridgeDesktopChoice] = []
-    let selectedProjectID: String? = nil
-    let selectedKind: String = "all"
-    let selectedRowID: String? = nil
+    var rowsTyped: [BridgeDesktopLogRow] = []
+    var projectOptions: [BridgeDesktopChoice] = []
+    var selectedProjectID: String? = nil
+    var selectedKind: String = "all"
+    var selectedRowID: String? = nil
   }
 
   struct WindowsSettingsDisplay: Equatable, Sendable {
@@ -121,15 +121,15 @@
     let saveDirectApprovalEnabled: Bool
     let saveTaskStartApprovalEnabled: Bool
     let statusText: String
-    let supervisorAvailable: Bool = false
-    let executionModel: String = ""
-    let executionEffort: String = ""
-    let supervisorModel: String = ""
-    let supervisorEffort: String = ""
-    let accessMode: String = "request-approval"
-    let directApprovalMode: String = "require"
-    let taskStartApprovalMode: String = "require"
-    let modelOptions: [BridgeDesktopModelOption] = []
+    var supervisorAvailable: Bool = false
+    var executionModel: String = ""
+    var executionEffort: String = ""
+    var supervisorModel: String = ""
+    var supervisorEffort: String = ""
+    var accessMode: String = "request-approval"
+    var directApprovalMode: String = "require"
+    var taskStartApprovalMode: String = "require"
+    var modelOptions: [BridgeDesktopModelOption] = []
   }
 
   final class AuxiliaryDisplayBox<Value: Equatable & Sendable>: @unchecked Sendable {

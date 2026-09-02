@@ -40,7 +40,7 @@
       case .setWorkbenchPermissionMode:
         return nonEmpty(payload.mode).map(MainWindowCommand.setWorkbenchPermissionMode)
       case .selectTask:
-        return nonEmpty(payload.taskID).map(MainWindowCommand.selectTask(id:))
+        return nonEmpty(payload.taskID).map(MainWindowCommand.selectTaskByID(id:))
       case .refreshTasks:
         return .refreshTasks
       case .interruptTask:
@@ -67,7 +67,7 @@
         else { return nil }
         return .resolveDirectApproval(id: approvalID, decision: decision)
       case .selectProject:
-        return nonEmpty(payload.projectID).map(MainWindowCommand.selectProject(id:))
+        return nonEmpty(payload.projectID).map(MainWindowCommand.selectProjectByID(id:))
       case .refreshProjects:
         return .refreshProjects
       case .registerProject:
@@ -80,7 +80,12 @@
           let write = nonEmpty(payload.writePermission),
           let network = nonEmpty(payload.networkPermission)
         else { return nil }
-        return .saveProjectPolicy(projectID: projectID, read: read, write: write, network: network)
+        return .saveProjectPolicyByID(
+          projectID: projectID,
+          read: read,
+          write: write,
+          network: network
+        )
       case .setProjectCommandMode:
         guard let projectID = nonEmpty(payload.projectID), let mode = nonEmpty(payload.mode) else {
           return nil
@@ -125,18 +130,18 @@
         return .openThread(projectID: projectID, threadID: threadID)
       case .selectLog:
         guard let logID = nonEmpty(payload.logID) else { return nil }
-        return .selectLog(id: logID, taskID: optionalValue(payload.taskID))
+        return .selectLogByID(id: logID, taskID: optionalValue(payload.taskID))
       case .refreshLogs:
         return .refreshLogs
       case .setLogSearch:
         return .setLogSearch(text: payload.searchText ?? "")
       case .setLogProjectFilter:
-        return .setLogProjectFilter(projectID: optionalValue(payload.projectID))
+        return .setLogProjectFilterByID(projectID: optionalValue(payload.projectID))
       case .setLogKindFilter:
         guard let kind = nonEmpty(payload.kind),
           ["all", "command", "file", "other"].contains(kind)
         else { return nil }
-        return .setLogKindFilter(kind: kind)
+        return .setLogKindFilterByID(kind: kind)
       case .copyLogs:
         return .copyLogs
       case .setMCPClientEnabled:
@@ -189,7 +194,10 @@
         guard let providerID = nonEmpty(payload.providerID),
           let installationID = nonEmpty(payload.installationID)
         else { return nil }
-        return .refreshAgentModels(providerID: providerID, installationID: installationID)
+        return .refreshAgentModelsByID(
+          providerID: providerID,
+          installationID: installationID
+        )
       case .saveAgentDefault:
         guard let providerID = nonEmpty(payload.providerID),
           let installationID = nonEmpty(payload.installationID),

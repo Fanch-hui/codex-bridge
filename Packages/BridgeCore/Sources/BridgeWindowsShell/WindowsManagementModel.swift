@@ -194,7 +194,7 @@
         } ?? false
       let canDisable = selectedAgent?.isEnabled ?? false
       let projectDisplay = WindowsProjectManagementDisplay(
-        rows: projectItems.map(\.rowText),
+        rows: projectPresentations.map(\.rowText),
         selectedIndex: selectedProjectIndex,
         detailText: selectedProject?.detailText ?? "请选择项目。",
         policy: selectedProject.map {

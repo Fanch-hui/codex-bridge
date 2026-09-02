@@ -17,6 +17,6 @@
     let rotateCredentialEnabled: Bool
     let rotateEndpointEnabled: Bool
     let statusText: String
-    let clientItems: [BridgeDesktopMCPClientRow] = []
+    var clientItems: [BridgeDesktopMCPClientRow] = []
   }
 #endif

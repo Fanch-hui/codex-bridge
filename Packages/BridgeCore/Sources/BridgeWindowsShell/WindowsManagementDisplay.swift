@@ -17,7 +17,7 @@
     let removeEnabled: Bool
     let savePolicyEnabled: Bool
     let statusText: String
-    let projectItems: [BridgeDesktopProjectRow] = []
+    var projectItems: [BridgeDesktopProjectRow] = []
   }
 
   struct WindowsAgentManagementDisplay: Equatable, Sendable {
@@ -36,8 +36,8 @@
     let acceptReplacementEnabled: Bool
     let removeEnabled: Bool
     let statusText: String
-    let providerItems: [BridgeDesktopAgentProviderRow] = []
-    let installationItems: [BridgeDesktopAgentInstallationRow] = []
+    var providerItems: [BridgeDesktopAgentProviderRow] = []
+    var installationItems: [BridgeDesktopAgentInstallationRow] = []
   }
 
   struct WindowsManagementDisplay: Equatable, Sendable {

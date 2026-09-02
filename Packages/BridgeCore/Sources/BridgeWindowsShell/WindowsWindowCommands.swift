@@ -93,17 +93,17 @@
     case loadEarlierConversation(taskID: String)
     case refreshConversation(taskID: String)
     case setWorkbenchPermissionMode(mode: String)
-    case selectTask(id: String)
+    case selectTaskByID(id: String)
     case interruptTask(id: String)
     case stopTask(id: String)
     case deleteTask(id: String)
     case steerTask(id: String, input: String, mode: String)
     case resolveTaskApproval(approvalID: String, taskID: String, decision: String)
     case resolveDirectApproval(id: String, decision: String)
-    case selectProject(id: String)
+    case selectProjectByID(id: String)
     case beginProjectRegistration
     case removeProject(id: String)
-    case saveProjectPolicy(
+    case saveProjectPolicyByID(
       projectID: String,
       read: String,
       write: String,
@@ -129,9 +129,9 @@
     )
     case removeProjectBlacklist(projectID: String, ruleID: String)
     case openThread(projectID: String, threadID: String)
-    case selectLog(id: String, taskID: String?)
-    case setLogProjectFilter(projectID: String?)
-    case setLogKindFilter(kind: String)
+    case selectLogByID(id: String, taskID: String?)
+    case setLogProjectFilterByID(projectID: String?)
+    case setLogKindFilterByID(kind: String)
     case setMCPClientEnabled(id: String, enabled: Bool)
     case setMCPClientExposure(id: String, exposureMode: String)
     case copyMCPClientConfiguration(id: String)
@@ -147,7 +147,7 @@
       executablePath: String,
       configurationPath: String?
     )
-    case refreshAgentModels(providerID: String, installationID: String)
+    case refreshAgentModelsByID(providerID: String, installationID: String)
     case saveAgentDefault(
       providerID: String,
       installationID: String,

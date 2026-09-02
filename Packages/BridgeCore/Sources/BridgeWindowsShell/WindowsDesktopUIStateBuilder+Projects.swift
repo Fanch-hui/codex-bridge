@@ -40,7 +40,7 @@
         ),
         rows: projectRows,
         selectedProjectID: selectedProjectID,
-        selectedProjectDetail: selectedProject.map { management.project.detailText },
+        selectedProjectDetail: selectedProject.map { _ in management.project.detailText },
         policyOptions: policyOptions,
         readOptions: [choice("denied", "拒绝"), choice("allowed", "允许")],
         writeOptions: [
