@@ -204,6 +204,7 @@ var macOSOnlyTargets: [Target] = []
     .target(
       name: "BridgeServiceAppShell",
       dependencies: [
+        "BridgeDesktopUI",
         "BridgeIPC",
         "BridgeMCP",
         "BridgeServiceAppCore",
