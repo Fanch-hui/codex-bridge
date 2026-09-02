@@ -65,9 +65,7 @@
     static let webViewRemoveWebMessageReceived = 35
   }
 
-  struct WebView2EventRegistrationToken {
-    var value: Int64 = 0
-  }
+  typealias WebView2EventRegistrationToken = Int64
 
   /// `CreateCoreWebView2EnvironmentWithOptions` from WebView2Loader.dll.
   typealias WebView2CreateEnvironmentFn =
