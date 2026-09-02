@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import Foundation
   import WinSDK
 
@@ -21,7 +22,9 @@
     private static let desktopWebViewStoppedMessage = UINT(WM_APP + 41)
 
     private static let commandLock = NSLock()
+    private static let browserViewportLock = NSLock()
     nonisolated(unsafe) private static var pendingCommands: [MainWindowCommand] = []
+    nonisolated(unsafe) private static var browserViewport: BridgeDesktopBrowserViewport?
     nonisolated(unsafe) static var selectedPage = WindowsMainPage.overview
     nonisolated(unsafe) static var chatBounds = RECT()
     nonisolated(unsafe) private static var waitingForWebViewShutdown = false
@@ -66,6 +69,15 @@
     static func currentPage() -> WindowsMainPage { selectedPage }
 
     static func workbenchChatBounds() -> RECT { chatBounds }
+
+    static func applyBrowserViewport(_ viewport: BridgeDesktopBrowserViewport) {
+      browserViewportLock.withLock { browserViewport = viewport }
+      WindowsUIThread.shared.enqueue { layout() }
+    }
+
+    static func browserViewportSnapshot() -> BridgeDesktopBrowserViewport? {
+      browserViewportLock.withLock { browserViewport }
+    }
 
     static func takePendingCommands() -> [MainWindowCommand] {
       commandLock.lock()

@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import WinSDK
 
   extension WindowsMainWindow {
@@ -28,22 +29,51 @@
     }
 
     private static func layoutSharedDesktop(in bounds: RECT) {
-      guard selectedPage == .workbench else {
-        chatBounds = RECT()
-        chat?.resize(to: RECT())
-        chat?.setVisible(false)
+      guard selectedPage == .workbench, let viewport = browserViewportSnapshot() else {
+        hideChatViewport()
         return
       }
-      let width = max(Int32(0), bounds.right - bounds.left)
-      let chatWidth = min(Int32(520), max(Int32(360), width / 3))
-      chatBounds = RECT(
-        left: max(bounds.left, bounds.right - chatWidth),
-        top: bounds.top,
-        right: bounds.right,
-        bottom: bounds.bottom
-      )
+      chatBounds = browserViewportRect(viewport, in: bounds)
       chat?.resize(to: chatBounds)
-      chat?.setVisible(true)
+      chat?.setVisible(viewport.visible && !isEmpty(chatBounds))
+    }
+
+    private static func hideChatViewport() {
+      chatBounds = RECT()
+      chat?.resize(to: RECT())
+      chat?.setVisible(false)
+    }
+
+    private static func browserViewportRect(
+      _ viewport: BridgeDesktopBrowserViewport,
+      in bounds: RECT
+    ) -> RECT {
+      let scale = dpiScale()
+      let width = Double(max(Int32(0), bounds.right - bounds.left))
+      let height = Double(max(Int32(0), bounds.bottom - bounds.top))
+      let x = min(width, max(0, finite(viewport.x) * scale))
+      let y = min(height, max(0, finite(viewport.y) * scale))
+      let right = min(width, max(x, x + max(0, finite(viewport.width) * scale)))
+      let bottom = min(height, max(y, y + max(0, finite(viewport.height) * scale)))
+      return RECT(
+        left: bounds.left + Int32(x.rounded(.down)),
+        top: bounds.top + Int32(y.rounded(.down)),
+        right: bounds.left + Int32(right.rounded(.down)),
+        bottom: bounds.top + Int32(bottom.rounded(.down))
+      )
+    }
+
+    private static func dpiScale() -> Double {
+      let dpi = window.map { GetDpiForWindow($0) } ?? 96
+      return Double(dpi == 0 ? 96 : dpi) / 96
+    }
+
+    private static func finite(_ value: Double) -> Double {
+      value.isFinite ? value : 0
+    }
+
+    private static func isEmpty(_ bounds: RECT) -> Bool {
+      bounds.right <= bounds.left || bounds.bottom <= bounds.top
     }
 
     private static func layoutWorkbench(in bounds: RECT) {
