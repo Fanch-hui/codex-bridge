@@ -7,6 +7,7 @@ param(
   [string]$OutDir = ".build\windows-dist",
   [string]$VcpkgRoot = "",
   [string]$VCRedistRoot = "",
+  [string]$TunnelClientDir = "",
   [string]$ISCCPath = ""
 )
 
@@ -110,6 +111,7 @@ try {
         "BridgeDesktopUITests",
         "BridgeServiceAppCoreTests",
         "BridgeServiceHostWindowsTests",
+        "BridgeTunnelWindowsTests",
         "BridgeCodexServiceWindowsTests",
         "BridgeServiceApplicationWindowsTests",
         "BridgeServiceCoreWindowsTests",
@@ -136,6 +138,14 @@ try {
   }
   if ($resolvedVCRedistRoot) {
     $stageArguments["VCRedistRoot"] = $resolvedVCRedistRoot
+  }
+  if (-not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
+    $resolvedTunnelClientDir = if ([IO.Path]::IsPathRooted($TunnelClientDir)) {
+      [IO.Path]::GetFullPath($TunnelClientDir)
+    } else {
+      [IO.Path]::GetFullPath((Join-Path $repoRoot $TunnelClientDir))
+    }
+    $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
   }
   & $stageScript @stageArguments
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
