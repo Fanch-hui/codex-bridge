@@ -53,11 +53,28 @@ $vcpkgRootValue = if ($resolvedVcpkgRoot) {
   ""
 }
 $originalPath = $env:PATH
+$originalInclude = $env:INCLUDE
+$originalLib = $env:LIB
+
+if (-not $vcpkgRootValue) {
+  throw "VcpkgRoot or VCPKG_INSTALLATION_ROOT is required."
+}
+$vcpkgInstalledRoot = Join-Path $vcpkgRootValue "installed\$vcpkgTriplet"
+$vcpkgIncludeDirectory = Join-Path $vcpkgInstalledRoot "include"
+$vcpkgLibraryDirectory = Join-Path $vcpkgInstalledRoot "lib"
+$sqliteHeader = Join-Path $vcpkgIncludeDirectory "sqlite3.h"
+$sqliteLibrary = Join-Path $vcpkgLibraryDirectory "sqlite3.lib"
+foreach ($requiredPath in @($sqliteHeader, $sqliteLibrary)) {
+  if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+    throw "Vcpkg SQLite development file is unavailable: $requiredPath"
+  }
+}
+$env:INCLUDE = (@($vcpkgIncludeDirectory, $originalInclude) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ";"
+$env:LIB = (@($vcpkgLibraryDirectory, $originalLib) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ";"
 
 if ($Test) {
-  if (-not $vcpkgRootValue) {
-    throw "VcpkgRoot or VCPKG_INSTALLATION_ROOT is required when running tests."
-  }
   $sqliteRuntimeDirectory = Join-Path $vcpkgRootValue "installed\$vcpkgTriplet\bin"
   if (-not (Test-Path (Join-Path $sqliteRuntimeDirectory "sqlite3.dll"))) {
     throw "SQLite runtime is unavailable: $sqliteRuntimeDirectory\sqlite3.dll"
@@ -139,4 +156,6 @@ try {
 } finally {
   Pop-Location
   $env:PATH = $originalPath
+  $env:INCLUDE = $originalInclude
+  $env:LIB = $originalLib
 }
