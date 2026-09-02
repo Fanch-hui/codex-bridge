@@ -1,6 +1,7 @@
 #if os(Windows)
   import BridgeDesktopUI
   import BridgeIPC
+  import BridgeServiceAppCore
 
   extension WindowsAgentDefaultsModel {
     func providerDefaultItems() -> [BridgeDesktopAgentDefaultState] {

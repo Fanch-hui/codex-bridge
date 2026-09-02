@@ -11,7 +11,7 @@
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var providers: [IPCAgentProviderSummary] = []
     private(set) var installations: [IPCAgentInstallationSummary] = []
-    private(set) var models: [IPCAgentModelSummary] = []
+    var models: [IPCAgentModelSummary] = []
     var selectedProviderID: String?
     var selectedInstallationID: String?
     var selectedModelID: String?
@@ -134,7 +134,7 @@
       }
     }
 
-    private func publishDisplay() {
+    func publishDisplay() {
       let providerIndex = selectedProviderID.flatMap { id in
         providers.firstIndex { $0.providerID == id }
       }
