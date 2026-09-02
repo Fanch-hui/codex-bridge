@@ -20,7 +20,7 @@
   --running-soft: #e6f2ff;
   --neutral-soft: #f0f0f1;
   --radius: 10px;
-  --sidebar-width: clamp(220px, 15vw, 292px);
+  --sidebar-width: clamp(220px, 20vw, 300px);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
