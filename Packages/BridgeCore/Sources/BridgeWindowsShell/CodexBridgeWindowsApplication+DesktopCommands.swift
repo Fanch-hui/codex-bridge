@@ -74,10 +74,10 @@
           management: management,
           auxiliary: auxiliary
         )
-      case .selectLogByID(let id, _):
+      case .selectLogByID(let id, let taskID):
         guard
           let index = auxiliary.logs.displayBox.current().rowsTyped.firstIndex(where: {
-            $0.id == id
+            $0.id == id && (taskID == nil || $0.taskID == taskID)
           })
         else { return true }
         auxiliary.logs.selectItem(at: index)

@@ -89,6 +89,7 @@
           selectedProjectIndex: selectedProjectID.flatMap { selectedID in
             projects.firstIndex(where: { $0.projectID == selectedID })
           },
+          selectedProjectID: selectedProjectID,
           permissionRows: ["只读", "可写"],
           selectedPermissionIndex: Self.permissionModes.firstIndex(
             of: workbenchPermissionMode),
@@ -127,7 +128,8 @@
           browserEnabled: isChatBrowserEnabled,
           supportsImmediateSteer: task?.installationID.flatMap { installationID in
             agentInstallations.first(where: { $0.installationID == installationID })
-          }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
+          }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true,
+          canLoadEarlierConversation: conversation?.canLoadEarlier == true
         )
       )
     }

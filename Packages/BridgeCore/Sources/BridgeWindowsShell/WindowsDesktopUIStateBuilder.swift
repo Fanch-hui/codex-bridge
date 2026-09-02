@@ -18,6 +18,10 @@
       browserAvailable: Bool = true
     ) -> BridgeDesktopUIState {
       BridgeDesktopUIState(
+        navigation: navigation(
+          workbench: workbench,
+          management: management
+        ),
         selectedNavigation: selectedNavigation,
         connectionLabel: connectionLabel(for: workbench.connectionState),
         connectionTone: connectionTone(for: workbench.connectionState),
@@ -186,7 +190,8 @@
           title: "远程 Secure Tunnel",
           value: "Windows 不可用",
           symbol: "circle.dashed",
-          tone: .neutral
+          tone: .neutral,
+          destination: .connections
         ),
         BridgeDesktopServiceRow(
           id: "local-agents",
@@ -196,22 +201,6 @@
           tone: available > 0 ? .success : .neutral,
           destination: .connections
         ),
-      ]
-    }
-
-    private static func notices(
-      workbench: WindowsWorkbenchDisplay
-    ) -> [BridgeDesktopNotice] {
-      guard workbench.connectionState == .unavailable else { return [] }
-      return [
-        BridgeDesktopNotice(
-          id: "service-unavailable",
-          title: "后台 Service 不可用",
-          message: workbench.detailText ?? "无法读取本机 Service 状态。",
-          symbol: "circle.dashed",
-          tone: .error,
-          destination: .connections
-        )
       ]
     }
 

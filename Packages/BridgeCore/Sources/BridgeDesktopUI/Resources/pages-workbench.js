@@ -221,6 +221,9 @@
       var actions = S.node("div", "approval-actions");
       var decisions = approval.decisionOptions && approval.decisionOptions.length
         ? approval.decisionOptions : ["allow", "deny"];
+      if (approval.canDeny && !decisions.some(function (decision) {
+        return decision.toLowerCase() === "deny";
+      })) decisions = decisions.concat(["deny"]);
       decisions.forEach(function (decision) {
         var allowed = decision.toLowerCase() === "deny" ? approval.canDeny : approval.canAllow;
         var command = approval.isDirect ? "resolveDirectApproval" : "resolveApproval";

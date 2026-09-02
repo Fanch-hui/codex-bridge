@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import Foundation
 
   enum WindowsDesktopUICommandRouter {
     static func command(for envelope: BridgeDesktopCommandEnvelope) -> MainWindowCommand? {

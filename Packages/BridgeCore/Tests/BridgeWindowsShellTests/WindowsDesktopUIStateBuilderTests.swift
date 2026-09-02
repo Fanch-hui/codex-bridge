@@ -36,6 +36,15 @@
         state.overview?.services.first(where: { $0.id == "secure-tunnel" })?.value,
         "Windows 不可用"
       )
+      XCTAssertEqual(
+        state.navigation.first(where: { $0.navigation == .workbench })?.badge,
+        1
+      )
+      XCTAssertEqual(
+        state.navigation.first(where: { $0.navigation == .projects })?.badge,
+        1
+      )
+      XCTAssertEqual(state.overview?.notices.map(\.id), ["local-approvals"])
     }
 
     func testLegacyRowsDoNotCreateSyntheticRecentTaskIdentifiers() {
@@ -46,6 +55,19 @@
       )
 
       XCTAssertTrue(state.overview?.recentTasks.isEmpty == true)
+    }
+
+    func testWorkbenchUsesStableProjectAndConversationPagingState() {
+      var workbench = makeWorkbench()
+      workbench.selectedProjectID = "project-stable"
+      workbench.canLoadEarlierConversation = true
+      let state = WindowsDesktopUIStateBuilder.build(
+        workbench: workbench,
+        management: makeManagement()
+      )
+
+      XCTAssertEqual(state.workbench?.selectedProjectID, "project-stable")
+      XCTAssertEqual(state.workbench?.browser.canLoadEarlierConversation, true)
     }
 
     func testSharedCommandsRouteToStablePageAndTaskIdentifiers() {

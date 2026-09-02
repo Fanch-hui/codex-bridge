@@ -48,6 +48,7 @@
     public var pendingApprovalCount: Int
     public var projectRows: [String]
     public var selectedProjectIndex: Int?
+    public var selectedProjectID: String? = nil
     public var permissionRows: [String]
     public var selectedPermissionIndex: Int?
     public var permissionMode: String = "workspace-write"
@@ -76,6 +77,7 @@
     public var approvalItems: [BridgeDesktopApprovalRow] = []
     public var browserEnabled: Bool = true
     public var supportsImmediateSteer: Bool = false
+    public var canLoadEarlierConversation: Bool = false
   }
 
   /// Lock-guarded bridge between main-actor model updates and the

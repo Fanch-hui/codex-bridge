@@ -21,10 +21,7 @@
           "bubble.left.and.text.bubble.right.fill"
         ),
         projects: projects,
-        selectedProjectID: display.selectedProjectIndex.flatMap {
-          management.project.projectItems.indices.contains($0)
-            ? management.project.projectItems[$0].projectID : nil
-        },
+        selectedProjectID: display.selectedProjectID,
         permissionMode: display.permissionMode,
         permissionOptions: permissions,
         tasks: display.taskItems,
@@ -60,7 +57,7 @@
         canGoBack: enabled,
         canGoForward: enabled,
         canReload: enabled,
-        canLoadEarlierConversation: display.selectedTaskDetail != nil
+        canLoadEarlierConversation: display.canLoadEarlierConversation
       )
     }
   }
