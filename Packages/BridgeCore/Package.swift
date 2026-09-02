@@ -550,6 +550,7 @@ let package = Package(
     .target(
       name: "BridgeWindowsShell",
       dependencies: [
+        "BridgeDesktopUI",
         "BridgeIPC",
         "BridgeMCP",
         "BridgeServiceAppCore",

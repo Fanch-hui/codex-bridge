@@ -60,6 +60,13 @@
     static let webViewReload = 31
     static let webViewGoBack = 40
     static let webViewGoForward = 41
+    static let webViewPostWebMessageAsJSON = 32
+    static let webViewAddWebMessageReceived = 34
+    static let webViewRemoveWebMessageReceived = 35
+  }
+
+  struct WebView2EventRegistrationToken {
+    var value: Int64 = 0
   }
 
   /// `CreateCoreWebView2EnvironmentWithOptions` from WebView2Loader.dll.
@@ -105,6 +112,31 @@
   typealias WebView2ActionFn =
     @convention(c) (
       UnsafeMutableRawPointer?
+    ) -> HRESULT
+
+  typealias WebView2PostWebMessageAsJSONFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafePointer<WCHAR>?
+    ) -> HRESULT
+
+  typealias WebView2AddWebMessageReceivedFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<WebView2EventRegistrationToken>?
+    ) -> HRESULT
+
+  typealias WebView2RemoveWebMessageReceivedFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      WebView2EventRegistrationToken
+    ) -> HRESULT
+
+  typealias WebView2GetWebMessageAsJSONFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UnsafeMutableRawPointer?>?
     ) -> HRESULT
 
   /// Loads a member function pointer of a COM interface by vtable slot.

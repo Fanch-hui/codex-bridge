@@ -10,27 +10,54 @@
       static let goBack = UINT(WM_APP + 2)
       static let goForward = UINT(WM_APP + 3)
       static let reload = UINT(WM_APP + 4)
+      static let postWebMessage = UINT(WM_APP + 5)
     }
 
     private let parentWindow: HWND
+    private let initialURL: String
+    let profileName: String
     private let updateState: StateUpdate
-    private let lock = NSLock()
-    private let finished = CreateEventW(nil, true, false, nil)
-    private var threadID: DWORD = 0
+    private let onWebMessage: (@Sendable (String) -> Void)?
+    let lock = NSLock()
+    let finished = CreateEventW(nil, true, false, nil)
+    var threadID: DWORD = 0
     private var pendingBounds = RECT()
     private var pendingVisible = false
-    private var stopping = false
-    private var completed = false
-    private var shutdownNotification: (window: HWND, message: UINT)?
+    var stopping = false
+    var completed = false
+    var shutdownNotification: (window: HWND, message: UINT)?
 
-    private var loaderModule: HMODULE?
-    private var environment: UnsafeMutableRawPointer?
-    private var controller: UnsafeMutableRawPointer?
-    private var webView: UnsafeMutableRawPointer?
+    var loaderModule: HMODULE?
+    var environment: UnsafeMutableRawPointer?
+    var controller: UnsafeMutableRawPointer?
+    var webView: UnsafeMutableRawPointer?
+    var webMessageHandler: UnsafeMutableRawPointer?
+    var webMessageToken = WebView2EventRegistrationToken()
+    var hasWebMessageToken = false
+    private var pendingWebMessage: String?
 
     init(parentWindow: HWND, updateState: @escaping StateUpdate) {
+      self.init(
+        parentWindow: parentWindow,
+        initialURL: WindowsChatWebView.chatURL,
+        profileName: "WebView2",
+        updateState: updateState,
+        onWebMessage: nil
+      )
+    }
+
+    init(
+      parentWindow: HWND,
+      initialURL: String,
+      profileName: String,
+      updateState: @escaping StateUpdate,
+      onWebMessage: (@Sendable (String) -> Void)?
+    ) {
       self.parentWindow = parentWindow
+      self.initialURL = initialURL
+      self.profileName = profileName
       self.updateState = updateState
+      self.onWebMessage = onWebMessage
     }
 
     deinit {
@@ -54,6 +81,11 @@
     func goBack() { post(Message.goBack) }
     func goForward() { post(Message.goForward) }
     func reload() { post(Message.reload) }
+
+    func postWebMessageAsJSON(_ message: String) {
+      lock.withLock { pendingWebMessage = message }
+      post(Message.postWebMessage)
+    }
 
     func beginShutdown(notifying window: HWND, message: UINT) -> Bool {
       let target = lock.withLock { () -> DWORD? in
@@ -175,12 +207,32 @@
         return
       }
       self.webView = webView
+      if onWebMessage != nil {
+        let handler = webView2WebMessageHandler { [weak self] _, args in
+          guard let json = webView2ReadWebMessageJSON(args) else { return }
+          self?.onWebMessage?(json)
+        }
+        var token = WebView2EventRegistrationToken()
+        let addMessageHandler: WebView2AddWebMessageReceivedFn = webView2Method(
+          webView, WebView2Slot.webViewAddWebMessageReceived,
+          as: WebView2AddWebMessageReceivedFn.self
+        )
+        let result = addMessageHandler(webView, handler, &token)
+        if result != webview2SOK {
+          _ = webView2Release(handler)
+          updateState(.failed, "无法接收 Desktop UI 命令（\(hresult(result))）。")
+          return
+        }
+        webMessageHandler = handler
+        webMessageToken = token
+        hasWebMessageToken = true
+      }
       let navigate: WebView2NavigateFn = webView2Method(
         webView,
         WebView2Slot.webViewNavigate,
         as: WebView2NavigateFn.self
       )
-      _ = WindowsChatWebView.chatURL.withCString(encodedAs: UTF16.self) {
+      _ = initialURL.withCString(encodedAs: UTF16.self) {
         navigate(webView, $0)
       }
       updateState(.active, nil)
@@ -192,8 +244,23 @@
       case Message.goBack: runAction(WebView2Slot.webViewGoBack)
       case Message.goForward: runAction(WebView2Slot.webViewGoForward)
       case Message.reload: runAction(WebView2Slot.webViewReload)
+      case Message.postWebMessage: postPendingWebMessage()
       default: break
       }
+    }
+
+    private func postPendingWebMessage() {
+      guard let webView else { return }
+      let message = lock.withLock { () -> String? in
+        defer { pendingWebMessage = nil }
+        return pendingWebMessage
+      }
+      guard let message else { return }
+      let post: WebView2PostWebMessageAsJSONFn = webView2Method(
+        webView, WebView2Slot.webViewPostWebMessageAsJSON,
+        as: WebView2PostWebMessageAsJSONFn.self
+      )
+      _ = message.withCString(encodedAs: UTF16.self) { post(webView, $0) }
     }
 
     private func synchronizeController() {
@@ -213,74 +280,10 @@
       _ = action(webView)
     }
 
-    private func post(_ message: UINT) {
+    func post(_ message: UINT) {
       let target = lock.withLock { threadID }
       if target != 0 { _ = PostThreadMessageW(target, message, 0, 0) }
     }
 
-    private func complete() {
-      let notification = lock.withLock { () -> (window: HWND, message: UINT)? in
-        completed = true
-        threadID = 0
-        return shutdownNotification
-      }
-      if let finished { _ = SetEvent(finished) }
-      if let notification {
-        _ = PostMessageW(notification.window, notification.message, 0, 0)
-      }
-    }
-
-    private func releaseInterfaces() {
-      if let controller {
-        let close: WebView2ActionFn = webView2Method(
-          controller, WebView2Slot.controllerClose, as: WebView2ActionFn.self)
-        _ = close(controller)
-      }
-      for object in [webView, controller, environment].compactMap({ $0 }) {
-        _ = webView2Release(object)
-      }
-      webView = nil
-      controller = nil
-      environment = nil
-    }
-
-    private func loadLoader() -> HMODULE? {
-      "WebView2Loader.dll".withCString(encodedAs: UTF16.self) { LoadLibraryW($0) }
-    }
-
-    private func loadCreateFunction(_ loader: HMODULE) -> WebView2CreateEnvironmentFn? {
-      guard
-        let address = "CreateCoreWebView2EnvironmentWithOptions".withCString({
-          GetProcAddress(loader, $0)
-        })
-      else { return nil }
-      return unsafeBitCast(address, to: WebView2CreateEnvironmentFn.self)
-    }
-
-    private func userDataFolderPath() -> String? {
-      let required = "LOCALAPPDATA".withCString(encodedAs: UTF16.self) {
-        GetEnvironmentVariableW($0, nil, 0)
-      }
-      guard required > 0 else { return nil }
-      var buffer = [WCHAR](repeating: 0, count: Int(required))
-      let written = "LOCALAPPDATA".withCString(encodedAs: UTF16.self) {
-        GetEnvironmentVariableW($0, &buffer, required)
-      }
-      guard written > 0 else { return nil }
-      var path = String(decoding: buffer.prefix(Int(written)), as: UTF16.self)
-      if path.hasSuffix("\\") { path.removeLast() }
-      return path + "\\CodexBridge\\WebView2"
-    }
-
-    private func ensureDirectoryExists(_ path: String) {
-      let root = path.dropLast("\\WebView2".count)
-      for directory in [String(root), path] {
-        directory.withCString(encodedAs: UTF16.self) { _ = CreateDirectoryW($0, nil) }
-      }
-    }
-
-    private func hresult(_ value: HRESULT) -> String {
-      String(format: "0x%08X", UInt32(bitPattern: value))
-    }
   }
 #endif
