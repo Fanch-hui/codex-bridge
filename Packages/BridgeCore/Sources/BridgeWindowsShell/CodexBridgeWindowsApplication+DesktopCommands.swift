@@ -178,18 +178,19 @@
         }
         return true
       case .refreshAgentModelsByID(let providerID, let installationID):
-        guard auxiliary.agentDefaults.selectedProviderID == providerID,
-          auxiliary.agentDefaults.selectedInstallationID == installationID
-        else { return true }
-        Task { @MainActor in await auxiliary.agentDefaults.refreshModels() }
+        Task { @MainActor in
+          await auxiliary.agentDefaults.refreshModels(
+            providerID: providerID,
+            installationID: installationID
+          )
+        }
         return true
       case .saveAgentDefault(
         let providerID, let installationID, let modelID, let permissionMode, let effort):
-        guard auxiliary.agentDefaults.selectedProviderID == providerID,
-          auxiliary.agentDefaults.selectedInstallationID == installationID
-        else { return true }
         Task { @MainActor in
           await auxiliary.agentDefaults.saveDefaults(
+            providerID: providerID,
+            installationID: installationID,
             model: modelID,
             permissionMode: permissionMode,
             effort: effort ?? ""

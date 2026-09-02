@@ -130,6 +130,27 @@
           mode: "interrupt-current-then-continue"
         )
       )
+
+      let providerDefault = BridgeDesktopCommandEnvelope(
+        requestID: "agent-default-1",
+        command: .saveAgentDefault,
+        payload: .init(
+          providerID: "opencode",
+          installationID: "installation-1",
+          modelID: nil,
+          permissionMode: "build"
+        )
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: providerDefault),
+        .saveAgentDefault(
+          providerID: "opencode",
+          installationID: "installation-1",
+          modelID: nil,
+          permissionMode: "build",
+          effort: nil
+        )
+      )
     }
 
     private func makeWorkbench(

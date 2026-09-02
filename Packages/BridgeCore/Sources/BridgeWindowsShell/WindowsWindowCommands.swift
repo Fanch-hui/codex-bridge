@@ -151,7 +151,7 @@
     case saveAgentDefault(
       providerID: String,
       installationID: String,
-      modelID: String,
+      modelID: String?,
       permissionMode: String,
       effort: String?
     )

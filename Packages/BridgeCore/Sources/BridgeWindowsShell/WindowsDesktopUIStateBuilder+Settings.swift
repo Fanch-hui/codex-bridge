@@ -7,7 +7,6 @@
       agentDefaults: WindowsAgentDefaultsDisplay?
     ) -> BridgeDesktopSettingsState? {
       guard let settings else { return nil }
-      let defaults = agentDefaults.flatMap(agentDefaultState)
       return BridgeDesktopSettingsState(
         header: header(
           "设置",
@@ -31,7 +30,7 @@
         taskStartApprovalMode: settings.taskStartApprovalMode,
         taskStartApprovalOptions: settings.taskStartApprovalValues.map { approvalChoice($0) },
         customInstructions: settings.customInstructions,
-        agentDefaults: defaults.map { [$0] } ?? [],
+        agentDefaults: agentDefaults?.defaultItems ?? [],
         keepServiceRunningAfterExit: true,
         serviceRegistered: false,
         canSavePreferences: settings.savePreferencesEnabled,
@@ -42,33 +41,6 @@
         servicePlatform: "Windows",
         serviceDescription: "后台 Service 按需启动，关闭窗口后继续运行。",
         statusMessage: settings.statusText
-      )
-    }
-
-    private static func agentDefaultState(
-      _ display: WindowsAgentDefaultsDisplay
-    ) -> BridgeDesktopAgentDefaultState? {
-      guard let providerID = display.selectedProviderID,
-        let provider = display.providerItems.first(where: { $0.providerID == providerID })
-      else { return nil }
-      let installation = display.selectedInstallationID.flatMap { id in
-        display.installationItems.first(where: { $0.installationID == id })
-      }
-      return BridgeDesktopAgentDefaultState(
-        providerID: provider.providerID,
-        providerName: provider.displayName,
-        installationID: installation?.installationID,
-        installationName: installation?.displayName,
-        model: display.selectedModelID,
-        modelOptions: display.modelOptions,
-        effort: display.selectedEffort.isEmpty ? nil : display.selectedEffort,
-        effortOptions: display.effortValues.map { effortChoice($0, includesDefault: true) },
-        permissionMode: display.selectedPermissionMode,
-        permissionOptions: display.permissionValues.map { permissionChoice($0) },
-        canSave: display.saveEnabled,
-        canRefreshModels: display.refreshModelsEnabled,
-        isRefreshingModels: false,
-        errorMessage: display.defaultErrorMessage
       )
     }
 

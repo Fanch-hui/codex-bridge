@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeServiceAppCore
 
@@ -16,8 +17,12 @@
     var selectedModelID: String?
     var selectedEffort = ""
     var selectedPermissionMode: String = "build"
-    private var busy = false
-    private var statusText = "尚未加载 Agent 默认设置。"
+    var modelCatalogs: [String: [IPCAgentModelSummary]] = [:]
+    var persistedDefaults: [String: IPCAgentModelDefaultResponse] = [:]
+    var providerErrors: [String: String] = [:]
+    var refreshingProviderIDs: Set<String> = []
+    var busy = false
+    var statusText = "尚未加载 Agent 默认设置。"
 
     init(client: any BridgeServiceClientProtocol) {
       self.client = client
@@ -62,7 +67,7 @@
         return
       }
       busy = false
-      await refreshModels()
+      await refreshAllProviderModels()
     }
 
     func selectProvider(at index: Int) {
@@ -88,98 +93,9 @@
       publishDisplay()
     }
 
-    func refreshModels() async {
-      guard connectionState == .connected, let installation = availableInstallation() else {
-        models = []
-        selectedModelID = nil
-        statusText = "没有可用且已启用的 Agent 安装。"
-        publishDisplay()
-        return
-      }
-      guard !busy else { return }
-      busy = true
-      statusText = "正在读取 Agent 模型…"
-      publishDisplay()
-      defer {
-        busy = false
-        publishDisplay()
-      }
-      do {
-        let defaults = try await client.agentModelDefault(providerID: installation.providerID)
-        let response = try await client.agentModels(
-          installationID: installation.installationID,
-          projectID: nil,
-          modelID: nil,
-          useStoredDefault: false
-        )
-        guard selectedProviderID == installation.providerID,
-          selectedInstallationID == installation.installationID
-        else { return }
-        models = response.models
-        selectedModelID = defaults.model
-        if selectedModelID == nil {
-          selectedModelID = models.first?.modelID
-        }
-        let permissionValues = Self.permissionValues(for: installation.providerID)
-        selectedPermissionMode =
-          permissionValues.contains(defaults.permissionMode)
-          ? defaults.permissionMode
-          : permissionValues[0]
-        selectedEffort = defaults.effort ?? ""
-        statusText = "已加载 \(models.count) 个模型，可保存 Provider 默认值。"
-      } catch {
-        statusText = "Agent 模型读取失败：\(BridgeServiceErrorMessage.message(error))"
-      }
-      publishDisplay()
-    }
-
-    func saveDefaults(model: String, permissionMode: String, effort: String) async {
-      guard let providerID = selectedProviderID, let installation = availableInstallation() else {
-        statusText = "请选择可用的 Agent 安装。"
-        publishDisplay()
-        return
-      }
-      let permissionValues = Self.permissionValues(for: providerID)
-      guard permissionValues.contains(permissionMode), availableEffortValues().contains(effort)
-      else {
-        statusText = "默认权限或推理强度无效。"
-        publishDisplay()
-        return
-      }
-      guard !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-        statusText = "默认模型不能为空。"
-        publishDisplay()
-        return
-      }
-      guard connectionState == .connected, !busy else { return }
-      busy = true
-      statusText = "正在保存 Agent 默认设置…"
-      publishDisplay()
-      defer {
-        busy = false
-        publishDisplay()
-      }
-      do {
-        _ = try await client.setAgentDefaults(
-          providerID: providerID,
-          model: model,
-          permissionMode: permissionMode,
-          effort: effort.isEmpty ? nil : effort
-        )
-        selectedInstallationID = installation.installationID
-        selectedModelID = model
-        selectedPermissionMode = permissionMode
-        selectedEffort = effort
-        statusText = "Agent 默认设置已保存。"
-      } catch {
-        statusText = "Agent 默认设置保存失败：\(BridgeServiceErrorMessage.message(error))"
-      }
-      publishDisplay()
-    }
-
     func refreshDisplaySnapshot() { publishDisplay() }
 
-    private func availableInstallation(for providerID: String? = nil)
+    func availableInstallation(for providerID: String? = nil)
       -> IPCAgentInstallationSummary?
     {
       let target = providerID ?? selectedProviderID
@@ -271,7 +187,7 @@
         selectedPermissionIndex: permissionIndex,
         refreshModelsEnabled: connectionState == .connected && !busy && installation != nil,
         saveEnabled: connectionState == .connected && !busy && installation != nil
-          && selectedModelID != nil,
+          && !refreshingProviderIDs.contains(selectedProviderID ?? ""),
         statusText: statusText,
         providerItems: desktopProviders,
         installationItems: desktopInstallations,
@@ -281,12 +197,13 @@
         selectedEffort: selectedEffort,
         selectedPermissionMode: selectedPermissionMode,
         defaultErrorMessage: statusText.hasPrefix("Agent 模型读取失败") ? statusText : nil,
-        modelOptions: desktopModels
+        modelOptions: desktopModels,
+        defaultItems: providerDefaultItems()
       )
       displayBox.store(value)
     }
 
-    private func availableEffortValues() -> [String] {
+    func availableEffortValues() -> [String] {
       DirectWorkspacePresentation.effortValues(
         catalog: models.flatMap(\.supportedReasoningEfforts),
         selected: [selectedEffort],

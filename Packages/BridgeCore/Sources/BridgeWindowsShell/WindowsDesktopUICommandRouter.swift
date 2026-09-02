@@ -202,13 +202,12 @@
       case .saveAgentDefault:
         guard let providerID = nonEmpty(payload.providerID),
           let installationID = nonEmpty(payload.installationID),
-          let modelID = nonEmpty(payload.modelID),
           let permissionMode = nonEmpty(payload.permissionMode)
         else { return nil }
         return .saveAgentDefault(
           providerID: providerID,
           installationID: installationID,
-          modelID: modelID,
+          modelID: optionalValue(payload.modelID),
           permissionMode: permissionMode,
           effort: optionalValue(payload.effort)
         )

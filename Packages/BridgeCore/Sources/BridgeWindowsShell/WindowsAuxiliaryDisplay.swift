@@ -75,6 +75,7 @@
     var selectedPermissionMode: String = ""
     var defaultErrorMessage: String? = nil
     var modelOptions: [BridgeDesktopModelOption] = []
+    var defaultItems: [BridgeDesktopAgentDefaultState] = []
   }
 
   struct WindowsLogDisplay: Equatable, Sendable {
