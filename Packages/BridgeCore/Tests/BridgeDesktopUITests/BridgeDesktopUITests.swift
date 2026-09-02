@@ -10,11 +10,17 @@ final class BridgeDesktopUITests: XCTestCase {
     }
 
     XCTAssertTrue(try BridgeDesktopUIResources.read(.indexHTML).contains("Codex Bridge"))
+    let index = try BridgeDesktopUIResources.read(.indexHTML)
+    XCTAssertTrue(index.contains("chat-browser-slot"))
+    XCTAssertFalse(index.contains("placeholder-page"))
     let script = try BridgeDesktopUIResources.read(.appJS)
     XCTAssertTrue(script.contains(#"emit("ready")"#))
-    XCTAssertTrue(script.contains("setIcons(metrics)"))
     XCTAssertTrue(script.contains("window.chrome.webview.addEventListener"))
     XCTAssertFalse(script.contains("https://"))
+    XCTAssertTrue(try BridgeDesktopUIResources.read(.pagesJS).contains("updateBrowserViewport"))
+    XCTAssertTrue(try BridgeDesktopUIResources.read(.pagesWorkbenchJS).contains("resolveApproval"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesProjectsJS).contains("saveProjectBlacklist"))
   }
 
   func testStateRoundTripsThroughJSON() throws {
@@ -49,7 +55,15 @@ final class BridgeDesktopUITests: XCTestCase {
       connectionLabel: "已连接",
       connectionTone: .success,
       isRefreshing: false,
-      overview: overview
+      overview: overview,
+      workbench: BridgeDesktopWorkbenchState(
+        header: BridgeDesktopPageHeader(
+          title: "工作台",
+          subtitle: "任务",
+          symbol: "bubble.left.and.text.bubble.right.fill"
+        ),
+        browser: BridgeDesktopBrowserSlot(visible: true, enabled: true)
+      )
     )
     let data = try JSONEncoder().encode(state)
     XCTAssertEqual(try JSONDecoder().decode(BridgeDesktopUIState.self, from: data), state)
@@ -57,14 +71,14 @@ final class BridgeDesktopUITests: XCTestCase {
 
   func testCommandEnvelopeDecodes() throws {
     let data = Data(
-      #"{"version":1,"requestID":"request-7","command":"selectPage","payload":{"navigation":"projects","taskID":null}}"#
+      #"{"version":1,"requestID":"request-7","command":"updateBrowserViewport","payload":{"viewport":{"x":1,"y":2,"width":640,"height":480,"visible":true}}}"#
         .utf8
     )
     let envelope = try JSONDecoder().decode(BridgeDesktopCommandEnvelope.self, from: data)
     XCTAssertEqual(envelope.version, BridgeDesktopCommandEnvelope.currentVersion)
     XCTAssertEqual(envelope.requestID, "request-7")
-    XCTAssertEqual(envelope.command, .selectPage)
-    XCTAssertEqual(envelope.payload.navigation, .projects)
-    XCTAssertNil(envelope.payload.taskID)
+    XCTAssertEqual(envelope.command, .updateBrowserViewport)
+    XCTAssertEqual(envelope.payload.viewport?.width, 640)
+    XCTAssertTrue(envelope.payload.viewport?.visible == true)
   }
 }

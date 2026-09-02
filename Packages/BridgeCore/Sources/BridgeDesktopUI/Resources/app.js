@@ -18,11 +18,14 @@
     "list.bullet.rectangle": '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     "checkmark.circle.fill": '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/>',
     "circle.dashed": '<circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>',
-    "link": '<path d="m9 15-2 2a3 3 0 0 1-4-4l3-3a3 3 0 0 1 4 0M15 9l2-2a3 3 0 0 1 4 4l-3 3a3 3 0 0 1-4 0M8 16l8-8"/>'
+    "link": '<path d="m9 15-2 2a3 3 0 0 1-4-4l3-3a3 3 0 0 1 4 0M15 9l2-2a3 3 0 0 1 4 4l-3 3a3 3 0 0 1-4 0M8 16l8-8"/>',
+    "terminal": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>',
+    "trash": '<path d="M4 7h16M10 11v5M14 11v5M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    "network": '<circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="m8 11 8-4M8 13l8 4"/>'
   };
 
   function iconMarkup(symbol) {
-    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (iconPaths[symbol] || iconPaths["circle.dashed"]) + '</svg>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (iconPaths[symbol] || iconPaths["circle.dashed"]) + "</svg>";
   }
 
   function setIcons(root) {
@@ -31,9 +34,7 @@
     });
   }
 
-  function toneClass(tone) {
-    return tone || "neutral";
-  }
+  function toneClass(tone) { return tone || "neutral"; }
 
   function emit(command, payload) {
     var envelope = { version: 1, requestID: "desktop-ui-" + (++requestSequence), command: command, payload: payload || {} };
@@ -53,27 +54,60 @@
       var button = document.createElement("button");
       button.type = "button";
       button.className = "nav-item" + (item.navigation === selected ? " is-selected" : "");
-      button.setAttribute("data-page", item.navigation);
       button.setAttribute("aria-current", item.navigation === selected ? "page" : "false");
-      button.innerHTML = '<span class="icon" data-symbol="' + item.symbol + '"></span><span class="nav-title"></span>' + (item.badge === null || item.badge === undefined ? "" : '<span class="nav-badge"></span>');
-      button.querySelector(".nav-title").textContent = item.title;
-      if (button.querySelector(".nav-badge")) button.querySelector(".nav-badge").textContent = item.badge;
+      button.appendChild(iconElement(item.symbol, "icon"));
+      button.appendChild(elementWithText("span", "nav-title", item.title));
+      if (item.badge !== null && item.badge !== undefined) button.appendChild(elementWithText("span", "nav-badge", item.badge));
       button.addEventListener("click", function () { emit("selectPage", { navigation: item.navigation }); });
       container.appendChild(button);
     });
     setIcons(container);
   }
 
+  function iconElement(symbol, className) {
+    var element = document.createElement("span");
+    element.className = className || "icon";
+    element.dataset.symbol = symbol;
+    return element;
+  }
+
+  function elementWithText(tag, className, value) {
+    var element = document.createElement(tag);
+    element.className = className;
+    element.textContent = value || "";
+    return element;
+  }
+
   function renderMetric(metric) {
     var button = document.createElement("button");
     button.type = "button";
     button.className = "metric-card tone-" + toneClass(metric.tone);
-    button.innerHTML = '<span class="metric-topline"><span class="metric-title"></span><span class="metric-icon" data-symbol="' + metric.symbol + '"></span></span><span class="metric-value"><span class="metric-number"></span>' + (metric.destination ? '<span class="metric-chevron" aria-hidden="true">›</span>' : "") + '</span><span class="metric-subtitle"></span>';
-    button.querySelector(".metric-title").textContent = metric.title;
-    button.querySelector(".metric-number").textContent = metric.value;
-    button.querySelector(".metric-subtitle").textContent = metric.subtitle;
+    var top = document.createElement("span");
+    top.className = "metric-topline";
+    top.appendChild(elementWithText("span", "metric-title", metric.title));
+    top.appendChild(iconElement(metric.symbol, "metric-icon"));
+    button.appendChild(top);
+    var value = document.createElement("span");
+    value.className = "metric-value";
+    value.appendChild(elementWithText("span", "metric-number", metric.value));
+    if (metric.destination) value.appendChild(elementWithText("span", "metric-chevron", "›"));
+    button.appendChild(value);
+    button.appendChild(elementWithText("span", "metric-subtitle", metric.subtitle));
     if (metric.destination) button.addEventListener("click", function () { emit("selectPage", { navigation: metric.destination }); });
     return button;
+  }
+
+  function renderOverview(overview) {
+    if (!overview) return;
+    document.getElementById("overview-title").textContent = overview.title;
+    document.getElementById("overview-subtitle").textContent = overview.subtitle;
+    var metrics = document.getElementById("metrics");
+    metrics.innerHTML = "";
+    (overview.metrics || []).forEach(function (metric) { metrics.appendChild(renderMetric(metric)); });
+    setIcons(metrics);
+    renderServices(overview.services, overview.serviceActions);
+    renderRecentTasks(overview.recentTasks);
+    renderNotices(overview.notices);
   }
 
   function renderServices(rows, actions) {
@@ -83,9 +117,9 @@
       var element = document.createElement(row.destination ? "button" : "div");
       element.className = "service-row tone-" + toneClass(row.tone);
       if (row.destination) { element.type = "button"; element.addEventListener("click", function () { emit("selectPage", { navigation: row.destination }); }); }
-      element.innerHTML = '<span class="service-icon" data-symbol="' + row.symbol + '"></span><span class="service-title"></span><span class="status-badge ' + toneClass(row.tone) + '"></span>';
-      element.querySelector(".service-title").textContent = row.title;
-      element.querySelector(".status-badge").textContent = row.value;
+      element.appendChild(iconElement(row.symbol, "service-icon"));
+      element.appendChild(elementWithText("span", "service-title", row.title));
+      element.appendChild(elementWithText("span", "status-badge " + toneClass(row.tone), row.value));
       container.appendChild(element);
     });
     if (actions && actions.length) {
@@ -96,9 +130,7 @@
         button.type = "button";
         button.className = "link-button";
         button.textContent = action.title;
-        button.addEventListener("click", function () {
-          emit(action.command, { navigation: action.destination || null, taskID: action.taskID || null });
-        });
+        button.addEventListener("click", function () { emit(action.command, { navigation: action.destination || null, taskID: action.taskID || null }); });
         actionBar.appendChild(button);
       });
       container.appendChild(actionBar);
@@ -115,12 +147,14 @@
       var row = document.createElement("button");
       row.type = "button";
       row.className = "recent-task";
-      row.innerHTML = '<span class="status-badge neutral recent-status"></span><span class="recent-source"></span><span><span class="recent-title"></span><span class="recent-project"></span></span><span class="recent-time"></span><span class="recent-chevron" aria-hidden="true">›</span>';
-      row.querySelector(".recent-status").textContent = task.status;
-      row.querySelector(".recent-source").textContent = task.source;
-      row.querySelector(".recent-title").textContent = task.title;
-      row.querySelector(".recent-project").textContent = task.projectName;
-      row.querySelector(".recent-time").textContent = task.updatedAt;
+      row.appendChild(elementWithText("span", "status-badge neutral recent-status", task.status));
+      row.appendChild(elementWithText("span", "recent-source", task.source));
+      var copy = document.createElement("span");
+      copy.appendChild(elementWithText("span", "recent-title", task.title));
+      copy.appendChild(elementWithText("span", "recent-project", task.projectName));
+      row.appendChild(copy);
+      row.appendChild(elementWithText("span", "recent-time", task.updatedAt));
+      row.appendChild(elementWithText("span", "recent-chevron", "›"));
       row.addEventListener("click", function () { emit("openTask", { taskID: task.id }); });
       container.appendChild(row);
     });
@@ -132,10 +166,21 @@
     (notices || []).forEach(function (notice) {
       var element = document.createElement("div");
       element.className = "notice " + toneClass(notice.tone);
-      element.innerHTML = '<span class="icon" data-symbol="' + notice.symbol + '"></span><div><h4></h4><p></p></div>' + (notice.destination ? '<button type="button" class="link-button">处理 →</button>' : "");
-      element.querySelector("h4").textContent = notice.title;
-      element.querySelector("p").textContent = notice.message;
-      if (notice.destination) element.querySelector("button").addEventListener("click", function () { emit("selectPage", { navigation: notice.destination }); });
+      element.appendChild(iconElement(notice.symbol, "icon"));
+      var copy = document.createElement("div");
+      copy.appendChild(document.createElement("h4"));
+      copy.lastChild.textContent = notice.title;
+      copy.appendChild(document.createElement("p"));
+      copy.lastChild.textContent = notice.message;
+      element.appendChild(copy);
+      if (notice.destination) {
+        var action = document.createElement("button");
+        action.type = "button";
+        action.className = "link-button";
+        action.textContent = "处理 →";
+        action.addEventListener("click", function () { emit("selectPage", { navigation: notice.destination }); });
+        element.appendChild(action);
+      }
       container.appendChild(element);
     });
     setIcons(container);
@@ -145,34 +190,29 @@
     state = nextState;
     var shell = document.getElementById("app-shell");
     var loading = document.getElementById("loading-state");
-    var overview = document.getElementById("overview-page");
-    var placeholder = document.getElementById("placeholder-page");
-    var hasOverview = !!(state && state.overview && state.selectedNavigation === "overview");
     loading.hidden = !!state;
-    overview.hidden = !hasOverview;
-    placeholder.hidden = !state || hasOverview;
     shell.dataset.state = state ? "ready" : "loading";
-    if (!state) return;
-
+    if (!state) {
+      globalPages(null, emit);
+      return;
+    }
     renderNavigation(state.navigation, state.selectedNavigation);
     var selectedItem = (state.navigation || []).find(function (item) { return item.navigation === state.selectedNavigation; }) || {};
-    document.getElementById("page-title").textContent = hasOverview ? state.overview.title : selectedItem.title || "Codex Bridge";
-    document.getElementById("placeholder-title").textContent = selectedItem.title || "等待页面状态";
+    var pageState = state[state.selectedNavigation];
+    document.getElementById("page-title").textContent = state.selectedNavigation === "overview" && state.overview
+      ? state.overview.title : pageState && pageState.header ? pageState.header.title : selectedItem.title || "Codex Bridge";
     var indicator = document.getElementById("connection-indicator");
     indicator.className = "connection-indicator " + toneClass(state.connectionTone);
     document.getElementById("connection-label").textContent = state.connectionLabel;
     document.getElementById("refresh-indicator").classList.toggle("is-visible", !!state.isRefreshing);
     document.querySelector(".refresh-button").classList.toggle("is-refreshing", !!state.isRefreshing);
-    if (!hasOverview) return;
-    document.getElementById("overview-title").textContent = state.overview.title;
-    document.getElementById("overview-subtitle").textContent = state.overview.subtitle;
-    var metrics = document.getElementById("metrics");
-    metrics.innerHTML = "";
-    state.overview.metrics.forEach(function (metric) { metrics.appendChild(renderMetric(metric)); });
-    setIcons(metrics);
-    renderServices(state.overview.services, state.overview.serviceActions);
-    renderRecentTasks(state.overview.recentTasks);
-    renderNotices(state.overview.notices);
+    if (state.selectedNavigation === "overview") renderOverview(state.overview);
+    globalPages(state, emit);
+    setIcons(document);
+  }
+
+  function globalPages(nextState, commandEmitter) {
+    if (window.CodexBridgeDesktopPages) window.CodexBridgeDesktopPages.render(nextState, commandEmitter);
   }
 
   document.addEventListener("click", function (event) {
@@ -182,18 +222,15 @@
     if (action.dataset.action === "select-page") emit("selectPage", { navigation: action.dataset.page });
     if (action.dataset.action === "toggle-sidebar") document.getElementById("app-shell").classList.toggle("sidebar-collapsed");
   });
+  window.addEventListener("resize", function () {
+    if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) window.CodexBridgeDesktopPages.measureBrowserViewport(emit);
+  });
 
-  window.CodexBridgeDesktopUI = {
-    setState: renderState,
-    getState: function () { return state; },
-    sendCommand: emit
-  };
+  window.CodexBridgeDesktopUI = { setState: renderState, getState: function () { return state; }, sendCommand: emit };
   if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
     window.chrome.webview.addEventListener("message", function (event) {
       var incoming = event.data;
-      if (typeof incoming === "string") {
-        try { incoming = JSON.parse(incoming); } catch (_) { return; }
-      }
+      if (typeof incoming === "string") { try { incoming = JSON.parse(incoming); } catch (_) { return; } }
       if (incoming && typeof incoming === "object") renderState(incoming);
     });
   }

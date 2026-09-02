@@ -7,6 +7,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
     <title>Codex Bridge</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="pages.css">
   </head>
   <body>
     <div class="app-shell" id="app-shell" data-state="loading">
@@ -63,12 +64,42 @@
             </section>
           </section>
 
-          <section class="placeholder-page" id="placeholder-page" hidden aria-live="polite">
-            <div class="empty-state">
-              <span class="empty-icon icon-tile" data-symbol="circle.dashed" aria-hidden="true"></span>
-              <h2 id="placeholder-title">等待页面状态</h2>
-              <p>页面数据由本机 Service 提供。</p>
+          <section class="page" id="workbench-page" hidden aria-labelledby="workbench-title">
+            <div id="workbench-header"></div>
+            <div class="workbench-layout">
+              <section class="browser-pane" id="workbench-browser-pane" aria-label="ChatGPT 工作区">
+                <div class="browser-pane-header">
+                  <h3>ChatGPT 工作区</h3>
+                  <div class="browser-controls" id="browser-controls"></div>
+                </div>
+                <div id="chat-browser-slot">
+                  <div class="browser-slot-note" id="browser-slot-note">由宿主加载真实 ChatGPT 工作区</div>
+                </div>
+              </section>
+              <aside class="inspector-pane" aria-label="任务检查器">
+                <div class="inspector-header">
+                  <h3>任务检查器</h3>
+                  <div id="workbench-inspector-project"></div>
+                </div>
+                <div class="inspector-scroll" id="workbench-inspector-content"></div>
+              </aside>
             </div>
+          </section>
+
+          <section class="page" id="projects-page" hidden aria-labelledby="projects-title">
+            <div id="projects-content"></div>
+          </section>
+
+          <section class="page" id="logs-page" hidden aria-labelledby="logs-title">
+            <div id="logs-content"></div>
+          </section>
+
+          <section class="page" id="connections-page" hidden aria-labelledby="connections-title">
+            <div id="connections-content"></div>
+          </section>
+
+          <section class="page" id="settings-page" hidden aria-labelledby="settings-title">
+            <div id="settings-content"></div>
           </section>
 
           <div class="loading-state" id="loading-state" role="status">
@@ -78,6 +109,13 @@
         </div>
       </main>
     </div>
+    <script src="pages-common.js"></script>
+    <script src="pages-workbench.js"></script>
+    <script src="pages-projects.js"></script>
+    <script src="pages-logs.js"></script>
+    <script src="pages-connections.js"></script>
+    <script src="pages-settings.js"></script>
+    <script src="pages.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

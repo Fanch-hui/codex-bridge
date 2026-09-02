@@ -1,0 +1,213 @@
+import Foundation
+
+public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
+  public let configured: Bool
+  public let enabled: Bool
+  public let helperAvailable: Bool
+  public let tunnelID: String?
+  public let lifecycle: String
+  public let acceptsRemoteSubmissions: Bool
+  public let actionRequired: Bool
+  public let canConfigure: Bool
+  public let canConnect: Bool
+  public let canDisconnect: Bool
+  public let canClear: Bool
+
+  public init(
+    configured: Bool,
+    enabled: Bool,
+    helperAvailable: Bool,
+    tunnelID: String? = nil,
+    lifecycle: String,
+    acceptsRemoteSubmissions: Bool,
+    actionRequired: Bool,
+    canConfigure: Bool = true,
+    canConnect: Bool = false,
+    canDisconnect: Bool = false,
+    canClear: Bool = false
+  ) {
+    self.configured = configured
+    self.enabled = enabled
+    self.helperAvailable = helperAvailable
+    self.tunnelID = tunnelID
+    self.lifecycle = lifecycle
+    self.acceptsRemoteSubmissions = acceptsRemoteSubmissions
+    self.actionRequired = actionRequired
+    self.canConfigure = canConfigure
+    self.canConnect = canConnect
+    self.canDisconnect = canDisconnect
+    self.canClear = canClear
+  }
+}
+
+public struct BridgeDesktopMCPClientRow: Codable, Equatable, Sendable {
+  public let clientID: String
+  public let displayName: String
+  public let enabled: Bool
+  public let exposureMode: String
+  public let exposureOptions: [BridgeDesktopChoice]
+  public let activeSessionCount: Int
+  public let lastConnectedAt: String?
+  public let canToggle: Bool
+  public let canCopyConfiguration: Bool
+  public let canRotateCredential: Bool
+
+  public init(
+    clientID: String,
+    displayName: String,
+    enabled: Bool,
+    exposureMode: String,
+    exposureOptions: [BridgeDesktopChoice] = [],
+    activeSessionCount: Int,
+    lastConnectedAt: String? = nil,
+    canToggle: Bool = true,
+    canCopyConfiguration: Bool = false,
+    canRotateCredential: Bool = false
+  ) {
+    self.clientID = clientID
+    self.displayName = displayName
+    self.enabled = enabled
+    self.exposureMode = exposureMode
+    self.exposureOptions = exposureOptions
+    self.activeSessionCount = activeSessionCount
+    self.lastConnectedAt = lastConnectedAt
+    self.canToggle = canToggle
+    self.canCopyConfiguration = canCopyConfiguration
+    self.canRotateCredential = canRotateCredential
+  }
+}
+
+public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
+  public let providerID: String
+  public let displayName: String
+  public let adapterRevision: Int
+  public let requiresConfiguration: Bool
+  public let supportsModelSelection: Bool
+  public let supportsEffortSelection: Bool
+  public let supportsSteer: Bool
+  public let supportsWorkspaceWrite: Bool
+  public let supportsSupervisor: Bool
+  public let detail: String?
+
+  public init(
+    providerID: String,
+    displayName: String,
+    adapterRevision: Int,
+    requiresConfiguration: Bool = false,
+    supportsModelSelection: Bool = true,
+    supportsEffortSelection: Bool = true,
+    supportsSteer: Bool = false,
+    supportsWorkspaceWrite: Bool = true,
+    supportsSupervisor: Bool = false,
+    detail: String? = nil
+  ) {
+    self.providerID = providerID
+    self.displayName = displayName
+    self.adapterRevision = adapterRevision
+    self.requiresConfiguration = requiresConfiguration
+    self.supportsModelSelection = supportsModelSelection
+    self.supportsEffortSelection = supportsEffortSelection
+    self.supportsSteer = supportsSteer
+    self.supportsWorkspaceWrite = supportsWorkspaceWrite
+    self.supportsSupervisor = supportsSupervisor
+    self.detail = detail
+  }
+}
+
+public struct BridgeDesktopAgentInstallationRow: Codable, Equatable, Sendable {
+  public let installationID: String
+  public let providerID: String
+  public let displayName: String
+  public let executablePath: String
+  public let version: String?
+  public let protocolRevision: String?
+  public let adapterRevision: Int
+  public let trustProfile: String
+  public let securityProfileID: String?
+  public let enabled: Bool
+  public let availability: String
+  public let effectiveCapabilities: [String]
+  public let lastProbeError: String?
+  public let lastProbedAt: String?
+  public let updatedAt: String
+  public let canToggle: Bool
+  public let canReprobe: Bool
+  public let canRemove: Bool
+
+  public init(
+    installationID: String,
+    providerID: String,
+    displayName: String,
+    executablePath: String,
+    version: String? = nil,
+    protocolRevision: String? = nil,
+    adapterRevision: Int,
+    trustProfile: String,
+    securityProfileID: String? = nil,
+    enabled: Bool,
+    availability: String,
+    effectiveCapabilities: [String] = [],
+    lastProbeError: String? = nil,
+    lastProbedAt: String? = nil,
+    updatedAt: String,
+    canToggle: Bool = true,
+    canReprobe: Bool = true,
+    canRemove: Bool = true
+  ) {
+    self.installationID = installationID
+    self.providerID = providerID
+    self.displayName = displayName
+    self.executablePath = executablePath
+    self.version = version
+    self.protocolRevision = protocolRevision
+    self.adapterRevision = adapterRevision
+    self.trustProfile = trustProfile
+    self.securityProfileID = securityProfileID
+    self.enabled = enabled
+    self.availability = availability
+    self.effectiveCapabilities = effectiveCapabilities
+    self.lastProbeError = lastProbeError
+    self.lastProbedAt = lastProbedAt
+    self.updatedAt = updatedAt
+    self.canToggle = canToggle
+    self.canReprobe = canReprobe
+    self.canRemove = canRemove
+  }
+}
+
+public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
+  public let header: BridgeDesktopPageHeader
+  public let summaryRows: [BridgeDesktopServiceRow]
+  public let localMCPURL: String?
+  public let localMCPState: String
+  public let tunnel: BridgeDesktopTunnelState
+  public let clients: [BridgeDesktopMCPClientRow]
+  public let providers: [BridgeDesktopAgentProviderRow]
+  public let installations: [BridgeDesktopAgentInstallationRow]
+  public let canRegisterAgent: Bool
+  public let statusMessage: String?
+
+  public init(
+    header: BridgeDesktopPageHeader,
+    summaryRows: [BridgeDesktopServiceRow] = [],
+    localMCPURL: String? = nil,
+    localMCPState: String = "unknown",
+    tunnel: BridgeDesktopTunnelState,
+    clients: [BridgeDesktopMCPClientRow] = [],
+    providers: [BridgeDesktopAgentProviderRow] = [],
+    installations: [BridgeDesktopAgentInstallationRow] = [],
+    canRegisterAgent: Bool = true,
+    statusMessage: String? = nil
+  ) {
+    self.header = header
+    self.summaryRows = summaryRows
+    self.localMCPURL = localMCPURL
+    self.localMCPState = localMCPState
+    self.tunnel = tunnel
+    self.clients = clients
+    self.providers = providers
+    self.installations = installations
+    self.canRegisterAgent = canRegisterAgent
+    self.statusMessage = statusMessage
+  }
+}
