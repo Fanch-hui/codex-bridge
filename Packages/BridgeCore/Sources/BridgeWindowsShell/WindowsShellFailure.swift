@@ -40,6 +40,10 @@
         0,
         UINT(SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
       )
+      // The control is created with an empty rect; sizing it here keeps the first
+      // failure report readable without waiting for an unrelated layout pass.
+      var area = RECT()
+      if GetClientRect(parent, &area) { layout(in: area) }
     }
 
     static func layout(in bounds: RECT) {

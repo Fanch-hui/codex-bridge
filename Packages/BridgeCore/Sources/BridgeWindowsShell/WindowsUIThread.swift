@@ -73,6 +73,9 @@
       activeChat.attach(to: window)
       activeChat.setVisible(false)
       activeDesktopUI.attach(to: window)
+      // The pre-attach layout was a no-op for both surfaces, so push the real client
+      // rect now instead of waiting for the first user interaction.
+      WindowsMainWindow.layout()
       lock.withLock {
         chat = activeChat
         desktopUI = activeDesktopUI

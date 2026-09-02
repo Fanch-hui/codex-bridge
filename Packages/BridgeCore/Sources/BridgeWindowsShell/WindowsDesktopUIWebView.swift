@@ -13,6 +13,11 @@
     private var worker: WindowsWebViewThread?
     private var latestState: BridgeDesktopUIState?
     private var isPageReady = false
+    private var readyDeadline: UInt64 = 0
+
+    /// Loading the local page needs the WebView2 runtime, the environment, the
+    /// controller and the JS bootstrap; a stall past this grace is a broken install.
+    private static let readyGraceNanoseconds: UInt64 = 20_000_000_000
 
     init(commandHandler: @escaping CommandHandler) {
       self.commandHandler = commandHandler
@@ -28,6 +33,14 @@
 
     var isReady: Bool {
       lock.withLock { snapshot.state == .active && isPageReady }
+    }
+
+    /// True while the page has not announced itself and the grace period is over,
+    /// which is how a stalled or half-installed bundle becomes visible instead of blank.
+    var loadStalled: Bool {
+      lock.withLock {
+        readyDeadline != 0 && !isPageReady && DispatchTime.now().uptimeNanoseconds > readyDeadline
+      }
     }
 
     func attach(to window: HWND?) {
@@ -50,6 +63,7 @@
         lock.withLock({
           guard worker == nil else { return false }
           worker = next
+          readyDeadline = DispatchTime.now().uptimeNanoseconds + Self.readyGraceNanoseconds
           return true
         })
       else { return }

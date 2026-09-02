@@ -102,7 +102,9 @@
         }
         return 0
       case WindowsMainWindowChrome.trayCallbackMessage:
-        _ = WindowsMainWindowChrome.handleTrayMessage(lParam, window: window)
+        if WindowsMainWindowChrome.handleTrayMessage(lParam, window: window) {
+          resynchronizeAfterRestore()
+        }
         return 0
       case UINT(WM_CLOSE):
         requestClose(window)
@@ -137,6 +139,13 @@
       WindowsShellFailure.present(desktopFailureText(), in: window)
     }
 
+    /// Re-applies surface bounds after a tray restore, where Win32 does not reliably
+    /// raise WM_SIZE for a window that was hidden rather than minimized.
+    static func resynchronizeAfterRestore() {
+      layout()
+      refreshSurfaces()
+    }
+
     static func desktopFailureText() -> String? {
       guard let desktopUI else { return nil }
       guard !desktopUI.isReady else { return nil }
@@ -145,9 +154,12 @@
         return
           "界面无法加载：\(desktopUI.errorDetail ?? "WebView2 运行时不可用")\r\n请安装 Microsoft Edge WebView2 Evergreen 运行时后重试，任务与本地 MCP 服务仍在后台运行。"
       default:
-        return nil
+        return desktopUI.loadStalled ? desktopStallText : nil
       }
     }
+
+    private static let desktopStallText =
+      "界面未能完成加载：WebView2 已启动，但页面没有响应。\r\n请重新启动 Codex Bridge；如果仍然如此，请修复安装或更新 Microsoft Edge WebView2 Evergreen 运行时。任务与本地 MCP 服务仍在后台运行。"
 
     private static func requestClose(_ window: HWND?) {
       guard !waitingForWebViewShutdown, let window else { return }
