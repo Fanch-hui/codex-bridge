@@ -68,7 +68,7 @@
     var button = document.createElement("button");
     button.type = "button";
     button.className = "metric-card tone-" + toneClass(metric.tone);
-    button.innerHTML = '<span class="metric-topline"><span class="metric-title"></span><span class="metric-icon icon" data-symbol="' + metric.symbol + '"></span></span><span class="metric-value"><span class="metric-number"></span>' + (metric.destination ? '<span class="metric-chevron" aria-hidden="true">›</span>' : "") + '</span><span class="metric-subtitle"></span>';
+    button.innerHTML = '<span class="metric-topline"><span class="metric-title"></span><span class="metric-icon" data-symbol="' + metric.symbol + '"></span></span><span class="metric-value"><span class="metric-number"></span>' + (metric.destination ? '<span class="metric-chevron" aria-hidden="true">›</span>' : "") + '</span><span class="metric-subtitle"></span>';
     button.querySelector(".metric-title").textContent = metric.title;
     button.querySelector(".metric-number").textContent = metric.value;
     button.querySelector(".metric-subtitle").textContent = metric.subtitle;
@@ -83,7 +83,7 @@
       var element = document.createElement(row.destination ? "button" : "div");
       element.className = "service-row tone-" + toneClass(row.tone);
       if (row.destination) { element.type = "button"; element.addEventListener("click", function () { emit("selectPage", { navigation: row.destination }); }); }
-      element.innerHTML = '<span class="service-icon icon" data-symbol="' + row.symbol + '"></span><span class="service-title"></span><span class="status-badge ' + toneClass(row.tone) + '"></span>';
+      element.innerHTML = '<span class="service-icon" data-symbol="' + row.symbol + '"></span><span class="service-title"></span><span class="status-badge ' + toneClass(row.tone) + '"></span>';
       element.querySelector(".service-title").textContent = row.title;
       element.querySelector(".status-badge").textContent = row.value;
       container.appendChild(element);
@@ -169,6 +169,7 @@
     var metrics = document.getElementById("metrics");
     metrics.innerHTML = "";
     state.overview.metrics.forEach(function (metric) { metrics.appendChild(renderMetric(metric)); });
+    setIcons(metrics);
     renderServices(state.overview.services, state.overview.serviceActions);
     renderRecentTasks(state.overview.recentTasks);
     renderNotices(state.overview.notices);
