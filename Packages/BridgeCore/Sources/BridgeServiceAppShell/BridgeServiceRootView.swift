@@ -10,17 +10,22 @@ public struct BridgeServiceRootView: View {
   }
 
   public var body: some View {
-    ZStack(alignment: .bottomTrailing) {
-      if model.navigation == .overview {
-        BridgeDesktopWebView(model: model, mode: .overview)
-      } else {
-        HStack(spacing: 0) {
-          BridgeDesktopWebView(model: model, mode: .navigationOnly)
-            .frame(width: 250)
-          Divider()
-          detail
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
+    ZStack(alignment: .topLeading) {
+      BridgeDesktopWebView(model: model)
+
+      if let viewport = model.chatBrowserViewport,
+        viewport.visible,
+        model.navigation == .workbench,
+        model.isChatBrowserEnabled
+      {
+        ChatGPTWebView(
+          initialURL: model.chatBrowserResumeURL,
+          reloadRequest: model.chatBrowserReloadRequest,
+          webViewReference: $model.chatWebView
+        )
+        .frame(width: viewport.width, height: viewport.height)
+        .offset(x: viewport.x, y: viewport.y)
+        .zIndex(10)
       }
 
       if let toast = model.toast {
@@ -29,31 +34,11 @@ public struct BridgeServiceRootView: View {
         }
         .padding(.trailing, 24)
         .padding(.bottom, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .zIndex(100)
       }
     }
     .navigationTitle("Codex Bridge")
-    .toolbar {
-      if model.navigation != .overview {
-        ToolbarItem(placement: .automatic) {
-          Button {
-            model.refresh()
-          } label: {
-            Image(systemName: "arrow.clockwise")
-              .rotationEffect(model.isRefreshing ? .degrees(360) : .degrees(0))
-              .animation(
-                model.isRefreshing
-                  ? .linear(duration: 1).repeatForever(autoreverses: false)
-                  : .default,
-                value: model.isRefreshing
-              )
-          }
-          .disabled(model.isRefreshing)
-          .accessibilityLabel("刷新状态")
-          .help("刷新后台 Service、项目、Skills 及连接状态")
-        }
-      }
-    }
     .task {
       model.start()
     }
@@ -71,24 +56,6 @@ public struct BridgeServiceRootView: View {
       }
     } message: {
       Text(model.errorMessage ?? "未知错误")
-    }
-  }
-
-  @ViewBuilder
-  private var detail: some View {
-    switch model.selection ?? .overview {
-    case .overview:
-      BridgeServiceOverviewView(model: model)
-    case .workbench:
-      BridgeServiceWorkbenchView(model: model)
-    case .projects:
-      BridgeServiceProjectsView(model: model)
-    case .logs:
-      BridgeServiceLogsView(model: model)
-    case .connections:
-      BridgeServiceConnectionsView(model: model)
-    case .settings:
-      BridgeServiceSettingsView(model: model)
     }
   }
 

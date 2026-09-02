@@ -20,7 +20,12 @@ enum BridgeDesktopUIStateBuilder {
       connectionLabel: model.connectionState.label,
       connectionTone: connectionTone(for: model.connectionState),
       isRefreshing: model.isRefreshing,
-      overview: selected == .overview ? overview(from: model) : nil
+      overview: overview(from: model),
+      workbench: workbench(from: model),
+      projects: projects(from: model),
+      logs: logs(from: model),
+      connections: connections(from: model),
+      settings: settings(from: model)
     )
   }
 
@@ -63,7 +68,7 @@ enum BridgeDesktopUIStateBuilder {
         symbol: "cpu.fill",
         subtitle: model.agentInstallations.isEmpty
           ? "未连接外部 Agent"
-          : "共 (model.agentInstallations.count) 个已登记",
+          : "共 \(model.agentInstallations.count) 个已登记",
         tone: enabledAgents > 0 ? .success : .neutral,
         destination: .connections
       ),
@@ -74,7 +79,7 @@ enum BridgeDesktopUIStateBuilder {
         symbol: "list.bullet.rectangle",
         subtitle: lastRefreshSubtitle(for: model),
         tone: .neutral,
-        destination: .logs
+        destination: .workbench
       ),
     ]
 
@@ -122,16 +127,18 @@ enum BridgeDesktopUIStateBuilder {
         title: "后台常驻 Service",
         value: model.connectionState.label,
         symbol: model.connectionState.symbol,
-        tone: connectionTone(for: model.connectionState)
+        tone: connectionTone(for: model.connectionState),
+        destination: .connections
       ),
       mcpRow(from: model),
       tunnelRow(from: model),
       BridgeDesktopServiceRow(
         id: "local-agents",
         title: "本机 Agent 引擎",
-        value: "(enabledAgents) 个可用 / 共 (model.agentInstallations.count) 个",
+        value: "\(enabledAgents) 个可用 / 共 \(model.agentInstallations.count) 个",
         symbol: "cpu.fill",
-        tone: enabledAgents > 0 ? .success : .neutral
+        tone: enabledAgents > 0 ? .success : .neutral,
+        destination: .connections
       ),
     ]
   }
@@ -144,7 +151,8 @@ enum BridgeDesktopUIStateBuilder {
       title: "本地 MCP 通道",
       value: value,
       symbol: ready ? "checkmark.circle.fill" : "circle.dashed",
-      tone: ready ? .success : .neutral
+      tone: ready ? .success : .neutral,
+      destination: .connections
     )
   }
 
@@ -154,8 +162,9 @@ enum BridgeDesktopUIStateBuilder {
         id: "secure-tunnel",
         title: "远程 Secure Tunnel",
         value: "未配置",
-        symbol: "link.badge.plus",
-        tone: .neutral
+        symbol: "link",
+        tone: .neutral,
+        destination: .connections
       )
     }
     let lifecycle = tunnel.lifecycle.isEmpty ? "未知" : tunnel.lifecycle
@@ -165,7 +174,8 @@ enum BridgeDesktopUIStateBuilder {
         title: "远程 Secure Tunnel",
         value: lifecycle,
         symbol: "checkmark.circle.fill",
-        tone: .success
+        tone: .success,
+        destination: .connections
       )
     }
     if tunnel.actionRequired {
@@ -173,8 +183,9 @@ enum BridgeDesktopUIStateBuilder {
         id: "secure-tunnel",
         title: "远程 Secure Tunnel",
         value: lifecycle,
-        symbol: "exclamationmark.triangle.fill",
-        tone: .warning
+        symbol: "shield.lefthalf.filled",
+        tone: .warning,
+        destination: .connections
       )
     }
     return BridgeDesktopServiceRow(
@@ -182,7 +193,8 @@ enum BridgeDesktopUIStateBuilder {
       title: "远程 Secure Tunnel",
       value: lifecycle,
       symbol: tunnel.enabled ? "link" : "circle.dashed",
-      tone: tunnel.enabled ? .running : .neutral
+      tone: tunnel.enabled ? .running : .neutral,
+      destination: .connections
     )
   }
 
@@ -194,7 +206,7 @@ enum BridgeDesktopUIStateBuilder {
           id: "service-approval",
           title: "需要批准后台项目",
           message: "请在系统设置中批准 Codex Bridge 后台 LaunchAgent 项目。",
-          symbol: "exclamationmark.triangle.fill",
+          symbol: "shield.lefthalf.filled",
           tone: .warning,
           destination: .connections
         )
@@ -205,8 +217,8 @@ enum BridgeDesktopUIStateBuilder {
         BridgeDesktopNotice(
           id: "local-approvals",
           title: "待处理本机审批",
-          message: "当前有 (model.approvals.count) 个远程任务或执行器操作等待你本机确认或拒绝。",
-          symbol: "exclamationmark.shield.fill",
+          message: "当前有 \(model.approvals.count) 个远程任务或执行器操作等待你本机确认或拒绝。",
+          symbol: "shield.lefthalf.filled",
           tone: .warning,
           destination: .workbench
         )
@@ -230,7 +242,7 @@ enum BridgeDesktopUIStateBuilder {
     }
   }
 
-  private static func connectionTone(
+  static func connectionTone(
     for state: BridgeServiceConnectionState
   ) -> BridgeDesktopStatusTone {
     switch state {
@@ -242,7 +254,7 @@ enum BridgeDesktopUIStateBuilder {
     }
   }
 
-  private static func taskStatusLabel(_ status: String) -> String {
+  static func taskStatusLabel(_ status: String) -> String {
     switch status {
     case "awaiting_local_approval": "等待本机批准"
     case "starting": "正在启动"

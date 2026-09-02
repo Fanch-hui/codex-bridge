@@ -1,4 +1,5 @@
 import AppKit
+import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
 import BridgeServiceAppCore
@@ -128,6 +129,11 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var selectedTaskID: String?
   @Published public internal(set) var selectedProjectID: String?
   @Published public internal(set) var workbenchPermissionMode = "workspace-write"
+  @Published var desktopLogSearchText = ""
+  @Published var desktopLogProjectID: String?
+  @Published var desktopLogKind = "all"
+  @Published var desktopSelectedLogID: String?
+  @Published var chatBrowserViewport: BridgeDesktopBrowserViewport?
   @Published public var chatWebView: WKWebView? {
     didSet {
       if chatWebView != nil {

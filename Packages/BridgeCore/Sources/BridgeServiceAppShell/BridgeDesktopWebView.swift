@@ -5,30 +5,15 @@ import SwiftUI
 import WebKit
 
 struct BridgeDesktopWebView: NSViewRepresentable {
-  enum Mode: Equatable {
-    case overview
-    case navigationOnly
-  }
-
   @ObservedObject var model: BridgeServiceAppModel
-  let mode: Mode
 
   func makeCoordinator() -> Coordinator {
-    Coordinator(model: model, mode: mode)
+    Coordinator(model: model)
   }
 
   func makeNSView(context: Context) -> WKWebView {
     let userContentController = WKUserContentController()
     userContentController.add(context.coordinator, name: "bridgeDesktopUI")
-    if mode == .navigationOnly {
-      userContentController.addUserScript(
-        WKUserScript(
-          source: Coordinator.navigationOnlyStyleUserScript,
-          injectionTime: .atDocumentStart,
-          forMainFrameOnly: true
-        )
-      )
-    }
 
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .nonPersistent()
@@ -45,36 +30,32 @@ struct BridgeDesktopWebView: NSViewRepresentable {
     webView.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
     context.coordinator.update(
       state: BridgeDesktopUIStateBuilder.build(from: model),
-      mode: mode,
       webView: webView
     )
     return webView
   }
 
   func updateNSView(_ nsView: WKWebView, context: Context) {
+    let state = BridgeDesktopUIStateBuilder.build(from: model)
+    if state.selectedNavigation != .workbench {
+      model.chatBrowserViewport = nil
+    }
     context.coordinator.update(
-      state: BridgeDesktopUIStateBuilder.build(from: model),
-      mode: mode,
+      state: state,
       webView: nsView
     )
   }
 
   final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     weak var model: BridgeServiceAppModel?
-    private var mode: Mode
     private var latestState: BridgeDesktopUIState?
     private var didFinishLoading = false
 
-    init(model: BridgeServiceAppModel, mode: Mode) {
+    init(model: BridgeServiceAppModel) {
       self.model = model
-      self.mode = mode
     }
 
-    func update(state: BridgeDesktopUIState, mode: Mode, webView: WKWebView) {
-      if self.mode != mode {
-        self.mode = mode
-        applyMode(to: webView)
-      }
+    func update(state: BridgeDesktopUIState, webView: WKWebView) {
       guard latestState != state else { return }
       latestState = state
       sendLatestState(to: webView)
@@ -94,7 +75,6 @@ struct BridgeDesktopWebView: NSViewRepresentable {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
       didFinishLoading = true
-      applyMode(to: webView)
       sendLatestState(to: webView)
     }
 
@@ -107,14 +87,6 @@ struct BridgeDesktopWebView: NSViewRepresentable {
 
     deinit {
       model = nil
-    }
-
-    private func applyMode(to webView: WKWebView) {
-      let script =
-        mode == .navigationOnly
-        ? Self.navigationOnlyStyleApplication
-        : Self.fullPageStyleApplication
-      webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
     private func sendLatestState(to webView: WKWebView) {
@@ -149,71 +121,11 @@ struct BridgeDesktopWebView: NSViewRepresentable {
 
     private func handle(_ envelope: BridgeDesktopCommandEnvelope) {
       guard let model else { return }
-      switch envelope.command {
-      case .ready:
-        return
-      case .refresh:
-        model.refresh()
-      case .selectPage:
-        guard let navigation = envelope.payload.navigation else { return }
-        select(navigation, in: model)
-      case .openWorkbench:
-        model.selection = .workbench
-      case .openProjects:
-        model.selection = .projects
-      case .openConnections:
-        model.selection = .connections
-      case .openSettings:
-        model.selection = .settings
-      case .openLogs:
-        model.selection = .logs
-      case .openTask:
-        guard let taskID = envelope.payload.taskID,
-          !taskID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-          taskID.count <= 256
-        else { return }
-        model.openTask(taskID)
-        model.selection = .workbench
+      Task { @MainActor [weak model] in
+        guard let model else { return }
+        BridgeDesktopCommandRouter.handle(envelope, model: model)
       }
     }
 
-    private func select(_ navigation: BridgeDesktopNavigation, in model: BridgeServiceAppModel) {
-      model.selection = BridgeServiceNavigation(rawValue: navigation.rawValue)
-    }
-
-    static let navigationOnlyStyle = """
-      html, body { min-width: 0 !important; overflow: hidden !important; }
-      .app-shell { display: block !important; min-height: 100vh !important; }
-      .sidebar { width: 100% !important; min-height: 100vh !important; }
-      .main-shell { display: none !important; }
-      """
-
-    static let navigationOnlyStyleUserScript = """
-      (function() {
-        var style = document.createElement('style');
-        style.id = 'bridge-desktop-navigation-only';
-        style.textContent = `\(navigationOnlyStyle)`;
-        (document.head || document.documentElement).appendChild(style);
-      }())
-      """
-
-    static let navigationOnlyStyleApplication = """
-      (function() {
-        var style = document.getElementById('bridge-desktop-navigation-only');
-        if (!style) {
-          style = document.createElement('style');
-          style.id = 'bridge-desktop-navigation-only';
-          style.textContent = `\(navigationOnlyStyle)`;
-          document.head.appendChild(style);
-        }
-      }())
-      """
-
-    static let fullPageStyleApplication = """
-      (function() {
-        var style = document.getElementById('bridge-desktop-navigation-only');
-        if (style) style.remove();
-      }())
-      """
   }
 }
