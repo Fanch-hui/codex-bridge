@@ -36,7 +36,7 @@
     var hasWebMessageToken = false
     private var pendingWebMessage: String?
 
-    init(parentWindow: HWND, updateState: @escaping StateUpdate) {
+    convenience init(parentWindow: HWND, updateState: @escaping StateUpdate) {
       self.init(
         parentWindow: parentWindow,
         initialURL: WindowsChatWebView.chatURL,

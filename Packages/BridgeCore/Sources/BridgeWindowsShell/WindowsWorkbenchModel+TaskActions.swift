@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeMCP
   import BridgeServiceAppCore
 
   extension WindowsWorkbenchModel {
