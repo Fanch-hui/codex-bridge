@@ -26,12 +26,32 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
   public let id: String
   public let role: String
   public let text: String
+  public let kind: String?
+  public let toolName: String?
+  public let toolStatus: String?
+  public let toolArguments: String?
+  public let isFinal: Bool
   public let status: String?
 
-  public init(id: String, role: String, text: String, status: String? = nil) {
+  public init(
+    id: String,
+    role: String,
+    text: String,
+    kind: String? = nil,
+    toolName: String? = nil,
+    toolStatus: String? = nil,
+    toolArguments: String? = nil,
+    isFinal: Bool = true,
+    status: String? = nil
+  ) {
     self.id = id
     self.role = role
     self.text = text
+    self.kind = kind
+    self.toolName = toolName
+    self.toolStatus = toolStatus
+    self.toolArguments = toolArguments
+    self.isFinal = isFinal
     self.status = status
   }
 }

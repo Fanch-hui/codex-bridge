@@ -183,9 +183,19 @@
     container.appendChild(S.node("h4", "subsection-title", "对话"));
     var list = S.node("div", "conversation-list");
     values.forEach(function (entry) {
-      var item = S.node("div", "conversation-entry");
-      item.appendChild(S.node("div", "entry-role", entry.role));
+      var item = S.node("div", "conversation-entry entry-" + (entry.kind || "message"));
+      var heading = S.node("div", "entry-heading");
+      heading.appendChild(S.node("span", "entry-role", entry.role));
+      if (entry.kind) heading.appendChild(S.badge(entry.kind, "neutral"));
+      if (!entry.isFinal) heading.appendChild(S.badge("流式", "running"));
+      item.appendChild(heading);
+      if (entry.toolName) {
+        var tool = S.node("div", "entry-tool mono", entry.toolName);
+        if (entry.toolStatus) tool.appendChild(S.badge(entry.toolStatus, entry.toolStatus === "failed" ? "error" : "neutral"));
+        item.appendChild(tool);
+      }
       item.appendChild(S.node("div", "entry-text", entry.text));
+      if (entry.toolArguments) item.appendChild(S.node("pre", "entry-arguments mono", entry.toolArguments));
       list.appendChild(item);
     });
     container.appendChild(list);
