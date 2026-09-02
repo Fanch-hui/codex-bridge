@@ -55,7 +55,7 @@
         if workbench.pendingApprovalCount > 0 { return workbench.pendingApprovalCount }
         return workbench.runningTaskCount > 0 ? workbench.runningTaskCount : nil
       case .projects:
-        let count = management.project.projectItems.count
+        let count = management.project.rows.count
         return count > 0 ? count : nil
       default:
         return nil
