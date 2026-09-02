@@ -33,11 +33,6 @@
       chat: WindowsChatWebView,
       desktopUI: WindowsDesktopUIWebView
     ) {
-      WindowsMainWindow.updateNavigation(workbench: workbench, management: management)
-      WindowsMainWindow.updateOverview(workbench: workbench, management: management)
-      applyWorkbench(workbench)
-      applyManagement(management)
-      applyBrowser(chat, workbench: workbench)
       desktopUI.setState(
         WindowsDesktopUIStateBuilder.build(
           workbench: workbench,
@@ -48,99 +43,33 @@
           settings: auxiliary.settings,
           agentDefaults: auxiliary.agentDefaults,
           selectedNavigation: WindowsMainWindow.currentPage().desktopNavigation,
-          browserAvailable: chat.state == .active
+          browserAvailable: chat.state == .active,
+          browserStatus: browserStatus(for: chat)
         )
       )
-      WindowsMainWindow.refreshSurfaceVisibility()
+      WindowsMainWindow.setChatSlotEnabled(chat.state == .active && workbench.browserEnabled)
+      WindowsMainWindow.refreshSurfaces()
     }
 
-    private nonisolated static func applyWorkbench(_ display: WindowsWorkbenchDisplay) {
-      guard display != lastAppliedDisplay else { return }
-      var lines = [
-        "服务连接: \(statusName(display.connectionState))",
-        "任务: \(display.taskCount)（运行中 \(display.runningTaskCount)）",
-        "审批: \(display.pendingApprovalCount)",
-        "MCP 地址: \(display.mcpAddress)",
-      ]
-      if let detail = display.detailText { lines.append("详情: \(detail)") }
-      WindowsMainWindow.setStatusText(lines.joined(separator: "\r\n"))
-      let previous = lastAppliedDisplay
-      if display.taskRows != previous?.taskRows
-        || display.selectedTaskIndex != previous?.selectedTaskIndex
-      {
-        WindowsMainWindow.setTaskRows(display.taskRows, selectedIndex: display.selectedTaskIndex)
-      }
-      if display.taskMetadata != previous?.taskMetadata {
-        WindowsTaskInspector.setTaskMetadata(display.taskMetadata)
-      }
-      if display.conversationText != previous?.conversationText {
-        WindowsTaskInspector.setConversationText(display.conversationText)
-      }
-      if display.actionText != previous?.actionText {
-        WindowsTaskInspector.setActionStatus(display.actionText)
-      }
-      if contextChanged(display, from: previous) {
-        WindowsTaskInspector.applyContext(display)
-      }
-      if display.interruptEnabled != previous?.interruptEnabled
-        || display.steerEnabled != previous?.steerEnabled
-      {
-        WindowsTaskInspector.setControls(
-          interruptEnabled: display.interruptEnabled,
-          steerEnabled: display.steerEnabled
-        )
-      }
-      WindowsApprovalWindow.apply(display)
-      lastAppliedDisplay = display
-    }
-
-    private nonisolated static func contextChanged(
-      _ display: WindowsWorkbenchDisplay,
-      from previous: WindowsWorkbenchDisplay?
-    ) -> Bool {
-      display.projectRows != previous?.projectRows
-        || display.selectedProjectIndex != previous?.selectedProjectIndex
-        || display.permissionRows != previous?.permissionRows
-        || display.selectedPermissionIndex != previous?.selectedPermissionIndex
-        || display.pendingApprovalCount != previous?.pendingApprovalCount
-        || display.stopEnabled != previous?.stopEnabled
-        || display.deleteEnabled != previous?.deleteEnabled
-    }
-
-    private nonisolated static func applyManagement(_ display: WindowsManagementDisplay) {
-      guard display != lastAppliedManagementDisplay else { return }
-      WindowsProjectManagementWindow.apply(display.project)
-      WindowsAgentManagementWindow.apply(display.agent)
-      lastAppliedManagementDisplay = display
-    }
-
-    private nonisolated static func applyBrowser(
-      _ chat: WindowsChatWebView,
-      workbench: WindowsWorkbenchDisplay
-    ) {
-      let placeholder: String?
+    private nonisolated static func browserStatus(for chat: WindowsChatWebView) -> String? {
       switch chat.state {
-      case .unsupported:
-        placeholder = "内置浏览器不可用：\(chat.errorDetail ?? "未知原因")\r\n可使用上方“在外部浏览器打开”，任务管理功能仍然可用。"
-      case .loading:
-        placeholder = "正在加载聊天页…"
-      case .failed:
-        placeholder = "聊天页加载失败：\(chat.errorDetail ?? "未知原因")\r\n可使用上方“在外部浏览器打开”，任务管理功能仍然可用。"
       case .active:
-        placeholder = nil
+        return nil
+      case .loading:
+        return "正在加载聊天页…"
+      case .failed:
+        return hostBrowserFailure("聊天页加载失败", chat)
+      case .unsupported:
+        return hostBrowserFailure("内置浏览器不可用", chat)
       }
-      WindowsBrowserToolbar.setBrowserActionsEnabled(chat.state == .active)
-      if !WindowsMainWindow.sharedDesktopPresented {
-        chat.setVisible(
-          chat.state == .active && workbench.browserEnabled
-            && WindowsMainWindow.currentPage() == .workbench)
-      } else if !workbench.browserEnabled {
-        chat.setVisible(false)
-      }
-      if placeholder != lastPlaceholderText {
-        WindowsMainWindow.setChatPlaceholder(placeholder)
-        lastPlaceholderText = placeholder
-      }
+    }
+
+    private nonisolated static func hostBrowserFailure(
+      _ reason: String,
+      _ chat: WindowsChatWebView
+    ) -> String {
+      let detail = chat.errorDetail ?? "未知原因"
+      return "\(reason)：\(detail)。可使用“在外部浏览器打开”，任务管理功能仍然可用。"
     }
 
     nonisolated static func openChatExternally() {
@@ -149,17 +78,6 @@
           _ = ShellExecuteW(
             WindowsMainWindow.currentWindow(), operation, url, nil, nil, SW_SHOWNORMAL)
         }
-      }
-    }
-
-    private nonisolated static func statusName(
-      _ state: WindowsWorkbenchDisplay.ConnectionState
-    ) -> String {
-      switch state {
-      case .idle: "未连接"
-      case .connecting: "连接中…"
-      case .connected: "已连接"
-      case .unavailable: "不可用"
       }
     }
   }

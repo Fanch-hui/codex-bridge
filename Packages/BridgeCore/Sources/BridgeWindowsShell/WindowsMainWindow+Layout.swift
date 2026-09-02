@@ -7,38 +7,24 @@
       var area = RECT()
       guard GetClientRect(window, &area) else { return }
       desktopUI?.resize(to: area)
-      if usesSharedDesktop {
-        layoutSharedDesktop(in: area)
-        return
-      }
-      let navigationWidth = Int32(WindowLayout.navigationWidth)
-      WindowsNavigationSidebar.layout(height: area.bottom, width: navigationWidth)
-      let detailBounds = RECT(
-        left: navigationWidth,
-        top: area.top,
-        right: area.right,
-        bottom: area.bottom
-      )
-      let contentBounds = WindowsPageHeader.layout(in: detailBounds)
-      WindowsOverviewPane.layout(in: contentBounds)
-      if selectedPage == .workbench {
-        layoutWorkbench(in: contentBounds)
-      } else {
-        WindowsEmbeddedPages.layout(page: selectedPage, in: contentBounds)
-      }
+      WindowsShellFailure.layout(in: area)
+      layoutChat(in: area)
     }
 
-    private static func layoutSharedDesktop(in bounds: RECT) {
-      guard selectedPage == .workbench, let viewport = browserViewportSnapshot() else {
-        hideChatViewport()
+    /// The chat surface is placed by the page's reported viewport; the host only
+    /// adds the window offset and the model-side enable switch.
+    private static func layoutChat(in bounds: RECT) {
+      let viewport = renderedPage == .workbench ? browserViewportSnapshot() : nil
+      guard chatSlotEnabled, let viewport, viewport.visible else {
+        hideChat()
         return
       }
       chatBounds = browserViewportRect(viewport, in: bounds)
       chat?.resize(to: chatBounds)
-      chat?.setVisible(viewport.visible && !isEmpty(chatBounds))
+      chat?.setVisible(!isEmpty(chatBounds))
     }
 
-    private static func hideChatViewport() {
+    private static func hideChat() {
       chatBounds = RECT()
       chat?.resize(to: RECT())
       chat?.setVisible(false)
@@ -74,51 +60,6 @@
 
     private static func isEmpty(_ bounds: RECT) -> Bool {
       bounds.right <= bounds.left || bounds.bottom <= bounds.top
-    }
-
-    private static func layoutWorkbench(in bounds: RECT) {
-      let width = bounds.right - bounds.left
-      let inspectorWidth = min(
-        Int32(WindowLayout.inspectorIdealWidth),
-        max(Int32(WindowLayout.inspectorMinimumWidth), width / 3)
-      )
-      let inspector = RECT(
-        left: bounds.right - inspectorWidth,
-        top: bounds.top,
-        right: bounds.right,
-        bottom: bounds.bottom
-      )
-      let browser = RECT(
-        left: bounds.left,
-        top: bounds.top,
-        right: inspector.left - 1,
-        bottom: bounds.bottom
-      )
-      chatBounds = WindowsBrowserToolbar.layout(in: browser)
-      WindowsTaskInspector.layoutChatPlaceholder(in: chatBounds)
-      WindowsTaskInspector.layoutInspector(in: inspector)
-      chat?.resize(to: chatBounds)
-    }
-
-    private static var usesSharedDesktop: Bool {
-      desktopUI?.isReady == true
-    }
-
-    @discardableResult
-    static func applySurfaceVisibility() -> Bool {
-      let sharedDesktop = usesSharedDesktop
-      guard sharedDesktop != sharedDesktopPresented else { return false }
-      sharedDesktopPresented = sharedDesktop
-      WindowsNavigationSidebar.setVisible(!sharedDesktop)
-      WindowsPageHeader.setVisible(!sharedDesktop)
-      WindowsOverviewPane.setVisible(!sharedDesktop && selectedPage == .overview)
-      WindowsTaskInspector.setVisible(!sharedDesktop && selectedPage == .workbench)
-      WindowsTaskInspector.setChatPlaceholderPageVisible(
-        !sharedDesktop && selectedPage == .workbench)
-      WindowsBrowserToolbar.setVisible(!sharedDesktop && selectedPage == .workbench)
-      WindowsEmbeddedPages.setNativeVisible(!sharedDesktop)
-      desktopUI?.setVisible(sharedDesktop)
-      return true
     }
   }
 #endif

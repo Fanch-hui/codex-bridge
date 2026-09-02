@@ -90,14 +90,7 @@
       drainActions()
       activeDesktopUI.shutdown()
       activeChat.shutdown()
-      WindowsApprovalWindow.shutdown()
-      WindowsProjectManagementWindow.shutdown()
-      WindowsAgentManagementWindow.shutdown()
-      WindowsWorkspaceWindow.shutdown()
-      WindowsAgentDefaultsWindow.shutdown()
-      WindowsLogWindow.shutdown()
-      WindowsSettingsWindow.shutdown()
-      WindowsConnectionWindow.shutdown()
+      WindowsShellFailure.shutdown()
       lock.withLock {
         actions.removeAll(keepingCapacity: false)
         chat = nil

@@ -4,20 +4,17 @@
   import WinSDK
 
   enum WindowLayout {
-    static let navigationWidth = 220
-    static let inspectorIdealWidth = 400
-    static let inspectorMinimumWidth = 280
     static let windowWidth = 1180
     static let windowHeight = 760
   }
 
+  /// Win32 host surface: owns the frame, the command queue and the two WebView2
+  /// children. All product pages live in `BridgeDesktopUI`.
   enum WindowsMainWindow {
     private static let windowClassName = WindowsApplicationIdentity.mainWindowClassName
     private static let windowTitle = "Codex Bridge"
     private static let defaultPosition = Int32(bitPattern: 0x8000_0000)
     private static let standardResourceID = 32_512
-    private static let timerID: UINT_PTR = 1
-    private static let timerIntervalMs: UINT = 250
     private static let chatWebViewStoppedMessage = UINT(WM_APP + 40)
     private static let desktopWebViewStoppedMessage = UINT(WM_APP + 41)
 
@@ -25,11 +22,14 @@
     private static let browserViewportLock = NSLock()
     nonisolated(unsafe) private static var pendingCommands: [MainWindowCommand] = []
     nonisolated(unsafe) private static var browserViewport: BridgeDesktopBrowserViewport?
-    nonisolated(unsafe) static var selectedPage = WindowsMainPage.overview
-    nonisolated(unsafe) static var chatBounds = RECT()
+    nonisolated(unsafe) static var chatSlotEnabled = false
     nonisolated(unsafe) private static var waitingForWebViewShutdown = false
     nonisolated(unsafe) private static var pendingWebViewShutdownCount = 0
-    nonisolated(unsafe) static var sharedDesktopPresented = false
+
+    /// Mirror of the page the shared UI last rendered; the command loop owns the
+    /// request, this value only reports what reached the surface.
+    nonisolated(unsafe) static var renderedPage = WindowsMainPage.overview
+    nonisolated(unsafe) static var chatBounds = RECT()
     nonisolated(unsafe) static var chat: WindowsChatWebView?
     nonisolated(unsafe) static var desktopUI: WindowsDesktopUIWebView?
     nonisolated(unsafe) static var window: HWND?
@@ -38,21 +38,12 @@
       WindowsUIFoundation.initialize()
       let instance = GetModuleHandleW(nil)!
       registerWindowClass(instance)
-      let created = createWindow(instance: instance)
-      guard let window = created else {
+      guard let window = createWindow(instance: instance) else {
         showCreationFailure(GetLastError())
         return nil
       }
       self.window = window
-      WindowsNavigationSidebar.create(in: window, instance: instance)
-      WindowsPageHeader.create(in: window, instance: instance)
-      WindowsOverviewPane.create(in: window, instance: instance)
-      WindowsTaskInspector.create(in: window, instance: instance)
-      WindowsBrowserToolbar.create(in: window, instance: instance)
-      WindowsEmbeddedPages.prepare(in: window)
       WindowsMainWindowChrome.install(on: window)
-      _ = SetTimer(window, timerID, timerIntervalMs, nil)
-      selectPage(.overview)
       layout()
       _ = ShowWindow(window, SW_SHOW)
       return window
@@ -66,18 +57,7 @@
 
     static func currentWindow() -> HWND? { window }
 
-    static func currentPage() -> WindowsMainPage { selectedPage }
-
-    static func workbenchChatBounds() -> RECT { chatBounds }
-
-    static func applyBrowserViewport(_ viewport: BridgeDesktopBrowserViewport) {
-      browserViewportLock.withLock { browserViewport = viewport }
-      WindowsUIThread.shared.enqueue { layout() }
-    }
-
-    static func browserViewportSnapshot() -> BridgeDesktopBrowserViewport? {
-      browserViewportLock.withLock { browserViewport }
-    }
+    static func currentPage() -> WindowsMainPage { renderedPage }
 
     static func takePendingCommands() -> [MainWindowCommand] {
       commandLock.lock()
@@ -88,72 +68,24 @@
     }
 
     static func selectPage(_ page: WindowsMainPage) {
-      selectedPage = page
-      WindowsNavigationSidebar.select(page)
-      WindowsPageHeader.apply(page: page)
-      WindowsOverviewPane.setVisible(page == .overview)
-      WindowsTaskInspector.setVisible(page == .workbench)
-      WindowsTaskInspector.setChatPlaceholderPageVisible(page == .workbench)
-      WindowsBrowserToolbar.setVisible(page == .workbench)
-      WindowsEmbeddedPages.select(page)
-      chat?.setVisible(page == .workbench)
-      applySurfaceVisibility()
+      guard renderedPage != page else { return }
+      renderedPage = page
       layout()
     }
 
-    static func refreshSurfaceVisibility() {
-      if applySurfaceVisibility() { layout() }
+    static func setChatSlotEnabled(_ enabled: Bool) {
+      guard chatSlotEnabled != enabled else { return }
+      chatSlotEnabled = enabled
+      layout()
     }
 
-    static func updateNavigation(
-      workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay
-    ) {
-      WindowsNavigationSidebar.update(
-        state: workbench.connectionState,
-        taskCount: workbench.taskCount,
-        approvalCount: workbench.pendingApprovalCount,
-        projectCount: management.project.rows.count
-      )
-      if selectedPage == .connections {
-        WindowsPageHeader.apply(
-          page: .connections,
-          statusDetail:
-            "本地 MCP：\(workbench.mcpAddress) · \(management.availableAgentCount) 个可用 Agent"
-        )
-      }
+    static func applyBrowserViewport(_ viewport: BridgeDesktopBrowserViewport) {
+      browserViewportLock.withLock { browserViewport = viewport }
+      WindowsUIThread.shared.enqueue { layout() }
     }
 
-    static func updateOverview(
-      workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay
-    ) {
-      WindowsOverviewPane.apply(
-        WindowsOverviewDisplay(
-          connectionState: workbench.connectionState,
-          runningTaskCount: workbench.runningTaskCount,
-          pendingApprovalCount: workbench.pendingApprovalCount,
-          projectCount: management.project.rows.count,
-          agentCount: management.availableAgentCount,
-          taskCount: workbench.taskCount,
-          mcpAddress: workbench.mcpAddress,
-          recentTaskRows: Array(workbench.recentTaskRows.prefix(4)),
-          detailText: workbench.detailText
-        )
-      )
-    }
-
-    static func setStatusText(_ text: String) {
-      WindowsTaskInspector.setStatusText(text)
-    }
-
-    static func setTaskRows(_ rows: [String], selectedIndex: Int?) {
-      WindowsTaskInspector.setTaskRows(rows, selectedIndex: selectedIndex)
-    }
-
-    static func setChatPlaceholder(_ text: String?) {
-      WindowsTaskInspector.setChatPlaceholder(text)
-      WindowsTaskInspector.setChatPlaceholderPageVisible(selectedPage == .workbench)
+    static func browserViewportSnapshot() -> BridgeDesktopBrowserViewport? {
+      browserViewportLock.withLock { browserViewport }
     }
 
     static func handleMessage(
@@ -161,14 +93,6 @@
     ) -> LRESULT {
       switch message {
       case UINT(WM_COMMAND):
-        let command =
-          WindowsNavigationSidebar.command(for: wParam)
-          ?? WindowsPageHeader.command(for: wParam)
-          ?? WindowsOverviewPane.command(for: wParam)
-          ?? WindowsBrowserToolbar.command(for: wParam)
-          ?? WindowsTaskInspector.command(for: wParam)
-          ?? WindowsEmbeddedPageTabs.command(for: wParam)
-        if let command { enqueue(command) }
         return 0
       case UINT(WM_SIZE):
         if wParam == WPARAM(SIZE_MINIMIZED) {
@@ -196,7 +120,6 @@
         WindowsUIFoundation.shutdown()
         waitingForWebViewShutdown = false
         pendingWebViewShutdownCount = 0
-        sharedDesktopPresented = false
         desktopUI = nil
         Self.window = nil
         PostQuitMessage(0)
@@ -206,9 +129,28 @@
       }
     }
 
-    private static func requestClose(_ window: HWND?) {
-      guard !waitingForWebViewShutdown else { return }
+    /// Surfaces the desktop UI once it is live and reports a clear reason when the
+    /// host cannot load it, so a broken install never degrades to a silent blank frame.
+    static func refreshSurfaces() {
       guard let window else { return }
+      desktopUI?.setVisible(desktopUI?.isReady == true)
+      WindowsShellFailure.present(desktopFailureText(), in: window)
+    }
+
+    static func desktopFailureText() -> String? {
+      guard let desktopUI else { return nil }
+      guard !desktopUI.isReady else { return nil }
+      switch desktopUI.state {
+      case .failed, .unsupported:
+        return
+          "界面无法加载：\(desktopUI.errorDetail ?? "WebView2 运行时不可用")\r\n请安装 Microsoft Edge WebView2 Evergreen 运行时后重试，任务与本地 MCP 服务仍在后台运行。"
+      default:
+        return nil
+      }
+    }
+
+    private static func requestClose(_ window: HWND?) {
+      guard !waitingForWebViewShutdown, let window else { return }
       var shutdownCount = 0
       if chat?.beginShutdown(notifying: window, message: chatWebViewStoppedMessage) == true {
         shutdownCount += 1

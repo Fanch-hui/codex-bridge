@@ -5,7 +5,8 @@
     static func workbenchPage(
       _ display: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
-      browserAvailable: Bool
+      browserAvailable: Bool,
+      browserStatus: String? = nil
     ) -> BridgeDesktopWorkbenchState {
       let projects = management.project.projectItems.map {
         choice($0.projectID, $0.name, detail: $0.detail)
@@ -29,7 +30,7 @@
         selectedTask: display.selectedTaskDetail,
         approvals: display.approvalItems,
         steerModes: steerModes(for: display),
-        browser: browserSlot(for: display, available: browserAvailable)
+        browser: browserSlot(for: display, available: browserAvailable, status: browserStatus)
       )
     }
 
@@ -45,13 +46,14 @@
 
     private static func browserSlot(
       for display: WindowsWorkbenchDisplay,
-      available: Bool
+      available: Bool,
+      status: String?
     ) -> BridgeDesktopBrowserSlot {
       let enabled = available && display.browserEnabled
       return BridgeDesktopBrowserSlot(
         visible: true,
         enabled: enabled,
-        status: available ? "由宿主加载真实 ChatGPT 工作区" : "内置 WebView2 浏览器不可用",
+        status: status ?? (available ? "由宿主加载真实 ChatGPT 工作区" : "内置 WebView2 浏览器不可用"),
         canToggle: available,
         canOpenExternally: true,
         canGoBack: enabled,

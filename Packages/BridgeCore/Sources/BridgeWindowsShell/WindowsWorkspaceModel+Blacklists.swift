@@ -10,7 +10,7 @@
     }
 
     func saveBlacklist(executable: String, pattern: String) async {
-      guard let projectID = selectedProjectID, let workspace = detail?.directWorkspace else {
+      guard let projectID = selectedProjectID, detail?.directWorkspace != nil else {
         statusText = "当前项目没有可编辑的 Direct 工作区。"
         publishDisplay()
         return

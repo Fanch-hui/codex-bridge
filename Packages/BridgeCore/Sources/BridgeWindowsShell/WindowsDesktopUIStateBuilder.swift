@@ -15,7 +15,8 @@
       agentDefaults: WindowsAgentDefaultsDisplay? = nil,
       selectedNavigation: BridgeDesktopNavigation = .overview,
       isRefreshing: Bool = false,
-      browserAvailable: Bool = true
+      browserAvailable: Bool = true,
+      browserStatus: String? = nil
     ) -> BridgeDesktopUIState {
       BridgeDesktopUIState(
         navigation: navigation(
@@ -33,7 +34,8 @@
         workbench: workbenchPage(
           workbench,
           management: management,
-          browserAvailable: browserAvailable
+          browserAvailable: browserAvailable,
+          browserStatus: browserStatus
         ),
         projects: projectsPage(
           management: management,

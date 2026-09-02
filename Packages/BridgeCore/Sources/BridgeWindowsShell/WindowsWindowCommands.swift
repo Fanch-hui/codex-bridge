@@ -3,13 +3,20 @@
   import BridgeIPC
   import Foundation
 
+  /// Page vocabulary shared by the command bus and the rendered desktop surface.
+  /// Titles and copy live in `BridgeDesktopNavigation`; the host holds no page text.
+  enum WindowsMainPage: Int, CaseIterable, Sendable {
+    case overview
+    case workbench
+    case projects
+    case logs
+    case connections
+    case settings
+  }
+
   enum MainWindowCommand: Equatable {
     case selectPage(index: Int)
-    case selectProjectsSection(index: Int)
-    case selectConnectionsSection(index: Int)
-    case selectSettingsSection(index: Int)
     case refreshCurrentPage
-    case openRecentTask(index: Int)
     case openTask(id: String)
     case browserBack
     case browserForward
@@ -25,12 +32,9 @@
     case stopSelectedTask
     case deleteSelectedTask
     case submitSteer(input: String)
-    case showApprovals
     case selectApproval(index: Int)
     case refreshApprovals
     case resolveApproval(decision: String)
-    case showProjects
-    case showAgents
     case selectMCPClient(index: Int)
     case refreshMCPConnections
     case toggleSelectedMCPClient
@@ -51,7 +55,6 @@
     case disableSelectedAgent
     case reprobeSelectedAgent(acceptReplacement: Bool)
     case removeSelectedAgent
-    case showWorkspace
     case selectWorkspaceProject(index: Int)
     case selectWorkspaceCommand(index: Int)
     case selectWorkspaceSkill(index: Int)
@@ -70,20 +73,17 @@
     case removeSelectedWorkspaceCommand
     case saveWorkspaceBlacklist(executable: String, pattern: String)
     case removeSelectedWorkspaceBlacklist
-    case showAgentDefaults
     case selectDefaultProvider(index: Int)
     case selectDefaultInstallation(index: Int)
     case refreshAgentDefaults
     case refreshAgentModels
     case saveAgentDefaults(model: String, permissionMode: String, effort: String)
-    case showLogs
     case refreshLogs
     case selectLog(index: Int)
     case setLogSearch(text: String)
     case setLogProjectFilter(index: Int)
     case setLogKindFilter(index: Int)
     case copyLogs
-    case showSettings
     case refreshSettings
     case saveSettingsPreferences(preferences: IPCModelPreferences)
     case saveSettingsInstructions(text: String)

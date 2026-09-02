@@ -6,9 +6,6 @@
   /// thread-affine Win32 message pump lives on `WindowsUIThread`.
   @MainActor
   public enum CodexBridgeWindowsApplication {
-    nonisolated(unsafe) static var lastAppliedDisplay: WindowsWorkbenchDisplay?
-    nonisolated(unsafe) static var lastAppliedManagementDisplay: WindowsManagementDisplay?
-    nonisolated(unsafe) static var lastPlaceholderText: String? = ""
     static var selectedPage = WindowsMainPage.overview
 
     public static func main() async {
@@ -40,7 +37,6 @@
           chat: chat,
           desktopUI: desktopUI
         )
-        auxiliary.applyDisplay()
         try? await Task.sleep(nanoseconds: 10_000_000)
       }
       await model.shutdown()
@@ -61,27 +57,6 @@
         selectedPage = page
         onUI { WindowsMainWindow.selectPage(page) }
         refresh(page: page, model: model, management: management, auxiliary: auxiliary)
-      case .selectProjectsSection(let index):
-        onUI { WindowsEmbeddedPages.selectSection(page: .projects, index: index) }
-        if index == 0 {
-          Task { await management.refreshProjects() }
-        } else {
-          auxiliary.run(.refreshWorkspace)
-        }
-      case .selectConnectionsSection(let index):
-        onUI { WindowsEmbeddedPages.selectSection(page: .connections, index: index) }
-        if index == 0 {
-          auxiliary.run(.refreshMCPConnections)
-        } else {
-          Task { await management.refreshAgents() }
-        }
-      case .selectSettingsSection(let index):
-        onUI { WindowsEmbeddedPages.selectSection(page: .settings, index: index) }
-        if index == 0 {
-          auxiliary.run(.refreshSettings)
-        } else {
-          auxiliary.run(.refreshAgentDefaults)
-        }
       case .refreshCurrentPage:
         refresh(
           page: selectedPage,
@@ -89,10 +64,6 @@
           management: management,
           auxiliary: auxiliary
         )
-      case .openRecentTask(let index):
-        model.selectTask(at: index)
-        selectedPage = .workbench
-        onUI { WindowsMainWindow.selectPage(.workbench) }
       case .openTask(let id):
         model.selectTask(id: id)
         selectedPage = .workbench
@@ -129,66 +100,13 @@
       case .deleteSelectedTask:
         Task { await model.deleteSelectedTask() }
       case .submitSteer(let input):
-        Task {
-          if await model.submitSteer(input: input) {
-            onUI { WindowsTaskInspector.clearSteerInput() }
-          }
-        }
-      case .showApprovals:
-        selectedPage = .workbench
-        model.refreshDisplaySnapshot()
-        let display = model.displayBox.current()
-        onUI {
-          WindowsMainWindow.selectPage(.workbench)
-          WindowsApprovalWindow.show(owner: WindowsMainWindow.currentWindow())
-          WindowsApprovalWindow.apply(display)
-        }
-        Task { await model.refreshApprovals() }
+        Task { await model.submitSteer(input: input) }
       case .selectApproval(let index):
         model.selectApproval(at: index)
       case .refreshApprovals:
         Task { await model.refreshApprovals() }
       case .resolveApproval(let decision):
         Task { await model.resolveSelectedApproval(decision: decision) }
-      case .showProjects:
-        selectedPage = .projects
-        onUI {
-          WindowsMainWindow.selectPage(.projects)
-          WindowsEmbeddedPages.selectSection(page: .projects, index: 0)
-        }
-        Task { await management.refreshProjects() }
-      case .showAgents:
-        selectedPage = .connections
-        onUI {
-          WindowsMainWindow.selectPage(.connections)
-          WindowsEmbeddedPages.selectSection(page: .connections, index: 1)
-        }
-        Task { await management.refreshAgents() }
-      case .showWorkspace:
-        selectedPage = .projects
-        onUI {
-          WindowsMainWindow.selectPage(.projects)
-          WindowsEmbeddedPages.selectSection(page: .projects, index: 1)
-        }
-        auxiliary.run(.refreshWorkspace)
-      case .showAgentDefaults:
-        selectedPage = .settings
-        onUI {
-          WindowsMainWindow.selectPage(.settings)
-          WindowsEmbeddedPages.selectSection(page: .settings, index: 1)
-        }
-        auxiliary.run(.refreshAgentDefaults)
-      case .showLogs:
-        selectedPage = .logs
-        onUI { WindowsMainWindow.selectPage(.logs) }
-        auxiliary.run(.refreshLogs)
-      case .showSettings:
-        selectedPage = .settings
-        onUI {
-          WindowsMainWindow.selectPage(.settings)
-          WindowsEmbeddedPages.selectSection(page: .settings, index: 0)
-        }
-        auxiliary.run(.refreshSettings)
       case .selectProject(let index):
         management.selectProject(at: index)
         auxiliary.run(.selectWorkspaceProject(index: index))
