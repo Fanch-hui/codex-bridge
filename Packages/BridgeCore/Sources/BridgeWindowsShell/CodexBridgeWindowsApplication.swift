@@ -36,6 +36,7 @@
         applyDisplay(
           model: model,
           management: management,
+          auxiliary: auxiliary,
           chat: chat,
           desktopUI: desktopUI
         )
@@ -51,6 +52,9 @@
       management: WindowsManagementModel,
       auxiliary: WindowsAuxiliaryRuntime
     ) {
+      if runDesktopCommand(command, model: model, management: management, auxiliary: auxiliary) {
+        return
+      }
       switch command {
       case .selectPage(let index):
         guard let page = WindowsMainPage(rawValue: index) else { return }

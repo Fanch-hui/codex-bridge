@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import Foundation
 
@@ -88,5 +89,78 @@
     case saveSettingsInstructions(text: String)
     case setSettingsDirectApprovalMode(mode: String)
     case setSettingsTaskStartApprovalMode(mode: String)
+    case setBrowserEnabled(enabled: Bool)
+    case loadEarlierConversation(taskID: String)
+    case refreshConversation(taskID: String)
+    case setWorkbenchPermissionMode(mode: String)
+    case selectTask(id: String)
+    case interruptTask(id: String)
+    case stopTask(id: String)
+    case deleteTask(id: String)
+    case steerTask(id: String, input: String, mode: String)
+    case resolveTaskApproval(approvalID: String, taskID: String, decision: String)
+    case resolveDirectApproval(id: String, decision: String)
+    case selectProject(id: String)
+    case beginProjectRegistration
+    case removeProject(id: String)
+    case saveProjectPolicy(
+      projectID: String,
+      read: String,
+      write: String,
+      network: String
+    )
+    case setProjectCommandMode(projectID: String, mode: String)
+    case saveProjectCommand(
+      projectID: String,
+      commandID: String?,
+      name: String,
+      executable: String,
+      arguments: [String],
+      workingDirectory: String?,
+      requiresNetwork: Bool,
+      risk: String
+    )
+    case removeProjectCommand(projectID: String, commandID: String)
+    case saveProjectBlacklist(
+      projectID: String,
+      ruleID: String?,
+      executable: String?,
+      pattern: String?
+    )
+    case removeProjectBlacklist(projectID: String, ruleID: String)
+    case openThread(projectID: String, threadID: String)
+    case selectLog(id: String, taskID: String?)
+    case setLogProjectFilter(projectID: String?)
+    case setLogKindFilter(kind: String)
+    case setMCPClientEnabled(id: String, enabled: Bool)
+    case setMCPClientExposure(id: String, exposureMode: String)
+    case copyMCPClientConfiguration(id: String)
+    case copyLocalMCPEndpoint
+    case rotateMCPClientCredential(id: String)
+    case selectAgent(id: String)
+    case setAgentEnabled(id: String, enabled: Bool)
+    case reprobeAgent(id: String, acceptReplacement: Bool)
+    case removeAgent(id: String)
+    case registerAgentFromDesktop(
+      providerID: String,
+      displayName: String,
+      executablePath: String,
+      configurationPath: String?
+    )
+    case refreshAgentModels(providerID: String, installationID: String)
+    case saveAgentDefault(
+      providerID: String,
+      installationID: String,
+      modelID: String,
+      permissionMode: String,
+      effort: String?
+    )
+    case saveSettingsExecutionPreferences(
+      executionModel: String,
+      executionEffort: String,
+      accessMode: String,
+      fastModeEnabled: Bool
+    )
+    case updateBrowserViewport(viewport: BridgeDesktopBrowserViewport)
   }
 #endif

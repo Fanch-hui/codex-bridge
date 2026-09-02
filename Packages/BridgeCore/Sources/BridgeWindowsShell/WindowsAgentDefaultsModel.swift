@@ -43,13 +43,6 @@
       )
     }
 
-    static func permissionValues(for providerID: String?) -> [String] {
-      guard let providerID else { return ["build", "plan"] }
-      return AgentProviderPresentation.identifier(providerID) == "opencode"
-        ? ["build", "plan"]
-        : ["workspace-write", "read-only"]
-    }
-
     func refresh() async {
       guard !busy else { return }
       busy = true
@@ -239,6 +232,17 @@
       let permissionValues = Self.permissionValues(for: selectedProviderID)
       let permissionIndex = permissionValues.firstIndex(of: selectedPermissionMode)
       let providerName = providerIndex.map { providers[$0].displayName } ?? "—"
+      let desktopProviders = providers.map(WindowsDesktopAgentPresentation.provider)
+      let desktopInstallations = installations.map { installation in
+        WindowsDesktopAgentPresentation.installation(
+          installation,
+          canToggle: !busy
+            && (installation.isEnabled || installation.availability == "available"),
+          canReprobe: !busy,
+          canRemove: !busy
+        )
+      }
+      let desktopModels = models.map(WindowsDesktopAgentPresentation.model)
       let detail =
         installation.map {
           [
@@ -268,7 +272,16 @@
         refreshModelsEnabled: connectionState == .connected && !busy && installation != nil,
         saveEnabled: connectionState == .connected && !busy && installation != nil
           && selectedModelID != nil,
-        statusText: statusText
+        statusText: statusText,
+        providerItems: desktopProviders,
+        installationItems: desktopInstallations,
+        selectedProviderID: selectedProviderID,
+        selectedInstallationID: selectedInstallationID,
+        selectedModelID: selectedModelID,
+        selectedEffort: selectedEffort,
+        selectedPermissionMode: selectedPermissionMode,
+        defaultErrorMessage: statusText.hasPrefix("Agent 模型读取失败") ? statusText : nil,
+        modelOptions: desktopModels
       )
       displayBox.store(value)
     }

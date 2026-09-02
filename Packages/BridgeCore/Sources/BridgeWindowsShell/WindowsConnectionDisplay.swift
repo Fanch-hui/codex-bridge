@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import Foundation
 
   struct WindowsConnectionDisplay: Equatable, Sendable {
@@ -16,5 +17,6 @@
     let rotateCredentialEnabled: Bool
     let rotateEndpointEnabled: Bool
     let statusText: String
+    let clientItems: [BridgeDesktopMCPClientRow] = []
   }
 #endif

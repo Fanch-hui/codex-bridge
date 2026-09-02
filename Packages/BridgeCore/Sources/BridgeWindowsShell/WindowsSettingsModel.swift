@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -202,6 +203,15 @@
       let accessIndex = current.flatMap { Self.accessValues.firstIndex(of: $0.accessMode) }
       let directIndex = Self.approvalValues.firstIndex(of: directMode)
       let taskIndex = Self.approvalValues.firstIndex(of: taskStartMode)
+      let modelOptions = models.map { model in
+        BridgeDesktopModelOption(
+          modelID: model.modelID,
+          displayName: model.displayName,
+          reasoningEfforts: model.reasoningEfforts.map {
+            BridgeDesktopChoice(id: $0, title: DirectWorkspacePresentation.effortLabel($0))
+          }
+        )
+      }
       let value = WindowsSettingsDisplay(
         connectionState: connectionState,
         modelRows: models.map { "\($0.displayName) · \($0.modelID)" },
@@ -224,7 +234,16 @@
         saveInstructionsEnabled: connectionState == .connected && !busy,
         saveDirectApprovalEnabled: connectionState == .connected && !busy,
         saveTaskStartApprovalEnabled: connectionState == .connected && !busy,
-        statusText: statusText
+        statusText: statusText,
+        supervisorAvailable: false,
+        executionModel: current?.executionModel ?? "",
+        executionEffort: current?.executionEffort ?? "",
+        supervisorModel: current?.supervisorModel ?? "",
+        supervisorEffort: current?.supervisorEffort ?? "",
+        accessMode: current?.accessMode ?? "request-approval",
+        directApprovalMode: directMode,
+        taskStartApprovalMode: taskStartMode,
+        modelOptions: modelOptions
       )
       displayBox.store(value)
     }

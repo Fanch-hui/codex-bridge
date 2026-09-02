@@ -65,6 +65,21 @@
         payload: .init(taskID: "task-42")
       )
       XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: task), .openTask(id: "task-42"))
+
+      let endpoint = BridgeDesktopCommandEnvelope(
+        requestID: "endpoint-1",
+        command: .copyLocalMCPEndpoint
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: endpoint),
+        .copyLocalMCPEndpoint
+      )
+
+      let unsupportedTunnel = BridgeDesktopCommandEnvelope(
+        requestID: "tunnel-1",
+        command: .connectTunnel
+      )
+      XCTAssertNil(WindowsDesktopUICommandRouter.command(for: unsupportedTunnel))
     }
 
     private func makeWorkbench(

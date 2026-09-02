@@ -43,7 +43,7 @@
         runSettings(command)
       case .selectMCPClient, .refreshMCPConnections, .toggleSelectedMCPClient,
         .setSelectedMCPExposure, .copySelectedMCPConfiguration,
-        .rotateSelectedMCPCredential, .rotateLocalMCPEndpoint:
+        .copyLocalMCPEndpoint, .rotateSelectedMCPCredential, .rotateLocalMCPEndpoint:
         runConnections(command)
       default:
         break
@@ -66,6 +66,10 @@
           connections.didCopyConfiguration(
             WindowsClipboard.write(configuration, owner: WindowsMainWindow.currentWindow()))
         }
+      case .copyLocalMCPEndpoint:
+        guard let endpoint = connections.localMCPEndpoint else { return }
+        connections.didCopyEndpoint(
+          WindowsClipboard.write(endpoint, owner: WindowsMainWindow.currentWindow()))
       case .rotateSelectedMCPCredential:
         Task { await connections.rotateSelectedCredential() }
       case .rotateLocalMCPEndpoint:

@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import Foundation
 
   struct WindowsProjectPolicy: Equatable, Sendable {
@@ -16,6 +17,7 @@
     let removeEnabled: Bool
     let savePolicyEnabled: Bool
     let statusText: String
+    let projectItems: [BridgeDesktopProjectRow] = []
   }
 
   struct WindowsAgentManagementDisplay: Equatable, Sendable {
@@ -34,6 +36,8 @@
     let acceptReplacementEnabled: Bool
     let removeEnabled: Bool
     let statusText: String
+    let providerItems: [BridgeDesktopAgentProviderRow] = []
+    let installationItems: [BridgeDesktopAgentInstallationRow] = []
   }
 
   struct WindowsManagementDisplay: Equatable, Sendable {

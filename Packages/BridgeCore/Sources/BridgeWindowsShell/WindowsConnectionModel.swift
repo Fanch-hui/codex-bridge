@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -110,6 +111,15 @@
       publishDisplay()
     }
 
+    var localMCPEndpoint: String? {
+      serviceStatus?.localMCPURL
+    }
+
+    func didCopyEndpoint(_ success: Bool) {
+      statusText = success ? "已复制本地 MCP Endpoint。" : "复制本地 MCP Endpoint 失败。"
+      publishDisplay()
+    }
+
     func refreshDisplaySnapshot() { publishDisplay() }
 
     private func mutate(_ progress: String, action: () async throws -> Void) async {
@@ -147,6 +157,24 @@
       }
       let isQwen = profile?.clientID == MCPClientID.qwenStudio.rawValue
       let enabled = profile?.enabled == true
+      let desktopClients = clients.map { client in
+        BridgeDesktopMCPClientRow(
+          clientID: client.clientID,
+          displayName: client.displayName,
+          enabled: client.enabled,
+          exposureMode: client.exposureMode.rawValue,
+          exposureOptions: Self.exposureModes.map { mode in
+            BridgeDesktopChoice(id: mode.rawValue, title: mode == .full ? "完整" : "只读")
+          },
+          activeSessionCount: client.activeSessionCount,
+          lastConnectedAt: client.lastConnectedAt,
+          canToggle: client.clientID == MCPClientID.qwenStudio.rawValue && !busy,
+          canCopyConfiguration: client.clientID == MCPClientID.qwenStudio.rawValue
+            && client.enabled && !busy,
+          canRotateCredential: client.clientID == MCPClientID.qwenStudio.rawValue
+            && client.enabled && !busy
+        )
+      }
       displayBox.store(
         WindowsConnectionDisplay(
           connectionState: connectionState,
@@ -168,7 +196,8 @@
           copyConfigurationEnabled: isQwen && enabled && !busy,
           rotateCredentialEnabled: isQwen && enabled && !busy,
           rotateEndpointEnabled: connectionState == .connected && !busy,
-          statusText: statusText
+          statusText: statusText,
+          clientItems: desktopClients
         )
       )
     }

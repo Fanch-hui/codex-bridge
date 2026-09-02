@@ -1,17 +1,16 @@
 #if os(Windows)
   import BridgeDesktopUI
-  import Foundation
 
   enum WindowsDesktopUICommandRouter {
     static func command(for envelope: BridgeDesktopCommandEnvelope) -> MainWindowCommand? {
+      let payload = envelope.payload
       switch envelope.command {
       case .ready:
         return nil
       case .refresh:
         return .refreshCurrentPage
       case .selectPage:
-        guard let navigation = envelope.payload.navigation else { return nil }
-        return select(navigation)
+        return payload.navigation.map(select)
       case .openWorkbench:
         return select(.workbench)
       case .openProjects:
@@ -23,17 +22,232 @@
       case .openLogs:
         return select(.logs)
       case .openTask:
-        guard
-          let taskID = envelope.payload.taskID?.trimmingCharacters(in: .whitespacesAndNewlines),
-          !taskID.isEmpty,
-          taskID.count <= 256
+        return nonEmpty(payload.taskID).map(MainWindowCommand.openTask)
+      case .browserBack:
+        return .browserBack
+      case .browserForward:
+        return .browserForward
+      case .browserReload:
+        return .browserReload
+      case .openBrowserExternally:
+        return .openChatExternally
+      case .setBrowserEnabled:
+        return nil
+      case .loadEarlierConversation:
+        return nonEmpty(payload.taskID).map(MainWindowCommand.loadEarlierConversation)
+      case .refreshConversation:
+        return nonEmpty(payload.taskID).map(MainWindowCommand.refreshConversation)
+      case .setWorkbenchPermissionMode:
+        return nonEmpty(payload.mode).map(MainWindowCommand.setWorkbenchPermissionMode)
+      case .selectTask:
+        return nonEmpty(payload.taskID).map(MainWindowCommand.selectTask(id:))
+      case .refreshTasks:
+        return .refreshTasks
+      case .interruptTask:
+        return nonEmpty(payload.taskID).map(MainWindowCommand.interruptTask)
+      case .stopTask:
+        return nonEmpty(payload.taskID).map(MainWindowCommand.stopTask)
+      case .deleteTask:
+        return nonEmpty(payload.taskID).map(MainWindowCommand.deleteTask)
+      case .steerTask:
+        guard let taskID = nonEmpty(payload.taskID), let input = payload.input,
+          let mode = nonEmpty(payload.mode), mode == "queued"
         else { return nil }
-        return .openTask(id: taskID)
+        return .steerTask(id: taskID, input: input, mode: mode)
+      case .resolveApproval:
+        guard let approvalID = nonEmpty(payload.approvalID), let taskID = nonEmpty(payload.taskID),
+          let decision = nonEmpty(payload.decision)
+        else { return nil }
+        return .resolveTaskApproval(
+          approvalID: approvalID, taskID: taskID, decision: decision)
+      case .resolveDirectApproval:
+        guard let approvalID = nonEmpty(payload.approvalID),
+          let decision = nonEmpty(payload.decision)
+        else { return nil }
+        return .resolveDirectApproval(id: approvalID, decision: decision)
+      case .selectProject:
+        return nonEmpty(payload.projectID).map(MainWindowCommand.selectProject(id:))
+      case .refreshProjects:
+        return .refreshProjects
+      case .registerProject:
+        return registerProject(payload)
+      case .removeProject:
+        return nonEmpty(payload.projectID).map(MainWindowCommand.removeProject(id:))
+      case .saveProjectPolicy:
+        guard let projectID = nonEmpty(payload.projectID),
+          let read = nonEmpty(payload.readPermission),
+          let write = nonEmpty(payload.writePermission),
+          let network = nonEmpty(payload.networkPermission)
+        else { return nil }
+        return .saveProjectPolicy(projectID: projectID, read: read, write: write, network: network)
+      case .setProjectCommandMode:
+        guard let projectID = nonEmpty(payload.projectID), let mode = nonEmpty(payload.mode) else {
+          return nil
+        }
+        return .setProjectCommandMode(projectID: projectID, mode: mode)
+      case .saveProjectCommand:
+        guard let projectID = nonEmpty(payload.projectID), let name = payload.name,
+          let executable = payload.executable,
+          !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return .saveProjectCommand(
+          projectID: projectID,
+          commandID: optionalValue(payload.commandID),
+          name: name,
+          executable: executable,
+          arguments: payload.arguments ?? [],
+          workingDirectory: optionalValue(payload.workingDirectory),
+          requiresNetwork: payload.requiresNetwork ?? false,
+          risk: nonEmpty(payload.risk) ?? "normal"
+        )
+      case .removeProjectCommand:
+        guard let projectID = nonEmpty(payload.projectID),
+          let commandID = nonEmpty(payload.commandID)
+        else { return nil }
+        return .removeProjectCommand(projectID: projectID, commandID: commandID)
+      case .saveProjectBlacklist:
+        guard let projectID = nonEmpty(payload.projectID) else { return nil }
+        return .saveProjectBlacklist(
+          projectID: projectID,
+          ruleID: optionalValue(payload.ruleID),
+          executable: optionalValue(payload.executable),
+          pattern: optionalValue(payload.pattern)
+        )
+      case .removeProjectBlacklist:
+        guard let projectID = nonEmpty(payload.projectID), let ruleID = nonEmpty(payload.ruleID)
+        else { return nil }
+        return .removeProjectBlacklist(projectID: projectID, ruleID: ruleID)
+      case .openThread:
+        guard let projectID = nonEmpty(payload.projectID), let threadID = nonEmpty(payload.threadID)
+        else { return nil }
+        return .openThread(projectID: projectID, threadID: threadID)
+      case .selectLog:
+        guard let logID = nonEmpty(payload.logID) else { return nil }
+        return .selectLog(id: logID, taskID: optionalValue(payload.taskID))
+      case .refreshLogs:
+        return .refreshLogs
+      case .setLogSearch:
+        return .setLogSearch(text: payload.searchText ?? "")
+      case .setLogProjectFilter:
+        return .setLogProjectFilter(projectID: optionalValue(payload.projectID))
+      case .setLogKindFilter:
+        guard let kind = nonEmpty(payload.kind),
+          ["all", "command", "file", "error", "event"].contains(kind)
+        else { return nil }
+        return .setLogKindFilter(kind: kind)
+      case .copyLogs:
+        return .copyLogs
+      case .setMCPClientEnabled:
+        guard let clientID = nonEmpty(payload.clientID), let enabled = payload.enabled else {
+          return nil
+        }
+        return .setMCPClientEnabled(id: clientID, enabled: enabled)
+      case .setMCPClientExposure:
+        guard let clientID = nonEmpty(payload.clientID), let mode = nonEmpty(payload.exposureMode),
+          ["read-only", "full"].contains(mode)
+        else { return nil }
+        return .setMCPClientExposure(id: clientID, exposureMode: mode)
+      case .copyMCPClientConfiguration:
+        return nonEmpty(payload.clientID).map(MainWindowCommand.copyMCPClientConfiguration)
+      case .copyLocalMCPEndpoint:
+        return .copyLocalMCPEndpoint
+      case .rotateMCPClientCredential:
+        return nonEmpty(payload.clientID).map(MainWindowCommand.rotateMCPClientCredential)
+      case .rotateLocalMCPEndpoint:
+        return .rotateLocalMCPEndpoint
+      case .configureTunnel, .connectTunnel, .disconnectTunnel, .clearTunnel:
+        return nil
+      case .registerAgent:
+        guard let providerID = nonEmpty(payload.providerID),
+          let executable = nonEmpty(payload.executable),
+          let displayName = nonEmpty(payload.displayName) ?? nonEmpty(payload.name)
+        else { return nil }
+        return .registerAgentFromDesktop(
+          providerID: providerID,
+          displayName: displayName,
+          executablePath: executable,
+          configurationPath: optionalValue(payload.configurationPath)
+        )
+      case .selectAgent:
+        return nonEmpty(payload.installationID ?? payload.providerID).map(
+          MainWindowCommand.selectAgent(id:))
+      case .setAgentEnabled:
+        guard let installationID = nonEmpty(payload.installationID), let enabled = payload.enabled
+        else {
+          return nil
+        }
+        return .setAgentEnabled(id: installationID, enabled: enabled)
+      case .reprobeAgent:
+        return nonEmpty(payload.installationID).map {
+          .reprobeAgent(id: $0, acceptReplacement: payload.acceptReplacement ?? false)
+        }
+      case .removeAgent:
+        return nonEmpty(payload.installationID).map(MainWindowCommand.removeAgent(id:))
+      case .refreshAgentModels:
+        guard let providerID = nonEmpty(payload.providerID),
+          let installationID = nonEmpty(payload.installationID)
+        else { return nil }
+        return .refreshAgentModels(providerID: providerID, installationID: installationID)
+      case .saveAgentDefault:
+        guard let providerID = nonEmpty(payload.providerID),
+          let installationID = nonEmpty(payload.installationID),
+          let modelID = nonEmpty(payload.modelID),
+          let permissionMode = nonEmpty(payload.permissionMode)
+        else { return nil }
+        return .saveAgentDefault(
+          providerID: providerID,
+          installationID: installationID,
+          modelID: modelID,
+          permissionMode: permissionMode,
+          effort: optionalValue(payload.effort)
+        )
+      case .setDirectApprovalMode:
+        return nonEmpty(payload.mode).map(MainWindowCommand.setSettingsDirectApprovalMode)
+      case .setTaskStartApprovalMode:
+        return nonEmpty(payload.mode).map(MainWindowCommand.setSettingsTaskStartApprovalMode)
+      case .saveSettings:
+        guard let executionModel = nonEmpty(payload.executionModel),
+          let executionEffort = payload.executionEffort,
+          let accessMode = nonEmpty(payload.accessMode)
+        else { return nil }
+        return .saveSettingsExecutionPreferences(
+          executionModel: executionModel,
+          executionEffort: executionEffort,
+          accessMode: accessMode,
+          fastModeEnabled: payload.fastModeEnabled ?? false
+        )
+      case .saveCustomInstructions:
+        return .saveSettingsInstructions(text: payload.value ?? payload.input ?? "")
+      case .setExecutionModel, .setExecutionEffort, .setAccessMode, .setFastMode,
+        .setSupervisorModel, .setSupervisorEffort, .setSupervisorEnabled,
+        .registerService, .unregisterService, .setKeepServiceRunning:
+        return nil
+      case .updateBrowserViewport:
+        return payload.viewport.map(MainWindowCommand.updateBrowserViewport)
       }
     }
 
     private static func select(_ navigation: BridgeDesktopNavigation) -> MainWindowCommand {
       .selectPage(index: WindowsMainPage(navigation).rawValue)
+    }
+
+    private static func registerProject(_ payload: BridgeDesktopCommandPayload) -> MainWindowCommand
+    {
+      guard let name = nonEmpty(payload.name), let path = nonEmpty(payload.path) else {
+        return .beginProjectRegistration
+      }
+      return .registerProject(name: name, path: path)
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? {
+      guard let value else { return nil }
+      let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+      return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func optionalValue(_ value: String?) -> String? {
+      nonEmpty(value)
     }
   }
 

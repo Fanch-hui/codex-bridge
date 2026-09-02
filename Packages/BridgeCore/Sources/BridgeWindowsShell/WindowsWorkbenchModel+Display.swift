@@ -1,4 +1,6 @@
 #if os(Windows)
+  import BridgeDesktopUI
+  import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
 
@@ -45,6 +47,36 @@
         && selectedApproval != nil
         && !approvalResolving
         && !approvalRefreshInProgress
+      let taskItems = visibleTasks.map {
+        Self.taskItem(
+          $0,
+          projectName: projectName(for: $0.projectID),
+          selectedTaskID: selectedTaskID,
+          canSteer: TaskInspectorPresentation.canSteer(
+            $0,
+            providerSupportsSteer: providerSupportsSteer(for: $0)
+          )
+        )
+      }
+      let selectedTaskDetail = task.map {
+        Self.taskDetail(
+          $0,
+          projectName: projectName(for: $0.projectID),
+          conversation: conversation,
+          selectedThreadPage: selectedThreadPage
+        )
+      }
+      let typedApprovals = approvalPresentationItems().enumerated().compactMap {
+        Self.approvalItem(
+          $0.element,
+          approvals: approvals,
+          directApprovals: directApprovals,
+          tasks: tasks,
+          projects: projects,
+          resolvingApprovalIDs: resolvingApprovalIDs,
+          connected: connectionState == .connected && !approvalRefreshInProgress
+        )
+      }
       displayBox.store(
         WindowsWorkbenchDisplay(
           connectionState: connectionState,
@@ -60,6 +92,7 @@
           permissionRows: ["只读", "可写"],
           selectedPermissionIndex: Self.permissionModes.firstIndex(
             of: workbenchPermissionMode),
+          permissionMode: workbenchPermissionMode,
           taskRows: workbenchRows,
           recentTaskRows: tasks.map(Self.rowText),
           recentTasks: tasks.map {
@@ -87,7 +120,10 @@
             && !(selectedApproval?.allowDecisions.isEmpty ?? true),
           approvalDenyEnabled: approvalActionsEnabled,
           approvalStatusText: approvalStatusText,
-          detailText: errorMessage
+          detailText: errorMessage,
+          taskItems: taskItems,
+          selectedTaskDetail: selectedTaskDetail,
+          approvalItems: typedApprovals
         )
       )
     }

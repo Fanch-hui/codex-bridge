@@ -8,6 +8,11 @@
     static func build(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
+      workspace: WindowsWorkspaceDisplay? = nil,
+      logs: WindowsLogDisplay? = nil,
+      connections: WindowsConnectionDisplay? = nil,
+      settings: WindowsSettingsDisplay? = nil,
+      agentDefaults: WindowsAgentDefaultsDisplay? = nil,
       selectedNavigation: BridgeDesktopNavigation = .overview,
       isRefreshing: Bool = false
     ) -> BridgeDesktopUIState {
@@ -19,6 +24,21 @@
         overview: overview(
           workbench: workbench,
           management: management
+        ),
+        workbench: workbenchPage(workbench, management: management),
+        projects: projectsPage(
+          management: management,
+          workspace: workspace
+        ),
+        logs: logsPage(logs),
+        connections: connectionsPage(
+          workbench: workbench,
+          management: management,
+          connections: connections
+        ),
+        settings: settingsPage(
+          settings: settings,
+          agentDefaults: agentDefaults
         )
       )
     }

@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -141,17 +142,29 @@
     }
 
     func publishDisplay() {
-      let projectItems = projects.map(ProjectAgentPresentation.project)
+      let projectPresentations = projects.map(ProjectAgentPresentation.project)
       let selectedProjectIndex = selectedProjectID.flatMap { id in
         projects.firstIndex { $0.projectID == id }
       }
-      let selectedProject = selectedProjectIndex.flatMap { projectItems[$0] }
-      let providerItems = agentProviders.map(ProjectAgentPresentation.provider)
+      let selectedProject = selectedProjectIndex.flatMap { projectPresentations[$0] }
+      let projectItems = projects.map { project in
+        BridgeDesktopProjectRow(
+          projectID: project.projectID,
+          name: project.name,
+          detail: ProjectAgentPresentation.project(project).detailText,
+          gitState: project.gitState,
+          readPermission: project.capabilities.read,
+          writePermission: project.capabilities.write,
+          networkPermission: project.capabilities.network,
+          selected: project.projectID == selectedProjectID
+        )
+      }
+      let providerPresentations = agentProviders.map(ProjectAgentPresentation.provider)
       let selectedProviderIndex = selectedProviderID.flatMap { id in
         agentProviders.firstIndex { $0.providerID == id }
       }
-      let selectedProvider = selectedProviderIndex.flatMap { providerItems[$0] }
-      let installationItems = agentInstallations.map { installation in
+      let selectedProvider = selectedProviderIndex.flatMap { providerPresentations[$0] }
+      let installationPresentations = agentInstallations.map { installation in
         let providerName = agentProviders.first { $0.providerID == installation.providerID }?
           .displayName
         return ProjectAgentPresentation.installation(installation, providerName: providerName)
@@ -159,10 +172,21 @@
       let selectedInstallationIndex = selectedInstallationID.flatMap { id in
         agentInstallations.firstIndex { $0.installationID == id }
       }
-      let selectedInstallation = selectedInstallationIndex.flatMap { installationItems[$0] }
+      let selectedInstallation = selectedInstallationIndex.flatMap { installationPresentations[$0] }
       let connected = connectionState == .connected
       let projectActions = connected && !projectBusy && !projectLoading
       let agentActions = connected && !agentBusy && !agentLoading
+      let desktopProviderItems = agentProviders.map(WindowsDesktopAgentPresentation.provider)
+      let desktopInstallationItems = agentInstallations.map { installation in
+        let canToggle =
+          agentActions && (installation.isEnabled || installation.availability == "available")
+        return WindowsDesktopAgentPresentation.installation(
+          installation,
+          canToggle: canToggle,
+          canReprobe: agentActions,
+          canRemove: agentActions
+        )
+      }
       let selectedAgent = selectedInstallationIndex.flatMap { agentInstallations[$0] }
       let canEnable =
         selectedAgent.map {
@@ -183,15 +207,16 @@
         registerEnabled: projectActions,
         removeEnabled: projectActions && selectedProject != nil,
         savePolicyEnabled: projectActions && selectedProject != nil,
-        statusText: projectStatusText
+        statusText: projectStatusText,
+        projectItems: projectItems
       )
       let agentDisplay = WindowsAgentManagementDisplay(
-        providerRows: providerItems.map(\.rowText),
-        providerIDs: providerItems.map(\.id),
+        providerRows: providerPresentations.map(\.rowText),
+        providerIDs: desktopProviderItems.map(\.providerID),
         selectedProviderIndex: selectedProviderIndex,
         providerDetailText: selectedProvider?.detailText ?? "请选择 Provider。",
         providerRequiresConfiguration: selectedProvider?.requiresConfiguration ?? false,
-        installationRows: installationItems.map(\.rowText),
+        installationRows: installationPresentations.map(\.rowText),
         selectedInstallationIndex: selectedInstallationIndex,
         installationDetailText: selectedInstallation?.detailText ?? "请选择安装记录。",
         registerEnabled: agentActions && selectedProvider != nil,
@@ -200,7 +225,9 @@
         reprobeEnabled: agentActions && selectedAgent != nil,
         acceptReplacementEnabled: agentActions && selectedAgent?.availability == "needs_review",
         removeEnabled: agentActions && selectedAgent != nil,
-        statusText: agentStatusText
+        statusText: agentStatusText,
+        providerItems: desktopProviderItems,
+        installationItems: desktopInstallationItems
       )
       displayBox.store(
         WindowsManagementDisplay(

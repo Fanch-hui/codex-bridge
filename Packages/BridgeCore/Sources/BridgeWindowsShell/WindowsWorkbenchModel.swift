@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -49,6 +50,7 @@
     public var selectedProjectIndex: Int?
     public var permissionRows: [String]
     public var selectedPermissionIndex: Int?
+    public var permissionMode: String = "workspace-write"
     public var taskRows: [String]
     public var recentTaskRows: [String]
     public var recentTasks: [WindowsRecentTaskPresentation] = []
@@ -69,6 +71,9 @@
     public var approvalDenyEnabled: Bool
     public var approvalStatusText: String?
     public var detailText: String?
+    public var taskItems: [BridgeDesktopTaskRow] = []
+    public var selectedTaskDetail: BridgeDesktopTaskDetail?
+    public var approvalItems: [BridgeDesktopApprovalRow] = []
   }
 
   /// Lock-guarded bridge between main-actor model updates and the

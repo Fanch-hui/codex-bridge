@@ -6,17 +6,20 @@
     static func applyDisplay(
       model: WindowsWorkbenchModel,
       management: WindowsManagementModel,
+      auxiliary: WindowsAuxiliaryRuntime,
       chat: WindowsChatWebView,
       desktopUI: WindowsDesktopUIWebView
     ) {
       model.refreshDisplaySnapshot()
       management.refreshDisplaySnapshot()
+      let auxiliarySnapshot = auxiliary.desktopDisplaySnapshot()
       let display = model.displayBox.current()
       let managementDisplay = management.displayBox.current()
       WindowsUIThread.shared.enqueue {
         applyOnUI(
           workbench: display,
           management: managementDisplay,
+          auxiliary: auxiliarySnapshot,
           chat: chat,
           desktopUI: desktopUI
         )
@@ -26,6 +29,7 @@
     private nonisolated static func applyOnUI(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
+      auxiliary: WindowsAuxiliaryDisplaySnapshot,
       chat: WindowsChatWebView,
       desktopUI: WindowsDesktopUIWebView
     ) {
@@ -38,6 +42,11 @@
         WindowsDesktopUIStateBuilder.build(
           workbench: workbench,
           management: management,
+          workspace: auxiliary.workspace,
+          logs: auxiliary.logs,
+          connections: auxiliary.connections,
+          settings: auxiliary.settings,
+          agentDefaults: auxiliary.agentDefaults,
           selectedNavigation: WindowsMainWindow.currentPage().desktopNavigation
         )
       )

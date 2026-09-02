@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -35,6 +36,17 @@
     let saveBlacklistEnabled: Bool
     let removeBlacklistEnabled: Bool
     let statusText: String
+    let selectedProjectID: String? = nil
+    let selectedCommandID: String? = nil
+    let selectedSkillID: String? = nil
+    let selectedThreadID: String? = nil
+    let fileWritePermission: String = "denied"
+    let commands: [BridgeDesktopWorkspaceCommand] = []
+    let blacklist: [BridgeDesktopBlacklistRule] = []
+    let skills: [BridgeDesktopSkillRow] = []
+    let threads: [BridgeDesktopThreadRow] = []
+    let verificationCommands: [String] = []
+    let threadCount: Int? = nil
   }
 
   struct WindowsAgentDefaultsDisplay: Equatable, Sendable {
@@ -54,6 +66,15 @@
     let refreshModelsEnabled: Bool
     let saveEnabled: Bool
     let statusText: String
+    let providerItems: [BridgeDesktopAgentProviderRow] = []
+    let installationItems: [BridgeDesktopAgentInstallationRow] = []
+    let selectedProviderID: String? = nil
+    let selectedInstallationID: String? = nil
+    let selectedModelID: String? = nil
+    let selectedEffort: String = ""
+    let selectedPermissionMode: String = ""
+    let defaultErrorMessage: String? = nil
+    let modelOptions: [BridgeDesktopModelOption] = []
   }
 
   struct WindowsLogDisplay: Equatable, Sendable {
@@ -70,6 +91,11 @@
     let copyEnabled: Bool
     let copyText: String
     let statusText: String
+    let rowsTyped: [BridgeDesktopLogRow] = []
+    let projectOptions: [BridgeDesktopChoice] = []
+    let selectedProjectID: String? = nil
+    let selectedKind: String = "all"
+    let selectedRowID: String? = nil
   }
 
   struct WindowsSettingsDisplay: Equatable, Sendable {
@@ -95,6 +121,15 @@
     let saveDirectApprovalEnabled: Bool
     let saveTaskStartApprovalEnabled: Bool
     let statusText: String
+    let supervisorAvailable: Bool = false
+    let executionModel: String = ""
+    let executionEffort: String = ""
+    let supervisorModel: String = ""
+    let supervisorEffort: String = ""
+    let accessMode: String = "request-approval"
+    let directApprovalMode: String = "require"
+    let taskStartApprovalMode: String = "require"
+    let modelOptions: [BridgeDesktopModelOption] = []
   }
 
   final class AuxiliaryDisplayBox<Value: Equatable & Sendable>: @unchecked Sendable {

@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -12,6 +13,8 @@
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var items: [TaskLogPresentation.Item] = []
     private(set) var projectNames: [String] = []
+    private(set) var projectIDs: [String] = []
+    private(set) var desktopRows: [BridgeDesktopLogRow] = []
     var searchText = ""
     var selectedProjectIndex = 0
     var selectedKindIndex = 0
@@ -52,9 +55,14 @@
         let projects = (try? await client.projects()) ?? []
         let tasks = try await client.tasks(IPCTaskListRequest(limit: 200))
         let names = Dictionary(uniqueKeysWithValues: projects.map { ($0.projectID, $0.name) })
-        projectNames = projects.map(\.name).sorted()
+        let sortedProjects = projects.sorted {
+          $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        projectNames = sortedProjects.map(\.name)
+        projectIDs = sortedProjects.map(\.projectID)
         selectedProjectIndex = min(selectedProjectIndex, projectNames.count)
         items = TaskLogPresentation.flatten(tasks: tasks, projectNames: names)
+        desktopRows = Self.desktopRows(tasks: tasks, projectNames: names)
         reconcileSelection()
         statusText = "已加载 \(items.count) 条任务事件。"
       } catch {
@@ -108,6 +116,9 @@
       let filtered = filteredItems
       let selectedIndex = selectedItemID.flatMap { id in filtered.firstIndex { $0.id == id } }
       let selected = selectedIndex.flatMap { filtered[$0] }
+      let selectedProjectID =
+        selectedProjectIndex > 0 && projectIDs.indices.contains(selectedProjectIndex - 1)
+        ? projectIDs[selectedProjectIndex - 1] : nil
       let value = WindowsLogDisplay(
         connectionState: connectionState,
         searchText: searchText,
@@ -121,7 +132,12 @@
         refreshEnabled: connectionState == .connected && !busy,
         copyEnabled: !filtered.isEmpty,
         copyText: filtered.map(\.rowText).joined(separator: "\r\n"),
-        statusText: "\(statusText) 当前显示 \(filtered.count) 条。"
+        statusText: "\(statusText) 当前显示 \(filtered.count) 条。",
+        rowsTyped: filteredDesktopRows,
+        projectOptions: desktopProjectOptions,
+        selectedProjectID: selectedProjectID,
+        selectedKind: selectedKindID,
+        selectedRowID: selectedItemID
       )
       displayBox.store(value)
     }
@@ -144,6 +160,84 @@
             || item.detailText.lowercased().contains(query)
         }
         return true
+      }
+    }
+
+    private var filteredDesktopRows: [BridgeDesktopLogRow] {
+      let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+      let projectID =
+        selectedProjectIndex > 0 && projectIDs.indices.contains(selectedProjectIndex - 1)
+        ? projectIDs[selectedProjectIndex - 1] : nil
+      let kind = selectedKindID == "all" ? nil : selectedKindID
+      return desktopRows.filter { row in
+        if let projectID, row.projectID != projectID { return false }
+        if let kind, row.kind != kind { return false }
+        guard !query.isEmpty else { return true }
+        return [row.projectName, row.summary, row.kindLabel, row.taskID].contains {
+          $0.lowercased().contains(query)
+        }
+      }
+    }
+
+    private var desktopProjectOptions: [BridgeDesktopChoice] {
+      [BridgeDesktopChoice(id: "all", title: "全部项目")]
+        + zip(projectIDs, projectNames).map { id, name in
+          BridgeDesktopChoice(id: id, title: name)
+        }
+    }
+
+    private var selectedKindID: String {
+      switch selectedKindIndex {
+      case 1: "command"
+      case 2: "file"
+      case 3: "error"
+      case 4: "event"
+      default: "all"
+      }
+    }
+
+    private static func desktopRows(
+      tasks: [MCPServiceTaskSnapshot],
+      projectNames: [String: String]
+    ) -> [BridgeDesktopLogRow] {
+      tasks.flatMap { task in
+        task.recentEvents.map { event in
+          let category = category(kind: event.kind, summary: event.summary)
+          return BridgeDesktopLogRow(
+            id: "\(task.taskID)_\(event.sequence)",
+            sequence: event.sequence,
+            taskID: task.taskID,
+            projectID: task.projectID,
+            projectName: projectNames[task.projectID] ?? task.projectID,
+            kind: category,
+            kindLabel: kindLabel(category),
+            summary: event.summary,
+            timestamp: event.occurredAt
+          )
+        }
+      }.sorted { $0.sequence > $1.sequence }
+    }
+
+    private static func category(kind: String, summary: String) -> String {
+      let value = "\(kind) \(summary)".lowercased()
+      if value.contains("command") || value.contains("exec") || value.contains("run") {
+        return "command"
+      }
+      if value.contains("file") || value.contains("edit") || value.contains("write") {
+        return "file"
+      }
+      if value.contains("failed") || value.contains("error") {
+        return "error"
+      }
+      return "event"
+    }
+
+    private static func kindLabel(_ kind: String) -> String {
+      switch kind {
+      case "command": "命令"
+      case "file": "文件"
+      case "error": "错误"
+      default: "事件"
       }
     }
 
