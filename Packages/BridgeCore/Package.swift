@@ -4,6 +4,10 @@ import PackageDescription
 
 var testTargets: [Target] = [
   .testTarget(
+    name: "BridgeDesktopUITests",
+    dependencies: ["BridgeDesktopUI"]
+  ),
+  .testTarget(
     name: "BridgeDomainTests",
     dependencies: ["BridgeDomain"]
   ),
@@ -283,6 +287,7 @@ let package = Package(
   name: "BridgeCore",
   platforms: [.macOS(.v14)],
   products: [
+    .library(name: "BridgeDesktopUI", targets: ["BridgeDesktopUI"]),
     .library(name: "BridgeDomain", targets: ["BridgeDomain"]),
     .library(name: "BridgeSecurity", targets: ["BridgeSecurity"]),
     .library(name: "BridgeCodexRPC", targets: ["BridgeCodexRPC"]),
@@ -341,6 +346,10 @@ let package = Package(
     ),
   ],
   targets: [
+    .target(
+      name: "BridgeDesktopUI",
+      resources: [.process("Resources")]
+    ),
     .target(name: "BridgeDomain"),
     .target(
       name: "BridgeSecurity",

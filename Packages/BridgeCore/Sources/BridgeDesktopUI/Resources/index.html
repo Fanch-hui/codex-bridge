@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+    <title>Codex Bridge</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell" id="app-shell" data-state="loading">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="sidebar-topbar">
+          <button class="sidebar-toggle icon-button" type="button" aria-label="切换侧边栏" data-action="toggle-sidebar">
+            <span class="icon" data-symbol="sidebar.left"></span>
+          </button>
+        </div>
+        <nav class="navigation" id="navigation" aria-label="页面导航"></nav>
+        <div class="sidebar-footer">
+          <span class="connection-indicator" id="connection-indicator" aria-hidden="true"></span>
+          <span id="connection-label">等待连接状态</span>
+          <span class="refresh-indicator" id="refresh-indicator" aria-hidden="true"></span>
+        </div>
+      </aside>
+
+      <main class="main-shell">
+        <header class="toolbar">
+          <h1 id="page-title">概览</h1>
+          <button class="refresh-button icon-button" type="button" aria-label="刷新状态" data-action="refresh">
+            <span class="icon" data-symbol="arrow.clockwise"></span>
+          </button>
+        </header>
+
+        <div class="content-scroll">
+          <section class="overview-page" id="overview-page" aria-labelledby="overview-title">
+            <div class="section-header">
+              <span class="section-icon icon-tile" data-symbol="gauge.with.needle" aria-hidden="true"></span>
+              <div>
+                <h2 id="overview-title">概览</h2>
+                <p id="overview-subtitle"></p>
+              </div>
+            </div>
+
+            <div class="notice-stack" id="notices" aria-live="polite"></div>
+
+            <section class="content-section" aria-labelledby="metrics-title">
+              <h3 id="metrics-title">关键指标</h3>
+              <div class="metrics-grid" id="metrics"></div>
+            </section>
+
+            <section class="content-section" aria-labelledby="services-title">
+              <h3 id="services-title">连接与服务拓扑全景</h3>
+              <div class="surface-card service-card" id="services"></div>
+            </section>
+
+            <section class="content-section recent-section" id="recent-section" aria-labelledby="recent-title">
+              <div class="section-heading-row">
+                <h3 id="recent-title">最近任务</h3>
+                <button class="link-button" type="button" data-action="select-page" data-page="workbench">进入工作台 <span aria-hidden="true">→</span></button>
+              </div>
+              <div class="surface-card recent-card" id="recent-tasks"></div>
+            </section>
+          </section>
+
+          <section class="placeholder-page" id="placeholder-page" hidden aria-live="polite">
+            <div class="empty-state">
+              <span class="empty-icon icon-tile" data-symbol="circle.dashed" aria-hidden="true"></span>
+              <h2 id="placeholder-title">等待页面状态</h2>
+              <p>页面数据由本机 Service 提供。</p>
+            </div>
+          </section>
+
+          <div class="loading-state" id="loading-state" role="status">
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <span>正在读取本机 Service 状态…</span>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
