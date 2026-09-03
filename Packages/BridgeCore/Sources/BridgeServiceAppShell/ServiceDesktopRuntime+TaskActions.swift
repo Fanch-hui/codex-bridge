@@ -112,6 +112,29 @@ extension BridgeServiceAppModel {
     }
   }
 
+  public func deleteSession(_ sessionID: String, inProject projectID: String? = nil) {
+    let targetProjectID = projectID ?? selectedProjectID
+    let relatedTasks = tasks.filter { task in
+      (targetProjectID == nil || task.projectID == targetProjectID)
+        && (task.effectiveSessionID ?? task.taskID) == sessionID
+    }
+    runMutation { [weak self] client in
+      guard let self else { return }
+      for task in relatedTasks {
+        try await client.deleteTask(taskID: task.taskID)
+      }
+      if let currentTaskID = self.conversation?.taskID,
+        relatedTasks.contains(where: { $0.taskID == currentTaskID })
+      {
+        self.closeConversation()
+        self.selectedTaskID = nil
+        self.selectedThreadID = nil
+      }
+      await self.refresh(silent: true, includeCatalog: false)
+      self.postToast("已删除会话记录")
+    }
+  }
+
   func loadThreads(projectID: String) async {
     do {
       let client = try currentClient()

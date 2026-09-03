@@ -139,6 +139,95 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
     XCTAssertTrue(preview.hasSuffix("…"))
   }
 
+  func testMultiTurnTasksAreConsolidatedIntoSingleSession() {
+    let turn1 = MCPServiceTaskSnapshot(
+      taskID: "task-1",
+      projectID: "proj-1",
+      prompt: "这是第一轮提示词",
+      status: "completed",
+      providerID: "antigravity",
+      providerSessionID: "agy-session-123",
+      supervisorStatus: "disabled",
+      localApprovalRequired: false,
+      updatedAt: "2026-08-28T00:00:01Z"
+    )
+    let turn2 = MCPServiceTaskSnapshot(
+      taskID: "task-2",
+      projectID: "proj-1",
+      prompt: "这是第二轮提示词",
+      status: "completed",
+      providerID: "antigravity",
+      providerSessionID: "agy-session-123",
+      supervisorStatus: "disabled",
+      localApprovalRequired: false,
+      updatedAt: "2026-08-28T00:00:02Z"
+    )
+
+    let sessions = WorkbenchAgentTaskPickerContent.sessions(tasks: [turn1, turn2])
+    XCTAssertEqual(sessions.count, 1)
+    let session = sessions[0]
+    XCTAssertEqual(session.sessionID, "agy-session-123")
+    XCTAssertEqual(session.providerID, "antigravity")
+    XCTAssertEqual(session.turnCount, 2)
+    XCTAssertEqual(session.latestTask.taskID, "task-2")
+    XCTAssertEqual(session.title, "这是第一轮提示词")
+
+    let titleWithTurns = WorkbenchTaskTextPresentation.sessionMenuTitle(
+      title: session.title,
+      turnCount: session.turnCount
+    )
+    XCTAssertEqual(titleWithTurns, "这是第一轮提示词 [2轮]")
+  }
+
+  func testGroupedSessionsCategorizesByProvider() {
+    let codexTask = MCPServiceTaskSnapshot(
+      taskID: "codex-1",
+      projectID: "proj-1",
+      status: "completed",
+      providerID: "codex",
+      threadID: "th-1",
+      supervisorStatus: "disabled",
+      localApprovalRequired: false,
+      updatedAt: "2026-08-28T00:00:01Z"
+    )
+    let agyTask = MCPServiceTaskSnapshot(
+      taskID: "agy-1",
+      projectID: "proj-1",
+      status: "completed",
+      providerID: "antigravity",
+      providerSessionID: "agy-sess-1",
+      supervisorStatus: "disabled",
+      localApprovalRequired: false,
+      updatedAt: "2026-08-28T00:00:02Z"
+    )
+    let openCodeTask = MCPServiceTaskSnapshot(
+      taskID: "opencode-1",
+      projectID: "proj-1",
+      status: "completed",
+      providerID: "opencode",
+      providerSessionID: "oc-sess-1",
+      supervisorStatus: "disabled",
+      localApprovalRequired: false,
+      updatedAt: "2026-08-28T00:00:03Z"
+    )
+
+    let groups = WorkbenchAgentTaskPickerContent.groupedSessions(tasks: [codexTask, agyTask, openCodeTask])
+    XCTAssertEqual(groups.map(\.providerID), ["codex", "antigravity", "opencode"])
+    XCTAssertEqual(groups[0].sessions.count, 1)
+    XCTAssertEqual(groups[1].sessions.count, 1)
+    XCTAssertEqual(groups[2].sessions.count, 1)
+  }
+
+  func testCleanTitleSanitizesToolFailureErrors() {
+    let rawError = "Antigravity could not run native tool 'view_file': operation timed out while executing"
+    let cleaned = WorkbenchTaskTextPresentation.cleanTitle(rawError)
+    XCTAssertEqual(cleaned, "工具 view_file 执行异常")
+
+    let rawDenied = "The user denied this provider invocation request in the desktop application"
+    let cleanedDenied = WorkbenchTaskTextPresentation.cleanTitle(rawDenied)
+    XCTAssertEqual(cleanedDenied, "用户拒绝执行")
+  }
+
   private func task(
     taskID: String,
     providerID: String,

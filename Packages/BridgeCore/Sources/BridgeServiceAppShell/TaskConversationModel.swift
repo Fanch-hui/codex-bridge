@@ -16,12 +16,14 @@ public final class TaskConversationModel: ObservableObject, Identifiable {
 
   public let id = UUID()
   public let taskID: String
+  public let priorTaskIDs: [String]
   public private(set) var subscriptionID = -1
 
   private static let pushBatchDelay: Duration = .milliseconds(16)
 
   private let client: any BridgeTaskConversationClient
   private let isTerminal: Bool
+  private var priorEntries: [Entry] = []
   private var index: [String: Int] = [:]
   private var hasAppliedPage = false
   private var streamingTask: Task<Void, Never>?
@@ -48,15 +50,18 @@ public final class TaskConversationModel: ObservableObject, Identifiable {
 
   public init(
     taskID: String,
+    priorTaskIDs: [String] = [],
     client: any BridgeTaskConversationClient,
     isTerminal: Bool = false
   ) {
     self.taskID = taskID
+    self.priorTaskIDs = priorTaskIDs
     self.client = client
     self.isTerminal = isTerminal
   }
 
   func start() async {
+    await loadPriorTasks()
     if isTerminal {
       await reloadAuthoritativeSnapshot()
       return
@@ -242,12 +247,34 @@ public final class TaskConversationModel: ObservableObject, Identifiable {
     return true
   }
 
+  private func loadPriorTasks() async {
+    guard !priorTaskIDs.isEmpty else { return }
+    var loaded: [Entry] = []
+    for priorID in priorTaskIDs {
+      do {
+        let page = try await client.taskConversation(
+          IPCTaskConversationRequest(taskID: priorID, limit: 200)
+        )
+        let priorItems = page.messages.map { Entry($0, isFinal: true, keyPrefix: priorID) }
+        loaded.append(contentsOf: priorItems)
+      } catch {
+        // Continue loading remaining prior tasks
+      }
+    }
+    guard !loaded.isEmpty else { return }
+    priorEntries = loaded
+    entries = priorEntries + entries
+    rebuildIndex()
+    requestAutoScroll()
+  }
+
   private func applyPage(_ page: IPCTaskConversationPage) {
     pushFlushTask?.cancel()
     pushFlushTask = nil
     pendingPushes.removeAll(keepingCapacity: false)
     pendingResyncPushes.removeAll(keepingCapacity: false)
-    entries = page.messages.map { Entry($0, isFinal: $0.final) }
+    let currentTaskEntries = page.messages.map { Entry($0, isFinal: $0.final) }
+    entries = priorEntries + currentTaskEntries
     canLoadEarlier = page.messages.count >= 200
     rebuildIndex()
     refreshStreamingState()

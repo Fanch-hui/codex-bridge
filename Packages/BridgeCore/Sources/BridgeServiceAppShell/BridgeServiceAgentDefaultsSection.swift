@@ -85,6 +85,7 @@ struct BridgeServiceAgentDefaultsSection: View {
         }
       }
       .pickerStyle(.menu)
+      .frame(maxWidth: 280)
     } else if let installation = selectedInstallation {
       LabeledContent("安装", value: installation.displayName)
         .font(.caption)
@@ -92,26 +93,124 @@ struct BridgeServiceAgentDefaultsSection: View {
   }
 
   private var modelSelection: some View {
-    Picker("默认模型", selection: modelBinding) {
-      Text("Provider 默认").tag("")
-      if let current = providerDefault.model,
-        !model.agentModelOptions(for: providerID).contains(where: { $0.modelID == current })
-      {
-        Text("当前设置 · \(current)").tag(current)
+    HStack(alignment: .center) {
+      Text("默认模型")
+
+      Spacer()
+
+      Menu {
+        Button {
+          modelBinding.wrappedValue = ""
+        } label: {
+          if (providerDefault.model ?? "").isEmpty {
+            Label("Provider 默认", systemImage: "checkmark")
+          } else {
+            Text("Provider 默认")
+          }
+        }
+
+        if let current = providerDefault.model,
+          !current.isEmpty,
+          !model.agentModelOptions(for: providerID).contains(where: { $0.modelID == current })
+        {
+          Button {
+            modelBinding.wrappedValue = current
+          } label: {
+            Label("当前设置 · \(current)", systemImage: "checkmark")
+          }
+        }
+
+        let options = model.agentModelOptions(for: providerID)
+        if !options.isEmpty {
+          Divider()
+          let groups = groupedModelOptions(options)
+          if groups.count > 1 || options.count > 10 {
+            ForEach(groups, id: \.vendor) { group in
+              Menu(group.vendor) {
+                ForEach(group.models, id: \.modelID) { item in
+                  Button {
+                    modelBinding.wrappedValue = item.modelID
+                  } label: {
+                    if providerDefault.model == item.modelID {
+                      Label(item.cleanName, systemImage: "checkmark")
+                    } else {
+                      Text(item.cleanName)
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            ForEach(options, id: \.modelID) { item in
+              Button {
+                modelBinding.wrappedValue = item.modelID
+              } label: {
+                if providerDefault.model == item.modelID {
+                  Label(item.displayName, systemImage: "checkmark")
+                } else {
+                  Text(item.displayName)
+                }
+              }
+            }
+          }
+        }
+      } label: {
+        Text(currentModelSelectionTitle)
+          .lineLimit(1)
+          .truncationMode(.middle)
       }
-      ForEach(model.agentModelOptions(for: providerID), id: \.modelID) { item in
-        Text("\(item.displayName) · \(item.modelID)")
-          .tag(item.modelID)
+      .menuStyle(.borderedButton)
+      .frame(maxWidth: 280)
+      .disabled(!canSelectModels || model.isRefreshingAgentModels(for: providerID))
+      .overlay(alignment: .trailing) {
+        if model.isRefreshingAgentModels(for: providerID) {
+          ProgressView()
+            .controlSize(.small)
+            .padding(.trailing, 8)
+        }
       }
     }
-    .pickerStyle(.menu)
-    .disabled(!canSelectModels || model.isRefreshingAgentModels(for: providerID))
-    .overlay(alignment: .trailing) {
-      if model.isRefreshingAgentModels(for: providerID) {
-        ProgressView()
-          .controlSize(.small)
-          .padding(.trailing, 8)
+  }
+
+  private var currentModelSelectionTitle: String {
+    if let current = providerDefault.model, !current.isEmpty {
+      if let item = model.agentModelOptions(for: providerID).first(where: { $0.modelID == current }) {
+        return item.displayName
       }
+      return current
+    }
+    return "Provider 默认"
+  }
+
+  private struct ModelVendorGroup {
+    let vendor: String
+    let models: [(modelID: String, cleanName: String)]
+  }
+
+  private func groupedModelOptions(_ options: [IPCAgentModelSummary]) -> [ModelVendorGroup] {
+    var groups: [String: [(modelID: String, cleanName: String)]] = [:]
+    var order: [String] = []
+
+    for item in options {
+      let vendor: String
+      let cleanName: String
+      if item.displayName.contains("/") {
+        let parts = item.displayName.split(separator: "/", maxSplits: 1)
+        vendor = String(parts[0]).trimmingCharacters(in: .whitespaces)
+        cleanName = String(parts[1]).trimmingCharacters(in: .whitespaces)
+      } else {
+        vendor = "其他"
+        cleanName = item.displayName
+      }
+      if groups[vendor] == nil {
+        order.append(vendor)
+        groups[vendor] = []
+      }
+      groups[vendor]?.append((modelID: item.modelID, cleanName: cleanName))
+    }
+
+    return order.map { vendor in
+      ModelVendorGroup(vendor: vendor, models: groups[vendor] ?? [])
     }
   }
 
@@ -171,6 +270,7 @@ struct BridgeServiceAgentDefaultsSection: View {
         }
       }
       .pickerStyle(.menu)
+      .frame(maxWidth: 280)
       .disabled(!canSelectEffort || model.isRefreshingAgentModels(for: providerID))
 
       if supportedEfforts.isEmpty {
@@ -189,6 +289,7 @@ struct BridgeServiceAgentDefaultsSection: View {
           Text(readModeTitle).tag(readModeValue)
         }
         .pickerStyle(.menu)
+        .frame(maxWidth: 280)
         .disabled(!canSelectWorkspaceWrite && selectedInstallation != nil)
       } else {
         Text("访问权限：只读（Provider 能力限制）")

@@ -46,6 +46,19 @@ extension BridgeServiceAppModel {
     }
   }
 
+  package func openSession(_ session: WorkbenchSessionItem) {
+    let latest = session.latestTask
+    let priorIDs = session.tasks.dropLast().map(\.taskID)
+    if selectedProjectID != latest.projectID {
+      selectProject(latest.projectID)
+    }
+    selectedTaskID = latest.taskID
+    selectedThread = nil
+    selectedThreadID = latest.isCodexTask ? latest.threadID : nil
+
+    openConversation(taskID: latest.taskID, priorTaskIDs: priorIDs)
+  }
+
   public func openTask(_ taskID: String) {
     guard let task = tasks.first(where: { $0.taskID == taskID }) else { return }
 
@@ -56,10 +69,12 @@ extension BridgeServiceAppModel {
     selectedThread = nil
     selectedThreadID = task.isCodexTask ? task.threadID : nil
 
-    openConversation(taskID: task.taskID)
+    let sessionTasks = WorkbenchAgentTaskPickerContent.sessionTasks(for: task, in: tasks)
+    let priorIDs = sessionTasks.filter { $0.taskID != task.taskID && $0.updatedAt <= task.updatedAt }.map(\.taskID)
+    openConversation(taskID: task.taskID, priorTaskIDs: priorIDs)
   }
 
-  public func openConversation(taskID: String) {
+  public func openConversation(taskID: String, priorTaskIDs: [String] = []) {
     guard let client, connectionState == .connected else {
       errorMessage = "后台 Service 未连接，无法查看对话。"
       return
@@ -75,6 +90,7 @@ extension BridgeServiceAppModel {
     closeConversation()
     let conversation = TaskConversationModel(
       taskID: taskID,
+      priorTaskIDs: priorTaskIDs,
       client: client,
       isTerminal: task?.isTerminal == true
     )

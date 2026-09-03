@@ -70,6 +70,7 @@ struct NativePermissionRuleEditor: View {
         Text("Deny").tag("deny")
       }
       .pickerStyle(.segmented)
+      .frame(maxWidth: 280)
 
       Picker("动作", selection: $action) {
         ForEach(availableActions, id: \.self) { value in
@@ -77,6 +78,7 @@ struct NativePermissionRuleEditor: View {
         }
       }
       .pickerStyle(.menu)
+      .frame(maxWidth: 280)
 
       VStack(alignment: .leading, spacing: 6) {
         Text("目标")

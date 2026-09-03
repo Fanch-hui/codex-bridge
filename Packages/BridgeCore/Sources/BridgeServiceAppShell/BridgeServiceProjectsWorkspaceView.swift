@@ -62,7 +62,7 @@ struct ProjectWorkspaceEditor: View {
           }
           .pickerStyle(.segmented)
           .labelsHidden()
-          .frame(maxWidth: 480)
+          .frame(maxWidth: 360)
 
           Text(modeDescription)
             .font(.caption)

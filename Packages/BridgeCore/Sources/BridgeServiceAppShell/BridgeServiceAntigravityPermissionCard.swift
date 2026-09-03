@@ -99,6 +99,7 @@ struct BridgeServiceAntigravityPermissionCard: View {
         }
       }
       .pickerStyle(.menu)
+      .frame(maxWidth: 280)
       .disabled(isLoading || isSaving)
     } else if let installation = installations.first {
       LabeledContent("安装", value: installation.displayName)
@@ -113,6 +114,7 @@ struct BridgeServiceAntigravityPermissionCard: View {
       }
     }
     .pickerStyle(.menu)
+    .frame(maxWidth: 280)
     .disabled(isSaving)
   }
 

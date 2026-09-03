@@ -31,6 +31,7 @@ struct BridgeServiceSettingsSupervisorDefaultsCard: View {
                 selectedID: model.modelPreferences?.supervisorModel
               )
             }
+            .frame(maxWidth: 280)
 
             Picker("推理强度", selection: supervisorEffortBinding) {
               BridgeServiceSettingsEffortOptions(
@@ -39,6 +40,7 @@ struct BridgeServiceSettingsSupervisorDefaultsCard: View {
                 selectedEffort: model.modelPreferences?.supervisorEffort
               )
             }
+            .frame(maxWidth: 280)
 
             Text("启用后，新任务会启动独立的只读 Supervisor 进行合规与执行监督；Supervisor 无权替本机用户批准操作。")
               .font(.caption2)

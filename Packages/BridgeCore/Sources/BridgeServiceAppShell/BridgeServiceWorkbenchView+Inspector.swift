@@ -155,6 +155,7 @@ struct BridgeServiceWorkbenchInspectorPane: View {
 struct BridgeServiceWorkbenchInspectorHeader: View {
   @ObservedObject var model: BridgeServiceAppModel
   let context: BridgeServiceWorkbenchInspectorContext
+  @State private var showDeleteConfirmation = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -178,9 +179,13 @@ struct BridgeServiceWorkbenchInspectorHeader: View {
         } label: {
           Text(model.projectName(for: model.selectedProjectID ?? ""))
             .font(.subheadline.weight(.bold))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: 180, alignment: .leading)
             .foregroundStyle(.primary)
         }
         .menuStyle(.borderlessButton)
+        .frame(maxWidth: 180, alignment: .leading)
 
         Spacer()
 
@@ -228,11 +233,33 @@ struct BridgeServiceWorkbenchInspectorHeader: View {
           }
           .buttonStyle(.bordered)
           .controlSize(.mini)
+        } else if let currentTask = context.currentTask, currentTask.isTerminal {
+          Button(role: .destructive) {
+            showDeleteConfirmation = true
+          } label: {
+            Image(systemName: "trash")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          .buttonStyle(.borderless)
+          .help("删除当前会话")
+          .accessibilityLabel("删除当前会话")
         }
       }
     }
     .padding(12)
     .background(Color(nsColor: .windowBackgroundColor))
+    .alert("删除当前会话？", isPresented: $showDeleteConfirmation) {
+      Button("删除", role: .destructive) {
+        if let task = context.currentTask {
+          let sessionID = task.effectiveSessionID ?? task.taskID
+          model.deleteSession(sessionID, inProject: task.projectID)
+        }
+      }
+      Button("取消", role: .cancel) {}
+    } message: {
+      Text("该操作会删除此会话在 Codex Bridge 中保存的全部轮次任务、事件和对话记录，无法撤销。")
+    }
   }
 
   private func canInterrupt(_ task: MCPServiceTaskSnapshot) -> Bool {

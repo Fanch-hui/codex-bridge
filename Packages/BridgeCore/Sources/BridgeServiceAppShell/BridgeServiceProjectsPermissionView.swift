@@ -136,7 +136,7 @@ struct ProjectPermissionEditor: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(maxWidth: 320)
+        .frame(maxWidth: 280)
       }
 
       Text(description)

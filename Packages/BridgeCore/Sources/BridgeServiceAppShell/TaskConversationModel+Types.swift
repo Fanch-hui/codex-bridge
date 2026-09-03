@@ -21,8 +21,12 @@ extension TaskConversationModel {
 
     public var id: String { key }
 
-    init(_ message: IPCTaskConversationMessage, isFinal: Bool) {
-      key = message.key
+    init(_ message: IPCTaskConversationMessage, isFinal: Bool, keyPrefix: String? = nil) {
+      if let keyPrefix {
+        key = "\(keyPrefix):\(message.key)"
+      } else {
+        key = message.key
+      }
       role = message.role
       kind = message.kind
       messageID = message.messageID

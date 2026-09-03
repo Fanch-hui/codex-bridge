@@ -5,6 +5,7 @@ import SwiftUI
 struct BridgeServiceProjectsView: View {
   @ObservedObject var model: BridgeServiceAppModel
   @State private var taskPendingDeletion: MCPServiceTaskSnapshot?
+  @State private var sessionPendingDeletion: WorkbenchSessionItem?
   @State private var projectPendingRemoval: MCPProjectSummary?
 
   var body: some View {
@@ -24,22 +25,30 @@ struct BridgeServiceProjectsView: View {
     .alert(
       "删除会话？",
       isPresented: Binding(
-        get: { taskPendingDeletion != nil },
+        get: { sessionPendingDeletion != nil || taskPendingDeletion != nil },
         set: { visible in
-          if !visible { taskPendingDeletion = nil }
+          if !visible {
+            sessionPendingDeletion = nil
+            taskPendingDeletion = nil
+          }
         }
-      ),
-      presenting: taskPendingDeletion
-    ) { task in
+      )
+    ) {
       Button("删除", role: .destructive) {
-        taskPendingDeletion = nil
-        model.deleteTask(task.taskID)
+        if let session = sessionPendingDeletion {
+          sessionPendingDeletion = nil
+          model.deleteSession(session.sessionID, inProject: model.selectedProjectID)
+        } else if let task = taskPendingDeletion {
+          taskPendingDeletion = nil
+          model.deleteTask(task.taskID)
+        }
       }
       Button("取消", role: .cancel) {
+        sessionPendingDeletion = nil
         taskPendingDeletion = nil
       }
-    } message: { _ in
-      Text("该操作会删除此会话在 Codex Bridge 中保存的任务、事件和对话记录，无法撤销。")
+    } message: {
+      Text("该操作会删除此会话在 Codex Bridge 中保存的全部任务、事件和对话记录，无法撤销。")
     }
     .alert(
       "移除项目？",
@@ -205,7 +214,7 @@ struct BridgeServiceProjectsView: View {
 
           VStack(alignment: .leading, spacing: 12) {
             HStack {
-              Text("Codex Threads")
+              Text("项目会话与任务")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
               Spacer()
@@ -220,7 +229,7 @@ struct BridgeServiceProjectsView: View {
               }
             }
 
-            threadsSection
+            sessionsSection
           }
         }
         .padding(28)
@@ -230,7 +239,7 @@ struct BridgeServiceProjectsView: View {
       ContentUnavailableView(
         "请选择一个项目",
         systemImage: "sidebar.left",
-        description: Text("从左侧列表中选择项目，以配置权限并查看绑定的 Codex Thread。")
+        description: Text("从左侧列表中选择项目，以配置权限并查看绑定的 Agent 会话。")
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -241,14 +250,24 @@ struct BridgeServiceProjectsView: View {
     return model.projects.first(where: { $0.projectID == selectedProjectID })
   }
 
-  private var threadsSection: some View {
+  private var projectSessions: [WorkbenchSessionItem] {
+    let projectTasks = model.tasks.filter { $0.projectID == model.selectedProjectID }
+    return WorkbenchAgentTaskPickerContent.sessions(tasks: projectTasks)
+  }
+
+  private var orphanThreads: [MCPThreadSummary] {
+    let projectTasks = model.tasks.filter { $0.projectID == model.selectedProjectID }
+    return WorkbenchAgentTaskPickerContent.orphanThreads(tasks: projectTasks, threads: model.threads)
+  }
+
+  private var sessionsSection: some View {
     VStack(alignment: .leading, spacing: 12) {
-      if model.threads.isEmpty {
+      if projectSessions.isEmpty && orphanThreads.isEmpty {
         NativeCard {
           HStack(spacing: 10) {
             Image(systemName: "bubble.left.and.bubble.right")
               .foregroundStyle(.secondary)
-            Text("该项目目前没有可读取的 Codex Thread。")
+            Text("该项目目前没有 Agent 会话记录。")
               .font(.subheadline)
               .foregroundStyle(.secondary)
           }
@@ -256,15 +275,79 @@ struct BridgeServiceProjectsView: View {
         }
       } else {
         VStack(spacing: 8) {
-          ForEach(model.threads, id: \.threadID) { thread in
+          ForEach(projectSessions) { session in
+            HStack(spacing: 0) {
+              Button {
+                model.openSession(session)
+              } label: {
+                HStack(spacing: 12) {
+                  Image(systemName: session.providerSystemImage)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.tint)
+
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                      WorkbenchTaskTextPresentation.sessionMenuTitle(
+                        title: session.title,
+                        turnCount: session.turnCount,
+                        maximumCharacters: 48
+                      )
+                    )
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+
+                    Text("\(session.providerDisplayName) · \(session.sessionID)")
+                      .font(.system(size: 11, design: .monospaced))
+                      .foregroundStyle(.secondary)
+                  }
+
+                  Spacer()
+
+                  StatusBadge(session.status, tone: session.isRunning ? .running : .neutral)
+
+                  Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .frame(maxWidth: .infinity, alignment: .leading)
+              }
+              .buttonStyle(.plain)
+
+              Divider()
+                .frame(height: 28)
+                .padding(.horizontal, 10)
+
+              Button(role: .destructive) {
+                sessionPendingDeletion = session
+              } label: {
+                Image(systemName: "trash")
+                  .frame(width: 24, height: 24)
+              }
+              .buttonStyle(.borderless)
+              .disabled(!session.isTerminal)
+              .help(session.isTerminal ? "删除会话" : "运行中的会话不能删除")
+              .accessibilityLabel("删除会话")
+            }
+            .padding(12)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 0.8)
+            )
+          }
+
+          ForEach(orphanThreads, id: \.threadID) { thread in
             HStack(spacing: 0) {
               Button {
                 model.openThread(thread.threadID)
               } label: {
                 HStack(spacing: 12) {
-                  Image(systemName: "bubble.left.fill")
+                  Image(systemName: AgentProviderPresentation.systemImage("codex"))
                     .font(.system(size: 14))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(.secondary)
 
                   VStack(alignment: .leading, spacing: 2) {
                     Text(thread.title ?? thread.preview ?? thread.threadID)
@@ -272,7 +355,7 @@ struct BridgeServiceProjectsView: View {
                       .lineLimit(1)
                       .foregroundStyle(.primary)
 
-                    Text(thread.threadID)
+                    Text("Codex 外部历史 · \(thread.threadID)")
                       .font(.system(size: 11, design: .monospaced))
                       .foregroundStyle(.secondary)
                   }
@@ -289,23 +372,6 @@ struct BridgeServiceProjectsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
               }
               .buttonStyle(.plain)
-
-              if let task = task(for: thread) {
-                Divider()
-                  .frame(height: 28)
-                  .padding(.horizontal, 10)
-
-                Button(role: .destructive) {
-                  taskPendingDeletion = task
-                } label: {
-                  Image(systemName: "trash")
-                    .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.borderless)
-                .disabled(!task.isTerminal)
-                .help(task.isTerminal ? "删除会话" : "运行中的会话不能删除")
-                .accessibilityLabel("删除会话")
-              }
             }
             .padding(12)
             .background(Color(nsColor: .controlBackgroundColor))

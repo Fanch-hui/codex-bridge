@@ -1,6 +1,36 @@
 import BridgeMCP
 import SwiftUI
 
+package struct WorkbenchSessionItem: Identifiable, Sendable {
+  package let sessionID: String
+  package let providerID: String
+  package let providerDisplayName: String
+  package let providerSystemImage: String
+  package let projectID: String
+  package let tasks: [MCPServiceTaskSnapshot]
+  package var latestTask: MCPServiceTaskSnapshot { tasks.last ?? tasks[0] }
+  package var id: String { sessionID }
+  package var turnCount: Int { tasks.count }
+  package var isTerminal: Bool { latestTask.isTerminal }
+  package var isRunning: Bool { latestTask.isRunning }
+  package var status: String { latestTask.status }
+  package var title: String {
+    let candidate = tasks.first?.prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let candidate, !candidate.isEmpty {
+      return candidate
+    }
+    return latestTask.workbenchTitle
+  }
+}
+
+package struct WorkbenchProviderSessionGroup: Identifiable {
+  package let providerID: String
+  package let providerDisplayName: String
+  package let providerSystemImage: String
+  package let sessions: [WorkbenchSessionItem]
+  package var id: String { providerID }
+}
+
 struct WorkbenchAgentTaskPicker: View {
   @ObservedObject var model: BridgeServiceAppModel
   let tasks: [MCPServiceTaskSnapshot]
@@ -13,21 +43,34 @@ struct WorkbenchAgentTaskPicker: View {
         .foregroundStyle(.secondary)
 
       if itemCount == 0 {
-        Text("暂无 Agent 任务")
+        Text("暂无 Agent 会话")
           .font(.caption)
           .foregroundStyle(.secondary)
       } else {
         Menu {
-          if !tasks.isEmpty {
-            Section("Agent 任务") {
-              ForEach(tasks, id: \.taskID) { task in
-                taskButton(task)
+          let groups = WorkbenchAgentTaskPickerContent.groupedSessions(tasks: tasks)
+          ForEach(groups) { group in
+            Section {
+              ForEach(group.sessions) { session in
+                Button {
+                  model.openSession(session)
+                } label: {
+                  Label(
+                    WorkbenchTaskTextPresentation.sessionMenuTitle(
+                      title: session.title,
+                      turnCount: session.turnCount
+                    ),
+                    systemImage: isSessionSelected(session) ? "checkmark" : session.providerSystemImage
+                  )
+                }
               }
+            } header: {
+              Label(group.providerDisplayName + " 会话", systemImage: group.providerSystemImage)
             }
           }
 
           if !orphanThreads.isEmpty {
-            Section("Codex 历史会话") {
+            Section {
               ForEach(orphanThreads, id: \.threadID) { thread in
                 Button {
                   model.openThread(thread.threadID)
@@ -39,6 +82,8 @@ struct WorkbenchAgentTaskPicker: View {
                   )
                 }
               }
+            } header: {
+              Label("Codex 外部历史会话", systemImage: AgentProviderPresentation.systemImage("codex"))
             }
           }
         } label: {
@@ -46,42 +91,36 @@ struct WorkbenchAgentTaskPicker: View {
             .font(.caption.weight(.medium))
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(maxWidth: 250, alignment: .leading)
+            .frame(maxWidth: 240, alignment: .leading)
         }
         .menuStyle(.borderlessButton)
-        .frame(maxWidth: 250, alignment: .leading)
+        .frame(maxWidth: 240, alignment: .leading)
         .help(selectedItemLabel)
-        .accessibilityLabel("当前 Agent 任务：\(selectedItemLabel)")
+        .accessibilityLabel("当前 Agent 会话：\(selectedItemLabel)")
       }
     }
   }
 
-  @ViewBuilder
-  private func taskButton(_ task: MCPServiceTaskSnapshot) -> some View {
-    Button {
-      model.openTask(task.taskID)
-    } label: {
-      Label(
-        WorkbenchTaskTextPresentation.menuTitle(for: task),
-        systemImage: task.taskID == model.selectedTaskID ? "checkmark" : task.providerSystemImage
-      )
-    }
+  private func isSessionSelected(_ session: WorkbenchSessionItem) -> Bool {
+    session.tasks.contains(where: { $0.taskID == model.selectedTaskID })
   }
 
   private var selectedItemLabel: String {
-    if let task = WorkbenchAgentTaskPickerContent.selectedTask(
+    if let session = WorkbenchAgentTaskPickerContent.selectedSession(
       tasks: tasks,
       selectedTaskID: model.selectedTaskID
     ) {
-      return WorkbenchTaskTextPresentation.menuTitle(for: task)
+      let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
+        title: session.title,
+        turnCount: session.turnCount,
+        maximumCharacters: 30
+      )
+      return "\(session.providerDisplayName) · \(title)"
     }
     if let thread = threads.first(where: { $0.threadID == model.selectedThreadID }) {
       return "Codex · \(threadTitle(thread))"
     }
-    if let task = tasks.first(where: { $0.taskID == model.selectedTaskID }) {
-      return WorkbenchTaskTextPresentation.menuTitle(for: task)
-    }
-    return "选择 Agent 任务（\(itemCount)）"
+    return "选择 Agent 会话（\(itemCount)）"
   }
 
   private var itemCount: Int {
@@ -95,12 +134,98 @@ struct WorkbenchAgentTaskPicker: View {
   private func threadTitle(_ thread: MCPThreadSummary) -> String {
     WorkbenchThreadTitlePresentation.compact(
       thread.title ?? thread.preview ?? thread.threadID,
-      maximumCharacters: 48
+      maximumCharacters: 36
     )
   }
 }
 
 package enum WorkbenchAgentTaskPickerContent {
+  package static func sessionTasks(
+    for task: MCPServiceTaskSnapshot,
+    in tasks: [MCPServiceTaskSnapshot]
+  ) -> [MCPServiceTaskSnapshot] {
+    let sessionID = task.effectiveSessionID ?? task.taskID
+    return tasks
+      .filter {
+        $0.projectID == task.projectID
+          && ($0.effectiveSessionID ?? $0.taskID) == sessionID
+      }
+      .sorted { $0.updatedAt < $1.updatedAt }
+  }
+
+  package static func sessions(
+    tasks: [MCPServiceTaskSnapshot]
+  ) -> [WorkbenchSessionItem] {
+    var grouped: [String: [MCPServiceTaskSnapshot]] = [:]
+    var order: [String] = []
+    for task in tasks {
+      let key = task.effectiveSessionID ?? task.taskID
+      if grouped[key] == nil {
+        order.append(key)
+        grouped[key] = []
+      }
+      grouped[key]?.append(task)
+    }
+    return order.compactMap { key in
+      guard let list = grouped[key], let first = list.first else { return nil }
+      let sorted = list.sorted { $0.updatedAt < $1.updatedAt }
+      return WorkbenchSessionItem(
+        sessionID: key,
+        providerID: first.providerIdentifier,
+        providerDisplayName: first.providerDisplayName,
+        providerSystemImage: first.providerSystemImage,
+        projectID: first.projectID,
+        tasks: sorted
+      )
+    }
+  }
+
+  package static func groupedSessions(
+    tasks: [MCPServiceTaskSnapshot]
+  ) -> [WorkbenchProviderSessionGroup] {
+    let allSessions = sessions(tasks: tasks)
+    var byProvider: [String: [WorkbenchSessionItem]] = [:]
+    for session in allSessions {
+      byProvider[session.providerID, default: []].append(session)
+    }
+    let preferredOrder = ["codex", "antigravity", "opencode", "deepseek-harness"]
+    var result: [WorkbenchProviderSessionGroup] = []
+    for pid in preferredOrder {
+      if let list = byProvider.removeValue(forKey: pid), !list.isEmpty {
+        result.append(
+          WorkbenchProviderSessionGroup(
+            providerID: pid,
+            providerDisplayName: AgentProviderPresentation.displayName(pid),
+            providerSystemImage: AgentProviderPresentation.systemImage(pid),
+            sessions: list
+          )
+        )
+      }
+    }
+    for (pid, list) in byProvider.sorted(by: { $0.key < $1.key }) where !list.isEmpty {
+      result.append(
+        WorkbenchProviderSessionGroup(
+          providerID: pid,
+          providerDisplayName: AgentProviderPresentation.displayName(pid),
+          providerSystemImage: AgentProviderPresentation.systemImage(pid),
+          sessions: list
+        )
+      )
+    }
+    return result
+  }
+
+  package static func selectedSession(
+    tasks: [MCPServiceTaskSnapshot],
+    selectedTaskID: String?
+  ) -> WorkbenchSessionItem? {
+    guard let selectedTaskID else { return nil }
+    let allSessions = sessions(tasks: tasks)
+    return allSessions.first(where: { session in
+      session.tasks.contains(where: { $0.taskID == selectedTaskID })
+    })
+  }
+
   package static func selectedTask(
     tasks: [MCPServiceTaskSnapshot],
     selectedTaskID: String?
@@ -124,7 +249,7 @@ package enum WorkbenchAgentTaskPickerContent {
     tasks: [MCPServiceTaskSnapshot],
     threads: [MCPThreadSummary]
   ) -> Int {
-    tasks.count + orphanThreads(tasks: tasks, threads: threads).count
+    sessions(tasks: tasks).count + orphanThreads(tasks: tasks, threads: threads).count
   }
 }
 
@@ -206,9 +331,45 @@ struct WorkbenchConversationErrorCard: View {
 }
 
 package enum WorkbenchTaskTextPresentation {
-  package static func menuTitle(for task: MCPServiceTaskSnapshot) -> String {
-    let title = compact(task.workbenchTitle, maximumCharacters: 160) ?? "未命名任务"
+  package static func sessionMenuTitle(
+    title: String,
+    turnCount: Int,
+    maximumCharacters: Int = 36
+  ) -> String {
+    let cleaned = cleanTitle(title, maximumCharacters: maximumCharacters) ?? "未命名会话"
+    if turnCount > 1 {
+      return "\(cleaned) [\(turnCount)轮]"
+    }
+    return cleaned
+  }
+
+  package static func menuTitle(
+    for task: MCPServiceTaskSnapshot,
+    maximumCharacters: Int = 36
+  ) -> String {
+    let title = cleanTitle(task.workbenchTitle, maximumCharacters: maximumCharacters) ?? "未命名任务"
     return "\(task.providerDisplayName) · \(title)"
+  }
+
+  package static func cleanTitle(_ value: String?, maximumCharacters: Int = 36) -> String? {
+    guard let value else { return nil }
+    var raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    if raw.contains("could not run native tool") {
+      if let toolRange = raw.range(of: "tool '") {
+        let after = raw[toolRange.upperBound...]
+        if let endRange = after.range(of: "'") {
+          let toolName = after[..<endRange.lowerBound]
+          raw = "工具 \(toolName) 执行异常"
+        } else {
+          raw = "工具执行异常"
+        }
+      } else {
+        raw = "工具执行异常"
+      }
+    } else if raw.contains("denied this provider invocation") {
+      raw = "用户拒绝执行"
+    }
+    return compact(raw, maximumCharacters: maximumCharacters)
   }
 
   package static func cardTitle(for task: MCPServiceTaskSnapshot) -> String? {
