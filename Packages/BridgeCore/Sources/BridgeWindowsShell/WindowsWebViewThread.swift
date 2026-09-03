@@ -15,7 +15,7 @@
 
     typealias NavigationUpdate = @Sendable (Bool, Bool) -> Void
 
-    private let parentWindow: HWND
+    let parentWindow: HWND
     private let initialURL: String
     let profileName: String
     let configuration: WindowsWebViewConfiguration
