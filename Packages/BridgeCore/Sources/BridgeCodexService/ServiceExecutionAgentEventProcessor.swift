@@ -91,13 +91,10 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
       return
 
     case .approvalAutomaticallyDenied(let itemID):
-      await conversation.upsertAuthoritativeEntry(
+      await conversation.declineToolCall(
         taskID: taskID,
-        key: "tool:" + itemID,
-        kind: .toolCall,
-        content: "The requested operation was denied by local policy.",
-        toolStatus: ExecutionToolCallStatus.declined.rawValue,
-        isFinal: false
+        itemID: itemID,
+        fallbackContent: "The requested operation was denied by local policy."
       )
       return
 

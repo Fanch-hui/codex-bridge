@@ -23,6 +23,16 @@ public enum ServiceAccessMode: String, Codable, CaseIterable, Sendable {
   case fullAccess = "full-access"
 }
 
+public struct ServiceTaskExecutionAuthorization: Equatable, Sendable {
+  public let accessMode: ServiceAccessMode
+  public let networkAllowed: Bool
+
+  public init(accessMode: ServiceAccessMode, networkAllowed: Bool) {
+    self.accessMode = accessMode
+    self.networkAllowed = networkAllowed
+  }
+}
+
 public enum ServiceTaskStatus: String, Codable, CaseIterable, Sendable {
   case awaitingLocalApproval = "awaiting_local_approval"
   case starting

@@ -5,6 +5,85 @@ import GRDB
 import XCTest
 
 final class SimpleServiceStoreTests: XCTestCase {
+  func testApprovalCanAtomicallyGrantOneTimeToolAndNetworkAccess() async throws {
+    let fixture = try ServiceCoreFixture()
+    defer { fixture.remove() }
+    let store = try SimpleServiceStore(path: fixture.databasePath)
+    let project = try makeServiceProject(
+      id: "prj-one-time-access",
+      rootURL: fixture.firstProjectURL,
+      policy: ProjectAccessPolicy(
+        read: .allowed,
+        write: .requiresLocalApproval,
+        network: .requiresLocalApproval
+      )
+    )
+    try await store.insertProject(project)
+    let task = try makeServiceTask(
+      id: "tsk-one-time-access",
+      projectID: project.id,
+      providerID: "antigravity",
+      installationID: "ainst-antigravity",
+      selectionMode: .explicit
+    )
+    _ = try await store.createTask(task, event: creationEvent(at: task.createdAt))
+    let clock = ServiceCoreTestClock(start: task.updatedAt.addingTimeInterval(1))
+    let manager = ServiceTaskManager(store: store, now: clock.next)
+
+    let approved = try await manager.approveAndBegin(
+      taskID: task.id,
+      summary: "The local user granted one-time AGY access.",
+      authorization: ServiceTaskExecutionAuthorization(
+        accessMode: .fullAccess,
+        networkAllowed: true
+      )
+    )
+
+    XCTAssertEqual(approved.state.status, .starting)
+    XCTAssertEqual(approved.accessMode, .fullAccess)
+    XCTAssertTrue(approved.networkAllowed)
+    let persisted = try await store.task(id: task.id)
+    XCTAssertEqual(persisted?.accessMode, .fullAccess)
+    XCTAssertEqual(persisted?.networkAllowed, true)
+    let events = try await store.events(taskID: task.id)
+    XCTAssertEqual(events.map(\.kind), [.taskCreated, .taskApproved])
+  }
+
+  func testOneTimeNetworkAccessCannotOverrideProjectDenial() async throws {
+    let fixture = try ServiceCoreFixture()
+    defer { fixture.remove() }
+    let store = try SimpleServiceStore(path: fixture.databasePath)
+    let project = try makeServiceProject(
+      id: "prj-denied-one-time-access",
+      rootURL: fixture.firstProjectURL
+    )
+    try await store.insertProject(project)
+    let task = try makeServiceTask(
+      id: "tsk-denied-one-time-access",
+      projectID: project.id,
+      providerID: "antigravity",
+      installationID: "ainst-antigravity",
+      selectionMode: .explicit
+    )
+    _ = try await store.createTask(task, event: creationEvent(at: task.createdAt))
+    let manager = ServiceTaskManager(store: store)
+
+    do {
+      _ = try await manager.approveAndBegin(
+        taskID: task.id,
+        authorization: ServiceTaskExecutionAuthorization(
+          accessMode: .fullAccess,
+          networkAllowed: true
+        )
+      )
+      XCTFail("Expected project network denial to reject the authorization")
+    } catch {
+      XCTAssertEqual(error as? ServiceStoreError, .invalidArgument("task.executionAuthorization"))
+    }
+    let persisted = try await store.task(id: task.id)
+    XCTAssertEqual(persisted?.state.status, .awaitingLocalApproval)
+  }
+
   func testProjectTaskStateAndEventsSurviveRestart() async throws {
     let fixture = try ServiceCoreFixture()
     defer { fixture.remove() }

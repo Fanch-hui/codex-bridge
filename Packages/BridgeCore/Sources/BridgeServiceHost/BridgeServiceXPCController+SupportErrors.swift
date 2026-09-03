@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeCodexService
 import BridgeDeepSeekHarnessACP
 import BridgeIPC
@@ -19,6 +20,9 @@ extension BridgeServiceXPCController {
     }
     if let error = error as? ServiceAgentRegistryError {
       return mapAgentRegistryError(error)
+    }
+    if let error = error as? AgentNativePermissionPolicyError {
+      return mapAgentNativePermissionPolicyError(error)
     }
     if let error = error as? DeepSeekHarnessACPError {
       return mapDeepSeekHarnessError(error)
@@ -103,6 +107,44 @@ extension BridgeServiceXPCController {
         code: "agent_registration_in_progress",
         message: "This Agent executable is already being registered.",
         retryable: true
+      )
+    }
+  }
+
+  private static func mapAgentNativePermissionPolicyError(
+    _ error: AgentNativePermissionPolicyError
+  ) -> BridgeServiceIPCError {
+    switch error {
+    case .unavailable:
+      return .init(
+        code: "agent_native_permissions_unavailable",
+        message: "Native permission settings are unavailable for this Agent installation."
+      )
+    case .revisionConflict:
+      return .init(
+        code: "agent_permission_revision_conflict",
+        message: "The native permission settings changed. Reload them before saving.",
+        retryable: true
+      )
+    case .settingsInvalid:
+      return .init(
+        code: "agent_permission_settings_invalid",
+        message: "The native permission settings file is invalid."
+      )
+    case .settingsUnsafe:
+      return .init(
+        code: "agent_permission_settings_unsafe",
+        message: "The native permission settings file cannot be modified safely."
+      )
+    case .ruleInvalid:
+      return .init(
+        code: "agent_permission_rule_invalid",
+        message: "The native permission rule is invalid."
+      )
+    case .remediationUnavailable:
+      return .init(
+        code: "agent_permission_remediation_unavailable",
+        message: "A safe native permission rule could not be derived for this tool call."
       )
     }
   }

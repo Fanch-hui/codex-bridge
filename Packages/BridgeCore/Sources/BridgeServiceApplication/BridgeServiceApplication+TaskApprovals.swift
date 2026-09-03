@@ -15,6 +15,7 @@ extension BridgeServiceApplication {
     public let providerID: String
     public let permissionMode: String
     public let networkAllowed: Bool
+    public let oneTimeToolAutoApprovalAvailable: Bool
 
     public var providerDisplayName: String {
       ServiceAgentProviderPolicyRegistry.displayName(
@@ -22,7 +23,10 @@ extension BridgeServiceApplication {
       )
     }
 
-    public init(task: ServiceTaskRecord) {
+    public init(
+      task: ServiceTaskRecord,
+      oneTimeToolAutoApprovalAvailable: Bool = false
+    ) {
       approvalID = Self.approvalID(for: task.id)
       taskID = task.id.rawValue
       projectID = task.projectID.rawValue
@@ -31,6 +35,7 @@ extension BridgeServiceApplication {
       providerID = task.providerID
       permissionMode = task.permissionMode.rawValue
       networkAllowed = task.networkAllowed
+      self.oneTimeToolAutoApprovalAvailable = oneTimeToolAutoApprovalAvailable
     }
 
     public static func approvalID(for taskID: TaskID) -> String {
@@ -47,20 +52,34 @@ extension BridgeServiceApplication {
     } else {
       taskList = try await tasks.tasks(limit: 500)
     }
-    return taskList.compactMap { task in
+    var result: [PendingTaskStartApproval] = []
+    for task in taskList {
       guard task.state.status == .awaitingLocalApproval,
         task.requiresLocalStartApproval
       else {
-        return nil
+        continue
       }
-      return PendingTaskStartApproval(task: task)
+      let policy = ServiceAgentProviderPolicyRegistry.policy(for: task.providerID)
+      let project = try await projects.project(id: task.projectID)
+      let canGrantOneTimeAccess =
+        policy?.supportsOneTimeToolAutoApproval == true
+        && project?.accessPolicy.network != .denied
+        && (task.permissionMode != .workspaceWrite || project?.accessPolicy.write != .denied)
+      result.append(
+        PendingTaskStartApproval(
+          task: task,
+          oneTimeToolAutoApprovalAvailable: canGrantOneTimeAccess
+        )
+      )
     }
+    return result
   }
 
   public func resolveTaskStartApproval(
     taskID: TaskID,
     approvalID: String,
     approved: Bool,
+    oneTimeToolAutoApproval: Bool = false,
     deadline: ContinuousClock.Instant
   ) async throws {
     try Self.checkDeadline(deadline)
@@ -72,7 +91,11 @@ extension BridgeServiceApplication {
       throw BridgeMCPQueryError.approvalExpired
     }
     if approved {
-      try await approveAndStartTask(taskID)
+      let authorization = try await taskExecutionAuthorization(
+        for: task,
+        oneTimeToolAutoApproval: oneTimeToolAutoApproval
+      )
+      try await approveAndStartTask(taskID, authorization: authorization)
     } else {
       do {
         _ = try await tasks.denyStart(taskID: taskID)
@@ -120,16 +143,20 @@ extension BridgeServiceApplication {
 
   func approveAndStartTask(
     _ taskID: TaskID,
-    automatically: Bool = false
+    automatically: Bool = false,
+    authorization: ServiceTaskExecutionAuthorization? = nil
   ) async throws {
     let started: ServiceTaskRecord
     do {
       started = try await tasks.approveAndBegin(
         taskID: taskID,
         summary:
-          automatically
-          ? "The configured local policy automatically approved this provider invocation."
-          : "The local user approved this provider invocation."
+          authorization != nil
+          ? "The local user approved this provider invocation with one-time tool and network access."
+          : automatically
+            ? "The configured local policy automatically approved this provider invocation."
+            : "The local user approved this provider invocation.",
+        authorization: authorization
       )
     } catch ServiceStoreError.invalidTaskTransition {
       throw BridgeMCPQueryError.approvalExpired
@@ -143,6 +170,34 @@ extension BridgeServiceApplication {
     } catch {
       throw Self.publicExecutionError(error)
     }
+  }
+
+  private func taskExecutionAuthorization(
+    for task: ServiceTaskRecord,
+    oneTimeToolAutoApproval: Bool
+  ) async throws -> ServiceTaskExecutionAuthorization? {
+    guard oneTimeToolAutoApproval else { return nil }
+    guard
+      ServiceAgentProviderPolicyRegistry.policy(for: task.providerID)?
+        .supportsOneTimeToolAutoApproval == true,
+      let installationID = task.installationID,
+      let registry = agentRegistry,
+      let project = try await projects.project(id: task.projectID),
+      project.accessPolicy.network != .denied,
+      task.permissionMode != .workspaceWrite || project.accessPolicy.write != .denied
+    else {
+      throw BridgeMCPQueryError.approvalDenied
+    }
+    let installation = try await registry.validateForExecution(
+      installationID: AgentInstallationID(rawValue: installationID)
+    )
+    guard installation.providerID.rawValue == task.providerID else {
+      throw BridgeMCPQueryError.approvalDenied
+    }
+    return ServiceTaskExecutionAuthorization(
+      accessMode: .fullAccess,
+      networkAllowed: true
+    )
   }
 
   public func pendingCodexApprovals(taskID: TaskID? = nil) async

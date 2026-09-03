@@ -31,6 +31,8 @@ struct BridgeServiceSettingsView: View {
               providerID: providerID
             )
           }
+
+          BridgeServiceAntigravityPermissionCard(model: model)
         }
 
         VStack(alignment: .leading, spacing: 12) {

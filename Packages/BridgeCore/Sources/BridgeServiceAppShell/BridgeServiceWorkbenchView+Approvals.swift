@@ -32,6 +32,7 @@ struct BridgeServiceWorkbenchApprovalTray: View {
 struct WorkbenchApprovalCard: View {
   @ObservedObject var model: BridgeServiceAppModel
   let approval: IPCApprovalSummary
+  @State private var showOneTimeAccessConfirmation = false
 
   var body: some View {
     let isResolving = model.isResolvingApproval(approval)
@@ -90,23 +91,32 @@ struct WorkbenchApprovalCard: View {
         Spacer()
 
         if approval.kind == "task_start" {
-          Button {
-            model.resolveApproval(approval, decision: "allow")
-          } label: {
-            if isResolving {
-              HStack(spacing: 4) {
-                ProgressView()
-                  .controlSize(.small)
-                Text("正在提交…")
+          if approval.oneTimeToolAutoApprovalAvailable == true {
+            Menu {
+              Button("按当前权限批准") {
+                model.resolveApproval(approval, decision: "allow")
               }
-            } else {
-              Text("批准启动")
+              Button("本次自动批准 AGY 工具并允许网络") {
+                showOneTimeAccessConfirmation = true
+              }
+            } label: {
+              approvalButtonLabel(isResolving: isResolving)
             }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(isResolving)
+            .accessibilityIdentifier("workbench.approval.\(approval.approvalID).allow")
+          } else {
+            Button {
+              model.resolveApproval(approval, decision: "allow")
+            } label: {
+              approvalButtonLabel(isResolving: isResolving)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .disabled(isResolving)
+            .accessibilityIdentifier("workbench.approval.\(approval.approvalID).allow")
           }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.small)
-          .disabled(isResolving)
-          .accessibilityIdentifier("workbench.approval.\(approval.approvalID).allow")
         } else {
           Menu {
             ForEach(allowDecisions, id: \.self) { decision in
@@ -136,6 +146,33 @@ struct WorkbenchApprovalCard: View {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .strokeBorder(Color.orange.opacity(0.5), lineWidth: 1)
     )
+    .alert("本次自动批准 AGY 工具？", isPresented: $showOneTimeAccessConfirmation) {
+      Button("自动批准并启动", role: .destructive) {
+        model.resolveApproval(
+          approval,
+          decision: "allow",
+          oneTimeToolAutoApproval: true
+        )
+      }
+      Button("取消", role: .cancel) {}
+    } message: {
+      Text(
+        "本次任务将自动批准 AGY 工具并允许网络。它仍受项目 Read Only/Write 硬策略约束，不会修改 AGY Global 配置。"
+      )
+    }
+  }
+
+  @ViewBuilder
+  private func approvalButtonLabel(isResolving: Bool) -> some View {
+    if isResolving {
+      HStack(spacing: 4) {
+        ProgressView()
+          .controlSize(.small)
+        Text("正在提交…")
+      }
+    } else {
+      Text("批准启动")
+    }
   }
 
   private var allowDecisions: [String] {

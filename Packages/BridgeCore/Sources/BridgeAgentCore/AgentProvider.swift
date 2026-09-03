@@ -212,6 +212,7 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
 
 public protocol AgentProvider: Sendable {
   var descriptor: AgentProviderDescriptor { get }
+  var nativePermissionPolicyManager: (any AgentNativePermissionPolicyManaging)? { get }
 
   func probe(_ request: AgentProbeRequest) async -> AgentProbeResult
 
@@ -233,6 +234,8 @@ public protocol AgentProvider: Sendable {
 }
 
 extension AgentProvider {
+  public var nativePermissionPolicyManager: (any AgentNativePermissionPolicyManaging)? { nil }
+
   public func models(
     installation _: AgentInstallation,
     projectRoot _: String?

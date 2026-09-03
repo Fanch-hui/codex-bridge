@@ -40,11 +40,15 @@ public struct AntigravityCLIProviderConfiguration: Sendable {
 
 public struct AntigravityCLIProvider: AgentProvider, Sendable {
   public let descriptor: AgentProviderDescriptor
+  public let nativePermissionPolicyManager: (any AgentNativePermissionPolicyManaging)?
 
   let configuration: AntigravityCLIProviderConfiguration
 
   public init(configuration: AntigravityCLIProviderConfiguration = .init()) throws {
     self.configuration = configuration
+    nativePermissionPolicyManager = AntigravityCLISettingsStore(
+      sourceEnvironment: configuration.sourceEnvironment
+    )
     descriptor = try AgentProviderDescriptor(
       providerID: .antigravity,
       displayName: "Antigravity CLI",

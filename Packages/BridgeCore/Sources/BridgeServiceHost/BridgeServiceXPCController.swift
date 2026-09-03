@@ -193,6 +193,14 @@ public final class BridgeServiceXPCController: NSObject, CodexBridgeServiceXPCPr
       return try await handleGetAgentModelDefault(request)
     case .setAgentModelDefault:
       return try await handleSetAgentModelDefault(request)
+    case .getAgentNativePermissionPolicy:
+      return try await handleGetAgentNativePermissionPolicy(request)
+    case .updateAgentNativePermissionPolicy:
+      return try await handleUpdateAgentNativePermissionPolicy(request)
+    case .getAgentPermissionRemediation:
+      return try await handleGetAgentPermissionRemediation(request)
+    case .applyAgentPermissionRemediation:
+      return try await handleApplyAgentPermissionRemediation(request)
     case .setExposureMode:
       return try await handleSetExposureMode(request)
     case .listMCPClients:
