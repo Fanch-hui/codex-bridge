@@ -117,6 +117,60 @@ extension BridgeServiceAppModel {
     }
   }
 
+  func prepareDesktopPermissionRemediation(
+    taskID: String,
+    messageKey: String
+  ) {
+    guard agentPermissionRemediationLoadingTaskIDs.insert(taskID).inserted else { return }
+    agentPermissionRemediationAppliedTaskIDs.remove(taskID)
+    agentPermissionRemediations.removeValue(forKey: taskID)
+    agentPermissionRemediationErrors.removeValue(forKey: taskID)
+    Task { [weak self] in
+      guard let self else { return }
+      defer { self.agentPermissionRemediationLoadingTaskIDs.remove(taskID) }
+      do {
+        let remediation = try await self.currentClient().agentPermissionRemediation(
+          IPCAgentPermissionRemediationRequest(
+            taskID: taskID,
+            messageKey: messageKey
+          )
+        )
+        guard remediation.taskID == taskID, remediation.messageKey == messageKey else {
+          self.agentPermissionRemediationErrors[taskID] = "权限修复建议与当前任务不匹配。"
+          return
+        }
+        self.agentPermissionRemediations[taskID] = remediation
+      } catch {
+        self.agentPermissionRemediationErrors[taskID] = Self.message(error)
+      }
+    }
+  }
+
+  func applyDesktopPermissionRemediation(
+    taskID: String,
+    messageKey: String
+  ) {
+    guard let remediation = agentPermissionRemediations[taskID],
+      remediation.messageKey == messageKey,
+      agentPermissionRemediationApplyingTaskIDs.insert(taskID).inserted
+    else { return }
+    agentPermissionRemediationErrors.removeValue(forKey: taskID)
+    Task { [weak self] in
+      guard let self else { return }
+      defer { self.agentPermissionRemediationApplyingTaskIDs.remove(taskID) }
+      let applied = await self.applyPermissionRemediation(remediation)
+      if applied {
+        self.agentPermissionRemediations.removeValue(forKey: taskID)
+        self.agentPermissionRemediationAppliedTaskIDs.insert(taskID)
+      } else {
+        self.agentPermissionRemediationErrors[taskID] =
+          self.agentNativePermissionErrors[remediation.installationID]
+          ?? self.errorMessage
+          ?? "AGY Global 权限规则未能保存。"
+      }
+    }
+  }
+
   private func openNativePermissionConflict(
     _ remediation: IPCAgentPermissionRemediationResponse,
     error: any Error

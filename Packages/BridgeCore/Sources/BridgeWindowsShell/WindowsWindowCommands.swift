@@ -105,7 +105,12 @@
     case stopTask(id: String)
     case deleteTask(id: String)
     case steerTask(id: String, input: String, mode: String)
-    case resolveTaskApproval(approvalID: String, taskID: String, decision: String)
+    case resolveTaskApproval(
+      approvalID: String,
+      taskID: String,
+      decision: String,
+      oneTimeToolAutoApproval: Bool
+    )
     case resolveDirectApproval(id: String, decision: String)
     case selectProjectByID(id: String)
     case beginProjectRegistration
@@ -161,6 +166,34 @@
       modelID: String?,
       permissionMode: String,
       effort: String?
+    )
+    case refreshAgentNativePermission(installationID: String)
+    case setAgentNativePermissionMode(
+      installationID: String,
+      mode: String,
+      confirmed: Bool
+    )
+    case addAgentNativePermissionRule(
+      installationID: String,
+      effect: String,
+      action: String,
+      target: String,
+      confirmed: Bool
+    )
+    case replaceAgentNativePermissionRule(
+      installationID: String,
+      ruleID: String,
+      effect: String,
+      action: String,
+      target: String,
+      confirmed: Bool
+    )
+    case removeAgentNativePermissionRule(installationID: String, ruleID: String)
+    case prepareAgentPermissionRemediation(taskID: String, messageKey: String)
+    case applyAgentPermissionRemediation(
+      taskID: String,
+      messageKey: String,
+      confirmed: Bool
     )
     case patchSettings(BridgeDesktopSettingsPatch)
     case updateBrowserViewport(viewport: BridgeDesktopBrowserViewport)

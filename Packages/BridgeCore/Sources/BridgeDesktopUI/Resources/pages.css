@@ -156,6 +156,10 @@
 .settings-card .field + .field, .settings-card .check-field + .field { margin-top: 11px; }
 .settings-card .hint { margin: 10px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .settings-card .form-actions { justify-content: flex-end; }
+.native-permission-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.native-permission-header h3, .native-permission-header h4 { margin: 0; }
+.native-permission-header > div { min-width: 0; }
+.native-permission-header + .form-grid { margin-top: 10px; }
 .page-message { margin-top: 16px; padding: 10px 12px; border-radius: 8px; color: var(--text-secondary); background: var(--surface-muted); font-size: 12px; }
 
 @media (max-width: 980px) {

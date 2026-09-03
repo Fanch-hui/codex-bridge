@@ -22,6 +22,11 @@
     var persistedDefaults: [String: IPCAgentModelDefaultResponse] = [:]
     var providerErrors: [String: String] = [:]
     var refreshingProviderIDs: Set<String> = []
+    var nativePermissionPolicy: IPCAgentNativePermissionPolicyResponse?
+    var nativePermissionInstallationID: String?
+    var nativePermissionLoading = false
+    var nativePermissionSaving = false
+    var nativePermissionError: String?
     var busy = false
     var statusText = "尚未加载 Agent 默认设置。"
 
@@ -73,6 +78,7 @@
       }
       busy = false
       await refreshAllProviderModels()
+      await refreshNativePermissionPolicy()
     }
 
     func selectProvider(at index: Int) {
@@ -203,7 +209,8 @@
         selectedPermissionMode: selectedPermissionMode,
         defaultErrorMessage: statusText.hasPrefix("Agent 模型读取失败") ? statusText : nil,
         modelOptions: desktopModels,
-        defaultItems: providerDefaultItems()
+        defaultItems: providerDefaultItems(),
+        nativePermissionPolicy: desktopNativePermissionPolicy()
       )
       displayBox.store(value)
     }

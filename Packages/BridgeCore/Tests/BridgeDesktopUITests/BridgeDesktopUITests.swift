@@ -27,6 +27,7 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(index.contains("windows-theme.css"))
     XCTAssertTrue(index.contains("windows-components.css"))
     XCTAssertTrue(index.contains("feedback.js"))
+    XCTAssertTrue(index.contains("pages-native-permissions.js"))
     let feedbackScript = try BridgeDesktopUIResources.read(.feedbackJS)
     XCTAssertTrue(feedbackScript.contains("dismissFeedback"))
     XCTAssertTrue(feedbackScript.contains("alertdialog"))
@@ -46,6 +47,8 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(try BridgeDesktopUIResources.read(.pagesJS).contains("updateBrowserViewport"))
     let workbenchScript = try BridgeDesktopUIResources.read(.pagesWorkbenchJS)
     XCTAssertTrue(workbenchScript.contains("resolveApproval"))
+    XCTAssertTrue(workbenchScript.contains("oneTimeApprovalButton"))
+    XCTAssertTrue(workbenchScript.contains("remediationCard"))
     XCTAssertTrue(workbenchScript.contains("deleteTask"))
     XCTAssertTrue(workbenchScript.contains("confirm("))
     XCTAssertTrue(workbenchScript.contains("setWorkbenchPermissionMode"))
@@ -65,6 +68,15 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(settingsScript.contains("settings-stack"))
     XCTAssertTrue(settingsScript.contains("TextEncoder"))
     XCTAssertTrue(settingsScript.contains("bindModelEffort"))
+    XCTAssertTrue(settingsScript.contains("nativePermissionPolicy"))
+    let nativePermissionScript = try BridgeDesktopUIResources.read(.pagesNativePermissionsJS)
+    XCTAssertTrue(nativePermissionScript.contains("setAgentNativePermissionMode"))
+    XCTAssertTrue(nativePermissionScript.contains("addAgentNativePermissionRule"))
+    XCTAssertTrue(nativePermissionScript.contains("replaceAgentNativePermissionRule"))
+    XCTAssertTrue(nativePermissionScript.contains("removeAgentNativePermissionRule"))
+    XCTAssertTrue(nativePermissionScript.contains("prepareAgentPermissionRemediation"))
+    XCTAssertTrue(nativePermissionScript.contains("applyAgentPermissionRemediation"))
+    XCTAssertTrue(nativePermissionScript.contains("oneTimeToolAutoApproval"))
   }
 
   func testStateRoundTripsThroughJSON() throws {
@@ -159,6 +171,86 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertEqual(envelope.command, .updateBrowserViewport)
     XCTAssertEqual(envelope.payload.viewport?.width, 640)
     XCTAssertTrue(envelope.payload.viewport?.visible == true)
+  }
+
+  func testNativePermissionContractsRoundTripThroughJSON() throws {
+    let permission = BridgeDesktopNativePermissionState(
+      providerID: "antigravity",
+      providerName: "Antigravity",
+      installationID: "ainst-agy",
+      installationName: "AGY CLI",
+      installations: [BridgeDesktopChoice(id: "ainst-agy", title: "AGY CLI")],
+      toolPermission: "request-review",
+      availableModes: [
+        BridgeDesktopNativePermissionMode(
+          modeID: "request-review",
+          displayName: "Request Review"
+        )
+      ],
+      availableActions: ["command"],
+      rules: [
+        BridgeDesktopNativePermissionRule(
+          ruleID: "rule-1",
+          effect: "allow",
+          action: "command",
+          target: "swift test",
+          isEditable: true,
+          isRedacted: false
+        )
+      ],
+      canEdit: true
+    )
+    let remediation = BridgeDesktopPermissionRemediationState(
+      messageKey: "tool:command-1",
+      installationID: "ainst-agy",
+      candidateID: "candidate-1",
+      action: "command",
+      target: "swift test",
+      displayRule: "command(swift test)",
+      requiresConfirmation: true
+    )
+    let approval = BridgeDesktopApprovalRow(
+      approvalID: "approval-1",
+      taskID: "task-1",
+      kind: "task_start",
+      title: "启动任务",
+      summary: "等待本机批准",
+      oneTimeToolAutoApprovalAvailable: true
+    )
+
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        BridgeDesktopNativePermissionState.self,
+        from: JSONEncoder().encode(permission)
+      ),
+      permission
+    )
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        BridgeDesktopPermissionRemediationState.self,
+        from: JSONEncoder().encode(remediation)
+      ),
+      remediation
+    )
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        BridgeDesktopApprovalRow.self,
+        from: JSONEncoder().encode(approval)
+      ),
+      approval
+    )
+  }
+
+  func testOneTimeApprovalCommandRequiresExplicitConfirmationPayload() throws {
+    let data = Data(
+      #"{"version":1,"requestID":"approval-1","command":"resolveApproval","payload":{"approvalID":"approval-1","taskID":"task-1","decision":"allow","oneTimeToolAutoApproval":true,"confirmed":true}}"#
+        .utf8
+    )
+    let envelope = try JSONDecoder().decode(BridgeDesktopCommandEnvelope.self, from: data)
+
+    XCTAssertEqual(envelope.command, .resolveApproval)
+    XCTAssertTrue(envelope.payload.oneTimeToolAutoApproval == true)
+    XCTAssertTrue(envelope.payload.confirmed == true)
   }
 
   func testSharedPresentationKeepsProviderPermissionsAligned() {

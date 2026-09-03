@@ -2,6 +2,7 @@
   "use strict";
 
   var S = global.CodexBridgeDesktopPageSupport;
+  var N = global.CodexBridgeDesktopNativePermissions;
 
   function toneForStatus(status) {
     if (status === "running" || status === "starting" || status === "运行中" || status === "正在启动") return "running";
@@ -160,6 +161,8 @@
           { approvalID: appr.approvalID, taskID: appr.taskID, decision: dec }, emit,
           isDeny ? "small danger" : "small primary", appr.resolving || !allowed));
       });
+      var oneTimeButton = N && N.oneTimeApprovalButton(appr, emit);
+      if (oneTimeButton) actions.appendChild(oneTimeButton);
       card.appendChild(actions); section.appendChild(card);
     });
     container.appendChild(section);
@@ -183,6 +186,8 @@
       stepCard.appendChild(S.node("div", "step-text", detail.currentStep));
       content.appendChild(stepCard);
     }
+    var remediationCard = N && N.remediationCard(detail, emit);
+    if (remediationCard) content.appendChild(remediationCard);
     var card = S.node("div", "page-card task-detail-card");
     card.appendChild(S.node("h3", "detail-title", detail.title));
     card.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));

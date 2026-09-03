@@ -60,6 +60,13 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case removeAgent
   case refreshAgentModels
   case saveAgentDefault
+  case refreshAgentNativePermission
+  case setAgentNativePermissionMode
+  case addAgentNativePermissionRule
+  case replaceAgentNativePermissionRule
+  case removeAgentNativePermissionRule
+  case prepareAgentPermissionRemediation
+  case applyAgentPermissionRemediation
   case setExecutionModel
   case setExecutionEffort
   case setAccessMode
@@ -112,6 +119,11 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let modelID: String?
   public let effort: String?
   public let permissionMode: String?
+  public let messageKey: String?
+  public let effect: String?
+  public let action: String?
+  public let target: String?
+  public let toolPermission: String?
   public let runtimeKey: String?
   public let executionModel: String?
   public let executionEffort: String?
@@ -126,6 +138,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let supervisorEnabled: Bool?
   public let fastModeEnabled: Bool?
   public let keepServiceRunningAfterExit: Bool?
+  public let oneTimeToolAutoApproval: Bool?
+  public let confirmed: Bool?
   public let viewport: BridgeDesktopBrowserViewport?
 
   public init(
@@ -162,6 +176,11 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     modelID: String? = nil,
     effort: String? = nil,
     permissionMode: String? = nil,
+    messageKey: String? = nil,
+    effect: String? = nil,
+    action: String? = nil,
+    target: String? = nil,
+    toolPermission: String? = nil,
     runtimeKey: String? = nil,
     executionModel: String? = nil,
     executionEffort: String? = nil,
@@ -176,6 +195,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     supervisorEnabled: Bool? = nil,
     fastModeEnabled: Bool? = nil,
     keepServiceRunningAfterExit: Bool? = nil,
+    oneTimeToolAutoApproval: Bool? = nil,
+    confirmed: Bool? = nil,
     viewport: BridgeDesktopBrowserViewport? = nil
   ) {
     self.navigation = navigation
@@ -211,6 +232,11 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.modelID = modelID
     self.effort = effort
     self.permissionMode = permissionMode
+    self.messageKey = messageKey
+    self.effect = effect
+    self.action = action
+    self.target = target
+    self.toolPermission = toolPermission
     self.runtimeKey = runtimeKey
     self.executionModel = executionModel
     self.executionEffort = executionEffort
@@ -225,6 +251,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.supervisorEnabled = supervisorEnabled
     self.fastModeEnabled = fastModeEnabled
     self.keepServiceRunningAfterExit = keepServiceRunningAfterExit
+    self.oneTimeToolAutoApproval = oneTimeToolAutoApproval
+    self.confirmed = confirmed
     self.viewport = viewport
   }
 }

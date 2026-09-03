@@ -67,6 +67,7 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
   public let canAllow: Bool
   public let canDeny: Bool
   public let resolving: Bool
+  public let oneTimeToolAutoApprovalAvailable: Bool?
 
   public init(
     approvalID: String,
@@ -82,7 +83,8 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
     decisionOptions: [String] = [],
     canAllow: Bool = true,
     canDeny: Bool = true,
-    resolving: Bool = false
+    resolving: Bool = false,
+    oneTimeToolAutoApprovalAvailable: Bool? = nil
   ) {
     self.approvalID = approvalID
     self.taskID = taskID
@@ -98,6 +100,47 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
     self.canAllow = canAllow
     self.canDeny = canDeny
     self.resolving = resolving
+    self.oneTimeToolAutoApprovalAvailable = oneTimeToolAutoApprovalAvailable
+  }
+}
+
+public struct BridgeDesktopPermissionRemediationState: Codable, Equatable, Sendable {
+  public let messageKey: String
+  public let installationID: String?
+  public let candidateID: String?
+  public let action: String?
+  public let target: String?
+  public let displayRule: String?
+  public let requiresConfirmation: Bool
+  public let isLoading: Bool
+  public let isApplying: Bool
+  public let didApply: Bool
+  public let errorMessage: String?
+
+  public init(
+    messageKey: String,
+    installationID: String? = nil,
+    candidateID: String? = nil,
+    action: String? = nil,
+    target: String? = nil,
+    displayRule: String? = nil,
+    requiresConfirmation: Bool = false,
+    isLoading: Bool = false,
+    isApplying: Bool = false,
+    didApply: Bool = false,
+    errorMessage: String? = nil
+  ) {
+    self.messageKey = messageKey
+    self.installationID = installationID
+    self.candidateID = candidateID
+    self.action = action
+    self.target = target
+    self.displayRule = displayRule
+    self.requiresConfirmation = requiresConfirmation
+    self.isLoading = isLoading
+    self.isApplying = isApplying
+    self.didApply = didApply
+    self.errorMessage = errorMessage
   }
 }
 
@@ -115,6 +158,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let changedFiles: [String]
   public let activity: [BridgeDesktopActivityRow]
   public let conversation: [BridgeDesktopConversationEntry]
+  public let permissionRemediation: BridgeDesktopPermissionRemediationState?
   public let updatedAt: String
 
   public init(
@@ -131,6 +175,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     changedFiles: [String] = [],
     activity: [BridgeDesktopActivityRow] = [],
     conversation: [BridgeDesktopConversationEntry] = [],
+    permissionRemediation: BridgeDesktopPermissionRemediationState? = nil,
     updatedAt: String
   ) {
     self.taskID = taskID
@@ -146,6 +191,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.changedFiles = changedFiles
     self.activity = activity
     self.conversation = conversation
+    self.permissionRemediation = permissionRemediation
     self.updatedAt = updatedAt
   }
 }

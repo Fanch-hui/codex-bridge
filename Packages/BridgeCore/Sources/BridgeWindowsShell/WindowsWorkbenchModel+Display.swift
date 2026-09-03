@@ -63,7 +63,8 @@
           $0,
           projectName: projectName(for: $0.projectID),
           conversation: conversation,
-          selectedThreadPage: selectedThreadPage
+          selectedThreadPage: selectedThreadPage,
+          permissionRemediation: desktopPermissionRemediation(for: $0)
         )
       }
       let typedApprovals = approvalPresentationItems().enumerated().compactMap {

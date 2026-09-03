@@ -8,6 +8,7 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case windowsThemeCSS = "windows-theme.css"
   case windowsComponentsCSS = "windows-components.css"
   case pagesCommonJS = "pages-common.js"
+  case pagesNativePermissionsJS = "pages-native-permissions.js"
   case pagesWorkbenchJS = "pages-workbench.js"
   case pagesProjectsJS = "pages-projects.js"
   case pagesLogsJS = "pages-logs.js"

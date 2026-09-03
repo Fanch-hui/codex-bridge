@@ -102,6 +102,107 @@ final class BridgeDesktopBridgeTests: XCTestCase {
     XCTAssertNil(model.chatBrowserViewport)
     defaults.removePersistentDomain(forName: "BridgeDesktopBridgeTests.viewport")
   }
+
+  func testSharedSettingsExposeAGYPolicyAndRequireConfirmationForDangerousMode()
+    async throws
+  {
+    let client = TestBridgeServiceClient()
+    let installation = IPCAgentInstallationSummary(
+      installationID: "ainst-agy",
+      providerID: "antigravity",
+      displayName: "AGY CLI",
+      executablePath: "/tmp/agy",
+      version: "1.1.22",
+      protocolRevision: "stream-json-v1",
+      adapterRevision: 1,
+      trustProfile: "user_trusted",
+      securityProfileID: "desktop-shared",
+      isEnabled: true,
+      availability: "available",
+      effectiveCapabilities: ["workspace.read", "workspace.write"],
+      lastProbedAt: "2026-09-03T00:00:00Z",
+      updatedAt: "2026-09-03T00:00:00Z"
+    )
+    let policy = IPCAgentNativePermissionPolicyResponse(
+      providerID: "antigravity",
+      installationID: installation.installationID,
+      toolPermission: "request-review",
+      availableModes: [
+        IPCAgentNativePermissionModeSummary(
+          modeID: "request-review",
+          displayName: "Request Review",
+          requiresConfirmation: false
+        ),
+        IPCAgentNativePermissionModeSummary(
+          modeID: "always-proceed",
+          displayName: "Always Proceed",
+          requiresConfirmation: true
+        ),
+      ],
+      availableActions: ["command"],
+      rules: [],
+      revision: "revision-1",
+      warnings: []
+    )
+    await client.configureAgentInstallations([installation])
+    await client.configureNativePermissionPolicy(policy)
+    let model = BridgeServiceAppModel(
+      registration: BridgeDesktopTestServiceRegistration(status: .enabled),
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+    await model.loadNativePermissionPolicy(installationID: installation.installationID)
+
+    let state = BridgeDesktopUIStateBuilder.build(from: model)
+    XCTAssertEqual(
+      state.settings?.nativePermissionPolicy?.installationID, installation.installationID)
+    XCTAssertEqual(state.settings?.nativePermissionPolicy?.toolPermission, "request-review")
+    XCTAssertEqual(state.settings?.nativePermissionPolicy?.installations.count, 1)
+
+    BridgeDesktopCommandRouter.handle(
+      BridgeDesktopCommandEnvelope(
+        requestID: "unsafe-mode-unconfirmed",
+        command: .setAgentNativePermissionMode,
+        payload: BridgeDesktopCommandPayload(
+          installationID: installation.installationID,
+          toolPermission: "always-proceed"
+        )
+      ),
+      model: model
+    )
+    await Task.yield()
+    let unconfirmedMutations = await client.nativePermissionMutationValues()
+    XCTAssertTrue(unconfirmedMutations.isEmpty)
+
+    BridgeDesktopCommandRouter.handle(
+      BridgeDesktopCommandEnvelope(
+        requestID: "unsafe-mode-confirmed",
+        command: .setAgentNativePermissionMode,
+        payload: BridgeDesktopCommandPayload(
+          installationID: installation.installationID,
+          toolPermission: "always-proceed",
+          confirmed: true
+        )
+      ),
+      model: model
+    )
+    try await waitForDesktopCondition {
+      await client.nativePermissionMutationValues().count == 1
+    }
+  }
+}
+
+private func waitForDesktopCondition(
+  _ predicate: @escaping @Sendable () async -> Bool
+) async throws {
+  for _ in 0..<100 {
+    if await predicate() { return }
+    try await Task.sleep(for: .milliseconds(10))
+  }
+  XCTFail("Timed out waiting for desktop bridge state")
 }
 
 @MainActor

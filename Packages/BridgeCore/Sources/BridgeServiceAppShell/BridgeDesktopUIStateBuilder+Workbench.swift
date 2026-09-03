@@ -144,6 +144,7 @@ extension BridgeDesktopUIStateBuilder {
       changedFiles: task.changedFiles,
       activity: taskActivity(task),
       conversation: conversationEntries(from: model.conversation),
+      permissionRemediation: permissionRemediation(for: task, model: model),
       updatedAt: task.updatedAt
     )
   }
@@ -201,7 +202,8 @@ extension BridgeDesktopUIStateBuilder {
         decisionOptions: (approval.decisionOptions ?? ["allow"]) + ["deny"],
         canAllow: !presentation.allowDecisions.isEmpty,
         canDeny: true,
-        resolving: model.isResolvingApproval(approval)
+        resolving: model.isResolvingApproval(approval),
+        oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable
       )
     }
     let directRows = model.directApprovals.map { approval in
@@ -223,6 +225,34 @@ extension BridgeDesktopUIStateBuilder {
       )
     }
     return taskRows + directRows
+  }
+
+  private static func permissionRemediation(
+    for task: MCPServiceTaskSnapshot,
+    model: BridgeServiceAppModel
+  ) -> BridgeDesktopPermissionRemediationState? {
+    guard task.providerID == "antigravity",
+      task.failureCode == "antigravity_permission_denied",
+      let entry = model.conversation?.entries.last(where: {
+        $0.kind == "tool_call" && $0.toolStatus == "declined"
+      })
+    else { return nil }
+    let response = model.agentPermissionRemediations[task.taskID].flatMap {
+      $0.messageKey == entry.key ? $0 : nil
+    }
+    return BridgeDesktopPermissionRemediationState(
+      messageKey: entry.key,
+      installationID: response?.installationID,
+      candidateID: response?.candidateID,
+      action: response?.action,
+      target: response?.target,
+      displayRule: response?.displayRule,
+      requiresConfirmation: response?.requiresConfirmation ?? false,
+      isLoading: model.agentPermissionRemediationLoadingTaskIDs.contains(task.taskID),
+      isApplying: model.agentPermissionRemediationApplyingTaskIDs.contains(task.taskID),
+      didApply: model.agentPermissionRemediationAppliedTaskIDs.contains(task.taskID),
+      errorMessage: model.agentPermissionRemediationErrors[task.taskID]
+    )
   }
 
   private static func browserSlot(

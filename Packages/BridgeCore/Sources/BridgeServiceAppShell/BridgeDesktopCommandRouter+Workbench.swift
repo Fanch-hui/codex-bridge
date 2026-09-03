@@ -145,7 +145,18 @@ extension BridgeDesktopCommandRouter {
       projectName: projectID.map { model.projectName(for: $0) }
     )
     guard decision == "deny" || presentation.allowDecisions.contains(decision) else { return }
-    model.resolveApproval(approval, decision: decision)
+    let oneTimeToolAutoApproval = payload.oneTimeToolAutoApproval == true
+    if oneTimeToolAutoApproval {
+      guard decision == "allow", approval.kind == "task_start",
+        approval.oneTimeToolAutoApprovalAvailable == true,
+        payload.confirmed == true
+      else { return }
+    }
+    model.resolveApproval(
+      approval,
+      decision: decision,
+      oneTimeToolAutoApproval: oneTimeToolAutoApproval
+    )
   }
 
   private static func resolveDirectApproval(

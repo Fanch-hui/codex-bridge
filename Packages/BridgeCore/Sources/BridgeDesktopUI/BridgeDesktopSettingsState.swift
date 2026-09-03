@@ -65,6 +65,99 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
   }
 }
 
+public struct BridgeDesktopNativePermissionMode: Codable, Equatable, Sendable {
+  public let modeID: String
+  public let displayName: String
+  public let requiresConfirmation: Bool
+
+  public init(
+    modeID: String,
+    displayName: String,
+    requiresConfirmation: Bool = false
+  ) {
+    self.modeID = modeID
+    self.displayName = displayName
+    self.requiresConfirmation = requiresConfirmation
+  }
+}
+
+public struct BridgeDesktopNativePermissionRule: Codable, Equatable, Sendable {
+  public let ruleID: String
+  public let effect: String
+  public let action: String
+  public let target: String
+  public let isEditable: Bool
+  public let isRedacted: Bool
+  public let requiresConfirmation: Bool
+
+  public init(
+    ruleID: String,
+    effect: String,
+    action: String,
+    target: String,
+    isEditable: Bool,
+    isRedacted: Bool,
+    requiresConfirmation: Bool = false
+  ) {
+    self.ruleID = ruleID
+    self.effect = effect
+    self.action = action
+    self.target = target
+    self.isEditable = isEditable
+    self.isRedacted = isRedacted
+    self.requiresConfirmation = requiresConfirmation
+  }
+}
+
+public struct BridgeDesktopNativePermissionState: Codable, Equatable, Sendable {
+  public let providerID: String
+  public let providerName: String
+  public let installationID: String
+  public let installationName: String
+  public let installations: [BridgeDesktopChoice]
+  public let toolPermission: String?
+  public let availableModes: [BridgeDesktopNativePermissionMode]
+  public let availableActions: [String]
+  public let rules: [BridgeDesktopNativePermissionRule]
+  public let warnings: [String]
+  public let isLoading: Bool
+  public let isSaving: Bool
+  public let canEdit: Bool
+  public let errorMessage: String?
+
+  public init(
+    providerID: String,
+    providerName: String,
+    installationID: String,
+    installationName: String,
+    installations: [BridgeDesktopChoice] = [],
+    toolPermission: String? = nil,
+    availableModes: [BridgeDesktopNativePermissionMode] = [],
+    availableActions: [String] = [],
+    rules: [BridgeDesktopNativePermissionRule] = [],
+    warnings: [String] = [],
+    isLoading: Bool = false,
+    isSaving: Bool = false,
+    canEdit: Bool = false,
+    errorMessage: String? = nil
+  ) {
+    self.providerID = providerID
+    self.providerName = providerName
+    self.installationID = installationID
+    self.installationName = installationName
+    self.installations = installations
+    self.toolPermission = toolPermission
+    self.availableModes = availableModes
+    self.availableActions = availableActions
+    self.rules = rules
+    self.warnings = warnings
+    self.isLoading = isLoading
+    self.isSaving = isSaving
+    self.canEdit = canEdit
+    self.errorMessage = errorMessage
+  }
+}
+
 public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let header: BridgeDesktopPageHeader
   public let models: [BridgeDesktopModelOption]
@@ -85,6 +178,7 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let taskStartApprovalOptions: [BridgeDesktopChoice]
   public let customInstructions: String
   public let agentDefaults: [BridgeDesktopAgentDefaultState]
+  public let nativePermissionPolicy: BridgeDesktopNativePermissionState?
   public let keepServiceRunningAfterExit: Bool
   public let serviceRegistered: Bool
   public let canSavePreferences: Bool
@@ -115,6 +209,7 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     taskStartApprovalOptions: [BridgeDesktopChoice] = [],
     customInstructions: String = "",
     agentDefaults: [BridgeDesktopAgentDefaultState] = [],
+    nativePermissionPolicy: BridgeDesktopNativePermissionState? = nil,
     keepServiceRunningAfterExit: Bool = true,
     serviceRegistered: Bool = false,
     canSavePreferences: Bool = true,
@@ -144,6 +239,7 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     self.taskStartApprovalOptions = taskStartApprovalOptions
     self.customInstructions = customInstructions
     self.agentDefaults = agentDefaults
+    self.nativePermissionPolicy = nativePermissionPolicy
     self.keepServiceRunningAfterExit = keepServiceRunningAfterExit
     self.serviceRegistered = serviceRegistered
     self.canSavePreferences = canSavePreferences

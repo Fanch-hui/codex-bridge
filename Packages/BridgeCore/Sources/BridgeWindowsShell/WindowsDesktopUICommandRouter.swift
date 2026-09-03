@@ -56,17 +56,8 @@
           ["queued", "interrupt-current-then-continue"].contains(mode)
         else { return nil }
         return .steerTask(id: taskID, input: input, mode: mode)
-      case .resolveApproval:
-        guard let approvalID = nonEmpty(payload.approvalID), let taskID = nonEmpty(payload.taskID),
-          let decision = nonEmpty(payload.decision)
-        else { return nil }
-        return .resolveTaskApproval(
-          approvalID: approvalID, taskID: taskID, decision: decision)
-      case .resolveDirectApproval:
-        guard let approvalID = nonEmpty(payload.approvalID),
-          let decision = nonEmpty(payload.decision)
-        else { return nil }
-        return .resolveDirectApproval(id: approvalID, decision: decision)
+      case .resolveApproval, .resolveDirectApproval:
+        return approvalCommand(envelope.command, payload: payload)
       case .selectProject:
         return nonEmpty(payload.projectID).map(MainWindowCommand.selectProjectByID(id:))
       case .refreshProjects:
@@ -220,6 +211,11 @@
           permissionMode: permissionMode,
           effort: optionalValue(payload.effort)
         )
+      case .refreshAgentNativePermission, .setAgentNativePermissionMode,
+        .addAgentNativePermissionRule, .replaceAgentNativePermissionRule,
+        .removeAgentNativePermissionRule, .prepareAgentPermissionRemediation,
+        .applyAgentPermissionRemediation:
+        return nativePermissionCommand(envelope.command, payload: payload)
       case .setDirectApprovalMode:
         return nonEmpty(payload.mode).map(MainWindowCommand.setSettingsDirectApprovalMode)
       case .setTaskStartApprovalMode:

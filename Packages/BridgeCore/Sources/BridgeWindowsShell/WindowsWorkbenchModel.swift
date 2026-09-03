@@ -164,6 +164,11 @@
     var resolvingApprovalIDs: Set<ApprovalPresentation.Identifier> = []
     var approvalStatusText: String?
     var approvalRefreshInProgress = false
+    var permissionRemediations: [String: IPCAgentPermissionRemediationResponse] = [:]
+    var permissionRemediationLoadingTaskIDs: Set<String> = []
+    var permissionRemediationApplyingTaskIDs: Set<String> = []
+    var permissionRemediationAppliedTaskIDs: Set<String> = []
+    var permissionRemediationErrors: [String: String] = [:]
 
     public convenience init() {
       self.init(feedback: WindowsDesktopFeedbackStore())

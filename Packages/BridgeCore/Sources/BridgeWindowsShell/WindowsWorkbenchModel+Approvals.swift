@@ -45,7 +45,10 @@
       publishDisplay()
     }
 
-    public func resolveSelectedApproval(decision: String) async {
+    public func resolveSelectedApproval(
+      decision: String,
+      oneTimeToolAutoApproval: Bool = false
+    ) async {
       guard connectionState == .connected else {
         setApprovalStatus("后台 Service 未连接，无法处理审批。")
         return
@@ -60,13 +63,29 @@
         setApprovalStatus("当前审批不支持该决策。", for: approvalID)
         return
       }
+      if oneTimeToolAutoApproval {
+        guard case .task(let rawID) = approvalID,
+          decision == "allow",
+          approvals.contains(where: {
+            $0.approvalID == rawID && $0.kind == "task_start"
+              && $0.oneTimeToolAutoApprovalAvailable == true
+          })
+        else {
+          setApprovalStatus("当前审批不支持本次 AGY 工具自动批准。", for: approvalID)
+          return
+        }
+      }
       guard resolvingApprovalIDs.insert(approvalID).inserted else { return }
       let selectionGeneration = approvalSelectionGeneration
       approvalStatusText = "正在处理审批…"
       publishDisplay()
 
       do {
-        try await sendApprovalDecision(approvalID, decision: decision)
+        try await sendApprovalDecision(
+          approvalID,
+          decision: decision,
+          oneTimeToolAutoApproval: oneTimeToolAutoApproval
+        )
         removeApproval(approvalID)
         await reloadTasksAndApprovals()
         finishApprovalResolution(
@@ -92,7 +111,8 @@
 
     private func sendApprovalDecision(
       _ approvalID: ApprovalPresentation.Identifier,
-      decision: String
+      decision: String,
+      oneTimeToolAutoApproval: Bool
     ) async throws {
       switch approvalID {
       case .task(let rawID):
@@ -103,10 +123,14 @@
           IPCApprovalResolutionRequest(
             taskID: approval.taskID,
             approvalID: approval.approvalID,
-            decision: decision
+            decision: decision,
+            oneTimeToolAutoApproval: oneTimeToolAutoApproval ? true : nil
           )
         )
       case .direct(let rawID):
+        guard !oneTimeToolAutoApproval else {
+          throw WindowsApprovalError.noLongerAvailable
+        }
         let accepted: Bool
         if decision == "allow" {
           accepted = try await client.approveDirectApproval(approvalID: rawID)

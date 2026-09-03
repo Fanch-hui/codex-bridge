@@ -50,11 +50,16 @@
           _ = await model.submitSteer(taskID: taskID, input: input, mode: steerMode)
         }
         return true
-      case .resolveTaskApproval(let approvalID, let taskID, let decision):
+      case .resolveTaskApproval(
+        let approvalID,
+        let taskID,
+        let decision,
+        let oneTimeToolAutoApproval):
         return resolveTaskApproval(
           approvalID: approvalID,
           taskID: taskID,
           decision: decision,
+          oneTimeToolAutoApproval: oneTimeToolAutoApproval,
           model: model
         )
       case .resolveDirectApproval(let approvalID, let decision):
@@ -197,6 +202,15 @@
           )
         }
         return true
+      case .refreshAgentNativePermission, .setAgentNativePermissionMode,
+        .addAgentNativePermissionRule, .replaceAgentNativePermissionRule,
+        .removeAgentNativePermissionRule, .prepareAgentPermissionRemediation,
+        .applyAgentPermissionRemediation:
+        return runNativePermissionCommand(
+          command,
+          model: model,
+          agentDefaults: auxiliary.agentDefaults
+        )
       case .patchSettings(let patch):
         Task { @MainActor in await auxiliary.settings.applyPreferencesPatch(patch) }
         return true
@@ -224,6 +238,7 @@
       approvalID: String,
       taskID: String,
       decision: String,
+      oneTimeToolAutoApproval: Bool,
       model: WindowsWorkbenchModel
     ) -> Bool {
       guard
@@ -232,7 +247,12 @@
         }), model.approvals.contains(where: { $0.approvalID == approvalID && $0.taskID == taskID })
       else { return true }
       model.selectApproval(at: index)
-      Task { @MainActor in await model.resolveSelectedApproval(decision: decision) }
+      Task { @MainActor in
+        await model.resolveSelectedApproval(
+          decision: decision,
+          oneTimeToolAutoApproval: oneTimeToolAutoApproval
+        )
+      }
       return true
     }
 

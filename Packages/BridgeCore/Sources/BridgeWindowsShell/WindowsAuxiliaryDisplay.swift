@@ -76,6 +76,7 @@
     var defaultErrorMessage: String? = nil
     var modelOptions: [BridgeDesktopModelOption] = []
     var defaultItems: [BridgeDesktopAgentDefaultState] = []
+    var nativePermissionPolicy: BridgeDesktopNativePermissionState? = nil
   }
 
   struct WindowsLogDisplay: Equatable, Sendable {

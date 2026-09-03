@@ -34,7 +34,8 @@
       _ task: MCPServiceTaskSnapshot,
       projectName: String,
       conversation: TaskConversationModel?,
-      selectedThreadPage: MCPThreadReadPage?
+      selectedThreadPage: MCPThreadReadPage?,
+      permissionRemediation: BridgeDesktopPermissionRemediationState?
     ) -> BridgeDesktopTaskDetail {
       let entries: [BridgeDesktopConversationEntry]
       if let selectedThreadPage {
@@ -83,6 +84,7 @@
         changedFiles: task.changedFiles,
         activity: activity,
         conversation: entries,
+        permissionRemediation: permissionRemediation,
         updatedAt: task.updatedAt
       )
     }
@@ -116,7 +118,8 @@
           decisionOptions: item.allowDecisions,
           canAllow: connected && !resolving && !item.allowDecisions.isEmpty,
           canDeny: connected && !resolving,
-          resolving: resolving
+          resolving: resolving,
+          oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable
         )
       case .direct(let approvalID):
         guard let approval = directApprovals.first(where: { $0.approvalID == approvalID }) else {

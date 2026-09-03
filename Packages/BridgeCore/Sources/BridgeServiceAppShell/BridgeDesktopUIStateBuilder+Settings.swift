@@ -41,6 +41,7 @@ extension BridgeDesktopUIStateBuilder {
       ),
       customInstructions: model.customInstructions ?? "",
       agentDefaults: agentDefaults(from: model),
+      nativePermissionPolicy: nativePermissionPolicy(from: model),
       keepServiceRunningAfterExit: model.keepServiceRunningAfterAppExit,
       serviceRegistered: model.registrationStatus == .enabled,
       canSavePreferences: preferences != nil && !model.models.isEmpty
@@ -136,6 +137,56 @@ extension BridgeDesktopUIStateBuilder {
         errorMessage: model.agentModelRefreshError(for: provider.providerID)
       )
     }
+  }
+
+  private static func nativePermissionPolicy(
+    from model: BridgeServiceAppModel
+  ) -> BridgeDesktopNativePermissionState? {
+    let installations = model.agentInstallations.filter {
+      $0.providerID == "antigravity" && $0.isEnabled && $0.availability == "available"
+    }
+    guard !installations.isEmpty else { return nil }
+    let installation =
+      model.focusedAgentNativePermissionInstallationID.flatMap { focused in
+        installations.first(where: { $0.installationID == focused })
+      } ?? installations[0]
+    let snapshot = model.nativePermissionPolicy(installationID: installation.installationID)
+    let isLoading = model.isLoadingNativePermissionPolicy(installation.installationID)
+    let isSaving = model.isSavingNativePermissionPolicy(installation.installationID)
+    return BridgeDesktopNativePermissionState(
+      providerID: installation.providerID,
+      providerName: "Antigravity",
+      installationID: installation.installationID,
+      installationName: installation.displayName,
+      installations: installations.map {
+        BridgeDesktopChoice(id: $0.installationID, title: $0.displayName)
+      },
+      toolPermission: snapshot?.toolPermission,
+      availableModes: snapshot?.availableModes.map {
+        BridgeDesktopNativePermissionMode(
+          modeID: $0.modeID,
+          displayName: $0.displayName,
+          requiresConfirmation: $0.requiresConfirmation
+        )
+      } ?? [],
+      availableActions: snapshot?.availableActions ?? [],
+      rules: snapshot?.rules.map {
+        BridgeDesktopNativePermissionRule(
+          ruleID: $0.ruleID,
+          effect: $0.effect,
+          action: $0.action,
+          target: $0.target,
+          isEditable: $0.isEditable,
+          isRedacted: $0.isRedacted,
+          requiresConfirmation: $0.requiresConfirmation
+        )
+      } ?? [],
+      warnings: snapshot?.warnings ?? [],
+      isLoading: isLoading,
+      isSaving: isSaving,
+      canEdit: model.connectionState == .connected && snapshot != nil && !isLoading && !isSaving,
+      errorMessage: model.agentNativePermissionErrors[installation.installationID]
+    )
   }
 
   private static func reasoningTitle(_ effort: String) -> String {

@@ -110,6 +110,12 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var agentNativePermissionSavingInstallations: Set<String> = []
   @Published public internal(set) var agentNativePermissionErrors: [String: String] = [:]
   @Published public internal(set) var focusedAgentNativePermissionInstallationID: String?
+  @Published public internal(set) var agentPermissionRemediations:
+    [String: IPCAgentPermissionRemediationResponse] = [:]
+  @Published public internal(set) var agentPermissionRemediationLoadingTaskIDs: Set<String> = []
+  @Published public internal(set) var agentPermissionRemediationApplyingTaskIDs: Set<String> = []
+  @Published public internal(set) var agentPermissionRemediationAppliedTaskIDs: Set<String> = []
+  @Published public internal(set) var agentPermissionRemediationErrors: [String: String] = [:]
   @Published public internal(set) var openCodeDefaultModel: String?
   @Published public internal(set) var openCodeDefaultPermissionMode = "build"
   @Published public internal(set) var openCodeDefaultEffort: String?

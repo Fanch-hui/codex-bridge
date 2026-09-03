@@ -31,6 +31,7 @@
         taskStartApprovalOptions: settings.taskStartApprovalValues.map { approvalChoice($0) },
         customInstructions: settings.customInstructions,
         agentDefaults: agentDefaults?.defaultItems ?? [],
+        nativePermissionPolicy: agentDefaults?.nativePermissionPolicy,
         keepServiceRunningAfterExit: settings.keepServiceRunningAfterExit,
         serviceRegistered: settings.serviceRegistered,
         canSavePreferences: settings.savePreferencesEnabled,

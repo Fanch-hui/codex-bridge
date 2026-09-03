@@ -2,6 +2,7 @@
   "use strict";
 
   var S = global.CodexBridgeDesktopPageSupport;
+  var N = global.CodexBridgeDesktopNativePermissions;
 
   function render(page, emit) {
     var container = document.getElementById("settings-content");
@@ -21,6 +22,8 @@
     var modelCards = [preferencesCard(page, emit)];
     if (page.supervisorAvailable) modelCards.push(supervisorCard(page, emit));
     modelCards.push(agentDefaultsCard(page, emit));
+    var nativePermissionCard = N && N.settingsCard(page.nativePermissionPolicy, emit);
+    if (nativePermissionCard) modelCards.push(nativePermissionCard);
     appendGroup(container, "模型与执行默认偏好", modelCards);
     appendGroup(container, "安全策略与全局指令", [
       approvalCard(page, emit), instructionsCard(page, emit)

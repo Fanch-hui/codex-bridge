@@ -25,6 +25,7 @@ enum BridgeDesktopCommandRouter {
       model.selection = .connections
     case .openSettings:
       model.selection = .settings
+      loadNativePermissionPolicyIfNeeded(model)
     case .openLogs:
       model.selection = .logs
     case .openTask:
@@ -51,6 +52,11 @@ enum BridgeDesktopCommandRouter {
       .connectTunnel, .disconnectTunnel, .clearTunnel, .registerAgent, .selectAgent,
       .setAgentEnabled, .reprobeAgent, .removeAgent, .refreshAgentModels:
       handleConnections(envelope, model: model)
+    case .refreshAgentNativePermission, .setAgentNativePermissionMode,
+      .addAgentNativePermissionRule, .replaceAgentNativePermissionRule,
+      .removeAgentNativePermissionRule, .prepareAgentPermissionRemediation,
+      .applyAgentPermissionRemediation:
+      handleNativePermissions(envelope, model: model)
     case .saveAgentDefault, .setExecutionModel, .setExecutionEffort, .setAccessMode,
       .setFastMode, .setSupervisorModel, .setSupervisorEffort, .setSupervisorEnabled,
       .setDirectApprovalMode, .setTaskStartApprovalMode, .saveSettings,
@@ -69,6 +75,7 @@ enum BridgeDesktopCommandRouter {
     guard let selection = BridgeServiceNavigation(rawValue: navigation.rawValue) else { return }
     model.selection = selection
     if selection != .workbench { model.chatBrowserViewport = nil }
+    if selection == .settings { loadNativePermissionPolicyIfNeeded(model) }
   }
 
   static func validatedID(_ value: String?, maximumBytes: Int = 1_024) -> String? {
