@@ -158,12 +158,12 @@ Direct 命令使用结构化 argv，不拼接 shell。陌生命令不会因为�
 
 Codex 不需要在“本机 Agent 引擎连接”登记。准备方式：
 
-1. 按官方方式安装并登录 Codex/ChatGPT 本机环境。
+1. 安装 Codex，并按当前使用的登录或模型 Provider 方式完成配置。
 2. 确认本机 `codex app-server --stdio` 可以由当前用户运行。
 3. 打开 `设置 → Codex 执行默认偏好`。
 4. 选择默认模型、推理强度、访问权限和可选的 Fast 模式。
 
-Bridge 会从受控位置发现 Codex，但不会读取或导出 Codex 的登录凭据。Codex 是当前唯一支持 Supervisor 和真正 in-flight steer 的 Provider。
+Bridge 会从受控位置发现 Codex，但不会读取或导出 Codex 的登录凭据，也不要求特定登录方式。若当前 Codex 配置不提供模型列表，普通任务仍会启动，并由 Codex 选择当前默认模型和 effort；该任务不会启用依赖模型目录的 Supervisor 或 Fast 模式。Codex 是当前唯一支持 Supervisor 和真正 in-flight steer 的 Provider。
 
 ### 5.2 OpenCode
 

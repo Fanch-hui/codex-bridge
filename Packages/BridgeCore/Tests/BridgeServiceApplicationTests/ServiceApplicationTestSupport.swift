@@ -165,6 +165,18 @@ var serviceModelCatalogScript: String {
   """#
 }
 
+var serviceUnavailableModelCatalogScript: String {
+  #"""
+  IFS= read -r initialize
+  printf '%s\n' '{"id":1,"result":{"userAgent":"fixture/1","codexHome":"/private/fixture","platformFamily":"unix","platformOs":"macos"}}'
+  IFS= read -r initialized
+  IFS= read -r request
+  case "$request" in *'"method":"model/list"'*) ;; *) exit 11 ;; esac
+  printf '%s\n' '{"id":2,"error":{"code":-32601,"message":"model catalog unavailable"}}'
+  sleep 1
+  """#
+}
+
 func serviceCountingModelCatalogScript(spawnLog: String) -> String {
   #"""
   printf 'spawn\n' >> "\#(spawnLog)"

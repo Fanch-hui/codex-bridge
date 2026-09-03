@@ -110,8 +110,8 @@ package actor ExecutionSession {
           approvalPolicy: posture.approvalPolicy,
           approvalsReviewer: posture.approvalsReviewer,
           serviceTier: posture.serviceTier,
-          model: request.task.executionModel,
-          effort: request.task.executionEffort
+          model: Self.wireModel(request.task.executionModel),
+          effort: Self.wireEffort(request.task.executionEffort)
         )
       )
       guard Self.isSafeWireIdentifier(turn.turn.id) else {

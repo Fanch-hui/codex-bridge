@@ -104,7 +104,7 @@ Bridge 只接受已登记项目。项目硬策略优先于 Workbench 默认和�
 
 ### 4. 配置执行 Provider
 
-- **Codex**：默认 Provider，不在“本机 Agent 引擎连接”中登记。请先在官方 Codex/ChatGPT 环境完成登录，再到 `设置 → Codex 执行默认偏好` 选择模型、effort、访问权限和 Fast 模式。Bridge 不读取 Codex 认证文件。
+- **Codex**：默认 Provider，不在“本机 Agent 引擎连接”中登记。请先确认 Codex 在当前登录或模型 Provider 配置下能够运行，再到 `设置 → Codex 执行默认偏好` 配置执行偏好。Bridge 不读取 Codex 认证文件，也不以模型列表是否可用作为普通任务的执行门槛；无法取得目录时，新任务跟随 Codex 当前默认模型和 effort。
 - **OpenCode**：`连接 → 本机 Agent 引擎连接 → 登记 Agent → OpenCode`，选择真实 `opencode` 可执行文件并 Probe。详见 [OpenCode 连接指南](./docs/OPENCODE_CONNECTION_GUIDE.md)。
 - **DeepSeek Harness**：登记官方 `dsh-v0.1.1-rc.2` 构建出的 `packages/examples/acp-demo/lib/bin.js`，再选择 DSH 源码树之外的 `cordis.yml`；为隔离凭据，建议 Profile 也位于任务项目和 Bridge 仓库之外。`.env` 与 `cordis.yml` 同目录，由 Harness 自己读取。详见 [DeepSeek Harness 接入指南](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)。
 - **Antigravity**：先用 `command -v agy` 找到真实 CLI，在目标项目中交互登录，并通过 `/settings`、`/permissions` 配置 headless 所需的命令、URL 与 MCP 规则；不要登记 Desktop App。详见 [Antigravity / AGY 连接与权限指南](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)。

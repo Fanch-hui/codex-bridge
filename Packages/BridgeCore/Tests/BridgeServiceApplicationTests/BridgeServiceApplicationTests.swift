@@ -714,6 +714,67 @@ final class BridgeServiceApplicationTests: XCTestCase {
     XCTAssertEqual(task.supervisorEffort, configured.supervisorEffort)
   }
 
+  func testUnavailableCodexCatalogFallsBackToProviderDefaults() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceUnavailableModelCatalogScript
+    )
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+    try await fixture.settings.setModelPreferences(
+      ServiceModelPreferences(
+        executionModel: "stale-official-model",
+        executionEffort: "high",
+        supervisorModel: "stale-supervisor-model",
+        supervisorEffort: "medium",
+        fastModeEnabled: true
+      )
+    )
+
+    let receipt = try await application.serviceSubmitTask(
+      MCPServiceTaskSubmission(
+        projectID: fixture.project.id.rawValue,
+        prompt: "Use the Codex provider defaults."
+      ),
+      deadline: deadline
+    )
+
+    let stored = try await fixture.tasks.task(id: TaskID(rawValue: receipt.taskID))
+    let task = try XCTUnwrap(stored)
+    XCTAssertEqual(task.executionModel, serviceDefaultProviderExecutionModel)
+    XCTAssertEqual(task.executionEffort, serviceDefaultProviderExecutionEffort)
+    XCTAssertNil(task.supervisorModel)
+    XCTAssertNil(task.supervisorEffort)
+    XCTAssertFalse(task.fastMode)
+  }
+
+  func testUnavailableCodexCatalogPreservesExplicitModelOverride() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceUnavailableModelCatalogScript
+    )
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+
+    let receipt = try await application.serviceSubmitTask(
+      MCPServiceTaskSubmission(
+        projectID: fixture.project.id.rawValue,
+        prompt: "Use the explicitly requested provider model.",
+        executionModel: "third-party/model",
+        executionEffort: "custom",
+        modelOverride: true
+      ),
+      deadline: deadline
+    )
+
+    let stored = try await fixture.tasks.task(id: TaskID(rawValue: receipt.taskID))
+    let task = try XCTUnwrap(stored)
+    XCTAssertEqual(task.executionModel, "third-party/model")
+    XCTAssertEqual(task.executionEffort, "custom")
+    XCTAssertNil(task.supervisorModel)
+    XCTAssertFalse(task.fastMode)
+  }
+
   func testUnmarkedSubmissionModelFieldsCannotOverrideBridgeDefaults() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     let application = makeServiceApplication(

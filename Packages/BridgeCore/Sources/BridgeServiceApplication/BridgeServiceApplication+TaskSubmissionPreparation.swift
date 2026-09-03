@@ -24,7 +24,15 @@ extension BridgeServiceApplication {
         deadline: deadline
       )
     }
-    let models = try await catalog.listModels(deadline: deadline).models
+    let models: [MCPModelSummary]?
+    do {
+      models = try await catalog.listModels(deadline: deadline).models
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch {
+      try Self.checkDeadline(deadline)
+      models = nil
+    }
     let selections = try await modelSelections(submission: submission, models: models)
     let requestedPermissionMode = try Self.permissionModeRequest(
       submission.permissionMode,
@@ -39,7 +47,7 @@ extension BridgeServiceApplication {
     let accessMode = try await settings.accessMode()
     let fastMode =
       try await settings.isFastModeEnabled()
-      && models.first(where: { $0.modelID == selections.execution.model })?
+      && models?.first(where: { $0.modelID == selections.execution.model })?
         .supportsFastMode == true
     guard !submission.networkAccess || project.accessPolicy.network != .denied else {
       throw BridgeMCPQueryError.contractRejected
