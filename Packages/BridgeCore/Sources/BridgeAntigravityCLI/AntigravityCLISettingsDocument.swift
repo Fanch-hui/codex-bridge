@@ -1,5 +1,4 @@
 import BridgeAgentCore
-import CryptoKit
 import Foundation
 
 struct AntigravityCLISettingsDocument {

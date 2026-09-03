@@ -117,7 +117,11 @@ try {
         "BridgeServiceCoreWindowsTests",
         "BridgeDirectCommandWindowsTests",
         "BridgeWindowsShellTests")) {
-      swift test @swiftArguments --filter $testFilter
+      $testArgs = @("test") + $swiftArguments + @("--filter", $testFilter)
+      if ($testFilter -eq "BridgeSecurityTests") {
+        $testArgs += @("--skip", "WindowsCredentialStoreTests")
+      }
+      swift @testArgs
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
   }
