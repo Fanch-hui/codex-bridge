@@ -41,6 +41,27 @@ extension MCPServiceTaskSnapshot {
     return isCodexTask ? turnID : providerRunID
   }
 
+  var canSteer: Bool {
+    status == "running" && expectedControlID != nil
+  }
+
+  var isFailedOrInterrupted: Bool {
+    status == "failed" || status == "interrupted"
+  }
+
+  var effectiveSessionID: String? {
+    isCodexTask ? threadID : (providerSessionID ?? threadID)
+  }
+
+  var canResumeSession: Bool {
+    isFailedOrInterrupted && effectiveSessionID != nil
+  }
+
+  var canRestart: Bool {
+    isFailedOrInterrupted
+      && !(prompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+  }
+
   var workbenchTitle: String {
     for value in [currentStep, resultSummary] {
       if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

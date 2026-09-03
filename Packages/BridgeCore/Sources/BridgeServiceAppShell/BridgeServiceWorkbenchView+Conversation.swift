@@ -4,6 +4,7 @@ import SwiftUI
 struct BridgeServiceWorkbenchInspectorLiveRegion: View {
   @ObservedObject var model: BridgeServiceAppModel
   let context: BridgeServiceWorkbenchInspectorContext
+  @Binding var steerInput: String
 
   @ViewBuilder
   var body: some View {
@@ -11,7 +12,8 @@ struct BridgeServiceWorkbenchInspectorLiveRegion: View {
       BridgeServiceWorkbenchObservedLiveRegion(
         model: model,
         conversation: conversation,
-        context: context
+        context: context,
+        steerInput: $steerInput
       )
       .id(conversation.id)
     } else {
@@ -23,8 +25,12 @@ struct BridgeServiceWorkbenchInspectorLiveRegion: View {
       )
       .frame(minHeight: 0, maxHeight: .infinity)
       Divider()
-      BridgeServiceWorkbenchInspectorFooter(model: model, activity: context.activity)
-        .fixedSize(horizontal: false, vertical: true)
+      BridgeServiceWorkbenchInspectorFooter(
+        model: model,
+        context: context,
+        steerInput: $steerInput
+      )
+      .fixedSize(horizontal: false, vertical: true)
     }
   }
 }
@@ -33,6 +39,7 @@ private struct BridgeServiceWorkbenchObservedLiveRegion: View {
   @ObservedObject var model: BridgeServiceAppModel
   @ObservedObject var conversation: TaskConversationModel
   let context: BridgeServiceWorkbenchInspectorContext
+  @Binding var steerInput: String
 
   var body: some View {
     let activity = CodexActivityPresentation(
@@ -47,8 +54,12 @@ private struct BridgeServiceWorkbenchObservedLiveRegion: View {
     )
     .frame(minHeight: 0, maxHeight: .infinity)
     Divider()
-    BridgeServiceWorkbenchInspectorFooter(model: model, activity: activity)
-      .fixedSize(horizontal: false, vertical: true)
+    BridgeServiceWorkbenchInspectorFooter(
+      model: model,
+      context: context,
+      steerInput: $steerInput
+    )
+    .fixedSize(horizontal: false, vertical: true)
   }
 }
 
@@ -179,41 +190,5 @@ struct BridgeServiceWorkbenchConversationStream: View {
 
   private var isWaitingForProvider: Bool {
     activity.showsBubble
-  }
-}
-
-struct BridgeServiceWorkbenchInspectorFooter: View {
-  @ObservedObject var model: BridgeServiceAppModel
-  let activity: CodexActivityPresentation
-
-  var body: some View {
-    HStack {
-      if activity.isActive {
-        HStack(spacing: 6) {
-          ThinkingOrbView(size: 14)
-          Text(activity.statusText)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-        }
-      } else {
-        Text(activity.statusText)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
-
-      Spacer()
-
-      Button {
-        model.refresh()
-      } label: {
-        Label("刷新", systemImage: "arrow.clockwise")
-          .font(.caption2)
-      }
-      .buttonStyle(.borderless)
-      .disabled(model.isRefreshing)
-    }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
-    .background(Color(nsColor: .windowBackgroundColor))
   }
 }

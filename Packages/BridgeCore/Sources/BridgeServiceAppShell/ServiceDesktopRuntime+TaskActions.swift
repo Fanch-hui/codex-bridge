@@ -45,6 +45,61 @@ extension BridgeServiceAppModel {
     }
   }
 
+  public func resumeTask(
+    _ task: MCPServiceTaskSnapshot,
+    prompt: String? = nil
+  ) {
+    guard let sessionID = task.effectiveSessionID else { return }
+    let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let finalPrompt = (trimmedPrompt?.isEmpty == false) ? trimmedPrompt! : "继续执行未完成的任务"
+    let request = IPCAgentSubmitRequest(
+      projectID: task.projectID,
+      providerID: task.providerIdentifier,
+      installationID: task.installationID,
+      model: task.executionModel,
+      effort: task.executionEffort,
+      permissionMode: task.permissionMode,
+      prompt: finalPrompt,
+      threadID: sessionID,
+      networkAccess: task.networkAccess,
+      modelOverride: task.executionModel != nil,
+      permissionModeOverride: task.permissionMode != nil
+    )
+    runMutation { [weak self] client in
+      guard let self else { return }
+      let response = try await client.submitAgentTask(request)
+      await self.refresh(silent: true, includeCatalog: false)
+      self.openTask(response.taskID)
+      self.postToast("已续接任务")
+    }
+  }
+
+  public func restartTask(_ task: MCPServiceTaskSnapshot) {
+    guard let originalPrompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !originalPrompt.isEmpty
+    else { return }
+    let request = IPCAgentSubmitRequest(
+      projectID: task.projectID,
+      providerID: task.providerIdentifier,
+      installationID: task.installationID,
+      model: task.executionModel,
+      effort: task.executionEffort,
+      permissionMode: task.permissionMode,
+      prompt: originalPrompt,
+      threadID: nil,
+      networkAccess: task.networkAccess,
+      modelOverride: task.executionModel != nil,
+      permissionModeOverride: task.permissionMode != nil
+    )
+    runMutation { [weak self] client in
+      guard let self else { return }
+      let response = try await client.submitAgentTask(request)
+      await self.refresh(silent: true, includeCatalog: false)
+      self.openTask(response.taskID)
+      self.postToast("已重新开始任务")
+    }
+  }
+
   public func deleteTask(_ taskID: String) {
     runMutation { [weak self] client in
       guard let self else { return }

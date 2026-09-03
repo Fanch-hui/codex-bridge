@@ -38,6 +38,7 @@ extension BridgeServiceApplication {
     return MCPServiceTaskSnapshot(
       taskID: task.id.rawValue,
       projectID: task.projectID.rawValue,
+      prompt: task.prompt,
       source: task.source.rawValue,
       sourceClientID: task.sourceClientID.isEmpty ? nil : task.sourceClientID,
       status: task.state.status.rawValue,

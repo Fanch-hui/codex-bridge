@@ -173,6 +173,7 @@ public struct MCPServiceTaskWaitPolicy: Codable, Equatable, Sendable {
 public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
   public let taskID: String
   public let projectID: String
+  public let prompt: String?
   public let source: String?
   public let sourceClientID: String?
   public let status: String
@@ -202,6 +203,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
   public init(
     taskID: String,
     projectID: String,
+    prompt: String? = nil,
     source: String? = nil,
     sourceClientID: String? = nil,
     status: String,
@@ -230,6 +232,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
   ) {
     self.taskID = taskID
     self.projectID = projectID
+    self.prompt = prompt
     self.source = source
     self.sourceClientID = sourceClientID
     self.status = status
@@ -266,6 +269,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
   private enum CodingKeys: String, CodingKey {
     case taskID = "task_id"
     case projectID = "project_id"
+    case prompt
     case source
     case sourceClientID = "source_client_id"
     case status
@@ -297,6 +301,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     taskID = try container.decode(String.self, forKey: .taskID)
     projectID = try container.decode(String.self, forKey: .projectID)
+    prompt = try container.decodeIfPresent(String.self, forKey: .prompt)
     source = try container.decodeIfPresent(String.self, forKey: .source)
     sourceClientID = try container.decodeIfPresent(String.self, forKey: .sourceClientID)
     status = try container.decode(String.self, forKey: .status)
