@@ -36,6 +36,21 @@
 
   function toneClass(tone) { return tone || "neutral"; }
 
+  function applyHostContext(context) {
+    var root = document.documentElement;
+    if (context && context.platform) {
+      root.dataset.platform = context.platform;
+    } else if (root.dataset.platform !== "windows") {
+      root.removeAttribute("data-platform");
+    }
+  }
+
+  function renderFeedback(feedback) {
+    if (window.CodexBridgeDesktopFeedback) {
+      window.CodexBridgeDesktopFeedback.render(feedback, emit);
+    }
+  }
+
   function emit(command, payload) {
     var envelope = { version: 1, requestID: "desktop-ui-" + (++requestSequence), command: command, payload: payload || {} };
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bridgeDesktopUI) {
@@ -188,11 +203,13 @@
 
   function renderState(nextState) {
     state = nextState;
+    applyHostContext(state && state.hostContext);
     var shell = document.getElementById("app-shell");
     var loading = document.getElementById("loading-state");
     loading.hidden = !!state;
     shell.dataset.state = state ? "ready" : "loading";
     if (!state) {
+      renderFeedback(null);
       globalPages(null, emit);
       return;
     }
@@ -206,6 +223,7 @@
     document.getElementById("connection-label").textContent = state.connectionLabel;
     document.getElementById("refresh-indicator").classList.toggle("is-visible", !!state.isRefreshing);
     document.querySelector(".refresh-button").classList.toggle("is-refreshing", !!state.isRefreshing);
+    renderFeedback(state.feedback);
     if (state.selectedNavigation === "overview") renderOverview(state.overview);
     globalPages(state, emit);
     setIcons(document);
@@ -225,6 +243,11 @@
       if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) {
         window.requestAnimationFrame(function () { window.CodexBridgeDesktopPages.measureBrowserViewport(emit); });
       }
+    }
+  });
+  document.addEventListener("contextmenu", function (event) {
+    if (document.documentElement.dataset.platform === "windows") {
+      event.preventDefault();
     }
   });
   window.addEventListener("resize", function () {

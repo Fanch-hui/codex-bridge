@@ -72,7 +72,8 @@
         finishApprovalResolution(
           approvalID,
           selectionGeneration: selectionGeneration,
-          message: "已提交：\(ApprovalPresentation.decisionLabel(decision))。"
+          message: "已提交：\(ApprovalPresentation.decisionLabel(decision))。",
+          succeeded: true
         )
       } catch {
         let message =
@@ -83,7 +84,8 @@
         finishApprovalResolution(
           approvalID,
           selectionGeneration: selectionGeneration,
-          message: message
+          message: message,
+          succeeded: false
         )
       }
     }
@@ -156,9 +158,15 @@
     private func finishApprovalResolution(
       _ approvalID: ApprovalPresentation.Identifier,
       selectionGeneration: UInt64,
-      message: String
+      message: String,
+      succeeded: Bool
     ) {
       resolvingApprovalIDs.remove(approvalID)
+      if succeeded {
+        feedback.postToast(message)
+      } else {
+        feedback.postAlert(message, title: "审批处理失败")
+      }
       guard approvalSelectionGeneration == selectionGeneration else {
         publishDisplay()
         return
@@ -182,6 +190,7 @@
     ) {
       guard approvalID == nil || selectedApprovalID == approvalID else { return }
       approvalStatusText = text
+      feedback.postAlert(text, title: "审批处理失败")
       publishDisplay()
     }
   }

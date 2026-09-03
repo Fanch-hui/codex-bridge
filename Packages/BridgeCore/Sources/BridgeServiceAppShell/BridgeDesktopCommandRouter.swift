@@ -57,6 +57,8 @@ enum BridgeDesktopCommandRouter {
       .saveCustomInstructions, .registerService, .unregisterService,
       .setKeepServiceRunning, .updateBrowserViewport:
       handleSettings(envelope, model: model)
+    case .dismissFeedback:
+      return
     }
   }
 

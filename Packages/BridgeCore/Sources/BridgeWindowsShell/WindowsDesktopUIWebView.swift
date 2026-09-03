@@ -50,8 +50,7 @@
       }
       let next = WindowsWebViewThread(
         parentWindow: window,
-        initialURL: url.absoluteString,
-        profileName: "DesktopUI",
+        configuration: .desktopUI(initialURL: Self.windowsURL(from: url)),
         updateState: { [weak self] state, detail in
           self?.store(state: state, errorDetail: detail)
         },
@@ -68,6 +67,14 @@
         })
       else { return }
       next.start()
+    }
+
+    private static func windowsURL(from url: URL) -> String {
+      guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+        return url.absoluteString
+      }
+      components.queryItems = [URLQueryItem(name: "platform", value: "windows")]
+      return components.url?.absoluteString ?? url.absoluteString
     }
 
     func resize(to bounds: RECT) {

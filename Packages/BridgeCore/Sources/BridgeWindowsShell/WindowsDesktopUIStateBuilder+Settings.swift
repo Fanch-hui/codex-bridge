@@ -48,35 +48,19 @@
       _ value: String,
       includesDefault: Bool = false
     ) -> BridgeDesktopChoice {
-      let title: String
-      switch value {
-      case "": title = "Provider 默认"
-      case "none": title = "无"
-      case "minimal": title = "最低"
-      case "low": title = "低"
-      case "medium": title = "中"
-      case "high": title = "高"
-      case "xhigh", "extra_high": title = "极高"
-      case "max": title = "最高"
-      case "ultra": title = "Ultra"
-      default: title = value
-      }
-      return choice(value, title, enabled: includesDefault || !value.isEmpty)
+      choice(
+        value,
+        BridgeDesktopPresentation.extendedReasoningTitle(value),
+        enabled: includesDefault || !value.isEmpty
+      )
     }
 
     private static func accessChoice(_ value: String) -> BridgeDesktopChoice {
-      let title: String
-      switch value {
-      case "request-approval": title = "请求批准"
-      case "auto-review": title = "自动评审"
-      case "full-access": title = "完全访问"
-      default: title = value
-      }
-      return choice(value, title)
+      choice(value, BridgeDesktopPresentation.accessModeTitle(value))
     }
 
     private static func approvalChoice(_ value: String) -> BridgeDesktopChoice {
-      choice(value, value == "auto" ? "自动" : "每次询问")
+      choice(value, BridgeDesktopPresentation.approvalModeTitle(value))
     }
   }
 #endif

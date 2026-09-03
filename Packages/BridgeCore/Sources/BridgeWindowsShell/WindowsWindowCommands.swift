@@ -16,7 +16,7 @@
 
   enum MainWindowCommand: Equatable {
     case selectPage(index: Int)
-    case refreshCurrentPage
+    case refreshAll
     case openTask(id: String)
     case browserBack
     case browserForward
@@ -159,12 +159,8 @@
       permissionMode: String,
       effort: String?
     )
-    case saveSettingsExecutionPreferences(
-      executionModel: String,
-      executionEffort: String,
-      accessMode: String,
-      fastModeEnabled: Bool
-    )
+    case patchSettings(BridgeDesktopSettingsPatch)
     case updateBrowserViewport(viewport: BridgeDesktopBrowserViewport)
+    case dismissFeedback(id: String)
   }
 #endif

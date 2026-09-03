@@ -9,6 +9,7 @@
   final class WindowsSettingsModel {
     let client: any BridgeServiceClientProtocol
     let displayBox: AuxiliaryDisplayBox<WindowsSettingsDisplay>
+    let feedback: WindowsDesktopFeedbackStore
 
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var models: [MCPModelSummary] = []
@@ -16,11 +17,15 @@
     private(set) var instructions = ""
     private(set) var directMode = "require"
     private(set) var taskStartMode = "require"
-    private var busy = false
-    private var statusText = "尚未加载设置。"
+    var busy = false
+    var statusText = "尚未加载设置。"
 
-    init(client: any BridgeServiceClientProtocol) {
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
       self.client = client
+      self.feedback = feedback
       displayBox = AuxiliaryDisplayBox(
         value: WindowsSettingsDisplay(
           connectionState: .idle,
@@ -49,8 +54,8 @@
       )
     }
 
-    static let accessValues = ["request-approval", "auto-review", "full-access"]
-    static let approvalValues = ["require", "auto"]
+    nonisolated static let accessValues = ["request-approval", "auto-review", "full-access"]
+    nonisolated static let approvalValues = ["require", "auto"]
 
     func refresh() async {
       guard !busy else { return }
@@ -100,7 +105,9 @@
     func savePreferences(_ value: IPCModelPreferences) async {
       guard connectionState == .connected, !busy else { return }
       guard !value.executionModel.isEmpty, !value.supervisorModel.isEmpty else {
-        statusText = "执行模型和 Supervisor 模型不能为空。"
+        let message = "执行模型和 Supervisor 模型不能为空。"
+        statusText = message
+        feedback.postAlert(message, title: "模型设置无法保存")
         publishDisplay()
         return
       }
@@ -124,8 +131,10 @@
         try await client.setModelPreferences(normalized)
         preferences = normalized
         statusText = "模型设置已保存。"
+        feedback.postToast(statusText)
       } catch {
         statusText = "模型设置保存失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText)
       }
       publishDisplay()
     }
@@ -133,7 +142,9 @@
     func saveInstructions(_ value: String) async {
       guard connectionState == .connected, !busy else { return }
       guard !value.utf8.contains(0), value.utf8.count <= 32 * 1_024 else {
-        statusText = "自定义指令不能包含 NUL，且不能超过 32 KiB。"
+        let message = "自定义指令不能包含 NUL，且不能超过 32 KiB。"
+        statusText = message
+        feedback.postAlert(message, title: "自定义指令无法保存")
         publishDisplay()
         return
       }
@@ -148,8 +159,10 @@
         try await client.setCustomInstructions(value)
         instructions = value
         statusText = "自定义指令已保存。"
+        feedback.postToast(statusText)
       } catch {
         statusText = "自定义指令保存失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText)
       }
       publishDisplay()
     }
@@ -182,8 +195,10 @@
           taskStartMode = mode
         }
         statusText = "审批设置已保存。"
+        feedback.postToast(statusText)
       } catch {
         statusText = "审批设置保存失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText)
       }
       publishDisplay()
     }

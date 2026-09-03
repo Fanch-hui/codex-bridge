@@ -156,9 +156,9 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
           throw AgentRuntimeError.processUnavailable
         }
       #endif
-      try FileManager.default.createSymbolicLink(
+      try DeepSeekHarnessACPDirectoryLink.createDirectoryLink(
         atPath: try DeepSeekHarnessACPPathSupport.append("node_modules", to: runtimeProfile),
-        withDestinationPath: moduleDirectory
+        destinationPath: moduleDirectory
       )
       return configuration
     } catch let error as AgentRuntimeError {
@@ -173,6 +173,12 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
       let canonical = AgentPathSemantics.canonicalPath(path),
       AgentPathSemantics.directoryPath(of: canonical) != nil
     else { return }
+    if let linkPath = try? DeepSeekHarnessACPPathSupport.append(
+      "node_modules",
+      to: DeepSeekHarnessACPPathSupport.append("profile", to: canonical, isDirectory: true)
+    ) {
+      DeepSeekHarnessACPDirectoryLink.removeDirectoryLink(atPath: linkPath)
+    }
     try? FileManager.default.removeItem(atPath: canonical)
   }
 

@@ -24,7 +24,7 @@
     }
 
     func configureTunnel(tunnelID: String, runtimeKey: String) async {
-      await mutate("正在配置 Secure Tunnel…") {
+      await mutate("正在配置 Secure Tunnel…", success: "Secure Tunnel 配置已保存。") {
         _ = try await self.client.configureTunnel(
           IPCTunnelConfigurationRequest(tunnelID: tunnelID, runtimeKey: runtimeKey)
         )
@@ -32,19 +32,19 @@
     }
 
     func connectTunnel() async {
-      await mutate("正在连接 Secure Tunnel…") {
+      await mutate("正在连接 Secure Tunnel…", success: "Secure Tunnel 连接已启动。") {
         _ = try await self.client.connectTunnel()
       }
     }
 
     func disconnectTunnel() async {
-      await mutate("正在断开 Secure Tunnel…") {
+      await mutate("正在断开 Secure Tunnel…", success: "Secure Tunnel 已断开。") {
         try await self.client.disconnectTunnel()
       }
     }
 
     func clearTunnel() async {
-      await mutate("正在清除 Secure Tunnel 配置…") {
+      await mutate("正在清除 Secure Tunnel 配置…", success: "Secure Tunnel 配置已清除。") {
         try await self.client.clearTunnel()
       }
     }

@@ -3,7 +3,7 @@
   import WinSDK
 
   final class WindowsChatWebView: @unchecked Sendable {
-    enum State: Equatable {
+    enum State: Equatable, Sendable {
       case unsupported
       case loading
       case active
@@ -13,7 +13,12 @@
     static let chatURL = "https://chatgpt.com"
 
     private let lock = NSLock()
-    private var snapshot = Snapshot(state: .loading, errorDetail: nil)
+    private var snapshot = Snapshot(
+      state: .loading,
+      errorDetail: nil,
+      canGoBack: false,
+      canGoForward: false
+    )
     private var worker: WindowsWebViewThread?
 
     var state: State {
@@ -24,11 +29,28 @@
       lock.withLock { snapshot.errorDetail }
     }
 
-    func attach(to window: HWND?) {
+    var canGoBack: Bool {
+      lock.withLock { snapshot.canGoBack }
+    }
+
+    var canGoForward: Bool {
+      lock.withLock { snapshot.canGoForward }
+    }
+
+    func attach(to window: HWND?, onNavigationChanged: (@Sendable (Bool, Bool) -> Void)? = nil) {
       guard let window else { return }
-      let next = WindowsWebViewThread(parentWindow: window) { [weak self] state, detail in
-        self?.store(state: state, errorDetail: detail)
-      }
+      let next = WindowsWebViewThread(
+        parentWindow: window,
+        configuration: .chatBrowser(),
+        updateState: { [weak self] state, detail in
+          self?.store(state: state, errorDetail: detail)
+        },
+        onWebMessage: nil,
+        onNavigationChanged: { [weak self] canGoBack, canGoForward in
+          self?.storeNavigation(canGoBack: canGoBack, canGoForward: canGoForward)
+          onNavigationChanged?(canGoBack, canGoForward)
+        }
+      )
       guard
         lock.withLock({
           guard worker == nil else { return false }
@@ -73,13 +95,31 @@
 
     private func store(state: State, errorDetail: String?) {
       lock.withLock {
-        snapshot = Snapshot(state: state, errorDetail: errorDetail)
+        snapshot = Snapshot(
+          state: state,
+          errorDetail: errorDetail,
+          canGoBack: snapshot.canGoBack,
+          canGoForward: snapshot.canGoForward
+        )
+      }
+    }
+
+    private func storeNavigation(canGoBack: Bool, canGoForward: Bool) {
+      lock.withLock {
+        snapshot = Snapshot(
+          state: snapshot.state,
+          errorDetail: snapshot.errorDetail,
+          canGoBack: canGoBack,
+          canGoForward: canGoForward
+        )
       }
     }
 
     private struct Snapshot {
       let state: State
       let errorDetail: String?
+      let canGoBack: Bool
+      let canGoForward: Bool
     }
   }
 #endif

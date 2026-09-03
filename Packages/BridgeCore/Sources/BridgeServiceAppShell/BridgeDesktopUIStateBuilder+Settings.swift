@@ -110,7 +110,7 @@ extension BridgeDesktopUIStateBuilder {
           modelID: item.modelID,
           displayName: item.displayName,
           reasoningEfforts: item.supportedReasoningEfforts.map {
-            BridgeDesktopChoice(id: $0, title: reasoningTitle($0))
+            BridgeDesktopChoice(id: $0, title: BridgeDesktopPresentation.reasoningTitle($0))
           }
         )
       }
@@ -123,10 +123,12 @@ extension BridgeDesktopUIStateBuilder {
         modelOptions: modelOptions,
         effort: defaultValue.effort,
         effortOptions: selected?.supportedReasoningEfforts.map {
-          BridgeDesktopChoice(id: $0, title: reasoningTitle($0))
+          BridgeDesktopChoice(id: $0, title: BridgeDesktopPresentation.reasoningTitle($0))
         } ?? [],
         permissionMode: defaultValue.permissionMode,
-        permissionOptions: permissionOptions(for: provider.providerID),
+        permissionOptions: BridgeDesktopPresentation.agentPermissionOptions(
+          for: provider.providerID
+        ),
         canSave: model.connectionState == .connected,
         canRefreshModels: provider.supportsModelSelection
           && installation?.effectiveCapabilities.contains("selection.model") == true,
@@ -136,29 +138,7 @@ extension BridgeDesktopUIStateBuilder {
     }
   }
 
-  private static func permissionOptions(for providerID: String) -> [BridgeDesktopChoice] {
-    let writableID = providerID == "opencode" ? "build" : "workspace-write"
-    let readOnlyID =
-      providerID == "opencode" || providerID == "antigravity"
-      ? "plan" : "read-only"
-    let writableTitle = providerID == "opencode" ? "工作区可写（Build）" : "工作区可写"
-    let readOnlyTitle =
-      providerID == "opencode" || providerID == "antigravity"
-      ? "只读（Plan）" : "只读"
-    return [
-      BridgeDesktopChoice(id: writableID, title: writableTitle),
-      BridgeDesktopChoice(id: readOnlyID, title: readOnlyTitle),
-    ]
-  }
-
   private static func reasoningTitle(_ effort: String) -> String {
-    switch effort.lowercased() {
-    case "minimal": return "最低"
-    case "low": return "低"
-    case "medium": return "中"
-    case "high": return "高"
-    case "xhigh", "extra_high": return "极高"
-    default: return effort
-    }
+    BridgeDesktopPresentation.reasoningTitle(effort)
   }
 }

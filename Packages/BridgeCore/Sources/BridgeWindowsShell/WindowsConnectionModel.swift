@@ -10,6 +10,7 @@
 
     let client: any BridgeServiceClientProtocol
     let displayBox: AuxiliaryDisplayBox<WindowsConnectionDisplay>
+    let feedback: WindowsDesktopFeedbackStore
     var connectionState = WindowsWorkbenchDisplay.ConnectionState.idle
     var serviceStatus: IPCServiceStatusResponse?
     var clients: [IPCMCPClientStatus] = []
@@ -17,8 +18,12 @@
     var busy = false
     var statusText = "尚未读取 MCP 客户端状态。"
 
-    init(client: any BridgeServiceClientProtocol) {
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
       self.client = client
+      self.feedback = feedback
       displayBox = AuxiliaryDisplayBox(value: Self.emptyDisplay)
     }
 
@@ -55,10 +60,14 @@
       guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue else {
         return
       }
-      await mutate("正在更新 Qwen Studio 状态…") {
+      let enabled = !profile.enabled
+      await mutate(
+        "正在更新 Qwen Studio 状态…",
+        success: enabled ? "Qwen Studio 已启用。" : "Qwen Studio 已停用。"
+      ) {
         try await self.client.setMCPClientEnabled(
           clientID: profile.clientID,
-          enabled: !profile.enabled
+          enabled: enabled
         )
       }
     }
@@ -66,7 +75,10 @@
     func setSelectedExposure(at index: Int) async {
       guard Self.exposureModes.indices.contains(index), let profile = selectedClient else { return }
       let mode = Self.exposureModes[index]
-      await mutate("正在保存工具权限…") {
+      await mutate(
+        "正在保存工具权限…",
+        success: "工具权限已设置为：\(mode == .full ? "完整" : "只读")。"
+      ) {
         if profile.clientID == MCPClientID.chatGPT.rawValue {
           try await self.client.setExposureMode(mode)
         } else {
@@ -86,6 +98,7 @@
         return value
       } catch {
         statusText = "生成 Qwen 配置失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText, title: "配置生成失败")
         publishDisplay()
         return nil
       }
@@ -95,19 +108,24 @@
       guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue,
         profile.enabled
       else { return }
-      await mutate("正在重新生成 Qwen 凭证…") {
+      await mutate("正在重新生成 Qwen 凭证…", success: "Qwen 凭证已重新生成。") {
         try await self.client.rotateMCPClientCredential(clientID: profile.clientID)
       }
     }
 
     func rotateEndpoint() async {
-      await mutate("正在重新生成本地 MCP Endpoint…") {
+      await mutate("正在重新生成本地 MCP Endpoint…", success: "本地 MCP Endpoint 已重新生成。") {
         _ = try await self.client.rotateLocalMCPEndpoint()
       }
     }
 
     func didCopyConfiguration(_ success: Bool) {
       statusText = success ? "已复制 Qwen Studio JSON 配置。" : "复制 Qwen 配置失败。"
+      if success {
+        feedback.postToast(statusText)
+      } else {
+        feedback.postAlert(statusText, title: "复制失败")
+      }
       publishDisplay()
     }
 
@@ -117,12 +135,21 @@
 
     func didCopyEndpoint(_ success: Bool) {
       statusText = success ? "已复制本地 MCP Endpoint。" : "复制本地 MCP Endpoint 失败。"
+      if success {
+        feedback.postToast(statusText)
+      } else {
+        feedback.postAlert(statusText, title: "复制失败")
+      }
       publishDisplay()
     }
 
     func refreshDisplaySnapshot() { publishDisplay() }
 
-    func mutate(_ progress: String, action: () async throws -> Void) async {
+    func mutate(
+      _ progress: String,
+      success: String,
+      action: () async throws -> Void
+    ) async {
       guard connectionState == .connected, !busy else { return }
       busy = true
       statusText = progress
@@ -131,9 +158,13 @@
         try await action()
         busy = false
         await refresh()
+        statusText = success
+        feedback.postToast(success)
+        publishDisplay()
       } catch {
         busy = false
         statusText = "操作失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText, title: "连接操作失败")
         publishDisplay()
       }
     }

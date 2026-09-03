@@ -59,11 +59,8 @@
   }
 
   extension WindowsAgentDefaultsModel {
-    static func permissionValues(for providerID: String?) -> [String] {
-      guard let providerID else { return ["build", "plan"] }
-      return AgentProviderPresentation.identifier(providerID) == "opencode"
-        ? ["build", "plan"]
-        : ["workspace-write", "read-only"]
+    nonisolated static func permissionValues(for providerID: String?) -> [String] {
+      BridgeDesktopPresentation.agentPermissionOptions(for: providerID).map(\.id)
     }
   }
 #endif

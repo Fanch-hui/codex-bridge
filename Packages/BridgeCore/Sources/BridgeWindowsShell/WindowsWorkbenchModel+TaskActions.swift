@@ -18,7 +18,7 @@
     }
 
     public func selectTask(id: String) {
-      guard let task = tasks.first(where: { $0.taskID == id }) else { return }
+      guard let task = task(id: id) else { return }
       selectTask(task)
     }
 
@@ -44,89 +44,101 @@
     }
 
     public func stopSelectedTask() async {
-      guard connectionState == .connected else {
-        setActionText("后台 Service 未连接，无法停止任务。")
+      guard let selectedTaskID else {
+        reportFailure("当前没有可停止的任务。", taskID: nil)
         return
       }
-      guard let task = selectedTask, task.isActive else {
-        setActionText("当前没有可停止的任务。")
+      await stopTask(id: selectedTaskID)
+    }
+
+    public func stopTask(id taskID: String) async {
+      guard connectionState == .connected else {
+        reportFailure("后台 Service 未连接，无法停止任务。", taskID: taskID)
+        return
+      }
+      guard let task = task(id: taskID), task.isActive else {
+        reportFailure("当前任务不可停止。", taskID: taskID)
         return
       }
       let requestTaskID = task.taskID
-      actionText = "正在停止任务…"
-      publishDisplay()
+      setActionTextIfSelected("正在停止任务…", taskID: requestTaskID)
       do {
         try await client.stopTask(taskID: requestTaskID)
         await refreshTasks()
-        guard shouldApplyActionResult(for: requestTaskID) else { return }
-        setActionText("停止请求已发送。")
+        reportSuccess("停止请求已发送。", taskID: requestTaskID)
       } catch {
         let message = BridgeServiceErrorMessage.message(error)
         await loadTasks()
-        guard shouldApplyActionResult(for: requestTaskID) else { return }
-        setActionText("停止失败：\(message)")
+        reportFailure("停止失败：\(message)", taskID: requestTaskID)
       }
     }
 
     public func deleteSelectedTask() async {
-      guard connectionState == .connected else {
-        setActionText("后台 Service 未连接，无法删除任务。")
+      guard let selectedTaskID else {
+        reportFailure("只能删除已结束的任务。", taskID: nil)
         return
       }
-      guard let task = selectedTask, task.isTerminal else {
-        setActionText("只能删除已结束的任务。")
+      await deleteTask(id: selectedTaskID)
+    }
+
+    public func deleteTask(id taskID: String) async {
+      guard connectionState == .connected else {
+        reportFailure("后台 Service 未连接，无法删除任务。", taskID: taskID)
+        return
+      }
+      guard let task = task(id: taskID), task.isTerminal else {
+        reportFailure("只能删除已结束的任务。", taskID: taskID)
         return
       }
       let requestTaskID = task.taskID
-      actionText = "正在删除任务…"
-      publishDisplay()
+      setActionTextIfSelected("正在删除任务…", taskID: requestTaskID)
       do {
         try await client.deleteTask(taskID: requestTaskID)
-        guard selectedTaskID == requestTaskID else { return }
-        selectedTaskID = nil
-        selectedThreadID = nil
-        selectedThreadPage = nil
-        conversation?.cancel()
-        conversation = nil
+        let wasSelected = selectedTaskID == requestTaskID
+        if wasSelected { clearSelectedTask() }
         await refreshTasks()
-        setActionText("任务已删除。")
+        reportSuccess("任务已删除。", taskID: wasSelected ? nil : requestTaskID)
       } catch {
         let message = BridgeServiceErrorMessage.message(error)
         await loadTasks()
-        guard shouldApplyActionResult(for: requestTaskID) else { return }
-        setActionText("删除失败：\(message)")
+        reportFailure("删除失败：\(message)", taskID: requestTaskID)
       }
     }
 
     public func interruptSelectedTask() async {
-      guard connectionState == .connected else {
-        setActionText("后台 Service 未连接，无法中断任务。")
+      guard let selectedTaskID else {
+        reportFailure("请先选择要中断的任务。", taskID: nil)
         return
       }
-      guard let task = selectedTask else {
-        setActionText("请先选择要中断的任务。")
+      await interruptTask(id: selectedTaskID)
+    }
+
+    public func interruptTask(id taskID: String) async {
+      guard connectionState == .connected else {
+        reportFailure("后台 Service 未连接，无法中断任务。", taskID: taskID)
+        return
+      }
+      guard let task = task(id: taskID) else {
+        reportFailure("任务不存在或已经移除。", taskID: taskID)
         return
       }
       guard let expectedTurnID = task.expectedControlID else {
-        setActionText("当前任务不可中断。")
+        reportFailure("当前任务不可中断。", taskID: taskID)
         return
       }
       let requestTaskID = task.taskID
-      actionText = "正在发送中断请求…"
-      publishDisplay()
+      setActionTextIfSelected("正在发送中断请求…", taskID: requestTaskID)
       do {
         _ = try await client.interruptTask(
           taskID: requestTaskID,
           expectedTurnID: expectedTurnID
         )
         await refreshTasks()
-        guard shouldApplyActionResult(for: requestTaskID) else { return }
-        setActionText("中断请求已发送。")
+        reportSuccess("中断请求已发送。", taskID: requestTaskID)
       } catch {
         let message = BridgeServiceErrorMessage.message(error)
         await loadTasks()
-        guard shouldApplyActionResult(for: requestTaskID) else { return }
-        setActionText("中断失败：\(message)")
+        reportFailure("中断失败：\(message)", taskID: requestTaskID)
       }
     }
 
@@ -134,12 +146,24 @@
       input: String,
       mode: MCPTaskSteerMode = .queued
     ) async -> Bool {
-      guard connectionState == .connected else {
-        setActionText("后台 Service 未连接，无法发送 Steer。")
+      guard let selectedTaskID else {
+        reportFailure("请先选择要发送 Steer 的任务。", taskID: nil)
         return false
       }
-      guard let task = selectedTask else {
-        setActionText("请先选择要发送 Steer 的任务。")
+      return await submitSteer(taskID: selectedTaskID, input: input, mode: mode)
+    }
+
+    public func submitSteer(
+      taskID: String,
+      input: String,
+      mode: MCPTaskSteerMode = .queued
+    ) async -> Bool {
+      guard connectionState == .connected else {
+        reportFailure("后台 Service 未连接，无法发送 Steer。", taskID: taskID)
+        return false
+      }
+      guard let task = task(id: taskID) else {
+        reportFailure("任务不存在或已经移除。", taskID: taskID)
         return false
       }
       guard
@@ -148,7 +172,7 @@
           providerSupportsSteer: providerSupportsSteer(for: task)
         )
       else {
-        setActionText("当前任务不支持 Steer。")
+        reportFailure("当前任务不支持 Steer。", taskID: taskID)
         return false
       }
       if mode == .interruptCurrentThenContinue {
@@ -157,17 +181,16 @@
             agentInstallations.first(where: { $0.installationID == installationID })
           }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
         guard supportsImmediate else {
-          setActionText("当前 Agent 不支持立即 Steer。")
+          reportFailure("当前 Agent 不支持立即 Steer。", taskID: taskID)
           return false
         }
       }
       guard let validationMessage = TaskInspectorPresentation.steerValidationMessage(input)
       else {
-        actionText = "正在发送 Steer…"
-        publishDisplay()
+        setActionTextIfSelected("正在发送 Steer…", taskID: taskID)
         do {
           guard let expectedTurnID = task.expectedControlID else {
-            setActionText("当前任务已不在可 Steer 状态。")
+            reportFailure("当前任务已不在可 Steer 状态。", taskID: taskID)
             return false
           }
           let requestTaskID = task.taskID
@@ -178,18 +201,16 @@
             mode: mode
           )
           await refreshTasks()
-          guard shouldApplyActionResult(for: requestTaskID) else { return false }
-          setActionText("Steer 已发送。")
+          reportSuccess("Steer 已发送。", taskID: requestTaskID)
           return true
         } catch {
           let message = BridgeServiceErrorMessage.message(error)
           await loadTasks()
-          guard shouldApplyActionResult(for: task.taskID) else { return false }
-          setActionText("Steer 发送失败：\(message)")
+          reportFailure("Steer 发送失败：\(message)", taskID: task.taskID)
           return false
         }
       }
-      setActionText(validationMessage)
+      reportFailure(validationMessage, taskID: taskID)
       return false
     }
 
@@ -198,11 +219,37 @@
       publishDisplay()
     }
 
-    private func shouldApplyActionResult(for taskID: String) -> Bool {
-      TaskInspectorPresentation.shouldApplyTaskActionResult(
-        for: taskID,
-        selectedTaskID: selectedTaskID
-      )
+    private func setActionTextIfSelected(_ text: String, taskID: String) {
+      guard selectedTaskID == taskID else { return }
+      setActionText(text)
+    }
+
+    private func reportSuccess(_ text: String, taskID: String?) {
+      if let taskID { setActionTextIfSelected(text, taskID: taskID) }
+      feedback.postToast(text)
+    }
+
+    private func reportFailure(_ text: String, taskID: String?) {
+      if let taskID {
+        setActionTextIfSelected(text, taskID: taskID)
+      } else {
+        setActionText(text)
+      }
+      feedback.postAlert(text, title: "任务操作失败")
+    }
+
+    private func task(id: String) -> MCPServiceTaskSnapshot? {
+      tasks.first(where: { $0.taskID == id })
+    }
+
+    private func clearSelectedTask() {
+      selectedTaskID = nil
+      selectedThreadID = nil
+      selectedThreadPage = nil
+      conversation?.cancel()
+      conversation = nil
+      conversationWasTerminal = false
+      actionText = nil
     }
   }
 #endif

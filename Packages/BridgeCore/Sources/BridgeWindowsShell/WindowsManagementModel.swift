@@ -8,6 +8,7 @@
   final class WindowsManagementModel {
     let client: any BridgeServiceClientProtocol
     let displayBox: ManagementDisplayBox
+    let feedback: WindowsDesktopFeedbackStore
 
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var projects: [MCPProjectSummary] = []
@@ -23,8 +24,12 @@
     private var projectStatusText = "尚未加载项目。"
     private var agentStatusText = "尚未加载 Agent 目录。"
 
-    init(client: any BridgeServiceClientProtocol) {
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
       self.client = client
+      self.feedback = feedback
       let emptyProject = WindowsProjectManagementDisplay(
         rows: [],
         selectedIndex: nil,

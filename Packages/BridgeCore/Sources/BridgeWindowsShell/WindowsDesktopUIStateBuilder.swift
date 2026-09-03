@@ -16,9 +16,13 @@
       selectedNavigation: BridgeDesktopNavigation = .overview,
       isRefreshing: Bool = false,
       browserAvailable: Bool = true,
-      browserStatus: String? = nil
+      browserStatus: String? = nil,
+      browserCanGoBack: Bool = false,
+      browserCanGoForward: Bool = false,
+      feedback: BridgeDesktopFeedback? = nil
     ) -> BridgeDesktopUIState {
       BridgeDesktopUIState(
+        hostContext: BridgeDesktopHostContext(platform: .windows),
         navigation: navigation(
           workbench: workbench,
           management: management
@@ -27,6 +31,7 @@
         connectionLabel: connectionLabel(for: workbench.connectionState),
         connectionTone: connectionTone(for: workbench.connectionState),
         isRefreshing: isRefreshing,
+        feedback: feedback,
         overview: overview(
           workbench: workbench,
           management: management,
@@ -36,7 +41,9 @@
           workbench,
           management: management,
           browserAvailable: browserAvailable,
-          browserStatus: browserStatus
+          browserStatus: browserStatus,
+          browserCanGoBack: browserCanGoBack,
+          browserCanGoForward: browserCanGoForward
         ),
         projects: projectsPage(
           management: management,

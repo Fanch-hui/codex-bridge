@@ -245,14 +245,35 @@ try {
   if ($desktopUIReparseItems.Count -ne 0) {
     throw "BridgeDesktopUI resources cannot contain reparse points."
   }
-  foreach ($resourceName in @("index.html", "styles.css", "app.js")) {
+  $requiredDesktopUIResources = @(
+    "index.html",
+    "host-context.js",
+    "styles.css",
+    "pages.css",
+    "windows-theme.css",
+    "windows-components.css",
+    "feedback.js",
+    "pages-common.js",
+    "pages-workbench.js",
+    "pages-projects.js",
+    "pages-logs.js",
+    "pages-connections.js",
+    "pages-settings.js",
+    "pages.js",
+    "app.js"
+  )
+  foreach ($resourceName in $requiredDesktopUIResources) {
     Assert-RegularFile (Join-Path $desktopUIResourceDirectory $resourceName) | Out-Null
   }
   $stagedDesktopUIResourceDirectory = Join-Path $outFull $desktopUIResourceCandidates[0].Name
   Copy-Item -LiteralPath $desktopUIResourceDirectory -Destination $stagedDesktopUIResourceDirectory -Recurse -Force
   Assert-Directory $stagedDesktopUIResourceDirectory | Out-Null
-  foreach ($resourceName in @("index.html", "styles.css", "app.js")) {
+  foreach ($resourceName in $requiredDesktopUIResources) {
     Assert-RegularFile (Join-Path $stagedDesktopUIResourceDirectory $resourceName) | Out-Null
+  }
+  $iconSource = Join-Path $desktopUIResourceDirectory "AppIcon.ico"
+  if (Test-Path -LiteralPath $iconSource) {
+    Stage-File $iconSource "AppIcon.ico"
   }
 
   $packagePath = Join-Path $temporaryRoot "webview2-package.zip"

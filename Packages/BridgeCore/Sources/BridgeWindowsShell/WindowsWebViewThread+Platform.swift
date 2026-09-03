@@ -26,6 +26,29 @@
       if let webMessageHandler { _ = webView2Release(webMessageHandler) }
       webMessageHandler = nil
       hasWebMessageToken = false
+
+      if let webView, hasHistoryChangedToken {
+        let removeHandler: WebView2RemoveEventHandlerFn = webView2Method(
+          webView, WebView2Slot.webViewRemoveHistoryChanged,
+          as: WebView2RemoveEventHandlerFn.self
+        )
+        _ = removeHandler(webView, historyChangedToken)
+      }
+      if let historyChangedHandler { _ = webView2Release(historyChangedHandler) }
+      historyChangedHandler = nil
+      hasHistoryChangedToken = false
+
+      if let webView, hasNavigationCompletedToken {
+        let removeHandler: WebView2RemoveEventHandlerFn = webView2Method(
+          webView, WebView2Slot.webViewRemoveNavigationCompleted,
+          as: WebView2RemoveEventHandlerFn.self
+        )
+        _ = removeHandler(webView, navigationCompletedToken)
+      }
+      if let navigationCompletedHandler { _ = webView2Release(navigationCompletedHandler) }
+      navigationCompletedHandler = nil
+      hasNavigationCompletedToken = false
+
       if let controller {
         let close: WebView2ActionFn = webView2Method(
           controller, WebView2Slot.controllerClose, as: WebView2ActionFn.self)

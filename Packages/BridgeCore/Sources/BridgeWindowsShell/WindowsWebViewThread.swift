@@ -13,11 +13,15 @@
       static let postWebMessage = UINT(WM_APP + 5)
     }
 
+    typealias NavigationUpdate = @Sendable (Bool, Bool) -> Void
+
     private let parentWindow: HWND
     private let initialURL: String
     let profileName: String
+    let configuration: WindowsWebViewConfiguration
     private let updateState: StateUpdate
     private let onWebMessage: (@Sendable (String) -> Void)?
+    private let onNavigationChanged: NavigationUpdate?
     let lock = NSLock()
     let finished = CreateEventW(nil, true, false, nil)
     var threadID: DWORD = 0
@@ -34,30 +38,62 @@
     var webMessageHandler: UnsafeMutableRawPointer?
     var webMessageToken = WebView2EventRegistrationToken()
     var hasWebMessageToken = false
+    var historyChangedHandler: UnsafeMutableRawPointer?
+    var historyChangedToken = WebView2EventRegistrationToken()
+    var hasHistoryChangedToken = false
+    var navigationCompletedHandler: UnsafeMutableRawPointer?
+    var navigationCompletedToken = WebView2EventRegistrationToken()
+    var hasNavigationCompletedToken = false
     private var pendingWebMessage: String?
 
-    convenience init(parentWindow: HWND, updateState: @escaping StateUpdate) {
+    convenience init(
+      parentWindow: HWND,
+      updateState: @escaping StateUpdate,
+      onNavigationChanged: NavigationUpdate? = nil
+    ) {
       self.init(
         parentWindow: parentWindow,
-        initialURL: WindowsChatWebView.chatURL,
-        profileName: "WebView2",
+        configuration: .chatBrowser(),
         updateState: updateState,
-        onWebMessage: nil
+        onWebMessage: nil,
+        onNavigationChanged: onNavigationChanged
       )
     }
 
-    init(
+    convenience init(
       parentWindow: HWND,
       initialURL: String,
       profileName: String,
       updateState: @escaping StateUpdate,
       onWebMessage: (@Sendable (String) -> Void)?
     ) {
+      let config =
+        profileName == "DesktopUI"
+        ? WindowsWebViewConfiguration.desktopUI(initialURL: initialURL)
+        : WindowsWebViewConfiguration.chatBrowser(initialURL: initialURL)
+      self.init(
+        parentWindow: parentWindow,
+        configuration: config,
+        updateState: updateState,
+        onWebMessage: onWebMessage,
+        onNavigationChanged: nil
+      )
+    }
+
+    init(
+      parentWindow: HWND,
+      configuration: WindowsWebViewConfiguration,
+      updateState: @escaping StateUpdate,
+      onWebMessage: (@Sendable (String) -> Void)?,
+      onNavigationChanged: NavigationUpdate? = nil
+    ) {
       self.parentWindow = parentWindow
-      self.initialURL = initialURL
-      self.profileName = profileName
+      self.configuration = configuration
+      self.initialURL = configuration.initialURL
+      self.profileName = configuration.profileName
       self.updateState = updateState
       self.onWebMessage = onWebMessage
+      self.onNavigationChanged = onNavigationChanged
     }
 
     deinit {
@@ -195,6 +231,28 @@
       }
       self.controller = controller
       webView2AddRef(controller)
+
+      if let color = configuration.defaultBackgroundColor {
+        var controller2Pointer: UnsafeMutableRawPointer?
+        let qi: WebView2QueryInterfaceFn = webView2Method(
+          controller, 0, as: WebView2QueryInterfaceFn.self
+        )
+        var iid = iidController2
+        if qi(controller, &iid, &controller2Pointer) == webview2SOK,
+          let controller2 = controller2Pointer
+        {
+          defer { _ = webView2Release(controller2) }
+          let putColor: WebView2PutColorFn = webView2Method(
+            controller2, WebView2Slot.controller2PutDefaultBackgroundColor,
+            as: WebView2PutColorFn.self
+          )
+          _ = putColor(
+            controller2,
+            COREWEBVIEW2_COLOR(a: color.a, r: color.r, g: color.g, b: color.b).rawValue
+          )
+        }
+      }
+
       synchronizeController()
       var pointer: UnsafeMutableRawPointer?
       let getWebView: WebView2GetCoreWebView2Fn = webView2Method(
@@ -207,6 +265,45 @@
         return
       }
       self.webView = webView
+
+      if configuration.hasCustomSettings {
+        var settingsPointer: UnsafeMutableRawPointer?
+        let getSettings: WebView2GetSettingsFn = webView2Method(
+          webView, WebView2Slot.webViewGetSettings, as: WebView2GetSettingsFn.self
+        )
+        if getSettings(webView, &settingsPointer) == webview2SOK, let settings = settingsPointer {
+          defer { _ = webView2Release(settings) }
+          if configuration.disableDefaultContextMenu {
+            let put: WebView2PutBoolFn = webView2Method(
+              settings, WebView2Slot.settingsPutAreDefaultContextMenusEnabled,
+              as: WebView2PutBoolFn.self
+            )
+            _ = put(settings, false)
+          }
+          if configuration.disableStatusBar {
+            let put: WebView2PutBoolFn = webView2Method(
+              settings, WebView2Slot.settingsPutIsStatusBarEnabled,
+              as: WebView2PutBoolFn.self
+            )
+            _ = put(settings, false)
+          }
+          if configuration.disableDevTools {
+            let put: WebView2PutBoolFn = webView2Method(
+              settings, WebView2Slot.settingsPutAreDevToolsEnabled,
+              as: WebView2PutBoolFn.self
+            )
+            _ = put(settings, false)
+          }
+          if configuration.disableZoomControl {
+            let put: WebView2PutBoolFn = webView2Method(
+              settings, WebView2Slot.settingsPutIsZoomControlEnabled,
+              as: WebView2PutBoolFn.self
+            )
+            _ = put(settings, false)
+          }
+        }
+      }
+
       if onWebMessage != nil {
         let handler = webView2WebMessageHandler { [weak self] _, args in
           guard let json = webView2ReadWebMessageJSON(args) else { return }
@@ -227,6 +324,41 @@
         webMessageToken = token
         hasWebMessageToken = true
       }
+
+      if onNavigationChanged != nil {
+        let historyHandler = webView2HistoryChangedHandler { [weak self] _, _ in
+          self?.syncNavigationState()
+        }
+        var hToken = WebView2EventRegistrationToken()
+        let addHistory: WebView2AddEventHandlerFn = webView2Method(
+          webView, WebView2Slot.webViewAddHistoryChanged,
+          as: WebView2AddEventHandlerFn.self
+        )
+        if addHistory(webView, historyHandler, &hToken) == webview2SOK {
+          historyChangedHandler = historyHandler
+          historyChangedToken = hToken
+          hasHistoryChangedToken = true
+        } else {
+          _ = webView2Release(historyHandler)
+        }
+
+        let navHandler = webView2NavigationCompletedHandler { [weak self] _, _ in
+          self?.syncNavigationState()
+        }
+        var nToken = WebView2EventRegistrationToken()
+        let addNav: WebView2AddEventHandlerFn = webView2Method(
+          webView, WebView2Slot.webViewAddNavigationCompleted,
+          as: WebView2AddEventHandlerFn.self
+        )
+        if addNav(webView, navHandler, &nToken) == webview2SOK {
+          navigationCompletedHandler = navHandler
+          navigationCompletedToken = nToken
+          hasNavigationCompletedToken = true
+        } else {
+          _ = webView2Release(navHandler)
+        }
+      }
+
       let navigate: WebView2NavigateFn = webView2Method(
         webView,
         WebView2Slot.webViewNavigate,
@@ -236,6 +368,23 @@
         navigate(webView, $0)
       }
       updateState(.active, nil)
+    }
+
+    func syncNavigationState() {
+      guard let webView else { return }
+      var canGoBackInt: Int32 = 0
+      var canGoForwardInt: Int32 = 0
+      let getCanGoBack: WebView2GetBoolFn = webView2Method(
+        webView, WebView2Slot.webViewGetCanGoBack, as: WebView2GetBoolFn.self
+      )
+      let getCanGoForward: WebView2GetBoolFn = webView2Method(
+        webView, WebView2Slot.webViewGetCanGoForward, as: WebView2GetBoolFn.self
+      )
+      _ = getCanGoBack(webView, &canGoBackInt)
+      _ = getCanGoForward(webView, &canGoForwardInt)
+      let canGoBack = canGoBackInt != 0
+      let canGoForward = canGoForwardInt != 0
+      onNavigationChanged?(canGoBack, canGoForward)
     }
 
     private func handle(_ message: UINT) {

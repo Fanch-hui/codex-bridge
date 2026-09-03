@@ -18,6 +18,21 @@
     0x6C48_19F3, 0xC9B7, 0x4260,
     (0x81, 0x27, 0xC9, 0xF5, 0xBD, 0xE7, 0xF6, 0x8C)
   )
+  let iidController2 = makeGUID(
+    0xC979_903E, 0xD4CA, 0x4228,
+    (0x92, 0xEB, 0x47, 0xEE, 0x3F, 0xA9, 0x6E, 0xAB)
+  )
+
+  struct COREWEBVIEW2_COLOR {
+    var a: UInt8
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8
+
+    var rawValue: UInt32 {
+      UInt32(a) | (UInt32(r) << 8) | (UInt32(g) << 16) | (UInt32(b) << 24)
+    }
+  }
 
   private func makeGUID(
     _ data1: UInt32,
@@ -56,14 +71,64 @@
     static let controllerPutBounds = 6
     static let controllerClose = 24
     static let controllerGetCoreWebView2 = 25
+    static let controller2PutDefaultBackgroundColor = 27
+    static let webViewGetSettings = 3
     static let webViewNavigate = 5
+    static let webViewAddHistoryChanged = 13
+    static let webViewRemoveHistoryChanged = 14
+    static let webViewAddNavigationCompleted = 15
+    static let webViewRemoveNavigationCompleted = 16
     static let webViewReload = 31
     static let webViewGoBack = 40
     static let webViewGoForward = 41
     static let webViewPostWebMessageAsJSON = 32
     static let webViewAddWebMessageReceived = 34
     static let webViewRemoveWebMessageReceived = 35
+    static let webViewGetCanGoBack = 38
+    static let webViewGetCanGoForward = 39
+    static let settingsPutIsStatusBarEnabled = 10
+    static let settingsPutAreDevToolsEnabled = 12
+    static let settingsPutAreDefaultContextMenusEnabled = 14
+    static let settingsPutIsZoomControlEnabled = 18
   }
+
+  typealias WebView2QueryInterfaceFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafePointer<GUID>?,
+      UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+    ) -> HRESULT
+
+  typealias WebView2GetSettingsFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+    ) -> HRESULT
+
+  typealias WebView2PutColorFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UInt32
+    ) -> HRESULT
+
+  typealias WebView2GetBoolFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<Int32>?
+    ) -> HRESULT
+
+  typealias WebView2AddEventHandlerFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<WebView2EventRegistrationToken>?
+    ) -> HRESULT
+
+  typealias WebView2RemoveEventHandlerFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      WebView2EventRegistrationToken
+    ) -> HRESULT
 
   typealias WebView2EventRegistrationToken = Int64
 

@@ -60,6 +60,7 @@
     func saveDefaults(model: String, permissionMode: String, effort: String) async {
       guard let providerID = selectedProviderID, let installationID = selectedInstallationID else {
         statusText = "请选择可用的 Agent 安装。"
+        feedback.postAlert(statusText, title: "Agent 默认设置无法保存")
         publishDisplay()
         return
       }
@@ -124,9 +125,11 @@
           catalog: modelCatalogs[providerID] ?? []
         )
         statusText = "\(providerName(providerID)) 默认设置已保存。"
+        feedback.postToast(statusText)
       } catch {
         statusText = "Agent 默认设置保存失败：\(BridgeServiceErrorMessage.message(error))"
         providerErrors[providerID] = statusText
+        feedback.postAlert(statusText)
       }
     }
 

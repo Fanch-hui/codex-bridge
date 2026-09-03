@@ -75,6 +75,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case unregisterService
   case setKeepServiceRunning
   case updateBrowserViewport
+  case dismissFeedback
 }
 
 public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
@@ -90,6 +91,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let logID: String?
   public let commandID: String?
   public let ruleID: String?
+  public let feedbackID: String?
   public let decision: String?
   public let input: String?
   public let mode: String?
@@ -139,6 +141,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     logID: String? = nil,
     commandID: String? = nil,
     ruleID: String? = nil,
+    feedbackID: String? = nil,
     decision: String? = nil,
     input: String? = nil,
     mode: String? = nil,
@@ -187,6 +190,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.logID = logID
     self.commandID = commandID
     self.ruleID = ruleID
+    self.feedbackID = feedbackID
     self.decision = decision
     self.input = input
     self.mode = mode

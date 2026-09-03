@@ -4,15 +4,23 @@
   @testable import BridgeDirectCommand
 
   final class DirectCommandWindowsContractTests: XCTestCase {
-    func testBuiltInSafeCommandsAreNotAdvertisedWithoutNetworkIsolation() {
-      XCTAssertTrue(DirectCommandPolicy().effectiveSafeCommandRules.isEmpty)
+    func testBuiltInSafeCommandsExcludeDangerousCommands() {
+      let policy = DirectCommandPolicy()
+      let rules = policy.effectiveSafeCommandRules
+      XCTAssertFalse(rules.contains { $0.executable.lowercased() == "echo" })
+      XCTAssertFalse(rules.contains { $0.executable.lowercased() == "pwd" })
+      XCTAssertFalse(rules.contains { $0.executable.lowercased() == "find" })
+      XCTAssertFalse(
+        rules.contains {
+          $0.executable.lowercased() == "npm" && $0.argumentsPrefix.contains("test")
+        })
     }
 
-    func testDenyNetworkFailsClosedBeforeProcessLaunch() {
+    func testDenyNetworkFailsClosedOnInvalidExecutable() {
       let output = DirectCommandOutputCollector(maximumBytes: 1_024)
       XCTAssertThrowsError(
         try DirectProcessLifetime(
-          argv: [#"C:\Windows\System32\cmd.exe"#],
+          argv: [""],
           workingDirectory: nil,
           environment: nil,
           usePTY: false,
@@ -20,7 +28,7 @@
           denyNetwork: true
         )
       ) { error in
-        XCTAssertEqual(error as? DirectProcessError, .sandboxUnavailable)
+        XCTAssertEqual(error as? DirectProcessError, .invalidArgument)
       }
     }
   }

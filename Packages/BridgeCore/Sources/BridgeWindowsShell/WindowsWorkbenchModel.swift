@@ -141,6 +141,7 @@
     public let displayBox = WorkbenchDisplayBox()
 
     let client: any BridgeServiceClientProtocol
+    let feedback: WindowsDesktopFeedbackStore
     var serviceStatus: IPCServiceStatusResponse?
     var projects: [MCPProjectSummary] = []
     var agentProviders: [IPCAgentProviderSummary] = []
@@ -164,7 +165,12 @@
     var approvalStatusText: String?
     var approvalRefreshInProgress = false
 
-    public init() {
+    public convenience init() {
+      self.init(feedback: WindowsDesktopFeedbackStore())
+    }
+
+    init(feedback: WindowsDesktopFeedbackStore) {
+      self.feedback = feedback
       client = BridgeServiceClient(transport: ServiceTransportFactory.defaultTransport())
       publishDisplay()
     }

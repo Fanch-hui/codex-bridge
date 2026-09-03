@@ -28,9 +28,9 @@
           effort: defaults?.effort,
           effortOptions: efforts.map(Self.effortChoice),
           permissionMode: permissionMode(defaults, providerID: provider.providerID),
-          permissionOptions: Self.permissionValues(for: provider.providerID).map {
-            Self.permissionChoice($0)
-          },
+          permissionOptions: BridgeDesktopPresentation.agentPermissionOptions(
+            for: provider.providerID
+          ),
           canSave: connectionState == .connected && !busy && installation != nil,
           canRefreshModels: provider.supportsModelSelection
             && installation?.effectiveCapabilities.contains("selection.model") == true,
@@ -50,32 +50,10 @@
     }
 
     private static func effortChoice(_ value: String) -> BridgeDesktopChoice {
-      let title: String
-      switch value {
-      case "": title = "Provider 默认"
-      case "none": title = "无"
-      case "minimal": title = "最低"
-      case "low": title = "低"
-      case "medium": title = "中"
-      case "high": title = "高"
-      case "xhigh", "extra_high": title = "极高"
-      case "max": title = "最高"
-      case "ultra": title = "Ultra"
-      default: title = value
-      }
-      return BridgeDesktopChoice(id: value, title: title)
-    }
-
-    private static func permissionChoice(_ value: String) -> BridgeDesktopChoice {
-      let title: String
-      switch value {
-      case "build": title = "工作区可写（Build）"
-      case "plan": title = "只读（Plan）"
-      case "workspace-write": title = "工作区可写"
-      case "read-only": title = "只读"
-      default: title = value
-      }
-      return BridgeDesktopChoice(id: value, title: title)
+      BridgeDesktopChoice(
+        id: value,
+        title: BridgeDesktopPresentation.extendedReasoningTitle(value)
+      )
     }
   }
 #endif

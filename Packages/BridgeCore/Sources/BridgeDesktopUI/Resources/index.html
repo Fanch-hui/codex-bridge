@@ -6,8 +6,11 @@
     <meta name="color-scheme" content="light dark">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
     <title>Codex Bridge</title>
+    <script src="host-context.js"></script>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="pages.css">
+    <link rel="stylesheet" href="windows-theme.css">
+    <link rel="stylesheet" href="windows-components.css">
   </head>
   <body>
     <div class="app-shell" id="app-shell" data-state="loading">
@@ -109,6 +112,7 @@
         </div>
       </main>
     </div>
+    <div class="feedback-layer" id="feedback-layer" hidden></div>
     <script src="pages-common.js"></script>
     <script src="pages-workbench.js"></script>
     <script src="pages-projects.js"></script>
@@ -116,6 +120,7 @@
     <script src="pages-connections.js"></script>
     <script src="pages-settings.js"></script>
     <script src="pages.js"></script>
+    <script src="feedback.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -36,21 +36,19 @@
         model.selectTask(id: taskID)
         return true
       case .interruptTask(let taskID):
-        guard model.selectedTaskID == taskID else { return true }
-        Task { @MainActor in await model.interruptSelectedTask() }
+        Task { @MainActor in await model.interruptTask(id: taskID) }
         return true
       case .stopTask(let taskID):
-        guard model.selectedTaskID == taskID else { return true }
-        Task { @MainActor in await model.stopSelectedTask() }
+        Task { @MainActor in await model.stopTask(id: taskID) }
         return true
       case .deleteTask(let taskID):
-        guard model.selectedTaskID == taskID else { return true }
-        Task { @MainActor in await model.deleteSelectedTask() }
+        Task { @MainActor in await model.deleteTask(id: taskID) }
         return true
       case .steerTask(let taskID, let input, let mode):
-        guard model.selectedTaskID == taskID, let steerMode = MCPTaskSteerMode(rawValue: mode)
-        else { return true }
-        Task { @MainActor in _ = await model.submitSteer(input: input, mode: steerMode) }
+        guard let steerMode = MCPTaskSteerMode(rawValue: mode) else { return true }
+        Task { @MainActor in
+          _ = await model.submitSteer(taskID: taskID, input: input, mode: steerMode)
+        }
         return true
       case .resolveTaskApproval(let approvalID, let taskID, let decision):
         return resolveTaskApproval(
@@ -199,23 +197,11 @@
           )
         }
         return true
-      case .saveSettingsExecutionPreferences(
-        let executionModel,
-        let executionEffort,
-        let accessMode,
-        let fastModeEnabled
-      ):
-        guard let current = auxiliary.settings.preferences else { return true }
-        let next = IPCModelPreferences(
-          executionModel: executionModel,
-          executionEffort: executionEffort,
-          supervisorModel: current.supervisorModel,
-          supervisorEffort: current.supervisorEffort,
-          supervisorEnabled: false,
-          accessMode: accessMode,
-          fastModeEnabled: fastModeEnabled
-        )
-        Task { @MainActor in await auxiliary.settings.savePreferences(next) }
+      case .patchSettings(let patch):
+        Task { @MainActor in await auxiliary.settings.applyPreferencesPatch(patch) }
+        return true
+      case .dismissFeedback(let id):
+        model.feedback.dismiss(id: id)
         return true
       case .updateBrowserViewport(let viewport):
         WindowsMainWindow.applyBrowserViewport(viewport)

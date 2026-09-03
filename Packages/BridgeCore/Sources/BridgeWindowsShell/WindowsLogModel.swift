@@ -9,6 +9,7 @@
   final class WindowsLogModel {
     let client: any BridgeServiceClientProtocol
     let displayBox: AuxiliaryDisplayBox<WindowsLogDisplay>
+    let feedback: WindowsDesktopFeedbackStore
 
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var items: [TaskLogPresentation.Item] = []
@@ -22,8 +23,12 @@
     private var busy = false
     private var statusText = "尚未加载任务日志。"
 
-    init(client: any BridgeServiceClientProtocol) {
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
       self.client = client
+      self.feedback = feedback
       displayBox = AuxiliaryDisplayBox(
         value: WindowsLogDisplay(
           connectionState: .idle,
@@ -48,7 +53,10 @@
       busy = true
       statusText = "正在读取任务日志…"
       publishDisplay()
-      defer { busy = false }
+      defer {
+        busy = false
+        publishDisplay()
+      }
       do {
         _ = try await client.status()
         connectionState = .connected
@@ -101,6 +109,11 @@
 
     func didCopy(_ success: Bool) {
       statusText = success ? "已复制 \(filteredItems.count) 条日志记录。" : "复制日志失败。"
+      if success {
+        feedback.postToast(statusText)
+      } else {
+        feedback.postAlert(statusText, title: "复制失败")
+      }
       publishDisplay()
     }
 

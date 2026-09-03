@@ -28,6 +28,7 @@
         management: management
       )
 
+      XCTAssertEqual(state.hostContext?.platform, .windows)
       XCTAssertEqual(state.connectionTone, .success)
       XCTAssertEqual(state.overview?.metrics.first(where: { $0.id == "running-tasks" })?.value, "2")
       XCTAssertEqual(state.overview?.metrics.first(where: { $0.id == "total-tasks" })?.value, "7")
@@ -71,6 +72,12 @@
     }
 
     func testSharedCommandsRouteToStablePageAndTaskIdentifiers() {
+      let refresh = BridgeDesktopCommandEnvelope(
+        requestID: "refresh-1",
+        command: .refresh
+      )
+      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: refresh), .refreshAll)
+
       let page = BridgeDesktopCommandEnvelope(
         requestID: "page-1",
         command: .selectPage,
@@ -145,6 +152,64 @@
           effort: nil
         )
       )
+
+      let executionModel = BridgeDesktopCommandEnvelope(
+        requestID: "settings-1",
+        command: .setExecutionModel,
+        payload: .init(modelID: "gpt-5.6")
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: executionModel),
+        .patchSettings(BridgeDesktopSettingsPatch(executionModel: "gpt-5.6"))
+      )
+
+      let fastMode = BridgeDesktopCommandEnvelope(
+        requestID: "settings-2",
+        command: .setFastMode,
+        payload: .init(fastModeEnabled: true)
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: fastMode),
+        .patchSettings(BridgeDesktopSettingsPatch(fastModeEnabled: true))
+      )
+
+      let dismiss = BridgeDesktopCommandEnvelope(
+        requestID: "feedback-1",
+        command: .dismissFeedback,
+        payload: .init(feedbackID: "windows-feedback-7")
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: dismiss),
+        .dismissFeedback(id: "windows-feedback-7")
+      )
+    }
+
+    func testWindowsKeepsSupervisorClosedAndUsesSharedAgentPermissions() {
+      XCTAssertEqual(
+        WindowsAgentDefaultsModel.permissionValues(for: "antigravity"),
+        ["workspace-write", "plan"]
+      )
+      XCTAssertEqual(
+        WindowsAgentDefaultsModel.permissionValues(for: "opencode"),
+        ["build", "plan"]
+      )
+
+      for command in [
+        BridgeDesktopCommand.setSupervisorModel,
+        .setSupervisorEffort,
+        .setSupervisorEnabled,
+      ] {
+        let envelope = BridgeDesktopCommandEnvelope(
+          requestID: "supervisor-\(command.rawValue)",
+          command: command,
+          payload: .init(
+            supervisorModel: "forbidden-model",
+            supervisorEffort: "high",
+            supervisorEnabled: true
+          )
+        )
+        XCTAssertNil(WindowsDesktopUICommandRouter.command(for: envelope))
+      }
     }
 
     func testTunnelCommandsRouteToServiceBackedWindowCommands() {
@@ -192,5 +257,6 @@
         XCTAssertNil(WindowsDesktopUICommandRouter.command(for: envelope))
       }
     }
+
   }
 #endif

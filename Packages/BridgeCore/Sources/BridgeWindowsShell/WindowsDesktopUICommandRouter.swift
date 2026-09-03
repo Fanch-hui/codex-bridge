@@ -9,7 +9,7 @@
       case .ready:
         return nil
       case .refresh:
-        return .refreshCurrentPage
+        return .refreshAll
       case .selectPage:
         return payload.navigation.map(select)
       case .openWorkbench:
@@ -229,20 +229,38 @@
           let executionEffort = payload.executionEffort,
           let accessMode = nonEmpty(payload.accessMode)
         else { return nil }
-        return .saveSettingsExecutionPreferences(
-          executionModel: executionModel,
-          executionEffort: executionEffort,
-          accessMode: accessMode,
-          fastModeEnabled: payload.fastModeEnabled ?? false
+        return .patchSettings(
+          BridgeDesktopSettingsPatch(
+            executionModel: executionModel,
+            executionEffort: executionEffort,
+            accessMode: accessMode,
+            fastModeEnabled: payload.fastModeEnabled ?? false
+          )
         )
       case .saveCustomInstructions:
         return .saveSettingsInstructions(text: payload.value ?? payload.input ?? "")
-      case .setExecutionModel, .setExecutionEffort, .setAccessMode, .setFastMode,
-        .setSupervisorModel, .setSupervisorEffort, .setSupervisorEnabled,
+      case .setExecutionModel:
+        return nonEmpty(payload.modelID ?? payload.executionModel).map {
+          .patchSettings(BridgeDesktopSettingsPatch(executionModel: $0))
+        }
+      case .setExecutionEffort:
+        return nonEmpty(payload.effort ?? payload.executionEffort).map {
+          .patchSettings(BridgeDesktopSettingsPatch(executionEffort: $0))
+        }
+      case .setAccessMode:
+        return nonEmpty(payload.accessMode).map {
+          .patchSettings(BridgeDesktopSettingsPatch(accessMode: $0))
+        }
+      case .setFastMode:
+        guard let enabled = payload.fastModeEnabled ?? payload.enabled else { return nil }
+        return .patchSettings(BridgeDesktopSettingsPatch(fastModeEnabled: enabled))
+      case .setSupervisorModel, .setSupervisorEffort, .setSupervisorEnabled,
         .registerService, .unregisterService, .setKeepServiceRunning:
         return nil
       case .updateBrowserViewport:
         return payload.viewport.map(MainWindowCommand.updateBrowserViewport)
+      case .dismissFeedback:
+        return nonEmpty(payload.feedbackID).map(MainWindowCommand.dismissFeedback)
       }
     }
 
@@ -269,27 +287,4 @@
     }
   }
 
-  extension WindowsMainPage {
-    init(_ navigation: BridgeDesktopNavigation) {
-      switch navigation {
-      case .overview: self = .overview
-      case .workbench: self = .workbench
-      case .projects: self = .projects
-      case .logs: self = .logs
-      case .connections: self = .connections
-      case .settings: self = .settings
-      }
-    }
-
-    var desktopNavigation: BridgeDesktopNavigation {
-      switch self {
-      case .overview: .overview
-      case .workbench: .workbench
-      case .projects: .projects
-      case .logs: .logs
-      case .connections: .connections
-      case .settings: .settings
-      }
-    }
-  }
 #endif

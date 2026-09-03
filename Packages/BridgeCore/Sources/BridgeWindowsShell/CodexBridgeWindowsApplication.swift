@@ -9,9 +9,10 @@
     static var selectedPage = WindowsMainPage.overview
 
     public static func main() async {
-      let model = WindowsWorkbenchModel()
-      let management = WindowsManagementModel(client: model.client)
-      let auxiliary = WindowsAuxiliaryRuntime(client: model.client)
+      let feedback = WindowsDesktopFeedbackStore()
+      let model = WindowsWorkbenchModel(feedback: feedback)
+      let management = WindowsManagementModel(client: model.client, feedback: feedback)
+      let auxiliary = WindowsAuxiliaryRuntime(client: model.client, feedback: feedback)
       let ui = WindowsUIThread.shared
       guard
         ui.start(),
@@ -58,13 +59,8 @@
         selectedPage = page
         onUI { WindowsMainWindow.selectPage(page) }
         refresh(page: page, model: model, management: management, auxiliary: auxiliary)
-      case .refreshCurrentPage:
-        refresh(
-          page: selectedPage,
-          model: model,
-          management: management,
-          auxiliary: auxiliary
-        )
+      case .refreshAll:
+        refreshAll(model: model, management: management, auxiliary: auxiliary)
       case .openTask(let id):
         model.selectTask(id: id)
         selectedPage = .workbench
@@ -194,6 +190,18 @@
       case .settings:
         auxiliary.run(.refreshSettings)
         auxiliary.run(.refreshAgentDefaults)
+      }
+    }
+
+    private static func refreshAll(
+      model: WindowsWorkbenchModel,
+      management: WindowsManagementModel,
+      auxiliary: WindowsAuxiliaryRuntime
+    ) {
+      Task {
+        await model.connectAndRefresh()
+        await management.refresh()
+        await auxiliary.refreshAll()
       }
     }
 

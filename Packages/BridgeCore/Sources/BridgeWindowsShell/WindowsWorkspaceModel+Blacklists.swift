@@ -11,8 +11,7 @@
 
     func saveBlacklist(executable: String, pattern: String) async {
       guard let projectID = selectedProjectID, detail?.directWorkspace != nil else {
-        statusText = "当前项目没有可编辑的 Direct 工作区。"
-        publishDisplay()
+        reportFailure("当前项目没有可编辑的 Direct 工作区。")
         return
       }
       let draft = BridgeBlacklistDraft(executable: executable, pattern: pattern)
@@ -20,15 +19,17 @@
         !draft.executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
           || !draft.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       else {
-        statusText = "黑名单的可执行文件或参数子串至少填写一项。"
-        publishDisplay()
+        reportFailure("黑名单的可执行文件或参数子串至少填写一项。")
         return
       }
       guard connectionState == .connected, !busy else { return }
       busy = true
       statusText = "正在保存黑名单规则…"
       publishDisplay()
-      defer { busy = false }
+      defer {
+        busy = false
+        publishDisplay()
+      }
       var next = blacklists
       if let index = next.firstIndex(where: { $0.id == selectedBlacklistID }) {
         next[index] = draft
@@ -43,11 +44,10 @@
         )
         selectedBlacklistID = draft.id
         syncWorkspace()
-        statusText = "黑名单规则已保存。"
+        reportSuccess("黑名单规则已保存。")
       } catch {
-        statusText = "黑名单保存失败：\(BridgeServiceErrorMessage.message(error))"
+        reportFailure("黑名单保存失败：\(BridgeServiceErrorMessage.message(error))")
       }
-      publishDisplay()
     }
 
     func removeSelectedBlacklist() async {
@@ -57,7 +57,10 @@
       busy = true
       statusText = "正在移除黑名单规则…"
       publishDisplay()
-      defer { busy = false }
+      defer {
+        busy = false
+        publishDisplay()
+      }
       do {
         detail = try await client.updateProjectCommands(
           projectID: projectID,
@@ -69,11 +72,10 @@
         )
         self.selectedBlacklistID = nil
         syncWorkspace()
-        statusText = "黑名单规则已移除。"
+        reportSuccess("黑名单规则已移除。")
       } catch {
-        statusText = "移除黑名单失败：\(BridgeServiceErrorMessage.message(error))"
+        reportFailure("移除黑名单失败：\(BridgeServiceErrorMessage.message(error))")
       }
-      publishDisplay()
     }
 
     func reconcileBlacklistSelection() {

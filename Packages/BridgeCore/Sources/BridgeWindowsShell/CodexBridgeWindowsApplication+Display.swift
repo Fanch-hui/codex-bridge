@@ -1,6 +1,21 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import Foundation
   import WinSDK
+
+  private struct WindowsDesktopRenderSnapshot: Equatable, Sendable {
+    let state: BridgeDesktopUIState
+    let chatSlotEnabled: Bool
+    let runningTaskCount: Int
+    let pendingApprovalCount: Int
+    let desktopState: WindowsChatWebView.State
+    let desktopErrorDetail: String?
+    let desktopReady: Bool
+    let desktopLoadStalled: Bool
+  }
+
+  @MainActor
+  private var lastWindowsDesktopRenderSnapshot: WindowsDesktopRenderSnapshot? = nil
 
   extension CodexBridgeWindowsApplication {
     static func applyDisplay(
@@ -15,39 +30,53 @@
       let auxiliarySnapshot = auxiliary.desktopDisplaySnapshot()
       let display = model.displayBox.current()
       let managementDisplay = management.displayBox.current()
+      let chatSlotEnabled = chat.state == .active && display.browserEnabled
+      let state = WindowsDesktopUIStateBuilder.build(
+        workbench: display,
+        management: managementDisplay,
+        workspace: auxiliarySnapshot.workspace,
+        logs: auxiliarySnapshot.logs,
+        connections: auxiliarySnapshot.connections,
+        settings: auxiliarySnapshot.settings,
+        agentDefaults: auxiliarySnapshot.agentDefaults,
+        selectedNavigation: selectedPage.desktopNavigation,
+        browserAvailable: chat.state == .active,
+        browserStatus: browserStatus(for: chat),
+        browserCanGoBack: chat.canGoBack,
+        browserCanGoForward: chat.canGoForward,
+        feedback: model.feedback.current
+      )
+      let snapshot = WindowsDesktopRenderSnapshot(
+        state: state,
+        chatSlotEnabled: chatSlotEnabled,
+        runningTaskCount: display.runningTaskCount,
+        pendingApprovalCount: display.pendingApprovalCount,
+        desktopState: desktopUI.state,
+        desktopErrorDetail: desktopUI.errorDetail,
+        desktopReady: desktopUI.isReady,
+        desktopLoadStalled: desktopUI.loadStalled
+      )
+      guard snapshot != lastWindowsDesktopRenderSnapshot else { return }
+      lastWindowsDesktopRenderSnapshot = snapshot
       WindowsUIThread.shared.enqueue {
         applyOnUI(
-          workbench: display,
-          management: managementDisplay,
-          auxiliary: auxiliarySnapshot,
-          chat: chat,
+          snapshot: snapshot,
           desktopUI: desktopUI
         )
       }
     }
 
     private nonisolated static func applyOnUI(
-      workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay,
-      auxiliary: WindowsAuxiliaryDisplaySnapshot,
-      chat: WindowsChatWebView,
+      snapshot: WindowsDesktopRenderSnapshot,
       desktopUI: WindowsDesktopUIWebView
     ) {
-      desktopUI.setState(
-        WindowsDesktopUIStateBuilder.build(
-          workbench: workbench,
-          management: management,
-          workspace: auxiliary.workspace,
-          logs: auxiliary.logs,
-          connections: auxiliary.connections,
-          settings: auxiliary.settings,
-          agentDefaults: auxiliary.agentDefaults,
-          selectedNavigation: WindowsMainWindow.currentPage().desktopNavigation,
-          browserAvailable: chat.state == .active,
-          browserStatus: browserStatus(for: chat)
-        )
+      desktopUI.setState(snapshot.state)
+      WindowsMainWindow.setChatSlotEnabled(snapshot.chatSlotEnabled)
+      WindowsMainWindowChrome.updateStatus(
+        connectionLabel: snapshot.state.connectionLabel,
+        runningTasks: snapshot.runningTaskCount,
+        pendingApprovals: snapshot.pendingApprovalCount
       )
-      WindowsMainWindow.setChatSlotEnabled(chat.state == .active && workbench.browserEnabled)
       WindowsMainWindow.refreshSurfaces()
     }
 

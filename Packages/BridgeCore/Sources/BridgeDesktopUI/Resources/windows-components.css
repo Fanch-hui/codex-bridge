@@ -1,0 +1,210 @@
+:root[data-platform="windows"] .page-card,
+:root[data-platform="windows"] .list-panel,
+:root[data-platform="windows"] .detail-panel,
+:root[data-platform="windows"] .browser-pane,
+:root[data-platform="windows"] .inspector-pane,
+:root[data-platform="windows"] .summary-card,
+:root[data-platform="windows"] .log-row {
+  border-color: var(--separator);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-platform="windows"] .button {
+  min-height: 32px;
+  border-color: var(--separator);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: background-color 120ms ease, border-color 120ms ease, transform 80ms ease;
+}
+
+:root[data-platform="windows"] .button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--separator));
+  background: var(--surface-muted);
+}
+
+:root[data-platform="windows"] .button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:root[data-platform="windows"] .button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: none;
+}
+
+:root[data-platform="windows"] .button.primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 88%, black);
+  background: color-mix(in srgb, var(--accent) 88%, black);
+}
+
+:root[data-platform="windows"] .button:disabled {
+  color: var(--text-tertiary);
+  opacity: 0.62;
+}
+
+:root[data-platform="windows"] .field input,
+:root[data-platform="windows"] .field select,
+:root[data-platform="windows"] .field textarea,
+:root[data-platform="windows"] .filter-bar input,
+:root[data-platform="windows"] .filter-bar select {
+  min-height: 32px;
+  border-color: var(--separator);
+  border-radius: 5px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text) 24%, transparent);
+}
+
+:root[data-platform="windows"] .field input:hover,
+:root[data-platform="windows"] .field select:hover,
+:root[data-platform="windows"] .field textarea:hover,
+:root[data-platform="windows"] .filter-bar input:hover,
+:root[data-platform="windows"] .filter-bar select:hover {
+  border-color: color-mix(in srgb, var(--text) 24%, transparent);
+}
+
+:root[data-platform="windows"] .field input:focus,
+:root[data-platform="windows"] .field select:focus,
+:root[data-platform="windows"] .field textarea:focus,
+:root[data-platform="windows"] .filter-bar input:focus,
+:root[data-platform="windows"] .filter-bar select:focus {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+:root[data-platform="windows"] .check-field input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+:root[data-platform="windows"] .list-body {
+  padding: 6px;
+}
+
+:root[data-platform="windows"] .log-row {
+  border-radius: 6px;
+}
+
+:root[data-platform="windows"] #chat-browser-slot {
+  background: var(--surface-muted);
+}
+
+:root[data-platform="windows"] .feedback-layer {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  pointer-events: none;
+}
+
+:root[data-platform="windows"] .feedback-layer.is-toast {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 20px 24px;
+}
+
+:root[data-platform="windows"] .feedback-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(420px, calc(100vw - 48px));
+  padding: 12px 14px;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
+  pointer-events: auto;
+  animation: windows-feedback-enter 160ms ease-out;
+}
+
+:root[data-platform="windows"] .feedback-toast > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+:root[data-platform="windows"] .feedback-toast strong {
+  font-size: 12px;
+}
+
+:root[data-platform="windows"] .feedback-toast span {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-platform="windows"] .feedback-dismiss {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+:root[data-platform="windows"] .feedback-dismiss:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+:root[data-platform="windows"] .feedback-layer.is-alert {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+
+:root[data-platform="windows"] .feedback-dialog {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 22px;
+  width: min(520px, calc(100vw - 48px));
+  padding: 22px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  animation: windows-feedback-enter 160ms ease-out;
+}
+
+:root[data-platform="windows"] .feedback-dialog h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+:root[data-platform="windows"] .feedback-dialog p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@keyframes windows-feedback-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (forced-colors: active) {
+  :root[data-platform="windows"] .button,
+  :root[data-platform="windows"] .field input,
+  :root[data-platform="windows"] .field select,
+  :root[data-platform="windows"] .field textarea,
+  :root[data-platform="windows"] .filter-bar input,
+  :root[data-platform="windows"] .filter-bar select {
+    border: 1px solid ButtonBorder;
+    box-shadow: none;
+    forced-color-adjust: auto;
+  }
+}

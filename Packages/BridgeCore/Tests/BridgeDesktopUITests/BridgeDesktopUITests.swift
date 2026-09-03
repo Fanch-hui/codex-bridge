@@ -12,12 +12,36 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(try BridgeDesktopUIResources.read(.indexHTML).contains("Codex Bridge"))
     let index = try BridgeDesktopUIResources.read(.indexHTML)
     XCTAssertTrue(index.contains("chat-browser-slot"))
+    XCTAssertTrue(index.contains("host-context.js"))
     XCTAssertFalse(index.contains("placeholder-page"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.hostContextJS).contains("platform === \"windows\"")
+    )
     let script = try BridgeDesktopUIResources.read(.appJS)
     XCTAssertTrue(script.contains(#"emit("ready")"#))
     XCTAssertTrue(script.contains("window.chrome.webview.addEventListener"))
     XCTAssertTrue(script.contains("toggle-sidebar"))
     XCTAssertTrue(script.contains("measureBrowserViewport"))
+    XCTAssertTrue(script.contains("root.dataset.platform"))
+    XCTAssertTrue(index.contains("feedback-layer"))
+    XCTAssertTrue(index.contains("windows-theme.css"))
+    XCTAssertTrue(index.contains("windows-components.css"))
+    XCTAssertTrue(index.contains("feedback.js"))
+    let feedbackScript = try BridgeDesktopUIResources.read(.feedbackJS)
+    XCTAssertTrue(feedbackScript.contains("dismissFeedback"))
+    XCTAssertTrue(feedbackScript.contains("alertdialog"))
+    XCTAssertTrue(feedbackScript.contains("aria-label"))
+    XCTAssertTrue(feedbackScript.contains("close.focus"))
+    XCTAssertTrue(feedbackScript.contains("event.key === \"Escape\""))
+    let windowsTheme = try BridgeDesktopUIResources.read(.windowsThemeCSS)
+    XCTAssertTrue(windowsTheme.contains("Segoe UI Variable Text"))
+    XCTAssertTrue(windowsTheme.contains(":root[data-platform=\"windows\"]"))
+    XCTAssertFalse(
+      try BridgeDesktopUIResources.read(.stylesCSS).contains("Segoe UI Variable")
+    )
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.windowsComponentsCSS).contains("feedback-dialog")
+    )
     XCTAssertFalse(script.contains("https://"))
     XCTAssertTrue(try BridgeDesktopUIResources.read(.pagesJS).contains("updateBrowserViewport"))
     let workbenchScript = try BridgeDesktopUIResources.read(.pagesWorkbenchJS)
@@ -25,7 +49,8 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(workbenchScript.contains("deleteTask"))
     XCTAssertTrue(workbenchScript.contains("confirm("))
     XCTAssertTrue(
-      try BridgeDesktopUIResources.read(.pagesProjectsJS).contains("saveProjectBlacklist"))
+      try BridgeDesktopUIResources.read(.pagesProjectsJS).contains("saveProjectBlacklist")
+    )
     let connectionsScript = try BridgeDesktopUIResources.read(.pagesConnectionsJS)
     XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
     XCTAssertTrue(connectionsScript.contains("acceptReplacement: true"))
@@ -65,10 +90,18 @@ final class BridgeDesktopUITests: XCTestCase {
       lastUpdatedAt: "2026-09-01T23:46:31Z"
     )
     let state = BridgeDesktopUIState(
+      hostContext: BridgeDesktopHostContext(platform: .windows),
       selectedNavigation: .overview,
       connectionLabel: "已连接",
       connectionTone: .success,
       isRefreshing: false,
+      feedback: BridgeDesktopFeedback(
+        id: "feedback-1",
+        kind: .toast,
+        tone: .success,
+        title: "完成",
+        message: "设置已保存"
+      ),
       overview: overview,
       workbench: BridgeDesktopWorkbenchState(
         header: BridgeDesktopPageHeader(
@@ -80,7 +113,28 @@ final class BridgeDesktopUITests: XCTestCase {
       )
     )
     let data = try JSONEncoder().encode(state)
-    XCTAssertEqual(try JSONDecoder().decode(BridgeDesktopUIState.self, from: data), state)
+    let decoded = try JSONDecoder().decode(BridgeDesktopUIState.self, from: data)
+    XCTAssertEqual(decoded, state)
+    XCTAssertEqual(decoded.hostContext?.platform, .windows)
+    XCTAssertEqual(decoded.feedback?.id, "feedback-1")
+  }
+
+  func testLegacyStateWithoutHostContextOrFeedbackStillDecodes() throws {
+    let state = BridgeDesktopUIState(
+      selectedNavigation: .overview,
+      connectionLabel: "已连接",
+      connectionTone: .success,
+      isRefreshing: false,
+      overview: nil
+    )
+    let data = try JSONEncoder().encode(state)
+    let json = try XCTUnwrap(String(data: data, encoding: .utf8))
+
+    XCTAssertFalse(json.contains("hostContext"))
+    XCTAssertFalse(json.contains("feedback"))
+    let decoded = try JSONDecoder().decode(BridgeDesktopUIState.self, from: data)
+    XCTAssertNil(decoded.hostContext)
+    XCTAssertNil(decoded.feedback)
   }
 
   func testCommandEnvelopeDecodes() throws {
@@ -94,5 +148,35 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertEqual(envelope.command, .updateBrowserViewport)
     XCTAssertEqual(envelope.payload.viewport?.width, 640)
     XCTAssertTrue(envelope.payload.viewport?.visible == true)
+  }
+
+  func testSharedPresentationKeepsProviderPermissionsAligned() {
+    XCTAssertEqual(
+      BridgeDesktopPresentation.agentPermissionOptions(for: "opencode").map(\.id),
+      ["build", "plan"]
+    )
+    XCTAssertEqual(
+      BridgeDesktopPresentation.agentPermissionOptions(for: "antigravity").map(\.id),
+      ["workspace-write", "plan"]
+    )
+    XCTAssertEqual(
+      BridgeDesktopPresentation.agentPermissionOptions(for: "deepseek-harness").map(\.id),
+      ["workspace-write", "read-only"]
+    )
+    XCTAssertEqual(BridgeDesktopPresentation.reasoningTitle("extra_high"), "极高")
+    XCTAssertEqual(BridgeDesktopPresentation.reasoningTitle("none"), "none")
+    XCTAssertEqual(BridgeDesktopPresentation.extendedReasoningTitle("none"), "无")
+  }
+
+  func testSettingsPatchPreservesPartialUpdateIntent() {
+    let patch = BridgeDesktopSettingsPatch(
+      executionModel: "gpt-5.6",
+      fastModeEnabled: true
+    )
+
+    XCTAssertEqual(patch.executionModel, "gpt-5.6")
+    XCTAssertNil(patch.executionEffort)
+    XCTAssertNil(patch.accessMode)
+    XCTAssertTrue(patch.fastModeEnabled == true)
   }
 }

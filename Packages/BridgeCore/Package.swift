@@ -282,6 +282,15 @@ var macOSOnlyTargets: [Target] = []
       path: "Tests/BridgeDirectCommandWindowsTests"
     ),
     .testTarget(
+      name: "BridgeDeepSeekHarnessACPWindowsTests",
+      dependencies: [
+        "BridgeAgentCore",
+        "BridgeDeepSeekHarnessACP",
+      ],
+      path: "Tests/BridgeDeepSeekHarnessACPTests",
+      sources: ["DeepSeekHarnessACPDirectoryLinkTests.swift"]
+    ),
+    .testTarget(
       name: "BridgeWindowsShellTests",
       dependencies: ["BridgeDesktopUI", "BridgeWindowsShell"],
       path: "Tests/BridgeWindowsShellTests"

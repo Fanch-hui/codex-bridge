@@ -8,11 +8,11 @@
       let projectName = name.trimmingCharacters(in: .whitespacesAndNewlines)
       let absolutePath = path.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !projectName.isEmpty, !absolutePath.isEmpty else {
-        setProjectStatus("项目名称和绝对路径不能为空。")
+        reportProjectFailure("项目名称和绝对路径不能为空。")
         return
       }
       guard connectionState == .connected else {
-        setProjectStatus("后台 Service 未连接，无法注册项目。")
+        reportProjectFailure("后台 Service 未连接，无法注册项目。")
         return
       }
       guard !projectBusy else { return }
@@ -25,9 +25,9 @@
         )
         selectedProjectID = detail.projectID
         await refreshProjects()
-        setProjectStatus("项目已注册：\(detail.name)")
+        reportProjectSuccess("项目已注册：\(detail.name)")
       } catch {
-        setProjectStatus("项目注册失败：\(BridgeServiceErrorMessage.message(error))")
+        reportProjectFailure("项目注册失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
 
@@ -35,11 +35,11 @@
       guard let projectID = selectedProjectID,
         let project = projects.first(where: { $0.projectID == projectID })
       else {
-        setProjectStatus("请先选择要移除的项目。")
+        reportProjectFailure("请先选择要移除的项目。")
         return
       }
       guard connectionState == .connected else {
-        setProjectStatus("后台 Service 未连接，无法移除项目。")
+        reportProjectFailure("后台 Service 未连接，无法移除项目。")
         return
       }
       guard !projectBusy else { return }
@@ -50,9 +50,9 @@
         try await client.removeProject(projectID: projectID)
         selectedProjectID = nil
         await refreshProjects()
-        setProjectStatus("已移除项目：\(project.name)")
+        reportProjectSuccess("已移除项目：\(project.name)")
       } catch {
-        setProjectStatus("项目移除失败：\(BridgeServiceErrorMessage.message(error))")
+        reportProjectFailure("项目移除失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
 
@@ -62,11 +62,11 @@
       network: String
     ) async {
       guard let projectID = selectedProjectID else {
-        setProjectStatus("请先选择要保存策略的项目。")
+        reportProjectFailure("请先选择要保存策略的项目。")
         return
       }
       guard connectionState == .connected else {
-        setProjectStatus("后台 Service 未连接，无法保存项目策略。")
+        reportProjectFailure("后台 Service 未连接，无法保存项目策略。")
         return
       }
       guard !projectBusy else { return }
@@ -83,9 +83,9 @@
           )
         )
         await refreshProjects()
-        setProjectStatus("项目策略已保存生效。")
+        reportProjectSuccess("项目策略已保存生效。")
       } catch {
-        setProjectStatus("项目策略保存失败：\(BridgeServiceErrorMessage.message(error))")
+        reportProjectFailure("项目策略保存失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
 
@@ -98,25 +98,25 @@
       let executable = executablePath.trimmingCharacters(in: .whitespacesAndNewlines)
       let configuration = configurationPath.trimmingCharacters(in: .whitespacesAndNewlines)
       guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
-        setAgentStatus("请选择有效的 Provider。")
+        reportAgentFailure("请选择有效的 Provider。")
         return
       }
       let requestedName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
       guard !requestedName.contains("\0"), requestedName.utf8.count <= 256 else {
-        setAgentStatus("Agent 显示名称无效。")
+        reportAgentFailure("Agent 显示名称无效。")
         return
       }
       let effectiveName = requestedName.isEmpty ? provider.displayName : requestedName
       guard !executable.isEmpty else {
-        setAgentStatus("Agent 可执行文件路径不能为空。")
+        reportAgentFailure("Agent 可执行文件路径不能为空。")
         return
       }
       guard !provider.requiresConfiguration || !configuration.isEmpty else {
-        setAgentStatus("当前 Provider 需要配置文件路径。")
+        reportAgentFailure("当前 Provider 需要配置文件路径。")
         return
       }
       guard connectionState == .connected else {
-        setAgentStatus("后台 Service 未连接，无法登记 Agent。")
+        reportAgentFailure("后台 Service 未连接，无法登记 Agent。")
         return
       }
       guard !agentBusy else { return }
@@ -135,9 +135,9 @@
         selectedInstallationID = installation.installationID
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
-        setAgentStatus("Agent 已登记：\(installation.displayName)（\(state)）。")
+        reportAgentSuccess("Agent 已登记：\(installation.displayName)（\(state)）。")
       } catch {
-        setAgentStatus("Agent 登记失败：\(BridgeServiceErrorMessage.message(error))")
+        reportAgentFailure("Agent 登记失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
 
@@ -145,15 +145,15 @@
       guard let installationID = selectedInstallationID,
         let installation = agentInstallations.first(where: { $0.installationID == installationID })
       else {
-        setAgentStatus("请先选择要启停的 Agent 安装。")
+        reportAgentFailure("请先选择要启停的 Agent 安装。")
         return
       }
       guard !enabled || installation.availability == "available" else {
-        setAgentStatus("只有 Probe 可用的 Agent 才能启用。")
+        reportAgentFailure("只有 Probe 可用的 Agent 才能启用。")
         return
       }
       guard connectionState == .connected else {
-        setAgentStatus("后台 Service 未连接，无法更改 Agent 状态。")
+        reportAgentFailure("后台 Service 未连接，无法更改 Agent 状态。")
         return
       }
       guard !agentBusy else { return }
@@ -166,19 +166,19 @@
           enabled: enabled
         )
         await refreshAgents()
-        setAgentStatus(enabled ? "Agent 已启用。" : "Agent 已停用。")
+        reportAgentSuccess(enabled ? "Agent 已启用。" : "Agent 已停用。")
       } catch {
-        setAgentStatus("Agent 启停失败：\(BridgeServiceErrorMessage.message(error))")
+        reportAgentFailure("Agent 启停失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
 
     func reprobeSelectedAgent(acceptReplacement: Bool) async {
       guard let installationID = selectedInstallationID else {
-        setAgentStatus("请先选择要 Probe 的 Agent 安装。")
+        reportAgentFailure("请先选择要 Probe 的 Agent 安装。")
         return
       }
       guard connectionState == .connected else {
-        setAgentStatus("后台 Service 未连接，无法 Probe Agent。")
+        reportAgentFailure("后台 Service 未连接，无法 Probe Agent。")
         return
       }
       guard !agentBusy else { return }
@@ -192,19 +192,19 @@
         )
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
-        setAgentStatus("Probe 完成：\(state)。")
+        reportAgentSuccess("Probe 完成：\(state)。")
       } catch {
-        setAgentStatus("Agent Probe 失败：\(BridgeServiceErrorMessage.message(error))")
+        reportAgentFailure("Agent Probe 失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
 
     func removeSelectedAgent() async {
       guard let installationID = selectedInstallationID else {
-        setAgentStatus("请先选择要移除的 Agent 安装。")
+        reportAgentFailure("请先选择要移除的 Agent 安装。")
         return
       }
       guard connectionState == .connected else {
-        setAgentStatus("后台 Service 未连接，无法移除 Agent。")
+        reportAgentFailure("后台 Service 未连接，无法移除 Agent。")
         return
       }
       guard !agentBusy else { return }
@@ -215,9 +215,9 @@
         try await client.removeAgentInstallation(installationID: installationID)
         selectedInstallationID = nil
         await refreshAgents()
-        setAgentStatus("Agent 安装登记已移除。")
+        reportAgentSuccess("Agent 安装登记已移除。")
       } catch {
-        setAgentStatus("Agent 移除失败：\(BridgeServiceErrorMessage.message(error))")
+        reportAgentFailure("Agent 移除失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
   }

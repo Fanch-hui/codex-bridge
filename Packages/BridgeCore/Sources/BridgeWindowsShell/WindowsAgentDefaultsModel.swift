@@ -7,6 +7,7 @@
   final class WindowsAgentDefaultsModel {
     let client: any BridgeServiceClientProtocol
     let displayBox: AuxiliaryDisplayBox<WindowsAgentDefaultsDisplay>
+    let feedback: WindowsDesktopFeedbackStore
 
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var providers: [IPCAgentProviderSummary] = []
@@ -24,8 +25,12 @@
     var busy = false
     var statusText = "尚未加载 Agent 默认设置。"
 
-    init(client: any BridgeServiceClientProtocol) {
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
       self.client = client
+      self.feedback = feedback
       displayBox = AuxiliaryDisplayBox(
         value: WindowsAgentDefaultsDisplay(
           connectionState: .idle,

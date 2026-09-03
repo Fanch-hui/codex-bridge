@@ -1,11 +1,13 @@
 import Foundation
 
 public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
+  public let hostContext: BridgeDesktopHostContext?
   public let navigation: [BridgeDesktopNavigationItem]
   public let selectedNavigation: BridgeDesktopNavigation
   public let connectionLabel: String
   public let connectionTone: BridgeDesktopStatusTone
   public let isRefreshing: Bool
+  public let feedback: BridgeDesktopFeedback?
   public let overview: BridgeDesktopOverviewState?
   public let workbench: BridgeDesktopWorkbenchState?
   public let projects: BridgeDesktopProjectsState?
@@ -14,11 +16,13 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
   public let settings: BridgeDesktopSettingsState?
 
   public init(
+    hostContext: BridgeDesktopHostContext? = nil,
     navigation: [BridgeDesktopNavigationItem] = BridgeDesktopNavigation.canonicalItems,
     selectedNavigation: BridgeDesktopNavigation,
     connectionLabel: String,
     connectionTone: BridgeDesktopStatusTone,
     isRefreshing: Bool,
+    feedback: BridgeDesktopFeedback? = nil,
     overview: BridgeDesktopOverviewState?,
     workbench: BridgeDesktopWorkbenchState? = nil,
     projects: BridgeDesktopProjectsState? = nil,
@@ -26,11 +30,13 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
     connections: BridgeDesktopConnectionsState? = nil,
     settings: BridgeDesktopSettingsState? = nil
   ) {
+    self.hostContext = hostContext
     self.navigation = navigation
     self.selectedNavigation = selectedNavigation
     self.connectionLabel = connectionLabel
     self.connectionTone = connectionTone
     self.isRefreshing = isRefreshing
+    self.feedback = feedback
     self.overview = overview
     self.workbench = workbench
     self.projects = projects

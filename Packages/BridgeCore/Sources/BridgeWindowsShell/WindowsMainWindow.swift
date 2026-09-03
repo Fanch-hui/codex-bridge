@@ -43,6 +43,8 @@
         return nil
       }
       self.window = window
+      applyDwmAttributes(to: window)
+      setWindowIcons(window)
       WindowsMainWindowChrome.install(on: window)
       layout()
       _ = ShowWindow(window, SW_SHOW)
@@ -93,12 +95,35 @@
     ) -> LRESULT {
       switch message {
       case UINT(WM_COMMAND):
+        if WindowsMainWindowChrome.handleCommand(wParam, window: window) { return 0 }
         return 0
       case UINT(WM_SIZE):
         if wParam == WPARAM(SIZE_MINIMIZED) {
           _ = ShowWindow(window, SW_HIDE)
         } else {
           layout()
+        }
+        return 0
+      case UINT(WM_DPICHANGED):
+        if let suggestedRect = UnsafePointer<RECT>(bitPattern: Int(lParam))?.pointee {
+          _ = SetWindowPos(
+            window,
+            nil,
+            suggestedRect.left,
+            suggestedRect.top,
+            suggestedRect.right - suggestedRect.left,
+            suggestedRect.bottom - suggestedRect.top,
+            UINT(SWP_NOZORDER | SWP_NOACTIVATE)
+          )
+        }
+        layout()
+        return 0
+      case UINT(WM_GETMINMAXINFO):
+        if let minMaxInfo = UnsafeMutablePointer<MINMAXINFO>(bitPattern: Int(lParam)) {
+          let dpi = GetDpiForWindow(window)
+          let scale = Double(dpi > 0 ? dpi : 96) / 96.0
+          minMaxInfo.pointee.ptMinTrackSize.x = Int32(Double(800) * scale)
+          minMaxInfo.pointee.ptMinTrackSize.y = Int32(Double(500) * scale)
         }
         return 0
       case WindowsMainWindowChrome.trayCallbackMessage:
@@ -213,11 +238,37 @@
           WindowsMainWindow.handleMessage(window, message, wParam, lParam)
         }
         windowClass.hInstance = instance
-        windowClass.hIcon = LoadIconW(nil, resourcePointer(standardResourceID))
+        windowClass.hIcon = WindowsApplicationIcon.load()
         windowClass.hCursor = LoadCursorW(nil, resourcePointer(standardResourceID))
-        windowClass.hbrBackground = GetSysColorBrush(COLOR_WINDOW)
+        windowClass.hbrBackground = CreateSolidBrush(COLORREF(0x001B_1818))
         windowClass.lpszClassName = className
         _ = RegisterClassW(&windowClass)
+      }
+    }
+
+    private static func applyDwmAttributes(to window: HWND) {
+      var useDarkMode: Int32 = 1
+      _ = DwmSetWindowAttribute(
+        window,
+        DWORD(20),
+        &useDarkMode,
+        DWORD(MemoryLayout<Int32>.size)
+      )
+      var cornerPreference: DWORD = 2
+      _ = DwmSetWindowAttribute(
+        window,
+        DWORD(33),
+        &cornerPreference,
+        DWORD(MemoryLayout<DWORD>.size)
+      )
+    }
+
+    private static func setWindowIcons(_ window: HWND) {
+      if let iconBig = WindowsApplicationIcon.load(width: 32, height: 32) {
+        _ = SendMessageW(window, UINT(WM_SETICON), WPARAM(1), LPARAM(Int(bitPattern: iconBig)))
+      }
+      if let iconSmall = WindowsApplicationIcon.load(width: 16, height: 16) {
+        _ = SendMessageW(window, UINT(WM_SETICON), WPARAM(0), LPARAM(Int(bitPattern: iconSmall)))
       }
     }
 
