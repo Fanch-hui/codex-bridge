@@ -16,17 +16,25 @@ public struct IPCApprovalResolutionRequest: Codable, Equatable, Sendable {
   public let taskID: String
   public let approvalID: String
   public let decision: String
+  public let oneTimeToolAutoApproval: Bool?
 
-  public init(taskID: String, approvalID: String, decision: String) {
+  public init(
+    taskID: String,
+    approvalID: String,
+    decision: String,
+    oneTimeToolAutoApproval: Bool? = nil
+  ) {
     self.taskID = taskID
     self.approvalID = approvalID
     self.decision = decision
+    self.oneTimeToolAutoApproval = oneTimeToolAutoApproval
   }
 
   private enum CodingKeys: String, CodingKey {
     case taskID = "task_id"
     case approvalID = "approval_id"
     case decision
+    case oneTimeToolAutoApproval = "one_time_tool_auto_approval"
   }
 }
 
@@ -93,6 +101,7 @@ public struct IPCApprovalSummary: Codable, Equatable, Sendable {
   public let relativePaths: [String]
   public let reason: String?
   public let decisionOptions: [String]?
+  public let oneTimeToolAutoApprovalAvailable: Bool?
 
   public init(
     approvalID: String,
@@ -106,7 +115,8 @@ public struct IPCApprovalSummary: Codable, Equatable, Sendable {
     displayCommand: String? = nil,
     relativePaths: [String] = [],
     reason: String? = nil,
-    decisionOptions: [String]? = nil
+    decisionOptions: [String]? = nil,
+    oneTimeToolAutoApprovalAvailable: Bool? = nil
   ) {
     self.approvalID = approvalID
     self.taskID = taskID
@@ -120,6 +130,7 @@ public struct IPCApprovalSummary: Codable, Equatable, Sendable {
     self.relativePaths = relativePaths
     self.reason = reason
     self.decisionOptions = decisionOptions
+    self.oneTimeToolAutoApprovalAvailable = oneTimeToolAutoApprovalAvailable
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -135,6 +146,7 @@ public struct IPCApprovalSummary: Codable, Equatable, Sendable {
     case relativePaths = "relative_paths"
     case reason
     case decisionOptions = "decision_options"
+    case oneTimeToolAutoApprovalAvailable = "one_time_tool_auto_approval_available"
   }
 }
 

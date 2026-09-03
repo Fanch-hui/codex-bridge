@@ -2,7 +2,11 @@ import BridgeIPC
 import BridgeServiceAppCore
 
 extension BridgeServiceAppModel {
-  public func resolveApproval(_ approval: IPCApprovalSummary, decision: String) {
+  public func resolveApproval(
+    _ approval: IPCApprovalSummary,
+    decision: String,
+    oneTimeToolAutoApproval: Bool = false
+  ) {
     let resolutionKey = WorkbenchApprovalResolutionKey.task(approval.approvalID)
     guard resolvingApprovalKeys.insert(resolutionKey).inserted else { return }
     errorMessage = nil
@@ -17,7 +21,8 @@ extension BridgeServiceAppModel {
           IPCApprovalResolutionRequest(
             taskID: approval.taskID,
             approvalID: approval.approvalID,
-            decision: decision
+            decision: decision,
+            oneTimeToolAutoApproval: oneTimeToolAutoApproval ? true : nil
           )
         )
         self.completeTaskApprovalResolution(

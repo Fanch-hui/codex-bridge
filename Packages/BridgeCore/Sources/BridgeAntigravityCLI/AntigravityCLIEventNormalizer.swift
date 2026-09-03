@@ -35,6 +35,12 @@ public enum AntigravityPermissionEvidence {
   }
 }
 
+struct AntigravityToolContext: Equatable, Sendable {
+  let itemID: String
+  let name: String
+  let stepIndex: Int
+}
+
 public actor AntigravityCLIEventNormalizer {
   private struct ContentState: Sendable {
     var content: String
@@ -74,7 +80,9 @@ public actor AntigravityCLIEventNormalizer {
     case "agent_response":
       try accumulateContent(update)
     case "tool":
-      events.append(try tool(update))
+      if !Self.isAnonymousPermissionDenial(update) {
+        events.append(try tool(update))
+      }
     default:
       if update.subagentInfo != nil {
         events.append(try subagent(update))
@@ -89,6 +97,7 @@ public actor AntigravityCLIEventNormalizer {
     permissionDenied: Bool,
     terminal: Bool,
     permissionMode: String? = nil,
+    deniedToolItemID: String? = nil,
     deniedToolName: String? = nil
   ) throws -> [AgentEventEnvelope] {
     try validateSession(result.conversationID)
@@ -114,13 +123,23 @@ public actor AntigravityCLIEventNormalizer {
         )
       )
     }
+    let completedTurnOrdinal = turnOrdinal
     turnOrdinal += 1
     latestMessageKey = nil
     contents.removeAll(keepingCapacity: true)
 
     guard terminal else { return events }
     if permissionDenied {
-      events.append(try envelope(.approvalAutomaticallyDenied("antigravity-soft-denial")))
+      let deniedItemID: String
+      if let itemID = Self.safeIdentifier(deniedToolItemID),
+        Self.safeIdentifier(deniedToolName) != nil
+      {
+        deniedItemID = itemID
+      } else {
+        deniedItemID = "antigravity-permission-\(completedTurnOrdinal)"
+        events.append(try fallbackPermissionTool(itemID: deniedItemID))
+      }
+      events.append(try envelope(.approvalAutomaticallyDenied(deniedItemID)))
       events.append(
         try envelope(
           .failed(
@@ -206,6 +225,20 @@ public actor AntigravityCLIEventNormalizer {
       locations: locations(in: info?.parameters)
     )
     return try envelope(.tool(payload))
+  }
+
+  private func fallbackPermissionTool(itemID: String) throws -> AgentEventEnvelope {
+    try envelope(
+      .tool(
+        AgentToolUpdate(
+          key: "tool:\(itemID)",
+          name: "antigravity_permission",
+          title: "Antigravity permission",
+          kind: "permission",
+          status: .declined
+        )
+      )
+    )
   }
 
   private func subagent(_ update: AntigravityStepUpdate) throws -> AgentEventEnvelope {
@@ -338,6 +371,23 @@ public actor AntigravityCLIEventNormalizer {
       .replacingOccurrences(of: "-", with: "")
     return normalized.contains("path")
       || ["file", "source", "destination", "target", "uri", "workspace"].contains(normalized)
+  }
+
+  static func toolContext(for update: AntigravityStepUpdate) -> AntigravityToolContext? {
+    guard update.stepType == "tool",
+      let name = safeIdentifier(update.toolInfo?.name ?? update.toolName)
+    else { return nil }
+    return AntigravityToolContext(
+      itemID: String(update.stepIndex),
+      name: name,
+      stepIndex: update.stepIndex
+    )
+  }
+
+  private static func isAnonymousPermissionDenial(_ update: AntigravityStepUpdate) -> Bool {
+    guard toolContext(for: update) == nil else { return false }
+    return AntigravityPermissionEvidence.detected(in: update.toolInfo?.error?.message)
+      || AntigravityPermissionEvidence.detected(in: update.error?.message)
   }
 
   private static func safeIdentifier(_ value: String?) -> String? {

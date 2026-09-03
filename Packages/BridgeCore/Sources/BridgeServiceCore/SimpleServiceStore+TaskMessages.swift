@@ -67,6 +67,24 @@ extension SimpleServiceStore {
     }
   }
 
+  public func taskMessage(
+    taskID: TaskID,
+    key: String
+  ) throws -> ServiceTaskMessageRecord? {
+    try ServiceValidation.identifier(key, field: "taskMessage.key", maximumBytes: 256)
+    do {
+      return try database.read { db in
+        try Self.taskMessageRow(taskID: taskID, key: key, in: db).map(
+          Self.decodeTaskMessage
+        )
+      }
+    } catch let error as ServiceStoreError {
+      throw error
+    } catch {
+      throw ServiceStoreError.storageFailure
+    }
+  }
+
   public func recentTaskMessageActivity(
     taskID: TaskID,
     limit: Int = 12

@@ -65,6 +65,16 @@ struct BridgeServiceWorkbenchInspectorBody: View {
         VStack(alignment: .leading, spacing: 12) {
           if let task = context.currentTask, task.isExternalAgentTask {
             WorkbenchExternalTaskCard(task: task)
+            if task.providerIdentifier == "antigravity",
+              task.failureCode == "antigravity_permission_denied",
+              let conversation
+            {
+              WorkbenchAntigravityPermissionRemediationCard(
+                model: model,
+                conversation: conversation,
+                task: task
+              )
+            }
           }
 
           if let message = model.conversation?.errorMessage {

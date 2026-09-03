@@ -106,6 +106,11 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
   private var agentModelsQueries: [AgentModelsQuery] = []
   private var failAgentModels = false
   private var registrationRequestValue: IPCAgentRegistrationRequest?
+  private var nativePermissionPolicies: [String: IPCAgentNativePermissionPolicyResponse] = [:]
+  private var nativePermissionMutations: [IPCAgentNativePermissionMutationRequest] = []
+  private var permissionRemediationValue: IPCAgentPermissionRemediationResponse?
+  private var permissionRemediationRequests: [IPCAgentPermissionRemediationRequest] = []
+  private var permissionRemediationApplyRequests: [IPCAgentPermissionRemediationApplyRequest] = []
   private var approvalResolutionDelay: Duration = .zero
   private var failApprovalReplyAfterResolution = false
   private let agentProvidersValue = [
@@ -256,6 +261,30 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
 
   func registrationRequest() -> IPCAgentRegistrationRequest? {
     registrationRequestValue
+  }
+
+  func configureNativePermissionPolicy(
+    _ policy: IPCAgentNativePermissionPolicyResponse
+  ) {
+    nativePermissionPolicies[policy.installationID] = policy
+  }
+
+  func nativePermissionMutationValues() -> [IPCAgentNativePermissionMutationRequest] {
+    nativePermissionMutations
+  }
+
+  func configurePermissionRemediation(
+    _ remediation: IPCAgentPermissionRemediationResponse
+  ) {
+    permissionRemediationValue = remediation
+  }
+
+  func permissionRemediationRequestValues() -> [IPCAgentPermissionRemediationRequest] {
+    permissionRemediationRequests
+  }
+
+  func permissionRemediationApplyRequestValues() -> [IPCAgentPermissionRemediationApplyRequest] {
+    permissionRemediationApplyRequests
   }
 
   func status() async throws -> IPCServiceStatusResponse {
@@ -582,6 +611,98 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
     )
     agentDefaultsByProvider[providerID] = response
     return response
+  }
+
+  func agentNativePermissionPolicy(
+    installationID: String
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    guard let policy = nativePermissionPolicies[installationID] else {
+      throw BridgeServiceClientError.unavailable
+    }
+    return policy
+  }
+
+  func updateAgentNativePermissionPolicy(
+    _ request: IPCAgentNativePermissionMutationRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    guard let current = nativePermissionPolicies[request.installationID],
+      current.revision == request.expectedRevision
+    else {
+      throw BridgeServiceClientError.responseFailed
+    }
+    nativePermissionMutations.append(request)
+    let updated = IPCAgentNativePermissionPolicyResponse(
+      providerID: current.providerID,
+      installationID: current.installationID,
+      toolPermission: request.toolPermission ?? current.toolPermission,
+      availableModes: current.availableModes,
+      availableActions: current.availableActions,
+      rules: current.rules,
+      revision: "revision-2",
+      warnings: current.warnings
+    )
+    nativePermissionPolicies[request.installationID] = updated
+    return updated
+  }
+
+  func agentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationRequest
+  ) async throws -> IPCAgentPermissionRemediationResponse {
+    permissionRemediationRequests.append(request)
+    guard let remediation = permissionRemediationValue,
+      remediation.taskID == request.taskID,
+      remediation.messageKey == request.messageKey
+    else {
+      throw BridgeServiceClientError.responseFailed
+    }
+    return remediation
+  }
+
+  func applyAgentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationApplyRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    permissionRemediationApplyRequests.append(request)
+    guard let remediation = permissionRemediationValue,
+      remediation.taskID == request.taskID,
+      remediation.messageKey == request.messageKey,
+      remediation.candidateID == request.candidateID,
+      remediation.settingsRevision == request.expectedRevision,
+      let current = nativePermissionPolicies[remediation.installationID]
+    else {
+      throw BridgeServiceClientError.responseFailed
+    }
+    if current.rules.contains(where: {
+      $0.action == remediation.action && $0.target == remediation.target
+        && ($0.effect == "ask" || $0.effect == "deny")
+    }) {
+      throw BridgeServiceIPCCodecError.remoteError(
+        BridgeServiceIPCError(
+          code: "agent_permission_rule_invalid",
+          message: "The native permission rule is invalid."
+        )
+      )
+    }
+    let rule = IPCAgentNativePermissionRuleSummary(
+      ruleID: "rule-remediation",
+      effect: "allow",
+      action: remediation.action,
+      target: remediation.target,
+      isEditable: true,
+      isRedacted: false,
+      requiresConfirmation: remediation.requiresConfirmation
+    )
+    let updated = IPCAgentNativePermissionPolicyResponse(
+      providerID: current.providerID,
+      installationID: current.installationID,
+      toolPermission: current.toolPermission,
+      availableModes: current.availableModes,
+      availableActions: current.availableActions,
+      rules: current.rules + [rule],
+      revision: "revision-remediated",
+      warnings: current.warnings
+    )
+    nativePermissionPolicies[remediation.installationID] = updated
+    return updated
   }
 
   func agentActionsValue() -> [String] {

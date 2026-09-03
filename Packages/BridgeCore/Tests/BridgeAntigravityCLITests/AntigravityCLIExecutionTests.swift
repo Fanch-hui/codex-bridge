@@ -105,14 +105,17 @@ final class AntigravityCLIExecutionTests: XCTestCase {
       AntigravityCLITestSupport.resultFrame(response: "The tool was not run.")
     )
     let events = await eventsTask.value
-    XCTAssertEqual(events.count, 3)
+    XCTAssertEqual(events.count, 4)
     guard case .content(let content) = events[0].event,
-      case .approvalAutomaticallyDenied(let reason) = events[1].event,
-      case .failed(let code, _) = events[2].event
+      case .tool(let fallbackTool) = events[1].event,
+      case .approvalAutomaticallyDenied(let itemID) = events[2].event,
+      case .failed(let code, _) = events[3].event
     else {
-      return XCTFail("Expected content, denial, and failure events")
+      return XCTFail("Expected content, permission fallback, denial, and failure events")
     }
-    XCTAssertEqual(reason, "antigravity-soft-denial")
+    XCTAssertEqual(fallbackTool.name, "antigravity_permission")
+    XCTAssertEqual(fallbackTool.status, .declined)
+    XCTAssertEqual(itemID, "antigravity-permission-0")
     XCTAssertEqual(code, "antigravity_permission_denied")
     XCTAssertEqual(content.content, "The tool was not run.")
   }
@@ -147,12 +150,16 @@ final class AntigravityCLIExecutionTests: XCTestCase {
     XCTAssertEqual(events.count, 4)
     guard case .tool(let tool) = events[0].event,
       case .content = events[1].event,
-      case .approvalAutomaticallyDenied = events[2].event,
+      case .approvalAutomaticallyDenied(let itemID) = events[2].event,
       case .failed(let code, _) = events[3].event
     else {
       return XCTFail("Expected tool, result content, denial, and failure")
     }
+    XCTAssertEqual(tool.key, "tool:1")
+    XCTAssertEqual(tool.name, "run_command")
+    XCTAssertEqual(tool.arguments, #"{"command":"touch output"}"#)
     XCTAssertEqual(tool.status, .failed)
+    XCTAssertEqual(itemID, "1")
     XCTAssertEqual(code, "antigravity_permission_denied")
   }
 
@@ -258,19 +265,20 @@ final class AntigravityCLIExecutionTests: XCTestCase {
     )
 
     let events = await eventsTask.value
-    XCTAssertEqual(events.map(\.providerSequence), [0, 1, 2, 3, 4])
+    XCTAssertEqual(events.map(\.providerSequence), [0, 1, 2, 3])
     guard case .tool(let webTool) = events[0].event,
-      case .tool(let denialTool) = events[1].event,
-      case .content(let content) = events[2].event,
-      case .approvalAutomaticallyDenied = events[3].event,
-      case .failed(let code, let summary) = events[4].event
+      case .content(let content) = events[1].event,
+      case .approvalAutomaticallyDenied(let itemID) = events[2].event,
+      case .failed(let code, let summary) = events[3].event
     else {
-      return XCTFail("Expected failed web tool, denial, response, and terminal failure")
+      return XCTFail("Expected the real web tool, response, denial, and terminal failure")
     }
+    XCTAssertEqual(webTool.key, "tool:4")
     XCTAssertEqual(webTool.name, "read_url_content")
+    XCTAssertEqual(webTool.arguments, #"{"url":"https:\/\/example.com"}"#)
     XCTAssertEqual(webTool.status, .failed)
     XCTAssertEqual(webTool.output, "request failed")
-    XCTAssertEqual(denialTool.status, .failed)
+    XCTAssertEqual(itemID, "4")
     XCTAssertEqual(content.content, "The page could not be read.")
     XCTAssertEqual(code, "antigravity_permission_denied")
     XCTAssertTrue(summary.contains("native tool 'read_url_content'"))

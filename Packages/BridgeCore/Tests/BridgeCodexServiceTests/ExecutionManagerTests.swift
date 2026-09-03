@@ -494,13 +494,13 @@ final class ExecutionManagerTests: XCTestCase {
     XCTAssertEqual(interrupted.state.codexTurnID, "turn-existing")
   }
 
-  func testUnavailableModelFailsTaskAndLeavesNoActiveSession() async throws {
+  func testEmptyModelCatalogDoesNotBlockExecution() async throws {
     let fixture = try await makeExecutionFixture(self)
     let task = try await submitStartedExecutionTask(
       fixture: fixture,
       taskID: "tsk-missing-model"
     )
-    let manager = makeExecutionManager(script: unavailableModelScript())
+    let manager = makeExecutionManager(script: unavailableModelScript(root: fixture.root.path))
     let coordinator = ServiceExecutionCoordinator(
       tasks: fixture.tasks,
       projects: fixture.projects,
@@ -508,19 +508,40 @@ final class ExecutionManagerTests: XCTestCase {
     )
     addTeardownBlock { await coordinator.shutdown() }
 
-    do {
-      _ = try await coordinator.start(taskID: task.id)
-      XCTFail("Expected the missing model to fail")
-    } catch {
-      XCTAssertEqual(error as? ExecutionServiceError, .modelUnavailable("fixture-model"))
-    }
+    let binding = try await coordinator.start(taskID: task.id)
+    XCTAssertEqual(binding?.threadID, "thread-uncatalogued")
 
-    let failed = try await waitForTask(fixture, taskID: task.id) {
-      $0.state.status == .failed
+    let completed = try await waitForTask(fixture, taskID: task.id) {
+      $0.state.status == .completed
     }
-    XCTAssertEqual(failed.state.failureCode, "execution_start_failed")
-    let active = await manager.hasActiveSession(taskID: task.id)
-    XCTAssertFalse(active)
+    XCTAssertEqual(completed.state.resultSummary, "Completed without a model catalog.")
+  }
+
+  func testProviderDefaultExecutionSkipsModelCatalogAndOmitsOverrides() async throws {
+    let fixture = try await makeExecutionFixture(self)
+    let task = try await submitStartedExecutionTask(
+      fixture: fixture,
+      taskID: "tsk-provider-default",
+      model: serviceDefaultProviderExecutionModel,
+      effort: serviceDefaultProviderExecutionEffort
+    )
+    let manager = makeExecutionManager(
+      script: providerDefaultExecutionScript(root: fixture.root.path)
+    )
+    let coordinator = ServiceExecutionCoordinator(
+      tasks: fixture.tasks,
+      projects: fixture.projects,
+      execution: manager
+    )
+    addTeardownBlock { await coordinator.shutdown() }
+
+    let binding = try await coordinator.start(taskID: task.id)
+    XCTAssertEqual(binding?.threadID, "thread-provider-default")
+
+    let completed = try await waitForTask(fixture, taskID: task.id) {
+      $0.state.status == .completed
+    }
+    XCTAssertEqual(completed.state.resultSummary, "Completed with provider defaults.")
   }
 
   func testNetworkTaskAcceptsThreadResponseWithoutNetworkAccessEcho() async throws {

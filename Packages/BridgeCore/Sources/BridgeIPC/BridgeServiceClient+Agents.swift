@@ -144,4 +144,31 @@ extension BridgeServiceClient {
       )
     )
   }
+
+  public func agentNativePermissionPolicy(
+    installationID: String
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    try await call(
+      operation: .getAgentNativePermissionPolicy,
+      payload: IPCAgentNativePermissionPolicyRequest(installationID: installationID)
+    )
+  }
+
+  public func updateAgentNativePermissionPolicy(
+    _ request: IPCAgentNativePermissionMutationRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    try await call(operation: .updateAgentNativePermissionPolicy, payload: request)
+  }
+
+  public func agentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationRequest
+  ) async throws -> IPCAgentPermissionRemediationResponse {
+    try await call(operation: .getAgentPermissionRemediation, payload: request)
+  }
+
+  public func applyAgentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationApplyRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    try await call(operation: .applyAgentPermissionRemediation, payload: request)
+  }
 }

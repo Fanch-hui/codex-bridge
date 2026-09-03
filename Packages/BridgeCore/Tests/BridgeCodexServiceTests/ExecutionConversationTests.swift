@@ -68,7 +68,9 @@ final class ExecutionConversationTests: XCTestCase {
 
   func testConversationPageIsEmptyForUnknownTask() async throws {
     let fixture = try await makeExecutionFixture(self)
-    let manager = makeExecutionManager(script: unavailableModelScript())
+    let manager = makeExecutionManager(
+      script: unavailableModelScript(root: fixture.root.path)
+    )
     let coordinator = ServiceExecutionCoordinator(
       tasks: fixture.tasks,
       projects: fixture.projects,

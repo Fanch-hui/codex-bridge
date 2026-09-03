@@ -1744,6 +1744,68 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     XCTAssertNil(completed.state.codexThreadID)
   }
 
+  func testAntigravityLocalApprovalCanGrantOneTimeToolAndNetworkAccess() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    _ = try await fixture.projects.updateAccessPolicy(
+      ProjectAccessPolicy(
+        read: .allowed,
+        write: .requiresLocalApproval,
+        network: .requiresLocalApproval
+      ),
+      projectID: fixture.project.id
+    )
+    try await fixture.settings.setWorkbenchPermissionMode(.readOnly)
+    let provider = try ScriptedAgentProvider(providerID: .antigravity)
+    let registry = try await Self.makeRegistry(fixture: fixture, provider: provider, enabled: true)
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceModelCatalogScript,
+      agentRegistry: registry,
+      agentRunner: ServiceAgentTaskRunner(
+        registry: registry,
+        providers: [.antigravity: provider]
+      )
+    )
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+    let receipt = try await application.serviceSubmitTask(
+      MCPServiceTaskSubmission(
+        projectID: fixture.project.id.rawValue,
+        prompt: "Inspect a remote dependency.",
+        providerID: AgentProviderID.antigravity.rawValue,
+        clientRequestID: "antigravity-one-time-access"
+      ),
+      deadline: deadline
+    )
+    let taskID = TaskID(rawValue: receipt.taskID)
+    let approvals = try await application.pendingTaskStartApprovals(taskID: taskID)
+    let approval = try XCTUnwrap(approvals.first)
+    XCTAssertTrue(approval.oneTimeToolAutoApprovalAvailable)
+
+    try await application.resolveTaskStartApproval(
+      taskID: taskID,
+      approvalID: approval.approvalID,
+      approved: true,
+      oneTimeToolAutoApproval: true,
+      deadline: deadline
+    )
+    let running = try await waitForTask(fixture, taskID: receipt.taskID) {
+      $0.state.status == .running
+    }
+    XCTAssertEqual(running.accessMode, .fullAccess)
+    XCTAssertTrue(running.networkAllowed)
+    let request = try XCTUnwrap(provider.startedRequests.first)
+    XCTAssertEqual(request.toolApprovalPolicy, .autoApprove)
+    XCTAssertEqual(request.mutationIntent, .readOnly)
+
+    try emit(
+      provider,
+      taskID: taskID,
+      sequence: 1,
+      event: .completed(summary: "Inspection complete.", stopReason: nil)
+    )
+    provider.finish(taskID: taskID)
+  }
+
   func testAgentDefaultSubmissionKeepsProviderDefaultWithoutEffectiveModelCapability()
     async throws
   {

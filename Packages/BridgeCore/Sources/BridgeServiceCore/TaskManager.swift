@@ -62,7 +62,7 @@ public actor ServiceTaskManager {
 
   @discardableResult
   public func begin(taskID: TaskID) async throws -> ServiceTaskRecord {
-    try await mutate(
+    return try await mutate(
       taskID: taskID,
       patch: StatePatch(
         status: .starting,
@@ -76,9 +76,23 @@ public actor ServiceTaskManager {
   @discardableResult
   public func approveAndBegin(
     taskID: TaskID,
-    summary: String = "The local user approved this provider invocation."
+    summary: String = "The local user approved this provider invocation.",
+    authorization: ServiceTaskExecutionAuthorization? = nil
   ) async throws -> ServiceTaskRecord {
-    try await mutate(
+    if let authorization {
+      let date = now()
+      return try await store.approveTask(
+        id: taskID,
+        authorization: authorization,
+        supervisorStatus: try await supervisorStartStatus(taskID: taskID),
+        event: ServiceTaskEventDraft(
+          kind: .taskApproved,
+          summary: summary,
+          createdAt: date
+        )
+      )
+    }
+    return try await mutate(
       taskID: taskID,
       patch: StatePatch(
         status: .starting,
@@ -359,6 +373,13 @@ public actor ServiceTaskManager {
       beforeMessageID: beforeMessageID,
       limit: limit
     )
+  }
+
+  public func message(
+    taskID: TaskID,
+    key: String
+  ) async throws -> ServiceTaskMessageRecord? {
+    try await store.taskMessage(taskID: taskID, key: key)
   }
 
   public func recentMessageActivity(

@@ -18,6 +18,7 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
   public let supportsSessionContinuation: Bool
   public let supportsSteer: Bool
   public let supportsInteractiveApproval: Bool
+  public let supportsOneTimeToolAutoApproval: Bool
   public let supportsModelSelection: Bool
   public let supportsEffortSelection: Bool
   public let supportsSkillSelection: Bool
@@ -44,6 +45,7 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
     supportsSessionContinuation: Bool = false,
     supportsSteer: Bool = false,
     supportsInteractiveApproval: Bool = false,
+    supportsOneTimeToolAutoApproval: Bool = false,
     supportsModelSelection: Bool = false,
     supportsEffortSelection: Bool = false,
     supportsSkillSelection: Bool = false,
@@ -69,6 +71,7 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
     self.supportsSessionContinuation = supportsSessionContinuation
     self.supportsSteer = supportsSteer
     self.supportsInteractiveApproval = supportsInteractiveApproval
+    self.supportsOneTimeToolAutoApproval = supportsOneTimeToolAutoApproval
     self.supportsModelSelection = supportsModelSelection
     self.supportsEffortSelection = supportsEffortSelection
     self.supportsSkillSelection = supportsSkillSelection
@@ -225,6 +228,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     supportsSessionContinuation: true,
     supportsSteer: true,
     supportsInteractiveApproval: false,
+    supportsOneTimeToolAutoApproval: true,
     supportsModelSelection: true,
     supportsEffortSelection: true,
     supportsSkillSelection: true,

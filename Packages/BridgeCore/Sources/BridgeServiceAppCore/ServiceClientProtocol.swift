@@ -71,6 +71,18 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     permissionMode: String?,
     effort: String?
   ) async throws -> IPCAgentModelDefaultResponse
+  func agentNativePermissionPolicy(
+    installationID: String
+  ) async throws -> IPCAgentNativePermissionPolicyResponse
+  func updateAgentNativePermissionPolicy(
+    _ request: IPCAgentNativePermissionMutationRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse
+  func agentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationRequest
+  ) async throws -> IPCAgentPermissionRemediationResponse
+  func applyAgentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationApplyRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse
   func customInstructions() async throws -> String
   func setCustomInstructions(_ instructions: String) async throws
   func removeProject(projectID: String) async throws
@@ -126,6 +138,30 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func agentNativePermissionPolicy(
+    installationID _: String
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func updateAgentNativePermissionPolicy(
+    _: IPCAgentNativePermissionMutationRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func agentPermissionRemediation(
+    _: IPCAgentPermissionRemediationRequest
+  ) async throws -> IPCAgentPermissionRemediationResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func applyAgentPermissionRemediation(
+    _: IPCAgentPermissionRemediationApplyRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
   public func agentCatalog() async throws -> IPCAgentCatalogResponse {
     throw BridgeServiceClientError.unavailable
   }

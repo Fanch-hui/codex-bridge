@@ -148,6 +148,7 @@ final class AntigravityCLIEventNormalizerTests: XCTestCase {
       permissionDenied: true,
       terminal: true,
       permissionMode: "request-review",
+      deniedToolItemID: "5",
       deniedToolName: "run_command"
     )
 
@@ -158,7 +159,7 @@ final class AntigravityCLIEventNormalizerTests: XCTestCase {
     else {
       return XCTFail("Expected content, automatic denial, and failure")
     }
-    XCTAssertEqual(reason, "antigravity-soft-denial")
+    XCTAssertEqual(reason, "5")
     XCTAssertEqual(code, "antigravity_permission_denied")
     guard case .failed(_, let summary) = events[2].event else {
       return XCTFail("Expected a permission-denied summary")
@@ -243,6 +244,7 @@ final class AntigravityCLIEventNormalizerTests: XCTestCase {
       permissionDenied: true,
       terminal: true,
       permissionMode: "proceed-in-sandbox",
+      deniedToolItemID: "7",
       deniedToolName: "read_url_content"
     )
 

@@ -141,6 +141,59 @@ extension TaskConversationBuffer {
     }
   }
 
+  public func declineToolCall(taskID: TaskID, itemID: String, fallbackContent: String) async {
+    let state = state(taskID: taskID)
+    let key = "tool:" + itemID
+    let existing = state.index[key].flatMap { index in
+      state.entries.indices.contains(index) ? state.entries[index] : nil
+    }
+    if existing?.toolStatus == ExecutionToolCallStatus.declined.rawValue { return }
+
+    let content: String
+    if let existing, !existing.content.isEmpty {
+      content = existing.content
+    } else {
+      content = Self.capped(fallbackContent)
+    }
+    let entry = Entry(
+      key: key,
+      role: .agent,
+      kind: .toolCall,
+      content: content,
+      toolName: existing?.toolName,
+      toolStatus: ExecutionToolCallStatus.declined.rawValue,
+      toolArguments: existing?.toolArguments,
+      isFinal: true,
+      createdAt: existing?.createdAt ?? Date()
+    )
+    if let index = state.index[key], state.entries.indices.contains(index) {
+      state.entries[index] = entry
+    } else {
+      guard state.entries.count < Self.maximumMessagesPerTask else { return }
+      append(entry, in: state)
+    }
+    markDirty(taskID: taskID, key: key, in: state)
+    notify(
+      ConversationChange(
+        taskID: taskID,
+        key: key,
+        role: .agent,
+        kind: .toolCall,
+        delta: nil,
+        baseContentLength: 0,
+        fullContent: content,
+        final: true,
+        toolName: entry.toolName,
+        toolStatus: entry.toolStatus,
+        toolArguments: entry.toolArguments
+      ),
+      in: state
+    )
+    if await shouldFlush(state) {
+      _ = await flush(taskID: taskID)
+    }
+  }
+
   public func finalize(taskID: TaskID, messages: [ExecutionAgentMessage]) async {
     guard !messages.isEmpty else { return }
     let state = state(taskID: taskID)

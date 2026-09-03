@@ -8,6 +8,188 @@ import XCTest
 
 @MainActor
 final class BridgeServiceAppModelTests: XCTestCase {
+  func testNativePermissionPolicyLoadsAndSavesIndependentlyFromWorkspaceMode()
+    async throws
+  {
+    let registration = TestServiceRegistration(status: .enabled)
+    let client = TestBridgeServiceClient()
+    let policy = IPCAgentNativePermissionPolicyResponse(
+      providerID: "antigravity",
+      installationID: "ainst-agy",
+      toolPermission: "request-review",
+      availableModes: [
+        IPCAgentNativePermissionModeSummary(
+          modeID: "request-review",
+          displayName: "Request Review",
+          requiresConfirmation: false
+        ),
+        IPCAgentNativePermissionModeSummary(
+          modeID: "always-proceed",
+          displayName: "Always Proceed",
+          requiresConfirmation: true
+        ),
+      ],
+      availableActions: ["command"],
+      rules: [],
+      revision: "revision-1",
+      warnings: []
+    )
+    await client.configureNativePermissionPolicy(policy)
+    let model = BridgeServiceAppModel(
+      registration: registration,
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+    let originalWorkbenchMode = model.workbenchPermissionMode
+
+    await model.loadNativePermissionPolicy(installationID: "ainst-agy")
+    XCTAssertEqual(
+      model.nativePermissionPolicy(installationID: "ainst-agy")?.toolPermission,
+      "request-review"
+    )
+    model.updateNativePermissionPolicy(
+      IPCAgentNativePermissionMutationRequest(
+        installationID: "ainst-agy",
+        expectedRevision: "revision-1",
+        operation: .setToolPermission,
+        toolPermission: "always-proceed"
+      )
+    )
+    try await waitUntil {
+      model.nativePermissionPolicy(installationID: "ainst-agy")?.revision == "revision-2"
+    }
+
+    XCTAssertEqual(
+      model.nativePermissionPolicy(installationID: "ainst-agy")?.toolPermission,
+      "always-proceed"
+    )
+    XCTAssertEqual(model.workbenchPermissionMode, originalWorkbenchMode)
+    let mutations = await client.nativePermissionMutationValues()
+    XCTAssertEqual(mutations.count, 1)
+  }
+
+  func testPermissionRemediationPreparesAndAppliesAuthorityBoundCandidate() async throws {
+    let client = TestBridgeServiceClient()
+    let policy = IPCAgentNativePermissionPolicyResponse(
+      providerID: "antigravity",
+      installationID: "ainst-agy",
+      toolPermission: "request-review",
+      availableModes: [
+        IPCAgentNativePermissionModeSummary(
+          modeID: "request-review",
+          displayName: "Request Review",
+          requiresConfirmation: false
+        )
+      ],
+      availableActions: ["command"],
+      rules: [],
+      revision: "revision-1",
+      warnings: []
+    )
+    let remediation = IPCAgentPermissionRemediationResponse(
+      taskID: "task-agy",
+      messageKey: "tool:command-1",
+      installationID: policy.installationID,
+      candidateID: "candidate-1",
+      action: "command",
+      target: "swift test",
+      displayRule: "command(swift test)",
+      requiresConfirmation: false,
+      settingsRevision: policy.revision
+    )
+    await client.configureNativePermissionPolicy(policy)
+    await client.configurePermissionRemediation(remediation)
+    let model = BridgeServiceAppModel(
+      registration: TestServiceRegistration(status: .enabled),
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+
+    let prepared = await model.permissionRemediation(
+      taskID: remediation.taskID,
+      messageKey: remediation.messageKey
+    )
+    XCTAssertEqual(prepared, remediation)
+    XCTAssertEqual(try XCTUnwrap(prepared).candidateID, remediation.candidateID)
+    let applied = await model.applyPermissionRemediation(remediation)
+    XCTAssertTrue(applied)
+
+    let requests = await client.permissionRemediationRequestValues()
+    let applyRequests = await client.permissionRemediationApplyRequestValues()
+    XCTAssertEqual(requests.count, 1)
+    XCTAssertEqual(applyRequests.first?.candidateID, remediation.candidateID)
+    XCTAssertEqual(
+      model.nativePermissionPolicy(installationID: policy.installationID)?.revision,
+      "revision-remediated"
+    )
+  }
+
+  func testPermissionRemediationOpensGlobalEditorForAskOrDenyConflict() async {
+    let client = TestBridgeServiceClient()
+    let conflictingRule = IPCAgentNativePermissionRuleSummary(
+      ruleID: "rule-deny",
+      effect: "deny",
+      action: "command",
+      target: "swift test",
+      isEditable: true,
+      isRedacted: false,
+      requiresConfirmation: false
+    )
+    let policy = IPCAgentNativePermissionPolicyResponse(
+      providerID: "antigravity",
+      installationID: "ainst-agy-conflict",
+      toolPermission: "request-review",
+      availableModes: [
+        IPCAgentNativePermissionModeSummary(
+          modeID: "request-review",
+          displayName: "Request Review",
+          requiresConfirmation: false
+        )
+      ],
+      availableActions: ["command"],
+      rules: [conflictingRule],
+      revision: "revision-conflict",
+      warnings: []
+    )
+    let remediation = IPCAgentPermissionRemediationResponse(
+      taskID: "task-agy-conflict",
+      messageKey: "tool:command-1",
+      installationID: policy.installationID,
+      candidateID: "candidate-conflict",
+      action: conflictingRule.action,
+      target: conflictingRule.target,
+      displayRule: "command(swift test)",
+      requiresConfirmation: false,
+      settingsRevision: policy.revision
+    )
+    await client.configureNativePermissionPolicy(policy)
+    await client.configurePermissionRemediation(remediation)
+    let model = BridgeServiceAppModel(
+      registration: TestServiceRegistration(status: .enabled),
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+
+    let applied = await model.applyPermissionRemediation(remediation)
+
+    XCTAssertFalse(applied)
+    XCTAssertEqual(model.selection, .settings)
+    XCTAssertEqual(
+      model.focusedAgentNativePermissionInstallationID,
+      policy.installationID
+    )
+    XCTAssertNotNil(model.agentNativePermissionErrors[policy.installationID])
+  }
+
   func testWorkbenchPermissionModeHydratesFromStatusAndPersistsThroughClient()
     async throws
   {

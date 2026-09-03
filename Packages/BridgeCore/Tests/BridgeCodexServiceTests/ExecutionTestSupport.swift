@@ -520,13 +520,60 @@ func resumeSteerInterruptExecutionScript(root: String) -> String {
     .replacingOccurrences(of: "__INTERRUPTED__", with: interrupted)
 }
 
-func unavailableModelScript() -> String {
-  #"""
-  IFS= read -r initialize
-  printf '%s\n' '{"id":1,"result":{"userAgent":"fixture/1","codexHome":"/private/fixture","platformFamily":"unix","platformOs":"macos"}}'
-  IFS= read -r initialized
-  IFS= read -r models
-  printf '%s\n' '{"id":2,"result":{"data":[],"nextCursor":null}}'
-  sleep 1
-  """#
+func unavailableModelScript(root: String) -> String {
+  let thread = executionThreadJSON(id: "thread-uncatalogued", root: root)
+  let turn = executionTurnJSON(id: "turn-uncatalogued", status: "inProgress")
+  let completed = executionTurnJSON(
+    id: "turn-uncatalogued",
+    status: "completed",
+    items: #"[{"type":"agentMessage","text":"Completed without a model catalog."}]"#
+  )
+  return #"""
+    IFS= read -r initialize
+    printf '%s\n' '{"id":1,"result":{"userAgent":"fixture/1","codexHome":"/private/fixture","platformFamily":"unix","platformOs":"macos"}}'
+    IFS= read -r initialized
+    IFS= read -r models
+    printf '%s\n' '{"id":2,"result":{"data":[],"nextCursor":null}}'
+    IFS= read -r thread_start
+    case "$thread_start" in *'"method":"thread/start"'*) ;; *) exit 21 ;; esac
+    printf '%s\n' '{"id":3,"result":{"thread":__THREAD__,"model":"fixture-model","modelProvider":"fixture","reasoningEffort":"medium","cwd":"__ROOT__","sandbox":{"type":"workspaceWrite","networkAccess":false,"writableRoots":["__ROOT__"],"excludeSlashTmp":false,"excludeTmpdirEnvVar":false},"approvalPolicy":"on-request","approvalsReviewer":"user","serviceTier":null}}'
+    IFS= read -r turn_start
+    printf '%s\n' '{"method":"turn/started","params":{"threadId":"thread-uncatalogued","turn":__TURN__}}'
+    printf '%s\n' '{"id":4,"result":{"turn":__TURN__}}'
+    printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-uncatalogued","turn":__COMPLETED__}}'
+    sleep 1
+    """#
+    .replacingOccurrences(of: "__ROOT__", with: root)
+    .replacingOccurrences(of: "__THREAD__", with: thread)
+    .replacingOccurrences(of: "__TURN__", with: turn)
+    .replacingOccurrences(of: "__COMPLETED__", with: completed)
+}
+
+func providerDefaultExecutionScript(root: String) -> String {
+  let thread = executionThreadJSON(id: "thread-provider-default", root: root)
+  let turn = executionTurnJSON(id: "turn-provider-default", status: "inProgress")
+  let completed = executionTurnJSON(
+    id: "turn-provider-default",
+    status: "completed",
+    items: #"[{"type":"agentMessage","text":"Completed with provider defaults."}]"#
+  )
+  return #"""
+    IFS= read -r initialize
+    printf '%s\n' '{"id":1,"result":{"userAgent":"fixture/1","codexHome":"/private/fixture","platformFamily":"unix","platformOs":"macos"}}'
+    IFS= read -r initialized
+    IFS= read -r thread_start
+    case "$thread_start" in *'"method":"thread/start"'*) ;; *) exit 21 ;; esac
+    case "$thread_start" in *'"model":'*) exit 22 ;; esac
+    printf '%s\n' '{"id":2,"result":{"thread":__THREAD__,"model":"third-party-default","modelProvider":"third-party","reasoningEffort":"custom","cwd":"__ROOT__","sandbox":{"type":"workspaceWrite","networkAccess":false,"writableRoots":["__ROOT__"],"excludeSlashTmp":false,"excludeTmpdirEnvVar":false},"approvalPolicy":"on-request","approvalsReviewer":"user","serviceTier":null}}'
+    IFS= read -r turn_start
+    case "$turn_start" in *'"model":'*|*'"effort":'*) exit 23 ;; esac
+    printf '%s\n' '{"method":"turn/started","params":{"threadId":"thread-provider-default","turn":__TURN__}}'
+    printf '%s\n' '{"id":3,"result":{"turn":__TURN__}}'
+    printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-provider-default","turn":__COMPLETED__}}'
+    sleep 1
+    """#
+    .replacingOccurrences(of: "__ROOT__", with: root)
+    .replacingOccurrences(of: "__THREAD__", with: thread)
+    .replacingOccurrences(of: "__TURN__", with: turn)
+    .replacingOccurrences(of: "__COMPLETED__", with: completed)
 }

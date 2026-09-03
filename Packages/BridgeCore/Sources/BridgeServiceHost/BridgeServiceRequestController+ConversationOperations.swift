@@ -171,6 +171,7 @@ extension BridgeServiceRequestController {
         taskID: taskID,
         approvalID: payload.approvalID,
         approved: decision == .allow,
+        oneTimeToolAutoApproval: payload.oneTimeToolAutoApproval == true,
         deadline: Self.deadline()
       )
     } else {

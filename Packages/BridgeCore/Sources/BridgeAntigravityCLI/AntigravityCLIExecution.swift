@@ -29,8 +29,8 @@ public actor AntigravityCLIExecution {
   private var turnFinalizing = false
   private var interruptRequested = false
   private var permissionDenied = false
-  private var permissionDeniedToolName: String?
-  private var lastFailedTool: (name: String, stepIndex: Int)?
+  private var permissionDeniedTool: AntigravityToolContext?
+  private var lastTool: AntigravityToolContext?
   private var permissionMode: String?
   private var nativeToolCapabilities: Set<AgentCapability> = []
   private var terminal = false
@@ -196,21 +196,16 @@ public actor AntigravityCLIExecution {
         guard let update = envelope.stepUpdate, let normalizer else {
           throw AntigravityCLIError.invalidMessage
         }
-        let toolName = update.toolInfo?.name ?? update.toolName
-        if update.stepType == "tool",
-          update.state == "ERROR" || update.toolInfo?.error != nil || update.error != nil,
-          let toolName
-        {
-          lastFailedTool = (toolName, update.stepIndex)
-        }
-        if AntigravityPermissionEvidence.detected(in: update.toolInfo?.error?.message)
-          || AntigravityPermissionEvidence.detected(in: update.error?.message)
-        {
+        let precedingTool = lastTool
+        let currentTool = AntigravityCLIEventNormalizer.toolContext(for: update)
+        if let currentTool { lastTool = currentTool }
+        if Self.permissionDenied(in: update) {
           permissionDenied = true
-          let precedingToolName = lastFailedTool.flatMap {
-            $0.stepIndex + 1 == update.stepIndex ? $0.name : nil
-          }
-          permissionDeniedToolName = toolName ?? precedingToolName
+          permissionDeniedTool =
+            currentTool
+            ?? precedingTool.flatMap {
+              $0.stepIndex + 1 == update.stepIndex ? $0 : nil
+            }
         }
         for event in try await normalizer.normalize(update) {
           guard !terminal else { return }
@@ -330,12 +325,14 @@ public actor AntigravityCLIExecution {
     let hasQueuedSteer = canContinue && !queuedSteers.isEmpty
     let terminalResult = !hasQueuedSteer
     await beforeResultNormalization()
+    let deniedTool = denied ? permissionDeniedTool ?? lastTool : nil
     for event in try await normalizer.normalize(
       result,
       permissionDenied: denied,
       terminal: terminalResult,
       permissionMode: permissionMode,
-      deniedToolName: permissionDeniedToolName
+      deniedToolItemID: deniedTool?.itemID,
+      deniedToolName: deniedTool?.name
     ) {
       guard !terminal else { return }
       if interruptRequested, Self.isTerminalEvent(event.event) { continue }
@@ -364,8 +361,8 @@ public actor AntigravityCLIExecution {
     }
     let frame = try AntigravityWireCodec.encodeUserMessage(prompt)
     permissionDenied = false
-    permissionDeniedToolName = nil
-    lastFailedTool = nil
+    permissionDeniedTool = nil
+    lastTool = nil
     try await transport.send(frame)
     guard !terminal else { return }
     turnFinalizing = false
@@ -388,6 +385,11 @@ public actor AntigravityCLIExecution {
     try? await Task.sleep(for: .milliseconds(25))
     output = await transport.standardErrorSnapshot()
     return AntigravityPermissionEvidence.detected(in: output)
+  }
+
+  private static func permissionDenied(in update: AntigravityStepUpdate) -> Bool {
+    AntigravityPermissionEvidence.detected(in: update.toolInfo?.error?.message)
+      || AntigravityPermissionEvidence.detected(in: update.error?.message)
   }
 
   private func streamEnded(failure: (any Error)?) async {

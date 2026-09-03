@@ -37,5 +37,10 @@
     public func stopStreaming() {
       controller.stopStreaming()
     }
+
+    static func map(_ error: Error) -> (code: String, message: String, retryable: Bool) {
+      let mapped = BridgeServiceRequestController.map(error)
+      return (mapped.code, mapped.message, mapped.retryable)
+    }
   }
 #endif

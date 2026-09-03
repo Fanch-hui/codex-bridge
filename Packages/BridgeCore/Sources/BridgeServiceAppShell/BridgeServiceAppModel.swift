@@ -104,6 +104,12 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var agentModelDefaults: [String: IPCAgentModelDefaultResponse] =
     [:]
   @Published public internal(set) var agentModelHydratingProviders: Set<String> = []
+  @Published public internal(set) var agentNativePermissionPolicies:
+    [String: IPCAgentNativePermissionPolicyResponse] = [:]
+  @Published public internal(set) var agentNativePermissionLoadingInstallations: Set<String> = []
+  @Published public internal(set) var agentNativePermissionSavingInstallations: Set<String> = []
+  @Published public internal(set) var agentNativePermissionErrors: [String: String] = [:]
+  @Published public internal(set) var focusedAgentNativePermissionInstallationID: String?
   @Published public internal(set) var openCodeDefaultModel: String?
   @Published public internal(set) var openCodeDefaultPermissionMode = "build"
   @Published public internal(set) var openCodeDefaultEffort: String?
@@ -197,6 +203,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var agentModelDefaultLoadGenerations: [String: UInt64] = [:]
   var agentModelDefaultRevisions: [String: UInt64] = [:]
   var agentModelDefaultMutationTasks: [String: Task<Void, Never>] = [:]
+  var agentNativePermissionGenerations: [String: UInt64] = [:]
   var resolvedTaskApprovalKeys: Set<String> = []
   var resolvedDirectApprovalKeys: Set<String> = []
   var chatBrowserResumeURL = URL(string: "https://chatgpt.com")!

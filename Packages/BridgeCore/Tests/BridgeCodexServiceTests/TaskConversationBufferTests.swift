@@ -1,7 +1,8 @@
-import BridgeCodexService
 import BridgeDomain
 import BridgeServiceCore
 import XCTest
+
+@testable import BridgeCodexService
 
 final class TaskConversationBufferTests: XCTestCase {
   func testUserMessageStreamsFullContentAndPersistsImmediately() async throws {
@@ -445,6 +446,51 @@ final class TaskConversationBufferTests: XCTestCase {
     XCTAssertEqual(persisted[0].toolName, "read")
     XCTAssertEqual(persisted[0].toolStatus, "completed")
     collect.cancel()
+  }
+
+  func testPermissionDenialCorrectsFinalFailedToolWithoutLosingMetadata() async throws {
+    let fixture = try await makeExecutionFixture(self)
+    let task = try await submitStartedExecutionTask(
+      fixture: fixture,
+      taskID: "tsk-buffer-declined-tool"
+    )
+    let buffer = TaskConversationBuffer(
+      tasks: fixture.tasks,
+      flushDeltaCount: 1,
+      flushInFlightCount: 1
+    )
+    let arguments = #"{"command":"git status"}"#
+    let failed = try ExecutionToolCall(
+      itemID: "tool-4",
+      tool: "run_command",
+      arguments: arguments,
+      status: .failed
+    )
+    let processor = ServiceExecutionAgentEventProcessor(
+      tasks: fixture.tasks,
+      projects: fixture.projects,
+      conversation: buffer
+    )
+
+    await buffer.upsertToolCall(taskID: task.id, call: failed)
+    try await processor.process(.approvalAutomaticallyDenied("tool-4"), taskID: task.id)
+
+    let entries = await buffer.entries(taskID: task.id)
+    XCTAssertEqual(entries.count, 1)
+    XCTAssertEqual(entries[0].key, "tool:tool-4")
+    XCTAssertEqual(entries[0].toolName, "run_command")
+    XCTAssertEqual(entries[0].toolArguments, arguments)
+    XCTAssertEqual(entries[0].content, arguments)
+    XCTAssertEqual(entries[0].toolStatus, ExecutionToolCallStatus.declined.rawValue)
+    XCTAssertTrue(entries[0].isFinal)
+
+    let closed = await buffer.close(taskID: task.id)
+    XCTAssertTrue(closed)
+    let persisted = try await fixture.store.taskMessages(taskID: task.id)
+    XCTAssertEqual(persisted.count, 1)
+    XCTAssertEqual(persisted[0].toolName, "run_command")
+    XCTAssertEqual(persisted[0].toolArguments, arguments)
+    XCTAssertEqual(persisted[0].toolStatus, ExecutionToolCallStatus.declined.rawValue)
   }
 
   func testPersistedFinalEntriesAreEvictedFromActiveMemoryWindow() async throws {
