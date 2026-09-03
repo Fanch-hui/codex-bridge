@@ -254,9 +254,14 @@
       case .setFastMode:
         guard let enabled = payload.fastModeEnabled ?? payload.enabled else { return nil }
         return .patchSettings(BridgeDesktopSettingsPatch(fastModeEnabled: enabled))
-      case .setSupervisorModel, .setSupervisorEffort, .setSupervisorEnabled,
-        .registerService, .unregisterService, .setKeepServiceRunning:
+      case .setSupervisorModel, .setSupervisorEffort, .setSupervisorEnabled:
         return nil
+      case .registerService:
+        return .registerService
+      case .unregisterService:
+        return .unregisterService
+      case .setKeepServiceRunning:
+        return .setKeepServiceRunning(payload.keepServiceRunningAfterExit ?? true)
       case .updateBrowserViewport:
         return payload.viewport.map(MainWindowCommand.updateBrowserViewport)
       case .dismissFeedback:

@@ -31,15 +31,15 @@
         taskStartApprovalOptions: settings.taskStartApprovalValues.map { approvalChoice($0) },
         customInstructions: settings.customInstructions,
         agentDefaults: agentDefaults?.defaultItems ?? [],
-        keepServiceRunningAfterExit: true,
-        serviceRegistered: false,
+        keepServiceRunningAfterExit: settings.keepServiceRunningAfterExit,
+        serviceRegistered: settings.serviceRegistered,
         canSavePreferences: settings.savePreferencesEnabled,
         canSaveInstructions: settings.saveInstructionsEnabled,
         canSaveApprovalModes: settings.saveDirectApprovalEnabled
           && settings.saveTaskStartApprovalEnabled,
-        canChangeService: false,
+        canChangeService: true,
         servicePlatform: "Windows",
-        serviceDescription: "后台 Service 按需启动，关闭窗口后继续运行。",
+        serviceDescription: "Windows 用户登录自动启动后台 Service，退出窗口后继续运行。",
         statusMessage: settings.statusText
       )
     }

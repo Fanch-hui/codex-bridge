@@ -17,6 +17,8 @@
     private(set) var instructions = ""
     private(set) var directMode = "require"
     private(set) var taskStartMode = "require"
+    var keepServiceRunningAfterExit = true
+    var serviceRegistered = false
     var busy = false
     var statusText = "尚未加载设置。"
 
@@ -26,6 +28,9 @@
     ) {
       self.client = client
       self.feedback = feedback
+      keepServiceRunningAfterExit =
+        UserDefaults.standard.object(forKey: "keepServiceRunningAfterAppExit") as? Bool ?? true
+      serviceRegistered = WindowsServiceRegistration.isRegistered()
       displayBox = AuxiliaryDisplayBox(
         value: WindowsSettingsDisplay(
           connectionState: .idle,
@@ -49,7 +54,9 @@
           saveInstructionsEnabled: false,
           saveDirectApprovalEnabled: false,
           saveTaskStartApprovalEnabled: false,
-          statusText: statusText
+          statusText: statusText,
+          keepServiceRunningAfterExit: keepServiceRunningAfterExit,
+          serviceRegistered: serviceRegistered
         )
       )
     }
@@ -99,6 +106,7 @@
         failures.append("任务启动审批")
       }
       statusText = failures.isEmpty ? "设置已加载。" : "部分设置读取失败：\(failures.joined(separator: "、"))"
+      serviceRegistered = WindowsServiceRegistration.isRegistered()
       publishDisplay()
     }
 
@@ -203,7 +211,7 @@
       publishDisplay()
     }
 
-    private func publishDisplay() {
+    func publishDisplay() {
       let current = preferences
       let modelIDs = models.map(\.modelID)
       let effortValues = availableEffortValues()
@@ -258,7 +266,9 @@
         accessMode: current?.accessMode ?? "request-approval",
         directApprovalMode: directMode,
         taskStartApprovalMode: taskStartMode,
-        modelOptions: modelOptions
+        modelOptions: modelOptions,
+        keepServiceRunningAfterExit: keepServiceRunningAfterExit,
+        serviceRegistered: serviceRegistered
       )
       displayBox.store(value)
     }

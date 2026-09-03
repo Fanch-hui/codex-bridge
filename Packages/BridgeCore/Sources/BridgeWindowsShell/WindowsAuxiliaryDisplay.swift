@@ -131,6 +131,8 @@
     var directApprovalMode: String = "require"
     var taskStartApprovalMode: String = "require"
     var modelOptions: [BridgeDesktopModelOption] = []
+    var keepServiceRunningAfterExit: Bool = true
+    var serviceRegistered: Bool = false
   }
 
   final class AuxiliaryDisplayBox<Value: Equatable & Sendable>: @unchecked Sendable {

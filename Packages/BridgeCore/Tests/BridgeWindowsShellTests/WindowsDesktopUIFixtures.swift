@@ -123,4 +123,36 @@
       tunnel: tunnel
     )
   }
+
+  func makeSettings(
+    keepServiceRunningAfterExit: Bool = true,
+    serviceRegistered: Bool = false
+  ) -> WindowsSettingsDisplay {
+    WindowsSettingsDisplay(
+      connectionState: .connected,
+      modelRows: [],
+      modelIDs: [],
+      selectedExecutionModelIndex: nil,
+      selectedSupervisorModelIndex: nil,
+      effortValues: [],
+      selectedExecutionEffortIndex: nil,
+      selectedSupervisorEffortIndex: nil,
+      accessValues: ["request-approval"],
+      selectedAccessIndex: 0,
+      supervisorEnabled: false,
+      fastModeEnabled: false,
+      directApprovalValues: ["require"],
+      selectedDirectApprovalIndex: 0,
+      taskStartApprovalValues: ["require"],
+      selectedTaskStartApprovalIndex: 0,
+      customInstructions: "",
+      savePreferencesEnabled: false,
+      saveInstructionsEnabled: false,
+      saveDirectApprovalEnabled: false,
+      saveTaskStartApprovalEnabled: false,
+      statusText: "就绪",
+      keepServiceRunningAfterExit: keepServiceRunningAfterExit,
+      serviceRegistered: serviceRegistered
+    )
+  }
 #endif

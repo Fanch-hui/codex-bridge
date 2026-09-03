@@ -89,6 +89,9 @@
     case setLogKindFilter(index: Int)
     case copyLogs
     case refreshSettings
+    case registerService
+    case unregisterService
+    case setKeepServiceRunning(Bool)
     case saveSettingsPreferences(preferences: IPCModelPreferences)
     case saveSettingsInstructions(text: String)
     case setSettingsDirectApprovalMode(mode: String)

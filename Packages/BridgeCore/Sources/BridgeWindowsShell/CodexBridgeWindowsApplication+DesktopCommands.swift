@@ -200,6 +200,15 @@
       case .patchSettings(let patch):
         Task { @MainActor in await auxiliary.settings.applyPreferencesPatch(patch) }
         return true
+      case .registerService:
+        Task { @MainActor in await auxiliary.settings.registerService() }
+        return true
+      case .unregisterService:
+        Task { @MainActor in await auxiliary.settings.unregisterService() }
+        return true
+      case .setKeepServiceRunning(let keep):
+        auxiliary.settings.setKeepServiceRunningAfterExit(keep)
+        return true
       case .dismissFeedback(let id):
         model.feedback.dismiss(id: id)
         return true

@@ -44,7 +44,8 @@
         runLogs(command)
       case .refreshSettings, .saveSettingsPreferences,
         .saveSettingsInstructions, .setSettingsDirectApprovalMode,
-        .setSettingsTaskStartApprovalMode:
+        .setSettingsTaskStartApprovalMode,
+        .registerService, .unregisterService, .setKeepServiceRunning:
         runSettings(command)
       case .selectMCPClient, .refreshMCPConnections, .toggleSelectedMCPClient,
         .setSelectedMCPExposure, .copySelectedMCPConfiguration,
@@ -183,6 +184,12 @@
         Task { await settings.setDirectApprovalMode(mode) }
       case .setSettingsTaskStartApprovalMode(let mode):
         Task { await settings.setTaskStartApprovalMode(mode) }
+      case .registerService:
+        Task { await settings.registerService() }
+      case .unregisterService:
+        Task { await settings.unregisterService() }
+      case .setKeepServiceRunning(let keep):
+        settings.setKeepServiceRunningAfterExit(keep)
       default:
         break
       }
