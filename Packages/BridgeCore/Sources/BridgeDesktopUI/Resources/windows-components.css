@@ -1,12 +1,34 @@
 :root[data-platform="windows"] .page-card,
 :root[data-platform="windows"] .list-panel,
 :root[data-platform="windows"] .detail-panel,
-:root[data-platform="windows"] .browser-pane,
-:root[data-platform="windows"] .inspector-pane,
 :root[data-platform="windows"] .summary-card,
 :root[data-platform="windows"] .log-row {
   border-color: var(--separator);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-platform="windows"] .browser-pane {
+  border: 0;
+  border-right: 1px solid var(--separator);
+  box-shadow: none;
+}
+
+:root[data-platform="windows"] .inspector-pane {
+  border: 0;
+  box-shadow: none;
+}
+
+:root[data-platform="windows"] .segmented-control {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+:root[data-platform="windows"] .segmented-btn.is-active {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-platform="windows"] .browser-url-pill {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 :root[data-platform="windows"] .button {

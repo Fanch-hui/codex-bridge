@@ -33,6 +33,9 @@ final class BridgeDesktopBridgeTests: XCTestCase {
       state.workbench?.tasks.map { $0.taskID } ?? [],
       model.tasks.map { $0.taskID }
     )
+    XCTAssertEqual(state.workbench?.projectStatus, "就绪")
+    XCTAssertEqual(state.workbench?.projectStatusTone, "success")
+    XCTAssertNotNil(state.workbench?.engineStatus)
     XCTAssertEqual(
       state.connections?.providers.map { $0.providerID } ?? [],
       model.agentProviders.map { $0.providerID }

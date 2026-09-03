@@ -37,13 +37,21 @@
       lock.withLock { snapshot.canGoForward }
     }
 
-    func attach(to window: HWND?, onNavigationChanged: (@Sendable (Bool, Bool) -> Void)? = nil) {
+    func attach(
+      to window: HWND?,
+      onStateChanged: (@Sendable (State) -> Void)? = nil,
+      onNavigationChanged: (@Sendable (Bool, Bool) -> Void)? = nil
+    ) {
       guard let window else { return }
       let next = WindowsWebViewThread(
         parentWindow: window,
         configuration: .chatBrowser(),
         updateState: { [weak self] state, detail in
           self?.store(state: state, errorDetail: detail)
+          onStateChanged?(state)
+          if state == .active {
+            WindowsMainWindow.enqueue(.refreshAll)
+          }
         },
         onWebMessage: nil,
         onNavigationChanged: { [weak self] canGoBack, canGoForward in
@@ -67,6 +75,10 @@
 
     func setVisible(_ visible: Bool) {
       lock.withLock { worker }?.setVisible(visible)
+    }
+
+    func bringToTop() {
+      lock.withLock { worker }?.bringToTop()
     }
 
     func goBack() {

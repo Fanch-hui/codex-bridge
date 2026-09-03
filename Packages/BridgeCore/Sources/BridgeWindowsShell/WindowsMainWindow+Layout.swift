@@ -20,8 +20,12 @@
         return
       }
       chatBounds = browserViewportRect(viewport, in: bounds)
+      let visible = !isEmpty(chatBounds)
       chat?.resize(to: chatBounds)
-      chat?.setVisible(!isEmpty(chatBounds))
+      chat?.setVisible(visible)
+      if visible {
+        chat?.bringToTop()
+      }
     }
 
     private static func hideChat() {
@@ -30,11 +34,12 @@
       chat?.setVisible(false)
     }
 
-    private static func browserViewportRect(
+    static func browserViewportRect(
       _ viewport: BridgeDesktopBrowserViewport,
-      in bounds: RECT
+      in bounds: RECT,
+      dpi overrideDpi: UINT? = nil
     ) -> RECT {
-      let scale = dpiScale()
+      let scale = dpiScale(overrideDpi: overrideDpi)
       let width = Double(max(Int32(0), bounds.right - bounds.left))
       let height = Double(max(Int32(0), bounds.bottom - bounds.top))
       let x = min(width, max(0, finite(viewport.x) * scale))
@@ -49,8 +54,8 @@
       )
     }
 
-    private static func dpiScale() -> Double {
-      let dpi = window.map { GetDpiForWindow($0) } ?? 96
+    private static func dpiScale(overrideDpi: UINT? = nil) -> Double {
+      let dpi = overrideDpi ?? window.map { GetDpiForWindow($0) } ?? 96
       return Double(dpi == 0 ? 96 : dpi) / 96
     }
 

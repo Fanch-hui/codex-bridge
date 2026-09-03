@@ -17,6 +17,7 @@
         choice("read-only", "只读"),
         choice("workspace-write", "工作区可写"),
       ]
+      let (projectStatus, projectStatusTone) = projectStatus(for: display)
       return BridgeDesktopWorkbenchState(
         header: header(
           "工作台",
@@ -38,8 +39,46 @@
           status: browserStatus,
           canGoBack: browserCanGoBack,
           canGoForward: browserCanGoForward
-        )
+        ),
+        projectStatus: projectStatus,
+        projectStatusTone: projectStatusTone,
+        engineStatus: engineStatus(for: display)
       )
+    }
+
+    private static func projectStatus(
+      for display: WindowsWorkbenchDisplay
+    ) -> (String, String) {
+      if let detail = display.selectedTaskDetail {
+        if detail.status == "运行中" || detail.status == "正在启动" {
+          return ("运行中", "running")
+        }
+        return (detail.status, tone(for: detail.status))
+      }
+      if display.runningTaskCount > 0 {
+        return ("运行中", "running")
+      }
+      return ("就绪", "success")
+    }
+
+    private static func tone(for status: String) -> String {
+      switch status {
+      case "运行中", "正在启动": "running"
+      case "已完成": "success"
+      case "失败": "error"
+      case "等待本机批准", "等待 Codex 审批": "warning"
+      default: "neutral"
+      }
+    }
+
+    private static func engineStatus(for display: WindowsWorkbenchDisplay) -> String {
+      if display.connectionState != .connected {
+        return "等待连接本机 Service"
+      }
+      if let detail = display.selectedTaskDetail, let step = detail.currentStep, !step.isEmpty {
+        return "\(detail.provider) \(step)"
+      }
+      return "已连接本机 Codex 引擎"
     }
 
     private static func steerModes(

@@ -162,6 +162,9 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let approvals: [BridgeDesktopApprovalRow]
   public let steerModes: [BridgeDesktopChoice]
   public let browser: BridgeDesktopBrowserSlot
+  public let projectStatus: String?
+  public let projectStatusTone: String?
+  public let engineStatus: String?
 
   public init(
     header: BridgeDesktopPageHeader,
@@ -174,7 +177,10 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     selectedTask: BridgeDesktopTaskDetail? = nil,
     approvals: [BridgeDesktopApprovalRow] = [],
     steerModes: [BridgeDesktopChoice] = [],
-    browser: BridgeDesktopBrowserSlot = .init()
+    browser: BridgeDesktopBrowserSlot = .init(),
+    projectStatus: String? = nil,
+    projectStatusTone: String? = nil,
+    engineStatus: String? = nil
   ) {
     self.header = header
     self.projects = projects
@@ -187,5 +193,8 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     self.approvals = approvals
     self.steerModes = steerModes
     self.browser = browser
+    self.projectStatus = projectStatus
+    self.projectStatusTone = projectStatusTone
+    self.engineStatus = engineStatus
   }
 }

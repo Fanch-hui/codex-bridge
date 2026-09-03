@@ -48,6 +48,11 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(workbenchScript.contains("resolveApproval"))
     XCTAssertTrue(workbenchScript.contains("deleteTask"))
     XCTAssertTrue(workbenchScript.contains("confirm("))
+    XCTAssertTrue(workbenchScript.contains("setWorkbenchPermissionMode"))
+    XCTAssertTrue(workbenchScript.contains("等待 ChatGPT 指令"))
+    XCTAssertTrue(index.contains("workbench-browser-toolbar"))
+    XCTAssertTrue(index.contains("workbench-inspector-header"))
+    XCTAssertTrue(index.contains("workbench-inspector-footer"))
     XCTAssertTrue(
       try BridgeDesktopUIResources.read(.pagesProjectsJS).contains("saveProjectBlacklist")
     )
@@ -109,7 +114,10 @@ final class BridgeDesktopUITests: XCTestCase {
           subtitle: "任务",
           symbol: "bubble.left.and.text.bubble.right.fill"
         ),
-        browser: BridgeDesktopBrowserSlot(visible: true, enabled: true)
+        browser: BridgeDesktopBrowserSlot(visible: true, enabled: true),
+        projectStatus: "就绪",
+        projectStatusTone: "success",
+        engineStatus: "已连接本机 Codex 引擎"
       )
     )
     let data = try JSONEncoder().encode(state)
@@ -117,6 +125,9 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertEqual(decoded, state)
     XCTAssertEqual(decoded.hostContext?.platform, .windows)
     XCTAssertEqual(decoded.feedback?.id, "feedback-1")
+    XCTAssertEqual(decoded.workbench?.projectStatus, "就绪")
+    XCTAssertEqual(decoded.workbench?.projectStatusTone, "success")
+    XCTAssertEqual(decoded.workbench?.engineStatus, "已连接本机 Codex 引擎")
   }
 
   func testLegacyStateWithoutHostContextOrFeedbackStillDecodes() throws {

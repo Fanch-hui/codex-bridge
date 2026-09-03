@@ -5,7 +5,8 @@ import BridgeServiceAppCore
 
 extension BridgeDesktopUIStateBuilder {
   static func workbench(from model: BridgeServiceAppModel) -> BridgeDesktopWorkbenchState {
-    BridgeDesktopWorkbenchState(
+    let (projectStatus, projectStatusTone) = projectStatus(from: model)
+    return BridgeDesktopWorkbenchState(
       header: BridgeDesktopPageHeader(
         title: "工作台",
         subtitle: "在本机 ChatGPT 工作区旁查看任务、审批与实时执行状态。",
@@ -22,8 +23,52 @@ extension BridgeDesktopUIStateBuilder {
       selectedTask: selectedTask(from: model),
       approvals: approvals(from: model),
       steerModes: steerModes(from: model),
-      browser: browserSlot(from: model)
+      browser: browserSlot(from: model),
+      projectStatus: projectStatus,
+      projectStatusTone: projectStatusTone,
+      engineStatus: engineStatus(from: model)
     )
+  }
+
+  private static func projectStatus(
+    from model: BridgeServiceAppModel
+  ) -> (String, String) {
+    if let taskID = model.selectedTaskID,
+      let task = model.tasks.first(where: { $0.taskID == taskID })
+    {
+      if task.isRunning {
+        return ("运行中", "running")
+      }
+      return (taskStatusLabel(task.status), statusTone(task.status))
+    }
+    if model.runningTaskCount > 0 {
+      return ("运行中", "running")
+    }
+    return ("就绪", "success")
+  }
+
+  private static func statusTone(_ status: String) -> String {
+    switch status {
+    case "running", "starting": "running"
+    case "completed": "success"
+    case "failed": "error"
+    case "awaiting_local_approval", "waiting_for_codex_approval": "warning"
+    default: "neutral"
+    }
+  }
+
+  private static func engineStatus(from model: BridgeServiceAppModel) -> String {
+    guard model.connectionState == .connected else {
+      return model.connectionState.label
+    }
+    let task =
+      model.selectedTaskID.flatMap { id in
+        model.tasks.first(where: { $0.taskID == id })
+      } ?? model.tasks.first(where: { $0.isRunning })
+    return CodexActivityPresentation(
+      task: task,
+      activity: model.conversation?.activity ?? .idle
+    ).statusText
   }
 
   private static let permissionOptions = [

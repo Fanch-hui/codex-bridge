@@ -421,6 +421,9 @@
         controller, WebView2Slot.controllerPutIsVisible, as: WebView2PutBoolFn.self)
       _ = putBounds(controller, values.0)
       _ = putVisible(controller, values.1)
+      if values.1 && configuration.purpose == .chatBrowser {
+        bringToTop()
+      }
     }
 
     private func runAction(_ slot: Int) {

@@ -67,24 +67,19 @@
             </section>
           </section>
 
-          <section class="page" id="workbench-page" hidden aria-labelledby="workbench-title">
-            <div id="workbench-header"></div>
+          <section class="workbench-page" id="workbench-page" hidden aria-label="工作台">
             <div class="workbench-layout">
-              <section class="browser-pane" id="workbench-browser-pane" aria-label="ChatGPT 工作区">
-                <div class="browser-pane-header">
-                  <h3>ChatGPT 工作区</h3>
-                  <div class="browser-controls" id="browser-controls"></div>
-                </div>
+              <section class="browser-pane" id="workbench-browser-pane" aria-label="内置 ChatGPT 浏览器">
+                <div class="browser-toolbar" id="workbench-browser-toolbar"></div>
                 <div id="chat-browser-slot">
                   <div class="browser-slot-note" id="browser-slot-note">由宿主加载真实 ChatGPT 工作区</div>
                 </div>
               </section>
-              <aside class="inspector-pane" aria-label="任务检查器">
-                <div class="inspector-header">
-                  <h3>任务检查器</h3>
-                  <div id="workbench-inspector-project"></div>
-                </div>
-                <div class="inspector-scroll" id="workbench-inspector-content"></div>
+              <aside class="inspector-pane" id="workbench-inspector-pane" aria-label="任务检查器">
+                <div class="inspector-header" id="workbench-inspector-header"></div>
+                <div class="inspector-approvals" id="workbench-inspector-approvals"></div>
+                <div class="inspector-content" id="workbench-inspector-content"></div>
+                <div class="inspector-footer" id="workbench-inspector-footer"></div>
               </aside>
             </div>
           </section>

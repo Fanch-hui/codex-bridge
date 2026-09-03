@@ -70,7 +70,6 @@
     }
 
     static func selectPage(_ page: WindowsMainPage) {
-      guard renderedPage != page else { return }
       renderedPage = page
       layout()
     }

@@ -69,6 +69,9 @@
 
       XCTAssertEqual(state.workbench?.selectedProjectID, "project-stable")
       XCTAssertEqual(state.workbench?.browser.canLoadEarlierConversation, true)
+      XCTAssertEqual(state.workbench?.projectStatus, "就绪")
+      XCTAssertEqual(state.workbench?.projectStatusTone, "success")
+      XCTAssertEqual(state.workbench?.engineStatus, "已连接本机 Codex 引擎")
     }
 
     func testSharedCommandsRouteToStablePageAndTaskIdentifiers() {
