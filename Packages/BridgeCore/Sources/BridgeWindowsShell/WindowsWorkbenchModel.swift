@@ -177,7 +177,7 @@
     var permissionRemediationAppliedTaskIDs: Set<String> = []
     var permissionRemediationErrors: [String: String] = [:]
     var models: [MCPModelSummary] = []
-    var modelPreferences: IPCModelPreferencesResponse?
+    var modelPreferences: IPCModelPreferences?
     var modelError: String?
 
     public convenience init() {

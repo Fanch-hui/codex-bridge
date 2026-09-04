@@ -57,6 +57,52 @@ $originalPath = $env:PATH
 $originalInclude = $env:INCLUDE
 $originalLib = $env:LIB
 
+if ([string]::IsNullOrWhiteSpace($originalInclude) -or [string]::IsNullOrWhiteSpace($originalLib)) {
+  $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+  if (Test-Path $vswhere) {
+    $vsRoot = & $vswhere -latest -property installationPath | Select-Object -First 1
+    if ($vsRoot) {
+      $msvcRoot = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+      $kitsInc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+      $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+
+      if ($msvcRoot -and $kitsInc -and [string]::IsNullOrWhiteSpace($originalInclude)) {
+        $originalInclude = @(
+          "$msvcRoot\include",
+          "$kitsInc\ucrt",
+          "$kitsInc\um",
+          "$kitsInc\shared",
+          "$kitsInc\winrt"
+        ) -join ";"
+      }
+      if ($msvcRoot -and $kitsLib -and [string]::IsNullOrWhiteSpace($originalLib)) {
+        $archDir = if ($architecture -eq "arm64") { "arm64" } else { "x64" }
+        $originalLib = @(
+          "$msvcRoot\lib\$archDir",
+          "$kitsLib\um\$archDir",
+          "$kitsLib\ucrt\$archDir"
+        ) -join ";"
+      }
+    }
+  }
+}
+
+$cleanSdkCandidates = @(
+  "C:\Program Files\Swift\Platforms\6.3.3\Windows.platform\Developer\SDKs\Windows.sdk",
+  "C:\Swift\Platforms\6.3.3\Windows.platform\Developer\SDKs\Windows.sdk"
+)
+foreach ($candidate in $cleanSdkCandidates) {
+  if (Test-Path -LiteralPath $candidate -PathType Container) {
+    if ([string]::IsNullOrWhiteSpace($env:SDKROOT) -or $env:SDKROOT -match '[^\u0000-\u007F]') {
+      $env:SDKROOT = $candidate
+    }
+    break
+  }
+}
+
 if (-not $vcpkgRootValue) {
   throw "VcpkgRoot or VCPKG_INSTALLATION_ROOT is required."
 }
@@ -85,7 +131,15 @@ if ($Test) {
 
 Push-Location $packagePath
 try {
-  $swiftArguments = @("-Xswiftc", "-DSQLITE_DISABLE_SNAPSHOT")
+  $swiftArguments = @(
+    "-Xswiftc", "-DSQLITE_DISABLE_SNAPSHOT",
+    "-Xswiftc", "-I$vcpkgIncludeDirectory",
+    "-Xswiftc", "-Xcc", "-Xswiftc", "-I$vcpkgIncludeDirectory",
+    "-Xcc", "-DNOMINMAX",
+    "-Xcc", "-I$vcpkgIncludeDirectory",
+    "-Xlinker", "-libpath:$vcpkgLibraryDirectory",
+    "--build-system", "swiftbuild"
+  )
   if ($targetTriple) {
     $swiftArguments += @("--triple", $targetTriple)
   }

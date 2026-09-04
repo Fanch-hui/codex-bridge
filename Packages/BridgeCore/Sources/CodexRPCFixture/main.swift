@@ -44,7 +44,9 @@ struct CodexRPCFixture {
           developerInstructions: "This is an isolated read-only protocol fixture. Do not use tools."
         )
       )
-      guard thread.thread.cwd == fixtureURL.path, thread.cwd == fixtureURL.path else {
+      guard pathsMatch(thread.thread.cwd, fixtureURL.path),
+        pathsMatch(thread.cwd, fixtureURL.path)
+      else {
         throw FixtureError.cwdMismatch
       }
 
@@ -245,6 +247,18 @@ struct CodexRPCFixture {
       return text
     }
     return ""
+  }
+
+  private static func pathsMatch(_ lhs: String, _ rhs: String) -> Bool {
+    #if os(Windows)
+      let normLhs = lhs.replacingOccurrences(of: "/", with: "\\").lowercased()
+        .trimmingCharacters(in: CharacterSet(charactersIn: "\\/"))
+      let normRhs = rhs.replacingOccurrences(of: "/", with: "\\").lowercased()
+        .trimmingCharacters(in: CharacterSet(charactersIn: "\\/"))
+      return normLhs == normRhs
+    #else
+      return lhs == rhs
+    #endif
   }
 
   private static func makeFixtureDirectory() throws -> URL {
