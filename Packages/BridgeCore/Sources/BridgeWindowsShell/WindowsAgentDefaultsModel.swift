@@ -22,6 +22,8 @@
     var persistedDefaults: [String: IPCAgentModelDefaultResponse] = [:]
     var providerErrors: [String: String] = [:]
     var refreshingProviderIDs: Set<String> = []
+    var modelRefreshGenerations: [String: UInt64] = [:]
+    var workbenchProjectID: String?
     var nativePermissionPolicy: IPCAgentNativePermissionPolicyResponse?
     var nativePermissionInstallationID: String?
     var nativePermissionLoading = false
@@ -64,7 +66,8 @@
       statusText = "正在读取 Agent 目录…"
       publishDisplay()
       do {
-        _ = try await client.status()
+        let status = try await client.status()
+        workbenchProjectID = status.workbenchProjectID
         connectionState = .connected
         let catalog = try await client.agentCatalog()
         providers = catalog.providers

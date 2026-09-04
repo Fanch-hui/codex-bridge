@@ -80,12 +80,12 @@ struct BridgeServiceWorkbenchInspectorContext {
     in model: BridgeServiceAppModel,
     task: MCPServiceTaskSnapshot?
   ) -> MCPServiceTaskSnapshot? {
-    guard let task,
-      task.isExternalAgentTask,
-      task.expectedControlID != nil,
-      let providerID = task.providerID,
-      model.agentProviders.first(where: { $0.providerID == providerID })?.supportsSteer == true
-    else { return nil }
+    guard let task, task.expectedControlID != nil else { return nil }
+    if task.isExternalAgentTask {
+      guard let providerID = task.providerID,
+        model.agentProviders.first(where: { $0.providerID == providerID })?.supportsSteer == true
+      else { return nil }
+    }
     return task
   }
 
@@ -128,7 +128,6 @@ struct BridgeServiceWorkbenchInspectorPane: View {
     VStack(spacing: 0) {
       BridgeServiceWorkbenchInspectorHeader(
         model: model,
-        steerInput: $steerInput,
         context: context
       )
       .fixedSize(horizontal: false, vertical: true)
@@ -139,8 +138,12 @@ struct BridgeServiceWorkbenchInspectorPane: View {
           .layoutPriority(2)
         Divider()
       }
-      BridgeServiceWorkbenchInspectorLiveRegion(model: model, context: context)
-        .layoutPriority(1)
+      BridgeServiceWorkbenchInspectorLiveRegion(
+        model: model,
+        context: context,
+        steerInput: $steerInput
+      )
+      .layoutPriority(1)
     }
     .frame(minHeight: 0, maxHeight: .infinity)
     .background(Color(nsColor: .controlBackgroundColor))
@@ -150,8 +153,8 @@ struct BridgeServiceWorkbenchInspectorPane: View {
 
 struct BridgeServiceWorkbenchInspectorHeader: View {
   @ObservedObject var model: BridgeServiceAppModel
-  @Binding var steerInput: String
   let context: BridgeServiceWorkbenchInspectorContext
+  @State private var showDeleteConfirmation = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -225,39 +228,31 @@ struct BridgeServiceWorkbenchInspectorHeader: View {
           }
           .buttonStyle(.bordered)
           .controlSize(.mini)
-        }
-      }
-
-      if let task = context.steerableTask {
-        HStack(spacing: 6) {
-          TextField("补充指令（当前轮完成后继续）", text: $steerInput)
-            .textFieldStyle(.roundedBorder)
-            .lineLimit(1...3)
-          Menu("发送") {
-            Button("当前轮结束后继续") {
-              model.steerTask(task, input: steerInput)
-              steerInput = ""
-            }
-            if context.canInterruptAndContinue {
-              Button("立即纠偏当前轮") {
-                model.steerTask(
-                  task,
-                  input: steerInput,
-                  mode: .interruptCurrentThenContinue
-                )
-                steerInput = ""
-              }
-            }
+        } else if let currentTask = context.currentTask, currentTask.isTerminal {
+          Button(role: .destructive) {
+            showDeleteConfirmation = true
+          } label: {
+            Image(systemName: "trash")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
-          .buttonStyle(.bordered)
-          .controlSize(.mini)
-          .disabled(!context.canSubmitSteer)
+          .buttonStyle(.borderless)
+          .help("删除当前会话")
+          .accessibilityLabel("删除当前会话")
         }
-        .help("可排队到当前轮结束；DeepSeek Harness 也可中断当前轮并在同一会话立即继续")
       }
     }
     .padding(12)
     .background(Color(nsColor: .windowBackgroundColor))
+    .alert("删除当前会话？", isPresented: $showDeleteConfirmation) {
+      Button("删除", role: .destructive) {
+        guard let task = context.currentTask else { return }
+        model.deleteSession(task.effectiveSessionID ?? task.taskID, inProject: task.projectID)
+      }
+      Button("取消", role: .cancel) {}
+    } message: {
+      Text("该操作会删除此会话在 Codex Bridge 中保存的全部轮次任务、事件和对话记录，无法撤销。")
+    }
   }
 
   private func canInterrupt(_ task: MCPServiceTaskSnapshot) -> Bool {

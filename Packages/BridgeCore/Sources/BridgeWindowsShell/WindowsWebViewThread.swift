@@ -13,7 +13,7 @@
       static let postWebMessage = UINT(WM_APP + 5)
     }
 
-    typealias NavigationUpdate = @Sendable (Bool, Bool) -> Void
+    typealias NavigationUpdate = @Sendable (Bool, Bool, String?) -> Void
 
     let parentWindow: HWND
     private let initialURL: String
@@ -384,7 +384,19 @@
       _ = getCanGoForward(webView, &canGoForwardInt)
       let canGoBack = canGoBackInt != 0
       let canGoForward = canGoForwardInt != 0
-      onNavigationChanged?(canGoBack, canGoForward)
+      onNavigationChanged?(canGoBack, canGoForward, currentURL(webView))
+    }
+
+    private func currentURL(_ webView: UnsafeMutableRawPointer) -> String? {
+      let getSource: WebView2GetStringFn = webView2Method(
+        webView,
+        WebView2Slot.webViewGetSource,
+        as: WebView2GetStringFn.self
+      )
+      var source: UnsafeMutablePointer<WCHAR>?
+      guard getSource(webView, &source) == webview2SOK, let source else { return nil }
+      defer { CoTaskMemFree(UnsafeMutableRawPointer(source)) }
+      return String(decodingCString: source, as: UTF16.self)
     }
 
     private func handle(_ message: UINT) {

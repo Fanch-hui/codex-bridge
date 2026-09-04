@@ -74,6 +74,16 @@
       XCTAssertEqual(state.workbench?.engineStatus, "已连接本机 Codex 引擎")
     }
 
+    func testWorkbenchPublishesCurrentBrowserURL() {
+      let state = WindowsDesktopUIStateBuilder.build(
+        workbench: makeWorkbench(),
+        management: makeManagement(),
+        browserURL: "https://chatgpt.com/c/example"
+      )
+
+      XCTAssertEqual(state.workbench?.browser.url, "https://chatgpt.com/c/example")
+    }
+
     func testSharedCommandsRouteToStablePageAndTaskIdentifiers() {
       let refresh = BridgeDesktopCommandEnvelope(
         requestID: "refresh-1",
@@ -133,6 +143,36 @@
           input: "修正方向",
           mode: "interrupt-current-then-continue"
         )
+      )
+
+      let resume = BridgeDesktopCommandEnvelope(
+        requestID: "resume-1",
+        command: .resumeTask,
+        payload: .init(taskID: "task-42", input: "继续完成")
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: resume),
+        .resumeTask(id: "task-42", input: "继续完成")
+      )
+
+      let restart = BridgeDesktopCommandEnvelope(
+        requestID: "restart-1",
+        command: .restartTask,
+        payload: .init(taskID: "task-42")
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: restart),
+        .restartTask(id: "task-42")
+      )
+
+      let deleteSession = BridgeDesktopCommandEnvelope(
+        requestID: "delete-session-1",
+        command: .deleteSession,
+        payload: .init(taskID: "task-42", sessionID: "session-9")
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: deleteSession),
+        .deleteSession(taskID: "task-42")
       )
 
       let providerDefault = BridgeDesktopCommandEnvelope(

@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
 
@@ -13,8 +14,8 @@
     }
 
     public func selectTask(at index: Int) {
-      guard tasks.indices.contains(index) else { return }
-      selectTask(tasks[index])
+      guard visibleSessions.indices.contains(index) else { return }
+      selectTask(visibleSessions[index].latestTask)
     }
 
     public func selectTask(id: String) {
@@ -214,6 +215,109 @@
       return false
     }
 
+    public func resumeTask(id taskID: String, input: String?) async {
+      guard connectionState == .connected, let task = task(id: taskID),
+        TaskInspectorPresentation.canResume(
+          task,
+          providerSupportsSessionContinuation: providerSupportsSessionContinuation(for: task)
+        ),
+        let sessionID = task.effectiveSessionID
+      else {
+        reportFailure("当前任务无法续接会话。", taskID: taskID)
+        return
+      }
+      let trimmed = input?.trimmingCharacters(in: .whitespacesAndNewlines)
+      await submitRetry(
+        task: task,
+        prompt: trimmed.flatMap { $0.isEmpty ? nil : $0 } ?? "继续执行未完成的任务",
+        threadID: sessionID,
+        progress: "正在续接任务…",
+        success: "已续接任务。"
+      )
+    }
+
+    public func restartTask(id taskID: String) async {
+      guard connectionState == .connected, let task = task(id: taskID), task.canRestart,
+        let prompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !prompt.isEmpty
+      else {
+        reportFailure("当前任务没有可用于重新开始的原始指令。", taskID: taskID)
+        return
+      }
+      await submitRetry(
+        task: task,
+        prompt: prompt,
+        threadID: nil,
+        progress: "正在重新开始任务…",
+        success: "已重新开始任务。"
+      )
+    }
+
+    public func deleteSession(containingTaskID taskID: String) async {
+      guard connectionState == .connected, let task = task(id: taskID) else {
+        reportFailure("会话不存在或已经移除。", taskID: taskID)
+        return
+      }
+      let relatedTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: tasks)
+      guard !relatedTasks.isEmpty, relatedTasks.allSatisfy({ $0.isTerminal }) else {
+        reportFailure("运行中的会话不能删除。", taskID: taskID)
+        return
+      }
+      let relatedIDs = Set(relatedTasks.map(\.taskID))
+      setActionTextIfSelected("正在删除会话…", taskID: taskID)
+      do {
+        for relatedTask in relatedTasks {
+          try await client.deleteTask(taskID: relatedTask.taskID)
+        }
+        if let selectedTaskID, relatedIDs.contains(selectedTaskID) {
+          clearSelectedTask()
+        }
+        await refreshTasks()
+        reportSuccess("会话已删除。", taskID: nil)
+      } catch {
+        await loadTasks()
+        reportFailure(
+          "删除会话失败：\(BridgeServiceErrorMessage.message(error))",
+          taskID: relatedIDs.contains(selectedTaskID ?? "") ? nil : taskID
+        )
+      }
+    }
+
+    private func submitRetry(
+      task: MCPServiceTaskSnapshot,
+      prompt: String,
+      threadID: String?,
+      progress: String,
+      success: String
+    ) async {
+      let request = IPCAgentSubmitRequest(
+        projectID: task.projectID,
+        providerID: task.providerIdentifier,
+        installationID: task.installationID,
+        model: task.executionModel,
+        effort: task.executionEffort,
+        permissionMode: task.permissionMode,
+        prompt: prompt,
+        threadID: threadID,
+        networkAccess: task.networkAccess,
+        modelOverride: task.executionModel != nil,
+        permissionModeOverride: task.permissionMode != nil
+      )
+      setActionTextIfSelected(progress, taskID: task.taskID)
+      do {
+        let response = try await client.submitAgentTask(request)
+        await refreshTasks()
+        selectTask(id: response.taskID)
+        reportSuccess(success, taskID: response.taskID)
+      } catch {
+        await loadTasks()
+        reportFailure(
+          "任务提交失败：\(BridgeServiceErrorMessage.message(error))",
+          taskID: task.taskID
+        )
+      }
+    }
+
     private func setActionText(_ text: String) {
       actionText = text
       publishDisplay()
@@ -246,8 +350,7 @@
       selectedTaskID = nil
       selectedThreadID = nil
       selectedThreadPage = nil
-      conversation?.cancel()
-      conversation = nil
+      closeConversation()
       conversationWasTerminal = false
       actionText = nil
     }

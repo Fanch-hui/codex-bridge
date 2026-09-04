@@ -6,6 +6,7 @@
       _ display: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
       browserAvailable: Bool,
+      browserURL: String? = nil,
       browserStatus: String? = nil,
       browserCanGoBack: Bool = false,
       browserCanGoForward: Bool = false
@@ -36,6 +37,7 @@
         browser: browserSlot(
           for: display,
           available: browserAvailable,
+          url: browserURL,
           status: browserStatus,
           canGoBack: browserCanGoBack,
           canGoForward: browserCanGoForward
@@ -94,6 +96,7 @@
     private static func browserSlot(
       for display: WindowsWorkbenchDisplay,
       available: Bool,
+      url: String?,
       status: String?,
       canGoBack: Bool,
       canGoForward: Bool
@@ -102,6 +105,7 @@
       return BridgeDesktopBrowserSlot(
         visible: true,
         enabled: enabled,
+        url: url,
         status: status ?? (available ? "由宿主加载真实 ChatGPT 工作区" : "内置 WebView2 浏览器不可用"),
         canToggle: available,
         canOpenExternally: true,

@@ -11,24 +11,40 @@
       tasks.filter { selectedProjectID == nil || $0.projectID == selectedProjectID }
     }
 
+    var visibleSessions: [WorkbenchSessionItem] {
+      WorkbenchSessionCatalog.sessions(tasks: visibleTasks)
+        .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
+    }
+
+    var allSessions: [WorkbenchSessionItem] {
+      WorkbenchSessionCatalog.sessions(tasks: tasks)
+        .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
+    }
+
     var orphanThreads: [MCPThreadSummary] {
-      let taskThreadIDs = Set(visibleTasks.compactMap { $0.isCodexTask ? $0.threadID : nil })
-      return threads.filter { !taskThreadIDs.contains($0.threadID) }
+      WorkbenchSessionCatalog.orphanThreads(tasks: visibleTasks, threads: threads)
     }
 
     func publishDisplay() {
       let runningCount = tasks.filter { $0.isRunning }.count
       let task = selectedTask
-      let selectedTaskIndex = selectedTaskID.flatMap { selectedID in
-        visibleTasks.firstIndex(where: { $0.taskID == selectedID })
+      let selectedSession = task.flatMap { selectedTask in
+        visibleSessions.first { session in
+          session.tasks.contains(where: { $0.taskID == selectedTask.taskID })
+        }
+      }
+      let selectedSessionIndex = selectedSession.flatMap { selected in
+        visibleSessions.firstIndex(where: {
+          $0.id == selected.id && $0.providerID == selected.providerID
+        })
       }
       let selectedThreadIndex = selectedThreadID.flatMap { selectedID in
         orphanThreads.firstIndex(where: { $0.threadID == selectedID })
       }
-      let workbenchRows = visibleTasks.map(Self.rowText) + orphanThreads.map(Self.threadRowText)
+      let workbenchRows =
+        visibleSessions.map(Self.sessionRowText) + orphanThreads.map(Self.threadRowText)
       let selectedIndex =
-        selectedTaskIndex
-        ?? selectedThreadIndex.map { visibleTasks.count + $0 }
+        selectedSessionIndex ?? selectedThreadIndex.map { visibleSessions.count + $0 }
       let conversationText =
         selectedThreadPage.map(Self.threadConversationText)
         ?? TaskInspectorPresentation.conversationText(
@@ -47,24 +63,34 @@
         && selectedApproval != nil
         && !approvalResolving
         && !approvalRefreshInProgress
-      let taskItems = visibleTasks.map {
-        Self.taskItem(
-          $0,
-          projectName: projectName(for: $0.projectID),
+      let taskItems = visibleSessions.map { session in
+        let latest = session.latestTask
+        return Self.sessionItem(
+          session,
+          projectName: projectName(for: latest.projectID),
           selectedTaskID: selectedTaskID,
           canSteer: TaskInspectorPresentation.canSteer(
-            $0,
-            providerSupportsSteer: providerSupportsSteer(for: $0)
+            latest,
+            providerSupportsSteer: providerSupportsSteer(for: latest)
+          ),
+          canResume: TaskInspectorPresentation.canResume(
+            latest,
+            providerSupportsSessionContinuation: providerSupportsSessionContinuation(for: latest)
           )
         )
       }
       let selectedTaskDetail = task.map {
         Self.taskDetail(
           $0,
+          session: selectedSession,
           projectName: projectName(for: $0.projectID),
           conversation: conversation,
           selectedThreadPage: selectedThreadPage,
-          permissionRemediation: desktopPermissionRemediation(for: $0)
+          permissionRemediation: desktopPermissionRemediation(for: $0),
+          canResume: TaskInspectorPresentation.canResume(
+            $0,
+            providerSupportsSessionContinuation: providerSupportsSessionContinuation(for: $0)
+          )
         )
       }
       let typedApprovals = approvalPresentationItems().enumerated().compactMap {
@@ -78,6 +104,7 @@
           connected: connectionState == .connected && !approvalRefreshInProgress
         )
       }
+      let recentSessions = allSessions.prefix(12)
       displayBox.store(
         WindowsWorkbenchDisplay(
           connectionState: connectionState,
@@ -92,12 +119,11 @@
           },
           selectedProjectID: selectedProjectID,
           permissionRows: ["只读", "可写"],
-          selectedPermissionIndex: Self.permissionModes.firstIndex(
-            of: workbenchPermissionMode),
+          selectedPermissionIndex: Self.permissionModes.firstIndex(of: workbenchPermissionMode),
           permissionMode: workbenchPermissionMode,
           taskRows: workbenchRows,
-          recentTaskRows: tasks.map(Self.rowText),
-          recentTasks: tasks.map {
+          recentTaskRows: recentSessions.map(Self.sessionRowText),
+          recentTasks: recentSessions.map {
             Self.recentTaskPresentation($0, projectName: projectName(for: $0.projectID))
           },
           selectedTaskID: selectedTaskID,
@@ -107,7 +133,8 @@
           interruptEnabled: connectionState == .connected
             && TaskInspectorPresentation.canInterrupt(task),
           stopEnabled: connectionState == .connected && task?.isActive == true,
-          deleteEnabled: connectionState == .connected && task?.isTerminal == true,
+          deleteEnabled: connectionState == .connected
+            && selectedSession?.tasks.allSatisfy({ $0.isTerminal }) == true,
           steerEnabled: connectionState == .connected
             && TaskInspectorPresentation.canSteer(
               task,
@@ -141,10 +168,21 @@
     }
 
     func providerSupportsSteer(for task: MCPServiceTaskSnapshot?) -> Bool {
-      guard let task, !agentProviders.isEmpty else { return false }
+      guard let task else { return false }
+      if task.isCodexTask { return true }
       let providerID = task.providerIdentifier
       return agentProviders.contains {
         AgentProviderPresentation.identifier($0.providerID) == providerID && $0.supportsSteer
+      }
+    }
+
+    func providerSupportsSessionContinuation(for task: MCPServiceTaskSnapshot?) -> Bool {
+      guard let task else { return false }
+      if task.isCodexTask { return true }
+      let providerID = task.providerIdentifier
+      return agentProviders.contains {
+        AgentProviderPresentation.identifier($0.providerID) == providerID
+          && $0.supportsSessionContinuation
       }
     }
 
@@ -166,9 +204,14 @@
       projects.first(where: { $0.projectID == projectID })?.name ?? projectID
     }
 
-    private static func rowText(_ task: MCPServiceTaskSnapshot) -> String {
+    private static func sessionRowText(_ session: WorkbenchSessionItem) -> String {
+      let task = session.latestTask
       let state = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
-      return "\(task.providerDisplayName) · \(task.workbenchTitle) — \(state)"
+      let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
+        title: session.title,
+        turnCount: session.turnCount
+      )
+      return "\(session.providerDisplayName) · \(title) — \(state)"
     }
 
     private static func threadRowText(_ thread: MCPThreadSummary) -> String {
@@ -176,13 +219,17 @@
     }
 
     private static func recentTaskPresentation(
-      _ task: MCPServiceTaskSnapshot,
+      _ session: WorkbenchSessionItem,
       projectName: String
     ) -> WindowsRecentTaskPresentation {
+      let task = session.latestTask
       let status = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
       return WindowsRecentTaskPresentation(
         taskID: task.taskID,
-        title: task.workbenchTitle,
+        title: WorkbenchTaskTextPresentation.sessionMenuTitle(
+          title: session.title,
+          turnCount: session.turnCount
+        ),
         projectName: projectName,
         source: task.sourceDisplayName,
         status: status,

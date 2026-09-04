@@ -37,7 +37,8 @@ enum BridgeDesktopCommandRouter {
     case .browserBack, .browserForward, .browserReload, .setBrowserEnabled,
       .openBrowserExternally, .loadEarlierConversation, .refreshConversation,
       .setWorkbenchPermissionMode, .selectTask, .refreshTasks, .interruptTask,
-      .stopTask, .deleteTask, .steerTask, .resolveApproval, .resolveDirectApproval:
+      .stopTask, .deleteTask, .deleteSession, .steerTask, .resumeTask, .restartTask,
+      .resolveApproval, .resolveDirectApproval:
       handleWorkbench(envelope, model: model)
     case .selectProject, .refreshProjects, .registerProject, .removeProject,
       .saveProjectPolicy, .setProjectCommandMode, .saveProjectCommand,

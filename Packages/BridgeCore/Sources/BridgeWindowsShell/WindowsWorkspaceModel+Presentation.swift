@@ -114,7 +114,17 @@
         skills: desktopSkills,
         threads: desktopThreads,
         verificationCommands: detail?.verificationCommands ?? [],
-        threadCount: detail?.threadCount
+        threadCount: detail?.threadCount,
+        selectedThreadTitle: selectedThreadPage.map {
+          $0.thread.title ?? $0.thread.preview ?? $0.thread.threadID
+        },
+        selectedThreadConversation: selectedThreadPage?.entries.enumerated().map { index, entry in
+          BridgeDesktopConversationEntry(
+            id: "thread:\(selectedThreadPage?.thread.threadID ?? "history"):\(index)",
+            role: entry.role == "user" ? "用户" : "Codex",
+            text: entry.text
+          )
+        } ?? []
       )
       displayBox.store(value)
     }

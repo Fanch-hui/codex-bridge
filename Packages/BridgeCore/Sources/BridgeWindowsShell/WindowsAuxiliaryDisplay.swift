@@ -47,6 +47,8 @@
     var threads: [BridgeDesktopThreadRow] = []
     var verificationCommands: [String] = []
     var threadCount: Int? = nil
+    var selectedThreadTitle: String? = nil
+    var selectedThreadConversation: [BridgeDesktopConversationEntry] = []
   }
 
   struct WindowsAgentDefaultsDisplay: Equatable, Sendable {

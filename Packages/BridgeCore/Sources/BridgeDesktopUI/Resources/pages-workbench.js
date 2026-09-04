@@ -25,7 +25,7 @@
     tb.appendChild(navGroup);
     var urlPill = S.node("div", "browser-url-pill mono");
     urlPill.appendChild(S.icon("lock.fill", "url-lock-icon"));
-    urlPill.appendChild(S.node("span", "url-text", "https://chatgpt.com"));
+    urlPill.appendChild(S.node("span", "url-text", browser.url || "https://chatgpt.com"));
     tb.appendChild(urlPill);
     tb.appendChild(S.node("div", "toolbar-spacer"));
 
@@ -114,7 +114,7 @@
     var row4 = S.node("div", "inspector-header-row row-tasks"), taskWrap = S.node("div", "task-picker-wrap");
     taskWrap.appendChild(S.icon("list.bullet.rectangle", "task-picker-icon"));
     var taskSelect = S.node("select", "task-native-select"), tasks = page.tasks || [];
-    var defaultOpt = S.node("option", null, "选择 Agent 任务 (" + tasks.length + ")");
+    var defaultOpt = S.node("option", null, "选择 Agent 会话 (" + tasks.length + ")");
     defaultOpt.value = ""; taskSelect.appendChild(defaultOpt);
     var curTask = null;
     tasks.forEach(function (t) {
@@ -127,7 +127,7 @@
     taskWrap.appendChild(taskSelect);
 
     var taskFace = S.node("span", "task-dropdown-face");
-    var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 任务 (" + tasks.length + ")");
+    var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 会话 (" + tasks.length + ")");
     taskFace.appendChild(S.node("span", "task-title-text", taskFaceLabel));
     taskFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
     taskWrap.appendChild(taskFace);
@@ -179,7 +179,9 @@
       content.appendChild(empty);
       return;
     }
-    var detail = page.selectedTask, row = S.safeArray(page.tasks).find(function (t) { return t.taskID === detail.taskID; }) || {};
+    var detail = page.selectedTask, row = S.safeArray(page.tasks).find(function (t) {
+      return t.taskID === detail.taskID || (detail.sessionID && t.sessionID === detail.sessionID);
+    }) || {};
     if (detail.currentStep) {
       var stepCard = S.node("div", "page-card current-step-card");
       stepCard.appendChild(S.node("div", "step-caption", "当前正在执行"));
@@ -203,7 +205,7 @@
     if (row.canDelete || (!row.isRunning && !row.isActive)) {
       var rm = S.button("删除会话", null, {}, emit, "small danger", false);
       rm.addEventListener("click", function () {
-        if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的任务、事件和对话记录，无法撤销。")) emit("deleteTask", { taskID: detail.taskID });
+        if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部轮次任务、事件和对话记录，无法撤销。")) emit("deleteSession", { taskID: detail.taskID, sessionID: detail.sessionID });
       });
       actions.appendChild(rm);
     }
@@ -211,6 +213,7 @@
     card.appendChild(actions);
 
     if (row.canSteer) card.appendChild(steerForm(page, detail.taskID, emit));
+    if (detail.canResume || detail.canRestart) card.appendChild(retryForm(detail, emit));
     if (detail.resultSummary) addTextBlock(card, "结果摘要", detail.resultSummary);
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(card, "变更文件", detail.changedFiles);
     if (detail.activity && detail.activity.length) addActivityBlock(card, detail.activity);
@@ -241,6 +244,32 @@
     var wrapper = S.node("div", "steer-form"); wrapper.appendChild(form); return wrapper;
   }
 
+  function retryForm(detail, emit) {
+    var wrapper = S.node("div", "retry-form page-message");
+    wrapper.appendChild(S.node("h4", null, "继续处理这个会话"));
+    var input = S.textField("补充说明", "", "可选。留空则直接接续未完成任务", "full");
+    if (detail.canResume) wrapper.appendChild(input.wrapper);
+    var actions = S.node("div", "form-actions");
+    if (detail.canResume) {
+      var resume = S.button("接着中断任务继续", null, {}, emit, "small primary", false);
+      resume.addEventListener("click", function () {
+        emit("resumeTask", { taskID: detail.taskID, input: input.control.value || null });
+      });
+      actions.appendChild(resume);
+    }
+    if (detail.canRestart) {
+      var restart = S.button("重新开始", null, {}, emit, "small", false);
+      restart.addEventListener("click", function () {
+        if (global.confirm("使用原始指令在当前项目开启全新会话？")) {
+          emit("restartTask", { taskID: detail.taskID });
+        }
+      });
+      actions.appendChild(restart);
+    }
+    wrapper.appendChild(actions);
+    return wrapper;
+  }
+
   function addActivityBlock(container, values) {
     container.appendChild(S.node("h4", "subsection-title", "实时活动"));
     var list = S.node("div", "activity-list");
@@ -254,24 +283,51 @@
   function addConversationBlock(container, values, page, emit) {
     container.appendChild(S.node("h4", "subsection-title", "对话"));
     var list = S.node("div", "conversation-list");
-    values.forEach(function (e) {
-      var it = S.node("div", "conversation-entry entry-" + (e.kind || "message")), hd = S.node("div", "entry-heading");
-      hd.appendChild(S.node("span", "entry-role", e.role));
-      if (e.kind) hd.appendChild(S.badge(e.kind, "neutral"));
-      if (!e.isFinal) hd.appendChild(S.badge("流式", "running"));
-      it.appendChild(hd);
-      if (e.toolName) {
-        var tl = S.node("div", "entry-tool mono", e.toolName);
-        if (e.toolStatus) tl.appendChild(S.badge(e.toolStatus, e.toolStatus === "failed" ? "error" : "neutral"));
-        it.appendChild(tl);
+    values.forEach(function (entry) {
+      if (entry.kind === "reasoning" || entry.kind === "tool_call") {
+        list.appendChild(conversationDisclosure(entry));
+      } else {
+        list.appendChild(conversationMessage(entry));
       }
-      it.appendChild(S.node("div", "entry-text", e.text));
-      if (e.toolArguments) it.appendChild(S.node("pre", "entry-arguments mono", e.toolArguments));
-      list.appendChild(it);
     });
     container.appendChild(list);
-    if (page.browser && page.browser.canLoadEarlierConversation) container.appendChild(S.button("加载更早对话", "loadEarlierConversation", { taskID: page.selectedTaskID }, emit, "small", false));
-    if (page.selectedTaskID) container.appendChild(S.button("刷新对话", "refreshConversation", { taskID: page.selectedTaskID }, emit, "small", false));
+    var actions = S.node("div", "conversation-actions");
+    if (page.browser && page.browser.canLoadEarlierConversation) {
+      actions.appendChild(S.button("加载更早对话", "loadEarlierConversation", { taskID: page.selectedTaskID }, emit, "small", false));
+    }
+    if (page.selectedTaskID) {
+      actions.appendChild(S.button("刷新对话", "refreshConversation", { taskID: page.selectedTaskID }, emit, "small", false));
+    }
+    if (actions.childNodes.length) container.appendChild(actions);
+  }
+
+  function conversationMessage(entry) {
+    var isUser = entry.role === "用户";
+    var item = S.node("article", "conversation-entry entry-message " + (isUser ? "entry-user" : "entry-agent"));
+    var heading = S.node("div", "entry-heading");
+    heading.appendChild(S.node("span", "entry-role", entry.role));
+    if (!entry.isFinal) heading.appendChild(S.badge("流式", "running"));
+    item.appendChild(heading);
+    item.appendChild(S.markdown(entry.text, "entry-text markdown-body"));
+    return item;
+  }
+
+  function conversationDisclosure(entry) {
+    var item = S.node("details", "conversation-entry entry-disclosure entry-" + entry.kind);
+    item.open = !entry.isFinal;
+    var summary = S.node("summary", "entry-heading disclosure-summary");
+    summary.appendChild(S.icon(entry.symbol || (entry.kind === "reasoning" ? "brain.head.profile" : "gearshape"), "entry-symbol"));
+    summary.appendChild(S.node("span", "entry-title", entry.displayTitle || entry.toolName || entry.role));
+    if (entry.displayStatus) {
+      summary.appendChild(S.badge(entry.displayStatus, entry.toolStatus === "failed" ? "error" : "neutral"));
+    }
+    if (!entry.isFinal) summary.appendChild(S.badge("流式", "running"));
+    item.appendChild(summary);
+    var body = S.node("div", "disclosure-body");
+    if (entry.text) body.appendChild(S.markdown(entry.text, "entry-text markdown-body"));
+    if (entry.toolArguments) body.appendChild(S.node("pre", "entry-arguments mono", entry.toolArguments));
+    item.appendChild(body);
+    return item;
   }
 
   function renderFooter(page, emit) {

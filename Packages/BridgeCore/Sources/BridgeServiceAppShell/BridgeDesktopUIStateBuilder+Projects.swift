@@ -5,6 +5,9 @@ extension BridgeDesktopUIStateBuilder {
   static func projects(from model: BridgeServiceAppModel) -> BridgeDesktopProjectsState {
     let selected = model.projects.first { $0.projectID == model.selectedProjectID }
     let detail = model.selectedProjectID.flatMap { model.projectDetails[$0] }
+    let projectTasks = model.tasks.filter { $0.projectID == model.selectedProjectID }
+    let sessions = WorkbenchSessionCatalog.sessions(tasks: projectTasks)
+      .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
     return BridgeDesktopProjectsState(
       header: BridgeDesktopPageHeader(
         title: "项目",
@@ -32,7 +35,41 @@ extension BridgeDesktopUIStateBuilder {
       workspace: detail?.directWorkspace.map(workspaceState),
       verificationCommands: detail?.verificationCommands ?? [],
       threadCount: detail?.threadCount,
+      sessions: sessions.map { session in
+        let task = session.latestTask
+        return BridgeDesktopTaskRow(
+          taskID: task.taskID,
+          sessionID: session.sessionID,
+          title: WorkbenchTaskTextPresentation.sessionMenuTitle(
+            title: session.title,
+            turnCount: session.turnCount
+          ),
+          projectID: task.projectID,
+          projectName: model.projectName(for: task.projectID),
+          source: task.sourceDisplayName,
+          provider: task.providerDisplayName,
+          providerID: task.providerIdentifier,
+          status: taskStatusLabel(task.status),
+          updatedAt: task.updatedAt,
+          turnCount: session.turnCount,
+          selected: session.tasks.contains(where: { $0.taskID == model.selectedTaskID }),
+          isRunning: task.isRunning,
+          isActive: task.isActive,
+          canDelete: session.tasks.allSatisfy { $0.isTerminal }
+        )
+      },
       threads: model.threads.map(threadRow),
+      selectedThreadID: model.selectedThread?.thread.threadID,
+      selectedThreadTitle: model.selectedThread.map {
+        $0.thread.title ?? $0.thread.preview ?? $0.thread.threadID
+      },
+      selectedThreadConversation: model.selectedThread?.entries.enumerated().map { index, entry in
+        BridgeDesktopConversationEntry(
+          id: "thread:\(model.selectedThread?.thread.threadID ?? "history"):\(index)",
+          role: entry.role == "user" ? "用户" : "Codex",
+          text: entry.text
+        )
+      } ?? [],
       skills: model.skills.map(skillRow),
       canRegister: model.connectionState == .connected,
       canRemove: selected != nil && model.connectionState == .connected,

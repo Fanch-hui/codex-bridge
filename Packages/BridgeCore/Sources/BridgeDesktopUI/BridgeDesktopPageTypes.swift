@@ -30,6 +30,9 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
   public let toolName: String?
   public let toolStatus: String?
   public let toolArguments: String?
+  public let displayTitle: String?
+  public let displayStatus: String?
+  public let symbol: String?
   public let isFinal: Bool
   public let status: String?
 
@@ -41,6 +44,9 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
     toolName: String? = nil,
     toolStatus: String? = nil,
     toolArguments: String? = nil,
+    displayTitle: String? = nil,
+    displayStatus: String? = nil,
+    symbol: String? = nil,
     isFinal: Bool = true,
     status: String? = nil
   ) {
@@ -51,6 +57,9 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
     self.toolName = toolName
     self.toolStatus = toolStatus
     self.toolArguments = toolArguments
+    self.displayTitle = displayTitle
+    self.displayStatus = displayStatus
+    self.symbol = symbol
     self.isFinal = isFinal
     self.status = status
   }
@@ -59,6 +68,7 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
 public struct BridgeDesktopBrowserSlot: Codable, Equatable, Sendable {
   public let visible: Bool
   public let enabled: Bool
+  public let url: String?
   public let status: String
   public let canToggle: Bool
   public let canOpenExternally: Bool
@@ -70,6 +80,7 @@ public struct BridgeDesktopBrowserSlot: Codable, Equatable, Sendable {
   public init(
     visible: Bool = true,
     enabled: Bool = true,
+    url: String? = nil,
     status: String = "由宿主加载 ChatGPT 工作区",
     canToggle: Bool = true,
     canOpenExternally: Bool = false,
@@ -80,6 +91,7 @@ public struct BridgeDesktopBrowserSlot: Codable, Equatable, Sendable {
   ) {
     self.visible = visible
     self.enabled = enabled
+    self.url = url
     self.status = status
     self.canToggle = canToggle
     self.canOpenExternally = canOpenExternally

@@ -129,8 +129,30 @@
 .conversation-entry .entry-role { color: var(--accent); font-size: 11px; font-weight: 650; }
 .entry-heading, .entry-tool { display: flex; align-items: center; gap: 7px; }
 .entry-tool { margin-top: 6px; font-size: 11px; font-weight: 650; }
-.conversation-entry .entry-text { margin-top: 4px; white-space: pre-wrap; line-height: 1.5; }
-.entry-arguments { max-height: 140px; margin: 7px 0 0; padding: 8px; overflow: auto; border-radius: 6px; background: rgba(0, 0, 0, .06); white-space: pre-wrap; }
+.conversation-entry.entry-user { margin-left: min(20%, 120px); background: var(--accent-soft); }
+.conversation-entry.entry-agent { padding-left: 0; background: transparent; }
+.entry-disclosure { border: 1px solid var(--separator); background: var(--surface); }
+.disclosure-summary { cursor: pointer; list-style: none; }
+.disclosure-summary::-webkit-details-marker { display: none; }
+.entry-symbol { width: 15px; height: 15px; color: var(--text-secondary); }
+.entry-title { font-size: 12px; font-weight: 650; }
+.disclosure-body { padding: 8px 0 0 22px; }
+.conversation-entry .entry-text { margin-top: 4px; line-height: 1.55; }
+.markdown-body { min-width: 0; overflow-wrap: anywhere; }
+.markdown-body p { margin: 0 0 8px; white-space: pre-wrap; }
+.markdown-body p:last-child { margin-bottom: 0; }
+.markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 { margin: 10px 0 6px; font-size: 13px; }
+.markdown-body ul, .markdown-body ol { margin: 6px 0; padding-left: 22px; }
+.markdown-body li + li { margin-top: 3px; }
+.markdown-body blockquote { margin: 7px 0; padding-left: 10px; border-left: 3px solid var(--separator); color: var(--text-secondary); }
+.markdown-code, .entry-arguments { max-height: 240px; margin: 7px 0 0; padding: 9px; overflow: auto; border-radius: 6px; background: rgba(0, 0, 0, .06); white-space: pre-wrap; }
+.markdown-inline-code { padding: 1px 4px; border-radius: 4px; background: var(--surface-muted); font-family: var(--mono); }
+.markdown-body a { color: var(--accent); }
+.conversation-actions, .retry-form .form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.retry-form h4 { margin: 0 0 8px; }
+.session-row { display: flex; align-items: center; gap: 10px; }
+.session-open { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 9px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.session-open .row-main { min-width: 0; }
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 20px; }
 .filter-bar .search-field { flex: 1 1 260px; }
 .filter-bar input, .filter-bar select { min-height: 32px; padding: 6px 9px; border: 1px solid var(--separator); border-radius: 7px; color: var(--text); background: var(--surface); font: inherit; }

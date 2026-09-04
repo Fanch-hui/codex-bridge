@@ -167,7 +167,11 @@ public struct BridgeDesktopProjectsState: Codable, Equatable, Sendable {
   public let workspace: BridgeDesktopWorkspaceState?
   public let verificationCommands: [String]
   public let threadCount: Int?
+  public let sessions: [BridgeDesktopTaskRow]
   public let threads: [BridgeDesktopThreadRow]
+  public let selectedThreadID: String?
+  public let selectedThreadTitle: String?
+  public let selectedThreadConversation: [BridgeDesktopConversationEntry]
   public let skills: [BridgeDesktopSkillRow]
   public let canRegister: Bool
   public let canRemove: Bool
@@ -185,7 +189,11 @@ public struct BridgeDesktopProjectsState: Codable, Equatable, Sendable {
     workspace: BridgeDesktopWorkspaceState? = nil,
     verificationCommands: [String] = [],
     threadCount: Int? = nil,
+    sessions: [BridgeDesktopTaskRow] = [],
     threads: [BridgeDesktopThreadRow] = [],
+    selectedThreadID: String? = nil,
+    selectedThreadTitle: String? = nil,
+    selectedThreadConversation: [BridgeDesktopConversationEntry] = [],
     skills: [BridgeDesktopSkillRow] = [],
     canRegister: Bool = true,
     canRemove: Bool = false,
@@ -202,7 +210,11 @@ public struct BridgeDesktopProjectsState: Codable, Equatable, Sendable {
     self.workspace = workspace
     self.verificationCommands = verificationCommands
     self.threadCount = threadCount
+    self.sessions = sessions
     self.threads = threads
+    self.selectedThreadID = selectedThreadID
+    self.selectedThreadTitle = selectedThreadTitle
+    self.selectedThreadConversation = selectedThreadConversation
     self.skills = skills
     self.canRegister = canRegister
     self.canRemove = canRemove

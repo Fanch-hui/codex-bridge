@@ -103,6 +103,129 @@
 
   function safeArray(value) { return Array.isArray(value) ? value : []; }
 
+  function markdown(value, className) {
+    var root = node("div", className || "markdown-body");
+    var lines = String(value || "").replace(/\r\n?/g, "\n").split("\n");
+    var index = 0;
+    while (index < lines.length) {
+      var line = lines[index];
+      if (line.trim().indexOf("```") === 0) {
+        var language = line.trim().slice(3).trim();
+        var codeLines = [];
+        index += 1;
+        while (index < lines.length && lines[index].trim().indexOf("```") !== 0) {
+          codeLines.push(lines[index]);
+          index += 1;
+        }
+        index += index < lines.length ? 1 : 0;
+        var pre = node("pre", "markdown-code");
+        var code = node("code", language ? "language-" + language : null, codeLines.join("\n"));
+        pre.appendChild(code);
+        root.appendChild(pre);
+        continue;
+      }
+      var heading = line.match(/^(#{1,4})\s+(.+)$/);
+      if (heading) {
+        var h = node("h" + Math.min(heading[1].length + 2, 6));
+        appendInline(h, heading[2]);
+        root.appendChild(h);
+        index += 1;
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(line)) {
+        var list = node("ul");
+        while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
+          var item = node("li");
+          appendInline(item, lines[index].replace(/^\s*[-*]\s+/, ""));
+          list.appendChild(item);
+          index += 1;
+        }
+        root.appendChild(list);
+        continue;
+      }
+      if (/^\s*\d+[.)]\s+/.test(line)) {
+        var ordered = node("ol");
+        while (index < lines.length && /^\s*\d+[.)]\s+/.test(lines[index])) {
+          var orderedItem = node("li");
+          appendInline(orderedItem, lines[index].replace(/^\s*\d+[.)]\s+/, ""));
+          ordered.appendChild(orderedItem);
+          index += 1;
+        }
+        root.appendChild(ordered);
+        continue;
+      }
+      if (/^>\s?/.test(line)) {
+        var quote = node("blockquote");
+        appendInline(quote, line.replace(/^>\s?/, ""));
+        root.appendChild(quote);
+        index += 1;
+        continue;
+      }
+      if (!line.trim()) {
+        index += 1;
+        continue;
+      }
+      var paragraphLines = [line];
+      index += 1;
+      while (index < lines.length && lines[index].trim() && !isBlockStart(lines[index])) {
+        paragraphLines.push(lines[index]);
+        index += 1;
+      }
+      var paragraph = node("p");
+      appendInline(paragraph, paragraphLines.join("\n"));
+      root.appendChild(paragraph);
+    }
+    return root;
+  }
+
+  function isBlockStart(line) {
+    return line.trim().indexOf("```") === 0 || /^(#{1,4})\s+/.test(line)
+      || /^\s*[-*]\s+/.test(line) || /^\s*\d+[.)]\s+/.test(line) || /^>\s?/.test(line);
+  }
+
+  function appendInline(container, value) {
+    var source = String(value || "");
+    var pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+    var offset = 0;
+    var match;
+    while ((match = pattern.exec(source)) !== null) {
+      if (match.index > offset) container.appendChild(document.createTextNode(source.slice(offset, match.index)));
+      appendInlineToken(container, match[0]);
+      offset = match.index + match[0].length;
+    }
+    if (offset < source.length) container.appendChild(document.createTextNode(source.slice(offset)));
+  }
+
+  function appendInlineToken(container, token) {
+    if (token.indexOf("**") === 0) {
+      container.appendChild(node("strong", null, token.slice(2, -2)));
+      return;
+    }
+    if (token.indexOf("`") === 0) {
+      container.appendChild(node("code", "markdown-inline-code", token.slice(1, -1)));
+      return;
+    }
+    var link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (!link || !safeWebURL(link[2])) {
+      container.appendChild(document.createTextNode(token));
+      return;
+    }
+    var anchor = node("a", null, link[1]);
+    anchor.href = link[2];
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    container.appendChild(anchor);
+  }
+
+  function safeWebURL(value) {
+    try {
+      var url = new URL(value);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch (_) {
+      return false;
+    }
+  }
+
   global.CodexBridgeDesktopPageSupport = {
     node: node,
     clear: clear,
@@ -115,6 +238,7 @@
     section: section,
     empty: empty,
     choices: choices,
-    safeArray: safeArray
+    safeArray: safeArray,
+    markdown: markdown
   };
 }(window));

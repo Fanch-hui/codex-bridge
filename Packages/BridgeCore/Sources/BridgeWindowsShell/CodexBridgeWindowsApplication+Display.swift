@@ -41,6 +41,7 @@
         agentDefaults: auxiliarySnapshot.agentDefaults,
         selectedNavigation: selectedPage.desktopNavigation,
         browserAvailable: chat.state == .active,
+        browserURL: chat.currentURL,
         browserStatus: browserStatus(for: chat),
         browserCanGoBack: chat.canGoBack,
         browserCanGoForward: chat.canGoForward,
@@ -83,7 +84,7 @@
     private nonisolated static func browserStatus(for chat: WindowsChatWebView) -> String? {
       switch chat.state {
       case .active:
-        return nil
+        return chat.currentURL
       case .loading:
         return "正在加载聊天页…"
       case .failed:
@@ -102,8 +103,9 @@
     }
 
     nonisolated static func openChatExternally() {
+      let chatURL = WindowsUIThread.shared.chatWebView()?.currentURL ?? WindowsChatWebView.chatURL
       "open".withCString(encodedAs: UTF16.self) { operation in
-        WindowsChatWebView.chatURL.withCString(encodedAs: UTF16.self) { url in
+        chatURL.withCString(encodedAs: UTF16.self) { url in
           _ = ShellExecuteW(
             WindowsMainWindow.currentWindow(), operation, url, nil, nil, SW_SHOWNORMAL)
         }

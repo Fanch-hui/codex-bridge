@@ -1,6 +1,11 @@
 public struct TaskConversationPresentationSnapshot {
   public let entries: [TaskConversationModel.Entry]
   public let canLoadEarlier: Bool
+
+  public init(entries: [TaskConversationModel.Entry], canLoadEarlier: Bool) {
+    self.entries = entries
+    self.canLoadEarlier = canLoadEarlier
+  }
 }
 
 public struct TaskConversationPresentationCache {

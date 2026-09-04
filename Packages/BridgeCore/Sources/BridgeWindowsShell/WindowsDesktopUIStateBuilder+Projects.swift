@@ -1,8 +1,10 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import Foundation
 
   extension WindowsDesktopUIStateBuilder {
     static func projectsPage(
+      workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
       workspace: WindowsWorkspaceDisplay?
     ) -> BridgeDesktopProjectsState {
@@ -56,7 +58,11 @@
         workspace: workspaceState,
         verificationCommands: workspace?.verificationCommands ?? [],
         threadCount: workspace?.threadCount,
+        sessions: workbench.taskItems.filter { $0.projectID == selectedProjectID },
         threads: workspace?.threads ?? [],
+        selectedThreadID: workspace?.selectedThreadID,
+        selectedThreadTitle: workspace?.selectedThreadTitle,
+        selectedThreadConversation: workspace?.selectedThreadConversation ?? [],
         skills: workspace?.skills ?? [],
         canRegister: management.project.registerEnabled,
         canRemove: management.project.removeEnabled,

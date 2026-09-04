@@ -5,60 +5,62 @@
   import BridgeServiceAppCore
 
   extension WindowsWorkbenchModel {
-    static func taskItem(
-      _ task: MCPServiceTaskSnapshot,
+    static func sessionItem(
+      _ session: WorkbenchSessionItem,
       projectName: String,
       selectedTaskID: String?,
-      canSteer: Bool
+      canSteer: Bool,
+      canResume: Bool
     ) -> BridgeDesktopTaskRow {
-      BridgeDesktopTaskRow(
+      let task = session.latestTask
+      return BridgeDesktopTaskRow(
         taskID: task.taskID,
-        title: task.workbenchTitle,
+        sessionID: session.sessionID,
+        title: WorkbenchTaskTextPresentation.sessionMenuTitle(
+          title: session.title,
+          turnCount: session.turnCount
+        ),
         projectID: task.projectID,
         projectName: projectName,
         source: task.sourceDisplayName,
         provider: task.providerDisplayName,
+        providerID: task.providerIdentifier,
         status: desktopStatusLabel(task),
         updatedAt: task.updatedAt,
-        selected: task.taskID == selectedTaskID,
+        turnCount: session.turnCount,
+        selected: session.tasks.contains(where: { $0.taskID == selectedTaskID }),
         isRunning: task.isRunning,
         isActive: task.isActive,
         canInterrupt: TaskInspectorPresentation.canInterrupt(task),
         canStop: task.isActive,
         canSteer: canSteer,
-        canDelete: task.isTerminal
+        canResume: canResume,
+        canRestart: task.canRestart,
+        canDelete: session.tasks.allSatisfy { $0.isTerminal }
       )
     }
 
     static func taskDetail(
       _ task: MCPServiceTaskSnapshot,
+      session: WorkbenchSessionItem?,
       projectName: String,
       conversation: TaskConversationModel?,
       selectedThreadPage: MCPThreadReadPage?,
-      permissionRemediation: BridgeDesktopPermissionRemediationState?
+      permissionRemediation: BridgeDesktopPermissionRemediationState?,
+      canResume: Bool
     ) -> BridgeDesktopTaskDetail {
       let entries: [BridgeDesktopConversationEntry]
       if let selectedThreadPage {
         entries = selectedThreadPage.entries.enumerated().map { index, entry in
           BridgeDesktopConversationEntry(
             id: "history:\(selectedThreadPage.thread.threadID):\(index)",
-            role: entry.role,
+            role: entry.role == "user" ? "用户" : "Codex",
             text: entry.text
           )
         }
       } else {
         entries = (conversation?.entries ?? []).map {
-          BridgeDesktopConversationEntry(
-            id: $0.key,
-            role: $0.role == "user" ? "用户" : "Agent",
-            text: $0.content,
-            kind: $0.kind,
-            toolName: $0.toolName,
-            toolStatus: $0.toolStatus,
-            toolArguments: $0.toolArguments,
-            isFinal: $0.isFinal,
-            status: $0.isFinal ? "final" : "streaming"
-          )
+          conversationEntry($0, providerID: task.providerIdentifier)
         }
       }
       let activity = task.recentActivity.map {
@@ -70,13 +72,28 @@
           occurredAt: $0.occurredAt
         )
       }
+      let resolvedSession =
+        session
+        ?? WorkbenchSessionItem(
+          sessionID: task.effectiveSessionID ?? task.taskID,
+          providerID: task.providerIdentifier,
+          providerDisplayName: task.providerDisplayName,
+          providerSystemImage: task.providerSystemImage,
+          projectID: task.projectID,
+          tasks: [task]
+        )
       return BridgeDesktopTaskDetail(
         taskID: task.taskID,
-        title: task.workbenchTitle,
+        sessionID: resolvedSession.sessionID,
+        title: WorkbenchTaskTextPresentation.sessionMenuTitle(
+          title: resolvedSession.title,
+          turnCount: resolvedSession.turnCount
+        ),
         projectName: projectName,
         status: desktopStatusLabel(task),
         provider: task.providerDisplayName,
-        model: task.executionModel,
+        providerID: task.providerIdentifier,
+        model: taskModelLabel(task),
         permissionMode: task.permissionMode,
         currentStep: task.currentStep,
         resultSummary: task.resultSummary,
@@ -85,6 +102,9 @@
         activity: activity,
         conversation: entries,
         permissionRemediation: permissionRemediation,
+        turnCount: resolvedSession.turnCount,
+        canResume: canResume,
+        canRestart: task.canRestart,
         updatedAt: task.updatedAt
       )
     }
@@ -142,6 +162,70 @@
           resolving: resolving
         )
       }
+    }
+
+    private static func conversationEntry(
+      _ entry: TaskConversationModel.Entry,
+      providerID: String
+    ) -> BridgeDesktopConversationEntry {
+      let role =
+        entry.role == "user"
+        ? "用户" : AgentProviderPresentation.displayName(providerID)
+      if entry.kind == "reasoning" {
+        return BridgeDesktopConversationEntry(
+          id: entry.key,
+          role: role,
+          text: entry.content,
+          kind: entry.kind,
+          displayTitle: CodexTranscriptPresentation.reasoningTitle(
+            providerID: providerID,
+            streaming: !entry.isFinal
+          ),
+          displayStatus: entry.isFinal ? "" : "进行中",
+          symbol: "brain.head.profile",
+          isFinal: entry.isFinal,
+          status: entry.isFinal ? "final" : "streaming"
+        )
+      }
+      if entry.kind == "tool_call" {
+        let presentation = CodexTranscriptPresentation.tool(
+          providerID: providerID,
+          name: entry.toolName,
+          status: entry.toolStatus
+        )
+        return BridgeDesktopConversationEntry(
+          id: entry.key,
+          role: role,
+          text: entry.content,
+          kind: entry.kind,
+          toolName: entry.toolName,
+          toolStatus: entry.toolStatus,
+          toolArguments: entry.toolArguments,
+          displayTitle: presentation.title,
+          displayStatus: CodexTranscriptPresentation.statusLabel(entry.toolStatus),
+          symbol: presentation.systemImage,
+          isFinal: entry.isFinal,
+          status: entry.isFinal ? "final" : "streaming"
+        )
+      }
+      return BridgeDesktopConversationEntry(
+        id: entry.key,
+        role: role,
+        text: entry.content,
+        kind: entry.kind,
+        isFinal: entry.isFinal,
+        status: entry.isFinal ? "final" : "streaming"
+      )
+    }
+
+    private static func taskModelLabel(_ task: MCPServiceTaskSnapshot) -> String? {
+      guard let model = task.executionModel?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !model.isEmpty
+      else { return nil }
+      guard let effort = task.executionEffort?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !effort.isEmpty
+      else { return model }
+      return "\(model) · \(BridgeDesktopPresentation.extendedReasoningTitle(effort))"
     }
 
     private static func desktopStatusLabel(_ task: MCPServiceTaskSnapshot) -> String {

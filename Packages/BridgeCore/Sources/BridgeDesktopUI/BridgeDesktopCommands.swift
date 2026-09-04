@@ -23,7 +23,10 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case interruptTask
   case stopTask
   case deleteTask
+  case deleteSession
   case steerTask
+  case resumeTask
+  case restartTask
   case resolveApproval
   case resolveDirectApproval
   case selectProject
@@ -88,6 +91,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
 public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let navigation: BridgeDesktopNavigation?
   public let taskID: String?
+  public let sessionID: String?
   public let approvalID: String?
   public let projectID: String?
   public let tunnelID: String?
@@ -145,6 +149,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public init(
     navigation: BridgeDesktopNavigation? = nil,
     taskID: String? = nil,
+    sessionID: String? = nil,
     approvalID: String? = nil,
     projectID: String? = nil,
     tunnelID: String? = nil,
@@ -201,6 +206,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   ) {
     self.navigation = navigation
     self.taskID = taskID
+    self.sessionID = sessionID
     self.approvalID = approvalID
     self.projectID = projectID
     self.tunnelID = tunnelID

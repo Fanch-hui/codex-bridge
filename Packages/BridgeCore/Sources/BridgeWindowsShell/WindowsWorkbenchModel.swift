@@ -155,6 +155,7 @@
     var isChatBrowserEnabled = true
     var selectedTaskID: String?
     var conversation: TaskConversationModel?
+    var conversationPresentationCache = TaskConversationPresentationCache()
     var conversationWasTerminal = false
     var actionText: String?
     var approvals: [IPCApprovalSummary] = []
@@ -233,7 +234,7 @@
     }
 
     public func shutdown() async {
-      conversation?.cancel()
+      closeConversation()
       await client.close()
     }
 
@@ -269,8 +270,7 @@
         })
       else {
         self.selectedTaskID = nil
-        conversation?.cancel()
-        conversation = nil
+        closeConversation()
         conversationWasTerminal = false
         actionText = nil
         return
@@ -282,12 +282,19 @@
     }
 
     func openConversation(for task: MCPServiceTaskSnapshot) {
-      conversation?.cancel()
+      closeConversation()
+      let sessionTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: tasks)
+      let priorTaskIDs =
+        sessionTasks
+        .filter { $0.taskID != task.taskID && $0.updatedAt <= task.updatedAt }
+        .map(\.taskID)
       let next = TaskConversationModel(
         taskID: task.taskID,
+        priorTaskIDs: priorTaskIDs,
         client: client,
         isTerminal: task.isTerminal
       )
+      next.restorePresentation(conversationPresentationCache.snapshot(for: task.taskID))
       conversation = next
       conversationWasTerminal = task.isTerminal
       Task { [weak self, weak next] in
@@ -295,6 +302,16 @@
         guard let self, self.conversation === next else { return }
         self.publishDisplay()
       }
+    }
+
+    func closeConversation() {
+      guard let current = conversation else { return }
+      conversationPresentationCache.store(
+        current.presentationSnapshot(),
+        for: current.taskID
+      )
+      current.cancel()
+      conversation = nil
     }
 
     var selectedTask: MCPServiceTaskSnapshot? {

@@ -2,52 +2,67 @@ import Foundation
 
 public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
   public let taskID: String
+  public let sessionID: String
   public let title: String
   public let projectID: String
   public let projectName: String
   public let source: String
   public let provider: String
+  public let providerID: String
   public let status: String
   public let updatedAt: String
+  public let turnCount: Int
   public let selected: Bool
   public let isRunning: Bool
   public let isActive: Bool
   public let canInterrupt: Bool
   public let canStop: Bool
   public let canSteer: Bool
+  public let canResume: Bool
+  public let canRestart: Bool
   public let canDelete: Bool
 
   public init(
     taskID: String,
+    sessionID: String? = nil,
     title: String,
     projectID: String,
     projectName: String,
     source: String,
     provider: String,
+    providerID: String = "codex",
     status: String,
     updatedAt: String,
+    turnCount: Int = 1,
     selected: Bool = false,
     isRunning: Bool = false,
     isActive: Bool = false,
     canInterrupt: Bool = false,
     canStop: Bool = false,
     canSteer: Bool = false,
+    canResume: Bool = false,
+    canRestart: Bool = false,
     canDelete: Bool = false
   ) {
     self.taskID = taskID
+    self.sessionID = sessionID ?? taskID
     self.title = title
     self.projectID = projectID
     self.projectName = projectName
     self.source = source
     self.provider = provider
+    self.providerID = providerID
     self.status = status
     self.updatedAt = updatedAt
+    self.turnCount = max(1, turnCount)
     self.selected = selected
     self.isRunning = isRunning
     self.isActive = isActive
     self.canInterrupt = canInterrupt
     self.canStop = canStop
     self.canSteer = canSteer
+    self.canResume = canResume
+    self.canRestart = canRestart
     self.canDelete = canDelete
   }
 }
@@ -146,10 +161,12 @@ public struct BridgeDesktopPermissionRemediationState: Codable, Equatable, Senda
 
 public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let taskID: String
+  public let sessionID: String
   public let title: String
   public let projectName: String
   public let status: String
   public let provider: String
+  public let providerID: String
   public let model: String?
   public let permissionMode: String?
   public let currentStep: String?
@@ -159,14 +176,19 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let activity: [BridgeDesktopActivityRow]
   public let conversation: [BridgeDesktopConversationEntry]
   public let permissionRemediation: BridgeDesktopPermissionRemediationState?
+  public let turnCount: Int
+  public let canResume: Bool
+  public let canRestart: Bool
   public let updatedAt: String
 
   public init(
     taskID: String,
+    sessionID: String? = nil,
     title: String,
     projectName: String,
     status: String,
     provider: String,
+    providerID: String = "codex",
     model: String? = nil,
     permissionMode: String? = nil,
     currentStep: String? = nil,
@@ -176,13 +198,18 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     activity: [BridgeDesktopActivityRow] = [],
     conversation: [BridgeDesktopConversationEntry] = [],
     permissionRemediation: BridgeDesktopPermissionRemediationState? = nil,
+    turnCount: Int = 1,
+    canResume: Bool = false,
+    canRestart: Bool = false,
     updatedAt: String
   ) {
     self.taskID = taskID
+    self.sessionID = sessionID ?? taskID
     self.title = title
     self.projectName = projectName
     self.status = status
     self.provider = provider
+    self.providerID = providerID
     self.model = model
     self.permissionMode = permissionMode
     self.currentStep = currentStep
@@ -192,6 +219,9 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.activity = activity
     self.conversation = conversation
     self.permissionRemediation = permissionRemediation
+    self.turnCount = max(1, turnCount)
+    self.canResume = canResume
+    self.canRestart = canRestart
     self.updatedAt = updatedAt
   }
 }

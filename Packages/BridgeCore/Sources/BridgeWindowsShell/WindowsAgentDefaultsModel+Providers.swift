@@ -30,27 +30,76 @@
         }
       }
       guard installationID == nil || installation != nil else { return }
+
+      modelRefreshGenerations[providerID, default: 0] &+= 1
+      let generation = modelRefreshGenerations[providerID, default: 0]
       refreshingProviderIDs.insert(providerID)
       providerErrors[providerID] = nil
       statusText = "正在读取 \(provider.displayName) 模型…"
       publishDisplay()
       defer {
-        refreshingProviderIDs.remove(providerID)
-        publishDisplay()
+        if modelRefreshGenerations[providerID] == generation {
+          refreshingProviderIDs.remove(providerID)
+          publishDisplay()
+        }
       }
+
       do {
-        let defaults = try await client.agentModelDefault(providerID: providerID)
-        let catalog = try await loadModels(provider: provider, installation: installation)
-        persistedDefaults[providerID] = defaults
-        modelCatalogs[providerID] = catalog
+        let status = try await client.status()
+        workbenchProjectID = status.workbenchProjectID
+        let persistedDefault = try await client.agentModelDefault(providerID: providerID)
+        guard modelRefreshGenerations[providerID] == generation else { return }
+        let catalogResponse = try await loadModels(
+          provider: provider,
+          installation: installation,
+          modelID: nil
+        )
+        guard modelRefreshGenerations[providerID] == generation else { return }
+        let defaultWasRemoved = AgentModelCatalogResolver.defaultModelWasRemoved(
+          persistedDefault.model,
+          from: catalogResponse
+        )
+        let response = try await modelSpecificResponse(
+          providerID: providerID,
+          provider: provider,
+          installation: installation,
+          persistedDefault: persistedDefault,
+          catalogResponse: catalogResponse,
+          defaultWasRemoved: defaultWasRemoved
+        )
+        guard modelRefreshGenerations[providerID] == generation else { return }
+        let resolution = AgentModelCatalogResolver.resolve(
+          previousOptions: modelCatalogs[providerID] ?? [],
+          catalogResponse: catalogResponse,
+          response: response,
+          defaultModel: persistedDefault.model,
+          persistedEffort: persistedDefault.effort,
+          defaultWasRemoved: defaultWasRemoved
+        )
+        let finalDefault = try await correctDefaultIfNeeded(
+          providerID: providerID,
+          persistedDefault: persistedDefault,
+          resolution: resolution
+        )
+        guard modelRefreshGenerations[providerID] == generation else { return }
+
+        persistedDefaults[providerID] = finalDefault
+        modelCatalogs[providerID] = resolution.response.models
         applySelectedProvider(
           providerID: providerID,
           installation: installation,
-          defaults: defaults,
-          catalog: catalog
+          defaults: finalDefault,
+          catalog: resolution.response.models
         )
-        statusText = "已加载 \(provider.displayName) 的 \(catalog.count) 个模型。"
+        providerErrors[providerID] = nil
+        if resolution.addedCount == 0, resolution.removedCount == 0 {
+          statusText = "已加载 \(provider.displayName) 的 \(resolution.response.models.count) 个模型。"
+        } else {
+          statusText =
+            "\(provider.displayName) 模型已刷新：新增 \(resolution.addedCount) 个，移除 \(resolution.removedCount) 个。"
+        }
       } catch {
+        guard modelRefreshGenerations[providerID] == generation else { return }
         let message = BridgeServiceErrorMessage.message(error)
         providerErrors[providerID] = "Agent 模型读取失败：\(message)"
         statusText = providerErrors[providerID]!
@@ -81,6 +130,7 @@
       effort: String
     ) async {
       guard connectionState == .connected, !busy,
+        !refreshingProviderIDs.contains(providerID),
         let provider = providers.first(where: { $0.providerID == providerID }),
         let installation = installations.first(where: {
           $0.installationID == installationID && $0.providerID == providerID
@@ -88,7 +138,7 @@
         }), Self.permissionValues(for: providerID).contains(permissionMode)
       else { return }
       let normalizedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
-      let requestedModel = normalizedModel?.isEmpty == true ? nil : normalizedModel
+      let requestedModel = normalizedModel.flatMap { $0.isEmpty ? nil : $0 }
       let catalog = modelCatalogs[providerID] ?? []
       if let requestedModel {
         guard provider.supportsModelSelection,
@@ -102,6 +152,7 @@
             .supportedReasoningEfforts.contains(effort) == true
         else { return }
       }
+      modelRefreshGenerations[providerID, default: 0] &+= 1
       busy = true
       statusText = "正在保存 Agent 默认设置…"
       publishDisplay()
@@ -116,13 +167,21 @@
           permissionMode: permissionMode,
           effort: effort.isEmpty ? nil : effort
         )
+        let refreshedCatalog = await refreshedCatalogAfterSave(
+          providerID: providerID,
+          provider: provider,
+          installation: installation,
+          persistedDefault: persisted,
+          fallback: catalog
+        )
         persistedDefaults[providerID] = persisted
+        modelCatalogs[providerID] = refreshedCatalog
         providerErrors[providerID] = nil
         applySelectedProvider(
           providerID: providerID,
           installation: installation,
           defaults: persisted,
-          catalog: modelCatalogs[providerID] ?? []
+          catalog: refreshedCatalog
         )
         statusText = "\(providerName(providerID)) 默认设置已保存。"
         feedback.postToast(statusText)
@@ -133,17 +192,81 @@
       }
     }
 
+    private func refreshedCatalogAfterSave(
+      providerID: String,
+      provider: IPCAgentProviderSummary,
+      installation: IPCAgentInstallationSummary,
+      persistedDefault: IPCAgentModelDefaultResponse,
+      fallback: [IPCAgentModelSummary]
+    ) async -> [IPCAgentModelSummary] {
+      guard provider.supportsModelSelection else { return [] }
+      do {
+        let catalog = try await loadModels(
+          provider: provider,
+          installation: installation,
+          modelID: nil
+        )
+        guard providerID != "deepseek-harness", let modelID = persistedDefault.model else {
+          return catalog.models
+        }
+        return try await loadModels(
+          provider: provider,
+          installation: installation,
+          modelID: modelID
+        ).models
+      } catch {
+        return fallback
+      }
+    }
+
+    private func modelSpecificResponse(
+      providerID: String,
+      provider: IPCAgentProviderSummary,
+      installation: IPCAgentInstallationSummary?,
+      persistedDefault: IPCAgentModelDefaultResponse,
+      catalogResponse: IPCAgentModelsResponse,
+      defaultWasRemoved: Bool
+    ) async throws -> IPCAgentModelsResponse {
+      guard providerID != "deepseek-harness", !defaultWasRemoved,
+        let modelID = persistedDefault.model
+      else { return catalogResponse }
+      return try await loadModels(
+        provider: provider,
+        installation: installation,
+        modelID: modelID
+      )
+    }
+
+    private func correctDefaultIfNeeded(
+      providerID: String,
+      persistedDefault: IPCAgentModelDefaultResponse,
+      resolution: AgentModelCatalogResolution
+    ) async throws -> IPCAgentModelDefaultResponse {
+      guard resolution.defaultWasRemoved || resolution.effortWasRemoved else {
+        return persistedDefault
+      }
+      return try await client.setAgentDefaults(
+        providerID: providerID,
+        model: resolution.defaultWasRemoved ? nil : persistedDefault.model,
+        permissionMode: providerID == "opencode" ? persistedDefault.permissionMode : nil,
+        effort: nil
+      )
+    }
+
     private func loadModels(
       provider: IPCAgentProviderSummary,
-      installation: IPCAgentInstallationSummary?
-    ) async throws -> [IPCAgentModelSummary] {
-      guard provider.supportsModelSelection, let installation else { return [] }
+      installation: IPCAgentInstallationSummary?,
+      modelID: String?
+    ) async throws -> IPCAgentModelsResponse {
+      guard provider.supportsModelSelection, let installation else {
+        return IPCAgentModelsResponse(models: [])
+      }
       return try await client.agentModels(
         installationID: installation.installationID,
-        projectID: nil,
-        modelID: nil,
+        projectID: workbenchProjectID,
+        modelID: modelID,
         useStoredDefault: false
-      ).models
+      )
     }
 
     private func applySelectedProvider(

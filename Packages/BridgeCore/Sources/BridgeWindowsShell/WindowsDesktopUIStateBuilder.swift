@@ -16,6 +16,7 @@
       selectedNavigation: BridgeDesktopNavigation = .overview,
       isRefreshing: Bool = false,
       browserAvailable: Bool = true,
+      browserURL: String? = nil,
       browserStatus: String? = nil,
       browserCanGoBack: Bool = false,
       browserCanGoForward: Bool = false,
@@ -41,11 +42,13 @@
           workbench,
           management: management,
           browserAvailable: browserAvailable,
+          browserURL: browserURL,
           browserStatus: browserStatus,
           browserCanGoBack: browserCanGoBack,
           browserCanGoForward: browserCanGoForward
         ),
         projects: projectsPage(
+          workbench: workbench,
           management: management,
           workspace: workspace
         ),

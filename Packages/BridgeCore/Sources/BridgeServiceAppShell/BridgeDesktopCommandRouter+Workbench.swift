@@ -62,8 +62,36 @@ extension BridgeDesktopCommandRouter {
         model.tasks.contains(where: { $0.taskID == taskID && $0.isTerminal })
       else { return }
       model.deleteTask(taskID)
+    case .deleteSession:
+      guard let selectedTask = task(payload.taskID, in: model), connected(model) else { return }
+      let sessionTasks = WorkbenchSessionCatalog.sessionTasks(for: selectedTask, in: model.tasks)
+      guard !sessionTasks.isEmpty, sessionTasks.allSatisfy({ $0.isTerminal }) else { return }
+      model.deleteSession(
+        selectedTask.effectiveSessionID ?? selectedTask.taskID,
+        inProject: selectedTask.projectID
+      )
     case .steerTask:
       steer(payload, model: model)
+    case .resumeTask:
+      guard let selectedTask = task(payload.taskID, in: model), connected(model) else { return }
+      let supportsContinuation =
+        selectedTask.isCodexTask
+        || selectedTask.providerID.flatMap { providerID in
+          model.agentProviders.first(where: { $0.providerID == providerID })?
+            .supportsSessionContinuation
+        } == true
+      guard
+        TaskInspectorPresentation.canResume(
+          selectedTask,
+          providerSupportsSessionContinuation: supportsContinuation
+        )
+      else { return }
+      model.resumeTask(selectedTask, prompt: payload.input)
+    case .restartTask:
+      guard let selectedTask = task(payload.taskID, in: model),
+        connected(model), selectedTask.canRestart
+      else { return }
+      model.restartTask(selectedTask)
     case .resolveApproval:
       resolveApproval(payload, model: model)
     case .resolveDirectApproval:
@@ -104,7 +132,7 @@ extension BridgeDesktopCommandRouter {
       let conversation = model.conversation,
       conversation.taskID == taskID
     else { return }
-    model.openConversation(taskID: taskID)
+    model.openTask(taskID)
   }
 
   private static func steer(
@@ -112,9 +140,13 @@ extension BridgeDesktopCommandRouter {
     model: BridgeServiceAppModel
   ) {
     guard let task = task(payload.taskID, in: model), connected(model),
-      let providerID = task.providerID,
-      model.agentProviders.first(where: { $0.providerID == providerID })?.supportsSteer == true,
-      TaskInspectorPresentation.canSteer(task, providerSupportsSteer: true),
+      TaskInspectorPresentation.canSteer(
+        task,
+        providerSupportsSteer: task.isCodexTask
+          || task.providerID.flatMap { providerID in
+            model.agentProviders.first(where: { $0.providerID == providerID })?.supportsSteer
+          } == true
+      ),
       let input = validatedText(payload.input, maximumBytes: IPCTaskSteerRequest.maximumInputBytes),
       TaskInspectorPresentation.steerValidationMessage(input) == nil
     else { return }

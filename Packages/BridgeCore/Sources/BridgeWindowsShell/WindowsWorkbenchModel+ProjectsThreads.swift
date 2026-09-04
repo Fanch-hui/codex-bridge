@@ -33,9 +33,13 @@
 
     func selectDefaultTaskIfNeeded() {
       guard selectedTaskID == nil, selectedThreadID == nil else { return }
-      guard let task = visibleTasks.first(where: { $0.isActive }) ?? visibleTasks.first else {
+      guard
+        let session = visibleSessions.first(where: { $0.latestTask.isActive })
+          ?? visibleSessions.first
+      else {
         return
       }
+      let task = session.latestTask
       selectedTaskID = task.taskID
       selectedThreadID = task.isCodexTask ? task.threadID : nil
       selectedThreadPage = nil
@@ -84,11 +88,11 @@
     }
 
     public func selectWorkbenchItem(at index: Int) async {
-      if visibleTasks.indices.contains(index) {
-        selectTask(visibleTasks[index])
+      if visibleSessions.indices.contains(index) {
+        selectTask(visibleSessions[index].latestTask)
         return
       }
-      let threadIndex = index - visibleTasks.count
+      let threadIndex = index - visibleSessions.count
       guard orphanThreads.indices.contains(threadIndex) else { return }
       await openThread(orphanThreads[threadIndex])
     }
@@ -116,8 +120,7 @@
       selectedTaskID = nil
       selectedThreadID = thread.threadID
       selectedThreadPage = nil
-      conversation?.cancel()
-      conversation = nil
+      closeConversation()
       actionText = "正在读取 Codex 历史会话…"
       publishDisplay()
       do {
@@ -146,8 +149,7 @@
       selectedTaskID = nil
       selectedThreadID = nil
       selectedThreadPage = nil
-      conversation?.cancel()
-      conversation = nil
+      closeConversation()
       conversationWasTerminal = false
     }
   }

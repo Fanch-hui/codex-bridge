@@ -44,11 +44,20 @@
       case .deleteTask(let taskID):
         Task { @MainActor in await model.deleteTask(id: taskID) }
         return true
+      case .deleteSession(let taskID):
+        Task { @MainActor in await model.deleteSession(containingTaskID: taskID) }
+        return true
       case .steerTask(let taskID, let input, let mode):
         guard let steerMode = MCPTaskSteerMode(rawValue: mode) else { return true }
         Task { @MainActor in
           _ = await model.submitSteer(taskID: taskID, input: input, mode: steerMode)
         }
+        return true
+      case .resumeTask(let taskID, let input):
+        Task { @MainActor in await model.resumeTask(id: taskID, input: input) }
+        return true
+      case .restartTask(let taskID):
+        Task { @MainActor in await model.restartTask(id: taskID) }
         return true
       case .resolveTaskApproval(
         let approvalID,

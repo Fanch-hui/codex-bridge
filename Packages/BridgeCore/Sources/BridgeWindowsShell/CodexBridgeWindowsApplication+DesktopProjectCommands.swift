@@ -16,7 +16,11 @@
         }
         management.selectProject(at: index)
         auxiliary.workspace.selectProject(id: projectID)
-        Task { @MainActor in await model.selectWorkbenchProject(id: projectID) }
+        auxiliary.agentDefaults.workbenchProjectID = projectID
+        Task { @MainActor in
+          await model.selectWorkbenchProject(id: projectID)
+          await auxiliary.agentDefaults.refreshAllProviderModels()
+        }
       case .beginProjectRegistration:
         WindowsDesktopUIHostActions.chooseProjectDirectory { name, path in
           WindowsMainWindow.enqueue(.registerProject(name: name, path: path))

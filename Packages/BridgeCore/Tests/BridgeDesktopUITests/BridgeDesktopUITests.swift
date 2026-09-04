@@ -49,16 +49,24 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(workbenchScript.contains("resolveApproval"))
     XCTAssertTrue(workbenchScript.contains("oneTimeApprovalButton"))
     XCTAssertTrue(workbenchScript.contains("remediationCard"))
-    XCTAssertTrue(workbenchScript.contains("deleteTask"))
+    XCTAssertTrue(workbenchScript.contains("deleteSession"))
+    XCTAssertTrue(workbenchScript.contains("resumeTask"))
+    XCTAssertTrue(workbenchScript.contains("restartTask"))
+    XCTAssertTrue(workbenchScript.contains("conversationDisclosure"))
     XCTAssertTrue(workbenchScript.contains("confirm("))
     XCTAssertTrue(workbenchScript.contains("setWorkbenchPermissionMode"))
     XCTAssertTrue(workbenchScript.contains("等待 ChatGPT 指令"))
     XCTAssertTrue(index.contains("workbench-browser-toolbar"))
     XCTAssertTrue(index.contains("workbench-inspector-header"))
     XCTAssertTrue(index.contains("workbench-inspector-footer"))
-    XCTAssertTrue(
-      try BridgeDesktopUIResources.read(.pagesProjectsJS).contains("saveProjectBlacklist")
-    )
+    let projectsScript = try BridgeDesktopUIResources.read(.pagesProjectsJS)
+    XCTAssertTrue(projectsScript.contains("saveProjectBlacklist"))
+    XCTAssertTrue(projectsScript.contains("addSessionRows"))
+    XCTAssertTrue(projectsScript.contains("addThreadTranscript"))
+    let commonScript = try BridgeDesktopUIResources.read(.pagesCommonJS)
+    XCTAssertTrue(commonScript.contains("function markdown"))
+    XCTAssertTrue(commonScript.contains("safeWebURL"))
+    XCTAssertFalse(commonScript.contains("innerHTML"))
     let connectionsScript = try BridgeDesktopUIResources.read(.pagesConnectionsJS)
     XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
     XCTAssertTrue(connectionsScript.contains("acceptReplacement: true"))
@@ -126,7 +134,11 @@ final class BridgeDesktopUITests: XCTestCase {
           subtitle: "任务",
           symbol: "bubble.left.and.text.bubble.right.fill"
         ),
-        browser: BridgeDesktopBrowserSlot(visible: true, enabled: true),
+        browser: BridgeDesktopBrowserSlot(
+          visible: true,
+          enabled: true,
+          url: "https://chatgpt.com/c/example"
+        ),
         projectStatus: "就绪",
         projectStatusTone: "success",
         engineStatus: "已连接本机 Codex 引擎"
@@ -140,6 +152,7 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertEqual(decoded.workbench?.projectStatus, "就绪")
     XCTAssertEqual(decoded.workbench?.projectStatusTone, "success")
     XCTAssertEqual(decoded.workbench?.engineStatus, "已连接本机 Codex 引擎")
+    XCTAssertEqual(decoded.workbench?.browser.url, "https://chatgpt.com/c/example")
   }
 
   func testLegacyStateWithoutHostContextOrFeedbackStillDecodes() throws {

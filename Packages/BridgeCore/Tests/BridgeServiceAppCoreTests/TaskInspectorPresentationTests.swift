@@ -78,8 +78,8 @@ final class TaskInspectorPresentationTests: XCTestCase {
     let completed = task(status: "completed", providerID: "opencode", providerRunID: "run-1")
 
     XCTAssertTrue(TaskInspectorPresentation.canInterrupt(codex))
-    XCTAssertFalse(
-      TaskInspectorPresentation.canSteer(codex, providerSupportsSteer: true)
+    XCTAssertTrue(
+      TaskInspectorPresentation.canSteer(codex, providerSupportsSteer: false)
     )
     XCTAssertTrue(
       TaskInspectorPresentation.canSteer(agent, providerSupportsSteer: true)

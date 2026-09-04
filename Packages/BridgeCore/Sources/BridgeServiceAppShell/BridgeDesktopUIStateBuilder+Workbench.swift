@@ -6,6 +6,11 @@ import BridgeServiceAppCore
 extension BridgeDesktopUIStateBuilder {
   static func workbench(from model: BridgeServiceAppModel) -> BridgeDesktopWorkbenchState {
     let (projectStatus, projectStatusTone) = projectStatus(from: model)
+    let projectTasks = model.tasks.filter {
+      model.selectedProjectID == nil || $0.projectID == model.selectedProjectID
+    }
+    let sessions = WorkbenchSessionCatalog.sessions(tasks: projectTasks)
+      .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
     return BridgeDesktopWorkbenchState(
       header: BridgeDesktopPageHeader(
         title: "工作台",
@@ -18,7 +23,7 @@ extension BridgeDesktopUIStateBuilder {
       selectedProjectID: model.selectedProjectID,
       permissionMode: model.workbenchPermissionMode,
       permissionOptions: permissionOptions,
-      tasks: model.tasks.map { task in taskRow(task, model: model) },
+      tasks: sessions.map { session in taskRow(session, model: model) },
       selectedTaskID: model.selectedTaskID,
       selectedTask: selectedTask(from: model),
       approvals: approvals(from: model),
@@ -95,23 +100,30 @@ extension BridgeDesktopUIStateBuilder {
   }
 
   private static func taskRow(
-    _ task: MCPServiceTaskSnapshot,
+    _ session: WorkbenchSessionItem,
     model: BridgeServiceAppModel
   ) -> BridgeDesktopTaskRow {
+    let task = session.latestTask
     let providerCanSteer =
       task.providerID.flatMap { providerID in
         model.agentProviders.first(where: { $0.providerID == providerID })?.supportsSteer
       } == true
     return BridgeDesktopTaskRow(
       taskID: task.taskID,
-      title: task.workbenchTitle,
+      sessionID: session.sessionID,
+      title: WorkbenchTaskTextPresentation.sessionMenuTitle(
+        title: session.title,
+        turnCount: session.turnCount
+      ),
       projectID: task.projectID,
       projectName: model.projectName(for: task.projectID),
       source: task.sourceDisplayName,
       provider: task.providerDisplayName,
+      providerID: task.providerIdentifier,
       status: taskStatusLabel(task.status),
       updatedAt: task.updatedAt,
-      selected: task.taskID == model.selectedTaskID,
+      turnCount: session.turnCount,
+      selected: session.tasks.contains(where: { $0.taskID == model.selectedTaskID }),
       isRunning: task.isRunning,
       isActive: task.isActive,
       canInterrupt: TaskInspectorPresentation.canInterrupt(task),
@@ -120,7 +132,9 @@ extension BridgeDesktopUIStateBuilder {
         task,
         providerSupportsSteer: providerCanSteer
       ),
-      canDelete: task.isTerminal
+      canResume: canResume(task, model: model),
+      canRestart: task.canRestart,
+      canDelete: session.tasks.allSatisfy { $0.isTerminal }
     )
   }
 
@@ -130,21 +144,36 @@ extension BridgeDesktopUIStateBuilder {
     guard let taskID = model.selectedTaskID,
       let task = model.tasks.first(where: { $0.taskID == taskID })
     else { return nil }
+    let sessionTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: model.tasks)
+    let session = WorkbenchSessionCatalog.sessions(tasks: sessionTasks).first
     return BridgeDesktopTaskDetail(
       taskID: task.taskID,
-      title: task.workbenchTitle,
+      sessionID: session?.sessionID ?? task.taskID,
+      title: session.map {
+        WorkbenchTaskTextPresentation.sessionMenuTitle(
+          title: $0.title,
+          turnCount: $0.turnCount
+        )
+      } ?? task.workbenchTitle,
       projectName: model.projectName(for: task.projectID),
       status: taskStatusLabel(task.status),
       provider: task.providerDisplayName,
-      model: task.executionModel,
+      providerID: task.providerIdentifier,
+      model: taskModelLabel(task, model: model),
       permissionMode: task.permissionMode,
       currentStep: task.currentStep,
       resultSummary: task.resultSummary,
       failureCode: task.failureCode,
       changedFiles: task.changedFiles,
       activity: taskActivity(task),
-      conversation: conversationEntries(from: model.conversation),
+      conversation: conversationEntries(
+        from: model.conversation,
+        providerID: task.providerIdentifier
+      ),
       permissionRemediation: permissionRemediation(for: task, model: model),
+      turnCount: session?.turnCount ?? 1,
+      canResume: canResume(task, model: model),
+      canRestart: task.canRestart,
       updatedAt: task.updatedAt
     )
   }
@@ -162,22 +191,100 @@ extension BridgeDesktopUIStateBuilder {
   }
 
   private static func conversationEntries(
-    from conversation: TaskConversationModel?
+    from conversation: TaskConversationModel?,
+    providerID: String
   ) -> [BridgeDesktopConversationEntry] {
     conversation?.entries.map {
-      let role = $0.role == "user" ? "用户" : "Agent"
-      return BridgeDesktopConversationEntry(
-        id: $0.key,
-        role: role,
-        text: $0.content,
-        kind: $0.kind,
-        toolName: $0.toolName,
-        toolStatus: $0.toolStatus,
-        toolArguments: $0.toolArguments,
-        isFinal: $0.isFinal,
-        status: $0.isFinal ? "final" : "streaming"
-      )
+      conversationEntry($0, providerID: providerID)
     } ?? []
+  }
+
+  private static func conversationEntry(
+    _ entry: TaskConversationModel.Entry,
+    providerID: String
+  ) -> BridgeDesktopConversationEntry {
+    let role =
+      entry.role == "user"
+      ? "用户" : AgentProviderPresentation.displayName(providerID)
+    if entry.kind == "reasoning" {
+      return BridgeDesktopConversationEntry(
+        id: entry.key,
+        role: role,
+        text: entry.content,
+        kind: entry.kind,
+        displayTitle: CodexTranscriptPresentation.reasoningTitle(
+          providerID: providerID,
+          streaming: !entry.isFinal
+        ),
+        displayStatus: entry.isFinal ? "" : "进行中",
+        symbol: "brain.head.profile",
+        isFinal: entry.isFinal,
+        status: entry.isFinal ? "final" : "streaming"
+      )
+    }
+    if entry.kind == "tool_call" {
+      let presentation = CodexTranscriptPresentation.tool(
+        providerID: providerID,
+        name: entry.toolName,
+        status: entry.toolStatus
+      )
+      return BridgeDesktopConversationEntry(
+        id: entry.key,
+        role: role,
+        text: entry.content,
+        kind: entry.kind,
+        toolName: entry.toolName,
+        toolStatus: entry.toolStatus,
+        toolArguments: entry.toolArguments,
+        displayTitle: presentation.title,
+        displayStatus: CodexTranscriptPresentation.statusLabel(entry.toolStatus),
+        symbol: presentation.systemImage,
+        isFinal: entry.isFinal,
+        status: entry.isFinal ? "final" : "streaming"
+      )
+    }
+    return BridgeDesktopConversationEntry(
+      id: entry.key,
+      role: role,
+      text: entry.content,
+      kind: entry.kind,
+      isFinal: entry.isFinal,
+      status: entry.isFinal ? "final" : "streaming"
+    )
+  }
+
+  private static func taskModelLabel(
+    _ task: MCPServiceTaskSnapshot,
+    model: BridgeServiceAppModel
+  ) -> String? {
+    let displayName: String?
+    if task.isCodexTask {
+      displayName = model.models.first(where: { $0.modelID == task.executionModel })?.displayName
+    } else {
+      displayName =
+        model.agentModelOptions(for: task.providerIdentifier)
+        .first(where: { $0.modelID == task.executionModel })?.displayName
+    }
+    let modelName = displayName ?? task.executionModel
+    guard let modelName else { return nil }
+    guard let effort = task.executionEffort, !effort.isEmpty else { return modelName }
+    return "\(modelName) · \(BridgeDesktopPresentation.extendedReasoningTitle(effort))"
+  }
+
+  private static func canResume(
+    _ task: MCPServiceTaskSnapshot,
+    model: BridgeServiceAppModel
+  ) -> Bool {
+    let supportsContinuation =
+      task.isCodexTask
+      || task.providerID.flatMap { providerID in
+        model.agentProviders.first(where: { $0.providerID == providerID })?
+          .supportsSessionContinuation
+      } == true
+    return TaskInspectorPresentation.canResume(
+      task,
+      providerSupportsSessionContinuation: supportsContinuation
+    )
   }
 
   private static func approvals(
@@ -266,6 +373,7 @@ extension BridgeDesktopUIStateBuilder {
     return BridgeDesktopBrowserSlot(
       visible: visible,
       enabled: model.isChatBrowserEnabled,
+      url: model.chatWebView?.url?.absoluteString ?? model.chatBrowserResumeURL.absoluteString,
       status: status,
       canToggle: true,
       canOpenExternally: true,

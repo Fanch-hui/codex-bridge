@@ -50,12 +50,19 @@
         return nonEmpty(payload.taskID).map(MainWindowCommand.stopTask)
       case .deleteTask:
         return nonEmpty(payload.taskID).map(MainWindowCommand.deleteTask)
+      case .deleteSession:
+        return nonEmpty(payload.taskID).map { .deleteSession(taskID: $0) }
       case .steerTask:
         guard let taskID = nonEmpty(payload.taskID), let input = payload.input,
           let mode = nonEmpty(payload.mode),
           ["queued", "interrupt-current-then-continue"].contains(mode)
         else { return nil }
         return .steerTask(id: taskID, input: input, mode: mode)
+      case .resumeTask:
+        guard let taskID = nonEmpty(payload.taskID) else { return nil }
+        return .resumeTask(id: taskID, input: optionalValue(payload.input))
+      case .restartTask:
+        return nonEmpty(payload.taskID).map { .restartTask(id: $0) }
       case .resolveApproval, .resolveDirectApproval:
         return approvalCommand(envelope.command, payload: payload)
       case .selectProject:

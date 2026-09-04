@@ -73,6 +73,7 @@
     static let controllerGetCoreWebView2 = 25
     static let controller2PutDefaultBackgroundColor = 27
     static let webViewGetSettings = 3
+    static let webViewGetSource = 4
     static let webViewNavigate = 5
     static let webViewAddHistoryChanged = 13
     static let webViewRemoveHistoryChanged = 14
@@ -103,6 +104,12 @@
     @convention(c) (
       UnsafeMutableRawPointer?,
       UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+    ) -> HRESULT
+
+  typealias WebView2GetStringFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UnsafeMutablePointer<WCHAR>?>?
     ) -> HRESULT
 
   typealias WebView2PutColorFn =

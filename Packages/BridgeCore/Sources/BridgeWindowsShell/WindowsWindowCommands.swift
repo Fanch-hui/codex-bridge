@@ -104,7 +104,10 @@
     case interruptTask(id: String)
     case stopTask(id: String)
     case deleteTask(id: String)
+    case deleteSession(taskID: String)
     case steerTask(id: String, input: String, mode: String)
+    case resumeTask(id: String, input: String?)
+    case restartTask(id: String)
     case resolveTaskApproval(
       approvalID: String,
       taskID: String,
