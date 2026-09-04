@@ -57,6 +57,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case disconnectTunnel
   case clearTunnel
   case registerAgent
+  case beginAgentRegistration
   case selectAgent
   case setAgentEnabled
   case reprobeAgent

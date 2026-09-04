@@ -80,6 +80,15 @@
       if let detail = display.selectedTaskDetail, let step = detail.currentStep, !step.isEmpty {
         return "\(detail.provider) \(step)"
       }
+      if let defaultModel = display.defaultModel, !defaultModel.isEmpty {
+        return "已连接本机 Codex 引擎 · 默认模型：\(defaultModel)"
+      }
+      if display.availableModelCount > 0 {
+        return "已连接本机 Codex 引擎 (\(display.availableModelCount) 个可用模型)"
+      }
+      if let error = display.modelError {
+        return "Codex 引擎未就绪：\(error)"
+      }
       return "已连接本机 Codex 引擎"
     }
 

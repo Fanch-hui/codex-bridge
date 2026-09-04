@@ -156,6 +156,7 @@
     case setAgentEnabled(id: String, enabled: Bool)
     case reprobeAgent(id: String, acceptReplacement: Bool)
     case removeAgent(id: String)
+    case beginAgentRegistration(providerID: String?)
     case registerAgentFromDesktop(
       providerID: String,
       displayName: String,

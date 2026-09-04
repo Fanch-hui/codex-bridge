@@ -183,6 +183,8 @@
           executablePath: executable,
           configurationPath: optionalValue(payload.configurationPath)
         )
+      case .beginAgentRegistration:
+        return .beginAgentRegistration(providerID: optionalValue(payload.providerID))
       case .selectAgent:
         return nonEmpty(payload.installationID ?? payload.providerID).map(
           MainWindowCommand.selectAgent(id:))

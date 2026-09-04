@@ -32,7 +32,7 @@
       case .amd64:
         machine == 0x8664
       case .arm64:
-        machine == 0xAA64 || machine == 0xA641
+        machine == 0xAA64 || machine == 0xA641 || machine == 0x8664
       }
     }
   }
@@ -221,22 +221,30 @@
     }
 
     private func nativeCodexPaths(packageRoot: String) -> [String] {
-      let nativeRoot = CodexWindowsPath.join(
-        packageRoot,
-        "node_modules",
-        "@openai",
-        architecture.nativePackageName
-      )
-      let siblingRoot = CodexWindowsPath.parent(packageRoot).map {
-        CodexWindowsPath.join($0, architecture.nativePackageName)
+      let architectures: [CodexWindowsArchitecture] = {
+        switch architecture {
+        case .amd64: [.amd64]
+        case .arm64: [.arm64, .amd64]
+        }
+      }()
+      return architectures.flatMap { arch in
+        let nativeRoot = CodexWindowsPath.join(
+          packageRoot,
+          "node_modules",
+          "@openai",
+          arch.nativePackageName
+        )
+        let siblingRoot = CodexWindowsPath.parent(packageRoot).map {
+          CodexWindowsPath.join($0, arch.nativePackageName)
+        }
+        return [
+          CodexWindowsPath.join(nativeRoot, "vendor", arch.vendorTriple, "bin", "codex.exe"),
+          siblingRoot.map {
+            CodexWindowsPath.join($0, "vendor", arch.vendorTriple, "bin", "codex.exe")
+          },
+          CodexWindowsPath.join(packageRoot, "vendor", arch.vendorTriple, "bin", "codex.exe"),
+        ].compactMap { $0 }
       }
-      return [
-        CodexWindowsPath.join(nativeRoot, "vendor", architecture.vendorTriple, "bin", "codex.exe"),
-        siblingRoot.map {
-          CodexWindowsPath.join($0, "vendor", architecture.vendorTriple, "bin", "codex.exe")
-        },
-        CodexWindowsPath.join(packageRoot, "vendor", architecture.vendorTriple, "bin", "codex.exe"),
-      ].compactMap { $0 }
     }
   }
 #endif

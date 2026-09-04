@@ -78,6 +78,9 @@
     public var browserEnabled: Bool = true
     public var supportsImmediateSteer: Bool = false
     public var canLoadEarlierConversation: Bool = false
+    public var defaultModel: String? = nil
+    public var availableModelCount: Int = 0
+    public var modelError: String? = nil
   }
 
   /// Lock-guarded bridge between main-actor model updates and the
@@ -114,7 +117,10 @@
       approvalAllowEnabled: false,
       approvalDenyEnabled: false,
       approvalStatusText: nil,
-      detailText: nil
+      detailText: nil,
+      defaultModel: nil,
+      availableModelCount: 0,
+      modelError: nil
     )
 
     public func current() -> WindowsWorkbenchDisplay {
@@ -170,6 +176,9 @@
     var permissionRemediationApplyingTaskIDs: Set<String> = []
     var permissionRemediationAppliedTaskIDs: Set<String> = []
     var permissionRemediationErrors: [String: String] = [:]
+    var models: [MCPModelSummary] = []
+    var modelPreferences: IPCModelPreferencesResponse?
+    var modelError: String?
 
     public convenience init() {
       self.init(feedback: WindowsDesktopFeedbackStore())
@@ -210,6 +219,15 @@
         } else {
           agentProviders = []
           agentInstallations = []
+        }
+        if let catalog = try? await client.modelCatalog() {
+          models = catalog.models
+          modelPreferences = catalog.preferences
+          modelError = nil
+        } else {
+          models = []
+          modelPreferences = nil
+          modelError = "尚未读取到 Codex 模型目录"
         }
         selectedProjectID =
           projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID

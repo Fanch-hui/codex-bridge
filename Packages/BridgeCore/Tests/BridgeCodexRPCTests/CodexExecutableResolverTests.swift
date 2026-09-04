@@ -103,23 +103,37 @@
       defer { fixture.remove() }
 
       let directory = fixture.path("Tools", "Codex")
-      let otherArchitecture: CodexWindowsArchitecture
-      switch CodexWindowsArchitecture.current {
-      case .amd64:
-        otherArchitecture = .arm64
-      case .arm64:
-        otherArchitecture = .amd64
-      }
       _ = try fixture.makeDirectExecutable(
         directory: directory,
-        architecture: otherArchitecture
+        architecture: .arm64
       )
       let resolver = CodexExecutableResolver(
         environment: fixture.environment(path: directory),
-        architecture: .current
+        architecture: .amd64
       )
 
       XCTAssertNil(resolver.resolve())
+    }
+
+    func testArm64ResolverAcceptsAmd64FallbackPackageAndBinary() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let packageRoot = fixture.path(
+        "AppData",
+        "Roaming",
+        "npm",
+        "node_modules",
+        "@openai",
+        "codex"
+      )
+      let amd64 = try fixture.makeNativeExecutable(packageRoot: packageRoot, architecture: .amd64)
+      let environment = fixture.environment(path: fixture.path("AppData", "Roaming", "npm"))
+
+      let resolver = CodexExecutableResolver(environment: environment, architecture: .arm64)
+      let resolved = try XCTUnwrap(resolver.resolve())
+
+      XCTAssertEqual(CodexWindowsPath.normalize(resolved), CodexWindowsPath.normalize(amd64))
     }
 
     func testResolverSelectsCurrentArchitectureNativePackage() throws {

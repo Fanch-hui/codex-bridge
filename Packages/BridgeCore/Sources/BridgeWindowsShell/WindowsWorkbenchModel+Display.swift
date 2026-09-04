@@ -157,7 +157,11 @@
           supportsImmediateSteer: task?.installationID.flatMap { installationID in
             agentInstallations.first(where: { $0.installationID == installationID })
           }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true,
-          canLoadEarlierConversation: conversation?.canLoadEarlier == true
+          canLoadEarlierConversation: conversation?.canLoadEarlier == true,
+          defaultModel: modelPreferences?.executionModel ?? models.first?.displayName
+            ?? models.first?.modelID,
+          availableModelCount: models.count,
+          modelError: modelError
         )
       )
     }

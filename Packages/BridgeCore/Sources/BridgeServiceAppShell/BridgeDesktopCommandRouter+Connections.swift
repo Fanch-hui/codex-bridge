@@ -55,6 +55,8 @@ extension BridgeDesktopCommandRouter {
       model.clearTunnel()
     case .registerAgent:
       registerAgent(payload, model: model)
+    case .beginAgentRegistration:
+      beginAgentRegistration(payload, model: model)
     case .selectAgent:
       return
     case .setAgentEnabled:
@@ -147,5 +149,49 @@ extension BridgeDesktopCommandRouter {
       return
     }
     model.refreshAgentModelCatalog(installationID: installationID, providerID: providerID)
+  }
+
+  private static func beginAgentRegistration(
+    _ payload: BridgeDesktopCommandPayload,
+    model: BridgeServiceAppModel
+  ) {
+    guard connected(model) else { return }
+    let targetProvider: IPCAgentProviderSummary? = {
+      if let providerID = validatedID(payload.providerID, maximumBytes: 128) {
+        return model.agentProviders.first(where: { $0.providerID == providerID })
+      }
+      return model.agentProviders.first
+    }()
+    guard let provider = targetProvider else { return }
+    let panel = NSOpenPanel()
+    panel.title = "选择 \(provider.displayName) 可执行文件"
+    panel.prompt = provider.requiresConfiguration ? "下一步" : "登记并 Probe"
+    panel.canChooseFiles = true
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
+    panel.resolvesAliases = true
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    let configurationURL: URL?
+    if provider.requiresConfiguration {
+      let configurationPanel = NSOpenPanel()
+      configurationPanel.title = "选择 \(provider.displayName) 配置文件"
+      configurationPanel.prompt = "登记并 Probe"
+      configurationPanel.canChooseFiles = true
+      configurationPanel.canChooseDirectories = false
+      configurationPanel.allowsMultipleSelection = false
+      configurationPanel.resolvesAliases = true
+      guard configurationPanel.runModal() == .OK, let selected = configurationPanel.url else {
+        return
+      }
+      configurationURL = selected
+    } else {
+      configurationURL = nil
+    }
+    model.registerAgentInstallation(
+      providerID: provider.providerID,
+      displayName: provider.displayName,
+      executableURL: url,
+      configurationURL: configurationURL
+    )
   }
 }

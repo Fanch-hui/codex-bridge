@@ -194,26 +194,92 @@
   function agentRegistration(providers, emit, enabled) {
     var wrapper = S.node("div", "page-message");
     wrapper.appendChild(S.node("h4", null, "登记 Agent"));
-    var grid = S.node("div", "form-grid");
-    var providerChoices = S.safeArray(providers).map(function (item) {
+    var providerList = S.safeArray(providers);
+    var providerChoices = providerList.map(function (item) {
       return { id: item.providerID, title: item.displayName, detail: item.detail };
     });
-    var provider = S.selectField("Provider", providerChoices[0] ? providerChoices[0].id : "", providerChoices, function () {}, "");
-    var name = S.textField("显示名称", providers && providers[0] ? providers[0].displayName : "", "Agent 名称");
-    var executable = S.textField("可执行路径", "", "由本机选择或输入");
-    var configuration = S.textField("配置路径", "", "需要配置时填写");
+
+    function getProvider(id) {
+      for (var i = 0; i < providerList.length; i++) {
+        if (providerList[i].providerID === id) return providerList[i];
+      }
+      return providerList[0];
+    }
+
+    function guideText(p) {
+      if (!p) return "请选择要登记的 Agent Provider。";
+      var id = (p.providerID || "").toLowerCase();
+      if (id.indexOf("opencode") >= 0) {
+        return "OpenCode CLI 引擎。无需配置文件。点击“弹窗选择文件登记…”选中 opencode.exe（npm 全局安装通常位于 %APPDATA%\\npm\\opencode.cmd）。";
+      }
+      if (id.indexOf("antigravity") >= 0) {
+        return "Antigravity CLI 引擎。无需配置文件。点击“弹窗选择文件登记…”选中 agy.exe（通常位于 PATH 或自定义安装目录）。";
+      }
+      if (id.indexOf("deepseek") >= 0) {
+        return "DeepSeek Harness。需要可执行文件及只读 cordis.yml 配置文件。点击“弹窗选择文件登记…”将依次弹出系统窗口指导选择。";
+      }
+      if (p.requiresConfiguration) {
+        return p.displayName + " 需要选择可执行文件与独立的配置文件（如 cordis.yml）。";
+      }
+      return p.displayName + " 仅需选择本机可执行文件（.exe 或脚本），无需单独配置文件。";
+    }
+
+    var selectedProvider = providerList[0];
+    var guideNode = S.node("div", "form-guide-note", guideText(selectedProvider));
+
+    var name = S.textField("显示名称", selectedProvider ? selectedProvider.displayName : "", "Agent 名称");
+    var executable = S.textField("可执行路径", "", "由系统弹窗选取，或手动输入绝对路径");
+    var configuration = S.textField("配置路径", "", (selectedProvider && !selectedProvider.requiresConfiguration) ? "当前 Provider 无需配置文件" : "需要配置时填写（如 cordis.yml）");
+    if (selectedProvider && !selectedProvider.requiresConfiguration) {
+      configuration.control.disabled = true;
+    }
+
+    var provider = S.selectField("Provider", selectedProvider ? selectedProvider.providerID : "", providerChoices, function (newID) {
+      selectedProvider = getProvider(newID);
+      name.control.value = selectedProvider ? selectedProvider.displayName : "";
+      guideNode.textContent = guideText(selectedProvider);
+      if (selectedProvider && !selectedProvider.requiresConfiguration) {
+        configuration.control.value = "";
+        configuration.control.disabled = true;
+        configuration.control.placeholder = "当前 Provider 无需配置文件";
+      } else {
+        configuration.control.disabled = false;
+        configuration.control.placeholder = "需要配置时填写（如 cordis.yml）";
+      }
+    }, "");
+
+    var grid = S.node("div", "form-grid");
     grid.appendChild(provider.wrapper);
     grid.appendChild(name.wrapper);
     grid.appendChild(executable.wrapper);
     grid.appendChild(configuration.wrapper);
     wrapper.appendChild(grid);
+    wrapper.appendChild(guideNode);
+
     var action = S.node("div", "form-actions");
-    var register = S.button("登记并 Probe", null, {}, emit, "small primary", !enabled || !providers || providers.length === 0);
+    var quickSelect = S.button("弹窗选择文件登记…", null, {}, emit, "small primary", !enabled || providerList.length === 0);
+    quickSelect.addEventListener("click", function () {
+      var currentID = provider.control.value || (selectedProvider ? selectedProvider.providerID : "");
+      emit("beginAgentRegistration", { providerID: currentID });
+    });
+    action.appendChild(quickSelect);
+
+    var register = S.button("按上方路径登记", null, {}, emit, "small", !enabled || providerList.length === 0);
     register.addEventListener("click", function () {
-      if (!executable.control.value) return;
-      emit("registerAgent", { providerID: provider.control.value, displayName: name.control.value, executable: executable.control.value, configurationPath: configuration.control.value || null });
+      var currentID = provider.control.value || (selectedProvider ? selectedProvider.providerID : "");
+      if (!executable.control.value) {
+        emit("beginAgentRegistration", { providerID: currentID });
+        return;
+      }
+      emit("registerAgent", {
+        providerID: currentID,
+        displayName: name.control.value,
+        executable: executable.control.value,
+        configurationPath: (selectedProvider && selectedProvider.requiresConfiguration) ? (configuration.control.value || null) : null
+      });
     });
     action.appendChild(register);
+
     wrapper.appendChild(action);
     return wrapper;
   }

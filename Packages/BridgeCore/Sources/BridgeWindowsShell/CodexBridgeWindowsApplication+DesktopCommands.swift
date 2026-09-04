@@ -180,6 +180,42 @@
         management.selectInstallation(at: index)
         Task { @MainActor in await management.removeSelectedAgent() }
         return true
+      case .beginAgentRegistration(let providerID):
+        let targetProvider: IPCAgentProviderSummary? = {
+          if let providerID {
+            return management.agentProviders.first(where: { $0.providerID == providerID })
+          }
+          return management.agentProviders.first
+        }()
+        guard let provider = targetProvider else { return true }
+        WindowsDesktopUIHostActions.chooseExecutableFile(
+          title: "选择 \(provider.displayName) 可执行文件"
+        ) { executablePath in
+          if provider.requiresConfiguration {
+            WindowsDesktopUIHostActions.chooseConfigFile(
+              title: "选择 \(provider.displayName) 配置文件 (cordis.yml)"
+            ) { configPath in
+              WindowsMainWindow.enqueue(
+                .registerAgentFromDesktop(
+                  providerID: provider.providerID,
+                  displayName: provider.displayName,
+                  executablePath: executablePath,
+                  configurationPath: configPath
+                )
+              )
+            }
+          } else {
+            WindowsMainWindow.enqueue(
+              .registerAgentFromDesktop(
+                providerID: provider.providerID,
+                displayName: provider.displayName,
+                executablePath: executablePath,
+                configurationPath: nil
+              )
+            )
+          }
+        }
+        return true
       case .registerAgentFromDesktop(
         let providerID, let displayName, let executablePath, let configurationPath):
         Task { @MainActor in

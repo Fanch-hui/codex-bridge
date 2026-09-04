@@ -25,7 +25,7 @@
       Task {
         await model.startServiceAndConnect()
         await management.refresh()
-        auxiliary.run(.refreshMCPConnections)
+        await auxiliary.refreshAll()
       }
 
       while ui.isRunning() {
