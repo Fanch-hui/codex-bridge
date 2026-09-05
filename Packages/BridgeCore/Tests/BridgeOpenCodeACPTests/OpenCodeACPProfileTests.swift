@@ -213,6 +213,32 @@ final class OpenCodeACPProfileTests: XCTestCase {
     }
   }
 
+  func testWindowsGUIExecutableDetection() {
+    func makePE(subsystem: UInt16) -> Data {
+      var bytes = [UInt8](repeating: 0, count: 256)
+      bytes[0] = 0x4D
+      bytes[1] = 0x5A
+      bytes[0x3C] = 0x40  // e_lfanew = 64
+      bytes[64] = 0x50  // P
+      bytes[65] = 0x45  // E
+      bytes[66] = 0
+      bytes[67] = 0
+      // Subsystem is at e_lfanew + 24 + 68 = 64 + 92 = 156
+      bytes[156] = UInt8(subsystem & 0xFF)
+      bytes[157] = UInt8((subsystem >> 8) & 0xFF)
+      return Data(bytes)
+    }
+
+    let guiPE = makePE(subsystem: 2)
+    let consolePE = makePE(subsystem: 3)
+    let truncated = Data([0x4D, 0x5A])
+
+    XCTAssertTrue(OpenCodeACPLaunchBuilder.isWindowsGUIExecutableData(guiPE))
+    XCTAssertFalse(OpenCodeACPLaunchBuilder.isWindowsGUIExecutableData(consolePE))
+    XCTAssertFalse(OpenCodeACPLaunchBuilder.isWindowsGUIExecutableData(truncated))
+    XCTAssertFalse(OpenCodeACPLaunchBuilder.isWindowsGUIExecutableData(Data()))
+  }
+
   private func makeTemporaryDirectory(prefix: String) throws -> String {
     let path = temporaryPath(prefix: prefix)
     try FileManager.default.createDirectory(

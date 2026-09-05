@@ -136,6 +136,21 @@
           CodexWindowsPath.join(
             userProfile,
             ".codex",
+            "plugins",
+            ".plugin-appserver",
+            "codex.exe"
+          ),
+          CodexWindowsPath.join(
+            userProfile,
+            ".codex",
+            ".sandbox-bin",
+            "codex.exe"
+          ),
+          CodexWindowsPath.join(userProfile, ".codex", "bin", "codex.exe"),
+          CodexWindowsPath.join(userProfile, ".codex", "codex.exe"),
+          CodexWindowsPath.join(
+            userProfile,
+            ".codex",
             "packages",
             "standalone",
             "current",

@@ -188,8 +188,14 @@
           return management.agentProviders.first
         }()
         guard let provider = targetProvider else { return true }
+        let dialogTitle: String = {
+          if provider.providerID == "opencode" {
+            return "选择 OpenCode 命令行工具 (opencode.cmd 或 opencode.exe)"
+          }
+          return "选择 \(provider.displayName) 命令行可执行文件"
+        }()
         WindowsDesktopUIHostActions.chooseExecutableFile(
-          title: "选择 \(provider.displayName) 可执行文件"
+          title: dialogTitle
         ) { executablePath in
           if provider.requiresConfiguration {
             WindowsDesktopUIHostActions.chooseConfigFile(

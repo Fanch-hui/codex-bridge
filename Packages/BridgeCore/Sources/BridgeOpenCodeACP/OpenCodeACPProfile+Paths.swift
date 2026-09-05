@@ -52,8 +52,46 @@ extension OpenCodeACPLaunchBuilder {
     guard let resolved = safeExecutable(path) else {
       throw AgentRuntimeError.installationUnavailable(AgentInstallationID(rawValue: path))
     }
+    #if os(Windows)
+      if isWindowsGUIExecutable(resolved) {
+        throw AgentRuntimeError.unsupportedProtocol("windows_gui_executable")
+      }
+    #endif
     return resolved
   }
+
+  static func isWindowsGUIExecutableData(_ data: Data) -> Bool {
+    guard data.count >= 0x40 else { return false }
+    let bytes = [UInt8](data)
+    guard bytes[0] == 0x4D, bytes[1] == 0x5A else { return false }
+    let offset =
+      UInt32(bytes[0x3C])
+      | (UInt32(bytes[0x3D]) << 8)
+      | (UInt32(bytes[0x3E]) << 16)
+      | (UInt32(bytes[0x3F]) << 24)
+    let headerOffset = Int(offset)
+    guard headerOffset >= 0, headerOffset + 94 <= bytes.count else { return false }
+    guard bytes[headerOffset] == 0x50, bytes[headerOffset + 1] == 0x45,
+      bytes[headerOffset + 2] == 0, bytes[headerOffset + 3] == 0
+    else {
+      return false
+    }
+    let subsystem = UInt16(bytes[headerOffset + 92]) | (UInt16(bytes[headerOffset + 93]) << 8)
+    return subsystem == 2
+  }
+
+  #if os(Windows)
+    static func isWindowsGUIExecutable(_ path: String) -> Bool {
+      guard path.lowercased().hasSuffix(".exe"),
+        let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+      else {
+        return false
+      }
+      defer { try? handle.close() }
+      guard let data = try? handle.read(upToCount: 1024) else { return false }
+      return isWindowsGUIExecutableData(data)
+    }
+  #endif
 
   private static func safeExecutable(_ path: String) -> String? {
     guard AgentPathSemantics.isAbsolute(path), !path.contains("\0"), path.utf8.count <= 16 * 1_024

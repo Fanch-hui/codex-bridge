@@ -197,6 +197,23 @@
       )
     }
 
+    func testResolverFindsUserProfilePluginAppServerInstallation() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let native = try fixture.makeDirectExecutable(
+        directory: fixture.path("User", ".codex", "plugins", ".plugin-appserver"),
+        architecture: .current
+      )
+      let environment = fixture.environment(path: fixture.path("Project", "bin"))
+      let resolver = CodexExecutableResolver(environment: environment, architecture: .current)
+
+      XCTAssertEqual(
+        CodexWindowsPath.normalize(try XCTUnwrap(resolver.resolve())),
+        CodexWindowsPath.normalize(native)
+      )
+    }
+
     func testWindowsCodexConfigurationNeverUsesPosixFallback() {
       let configuration = AppServerConfiguration.codex()
       XCTAssertNotEqual(configuration.executableURL.path, "/usr/bin/env")
