@@ -3,6 +3,7 @@
 #   powershell -File Scripts\build-windows.ps1 [-Test] [-Installer] [-OutDir path]
 param(
   [switch]$Test,
+  [string]$TestFilter = "",
   [switch]$Installer,
   [string]$OutDir = ".build\windows-dist",
   [string]$VcpkgRoot = "",
@@ -121,7 +122,7 @@ $env:INCLUDE = (@($vcpkgIncludeDirectory, $originalInclude) |
 $env:LIB = (@($vcpkgLibraryDirectory, $originalLib) |
     Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ";"
 
-if ($Test) {
+if ($Test -or -not [string]::IsNullOrWhiteSpace($TestFilter)) {
   $sqliteRuntimeDirectory = Join-Path $vcpkgRootValue "installed\$vcpkgTriplet\bin"
   if (-not (Test-Path (Join-Path $sqliteRuntimeDirectory "sqlite3.dll"))) {
     throw "SQLite runtime is unavailable: $sqliteRuntimeDirectory\sqlite3.dll"
@@ -169,12 +170,16 @@ try {
     throw "Swift build output directory was empty."
   }
 
-  if ($Test) {
-    foreach ($testFilter in @(
+  if ($Test -or -not [string]::IsNullOrWhiteSpace($TestFilter)) {
+    $filters = if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+      @($TestFilter)
+    } else {
+      @(
         "BridgeDomainTests",
         "BridgeAgentCoreTests",
         "BridgeSecurityTests",
         "BridgeCodexRPCTests",
+        "BridgeOpenCodeACPTests",
         "BridgeDesktopUITests",
         "BridgeServiceAppCoreTests",
         "BridgeServiceHostWindowsTests",
@@ -183,7 +188,10 @@ try {
         "BridgeServiceApplicationWindowsTests",
         "BridgeServiceCoreWindowsTests",
         "BridgeDirectCommandWindowsTests",
-        "BridgeWindowsShellTests")) {
+        "BridgeWindowsShellTests"
+      )
+    }
+    foreach ($testFilter in $filters) {
       $testArgs = @("test") + $swiftArguments + @("--filter", $testFilter)
       if ($testFilter -eq "BridgeSecurityTests") {
         $testArgs += @("--skip", "WindowsCredentialStoreTests")
