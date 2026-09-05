@@ -47,9 +47,9 @@ function Resolve-SwiftRuntimeMergeModule(
     throw "Swift platform version was not found above SDKROOT."
   }
   $swiftRoot = $versionDirectory.Parent.Parent
-  Assert-Directory $swiftRoot.FullName | Out-Null
+  Assert-Directory $swiftRoot.FullName -AllowReparsePoint | Out-Null
   $redistributablesRoot = Join-Path $swiftRoot.FullName "Redistributables\$($versionDirectory.Name)"
-  Assert-Directory $redistributablesRoot | Out-Null
+  Assert-Directory $redistributablesRoot -AllowReparsePoint | Out-Null
   $moduleArchitecture = if ($Architecture -eq "x64") { "amd64" } else { "arm64" }
   $modulePrefix = switch ($sdkDirectory.Name) {
     "Windows.sdk" { "rtl" }

@@ -38,19 +38,7 @@ enum AntigravityCLILaunchRuntime {
       environment["USERPROFILE"] = home
       environment["TEMP"] = temporary
       environment["TMP"] = temporary
-      for key in [
-        "SystemRoot", "SystemDrive", "ComSpec", "PATHEXT", "LOCALAPPDATA", "APPDATA",
-      ] {
-        if let value = source.first(where: {
-          $0.key.caseInsensitiveCompare(key) == .orderedSame
-        })?.value,
-          !value.isEmpty,
-          !value.contains("\0"),
-          value.rangeOfCharacter(from: .controlCharacters) == nil
-        {
-          environment[key] = value
-        }
-      }
+      AgentProviderEnvironment.applyWindowsSystemEnvironment(to: &environment, from: source)
     #endif
     for key in ["USER", "LOGNAME", "LANG", "LC_ALL", "SHELL"] {
       if let value = source[key], !value.isEmpty, !value.contains("\0") {

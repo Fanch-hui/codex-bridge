@@ -191,6 +191,7 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
       environment["USERPROFILE"] = sourceHome
       environment["TEMP"] = temporary
       environment["TMP"] = temporary
+      AgentProviderEnvironment.applyWindowsSystemEnvironment(to: &environment, from: source)
     #endif
     for key in ["USER", "LOGNAME", "LANG", "LC_ALL", "SHELL"] {
       if let value = source[key], !value.isEmpty, !value.contains("\0") {

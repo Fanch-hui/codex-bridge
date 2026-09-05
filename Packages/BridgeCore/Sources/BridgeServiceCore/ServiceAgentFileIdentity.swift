@@ -112,7 +112,7 @@ public struct ServiceAgentFileIdentity: Codable, Equatable, Sendable {
           DWORD(FILE_SHARE_READ),
           nil,
           DWORD(OPEN_EXISTING),
-          DWORD(FILE_FLAG_OPEN_REPARSE_POINT),
+          0,
           nil
         )
       }

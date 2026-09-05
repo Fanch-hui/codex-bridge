@@ -132,7 +132,7 @@
         ])
       }
       if let userProfile {
-        result.append(
+        result.append(contentsOf: [
           CodexWindowsPath.join(
             userProfile,
             ".codex",
@@ -141,8 +141,19 @@
             "current",
             "bin",
             "codex.exe"
-          ))
+          ),
+          CodexWindowsPath.join(userProfile, ".cargo", "bin", "codex.exe"),
+          CodexWindowsPath.join(userProfile, ".local", "bin", "codex.exe"),
+          CodexWindowsPath.join(userProfile, "scoop", "shims", "codex.exe"),
+          CodexWindowsPath.join(userProfile, "scoop", "apps", "codex", "current", "codex.exe"),
+        ])
       }
+      if let localAppData {
+        result.append(
+          CodexWindowsPath.join(localAppData, "Microsoft", "WinGet", "Links", "codex.exe")
+        )
+      }
+      result.append("C:\\ProgramData\\chocolatey\\bin\\codex.exe")
       for root in [programW6432, programFiles, programFilesX86].compactMap({ $0 }) {
         result.append(contentsOf: [
           CodexWindowsPath.join(root, "OpenAI", "Codex", "bin", "codex.exe"),

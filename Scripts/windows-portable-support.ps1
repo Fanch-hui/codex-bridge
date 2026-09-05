@@ -24,9 +24,12 @@ function Assert-RegularFile([string]$Path) {
   return $item
 }
 
-function Assert-Directory([string]$Path) {
+function Assert-Directory([string]$Path, [switch]$AllowReparsePoint) {
   $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-  if (-not $item.PSIsContainer -or (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+  if (-not $item.PSIsContainer) {
+    throw "Expected a regular directory: $Path"
+  }
+  if (-not $AllowReparsePoint -and (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
     throw "Expected a regular directory: $Path"
   }
   return $item

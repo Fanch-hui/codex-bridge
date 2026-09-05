@@ -126,7 +126,20 @@ if ($Test) {
   if (-not (Test-Path (Join-Path $sqliteRuntimeDirectory "sqlite3.dll"))) {
     throw "SQLite runtime is unavailable: $sqliteRuntimeDirectory\sqlite3.dll"
   }
-  $env:PATH = "$sqliteRuntimeDirectory;$originalPath"
+  $testPaths = @($sqliteRuntimeDirectory)
+  if (-not [string]::IsNullOrWhiteSpace($env:SDKROOT)) {
+    $archSubdir = if ($architecture -eq "arm64") { "bin64a" } else { "bin64" }
+    $devLibraryRoot = Join-Path (Split-Path -Parent (Split-Path -Parent (Get-FullPath $env:SDKROOT))) "Library"
+    if (Test-Path $devLibraryRoot) {
+      Get-ChildItem -LiteralPath $devLibraryRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+        $candidate = Join-Path $_.FullName "usr\$archSubdir"
+        if (Test-Path $candidate) {
+          $testPaths += $candidate
+        }
+      }
+    }
+  }
+  $env:PATH = (@($testPaths) + @($originalPath)) -join ";"
 }
 
 Push-Location $packagePath

@@ -228,8 +228,18 @@ extension ManagedStdioProcess {
         throw ManagedProcessError.invalidArgument
       }
       let process = Foundation.Process()
-      process.executableURL = URL(fileURLWithPath: executable)
-      process.arguments = Array(argv.dropFirst())
+      let lower = executable.lowercased()
+      if lower.hasSuffix(".cmd") || lower.hasSuffix(".bat") {
+        let comSpec =
+          environment["ComSpec"]
+          ?? ProcessInfo.processInfo.environment["ComSpec"]
+          ?? "C:\\Windows\\System32\\cmd.exe"
+        process.executableURL = URL(fileURLWithPath: comSpec)
+        process.arguments = ["/d", "/s", "/c", executable] + Array(argv.dropFirst())
+      } else {
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = Array(argv.dropFirst())
+      }
       process.environment = environment
       if let workingDirectory {
         process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)

@@ -230,19 +230,8 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
       environment["USERPROFILE"] = home
       environment["TEMP"] = temporary
       environment["TMP"] = temporary
-      for key in [
-        "SystemRoot", "SystemDrive", "ComSpec", "PATHEXT", "LOCALAPPDATA", "APPDATA",
-      ] {
-        if let value = sourceEnvironment.first(where: {
-          $0.key.caseInsensitiveCompare(key) == .orderedSame
-        })?.value,
-          !value.isEmpty,
-          !value.contains("\0"),
-          value.rangeOfCharacter(from: .controlCharacters) == nil
-        {
-          environment[key] = value
-        }
-      }
+      AgentProviderEnvironment.applyWindowsSystemEnvironment(
+        to: &environment, from: sourceEnvironment)
     #endif
     return environment
   }
