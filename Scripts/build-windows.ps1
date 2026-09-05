@@ -129,7 +129,7 @@ if ($Test) {
   $testPaths = @($sqliteRuntimeDirectory)
   if (-not [string]::IsNullOrWhiteSpace($env:SDKROOT)) {
     $archSubdir = if ($architecture -eq "arm64") { "bin64a" } else { "bin64" }
-    $devLibraryRoot = Join-Path (Split-Path -Parent (Split-Path -Parent (Get-FullPath $env:SDKROOT))) "Library"
+    $devLibraryRoot = Join-Path (Split-Path -Parent (Split-Path -Parent ([IO.Path]::GetFullPath($env:SDKROOT)))) "Library"
     if (Test-Path $devLibraryRoot) {
       Get-ChildItem -LiteralPath $devLibraryRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         $candidate = Join-Path $_.FullName "usr\$archSubdir"
