@@ -15,16 +15,12 @@
     private static let windowTitle = "Codex Bridge"
     private static let defaultPosition = Int32(bitPattern: 0x8000_0000)
     private static let standardResourceID = 32_512
-    private static let chatWebViewStoppedMessage = UINT(WM_APP + 40)
-    private static let desktopWebViewStoppedMessage = UINT(WM_APP + 41)
 
     private static let commandLock = NSLock()
     private static let browserViewportLock = NSLock()
     nonisolated(unsafe) private static var pendingCommands: [MainWindowCommand] = []
     nonisolated(unsafe) private static var browserViewport: BridgeDesktopBrowserViewport?
     nonisolated(unsafe) static var chatSlotEnabled = false
-    nonisolated(unsafe) private static var waitingForWebViewShutdown = false
-    nonisolated(unsafe) private static var pendingWebViewShutdownCount = 0
 
     /// Mirror of the page the shared UI last rendered; the command loop owns the
     /// request, this value only reports what reached the surface.
@@ -131,21 +127,24 @@
         }
         return 0
       case UINT(WM_CLOSE):
-        requestClose(window)
+        if wParam == WindowsApplicationIdentity.explicitCloseRequest {
+          WindowsMainWindowLifecycle.requestExit(window)
+        } else {
+          _ = ShowWindow(window, SW_HIDE)
+        }
         return 0
-      case chatWebViewStoppedMessage:
+      case WindowsMainWindowLifecycle.chatStoppedMessage:
         chat?.shutdown()
-        finishWebViewShutdown(window)
+        WindowsMainWindowLifecycle.finishWebViewShutdown(window)
         return 0
-      case desktopWebViewStoppedMessage:
+      case WindowsMainWindowLifecycle.desktopStoppedMessage:
         desktopUI?.shutdown()
-        finishWebViewShutdown(window)
+        WindowsMainWindowLifecycle.finishWebViewShutdown(window)
         return 0
       case UINT(WM_DESTROY):
         WindowsMainWindowChrome.removeTrayIcon()
         WindowsUIFoundation.shutdown()
-        waitingForWebViewShutdown = false
-        pendingWebViewShutdownCount = 0
+        WindowsMainWindowLifecycle.reset()
         desktopUI = nil
         Self.window = nil
         PostQuitMessage(0)
@@ -184,30 +183,6 @@
 
     private static let desktopStallText =
       "界面未能完成加载：WebView2 已启动，但页面没有响应。\r\n请重新启动 Codex Bridge；如果仍然如此，请修复安装或更新 Microsoft Edge WebView2 Evergreen 运行时。任务与本地 MCP 服务仍在后台运行。"
-
-    private static func requestClose(_ window: HWND?) {
-      guard !waitingForWebViewShutdown, let window else { return }
-      var shutdownCount = 0
-      if chat?.beginShutdown(notifying: window, message: chatWebViewStoppedMessage) == true {
-        shutdownCount += 1
-      }
-      if desktopUI?.beginShutdown(notifying: window, message: desktopWebViewStoppedMessage) == true
-      {
-        shutdownCount += 1
-      }
-      if shutdownCount > 0 {
-        waitingForWebViewShutdown = true
-        pendingWebViewShutdownCount = shutdownCount
-        _ = EnableWindow(window, false)
-        return
-      }
-      _ = DestroyWindow(window)
-    }
-
-    private static func finishWebViewShutdown(_ window: HWND?) {
-      pendingWebViewShutdownCount = max(0, pendingWebViewShutdownCount - 1)
-      if pendingWebViewShutdownCount == 0 { _ = DestroyWindow(window) }
-    }
 
     private static func createWindow(instance: HINSTANCE?) -> HWND? {
       windowTitle.withCString(encodedAs: UTF16.self) { title in

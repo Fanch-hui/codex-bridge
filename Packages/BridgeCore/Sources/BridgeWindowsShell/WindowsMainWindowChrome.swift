@@ -52,7 +52,7 @@
       case MenuCommand.refresh:
         WindowsMainWindow.enqueue(.refreshAll)
       case MenuCommand.exit:
-        _ = PostMessageW(window, UINT(WM_CLOSE), 0, 0)
+        _ = PostMessageW(window, UINT(WM_CLOSE), WindowsApplicationIdentity.explicitCloseRequest, 0)
       default:
         return false
       }

@@ -4,6 +4,7 @@
 
   enum WindowsApplicationIdentity {
     static let mainWindowClassName = "CodexBridgeMainWindow"
+    static let explicitCloseRequest = WPARAM(1)
   }
 
   public enum WindowsApplicationControl {
@@ -32,7 +33,7 @@
       guard processImagePath(process)?.caseInsensitiveCompare(expectedPath) == .orderedSame else {
         return false
       }
-      if !PostMessageW(window, UINT(WM_CLOSE), 0, 0),
+      if !PostMessageW(window, UINT(WM_CLOSE), WindowsApplicationIdentity.explicitCloseRequest, 0),
         WaitForSingleObject(process, 0) != WAIT_OBJECT_0
       {
         return false
