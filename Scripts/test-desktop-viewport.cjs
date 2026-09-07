@@ -32,3 +32,24 @@ test("workbench icon roles retain the shared sizing and stroke class", () => {
   assert.equal(icon.className, "icon dropdown-arrow");
   assert.equal(icon.dataset.symbol, "chevron.down");
 });
+
+test("stream updates preserve workbench selectors while control state changes refresh them", () => {
+  const ui = createHarness(["pages-common.js", "pages-workbench-header.js"], [
+    "workbench-browser-toolbar", "chat-browser-slot", "browser-slot-note", "workbench-inspector-header"
+  ]);
+  const header = ui.roots[3];
+  const page = {
+    projects: [{ id: "project", title: "项目" }], selectedProjectID: "project",
+    tasks: [{ taskID: "task", title: "任务", provider: "codex", status: "running", selected: true }],
+    selectedTaskID: "task", permissionMode: "read-only", browser: { enabled: false }
+  };
+  const render = ui.window.CodexBridgeDesktopWorkbenchHeader.render;
+  render(page, () => {});
+  const picker = header.querySelector(".task-native-select");
+  picker.focus();
+  render({ ...page, tasks: page.tasks.map(t => ({ ...t, updatedAt: "later" })) }, () => {});
+  assert.equal(header.querySelector(".task-native-select"), picker);
+  assert.equal(ui.document.activeElement, picker);
+  render({ ...page, tasks: page.tasks.map(t => ({ ...t, canInterrupt: true })) }, () => {});
+  assert.ok(ui.find(header, node => node.tagName === "button" && node.textContent === "中断"));
+});

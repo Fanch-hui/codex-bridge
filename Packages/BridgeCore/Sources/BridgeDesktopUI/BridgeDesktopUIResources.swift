@@ -13,6 +13,7 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case pagesNativePermissionsJS = "pages-native-permissions.js"
   case pagesWorkbenchConversationJS = "pages-workbench-conversation.js"
   case pagesWorkbenchControlsJS = "pages-workbench-controls.js"
+  case pagesWorkbenchHeaderJS = "pages-workbench-header.js"
   case pagesWorkbenchJS = "pages-workbench.js"
   case pagesFormDraftJS = "pages-form-draft.js"
   case pagesProjectEditorsJS = "pages-project-editors.js"

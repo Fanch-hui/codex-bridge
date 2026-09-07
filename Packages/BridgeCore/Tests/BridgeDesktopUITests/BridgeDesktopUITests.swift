@@ -57,7 +57,9 @@ final class BridgeDesktopUITests: XCTestCase {
       try BridgeDesktopUIResources.read(.pagesWorkbenchConversationJS).contains(
         "conversationDisclosure"))
     XCTAssertTrue(workbenchScript.contains("confirm("))
-    XCTAssertTrue(workbenchScript.contains("setWorkbenchPermissionMode"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesWorkbenchHeaderJS).contains(
+        "setWorkbenchPermissionMode"))
     XCTAssertTrue(workbenchScript.contains("等待 ChatGPT 指令"))
     XCTAssertTrue(index.contains("workbench-browser-toolbar"))
     XCTAssertTrue(index.contains("workbench-inspector-header"))
