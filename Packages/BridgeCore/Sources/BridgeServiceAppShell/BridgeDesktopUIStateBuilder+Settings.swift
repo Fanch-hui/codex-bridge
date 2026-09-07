@@ -131,10 +131,6 @@ extension BridgeDesktopUIStateBuilder {
         permissionOptions: BridgeDesktopPresentation.agentPermissionOptions(
           for: provider.providerID
         ),
-        supportsWorkspaceWrite: installation.map {
-          $0.effectiveCapabilities.contains("workspace.write_in_place")
-            || $0.effectiveCapabilities.contains("workspace.write_isolated")
-        } ?? true,
         canSave: model.connectionState == .connected,
         canRefreshModels: provider.supportsModelSelection
           && installation?.effectiveCapabilities.contains("selection.model") == true,
