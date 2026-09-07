@@ -115,7 +115,7 @@
         }
         auxiliary.connections.selectClient(at: index)
         guard auxiliary.connections.clients[index].enabled != enabled else { return true }
-        Task { @MainActor in await auxiliary.connections.toggleSelectedClient() }
+        Task { @MainActor in await auxiliary.connections.toggleSelectedClient(clientID: id) }
         return true
       case .setMCPClientExposure(let id, let exposureMode):
         guard
@@ -123,7 +123,9 @@
           let modeIndex = ["read-only", "full"].firstIndex(of: exposureMode)
         else { return true }
         auxiliary.connections.selectClient(at: clientIndex)
-        Task { @MainActor in await auxiliary.connections.setSelectedExposure(at: modeIndex) }
+        Task { @MainActor in
+          await auxiliary.connections.setSelectedExposure(at: modeIndex, clientID: id)
+        }
         return true
       case .copyMCPClientConfiguration(let id):
         guard let index = auxiliary.connections.clients.firstIndex(where: { $0.clientID == id })
@@ -139,7 +141,7 @@
           return true
         }
         auxiliary.connections.selectClient(at: index)
-        Task { @MainActor in await auxiliary.connections.rotateSelectedCredential() }
+        Task { @MainActor in await auxiliary.connections.rotateSelectedCredential(clientID: id) }
         return true
       case .configureTunnel, .connectTunnel, .disconnectTunnel, .clearTunnel:
         return runTunnelCommand(command, connections: auxiliary.connections)
@@ -158,7 +160,7 @@
           return true
         }
         management.selectInstallation(at: index)
-        Task { @MainActor in await management.setSelectedAgentEnabled(enabled) }
+        Task { @MainActor in await management.setSelectedAgentEnabled(enabled, installationID: id) }
         return true
       case .reprobeAgent(let id, let acceptReplacement):
         guard
@@ -168,7 +170,8 @@
         }
         management.selectInstallation(at: index)
         Task { @MainActor in
-          await management.reprobeSelectedAgent(acceptReplacement: acceptReplacement)
+          await management.reprobeSelectedAgent(
+            acceptReplacement: acceptReplacement, installationID: id)
         }
         return true
       case .removeAgent(let id):
@@ -178,7 +181,7 @@
           return true
         }
         management.selectInstallation(at: index)
-        Task { @MainActor in await management.removeSelectedAgent() }
+        Task { @MainActor in await management.removeSelectedAgent(installationID: id) }
         return true
       case .beginAgentRegistration(let providerID):
         let targetProvider: IPCAgentProviderSummary? = {
@@ -299,7 +302,8 @@
       else { return true }
       model.selectApproval(at: index)
       Task { @MainActor in
-        await model.resolveSelectedApproval(
+        await model.resolveApproval(
+          .task(approvalID),
           decision: decision,
           oneTimeToolAutoApproval: oneTimeToolAutoApproval
         )
@@ -318,7 +322,7 @@
         })
       else { return true }
       model.selectApproval(at: index)
-      Task { @MainActor in await model.resolveSelectedApproval(decision: decision) }
+      Task { @MainActor in await model.resolveApproval(.direct(approvalID), decision: decision) }
       return true
     }
 

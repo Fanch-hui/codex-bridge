@@ -71,7 +71,8 @@ extension BridgeDesktopUIStateBuilder {
       displayName: model.displayName,
       reasoningEfforts: model.reasoningEfforts.map {
         BridgeDesktopChoice(id: $0, title: reasoningTitle($0))
-      }
+      },
+      supportsFastMode: model.supportsFastMode
     )
   }
 

@@ -50,9 +50,12 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(workbenchScript.contains("oneTimeApprovalButton"))
     XCTAssertTrue(workbenchScript.contains("remediationCard"))
     XCTAssertTrue(workbenchScript.contains("deleteSession"))
-    XCTAssertTrue(workbenchScript.contains("resumeTask"))
-    XCTAssertTrue(workbenchScript.contains("restartTask"))
-    XCTAssertTrue(workbenchScript.contains("conversationDisclosure"))
+    let workbenchControls = try BridgeDesktopUIResources.read(.pagesWorkbenchControlsJS)
+    XCTAssertTrue(workbenchControls.contains("resumeTask"))
+    XCTAssertTrue(workbenchControls.contains("restartTask"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesWorkbenchConversationJS).contains(
+        "conversationDisclosure"))
     XCTAssertTrue(workbenchScript.contains("confirm("))
     XCTAssertTrue(workbenchScript.contains("setWorkbenchPermissionMode"))
     XCTAssertTrue(workbenchScript.contains("等待 ChatGPT 指令"))
@@ -60,9 +63,12 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(index.contains("workbench-inspector-header"))
     XCTAssertTrue(index.contains("workbench-inspector-footer"))
     let projectsScript = try BridgeDesktopUIResources.read(.pagesProjectsJS)
-    XCTAssertTrue(projectsScript.contains("saveProjectBlacklist"))
-    XCTAssertTrue(projectsScript.contains("addSessionRows"))
-    XCTAssertTrue(projectsScript.contains("addThreadTranscript"))
+    XCTAssertTrue(projectsScript.contains("CodexBridgeDesktopProjectWorkspace"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesProjectEditorsJS).contains("saveProjectBlacklist"))
+    let projectCollections = try BridgeDesktopUIResources.read(.pagesProjectCollectionsJS)
+    XCTAssertTrue(projectCollections.contains("addSessionRows"))
+    XCTAssertTrue(projectCollections.contains("addThreadTranscript"))
     let commonScript = try BridgeDesktopUIResources.read(.pagesCommonJS)
     XCTAssertTrue(commonScript.contains("function markdown"))
     XCTAssertTrue(commonScript.contains("safeWebURL"))
@@ -74,14 +80,22 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(connectionsScript.contains("现有配置将立即失效"))
     let settingsScript = try BridgeDesktopUIResources.read(.pagesSettingsJS)
     XCTAssertTrue(settingsScript.contains("settings-stack"))
-    XCTAssertTrue(settingsScript.contains("TextEncoder"))
-    XCTAssertTrue(settingsScript.contains("bindModelEffort"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesSettingsInstructionsJS).contains("TextEncoder"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesSettingsModelsJS).contains("chooseEffort"))
     XCTAssertTrue(settingsScript.contains("nativePermissionPolicy"))
     let nativePermissionScript = try BridgeDesktopUIResources.read(.pagesNativePermissionsJS)
     XCTAssertTrue(nativePermissionScript.contains("setAgentNativePermissionMode"))
-    XCTAssertTrue(nativePermissionScript.contains("addAgentNativePermissionRule"))
-    XCTAssertTrue(nativePermissionScript.contains("replaceAgentNativePermissionRule"))
-    XCTAssertTrue(nativePermissionScript.contains("removeAgentNativePermissionRule"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesSettingsNativeJS).contains(
+        "addAgentNativePermissionRule"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesSettingsNativeJS).contains(
+        "replaceAgentNativePermissionRule"))
+    XCTAssertTrue(
+      try BridgeDesktopUIResources.read(.pagesSettingsNativeJS).contains(
+        "removeAgentNativePermissionRule"))
     XCTAssertTrue(nativePermissionScript.contains("prepareAgentPermissionRemediation"))
     XCTAssertTrue(nativePermissionScript.contains("applyAgentPermissionRemediation"))
     XCTAssertTrue(nativePermissionScript.contains("oneTimeToolAutoApproval"))

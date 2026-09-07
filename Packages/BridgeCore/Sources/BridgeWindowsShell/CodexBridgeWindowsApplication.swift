@@ -103,7 +103,8 @@
       case .refreshApprovals:
         Task { await model.refreshApprovals() }
       case .resolveApproval(let decision):
-        Task { await model.resolveSelectedApproval(decision: decision) }
+        guard let approvalID = model.selectedApprovalID else { return }
+        Task { await model.resolveApproval(approvalID, decision: decision) }
       case .selectProject(let index):
         management.selectProject(at: index)
         auxiliary.run(.selectWorkspaceProject(index: index))
@@ -121,17 +122,20 @@
           auxiliary.run(.refreshWorkspace)
         }
       case .removeSelectedProject:
+        guard let projectID = management.selectedProjectID else { return }
         Task {
-          await management.removeSelectedProject()
+          await management.removeSelectedProject(projectID: projectID)
           await model.connectAndRefresh()
           auxiliary.run(.refreshWorkspace)
         }
       case .saveProjectPolicy(let read, let write, let network):
+        guard let projectID = management.selectedProjectID else { return }
         Task {
           await management.saveSelectedProjectPolicy(
             read: read,
             write: write,
-            network: network
+            network: network,
+            projectID: projectID
           )
         }
       case .selectAgentProvider(let index):
@@ -149,19 +153,26 @@
           )
         }
       case .enableSelectedAgent:
-        Task { await management.setSelectedAgentEnabled(true) }
+        guard let id = management.selectedInstallationID else { return }
+        Task { await management.setSelectedAgentEnabled(true, installationID: id) }
       case .disableSelectedAgent:
-        Task { await management.setSelectedAgentEnabled(false) }
+        guard let id = management.selectedInstallationID else { return }
+        Task { await management.setSelectedAgentEnabled(false, installationID: id) }
       case .reprobeSelectedAgent(let acceptReplacement):
-        Task { await management.reprobeSelectedAgent(acceptReplacement: acceptReplacement) }
+        guard let id = management.selectedInstallationID else { return }
+        Task {
+          await management.reprobeSelectedAgent(
+            acceptReplacement: acceptReplacement, installationID: id)
+        }
       case .removeSelectedAgent:
-        Task { await management.removeSelectedAgent() }
+        guard let id = management.selectedInstallationID else { return }
+        Task { await management.removeSelectedAgent(installationID: id) }
       default:
         auxiliary.run(command)
       }
     }
 
-    private static func onUI(_ action: @escaping @Sendable () -> Void) {
+    static func onUI(_ action: @escaping @Sendable () -> Void) {
       WindowsUIThread.shared.enqueue(action)
     }
 

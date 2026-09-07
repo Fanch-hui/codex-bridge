@@ -60,16 +60,10 @@ extension BridgeDesktopUIStateBuilder {
       },
       threads: model.threads.map(threadRow),
       selectedThreadID: model.selectedThread?.thread.threadID,
-      selectedThreadTitle: model.selectedThread.map {
-        $0.thread.title ?? $0.thread.preview ?? $0.thread.threadID
+      selectedThreadTitle: model.selectedThread.map { ThreadHistoryPresentation.title($0.thread) },
+      selectedThreadConversation: ThreadHistoryPresentation.entries(model.selectedThread).map {
+        BridgeDesktopConversationEntry(id: $0.id, role: $0.role, text: $0.text)
       },
-      selectedThreadConversation: model.selectedThread?.entries.enumerated().map { index, entry in
-        BridgeDesktopConversationEntry(
-          id: "thread:\(model.selectedThread?.thread.threadID ?? "history"):\(index)",
-          role: entry.role == "user" ? "用户" : "Codex",
-          text: entry.text
-        )
-      } ?? [],
       skills: model.skills.map(skillRow),
       canRegister: model.connectionState == .connected,
       canRemove: selected != nil && model.connectionState == .connected,

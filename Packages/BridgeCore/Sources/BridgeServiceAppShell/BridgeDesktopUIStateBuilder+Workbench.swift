@@ -26,6 +26,7 @@ extension BridgeDesktopUIStateBuilder {
       tasks: sessions.map { session in taskRow(session, model: model) },
       selectedTaskID: model.selectedTaskID,
       selectedTask: selectedTask(from: model),
+      history: threadHistory(from: model),
       approvals: approvals(from: model),
       steerModes: steerModes(from: model),
       browser: browserSlot(from: model),

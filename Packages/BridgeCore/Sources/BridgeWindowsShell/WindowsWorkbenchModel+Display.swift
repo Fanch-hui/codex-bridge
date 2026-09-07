@@ -152,6 +152,7 @@
           detailText: errorMessage,
           taskItems: taskItems,
           selectedTaskDetail: selectedTaskDetail,
+          history: threadHistory(),
           approvalItems: typedApprovals,
           browserEnabled: isChatBrowserEnabled,
           supportsImmediateSteer: task?.installationID.flatMap { installationID in

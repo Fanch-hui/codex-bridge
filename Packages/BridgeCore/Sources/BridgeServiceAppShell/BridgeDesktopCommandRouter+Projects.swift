@@ -261,5 +261,6 @@ extension BridgeDesktopCommandRouter {
     let projectID = validatedID(payload.projectID)
     if let projectID, project(projectID, in: model) == nil { return }
     model.openThread(threadID, inProject: projectID)
+    model.selection = .workbench
   }
 }

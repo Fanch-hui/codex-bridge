@@ -56,8 +56,10 @@
       publishDisplay()
     }
 
-    func toggleSelectedClient() async {
-      guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue else {
+    func toggleSelectedClient(clientID: String? = nil) async {
+      guard let profile = profile(clientID: clientID),
+        profile.clientID == MCPClientID.qwenStudio.rawValue
+      else {
         return
       }
       let enabled = !profile.enabled
@@ -72,8 +74,9 @@
       }
     }
 
-    func setSelectedExposure(at index: Int) async {
-      guard Self.exposureModes.indices.contains(index), let profile = selectedClient else { return }
+    func setSelectedExposure(at index: Int, clientID: String? = nil) async {
+      guard Self.exposureModes.indices.contains(index), let profile = profile(clientID: clientID)
+      else { return }
       let mode = Self.exposureModes[index]
       await mutate(
         "正在保存工具权限…",
@@ -87,8 +90,9 @@
       }
     }
 
-    func exportSelectedConfiguration() async -> String? {
-      guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue,
+    func exportSelectedConfiguration(clientID: String? = nil) async -> String? {
+      guard let profile = profile(clientID: clientID),
+        profile.clientID == MCPClientID.qwenStudio.rawValue,
         profile.enabled
       else { return nil }
       do {
@@ -104,8 +108,9 @@
       }
     }
 
-    func rotateSelectedCredential() async {
-      guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue,
+    func rotateSelectedCredential(clientID: String? = nil) async {
+      guard let profile = profile(clientID: clientID),
+        profile.clientID == MCPClientID.qwenStudio.rawValue,
         profile.enabled
       else { return }
       await mutate("正在重新生成 Qwen 凭证…", success: "Qwen 凭证已重新生成。") {
@@ -169,9 +174,11 @@
       }
     }
 
-    private var selectedClient: IPCMCPClientStatus? {
-      guard let selectedClientID else { return nil }
-      return clients.first { $0.clientID == selectedClientID }
+    private var selectedClient: IPCMCPClientStatus? { profile(clientID: nil) }
+
+    private func profile(clientID: String?) -> IPCMCPClientStatus? {
+      guard let id = clientID ?? selectedClientID else { return nil }
+      return clients.first { $0.clientID == id }
     }
 
     private func reconcileSelection() {

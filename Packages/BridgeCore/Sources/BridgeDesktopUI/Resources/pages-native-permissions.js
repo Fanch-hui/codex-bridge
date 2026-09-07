@@ -4,53 +4,6 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var effects = [{ id: "allow", title: "Allow" }, { id: "ask", title: "Ask" }, { id: "deny", title: "Deny" }];
 
-  function settingsCard(policy, emit) {
-    if (!policy) return null;
-    var card = S.node("section", "page-card settings-card");
-    var header = S.node("div", "native-permission-header");
-    var title = S.node("div");
-    title.appendChild(S.node("h3", null, "AGY CLI Global 工具权限"));
-    header.appendChild(title);
-    header.appendChild(S.button(
-      policy.isLoading ? "刷新中…" : "刷新",
-      "refreshAgentNativePermission",
-      { installationID: policy.installationID },
-      emit,
-      "small",
-      policy.isLoading || policy.isSaving
-    ));
-    card.appendChild(header);
-    card.appendChild(installationField(policy, emit));
-
-    if (policy.isLoading && !policy.toolPermission) {
-      card.appendChild(S.node("div", "page-message", "正在读取 AGY Global 权限…"));
-      return card;
-    }
-    if (!policy.toolPermission) {
-      card.appendChild(S.node("div", "page-message", "尚未读取 AGY Global 权限。"));
-      if (policy.errorMessage) card.appendChild(errorMessage(policy.errorMessage));
-      return card;
-    }
-
-    card.appendChild(modeField(policy, emit));
-    S.safeArray(policy.warnings).forEach(function (warning) {
-      card.appendChild(S.node("p", "hint", "⚠ " + warning));
-    });
-    card.appendChild(S.node("p", "hint", "规则优先级：Deny > Ask > Allow。修改仅对之后启动的新任务生效。"));
-    card.appendChild(newRuleEditor(policy, emit));
-
-    var rules = S.safeArray(policy.rules);
-    if (!rules.length) {
-      card.appendChild(S.node("div", "page-message", "当前没有 Global 工具规则。"));
-    } else {
-      rules.forEach(function (rule) {
-        card.appendChild(ruleEditor(policy, rule, emit));
-      });
-    }
-    if (policy.errorMessage) card.appendChild(errorMessage(policy.errorMessage));
-    return card;
-  }
-
   function installationField(policy, emit) {
     var installations = S.safeArray(policy.installations);
     if (installations.length <= 1) {
@@ -94,54 +47,6 @@
     }, "");
     field.control.disabled = !policy.canEdit;
     return field.wrapper;
-  }
-
-  function newRuleEditor(policy, emit) {
-    var wrapper = S.node("div", "page-message");
-    wrapper.appendChild(S.node("h4", null, "新增规则"));
-    var editor = ruleFields(policy, { effect: "allow", action: defaultAction(policy), target: "" });
-    wrapper.appendChild(editor.grid);
-    var actions = S.node("div", "form-actions");
-    var add = S.button("添加规则", null, {}, emit, "small primary", !policy.canEdit);
-    add.addEventListener("click", function () {
-      submitRule("addAgentNativePermissionRule", policy, null, editor, emit);
-    });
-    actions.appendChild(add);
-    wrapper.appendChild(actions);
-    return wrapper;
-  }
-
-  function ruleEditor(policy, rule, emit) {
-    var wrapper = S.node("div", "page-message");
-    var heading = S.node("div", "native-permission-header");
-    heading.appendChild(S.node("h4", null, rule.effect.toUpperCase() + " · " + actionTitle(rule.action)));
-    heading.appendChild(S.badge(rule.isRedacted ? "已隐藏" : (rule.isEditable ? "可编辑" : "只读"), "neutral"));
-    wrapper.appendChild(heading);
-
-    if (!rule.isEditable || rule.isRedacted) {
-      wrapper.appendChild(S.node("p", "mono", rule.isRedacted ? "目标已由 Service 隐藏" : rule.action + "(" + rule.target + ")"));
-      return wrapper;
-    }
-
-    var editor = ruleFields(policy, rule);
-    wrapper.appendChild(editor.grid);
-    var actions = S.node("div", "form-actions");
-    var remove = S.button("删除", null, {}, emit, "small danger", !policy.canEdit);
-    remove.addEventListener("click", function () {
-      if (!global.confirm("删除这条 AGY Global 规则？")) return;
-      emit("removeAgentNativePermissionRule", {
-        installationID: policy.installationID,
-        ruleID: rule.ruleID
-      });
-    });
-    var save = S.button("保存规则", null, {}, emit, "small primary", !policy.canEdit);
-    save.addEventListener("click", function () {
-      submitRule("replaceAgentNativePermissionRule", policy, rule, editor, emit);
-    });
-    actions.appendChild(remove);
-    actions.appendChild(save);
-    wrapper.appendChild(actions);
-    return wrapper;
   }
 
   function ruleFields(policy, value) {
@@ -290,7 +195,15 @@
   function errorMessage(message) { return S.node("div", "page-message", "⚠ " + message); }
 
   global.CodexBridgeDesktopNativePermissions = {
-    settingsCard: settingsCard,
+    settingsCard: function (policy, emit) {
+      return policy ? global.CodexBridgeDesktopSettingsNative.card(policy, emit).root : null;
+    },
+    installationField: installationField,
+    modeField: modeField,
+    ruleFields: ruleFields,
+    submitRule: submitRule,
+    defaultAction: defaultAction,
+    actionTitle: actionTitle,
     remediationCard: remediationCard,
     oneTimeApprovalButton: oneTimeApprovalButton
   };

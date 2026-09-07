@@ -42,6 +42,50 @@ final class BridgeDesktopBridgeTests: XCTestCase {
     )
   }
 
+  func testWorkbenchHistoryIncludesOrphansAndUsesSelectedTranscript() {
+    let model = BridgeServiceAppModel(
+      registration: BridgeDesktopTestServiceRegistration(status: .enabled),
+      clientFactory: { TestBridgeServiceClient() },
+      pollInterval: nil
+    )
+    let linked = MCPThreadSummary(threadID: "linked", title: "已关联", status: "idle")
+    let orphan = MCPThreadSummary(threadID: "orphan", title: "历史会话", status: "idle")
+    model.selectedProjectID = "project-1"
+    model.tasks = [
+      MCPServiceTaskSnapshot(
+        taskID: "task-1",
+        projectID: "project-1",
+        status: "completed",
+        providerID: "codex",
+        threadID: "linked",
+        supervisorStatus: "disabled",
+        localApprovalRequired: false,
+        updatedAt: "2026-09-07T00:00:00Z"
+      )
+    ]
+    model.threads = [linked, orphan]
+    model.selectedTaskID = nil
+    model.selectedThreadID = orphan.threadID
+    model.selectedThread = MCPThreadReadPage(
+      thread: orphan,
+      detail: .full,
+      entries: [MCPThreadEntry(turnID: "turn-1", role: "assistant", text: "已有的完整记录")]
+    )
+
+    let state = BridgeDesktopUIStateBuilder.workbench(from: model)
+    XCTAssertEqual(state.history.threads.map(\.threadID), ["orphan"])
+    XCTAssertEqual(state.history.selectedThreadID, "orphan")
+    XCTAssertEqual(state.history.selectedThreadTitle, "历史会话")
+    XCTAssertEqual(state.history.conversation.map(\.text), ["已有的完整记录"])
+    XCTAssertNil(state.selectedTask)
+
+    model.selectedTaskID = "task-1"
+    let taskState = BridgeDesktopUIStateBuilder.workbench(from: model)
+    XCTAssertNil(taskState.history.selectedThreadID)
+    XCTAssertTrue(taskState.history.conversation.isEmpty)
+    XCTAssertEqual(taskState.selectedTask?.taskID, "task-1")
+  }
+
   func testLogCategoryUsesPersistedServiceEventKind() {
     XCTAssertEqual(
       BridgeDesktopLogPresentation.category(for: "execution.command_completed"),

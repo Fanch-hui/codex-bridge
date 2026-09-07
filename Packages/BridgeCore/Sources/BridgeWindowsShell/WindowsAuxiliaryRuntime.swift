@@ -63,12 +63,17 @@
       case .refreshMCPConnections:
         Task { await connections.refresh() }
       case .toggleSelectedMCPClient:
-        Task { await connections.toggleSelectedClient() }
+        guard let clientID = connections.selectedClientID else { return }
+        Task { await connections.toggleSelectedClient(clientID: clientID) }
       case .setSelectedMCPExposure(let index):
-        Task { await connections.setSelectedExposure(at: index) }
+        guard let clientID = connections.selectedClientID else { return }
+        Task { await connections.setSelectedExposure(at: index, clientID: clientID) }
       case .copySelectedMCPConfiguration:
+        guard let clientID = connections.selectedClientID else { return }
         Task {
-          guard let configuration = await connections.exportSelectedConfiguration() else { return }
+          guard
+            let configuration = await connections.exportSelectedConfiguration(clientID: clientID)
+          else { return }
           connections.didCopyConfiguration(
             WindowsClipboard.write(configuration, owner: WindowsMainWindow.currentWindow()))
         }
@@ -77,7 +82,8 @@
         connections.didCopyEndpoint(
           WindowsClipboard.write(endpoint, owner: WindowsMainWindow.currentWindow()))
       case .rotateSelectedMCPCredential:
-        Task { await connections.rotateSelectedCredential() }
+        guard let clientID = connections.selectedClientID else { return }
+        Task { await connections.rotateSelectedCredential(clientID: clientID) }
       case .rotateLocalMCPEndpoint:
         Task { await connections.rotateEndpoint() }
       default:
@@ -100,7 +106,8 @@
       case .refreshWorkspace:
         Task { await workspace.refreshSelected() }
       case .setWorkspaceMode(let mode):
-        Task { await workspace.setMode(mode) }
+        guard let projectID = workspace.selectedProjectID else { return }
+        Task { await workspace.setMode(mode, projectID: projectID) }
       case .saveWorkspaceCommand(
         let name,
         let executable,
@@ -117,13 +124,19 @@
           requiresNetwork: requiresNetwork,
           risk: risk
         )
-        Task { await workspace.saveCommand(draft) }
+        guard let context = workspace.editContext else { return }
+        Task { await workspace.saveCommand(draft, context: context) }
       case .removeSelectedWorkspaceCommand:
-        Task { await workspace.removeSelectedCommand() }
+        guard let context = workspace.editContext else { return }
+        Task { await workspace.removeSelectedCommand(context: context) }
       case .saveWorkspaceBlacklist(let executable, let pattern):
-        Task { await workspace.saveBlacklist(executable: executable, pattern: pattern) }
+        guard let context = workspace.editContext else { return }
+        Task {
+          await workspace.saveBlacklist(executable: executable, pattern: pattern, context: context)
+        }
       case .removeSelectedWorkspaceBlacklist:
-        Task { await workspace.removeSelectedBlacklist() }
+        guard let context = workspace.editContext else { return }
+        Task { await workspace.removeSelectedBlacklist(context: context) }
       default:
         break
       }

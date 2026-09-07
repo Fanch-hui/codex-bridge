@@ -110,12 +110,16 @@
     row3.appendChild(seg);
     header.appendChild(row3);
 
-    // Row 4: Task selector dropdown + Action button
+    header.appendChild(sessionPicker(page, emit));
+  }
+
+  function sessionPicker(page, emit) {
     var row4 = S.node("div", "inspector-header-row row-tasks"), taskWrap = S.node("div", "task-picker-wrap");
     taskWrap.appendChild(S.icon("list.bullet.rectangle", "task-picker-icon"));
     var taskSelect = S.node("select", "task-native-select"), tasks = page.tasks || [];
-    var defaultOpt = S.node("option", null, "选择 Agent 会话 (" + tasks.length + ")");
+    var defaultOpt = S.node("option", null, "选择 Agent 会话 (" + (tasks.length + S.safeArray(page.history && page.history.threads).length) + ")");
     defaultOpt.value = ""; taskSelect.appendChild(defaultOpt);
+    var history = page.history || {}, historicalThreads = S.safeArray(history.threads);
     var curTask = null;
     tasks.forEach(function (t) {
       var opt = S.node("option", null, "[" + t.provider + "] " + t.title + " (" + t.status + ")");
@@ -123,11 +127,28 @@
       if (t.taskID === page.selectedTaskID || t.selected) { opt.selected = true; curTask = t; }
       taskSelect.appendChild(opt);
     });
-    taskSelect.addEventListener("change", function () { if (taskSelect.value) emit("selectTask", { taskID: taskSelect.value }); });
+    if (historicalThreads.length) {
+      var group = S.node("optgroup"); group.label = "Codex 外部历史会话";
+      historicalThreads.forEach(function (thread) {
+        var option = S.node("option", null, thread.title);
+        option.value = "history:" + thread.threadID;
+        option.dataset.threadID = thread.threadID;
+        option.selected = !page.selectedTaskID && thread.threadID === history.selectedThreadID;
+        group.appendChild(option);
+      });
+      taskSelect.appendChild(group);
+    }
+    taskSelect.setAttribute("aria-label", "当前 Agent 会话");
+    taskSelect.addEventListener("change", function () {
+      var option = taskSelect.options[taskSelect.selectedIndex];
+      if (option && option.dataset.threadID) emit("openThread", { threadID: option.dataset.threadID, projectID: page.selectedProjectID });
+      else if (taskSelect.value) emit("selectTask", { taskID: taskSelect.value });
+    });
     taskWrap.appendChild(taskSelect);
 
     var taskFace = S.node("span", "task-dropdown-face");
-    var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 会话 (" + tasks.length + ")");
+    var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 会话 (" + (tasks.length + S.safeArray(page.history && page.history.threads).length) + ")");
+    if (!curTask && history.selectedThreadID) taskFaceLabel = "Codex · " + (history.selectedThreadTitle || "外部历史会话");
     taskFace.appendChild(S.node("span", "task-title-text", taskFaceLabel));
     taskFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
     taskWrap.appendChild(taskFace);
@@ -136,7 +157,7 @@
     if (curTask && (curTask.canInterrupt || curTask.isRunning)) {
       row4.appendChild(S.button("中断", "interruptTask", { taskID: curTask.taskID }, emit, "small danger", false));
     }
-    header.appendChild(row4);
+    return row4;
   }
 
   function renderApprovals(page, emit) {
@@ -170,7 +191,21 @@
 
   function renderContent(page, emit) {
     var content = document.getElementById("workbench-inspector-content");
+    var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
+    try { renderContentBody(content, page, emit); } finally { restore(); }
+  }
+
+  function renderContentBody(content, page, emit) {
     S.clear(content);
+    if (!page.selectedTask && page.history && page.history.selectedThreadID) {
+      content.appendChild(S.node("h3", "detail-title", page.history.selectedThreadTitle || "Codex 外部历史会话"));
+      if (S.safeArray(page.history.conversation).length) {
+        global.CodexBridgeDesktopWorkbenchConversation.render(content, page.history.conversation, page, emit);
+      } else {
+        content.appendChild(S.node("p", "muted", "此会话暂无对话记录。"));
+      }
+      return;
+    }
     if (!page.selectedTask) {
       var empty = S.node("div", "workbench-empty-state");
       empty.appendChild(S.icon("sparkles", "empty-sparkle-icon"));
@@ -202,7 +237,7 @@
     var actions = S.node("div", "form-actions");
     if (row.canInterrupt) actions.appendChild(S.button("中断", "interruptTask", { taskID: detail.taskID }, emit, "small danger", false));
     if (row.canStop) actions.appendChild(S.button("停止", "stopTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (row.canDelete || (!row.isRunning && !row.isActive)) {
+    if (row.canDelete) {
       var rm = S.button("删除会话", null, {}, emit, "small danger", false);
       rm.addEventListener("click", function () {
         if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部轮次任务、事件和对话记录，无法撤销。")) emit("deleteSession", { taskID: detail.taskID, sessionID: detail.sessionID });
@@ -212,12 +247,10 @@
     actions.appendChild(S.button("刷新任务", "refreshTasks", {}, emit, "small", false));
     card.appendChild(actions);
 
-    if (row.canSteer) card.appendChild(steerForm(page, detail.taskID, emit));
-    if (detail.canResume || detail.canRestart) card.appendChild(retryForm(detail, emit));
     if (detail.resultSummary) addTextBlock(card, "结果摘要", detail.resultSummary);
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(card, "变更文件", detail.changedFiles);
     if (detail.activity && detail.activity.length) addActivityBlock(card, detail.activity);
-    if (detail.conversation && detail.conversation.length) addConversationBlock(card, detail.conversation, page, emit);
+    if (detail.conversation && detail.conversation.length) global.CodexBridgeDesktopWorkbenchConversation.render(card, detail.conversation, page, emit);
     content.appendChild(card);
   }
 
@@ -230,46 +263,6 @@
     c.appendChild(list);
   }
 
-  function steerForm(page, taskID, emit) {
-    var form = S.node("div", "form-grid"), input = S.textField("补充指令", "", "当前轮完成后继续", "full");
-    form.appendChild(input.wrapper);
-    var modes = S.selectField("发送方式", page.steerModes && page.steerModes[0] ? page.steerModes[0].id : "", page.steerModes || [], function () {}, "");
-    form.appendChild(modes.wrapper);
-    var action = S.node("div", "form-actions full"), send = S.button("发送 Steer", null, {}, emit, "small primary", false);
-    send.addEventListener("click", function () {
-      var val = input.control.value; if (!val.trim()) return;
-      emit("steerTask", { taskID: taskID, input: val, mode: modes.control.value }); input.control.value = "";
-    });
-    action.appendChild(send); form.appendChild(action);
-    var wrapper = S.node("div", "steer-form"); wrapper.appendChild(form); return wrapper;
-  }
-
-  function retryForm(detail, emit) {
-    var wrapper = S.node("div", "retry-form page-message");
-    wrapper.appendChild(S.node("h4", null, "继续处理这个会话"));
-    var input = S.textField("补充说明", "", "可选。留空则直接接续未完成任务", "full");
-    if (detail.canResume) wrapper.appendChild(input.wrapper);
-    var actions = S.node("div", "form-actions");
-    if (detail.canResume) {
-      var resume = S.button("接着中断任务继续", null, {}, emit, "small primary", false);
-      resume.addEventListener("click", function () {
-        emit("resumeTask", { taskID: detail.taskID, input: input.control.value || null });
-      });
-      actions.appendChild(resume);
-    }
-    if (detail.canRestart) {
-      var restart = S.button("重新开始", null, {}, emit, "small", false);
-      restart.addEventListener("click", function () {
-        if (global.confirm("使用原始指令在当前项目开启全新会话？")) {
-          emit("restartTask", { taskID: detail.taskID });
-        }
-      });
-      actions.appendChild(restart);
-    }
-    wrapper.appendChild(actions);
-    return wrapper;
-  }
-
   function addActivityBlock(container, values) {
     container.appendChild(S.node("h4", "subsection-title", "实时活动"));
     var list = S.node("div", "activity-list");
@@ -280,68 +273,9 @@
     container.appendChild(list);
   }
 
-  function addConversationBlock(container, values, page, emit) {
-    container.appendChild(S.node("h4", "subsection-title", "对话"));
-    var list = S.node("div", "conversation-list");
-    values.forEach(function (entry) {
-      if (entry.kind === "reasoning" || entry.kind === "tool_call") {
-        list.appendChild(conversationDisclosure(entry));
-      } else {
-        list.appendChild(conversationMessage(entry));
-      }
-    });
-    container.appendChild(list);
-    var actions = S.node("div", "conversation-actions");
-    if (page.browser && page.browser.canLoadEarlierConversation) {
-      actions.appendChild(S.button("加载更早对话", "loadEarlierConversation", { taskID: page.selectedTaskID }, emit, "small", false));
-    }
-    if (page.selectedTaskID) {
-      actions.appendChild(S.button("刷新对话", "refreshConversation", { taskID: page.selectedTaskID }, emit, "small", false));
-    }
-    if (actions.childNodes.length) container.appendChild(actions);
-  }
-
-  function conversationMessage(entry) {
-    var isUser = entry.role === "用户";
-    var item = S.node("article", "conversation-entry entry-message " + (isUser ? "entry-user" : "entry-agent"));
-    var heading = S.node("div", "entry-heading");
-    heading.appendChild(S.node("span", "entry-role", entry.role));
-    if (!entry.isFinal) heading.appendChild(S.badge("流式", "running"));
-    item.appendChild(heading);
-    item.appendChild(S.markdown(entry.text, "entry-text markdown-body"));
-    return item;
-  }
-
-  function conversationDisclosure(entry) {
-    var item = S.node("details", "conversation-entry entry-disclosure entry-" + entry.kind);
-    item.open = !entry.isFinal;
-    var summary = S.node("summary", "entry-heading disclosure-summary");
-    summary.appendChild(S.icon(entry.symbol || (entry.kind === "reasoning" ? "brain.head.profile" : "gearshape"), "entry-symbol"));
-    summary.appendChild(S.node("span", "entry-title", entry.displayTitle || entry.toolName || entry.role));
-    if (entry.displayStatus) {
-      summary.appendChild(S.badge(entry.displayStatus, entry.toolStatus === "failed" ? "error" : "neutral"));
-    }
-    if (!entry.isFinal) summary.appendChild(S.badge("流式", "running"));
-    item.appendChild(summary);
-    var body = S.node("div", "disclosure-body");
-    if (entry.text) body.appendChild(S.markdown(entry.text, "entry-text markdown-body"));
-    if (entry.toolArguments) body.appendChild(S.node("pre", "entry-arguments mono", entry.toolArguments));
-    item.appendChild(body);
-    return item;
-  }
-
-  function renderFooter(page, emit) {
-    var footer = document.getElementById("workbench-inspector-footer");
-    S.clear(footer);
-    footer.appendChild(S.node("span", "footer-status-text", page.engineStatus || "已连接本机 Codex 引擎"));
-    var refreshBtn = S.button("", "refresh", {}, emit, "footer-refresh-btn link-button");
-    refreshBtn.appendChild(S.icon("arrow.clockwise"));
-    refreshBtn.appendChild(S.node("span", null, "刷新"));
-    footer.appendChild(refreshBtn);
-  }
-
   function render(page, emit) {
     if (!page) {
+      global.CodexBridgeDesktopWorkbenchControls.render(null, emit);
       document.getElementById("chat-browser-slot").classList.add("browser-hidden");
       document.getElementById("browser-slot-note").textContent = "等待本机 Service 提供浏览器状态";
       return;
@@ -350,7 +284,7 @@
     renderInspectorHeader(page, emit);
     renderApprovals(page, emit);
     renderContent(page, emit);
-    renderFooter(page, emit);
+    global.CodexBridgeDesktopWorkbenchControls.render(page, emit);
   }
 
   global.CodexBridgeDesktopWorkbenchPage = { render: render };

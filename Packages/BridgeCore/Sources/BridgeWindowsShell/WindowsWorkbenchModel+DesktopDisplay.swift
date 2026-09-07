@@ -51,12 +51,8 @@
     ) -> BridgeDesktopTaskDetail {
       let entries: [BridgeDesktopConversationEntry]
       if let selectedThreadPage {
-        entries = selectedThreadPage.entries.enumerated().map { index, entry in
-          BridgeDesktopConversationEntry(
-            id: "history:\(selectedThreadPage.thread.threadID):\(index)",
-            role: entry.role == "user" ? "用户" : "Codex",
-            text: entry.text
-          )
+        entries = ThreadHistoryPresentation.entries(selectedThreadPage).map {
+          BridgeDesktopConversationEntry(id: $0.id, role: $0.role, text: $0.text)
         }
       } else {
         entries = (conversation?.entries ?? []).map {

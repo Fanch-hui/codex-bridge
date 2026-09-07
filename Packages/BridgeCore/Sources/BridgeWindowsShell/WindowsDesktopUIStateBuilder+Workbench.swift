@@ -32,6 +32,7 @@
         tasks: display.taskItems,
         selectedTaskID: display.selectedTaskID,
         selectedTask: display.selectedTaskDetail,
+        history: display.history,
         approvals: display.approvalItems,
         steerModes: steerModes(for: display),
         browser: browserSlot(

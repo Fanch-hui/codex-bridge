@@ -28,18 +28,19 @@
       case .removeProject(let projectID):
         guard management.selectedProjectID == projectID else { return true }
         Task { @MainActor in
-          await management.removeSelectedProject()
+          await management.removeSelectedProject(projectID: projectID)
           await model.connectAndRefresh()
           auxiliary.run(.refreshWorkspace)
         }
       case .saveProjectPolicyByID(let projectID, let read, let write, let network):
         guard management.selectedProjectID == projectID else { return true }
         Task { @MainActor in
-          await management.saveSelectedProjectPolicy(read: read, write: write, network: network)
+          await management.saveSelectedProjectPolicy(
+            read: read, write: write, network: network, projectID: projectID)
         }
       case .setProjectCommandMode(let projectID, let mode):
         guard auxiliary.workspace.selectedProjectID == projectID else { return true }
-        Task { @MainActor in await auxiliary.workspace.setMode(mode) }
+        Task { @MainActor in await auxiliary.workspace.setMode(mode, projectID: projectID) }
       case .saveProjectCommand(
         let projectID,
         let commandID,
@@ -54,7 +55,8 @@
         guard
           commandID == nil || auxiliary.workspace.commands.contains(where: { $0.id == commandID })
         else { return true }
-        auxiliary.workspace.selectedCommandID = commandID
+        guard var context = auxiliary.workspace.editContext else { return true }
+        context.commandID = commandID
         let draft = BridgeWorkspaceCommandDraft(
           name: name,
           executable: executable,
@@ -63,35 +65,47 @@
           requiresNetwork: requiresNetwork,
           risk: risk
         )
-        Task { @MainActor in await auxiliary.workspace.saveCommand(draft) }
+        Task { @MainActor in await auxiliary.workspace.saveCommand(draft, context: context) }
       case .removeProjectCommand(let projectID, let commandID):
         guard auxiliary.workspace.selectedProjectID == projectID,
           auxiliary.workspace.commands.contains(where: { $0.id == commandID })
         else { return true }
-        auxiliary.workspace.selectedCommandID = commandID
-        Task { @MainActor in await auxiliary.workspace.removeSelectedCommand() }
+        guard var context = auxiliary.workspace.editContext else { return true }
+        context.commandID = commandID
+        Task { @MainActor in await auxiliary.workspace.removeSelectedCommand(context: context) }
       case .saveProjectBlacklist(let projectID, let ruleID, let executable, let pattern):
         guard auxiliary.workspace.selectedProjectID == projectID else { return true }
         guard ruleID == nil || auxiliary.workspace.blacklists.contains(where: { $0.id == ruleID })
         else { return true }
-        auxiliary.workspace.selectedBlacklistID = ruleID
+        guard var context = auxiliary.workspace.editContext else { return true }
+        context.blacklistID = ruleID
         Task { @MainActor in
           await auxiliary.workspace.saveBlacklist(
             executable: executable ?? "",
-            pattern: pattern ?? ""
+            pattern: pattern ?? "",
+            context: context
           )
         }
       case .removeProjectBlacklist(let projectID, let ruleID):
         guard auxiliary.workspace.selectedProjectID == projectID,
           auxiliary.workspace.blacklists.contains(where: { $0.id == ruleID })
         else { return true }
-        auxiliary.workspace.selectedBlacklistID = ruleID
-        Task { @MainActor in await auxiliary.workspace.removeSelectedBlacklist() }
+        guard var context = auxiliary.workspace.editContext else { return true }
+        context.blacklistID = ruleID
+        Task { @MainActor in await auxiliary.workspace.removeSelectedBlacklist(context: context) }
       case .openThread(let projectID, let threadID):
-        guard auxiliary.workspace.selectedProjectID == projectID,
-          let index = auxiliary.workspace.threads.firstIndex(where: { $0.threadID == threadID })
-        else { return true }
-        auxiliary.workspace.selectThread(at: index)
+        let isWorkbenchThread =
+          model.selectedProjectID == projectID
+          && model.threads.contains(where: { $0.threadID == threadID })
+        let isProjectThread =
+          auxiliary.workspace.selectedProjectID == projectID
+          && auxiliary.workspace.threads.contains(where: { $0.threadID == threadID })
+        guard isWorkbenchThread || isProjectThread else { return true }
+        selectedPage = .workbench
+        onUI { WindowsMainWindow.selectPage(.workbench) }
+        Task { @MainActor in
+          await model.openWorkbenchThread(threadID: threadID, projectID: projectID)
+        }
       default:
         return false
       }

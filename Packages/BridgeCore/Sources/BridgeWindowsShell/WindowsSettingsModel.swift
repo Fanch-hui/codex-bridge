@@ -232,7 +232,8 @@
           displayName: model.displayName,
           reasoningEfforts: model.reasoningEfforts.map {
             BridgeDesktopChoice(id: $0, title: DirectWorkspacePresentation.effortLabel($0))
-          }
+          },
+          supportsFastMode: model.supportsFastMode
         )
       }
       let value = WindowsSettingsDisplay(

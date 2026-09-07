@@ -74,6 +74,7 @@
     public var detailText: String?
     public var taskItems: [BridgeDesktopTaskRow] = []
     public var selectedTaskDetail: BridgeDesktopTaskDetail?
+    public var history: BridgeDesktopThreadHistoryState = .init()
     public var approvalItems: [BridgeDesktopApprovalRow] = []
     public var browserEnabled: Bool = true
     public var supportsImmediateSteer: Bool = false
@@ -184,9 +185,16 @@
       self.init(feedback: WindowsDesktopFeedbackStore())
     }
 
-    init(feedback: WindowsDesktopFeedbackStore) {
+    convenience init(feedback: WindowsDesktopFeedbackStore) {
+      self.init(
+        client: BridgeServiceClient(transport: ServiceTransportFactory.defaultTransport()),
+        feedback: feedback
+      )
+    }
+
+    init(client: any BridgeServiceClientProtocol, feedback: WindowsDesktopFeedbackStore) {
+      self.client = client
       self.feedback = feedback
-      client = BridgeServiceClient(transport: ServiceTransportFactory.defaultTransport())
       publishDisplay()
     }
 

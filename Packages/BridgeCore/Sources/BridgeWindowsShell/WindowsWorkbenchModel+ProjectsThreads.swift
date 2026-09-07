@@ -89,36 +89,38 @@
 
     public func selectWorkbenchItem(at index: Int) async {
       if visibleSessions.indices.contains(index) {
-        selectTask(visibleSessions[index].latestTask)
+        selectTask(id: visibleSessions[index].latestTask.taskID)
         return
       }
       let threadIndex = index - visibleSessions.count
       guard orphanThreads.indices.contains(threadIndex) else { return }
-      await openThread(orphanThreads[threadIndex])
+      await openThread(orphanThreads[threadIndex].threadID)
     }
 
-    private func selectTask(_ task: MCPServiceTaskSnapshot) {
-      selectedTaskID = task.taskID
-      selectedThreadID = task.isCodexTask ? task.threadID : nil
-      selectedThreadPage = nil
-      actionText = nil
-      openConversation(for: task)
-      publishDisplay()
+    public func openWorkbenchThread(threadID: String, projectID: String) async {
+      guard connectionState == .connected,
+        let projectIndex = projects.firstIndex(where: { $0.projectID == projectID })
+      else { return }
+      if selectedProjectID != projectID {
+        await selectWorkbenchProject(at: projectIndex)
+      }
+      guard selectedProjectID == projectID else { return }
+      await openThread(threadID)
     }
 
-    private func openThread(_ thread: MCPThreadSummary) async {
+    private func openThread(_ threadID: String) async {
       guard let projectID = selectedProjectID else { return }
       if let task =
         visibleTasks
-        .filter({ $0.isCodexTask && $0.threadID == thread.threadID })
+        .filter({ $0.isCodexTask && $0.threadID == threadID })
         .max(by: { $0.updatedAt < $1.updatedAt })
       {
-        selectTask(task)
+        selectTask(id: task.taskID)
         return
       }
 
       selectedTaskID = nil
-      selectedThreadID = thread.threadID
+      selectedThreadID = threadID
       selectedThreadPage = nil
       closeConversation()
       actionText = "正在读取 Codex 历史会话…"
@@ -127,17 +129,21 @@
         let page = try await client.readThread(
           IPCThreadReadRequest(
             projectID: projectID,
-            threadID: thread.threadID,
+            threadID: threadID,
             detail: .full
           )
         )
-        guard selectedProjectID == projectID, selectedThreadID == thread.threadID else {
+        guard selectedProjectID == projectID, selectedThreadID == threadID,
+          selectedTaskID == nil
+        else {
           return
         }
         selectedThreadPage = page
         actionText = nil
       } catch {
-        guard selectedProjectID == projectID, selectedThreadID == thread.threadID else {
+        guard selectedProjectID == projectID, selectedThreadID == threadID,
+          selectedTaskID == nil
+        else {
           return
         }
         actionText = "读取会话失败：\(BridgeServiceErrorMessage.message(error))"

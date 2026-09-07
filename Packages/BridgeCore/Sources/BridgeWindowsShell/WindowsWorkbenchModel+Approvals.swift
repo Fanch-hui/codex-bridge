@@ -49,12 +49,24 @@
       decision: String,
       oneTimeToolAutoApproval: Bool = false
     ) async {
+      guard let approvalID = selectedApprovalID else {
+        setApprovalStatus("请先选择要处理的审批。")
+        return
+      }
+      await resolveApproval(
+        approvalID, decision: decision, oneTimeToolAutoApproval: oneTimeToolAutoApproval)
+    }
+
+    func resolveApproval(
+      _ approvalID: ApprovalPresentation.Identifier,
+      decision: String,
+      oneTimeToolAutoApproval: Bool = false
+    ) async {
       guard connectionState == .connected else {
         setApprovalStatus("后台 Service 未连接，无法处理审批。")
         return
       }
-      guard let approvalID = selectedApprovalID,
-        let item = approvalPresentationItems().first(where: { $0.id == approvalID })
+      guard let item = approvalPresentationItems().first(where: { $0.id == approvalID })
       else {
         setApprovalStatus("请先选择要处理的审批。")
         return
@@ -76,8 +88,8 @@
         }
       }
       guard resolvingApprovalIDs.insert(approvalID).inserted else { return }
-      let selectionGeneration = approvalSelectionGeneration
-      approvalStatusText = "正在处理审批…"
+      let selectionGeneration = selectedApprovalID == approvalID ? approvalSelectionGeneration : nil
+      if selectedApprovalID == approvalID { approvalStatusText = "正在处理审批…" }
       publishDisplay()
 
       do {
@@ -181,7 +193,7 @@
 
     private func finishApprovalResolution(
       _ approvalID: ApprovalPresentation.Identifier,
-      selectionGeneration: UInt64,
+      selectionGeneration: UInt64?,
       message: String,
       succeeded: Bool
     ) {
@@ -191,7 +203,7 @@
       } else {
         feedback.postAlert(message, title: "审批处理失败")
       }
-      guard approvalSelectionGeneration == selectionGeneration else {
+      guard let selectionGeneration, approvalSelectionGeneration == selectionGeneration else {
         publishDisplay()
         return
       }

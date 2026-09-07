@@ -30,6 +30,7 @@ extension BridgeServiceAppModel {
     }
 
     selectedTaskID = nil
+    selectedThread = nil
     closeConversation()
 
     runMutation { [weak self] client in
@@ -42,7 +43,9 @@ extension BridgeServiceAppModel {
           limit: 100
         )
       )
-      guard self.selectedThreadID == threadID, self.selectedTaskID == nil else { return }
+      guard self.selectedProjectID == targetProjectID, self.selectedThreadID == threadID,
+        self.selectedTaskID == nil
+      else { return }
       self.selectedThread = page
     }
   }

@@ -31,8 +31,8 @@
       }
     }
 
-    func removeSelectedProject() async {
-      guard let projectID = selectedProjectID,
+    func removeSelectedProject(projectID requestedProjectID: String? = nil) async {
+      guard let projectID = requestedProjectID ?? selectedProjectID,
         let project = projects.first(where: { $0.projectID == projectID })
       else {
         reportProjectFailure("请先选择要移除的项目。")
@@ -48,20 +48,22 @@
       defer { setProjectBusy(false) }
       do {
         try await client.removeProject(projectID: projectID)
-        selectedProjectID = nil
+        if selectedProjectID == projectID { selectedProjectID = nil }
         await refreshProjects()
-        reportProjectSuccess("已移除项目：\(project.name)")
+        reportProjectSuccess("已移除项目：\(project.name)", projectID: projectID)
       } catch {
-        reportProjectFailure("项目移除失败：\(BridgeServiceErrorMessage.message(error))")
+        reportProjectFailure(
+          "项目移除失败：\(BridgeServiceErrorMessage.message(error))", projectID: projectID)
       }
     }
 
     func saveSelectedProjectPolicy(
       read: String,
       write: String,
-      network: String
+      network: String,
+      projectID requestedProjectID: String? = nil
     ) async {
-      guard let projectID = selectedProjectID else {
+      guard let projectID = requestedProjectID ?? selectedProjectID else {
         reportProjectFailure("请先选择要保存策略的项目。")
         return
       }
@@ -83,9 +85,10 @@
           )
         )
         await refreshProjects()
-        reportProjectSuccess("项目策略已保存生效。")
+        reportProjectSuccess("项目策略已保存生效。", projectID: projectID)
       } catch {
-        reportProjectFailure("项目策略保存失败：\(BridgeServiceErrorMessage.message(error))")
+        reportProjectFailure(
+          "项目策略保存失败：\(BridgeServiceErrorMessage.message(error))", projectID: projectID)
       }
     }
 
@@ -134,10 +137,16 @@
         )
         selectedInstallationID = installation.installationID
         if installation.availability == "available" {
-          _ = try? await client.setAgentInstallationEnabled(
-            installationID: installation.installationID,
-            enabled: true
-          )
+          do {
+            _ = try await client.setAgentInstallationEnabled(
+              installationID: installation.installationID,
+              enabled: true
+            )
+          } catch {
+            await refreshAgents()
+            reportAgentFailure("Agent 已登记，启用失败：\(BridgeServiceErrorMessage.message(error))")
+            return
+          }
         }
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
@@ -151,8 +160,8 @@
       }
     }
 
-    func setSelectedAgentEnabled(_ enabled: Bool) async {
-      guard let installationID = selectedInstallationID,
+    func setSelectedAgentEnabled(_ enabled: Bool, installationID requestedID: String? = nil) async {
+      guard let installationID = requestedID ?? selectedInstallationID,
         let installation = agentInstallations.first(where: { $0.installationID == installationID })
       else {
         reportAgentFailure("请先选择要启停的 Agent 安装。")
@@ -176,14 +185,17 @@
           enabled: enabled
         )
         await refreshAgents()
-        reportAgentSuccess(enabled ? "Agent 已启用。" : "Agent 已停用。")
+        reportAgentSuccess(enabled ? "Agent 已启用。" : "Agent 已停用。", installationID: installationID)
       } catch {
-        reportAgentFailure("Agent 启停失败：\(BridgeServiceErrorMessage.message(error))")
+        reportAgentFailure(
+          "Agent 启停失败：\(BridgeServiceErrorMessage.message(error))", installationID: installationID)
       }
     }
 
-    func reprobeSelectedAgent(acceptReplacement: Bool) async {
-      guard let installationID = selectedInstallationID else {
+    func reprobeSelectedAgent(acceptReplacement: Bool, installationID requestedID: String? = nil)
+      async
+    {
+      guard let installationID = requestedID ?? selectedInstallationID else {
         reportAgentFailure("请先选择要 Probe 的 Agent 安装。")
         return
       }
@@ -202,14 +214,16 @@
         )
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
-        reportAgentSuccess("Probe 完成：\(state)。")
+        reportAgentSuccess("Probe 完成：\(state)。", installationID: installationID)
       } catch {
-        reportAgentFailure("Agent Probe 失败：\(BridgeServiceErrorMessage.message(error))")
+        reportAgentFailure(
+          "Agent Probe 失败：\(BridgeServiceErrorMessage.message(error))",
+          installationID: installationID)
       }
     }
 
-    func removeSelectedAgent() async {
-      guard let installationID = selectedInstallationID else {
+    func removeSelectedAgent(installationID requestedID: String? = nil) async {
+      guard let installationID = requestedID ?? selectedInstallationID else {
         reportAgentFailure("请先选择要移除的 Agent 安装。")
         return
       }
@@ -223,11 +237,12 @@
       defer { setAgentBusy(false) }
       do {
         try await client.removeAgentInstallation(installationID: installationID)
-        selectedInstallationID = nil
+        if selectedInstallationID == installationID { selectedInstallationID = nil }
         await refreshAgents()
-        reportAgentSuccess("Agent 安装登记已移除。")
+        reportAgentSuccess("Agent 安装登记已移除。", installationID: installationID)
       } catch {
-        reportAgentFailure("Agent 移除失败：\(BridgeServiceErrorMessage.message(error))")
+        reportAgentFailure(
+          "Agent 移除失败：\(BridgeServiceErrorMessage.message(error))", installationID: installationID)
       }
     }
   }

@@ -115,16 +115,10 @@
         threads: desktopThreads,
         verificationCommands: detail?.verificationCommands ?? [],
         threadCount: detail?.threadCount,
-        selectedThreadTitle: selectedThreadPage.map {
-          $0.thread.title ?? $0.thread.preview ?? $0.thread.threadID
-        },
-        selectedThreadConversation: selectedThreadPage?.entries.enumerated().map { index, entry in
-          BridgeDesktopConversationEntry(
-            id: "thread:\(selectedThreadPage?.thread.threadID ?? "history"):\(index)",
-            role: entry.role == "user" ? "用户" : "Codex",
-            text: entry.text
-          )
-        } ?? []
+        selectedThreadTitle: selectedThreadPage.map { ThreadHistoryPresentation.title($0.thread) },
+        selectedThreadConversation: ThreadHistoryPresentation.entries(selectedThreadPage).map {
+          BridgeDesktopConversationEntry(id: $0.id, role: $0.role, text: $0.text)
+        }
       )
       displayBox.store(value)
     }
