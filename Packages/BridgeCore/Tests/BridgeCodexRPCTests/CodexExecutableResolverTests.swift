@@ -214,6 +214,54 @@
       )
     }
 
+    func testResolverDerivesUserProfileWhenWindowsVariablesAreMissing() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let native = try fixture.makeDirectExecutable(
+        directory: fixture.path("User", ".codex", "plugins", ".plugin-appserver"),
+        architecture: .current
+      )
+      var environment = fixture.environment(path: fixture.path("Project", "bin"))
+      environment.removeValue(forKey: "USERPROFILE")
+      environment.removeValue(forKey: "APPDATA")
+      environment.removeValue(forKey: "LOCALAPPDATA")
+      environment["HOME"] = fixture.path("User")
+
+      let resolver = CodexExecutableResolver(environment: environment, architecture: .current)
+
+      XCTAssertEqual(
+        CodexWindowsPath.normalize(try XCTUnwrap(resolver.resolve())),
+        CodexWindowsPath.normalize(native)
+      )
+    }
+
+    func testChildEnvironmentRestoresWindowsRuntimeVariables() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let environment = ["HOME": fixture.path("User")]
+      let child = CodexWindowsPath.childEnvironment(
+        configured: environment,
+        source: [:]
+      )
+
+      XCTAssertEqual(
+        CodexWindowsPath.normalize(child["USERPROFILE"] ?? ""),
+        CodexWindowsPath.normalize(fixture.path("User"))
+      )
+      XCTAssertEqual(
+        CodexWindowsPath.normalize(child["APPDATA"] ?? ""),
+        CodexWindowsPath.normalize(fixture.path("User", "AppData", "Roaming"))
+      )
+      XCTAssertEqual(
+        CodexWindowsPath.normalize(child["LOCALAPPDATA"] ?? ""),
+        CodexWindowsPath.normalize(fixture.path("User", "AppData", "Local"))
+      )
+      XCTAssertFalse(child["TEMP"]?.isEmpty ?? true)
+      XCTAssertFalse(child["TMP"]?.isEmpty ?? true)
+    }
+
     func testWindowsCodexConfigurationNeverUsesPosixFallback() {
       let configuration = AppServerConfiguration.codex()
       XCTAssertNotEqual(configuration.executableURL.path, "/usr/bin/env")

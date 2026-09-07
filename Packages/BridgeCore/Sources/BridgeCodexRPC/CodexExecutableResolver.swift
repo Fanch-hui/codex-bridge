@@ -81,12 +81,16 @@
     }
 
     private func candidatePaths() -> [String] {
-      let appData = CodexWindowsPath.environmentValue("APPDATA", in: environment)
-      let localAppData = CodexWindowsPath.environmentValue("LOCALAPPDATA", in: environment)
+      let userProfile = CodexWindowsPath.userProfile(in: environment)
+      let appData =
+        CodexWindowsPath.environmentValue("APPDATA", in: environment)
+        ?? userProfile.map { CodexWindowsPath.join($0, "AppData", "Roaming") }
+      let localAppData =
+        CodexWindowsPath.environmentValue("LOCALAPPDATA", in: environment)
+        ?? userProfile.map { CodexWindowsPath.join($0, "AppData", "Local") }
       let programFiles = CodexWindowsPath.environmentValue("ProgramFiles", in: environment)
       let programFilesX86 = CodexWindowsPath.environmentValue("ProgramFiles(x86)", in: environment)
       let programW6432 = CodexWindowsPath.environmentValue("ProgramW6432", in: environment)
-      let userProfile = CodexWindowsPath.environmentValue("USERPROFILE", in: environment)
       var result: [String] = []
 
       if let configured = CodexWindowsPath.environmentValue(

@@ -3,7 +3,6 @@
 #if os(Windows)
   import WinSDK
 #endif
-
 public struct AppServerConfiguration: Equatable, Sendable {
   public let executableURL: URL
   public let arguments: [String]
@@ -201,7 +200,6 @@ public actor AppServerProcess {
       await dispatcher.terminate(with: .processLaunchFailed(error.localizedDescription))
       throw CodexRPCError.processLaunchFailed(error.localizedDescription)
     }
-
     self.state = state
     self.transport = transport
     self.dispatcher = dispatcher
@@ -216,9 +214,15 @@ public actor AppServerProcess {
 
   public func stop() async {
     guard let state else { return }
+    #if os(Windows)
+      state.terminateIfRunning()
+      await waitForExitOrKill(state)
+    #endif
     await transport?.stop()
-    state.terminateIfRunning()
-    await waitForExitOrKill(state)
+    #if !os(Windows)
+      state.terminateIfRunning()
+      await waitForExitOrKill(state)
+    #endif
     let status = await state.waitForExit()
     await dispatcher?.terminate(with: .processExited(status))
     state.stderrPipe.fileHandleForReading.readabilityHandler = nil

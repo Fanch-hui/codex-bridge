@@ -7,7 +7,8 @@ extension AppServerConfiguration {
         if let discovered = CodexExecutableResolver().resolve(explicitPath: executableURL.path) {
           return AppServerConfiguration(
             executableURL: URL(fileURLWithPath: discovered),
-            arguments: ["app-server", "--stdio"]
+            arguments: ["app-server", "--stdio"],
+            environment: CodexWindowsPath.childEnvironment()
           )
         }
         if let cmdScript = resolveCommandScript(executableURL.path) {
@@ -21,7 +22,8 @@ extension AppServerConfiguration {
       if let discovered = CodexExecutableResolver().resolve() {
         return AppServerConfiguration(
           executableURL: URL(fileURLWithPath: discovered),
-          arguments: ["app-server", "--stdio"]
+          arguments: ["app-server", "--stdio"],
+          environment: CodexWindowsPath.childEnvironment()
         )
       }
       if let cmdScript = defaultWindowsCodexCommandPath() {
@@ -87,7 +89,8 @@ extension AppServerConfiguration {
         ProcessInfo.processInfo.environment["ComSpec"] ?? "C:\\Windows\\System32\\cmd.exe"
       return AppServerConfiguration(
         executableURL: URL(fileURLWithPath: comSpec),
-        arguments: ["/d", "/s", "/c", scriptPath, "app-server", "--stdio"]
+        arguments: ["/d", "/s", "/c", scriptPath, "app-server", "--stdio"],
+        environment: CodexWindowsPath.childEnvironment()
       )
     }
 
@@ -96,7 +99,8 @@ extension AppServerConfiguration {
         ProcessInfo.processInfo.environment["ComSpec"] ?? "C:\\Windows\\System32\\cmd.exe"
       return AppServerConfiguration(
         executableURL: URL(fileURLWithPath: comSpec),
-        arguments: ["/d", "/s", "/c", "codex", "app-server", "--stdio"]
+        arguments: ["/d", "/s", "/c", "codex", "app-server", "--stdio"],
+        environment: CodexWindowsPath.childEnvironment()
       )
     }
 

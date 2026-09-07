@@ -79,18 +79,37 @@ public actor JSONLineTransport {
       bufferingPolicy: .unbounded
     )
     readContinuation = pair.continuation
-    output.value.readabilityHandler = { handle in
-      let data = handle.availableData
-      if data.isEmpty {
-        pair.continuation.finish()
-      } else {
-        guard chunkGate.acquire() else { return }
-        if case .terminated = pair.continuation.yield(data) {
-          chunkGate.release()
-          chunkGate.close()
+    #if os(Windows)
+      // Anonymous pipe reads stay on a dedicated OS thread until the writer closes.
+      Thread.detachNewThread {
+        while true {
+          let data = output.value.readData(ofLength: 64 * 1_024)
+          guard !data.isEmpty else {
+            pair.continuation.finish()
+            return
+          }
+          guard chunkGate.acquire() else { return }
+          if case .terminated = pair.continuation.yield(data) {
+            chunkGate.release()
+            chunkGate.close()
+            return
+          }
         }
       }
-    }
+    #else
+      output.value.readabilityHandler = { handle in
+        let data = handle.availableData
+        if data.isEmpty {
+          pair.continuation.finish()
+        } else {
+          guard chunkGate.acquire() else { return }
+          if case .terminated = pair.continuation.yield(data) {
+            chunkGate.release()
+            chunkGate.close()
+          }
+        }
+      }
+    #endif
     readerTask = Task.detached(priority: .userInitiated) {
       defer { chunkGate.close() }
       var parser = JSONLineParser(maximumLineBytes: maximumLineBytes)
