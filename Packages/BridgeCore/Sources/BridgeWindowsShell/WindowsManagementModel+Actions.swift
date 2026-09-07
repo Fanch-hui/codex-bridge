@@ -136,23 +136,11 @@
           )
         )
         selectedInstallationID = installation.installationID
-        if installation.availability == "available" {
-          do {
-            _ = try await client.setAgentInstallationEnabled(
-              installationID: installation.installationID,
-              enabled: true
-            )
-          } catch {
-            await refreshAgents()
-            reportAgentFailure("Agent 已登记，启用失败：\(BridgeServiceErrorMessage.message(error))")
-            return
-          }
-        }
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
         let successNote =
           installation.availability == "available"
-          ? "Agent 已登记并启用：\(installation.displayName)（\(state)）。"
+          ? "已登记并验证 \(installation.displayName)，确认启用后才会进入可选目录。"
           : "Agent 已登记：\(installation.displayName)（\(state)）。"
         reportAgentSuccess(successNote)
       } catch {
