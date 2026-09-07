@@ -30,6 +30,7 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
   public let effortOptions: [BridgeDesktopChoice]
   public let permissionMode: String
   public let permissionOptions: [BridgeDesktopChoice]
+  public let supportsWorkspaceWrite: Bool?
   public let canSave: Bool
   public let canRefreshModels: Bool
   public let isRefreshingModels: Bool
@@ -46,6 +47,7 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
     effortOptions: [BridgeDesktopChoice] = [],
     permissionMode: String = "",
     permissionOptions: [BridgeDesktopChoice] = [],
+    supportsWorkspaceWrite: Bool? = true,
     canSave: Bool = true,
     canRefreshModels: Bool = false,
     isRefreshingModels: Bool = false,
@@ -61,6 +63,7 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
     self.effortOptions = effortOptions
     self.permissionMode = permissionMode
     self.permissionOptions = permissionOptions
+    self.supportsWorkspaceWrite = supportsWorkspaceWrite
     self.canSave = canSave
     self.canRefreshModels = canRefreshModels
     self.isRefreshingModels = isRefreshingModels

@@ -31,7 +31,11 @@
           permissionOptions: BridgeDesktopPresentation.agentPermissionOptions(
             for: provider.providerID
           ),
-          canSave: connectionState == .connected && !busy && installation != nil,
+          supportsWorkspaceWrite: installation.map {
+            $0.effectiveCapabilities.contains("workspace.write_in_place")
+              || $0.effectiveCapabilities.contains("workspace.write_isolated")
+          } ?? true,
+          canSave: connectionState == .connected && !busy,
           canRefreshModels: provider.supportsModelSelection
             && installation?.effectiveCapabilities.contains("selection.model") == true,
           isRefreshingModels: refreshingProviderIDs.contains(provider.providerID),

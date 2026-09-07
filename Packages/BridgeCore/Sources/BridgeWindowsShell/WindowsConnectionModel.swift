@@ -1,4 +1,5 @@
 #if os(Windows)
+  import Foundation
   import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
@@ -135,7 +136,15 @@
     }
 
     var localMCPEndpoint: String? {
-      serviceStatus?.localMCPURL
+      Self.safeLocalMCPDescription(from: serviceStatus?.localMCPURL)
+    }
+
+    nonisolated static func safeLocalMCPDescription(from raw: String?) -> String? {
+      guard let raw, let components = URLComponents(string: raw), let host = components.host else {
+        return nil
+      }
+      let port = components.port.map { ":\($0)" } ?? ""
+      return "\(components.scheme ?? "http")://\(host)\(port)/mcp"
     }
 
     func didCopyEndpoint(_ success: Bool) {
@@ -221,7 +230,7 @@
           },
           selectedClientIndex: selectedIndex,
           clientDetailText: detailText(profile),
-          endpointText: serviceStatus?.localMCPURL ?? "本地 MCP Endpoint 暂不可用",
+          endpointText: localMCPEndpoint ?? "本地 MCP Endpoint 暂不可用",
           exposureRows: ["只读", "完整"],
           selectedExposureIndex: profile.flatMap {
             Self.exposureModes.firstIndex(of: $0.exposureMode)

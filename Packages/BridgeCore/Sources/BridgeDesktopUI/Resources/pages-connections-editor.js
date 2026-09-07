@@ -69,6 +69,7 @@
       var controls = S.node("div", "client-controls");
       var toggle = S.node("label", "check-field");
       var checkbox = S.node("input");
+      var toggleText = S.node("span");
       checkbox.type = "checkbox";
       checkbox.addEventListener("change", function () {
         context.emit("setMCPClientEnabled", {
@@ -77,7 +78,7 @@
         });
       });
       toggle.appendChild(checkbox);
-      toggle.appendChild(S.node("span", null, "启用"));
+      toggle.appendChild(toggleText);
       controls.appendChild(toggle);
       var exposure = S.selectField("工具权限", "", [], function (value) {
         context.emit("setMCPClientExposure", {
@@ -85,13 +86,12 @@
           exposureMode: value
         });
       }, "client-exposure");
-      controls.appendChild(exposure.control);
+      controls.appendChild(exposure.wrapper);
       var copy = S.button("复制 Qwen JSON 配置", null, {}, null, "small", true);
       copy.addEventListener("click", function () {
         context.emit("copyMCPClientConfiguration", { clientID: row.dataset.clientID });
       });
       controls.appendChild(copy);
-
       var rotate = S.button("重新生成凭证", null, {}, null, "small danger", true);
       rotate.addEventListener("click", function () {
         if (global.confirm("重新生成这个 MCP 客户端的凭证？现有配置将立即失效。")) {
@@ -107,7 +107,7 @@
         name: name,
         state: state,
         detail: detail,
-        checkbox: checkbox,
+        toggle: toggle, checkbox: checkbox, toggleText: toggleText,
         exposure: exposure.control,
         copy: copy,
         rotate: rotate,
@@ -123,6 +123,8 @@
         + (client.lastConnectedAt ? " · 最近连接：" + client.lastConnectedAt : "");
       row.checkbox.checked = !!client.enabled;
       row.checkbox.disabled = !client.canToggle;
+      row.toggle.hidden = !client.canToggle;
+      row.toggleText.textContent = client.clientID === "qwen.studio" ? "启用 Qwen Studio" : "启用";
       D.selectOptions(row.exposure, S.choices(client.exposureMode, client.exposureOptions));
       row.exposure.value = client.exposureMode || "";
       row.exposure.disabled = !client.enabled;
@@ -209,7 +211,6 @@
       }
       return item.displayName + " 仅需选择本机可执行文件（.exe 或脚本），无需单独配置文件。";
     }
-
     var guide = S.node("div", "form-guide-note");
     var grid = S.node("div", "form-grid");
     grid.appendChild(provider.wrapper);
@@ -226,7 +227,6 @@
       configuration.control.placeholder = requiresConfiguration
         ? "需要配置时填写（如 cordis.yml）" : "当前 Provider 无需配置文件";
     }
-
     provider.control.addEventListener("change", function () {
       var selected = getProvider(provider.control.value);
       if (selected) {
@@ -291,7 +291,6 @@
       }
     };
   }
-
   global.CodexBridgeDesktopConnectionsEditors = {
     createTunnelForm: createTunnelForm,
     createClients: createClients,

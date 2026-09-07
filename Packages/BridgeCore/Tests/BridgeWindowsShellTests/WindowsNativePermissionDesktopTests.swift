@@ -42,6 +42,15 @@
       XCTAssertEqual(
         WindowsDesktopUICommandRouter.command(
           for: envelope(
+            .refreshAgentNativePermission,
+            payload: BridgeDesktopCommandPayload(installationID: "ainst-agy")
+          )
+        ),
+        .refreshAgentNativePermission(installationID: "ainst-agy")
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(
+          for: envelope(
             .setAgentNativePermissionMode,
             payload: BridgeDesktopCommandPayload(
               installationID: "ainst-agy",
@@ -77,6 +86,42 @@
           action: "command",
           target: "swift test",
           confirmed: false
+        )
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(
+          for: envelope(
+            .addAgentNativePermissionRule,
+            payload: BridgeDesktopCommandPayload(
+              installationID: "ainst-agy",
+              effect: "allow",
+              action: "command",
+              target: "swift test",
+              confirmed: true
+            )
+          )
+        ),
+        .addAgentNativePermissionRule(
+          installationID: "ainst-agy",
+          effect: "allow",
+          action: "command",
+          target: "swift test",
+          confirmed: true
+        )
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(
+          for: envelope(
+            .removeAgentNativePermissionRule,
+            payload: BridgeDesktopCommandPayload(
+              installationID: "ainst-agy",
+              ruleID: "rule-1"
+            )
+          )
+        ),
+        .removeAgentNativePermissionRule(
+          installationID: "ainst-agy",
+          ruleID: "rule-1"
         )
       )
       XCTAssertEqual(

@@ -107,15 +107,15 @@
     }
 
     func saveDefaults(model: String, permissionMode: String, effort: String) async {
-      guard let providerID = selectedProviderID, let installationID = selectedInstallationID else {
-        statusText = "请选择可用的 Agent 安装。"
+      guard let providerID = selectedProviderID else {
+        statusText = "请选择 Agent Provider。"
         feedback.postAlert(statusText, title: "Agent 默认设置无法保存")
         publishDisplay()
         return
       }
       await saveDefaults(
         providerID: providerID,
-        installationID: installationID,
+        installationID: selectedInstallationID,
         model: model,
         permissionMode: permissionMode,
         effort: effort
@@ -124,7 +124,7 @@
 
     func saveDefaults(
       providerID: String,
-      installationID: String,
+      installationID: String?,
       model: String?,
       permissionMode: String,
       effort: String
@@ -132,11 +132,15 @@
       guard connectionState == .connected, !busy,
         !refreshingProviderIDs.contains(providerID),
         let provider = providers.first(where: { $0.providerID == providerID }),
-        let installation = installations.first(where: {
-          $0.installationID == installationID && $0.providerID == providerID
-            && $0.isEnabled && $0.availability == "available"
-        }), Self.permissionValues(for: providerID).contains(permissionMode)
+        Self.permissionValues(for: providerID).contains(permissionMode)
       else { return }
+      let installation = installationID.flatMap { requestedID in
+        installations.first {
+          $0.installationID == requestedID && $0.providerID == providerID
+            && $0.isEnabled && $0.availability == "available"
+        }
+      }
+      guard installationID == nil || installation != nil else { return }
       let normalizedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
       let requestedModel = normalizedModel.flatMap { $0.isEmpty ? nil : $0 }
       let catalog = modelCatalogs[providerID] ?? []
@@ -195,7 +199,7 @@
     private func refreshedCatalogAfterSave(
       providerID: String,
       provider: IPCAgentProviderSummary,
-      installation: IPCAgentInstallationSummary,
+      installation: IPCAgentInstallationSummary?,
       persistedDefault: IPCAgentModelDefaultResponse,
       fallback: [IPCAgentModelSummary]
     ) async -> [IPCAgentModelSummary] {

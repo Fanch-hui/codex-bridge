@@ -15,8 +15,10 @@
     var model = S.selectField("默认模型", item.model || "", S.choices(item.model || "", modelOptions(item)), function () {}, "");
     var effort = S.selectField("推理强度", item.effort || "", S.choices(item.effort || "", M.effortOptions(item.model, item.modelOptions, item.effortOptions, true)), function () {}, "");
     var permission = S.selectField("访问权限", item.permissionMode, S.choices(item.permissionMode, item.permissionOptions), function () {}, "");
+    var permissionHint = S.node("p", "hint");
     [model, effort, permission].forEach(function (field) { grid.appendChild(field.wrapper); });
     root.appendChild(grid);
+    root.appendChild(permissionHint);
     var draft = D.bind({ model: model.control, effort: effort.control, permission: permission.control });
     var actions = S.node("div", "form-actions");
     var save = S.button("保存 Agent 默认", null, {}, emit, "small primary", !item.canSave);
@@ -43,13 +45,19 @@
       context.item = next;
       context.emit = nextEmit;
       title.textContent = next.providerName;
-      installation.textContent = next.installationName ? "安装：" + next.installationName : "";
-      installation.hidden = !next.installationName;
+      installation.textContent = next.installationName
+        ? "安装：" + next.installationName
+        : "尚未登记可用安装，可先保存权限默认值；模型列表需先登记并 Probe。";
+      installation.hidden = false;
       D.selectOptions(model.control, S.choices(next.model || "", modelOptions(next)));
       D.selectOptions(effort.control, S.choices(next.effort || "", M.effortOptions(model.control.value, next.modelOptions, next.effortOptions, true)));
       D.selectOptions(permission.control, S.choices(next.permissionMode, next.permissionOptions));
       draft.update({ model: next.model || "", effort: next.effort || "", permission: next.permissionMode });
       M.chooseEffort(effort.control, S.choices(next.effort || "", M.effortOptions(model.control.value, next.modelOptions, next.effortOptions, true)), false);
+      permission.control.disabled = next.supportsWorkspaceWrite === false;
+      permissionHint.textContent = next.supportsWorkspaceWrite === false
+        ? "当前安装的有效能力不包含工作区写入，将按只读执行。" : "";
+      permissionHint.hidden = next.supportsWorkspaceWrite !== false;
       save.disabled = !next.canSave;
       refresh.hidden = !next.canRefreshModels;
       refresh.disabled = !!next.isRefreshingModels;

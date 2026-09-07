@@ -4,6 +4,16 @@
   @testable import BridgeWindowsShell
 
   final class WindowsDesktopUIStateBuilderTests: XCTestCase {
+    func testConnectionEndpointProjectionDropsCredentialsAndPath() {
+      XCTAssertEqual(
+        WindowsConnectionModel.safeLocalMCPDescription(
+          from: "http://127.0.0.1:58720/internal?token=hidden"
+        ),
+        "http://127.0.0.1:58720/mcp"
+      )
+      XCTAssertNil(WindowsConnectionModel.safeLocalMCPDescription(from: "not a URL"))
+    }
+
     func testBuildUsesLiveCountsAndTaskIdentifiers() {
       let workbench = makeWorkbench(
         taskCount: 7,
@@ -192,6 +202,24 @@
           installationID: "installation-1",
           modelID: nil,
           permissionMode: "build",
+          effort: nil
+        )
+      )
+      let providerPermissionOnly = BridgeDesktopCommandEnvelope(
+        requestID: "agent-permission-only-1",
+        command: .saveAgentDefault,
+        payload: .init(
+          providerID: "antigravity",
+          permissionMode: "workspace-write"
+        )
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: providerPermissionOnly),
+        .saveAgentDefault(
+          providerID: "antigravity",
+          installationID: nil,
+          modelID: nil,
+          permissionMode: "workspace-write",
           effort: nil
         )
       )

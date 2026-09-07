@@ -205,9 +205,19 @@
     var row = S.node("div", "agent-row");
     row.appendChild(S.icon("cpu.fill", "service-icon"));
     var main = S.node("div", "row-main");
-    main.appendChild(S.node("div", "row-title", installation.displayName));
+    var heading = S.node("div", "client-heading");
+    heading.appendChild(S.node("div", "row-title", installation.displayName));
+    heading.appendChild(S.badge(
+      availabilityLabel(installation.availability),
+      availabilityTone(installation.availability)
+    ));
+    main.appendChild(heading);
     main.appendChild(S.node("div", "row-detail mono", installation.providerID + " · " + installation.executablePath));
-    main.appendChild(S.node("div", "row-detail", (installation.version || "未识别") + " · " + installation.availability));
+    main.appendChild(S.node("div", "row-detail", (installation.version || "未识别")
+      + " · ACP " + (installation.protocolRevision || "未协商")
+      + " · Adapter r" + installation.adapterRevision));
+    main.appendChild(S.node("div", "row-detail", "状态：" + availabilityLabel(installation.availability)
+      + " · 有效能力：" + (installation.effectiveCapabilities || []).length + " 项"));
     if (installation.lastProbeError) main.appendChild(S.node("div", "row-detail", installation.lastProbeError));
     row.appendChild(main);
     var actions = S.node("div", "client-controls");
@@ -222,7 +232,7 @@
     enabled.appendChild(checkbox);
     enabled.appendChild(S.node("span", null, "启用"));
     actions.appendChild(enabled);
-    actions.appendChild(S.button("Probe", "reprobeAgent", {
+    actions.appendChild(S.button("重新 Probe", "reprobeAgent", {
       installationID: installation.installationID,
       acceptReplacement: false
     }, emit, "small", !installation.canReprobe));
@@ -235,7 +245,7 @@
       });
       actions.appendChild(accept);
     }
-    var remove = S.button("移除", null, {}, null, "small danger", !installation.canRemove);
+    var remove = S.button("移除登记", null, {}, null, "small danger", !installation.canRemove);
     remove.addEventListener("click", function () {
       if (global.confirm("移除这个 Agent 登记？本机可执行文件不会被删除。")) {
         emit("removeAgent", { installationID: installation.installationID });
@@ -244,6 +254,20 @@
     actions.appendChild(remove);
     row.appendChild(actions);
     return row;
+  }
+
+  function availabilityLabel(value) {
+    if (value === "available") return "可用";
+    if (value === "needs_review") return "需复核";
+    if (value === "unavailable") return "不可用";
+    return "未知";
+  }
+
+  function availabilityTone(value) {
+    if (value === "available") return "success";
+    if (value === "needs_review") return "warning";
+    if (value === "unavailable") return "error";
+    return "neutral";
   }
 
   function addFact(container, title, value) {

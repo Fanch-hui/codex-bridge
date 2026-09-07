@@ -88,7 +88,7 @@
         models = catalog.models
         preferences = catalog.preferences
       } catch {
-        failures.append("模型")
+        failures.append("模型：\(BridgeServiceErrorMessage.message(error))")
       }
       do {
         instructions = try await client.customInstructions()
@@ -254,7 +254,8 @@
         taskStartApprovalValues: Self.approvalValues,
         selectedTaskStartApprovalIndex: taskIndex,
         customInstructions: instructions,
-        savePreferencesEnabled: connectionState == .connected && !busy && current != nil,
+        savePreferencesEnabled: connectionState == .connected && !busy && current != nil
+          && !models.isEmpty,
         saveInstructionsEnabled: connectionState == .connected && !busy,
         saveDirectApprovalEnabled: connectionState == .connected && !busy,
         saveTaskStartApprovalEnabled: connectionState == .connected && !busy,

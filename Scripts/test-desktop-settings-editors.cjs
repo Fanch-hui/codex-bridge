@@ -85,6 +85,64 @@ test("model drafts persist and Fast capability follows the chosen model", () => 
   assert.equal(fast.disabled, false);
 });
 
+test("approval and service cards preserve DOM and honor save controls", () => {
+  const ui = runtime();
+  const options = [{ id: "require", title: "每次询问" }, { id: "auto", title: "自动" }];
+  const state = page({
+    directApprovalMode: "require", directApprovalOptions: options,
+    taskStartApprovalMode: "require", taskStartApprovalOptions: options,
+    canSaveApprovalModes: true, canChangeService: true, serviceRegistered: false,
+    keepServiceRunningAfterExit: false
+  });
+  ui.render(state);
+  const approvals = ui.section("安全审批策略");
+  const direct = approvals.querySelector("select");
+  direct.focus();
+  const service = ui.section("后台服务");
+  const keep = service.querySelector("input");
+  keep.checked = true;
+  ui.render({ ...state, canSaveApprovalModes: false, serviceRegistered: true });
+  assert.equal(ui.section("安全审批策略"), approvals);
+  assert.equal(approvals.querySelector("select"), direct);
+  assert.equal(direct.disabled, true);
+  assert.equal(ui.section("后台服务"), service);
+  assert.equal(keep.checked, true);
+  ui.button("注销后台服务", service).dispatch("click");
+  assert.equal(ui.commands.at(-1).command, "unregisterService");
+});
+
+test("agent permission defaults remain editable without an installation", () => {
+  const ui = runtime();
+  const agent = {
+    providerID: "antigravity", installationID: null, providerName: "Antigravity",
+    model: null, effort: null, permissionMode: "workspace-write", modelOptions: [],
+    effortOptions: [{ id: "", title: "Provider 默认" }],
+    permissionOptions: [{ id: "workspace-write", title: "工作区可写" }],
+    canSave: true, canRefreshModels: false
+  };
+  ui.render(page({ agentDefaults: [agent] }));
+  const card = ui.section("外部 Agent 默认偏好");
+  assert.equal(card.querySelector(".hint").textContent.includes("尚未登记可用安装"), true);
+  assert.equal(ui.button("保存 Agent 默认", card).disabled, false);
+  ui.button("保存 Agent 默认", card).dispatch("click");
+  assert.equal(ui.commands.at(-1).payload.installationID, null);
+});
+
+test("agent permission selector follows installation capabilities", () => {
+  const ui = runtime();
+  const agent = {
+    providerID: "antigravity", installationID: "install-a", installationName: "AGY",
+    providerName: "Antigravity", model: null, effort: null, permissionMode: "plan",
+    modelOptions: [], effortOptions: [{ id: "", title: "Provider 默认" }],
+    permissionOptions: [{ id: "workspace-write", title: "工作区可写" }, { id: "plan", title: "只读" }],
+    supportsWorkspaceWrite: false, canSave: true, canRefreshModels: false
+  };
+  ui.render(page({ agentDefaults: [agent] }));
+  const card = ui.section("外部 Agent 默认偏好");
+  assert.equal(card.querySelectorAll("select")[2].disabled, true);
+  assert.equal(card.querySelectorAll(".hint").some(item => item.textContent.includes("有效能力")), true);
+});
+
 test("Supervisor and Agent editors retain drafts while updating capabilities and callbacks", () => {
   const ui = runtime();
   const agent = { providerID: "opencode", installationID: "install-a", providerName: "OpenCode", model: "one", effort: "medium", permissionMode: "build", modelOptions: [{ modelID: "one", displayName: "One", reasoningEfforts: effort }], effortOptions: effort, permissionOptions: [{ id: "build", title: "Build" }, { id: "plan", title: "Plan" }], canSave: true, canRefreshModels: true };

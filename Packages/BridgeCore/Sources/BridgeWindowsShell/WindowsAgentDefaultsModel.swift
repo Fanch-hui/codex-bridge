@@ -182,7 +182,7 @@
             "状态：\(ProjectAgentPresentation.availabilityLabel($0.availability))",
             "版本：\($0.version ?? "未知")",
           ].joined(separator: "\r\n")
-        } ?? "请选择可用的 Agent 安装。"
+        } ?? "尚未登记可用安装。\r\n仍可保存该 Provider 的权限默认值。"
       let value = WindowsAgentDefaultsDisplay(
         connectionState: connectionState,
         providerRows: providers.map { "\($0.displayName) · \($0.providerID)" },
@@ -200,7 +200,7 @@
         permissionValues: permissionValues,
         selectedPermissionIndex: permissionIndex,
         refreshModelsEnabled: connectionState == .connected && !busy && installation != nil,
-        saveEnabled: connectionState == .connected && !busy && installation != nil
+        saveEnabled: connectionState == .connected && !busy
           && !refreshingProviderIDs.contains(selectedProviderID ?? ""),
         statusText: statusText,
         providerItems: desktopProviders,

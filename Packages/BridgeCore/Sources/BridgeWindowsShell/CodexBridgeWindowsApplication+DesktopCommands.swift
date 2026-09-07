@@ -160,7 +160,10 @@
           return true
         }
         management.selectInstallation(at: index)
-        Task { @MainActor in await management.setSelectedAgentEnabled(enabled, installationID: id) }
+        Task { @MainActor in
+          await management.setSelectedAgentEnabled(enabled, installationID: id)
+          await auxiliary.agentDefaults.refresh()
+        }
         return true
       case .reprobeAgent(let id, let acceptReplacement):
         guard
@@ -172,6 +175,7 @@
         Task { @MainActor in
           await management.reprobeSelectedAgent(
             acceptReplacement: acceptReplacement, installationID: id)
+          await auxiliary.agentDefaults.refresh()
         }
         return true
       case .removeAgent(let id):
@@ -181,7 +185,10 @@
           return true
         }
         management.selectInstallation(at: index)
-        Task { @MainActor in await management.removeSelectedAgent(installationID: id) }
+        Task { @MainActor in
+          await management.removeSelectedAgent(installationID: id)
+          await auxiliary.agentDefaults.refresh()
+        }
         return true
       case .beginAgentRegistration(let providerID):
         let targetProvider: IPCAgentProviderSummary? = {
@@ -234,6 +241,7 @@
             configurationPath: configurationPath ?? "",
             displayName: displayName
           )
+          await auxiliary.agentDefaults.refresh()
         }
         return true
       case .refreshAgentModelsByID(let providerID, let installationID):

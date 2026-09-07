@@ -1,6 +1,7 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
+  var D = global.CodexBridgeDesktopFormDraft;
   var M = global.CodexBridgeDesktopSettingsModels;
 
   function group(container, title) {
@@ -28,11 +29,15 @@
     var safety = group(content, "安全策略与全局指令");
     var approvals = S.node("div");
     safety.appendChild(approvals);
+    var approvalEditor = approvalCard(page, emit);
+    approvals.appendChild(approvalEditor.root);
     var instructions = global.CodexBridgeDesktopSettingsInstructions.create(page, emit);
     safety.appendChild(instructions.root);
     var service = group(content, "后台运行与远程授权");
     var status = S.node("div", "page-message");
     content.appendChild(status);
+    var serviceEditor = serviceCard(page, emit);
+    service.appendChild(serviceEditor.root);
     var unavailable = S.node("div");
     S.empty(unavailable, "设置页暂不可用", "连接本机 Service 后，可以配置模型、安全审批与后台服务。");
     container.appendChild(unavailable);
@@ -48,10 +53,8 @@
         agents.update(next, nextEmit);
         instructions.update(next, nextEmit);
         native.update(next.nativePermissionPolicy, nextEmit);
-        S.clear(approvals);
-        approvals.appendChild(approvalCard(next, nextEmit));
-        S.clear(service);
-        service.appendChild(serviceCard(next, nextEmit));
+        approvalEditor.update(next, nextEmit);
+        serviceEditor.update(next, nextEmit);
         status.textContent = next.statusMessage || "";
         status.hidden = !next.statusMessage;
       }
@@ -69,48 +72,78 @@
   }
 
   function approvalCard(page, emit) {
+    var context = { page: page, emit: emit };
     var card = S.node("section", "page-card settings-card");
     card.appendChild(S.node("h3", null, "安全审批策略"));
     var direct = S.selectField("Direct 操作", page.directApprovalMode, S.choices(page.directApprovalMode, page.directApprovalOptions), function (value) {
-      emit("setDirectApprovalMode", { mode: value });
+      context.emit("setDirectApprovalMode", { mode: value });
     }, "");
     var task = S.selectField("远程任务启动", page.taskStartApprovalMode, S.choices(page.taskStartApprovalMode, page.taskStartApprovalOptions), function (value) {
-      emit("setTaskStartApprovalMode", { mode: value });
+      context.emit("setTaskStartApprovalMode", { mode: value });
     }, "");
     card.appendChild(direct.wrapper);
     card.appendChild(task.wrapper);
     card.appendChild(S.node("p", "hint", "策略仍由本机 Service 和项目权限强制执行。"));
-    return card;
+    function update(next, nextEmit) {
+      context.page = next;
+      context.emit = nextEmit;
+      D.selectOptions(direct.control, S.choices(next.directApprovalMode, next.directApprovalOptions));
+      D.selectOptions(task.control, S.choices(next.taskStartApprovalMode, next.taskStartApprovalOptions));
+      direct.control.value = next.directApprovalMode || "";
+      task.control.value = next.taskStartApprovalMode || "";
+      direct.control.disabled = !next.canSaveApprovalModes;
+      task.control.disabled = !next.canSaveApprovalModes;
+    }
+    update(page, emit);
+    return { root: card, update: update };
   }
 
   function serviceCard(page, emit) {
+    var context = { page: page, emit: emit };
     var card = S.node("section", "page-card settings-card");
     card.appendChild(S.node("h3", null, "后台服务"));
-    card.appendChild(S.node("p", "hint", page.serviceDescription));
-    card.appendChild(S.node("p", "hint", "平台：" + page.servicePlatform));
+    var description = S.node("p", "hint");
+    var platform = S.node("p", "hint");
+    card.appendChild(description);
+    card.appendChild(platform);
     var keep = M.check("退出 App 后继续运行", page.keepServiceRunningAfterExit);
-    keep.wrapper.querySelector("input").disabled = !page.canChangeService;
+    var keepDraft = D.bind({ keep: keep.control });
     keep.wrapper.querySelector("input").addEventListener("change", function () {
-      emit("setKeepServiceRunning", { keepServiceRunningAfterExit: keep.control.checked });
+      context.emit("setKeepServiceRunning", { keepServiceRunningAfterExit: keep.control.checked });
     });
     card.appendChild(keep.wrapper);
-    card.appendChild(S.badge(page.serviceRegistered ? "已注册" : "未注册", page.serviceRegistered ? "success" : "warning"));
+    var badge = S.badge("未注册", "warning");
+    card.appendChild(badge);
     var actions = S.node("div", "form-actions");
-    if (page.canChangeService) {
-      if (page.serviceRegistered) {
-        var unregister = S.button("注销后台服务", null, {}, emit, "small danger", false);
+    card.appendChild(actions);
+    function update(next, nextEmit) {
+      context.page = next;
+      context.emit = nextEmit;
+      description.textContent = next.serviceDescription || "";
+      platform.textContent = "平台：" + (next.servicePlatform || "未知");
+      keepDraft.update({ keep: next.keepServiceRunningAfterExit == null
+        ? false : next.keepServiceRunningAfterExit });
+      keep.control.disabled = !next.canChangeService;
+      badge.textContent = next.serviceRegistered ? "已注册" : "未注册";
+      badge.className = "status-badge " + (next.serviceRegistered ? "success" : "warning");
+      S.clear(actions);
+      if (!next.canChangeService) return;
+      if (next.serviceRegistered) {
+        var unregister = S.button("注销后台服务", null, {}, null, "small danger", false);
         unregister.addEventListener("click", function () {
           if (global.confirm("停用后台 Service？退出 App 后将无法继续响应远程请求。")) {
-            emit("unregisterService", {});
+            context.emit("unregisterService", {});
           }
         });
         actions.appendChild(unregister);
       } else {
-        actions.appendChild(S.button("注册后台服务", "registerService", {}, emit, "small primary", false));
+        var register = S.button("注册后台服务", null, {}, null, "small primary", false);
+        register.addEventListener("click", function () { context.emit("registerService", {}); });
+        actions.appendChild(register);
       }
     }
-    card.appendChild(actions);
-    return card;
+    update(page, emit);
+    return { root: card, update: update };
   }
 
   global.CodexBridgeDesktopSettingsPage = { render: render };

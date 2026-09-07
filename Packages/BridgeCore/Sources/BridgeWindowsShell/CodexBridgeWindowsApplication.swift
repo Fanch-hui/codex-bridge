@@ -151,22 +151,33 @@
             executablePath: executablePath,
             configurationPath: configurationPath
           )
+          await auxiliary.agentDefaults.refresh()
         }
       case .enableSelectedAgent:
         guard let id = management.selectedInstallationID else { return }
-        Task { await management.setSelectedAgentEnabled(true, installationID: id) }
+        Task {
+          await management.setSelectedAgentEnabled(true, installationID: id)
+          await auxiliary.agentDefaults.refresh()
+        }
       case .disableSelectedAgent:
         guard let id = management.selectedInstallationID else { return }
-        Task { await management.setSelectedAgentEnabled(false, installationID: id) }
+        Task {
+          await management.setSelectedAgentEnabled(false, installationID: id)
+          await auxiliary.agentDefaults.refresh()
+        }
       case .reprobeSelectedAgent(let acceptReplacement):
         guard let id = management.selectedInstallationID else { return }
         Task {
           await management.reprobeSelectedAgent(
             acceptReplacement: acceptReplacement, installationID: id)
+          await auxiliary.agentDefaults.refresh()
         }
       case .removeSelectedAgent:
         guard let id = management.selectedInstallationID else { return }
-        Task { await management.removeSelectedAgent(installationID: id) }
+        Task {
+          await management.removeSelectedAgent(installationID: id)
+          await auxiliary.agentDefaults.refresh()
+        }
       default:
         auxiliary.run(command)
       }
@@ -197,7 +208,10 @@
         auxiliary.run(.refreshLogs)
       case .connections:
         auxiliary.run(.refreshMCPConnections)
-        Task { await management.refreshAgents() }
+        Task {
+          await management.refreshAgents()
+          await auxiliary.agentDefaults.refresh()
+        }
       case .settings:
         auxiliary.run(.refreshSettings)
         auxiliary.run(.refreshAgentDefaults)

@@ -166,7 +166,7 @@
     case refreshAgentModelsByID(providerID: String, installationID: String)
     case saveAgentDefault(
       providerID: String,
-      installationID: String,
+      installationID: String?,
       modelID: String?,
       permissionMode: String,
       effort: String?

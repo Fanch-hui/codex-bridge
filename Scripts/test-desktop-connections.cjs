@@ -150,3 +150,33 @@ test("agent registration and MCP client rows retain drafts while lists and permi
   ui.button("按上方路径登记").dispatch("click");
   assert.equal(ui.commands.at(-1).command, "beginAgentRegistration");
 });
+
+test("connection rows expose parity labels and hide ChatGPT toggle", () => {
+  const ui = runtime();
+  ui.render(page({
+    clients: [
+      { ...page().clients[0], enabled: true },
+      {
+        clientID: "chatgpt", displayName: "ChatGPT / OpenAI Tunnel", enabled: true,
+        exposureMode: "read-only", exposureOptions: page().clients[0].exposureOptions,
+        activeSessionCount: 0, lastConnectedAt: null, canToggle: false,
+        canCopyConfiguration: false, canRotateCredential: false
+      }
+    ],
+    installations: [{
+      installationID: "install-a", providerID: "opencode", displayName: "OpenCode",
+      executablePath: "C:\\Tools\\opencode.exe", version: "1.2.3", protocolRevision: "1",
+      adapterRevision: 2, availability: "available", effectiveCapabilities: [],
+      isEnabled: true, canToggle: true, canReprobe: true, canRemove: true
+    }]
+  }));
+  const clientRow = client(ui.root, "qwen.studio");
+  assert.equal(clientRow.querySelector(".check-field").hidden, false);
+  const chatRow = client(ui.root, "chatgpt");
+  assert.equal(chatRow.querySelector(".check-field").hidden, true);
+  const agent = ui.find(ui.root, node => node.className.split(" ").includes("agent-row"));
+  assert.equal(agent.querySelector(".status-badge").textContent, "可用");
+  assert.equal(agent.querySelectorAll(".row-detail")[1].textContent.includes("ACP 1"), true);
+  assert.equal(ui.button("重新 Probe", agent).disabled, false);
+  assert.equal(ui.button("移除登记", agent).disabled, false);
+});
