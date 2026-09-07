@@ -14,7 +14,7 @@
     private static let windowClassName = WindowsApplicationIdentity.mainWindowClassName
     private static let windowTitle = "Codex Bridge"
     private static let defaultPosition = Int32(bitPattern: 0x8000_0000)
-    private static let standardResourceID = 32_512
+    private static let standardCursorID = 32_512
 
     private static let commandLock = NSLock()
     private static let browserViewportLock = NSLock()
@@ -213,15 +213,15 @@
         }
         windowClass.hInstance = instance
         windowClass.hIcon = WindowsApplicationIcon.load()
-        windowClass.hCursor = LoadCursorW(nil, resourcePointer(standardResourceID))
-        windowClass.hbrBackground = CreateSolidBrush(COLORREF(0x001B_1818))
+        windowClass.hCursor = LoadCursorW(nil, resourcePointer(standardCursorID))
+        windowClass.hbrBackground = CreateSolidBrush(WindowsSystemAppearance.canvasColorRef)
         windowClass.lpszClassName = className
         _ = RegisterClassW(&windowClass)
       }
     }
 
     private static func applyDwmAttributes(to window: HWND) {
-      var useDarkMode: Int32 = 1
+      var useDarkMode: Int32 = WindowsSystemAppearance.isDark ? 1 : 0
       _ = DwmSetWindowAttribute(
         window,
         DWORD(20),

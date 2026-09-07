@@ -23,9 +23,6 @@
       let visible = !isEmpty(chatBounds)
       chat?.resize(to: chatBounds)
       chat?.setVisible(visible)
-      if visible {
-        chat?.bringToTop()
-      }
     }
 
     private static func hideChat() {

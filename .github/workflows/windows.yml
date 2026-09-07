@@ -171,6 +171,13 @@ jobs:
             }
             Add-Content $env:GITHUB_PATH $vcpkgBin
           }
+      - name: Compile Windows application resources
+        shell: pwsh
+        run: |
+          $resourceOutput = Join-Path $env:GITHUB_WORKSPACE ".build\windows-resources\CodexBridgeWindowsApp.res"
+          & "$env:GITHUB_WORKSPACE\Scripts\compile-windows-resources.ps1" -OutputPath $resourceOutput
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content $env:GITHUB_ENV "CODEX_BRIDGE_WINDOWS_RESOURCE=$resourceOutput"
       - name: Build service and Windows shell
         working-directory: Packages/BridgeCore
         shell: pwsh

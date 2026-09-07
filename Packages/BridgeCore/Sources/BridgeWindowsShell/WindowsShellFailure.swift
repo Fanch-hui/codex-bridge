@@ -9,10 +9,15 @@
     private static let lineHeight = 22
 
     nonisolated(unsafe) private static var label: HWND?
+    nonisolated(unsafe) private static var presentedText: String?
+    nonisolated(unsafe) private static var layoutBounds: RECT?
 
     static func present(_ text: String?, in parent: HWND?) {
       guard let text, let parent else {
-        _ = ShowWindow(label, SW_HIDE)
+        if presentedText != nil {
+          _ = ShowWindow(label, SW_HIDE)
+        }
+        presentedText = nil
         return
       }
       let instance = GetModuleHandleW(nil)
@@ -29,7 +34,12 @@
         )
       label = control
       guard let control else { return }
-      WindowsUIFoundation.setText(control, text)
+      let textChanged = presentedText != text
+      if textChanged {
+        WindowsUIFoundation.setText(control, text)
+        presentedText = text
+      }
+      guard textChanged || !IsWindowVisible(control) else { return }
       _ = ShowWindow(control, SW_SHOW)
       _ = SetWindowPos(
         control,
@@ -52,18 +62,33 @@
       let height = max(Int32(0), bounds.bottom - bounds.top)
       let boxWidth = max(Int32(0), width - Int32(horizontalPadding * 2))
       let boxHeight = Int32(lineHeight * 4)
+      let nextBounds = RECT(
+        left: bounds.left + Int32(horizontalPadding),
+        top: bounds.top + max(0, (height - boxHeight) / 2),
+        right: bounds.left + Int32(horizontalPadding) + boxWidth,
+        bottom: bounds.top + max(0, (height - boxHeight) / 2) + boxHeight
+      )
+      guard layoutBounds.map({ !sameBounds($0, nextBounds) }) ?? true else { return }
+      layoutBounds = nextBounds
       _ = MoveWindow(
         label,
-        bounds.left + Int32(horizontalPadding),
-        bounds.top + max(0, (height - boxHeight) / 2),
-        boxWidth,
-        boxHeight,
+        nextBounds.left,
+        nextBounds.top,
+        nextBounds.right - nextBounds.left,
+        nextBounds.bottom - nextBounds.top,
         true
       )
     }
 
     static func shutdown() {
+      presentedText = nil
+      layoutBounds = nil
       label = nil
+    }
+
+    private static func sameBounds(_ lhs: RECT, _ rhs: RECT) -> Bool {
+      lhs.left == rhs.left && lhs.top == rhs.top && lhs.right == rhs.right
+        && lhs.bottom == rhs.bottom
     }
   }
 #endif

@@ -27,6 +27,8 @@
     var threadID: DWORD = 0
     private var pendingBounds = RECT()
     private var pendingVisible = false
+    private var synchronizedBounds: RECT?
+    private var synchronizedVisible: Bool?
     var stopping = false
     var completed = false
     var shutdownNotification: (window: HWND, message: UINT)?
@@ -105,13 +107,21 @@
     }
 
     func resize(to bounds: RECT) {
-      lock.withLock { pendingBounds = bounds }
-      post(Message.synchronize)
+      let changed = lock.withLock { () -> Bool in
+        guard !sameBounds(pendingBounds, bounds) else { return false }
+        pendingBounds = bounds
+        return true
+      }
+      if changed { post(Message.synchronize) }
     }
 
     func setVisible(_ visible: Bool) {
-      lock.withLock { pendingVisible = visible }
-      post(Message.synchronize)
+      let changed = lock.withLock { () -> Bool in
+        guard pendingVisible != visible else { return false }
+        pendingVisible = visible
+        return true
+      }
+      if changed { post(Message.synchronize) }
     }
 
     func goBack() { post(Message.goBack) }
@@ -427,15 +437,30 @@
     private func synchronizeController() {
       guard let controller else { return }
       let values = lock.withLock { (pendingBounds, pendingVisible) }
-      let putBounds: WebView2PutBoundsFn = webView2Method(
-        controller, WebView2Slot.controllerPutBounds, as: WebView2PutBoundsFn.self)
-      let putVisible: WebView2PutBoolFn = webView2Method(
-        controller, WebView2Slot.controllerPutIsVisible, as: WebView2PutBoolFn.self)
-      _ = putBounds(controller, values.0)
-      _ = putVisible(controller, values.1)
-      if values.1 && configuration.purpose == .chatBrowser {
+      let boundsChanged = synchronizedBounds.map { !sameBounds($0, values.0) } ?? true
+      let visibilityChanged = synchronizedVisible.map { $0 != values.1 } ?? true
+      if boundsChanged {
+        let putBounds: WebView2PutBoundsFn = webView2Method(
+          controller, WebView2Slot.controllerPutBounds, as: WebView2PutBoundsFn.self)
+        if putBounds(controller, values.0) == webview2SOK {
+          synchronizedBounds = values.0
+        }
+      }
+      if visibilityChanged {
+        let putVisible: WebView2PutBoolFn = webView2Method(
+          controller, WebView2Slot.controllerPutIsVisible, as: WebView2PutBoolFn.self)
+        if putVisible(controller, values.1) == webview2SOK {
+          synchronizedVisible = values.1
+        }
+      }
+      if values.1 && configuration.purpose == .chatBrowser && (boundsChanged || visibilityChanged) {
         bringToTop()
       }
+    }
+
+    private func sameBounds(_ lhs: RECT, _ rhs: RECT) -> Bool {
+      lhs.left == rhs.left && lhs.top == rhs.top && lhs.right == rhs.right
+        && lhs.bottom == rhs.bottom
     }
 
     private func runAction(_ slot: Int) {

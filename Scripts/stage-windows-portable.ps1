@@ -283,9 +283,8 @@ try {
     Assert-RegularFile (Join-Path $stagedDesktopUIResourceDirectory $resourceName) | Out-Null
   }
   $iconSource = Join-Path $desktopUIResourceDirectory "AppIcon.ico"
-  if (Test-Path -LiteralPath $iconSource) {
-    Stage-File $iconSource "AppIcon.ico"
-  }
+  Assert-RegularFile $iconSource | Out-Null
+  Stage-File $iconSource "AppIcon.ico"
 
   $packagePath = Join-Path $temporaryRoot "webview2-package.zip"
   $packageUri = "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$webView2Version/microsoft.web.webview2.$webView2Version.nupkg"

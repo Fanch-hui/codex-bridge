@@ -25,7 +25,7 @@
         disableStatusBar: true,
         disableDevTools: true,
         disableZoomControl: true,
-        defaultBackgroundColor: (r: 24, g: 24, b: 27, a: 255)
+        defaultBackgroundColor: WindowsSystemAppearance.canvasColor
       )
     }
 

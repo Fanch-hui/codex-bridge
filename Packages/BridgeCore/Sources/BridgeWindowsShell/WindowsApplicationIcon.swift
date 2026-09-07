@@ -10,17 +10,9 @@
 
     static func load(width: Int32 = 0, height: Int32 = 0) -> HICON? {
       if let module = GetModuleHandleW(nil) {
-        var pathBuffer = [WCHAR](repeating: 0, count: Int(MAX_PATH))
-        let length = GetModuleFileNameW(module, &pathBuffer, DWORD(MAX_PATH))
-        if length > 0 {
-          let exePath = String(decodingCString: pathBuffer, as: UTF16.self)
-          let exeDir = URL(fileURLWithPath: exePath).deletingLastPathComponent()
-          let candidates = [
-            exeDir.appendingPathComponent("AppIcon.ico").path,
-            exeDir.appendingPathComponent("Resources").appendingPathComponent("AppIcon.ico").path,
-            exeDir.appendingPathComponent("BridgeDesktopUI_BridgeDesktopUI.resources")
-              .appendingPathComponent("AppIcon.ico").path,
-          ]
+        if let exePath = executablePath(module), let separator = lastSeparator(in: exePath) {
+          let exeDir = String(exePath[..<separator])
+          let candidates = iconCandidates(in: exeDir)
           for candidate in candidates {
             if FileManager.default.fileExists(atPath: candidate) {
               let handle = candidate.withCString(encodedAs: UTF16.self) { pathPointer in
@@ -39,8 +31,32 @@
             }
           }
         }
+        return LoadIconW(module, resourcePointer(standardResourceID))
       }
-      return LoadIconW(nil, resourcePointer(standardResourceID))
+      return nil
+    }
+
+    private static func executablePath(_ module: HMODULE) -> String? {
+      var pathBuffer = [WCHAR](repeating: 0, count: 32_768)
+      let length = GetModuleFileNameW(module, &pathBuffer, DWORD(pathBuffer.count))
+      guard length > 0, length < DWORD(pathBuffer.count) else { return nil }
+      return String(decoding: pathBuffer.prefix(Int(length)), as: UTF16.self)
+    }
+
+    private static func lastSeparator(in path: String) -> String.Index? {
+      path.lastIndex(where: { $0 == "\\" || $0 == "/" })
+    }
+
+    private static func iconCandidates(in directory: String) -> [String] {
+      var candidates = [directory + "\\AppIcon.ico", directory + "\\Resources\\AppIcon.ico"]
+      let resourceDirectories =
+        (try? FileManager.default.contentsOfDirectory(atPath: directory)) ?? []
+      for name in resourceDirectories where name.localizedCaseInsensitiveContains("BridgeDesktopUI")
+      {
+        guard name.hasSuffix(".resources") || name.hasSuffix(".bundle") else { continue }
+        candidates.append(directory + "\\" + name + "\\AppIcon.ico")
+      }
+      return candidates
     }
 
     private static func resourcePointer(_ id: Int) -> UnsafePointer<WCHAR> {

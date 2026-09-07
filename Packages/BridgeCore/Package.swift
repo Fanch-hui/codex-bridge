@@ -1,5 +1,6 @@
 // swift-tools-version: 6.1
 
+import Foundation
 import PackageDescription
 
 var testTargets: [Target] = [
@@ -23,6 +24,20 @@ var testTargets: [Target] = [
 
 var macOSOnlyProducts: [Product] = []
 var macOSOnlyTargets: [Target] = []
+
+var windowsApplicationLinkerFlags = [
+  "-Xlinker", "/SUBSYSTEM:WINDOWS",
+  "-Xlinker", "/ENTRY:mainCRTStartup",
+  "-Xlinker", "/MANIFEST:EMBED",
+  "-Xlinker", "/MANIFESTINPUT:Windows/CodexBridgeWindowsApp.manifest",
+]
+#if os(Windows)
+  if let resourcePath = ProcessInfo.processInfo.environment["CODEX_BRIDGE_WINDOWS_RESOURCE"],
+    !resourcePath.isEmpty
+  {
+    windowsApplicationLinkerFlags += ["-Xlinker", resourcePath]
+  }
+#endif
 
 #if !os(Windows)
   testTargets += [
@@ -592,13 +607,7 @@ let package = Package(
       ],
       linkerSettings: [
         .unsafeFlags(
-          [
-            "-Xlinker", "/SUBSYSTEM:WINDOWS",
-            "-Xlinker", "/ENTRY:mainCRTStartup",
-            "-Xlinker", "/MANIFEST:EMBED",
-            "-Xlinker",
-            "/MANIFESTINPUT:Windows/CodexBridgeWindowsApp.manifest",
-          ],
+          windowsApplicationLinkerFlags,
           .when(platforms: [.windows])
         )
       ]

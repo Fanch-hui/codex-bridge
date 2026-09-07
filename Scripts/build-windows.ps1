@@ -57,6 +57,12 @@ $vcpkgRootValue = if ($resolvedVcpkgRoot) {
 $originalPath = $env:PATH
 $originalInclude = $env:INCLUDE
 $originalLib = $env:LIB
+$originalWindowsResource = $env:CODEX_BRIDGE_WINDOWS_RESOURCE
+
+$resourceOutput = Join-Path $resolvedOutDir "CodexBridgeWindowsApp.res"
+& (Join-Path $repoRoot "Scripts\compile-windows-resources.ps1") -OutputPath $resourceOutput
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$env:CODEX_BRIDGE_WINDOWS_RESOURCE = [IO.Path]::GetFullPath($resourceOutput)
 
 if ([string]::IsNullOrWhiteSpace($originalInclude) -or [string]::IsNullOrWhiteSpace($originalLib)) {
   $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -247,4 +253,9 @@ try {
   $env:PATH = $originalPath
   $env:INCLUDE = $originalInclude
   $env:LIB = $originalLib
+  if ($null -eq $originalWindowsResource) {
+    Remove-Item Env:CODEX_BRIDGE_WINDOWS_RESOURCE -ErrorAction SilentlyContinue
+  } else {
+    $env:CODEX_BRIDGE_WINDOWS_RESOURCE = $originalWindowsResource
+  }
 }

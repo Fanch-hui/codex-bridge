@@ -88,10 +88,6 @@
       lock.withLock { worker }?.setVisible(visible)
     }
 
-    func bringToTop() {
-      lock.withLock { worker }?.bringToTop()
-    }
-
     func goBack() {
       lock.withLock { worker }?.goBack()
     }
