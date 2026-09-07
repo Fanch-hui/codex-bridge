@@ -80,7 +80,7 @@ enum BridgeDesktopUIStateBuilder {
         symbol: "list.bullet.rectangle",
         subtitle: lastRefreshSubtitle(for: model),
         tone: .neutral,
-        destination: .workbench
+        destination: .logs
       ),
     ]
 
@@ -209,7 +209,7 @@ enum BridgeDesktopUIStateBuilder {
           message: "请在系统设置中批准 Codex Bridge 后台 LaunchAgent 项目。",
           symbol: "shield.lefthalf.filled",
           tone: .warning,
-          destination: .connections
+          command: .openSystemSettings
         )
       )
     }

@@ -9,6 +9,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case openConnections
   case openSettings
   case openLogs
+  case openSystemSettings
   case openTask
   case browserBack
   case browserForward

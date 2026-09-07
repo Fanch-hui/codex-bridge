@@ -60,6 +60,7 @@ public struct BridgeDesktopNotice: Codable, Equatable, Sendable {
   public let symbol: String
   public let tone: BridgeDesktopStatusTone
   public let destination: BridgeDesktopNavigation?
+  public let command: BridgeDesktopCommand?
 
   public init(
     id: String,
@@ -67,7 +68,8 @@ public struct BridgeDesktopNotice: Codable, Equatable, Sendable {
     message: String,
     symbol: String,
     tone: BridgeDesktopStatusTone,
-    destination: BridgeDesktopNavigation? = nil
+    destination: BridgeDesktopNavigation? = nil,
+    command: BridgeDesktopCommand? = nil
   ) {
     self.id = id
     self.title = title
@@ -75,6 +77,7 @@ public struct BridgeDesktopNotice: Codable, Equatable, Sendable {
     self.symbol = symbol
     self.tone = tone
     self.destination = destination
+    self.command = command
   }
 }
 

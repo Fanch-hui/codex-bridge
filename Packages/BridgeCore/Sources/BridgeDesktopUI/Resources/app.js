@@ -196,12 +196,18 @@
       copy.appendChild(document.createElement("p"));
       copy.lastChild.textContent = notice.message;
       element.appendChild(copy);
-      if (notice.destination) {
+      if (notice.command || notice.destination) {
         var action = document.createElement("button");
         action.type = "button";
         action.className = "link-button";
-        action.textContent = "处理 →";
-        action.addEventListener("click", function () { emit("selectPage", { navigation: notice.destination }); });
+        action.textContent = notice.command === "openSystemSettings" ? "打开登录项设置" : "处理 →";
+        action.addEventListener("click", function () {
+          if (notice.command) {
+            emit(notice.command, { navigation: notice.destination || null });
+          } else {
+            emit("selectPage", { navigation: notice.destination });
+          }
+        });
         element.appendChild(action);
       }
       container.appendChild(element);

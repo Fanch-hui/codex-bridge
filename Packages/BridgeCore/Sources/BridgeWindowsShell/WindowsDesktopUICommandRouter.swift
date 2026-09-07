@@ -22,6 +22,8 @@
         return select(.settings)
       case .openLogs:
         return select(.logs)
+      case .openSystemSettings:
+        return nil
       case .openTask:
         return nonEmpty(payload.taskID).map(MainWindowCommand.openTask)
       case .browserBack:

@@ -28,6 +28,8 @@ enum BridgeDesktopCommandRouter {
       loadNativePermissionPolicyIfNeeded(model)
     case .openLogs:
       model.selection = .logs
+    case .openSystemSettings:
+      model.openSystemSettings()
     case .openTask:
       guard let taskID = validatedID(envelope.payload.taskID),
         model.tasks.contains(where: { $0.taskID == taskID })
