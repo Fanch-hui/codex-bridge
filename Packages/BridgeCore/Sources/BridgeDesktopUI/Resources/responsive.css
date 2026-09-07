@@ -3,7 +3,7 @@
 .sidebar-footer { flex: 0 0 auto; }
 .sidebar-footer #connection-label { min-width: 0; overflow-wrap: anywhere; }
 .page-header > div, .section-header > div, .service-main,
-.recent-task > div, .page-card, .conversation-entry { min-width: 0; }
+.recent-task > *, .metric-card, .page-card, .conversation-entry { min-width: 0; }
 .page-header h2, .section-header h2, .detail-title { text-wrap: balance; }
 .page-header p, .section-header p, .detail-subtitle,
 .page-message, .row-detail, .hint, .muted, .step-text,
@@ -12,6 +12,9 @@
 .button { max-width: 100%; padding-block: 5px; overflow-wrap: anywhere; }
 .form-actions > *, .filter-bar > * { min-width: 0; max-width: 100%; }
 .service-actions, .client-heading, .native-permission-header { flex-wrap: wrap; }
+.recent-title, .recent-project { display: block; }
+.service-title { overflow-wrap: anywhere; }
+.metric-value { flex-wrap: wrap; overflow-wrap: anywhere; }
 .metric-value, .summary-value { font-variant-numeric: tabular-nums; }
 .icon { flex: 0 0 auto; }
 .icon.dropdown-arrow { width: 12px; height: 12px; }
@@ -32,9 +35,9 @@
 .inspector-status-wrap .status-badge { white-space: normal; overflow-wrap: anywhere; }
 .row-permissions { flex-wrap: wrap; }
 .inspector-header, .inspector-approvals, .inspector-footer { flex: 0 0 auto; }
-.inspector-header { max-height: 45%; overflow-y: auto; }
-.inspector-footer { max-height: 45%; overflow-y: auto; }
-.inspector-approvals { max-height: 28%; overflow-y: auto; }
+.inspector-header { max-height: 35%; overflow-y: auto; }
+.inspector-footer { max-height: 35%; overflow-y: auto; }
+.inspector-approvals { max-height: 20%; overflow-y: auto; }
 .inspector-content { overflow-x: hidden; overflow-wrap: anywhere; }
 .inspector-content .task-detail-card { padding: 0; border: 0; background: transparent; }
 .inspector-content .detail-grid { gap: 10px; }
@@ -63,6 +66,6 @@
   .form-grid, .form-grid.three { grid-template-columns: minmax(0, 1fr); }
   .recent-task { grid-template-columns: 90px minmax(0, 1fr) 20px; }
   .recent-source, .recent-time { display: none; }
-  .service-row { flex-wrap: wrap; }
-  .service-name { min-width: 0; }
+  .service-row { grid-template-columns: 28px minmax(0, 1fr); gap: 6px; padding-block: 10px; }
+  .service-row > .status-badge { grid-column: 2; justify-self: start; }
 }

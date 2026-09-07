@@ -102,7 +102,8 @@ Visual Studio `%VCToolsRedistDir%` 对应架构的 CRT 目录收集 Microsoft �
 .build/windows-installer/arm64/CodexBridge-Windows-arm64-<version>-Setup.exe
 ```
 
-安装包使用固定 AppId 与 `%LOCALAPPDATA%\Programs\CodexBridge`，按用户安装，无需 UAC；
+安装包使用固定 AppId，默认目录为 `%LOCALAPPDATA%\Programs\CodexBridge`，允许选择安装位置；
+开源许可通过信息页展示，按用户安装，无需 UAC；
 只创建指向 Swift 壳的开始菜单快捷方式，服务仍由壳按需拉起，不注册 Windows Service、
 计划任务或自启动项。x64 安装包只允许原生 x64 Windows，ARM64 安装包只允许 ARM64
 Windows；二者可沿用同一 AppId 升级。卸载删除程序文件和快捷方式，但保留
