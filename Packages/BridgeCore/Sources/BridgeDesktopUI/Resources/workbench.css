@@ -55,3 +55,5 @@
 .current-step-card { border-left: 3px solid var(--accent); background: var(--accent-soft); }
 .step-caption { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent); }
 .step-text { margin-top: 4px; font-size: 12px; color: var(--text); }
+
+.path-row { min-width: 0; padding: 8px 10px; border-radius: 6px; background: var(--surface-muted); overflow-wrap: anywhere; }

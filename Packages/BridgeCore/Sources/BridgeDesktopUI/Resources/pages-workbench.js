@@ -103,7 +103,7 @@
   function addListBlock(c, title, values) {
     c.appendChild(S.node("h4", "subsection-title", title));
     var list = S.node("div", "activity-list");
-    values.forEach(function (v) { list.appendChild(S.node("div", "activity-row mono", v)); });
+    values.forEach(function (v) { list.appendChild(S.node("div", "path-row mono", v)); });
     c.appendChild(list);
   }
 
