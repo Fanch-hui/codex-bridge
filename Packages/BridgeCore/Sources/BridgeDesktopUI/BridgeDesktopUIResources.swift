@@ -18,6 +18,7 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case pagesProjectCollectionsJS = "pages-project-collections.js"
   case pagesProjectsJS = "pages-projects.js"
   case pagesLogsJS = "pages-logs.js"
+  case pagesConnectionsEditorJS = "pages-connections-editor.js"
   case pagesConnectionsJS = "pages-connections.js"
   case pagesSettingsNativeJS = "pages-settings-native.js"
   case pagesSettingsModelsJS = "pages-settings-models.js"

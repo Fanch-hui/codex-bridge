@@ -263,6 +263,7 @@ try {
     "pages-project-collections.js",
     "pages-projects.js",
     "pages-logs.js",
+    "pages-connections-editor.js",
     "pages-connections.js",
     "pages-settings-native.js",
     "pages-settings-models.js",

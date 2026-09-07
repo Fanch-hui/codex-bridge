@@ -77,7 +77,11 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
     XCTAssertTrue(connectionsScript.contains("acceptReplacement: true"))
     XCTAssertTrue(connectionsScript.contains("现有客户端地址将立即失效"))
-    XCTAssertTrue(connectionsScript.contains("现有配置将立即失效"))
+    let connectionsEditor = try BridgeDesktopUIResources.read(.pagesConnectionsEditorJS)
+    XCTAssertTrue(connectionsEditor.contains("现有配置将立即失效"))
+    XCTAssertTrue(connectionsEditor.contains("CodexBridgeDesktopFormDraft"))
+    XCTAssertTrue(connectionsEditor.contains("configureTunnel"))
+    XCTAssertTrue(index.contains("pages-connections-editor.js"))
     let settingsScript = try BridgeDesktopUIResources.read(.pagesSettingsJS)
     XCTAssertTrue(settingsScript.contains("settings-stack"))
     XCTAssertTrue(
