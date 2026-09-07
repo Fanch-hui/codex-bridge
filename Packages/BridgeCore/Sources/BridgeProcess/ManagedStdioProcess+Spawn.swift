@@ -229,18 +229,27 @@ extension ManagedStdioProcess {
       }
       let process = Foundation.Process()
       let lower = executable.lowercased()
+      let launchEnvironment: [String: String]
       if lower.hasSuffix(".cmd") || lower.hasSuffix(".bat") {
         let comSpec =
           environment["ComSpec"]
           ?? ProcessInfo.processInfo.environment["ComSpec"]
           ?? "C:\\Windows\\System32\\cmd.exe"
         process.executableURL = URL(fileURLWithPath: comSpec)
-        process.arguments = ["/d", "/s", "/c", executable] + Array(argv.dropFirst())
+        var batchEnvironment = environment
+        batchEnvironment[Self.windowsBatchCommandEnvironmentKey] =
+          Self.windowsBatchCommand(argv)
+        process.arguments = [
+          "/d", "/v:off", "/s", "/c",
+          "%\(Self.windowsBatchCommandEnvironmentKey)%",
+        ]
+        launchEnvironment = batchEnvironment
       } else {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = Array(argv.dropFirst())
+        launchEnvironment = environment
       }
-      process.environment = environment
+      process.environment = launchEnvironment
       if let workingDirectory {
         process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)
       }
