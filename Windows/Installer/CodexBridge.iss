@@ -33,7 +33,8 @@ AppPublisherURL=https://github.com/yeyuancc0-glitch/codex-bridge
 AppSupportURL=https://github.com/yeyuancc0-glitch/codex-bridge/issues
 DefaultDirName={localappdata}\Programs\CodexBridge
 DefaultGroupName=Codex Bridge
-DisableDirPage=yes
+SetupIconFile={#PayloadDir}\AppIcon.ico
+DisableDirPage=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 MinVersion=10.0
@@ -47,11 +48,11 @@ RestartApplications=no
 SetupArchitecture={#SetupArchitecture}
 ArchitecturesAllowed={#AllowedArchitecture}
 ArchitecturesInstallIn64BitMode={#AllowedArchitecture}
-UninstallDisplayIcon={app}\codex-bridge-windows-app.exe
+UninstallDisplayIcon={app}\AppIcon.ico
 VersionInfoVersion={#AppVersion}
 VersionInfoDescription=Codex Bridge Installer
 VersionInfoProductName=Codex Bridge
-LicenseFile={#PayloadDir}\LICENSE.txt
+InfoBeforeFile={#PayloadDir}\LICENSE.txt
 
 [Files]
 Source: "{#PayloadDir}\SHA256SUMS.txt"; Flags: dontcopy
@@ -67,7 +68,7 @@ Type: files; Name: "{app}\CodexBridge.App.pri"
 Type: files; Name: "{app}\payload-manifest.json"
 
 [Icons]
-Name: "{group}\Codex Bridge"; Filename: "{app}\codex-bridge-windows-app.exe"; WorkingDir: "{app}"
+Name: "{group}\Codex Bridge"; Filename: "{app}\codex-bridge-windows-app.exe"; WorkingDir: "{app}"; IconFilename: "{app}\AppIcon.ico"
 
 [Run]
 Filename: "{app}\codex-bridge-windows-app.exe"; Description: "启动 Codex Bridge"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent

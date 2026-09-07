@@ -12,8 +12,11 @@ $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $installerFull = Get-FullPath $InstallerPath
 Assert-RegularFile $installerFull | Out-Null
 $installRoot = Join-Path $env:LOCALAPPDATA "Programs\CodexBridge"
+$initialInstallRoot = $installRoot
+$movedInstallRoot = Join-Path $env:RUNNER_TEMP "CodexBridge-Moved-$PID"
 $appPath = Join-Path $installRoot "codex-bridge-windows-app.exe"
 $servicePath = Join-Path $installRoot "codex-bridge-service.exe"
+$initialServicePath = $servicePath
 $shortcutPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Codex Bridge\Codex Bridge.lnk"
 $sentinelName = "installer-preservation-$PID.sentinel"
 $dataSentinel = Join-Path $env:LOCALAPPDATA "CodexBridgeService\$sentinelName"
@@ -24,7 +27,11 @@ $logs = @()
 $service = $null
 $legacyObsoletePath = Join-Path $installRoot "LegacyRuntime\obsolete.dll"
 
-function Invoke-Setup([string]$Executable, [string]$LogName, [switch]$Uninstall) {
+function Invoke-Setup(
+  [string]$Executable,
+  [string]$LogName,
+  [switch]$Uninstall,
+  [string]$InstallDirectory = "") {
   $logPath = Join-Path $env:RUNNER_TEMP $LogName
   $script:logs += $logPath
   $arguments = @(
@@ -34,6 +41,9 @@ function Invoke-Setup([string]$Executable, [string]$LogName, [switch]$Uninstall)
     "/LOG=`"$logPath`""
   )
   if (-not $Uninstall) { $arguments += "/SP-" }
+  if (-not [string]::IsNullOrWhiteSpace($InstallDirectory)) {
+    $arguments += "/DIR=`"$InstallDirectory`""
+  }
   Write-Host "Running $LogName"
   $process = Start-Process -FilePath $Executable -ArgumentList $arguments -PassThru
   $exitCode = Wait-DirectProcessExit $process 120 $LogName
@@ -193,17 +203,26 @@ try {
   Set-ItemProperty -Path $runKey -Name "CodexBridgeService" -Value ('"' + $servicePath + '"')
   $legacyRunCreated = $true
 
-  Invoke-Setup $installerFull "CodexBridge-upgrade.log"
+  if (Test-Path -LiteralPath $movedInstallRoot) {
+    throw "Moved install root must not exist before the directory migration test: $movedInstallRoot"
+  }
+  Invoke-Setup $installerFull "CodexBridge-upgrade.log" -InstallDirectory $movedInstallRoot
+  $installRoot = $movedInstallRoot
+  $appPath = Join-Path $installRoot "codex-bridge-windows-app.exe"
+  $servicePath = Join-Path $installRoot "codex-bridge-service.exe"
   Wait-BridgeProcessesExit
+  if (Test-Path -LiteralPath $initialInstallRoot) {
+    throw "Upgrade retained the previous application directory."
+  }
   if (Test-Path -LiteralPath $obsoletePath) {
-    throw "Upgrade retained an obsolete manifest-owned file."
+    throw "Directory migration retained an obsolete manifest-owned file."
   }
   Assert-Payload $installRoot
   foreach ($sentinel in @($dataSentinel, $webViewSentinel)) {
     Assert-RegularFile $sentinel | Out-Null
   }
-  if ($null -ne (Get-LegacyRunValue)) {
-    throw "Legacy startup registration remained after upgrade."
+  if ((Get-LegacyRunValue) -ne ('"' + $servicePath + '"')) {
+    throw "Startup registration did not move to the selected application directory."
   }
 
   Start-InstalledServiceThroughApplication
@@ -214,6 +233,9 @@ try {
   Wait-BridgeProcessesExit
 
   Remove-TestOwnedEmptyInstallRoot $installRoot 60
+  if (Test-Path -LiteralPath $initialInstallRoot) {
+    throw "Previous application directory remained after uninstall."
+  }
   if (Test-Path -LiteralPath $shortcutPath) { throw "Start Menu shortcut remained after uninstall." }
   if ($null -ne (Get-LegacyRunValue)) {
     throw "Legacy startup registration remained after uninstall."
@@ -229,23 +251,27 @@ try {
     try {
       $process.Refresh()
       if (-not $process.HasExited -and
-          (Test-SameOrChildPath $installRoot $process.Path)) {
+          ((Test-SameOrChildPath $initialInstallRoot $process.Path) -or
+           (Test-SameOrChildPath $movedInstallRoot $process.Path))) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
       }
     } catch {}
   }
-  $cleanupUninstaller = Join-Path $installRoot "unins000.exe"
-  if (Test-Path -LiteralPath $cleanupUninstaller) {
-    try {
-      $cleanup = Start-Process -FilePath $cleanupUninstaller -ArgumentList @(
-        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
-      ) -PassThru
-      Wait-DirectProcessExit $cleanup 120 "Cleanup uninstaller" | Out-Null
-    } catch {}
+  foreach ($cleanupRoot in @($movedInstallRoot, $initialInstallRoot)) {
+    $cleanupUninstaller = Join-Path $cleanupRoot "unins000.exe"
+    if (Test-Path -LiteralPath $cleanupUninstaller) {
+      try {
+        $cleanup = Start-Process -FilePath $cleanupUninstaller -ArgumentList @(
+          "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
+        ) -PassThru
+        Wait-DirectProcessExit $cleanup 120 "Cleanup uninstaller" | Out-Null
+      } catch {}
+    }
   }
   if ($legacyRunCreated) {
     $runValue = Get-LegacyRunValue
-    if ($runValue -eq ('"' + $servicePath + '"')) {
+    if (($runValue -eq ('"' + $servicePath + '"')) -or
+        ($runValue -eq ('"' + $initialServicePath + '"'))) {
       Remove-ItemProperty -Path $runKey -Name "CodexBridgeService" -ErrorAction SilentlyContinue
     }
   }

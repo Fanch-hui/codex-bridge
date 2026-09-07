@@ -231,6 +231,12 @@ try {
       [IO.Path]::GetFullPath((Join-Path $repoRoot $TunnelClientDir))
     }
     $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
+  } elseif ($Installer) {
+    $resolvedTunnelClientDir = Join-Path $resolvedOutDir "tunnel-client"
+    & (Join-Path $repoRoot "Scripts\stage-windows-tunnel-client.ps1") `
+      -Architecture $architecture -Destination $resolvedTunnelClientDir
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
   }
   & $stageScript @stageArguments
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

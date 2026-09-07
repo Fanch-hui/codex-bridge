@@ -18,7 +18,7 @@ begin
   Result := Value;
 end;
 
-function RemoveLegacyPayloadFiles(const NewManifest: String): String;
+function RemoveLegacyPayloadFilesAt(const AppDirectory: String; const NewManifest: String): String;
 var
   I: Integer;
   InstalledManifest: String;
@@ -28,15 +28,24 @@ var
   InstalledPath: String;
 begin
   Result := '';
-  InstalledManifest := ExpandConstant('{app}\payload-manifest.json');
+  InstalledManifest := AddBackslash(AppDirectory) + 'payload-manifest.json';
   if not FileExists(InstalledManifest) then
     Exit;
-  if not LoadStringsFromFile(InstalledManifest, LegacyLines) or
-     not LoadStringsFromFile(NewManifest, NewLines) then
+  if not LoadStringsFromFile(InstalledManifest, LegacyLines) then
   begin
     Result := 'Codex Bridge could not read its legacy payload manifest.';
     Exit;
   end;
+  if NewManifest <> '' then
+  begin
+    if not LoadStringsFromFile(NewManifest, NewLines) then
+    begin
+      Result := 'Codex Bridge could not read its current payload manifest.';
+      Exit;
+    end;
+  end
+  else
+    SetArrayLength(NewLines, 0);
 
   for I := 0 to GetArrayLength(LegacyLines) - 1 do
   begin
@@ -45,8 +54,9 @@ begin
       Continue;
     if ManifestContains(NewLines, RelativePath) then
       Continue;
-    InstalledPath := AddBackslash(ExpandConstant('{app}')) + RelativePath;
-    if FileExists(InstalledPath) and HasReparseDirectory(InstalledPath) then
+    InstalledPath := AddBackslash(AppDirectory) + RelativePath;
+    if FileExists(InstalledPath) and
+       HasReparseDirectoryAt(InstalledPath, AppDirectory) then
     begin
       Result := 'Codex Bridge found an unsafe legacy application directory.';
       Exit;
@@ -56,6 +66,11 @@ begin
       Result := 'Codex Bridge could not remove an obsolete legacy application file.';
       Exit;
     end;
-    RemoveEmptyParents(InstalledPath);
+    RemoveEmptyParentsAt(InstalledPath, AppDirectory);
   end;
+end;
+
+function RemoveLegacyPayloadFiles(const NewManifest: String): String;
+begin
+  Result := RemoveLegacyPayloadFilesAt(ExpandConstant('{app}'), NewManifest);
 end;

@@ -116,6 +116,7 @@ foreach ($required in @(
     "swiftCore.dll",
     "sqlite3.dll",
     "WebView2Loader.dll",
+    "AppIcon.ico",
     "LICENSE.txt",
     "NOTICE.txt")) {
   Assert-RegularFile (Join-Path $payloadFull $required) | Out-Null

@@ -62,7 +62,15 @@ function Assert-PEMachine([string]$Path, [UInt16]$Expected) {
 }
 
 if (Test-Path -LiteralPath $Destination) {
-  throw "Tunnel client destination already exists: $Destination"
+  $executable = Join-Path $Destination 'tunnel-client.exe'
+  Assert-SHA256 $executable $platform.TunnelClientSHA256
+  Assert-PEMachine $executable $platform.Machine
+  $digest = (Get-Content -LiteralPath (Join-Path $Destination 'tunnel-client.sha256') -Raw).Trim()
+  if ($digest -cne $platform.TunnelClientSHA256) {
+    throw 'Cached tunnel client digest does not match the pinned release.'
+  }
+  Write-Host "Using verified $release $Architecture tunnel-client from $Destination"
+  return
 }
 
 $archiveName = "tunnel-client-$release-windows-$($platform.Name).zip"
