@@ -5,6 +5,8 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case hostContextJS = "host-context.js"
   case stylesCSS = "styles.css"
   case pagesCSS = "pages.css"
+  case workbenchCSS = "workbench.css"
+  case responsiveCSS = "responsive.css"
   case windowsThemeCSS = "windows-theme.css"
   case windowsComponentsCSS = "windows-components.css"
   case pagesCommonJS = "pages-common.js"

@@ -1,0 +1,68 @@
+.sidebar { border-right: 1px solid var(--separator); }
+.navigation { overflow-y: auto; min-height: 0; }
+.sidebar-footer { flex: 0 0 auto; }
+.sidebar-footer #connection-label { min-width: 0; overflow-wrap: anywhere; }
+.page-header > div, .section-header > div, .service-main,
+.recent-task > div, .page-card, .conversation-entry { min-width: 0; }
+.page-header h2, .section-header h2, .detail-title { text-wrap: balance; }
+.page-header p, .section-header p, .detail-subtitle,
+.page-message, .row-detail, .hint, .muted, .step-text,
+.approval-card, .client-exposure-hint { overflow-wrap: anywhere; }
+.page-card pre, .detail-body pre { max-width: 100%; overflow: auto; }
+.button { max-width: 100%; padding-block: 5px; overflow-wrap: anywhere; }
+.form-actions > *, .filter-bar > * { min-width: 0; max-width: 100%; }
+.service-actions, .client-heading, .native-permission-header { flex-wrap: wrap; }
+.metric-value, .summary-value { font-variant-numeric: tabular-nums; }
+.icon { flex: 0 0 auto; }
+.icon.dropdown-arrow { width: 12px; height: 12px; }
+.icon.perm-icon, .icon.external-icon { width: 15px; height: 15px; }
+.icon.placeholder-icon { width: 28px; height: 28px; }
+.browser-toolbar .toolbar-spacer { flex: 1 1 0; }
+.browser-nav-group, .browser-toggle-wrap { flex: 0 0 auto; }
+.browser-url-pill { min-width: 0; flex: 1 1 140px; max-width: 100%; }
+.url-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.browser-toggle-wrap { white-space: nowrap; }
+.browser-toolbar .button.icon-btn-small { flex: 0 0 28px; padding: 0; }
+.browser-toolbar .browser-external-btn { gap: 5px; }
+.browser-slot-note { min-width: 0; min-height: 0; overflow: auto; }
+.project-select-wrap { flex: 1 1 0; }
+.project-dropdown-face, .task-dropdown-face { max-width: 100%; }
+.project-title-text, .task-title-text { max-width: 100%; min-width: 0; }
+.inspector-status-wrap { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 45%; }
+.inspector-status-wrap .status-badge { white-space: normal; overflow-wrap: anywhere; }
+.row-permissions { flex-wrap: wrap; }
+.inspector-header, .inspector-approvals, .inspector-footer { flex: 0 0 auto; }
+.inspector-header { max-height: 45%; overflow-y: auto; }
+.inspector-footer { max-height: 45%; overflow-y: auto; }
+.inspector-approvals { max-height: 28%; overflow-y: auto; }
+.inspector-content { overflow-x: hidden; overflow-wrap: anywhere; }
+.inspector-content .task-detail-card { padding: 0; border: 0; background: transparent; }
+.inspector-content .detail-grid { gap: 10px; }
+.workbench-controls .form-grid { grid-template-columns: minmax(0, 1fr); }
+.project-native-select:focus-visible + .project-dropdown-face,
+.task-native-select:focus-visible + .task-dropdown-face { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 1100px) {
+  .app-shell { --sidebar-width: 68px; }
+  .sidebar-topbar { padding-inline: 16px; }
+  .navigation { padding-inline: 10px; }
+  .nav-item { grid-template-columns: 1fr; justify-items: center; padding-inline: 0; }
+  .nav-title, .nav-badge, .sidebar-footer span:not(.connection-indicator) { display: none; }
+  .sidebar-footer { justify-content: center; padding-inline: 0; }
+  .settings-grid, .split-layout { grid-template-columns: minmax(0, 1fr); }
+  .connection-summary, .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .toolbar { padding-inline: 18px; }
+  .workbench-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 2fr) minmax(0, 3fr); }
+  .workbench-layout.inspector-hidden { grid-template-rows: minmax(0, 1fr); }
+  .browser-pane { border-right: 0; border-bottom: 1px solid var(--separator); }
+  .inspector-header { gap: 6px; padding: 10px 14px; }
+  .inspector-subtitle { display: none; }
+  .form-grid, .form-grid.three { grid-template-columns: minmax(0, 1fr); }
+  .recent-task { grid-template-columns: 90px minmax(0, 1fr) 20px; }
+  .recent-source, .recent-time { display: none; }
+  .service-row { flex-wrap: wrap; }
+  .service-name { min-width: 0; }
+}

@@ -76,6 +76,8 @@
     (items || []).forEach(function (item) {
       var button = document.createElement("button");
       button.type = "button";
+      button.title = item.title;
+      button.setAttribute("aria-label", item.title);
       button.className = "nav-item" + (item.navigation === selected ? " is-selected" : "");
       button.setAttribute("aria-current", item.navigation === selected ? "page" : "false");
       button.appendChild(iconElement(item.symbol, "icon"));

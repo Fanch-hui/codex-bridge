@@ -9,8 +9,21 @@
     settings: global.CodexBridgeDesktopSettingsPage
   };
   var lastViewport = "";
+  var viewportEmitter;
+  var viewportFrame = 0;
+  var slot = document.getElementById("chat-browser-slot");
+  if (global.ResizeObserver && slot) {
+    new ResizeObserver(function () {
+      if (!viewportEmitter || viewportFrame) return;
+      viewportFrame = global.requestAnimationFrame(function () {
+        viewportFrame = 0;
+        measureBrowserViewport(viewportEmitter);
+      });
+    }).observe(slot);
+  }
 
   function render(state, emit) {
+    viewportEmitter = emit;
     var names = ["overview", "workbench", "projects", "logs", "connections", "settings"];
     names.forEach(function (name) {
       var section = document.getElementById(name + "-page");
@@ -31,12 +44,15 @@
     var slot = document.getElementById("chat-browser-slot");
     if (!slot) return;
     var rect = slot.getBoundingClientRect();
-    var visible = rect.width > 0 && rect.height > 0 && !slot.classList.contains("browser-hidden");
+    var left = Math.max(0, rect.left), top = Math.max(0, rect.top);
+    var width = Math.max(0, Math.min(global.innerWidth, rect.right) - left);
+    var height = Math.max(0, Math.min(global.innerHeight, rect.bottom) - top);
+    var visible = width > 0 && height > 0 && !slot.classList.contains("browser-hidden");
     var viewport = {
-      x: rect.left,
-      y: rect.top,
-      width: rect.width,
-      height: rect.height,
+      x: left,
+      y: top,
+      width: width,
+      height: height,
       visible: visible
     };
     emitBrowserViewport(emit, viewport);

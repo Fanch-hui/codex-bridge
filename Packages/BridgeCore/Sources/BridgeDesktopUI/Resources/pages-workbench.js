@@ -20,7 +20,7 @@
      ["chevron.right", "前进", "browserForward", !browser.canGoForward],
      ["arrow.clockwise", "刷新当前网页", "browserReload", !browser.canReload]].forEach(function (n) {
       var btn = S.button("", n[2], {}, emit, "icon-btn-small", n[3]);
-      btn.title = n[1]; btn.appendChild(S.icon(n[0])); navGroup.appendChild(btn);
+      btn.title = n[1]; btn.setAttribute("aria-label", n[1]); btn.appendChild(S.icon(n[0])); navGroup.appendChild(btn);
     });
     tb.appendChild(navGroup);
     var urlPill = S.node("div", "browser-url-pill mono");
@@ -32,6 +32,9 @@
     var toggleWrap = S.node("label", "browser-toggle-wrap");
     toggleWrap.appendChild(S.node("span", "browser-toggle-title", "内置浏览器"));
     var toggleBtn = S.node("button", "switch-toggle" + (browser.enabled ? " is-active" : ""));
+    toggleBtn.setAttribute("role", "switch");
+    toggleBtn.setAttribute("aria-label", "内置浏览器");
+    toggleBtn.setAttribute("aria-checked", String(!!browser.enabled));
     toggleBtn.type = "button"; toggleBtn.disabled = !browser.canToggle;
     toggleBtn.appendChild(S.node("span", "switch-thumb"));
     toggleBtn.addEventListener("click", function () { emit("setBrowserEnabled", { enabled: !browser.enabled }); });
@@ -64,6 +67,7 @@
     var row1 = S.node("div", "inspector-header-row row-project"), pGroup = S.node("div", "project-selector-group");
     pGroup.appendChild(S.icon("folder.fill", "project-folder-icon"));
     var selectWrap = S.node("div", "project-select-wrap"), select = S.node("select", "project-native-select");
+    select.setAttribute("aria-label", "工作台项目");
     var projects = page.projects || [];
     projects.forEach(function (p) {
       var opt = S.node("option", null, p.title);
@@ -117,6 +121,7 @@
     var row4 = S.node("div", "inspector-header-row row-tasks"), taskWrap = S.node("div", "task-picker-wrap");
     taskWrap.appendChild(S.icon("list.bullet.rectangle", "task-picker-icon"));
     var taskSelect = S.node("select", "task-native-select"), tasks = page.tasks || [];
+    taskSelect.setAttribute("aria-label", "Agent 会话");
     var defaultOpt = S.node("option", null, "选择 Agent 会话 (" + (tasks.length + S.safeArray(page.history && page.history.threads).length) + ")");
     defaultOpt.value = ""; taskSelect.appendChild(defaultOpt);
     var history = page.history || {}, historicalThreads = S.safeArray(history.threads);

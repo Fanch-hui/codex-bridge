@@ -13,7 +13,7 @@
   }
 
   function icon(symbol, className) {
-    var element = node("span", className || "icon");
+    var element = node("span", "icon" + (className ? " " + className : ""));
     element.dataset.symbol = symbol || "circle.dashed";
     return element;
   }
