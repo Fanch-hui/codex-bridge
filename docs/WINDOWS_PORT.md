@@ -189,18 +189,19 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
    sqlite3 不提供实验性的 snapshot 符号；本项目未使用该 API，常规事务/WAL/迁移
    不受影响。schema v15 将项目、任务、Agent 安装与工件路径约束统一为 portable
    absolute-path 语义，迁移时保留 v14 数据，同时接受 POSIX、Windows 盘符和 UNC 根路径。
-7. **DeepSeek Harness 运行时模块链接**。受控 profile 需要把已校验的
-   `node_modules` 目录链接到隔离运行目录；Windows 创建目录符号链接可能要求
-   Developer Mode 或 `SeCreateSymbolicLinkPrivilege`，失败时保持 fail-closed。
-   是否需要改为受控 junction，待 Windows 真机验收后决定。
+7. **DeepSeek Harness 运行时模块链接**。受控 profile 把已校验的
+   `node_modules` 目录链接到隔离运行目录。Windows 优先使用目录符号链接；缺少
+   Developer Mode 或符号链接权限时回退到受控 NTFS Junction。卸载链接通过
+   `RemoveDirectoryW` 移除 reparse point，保留目标目录。
    Windows 上 Node 解释器必须是有效 PE；由 Node 间接执行的 Harness 脚本入口
    仍按正规文件、句柄身份与摘要校验，不误要求脚本本身是 PE。
 8. **Windows 不提供 Supervisor（已确认的产品边界）**。macOS 的 evidence-only
    Supervisor 依赖 `sandbox-exec` 隔离；Windows 默认关闭、不向 UI 宣称可用，显式启用
    也会 fail-closed，不会退化成无隔离审查。macOS Supervisor 保持原有行为。
-9. **Direct 命令的网络隔离边界**。Windows 没有与 macOS sandbox profile 等价的
-   per-process deny-network 实现，因此要求 `denyNetwork` 的直接命令在启动前失败；
-   内置 safe command 不在 Windows 对外发布。已注册且声明需要网络的命令仍按项目策略运行。
+9. **Direct 命令的网络隔离边界**。Windows 的 `denyNetwork` 由零网络 Capabilities
+   的 AppContainer 执行，工作目录通过显式 DACL 授权，Job Object 在关闭时终止进程树。
+   无法创建隔离环境时在启动前报错。Windows safe command 限于已校验的 PE 可执行文件；
+   声明需要网络的命令仍按项目网络策略执行。
 10. **Windows UI 与功能以 macOS 为产品基准**。Windows 使用 Win32/WebView2 承载相同的
    概览、工作台、项目、日志、连接和设置导航；页面状态、文案、操作后果与 Service API
    闭环必须一致，不能用独立工具窗口、占位页或静态指标代替。平台原生控件允许存在渲染
