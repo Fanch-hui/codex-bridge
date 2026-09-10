@@ -9,7 +9,7 @@ package struct WorkbenchSessionItem: Identifiable, Sendable {
   package let projectID: String
   package let tasks: [MCPServiceTaskSnapshot]
   package var latestTask: MCPServiceTaskSnapshot { tasks.last ?? tasks[0] }
-  package var id: String { sessionID }
+  package var id: String { [projectID, providerID, sessionID].joined(separator: "\u{1F}") }
   package var turnCount: Int { tasks.count }
   package var isTerminal: Bool { latestTask.isTerminal }
   package var isRunning: Bool { latestTask.isRunning }
@@ -60,7 +60,8 @@ struct WorkbenchAgentTaskPicker: View {
                       title: session.title,
                       turnCount: session.turnCount
                     ),
-                    systemImage: isSessionSelected(session) ? "checkmark" : session.providerSystemImage
+                    systemImage: isSessionSelected(session)
+                      ? "checkmark" : session.providerSystemImage
                   )
                 }
               }
@@ -145,9 +146,11 @@ package enum WorkbenchAgentTaskPickerContent {
     in tasks: [MCPServiceTaskSnapshot]
   ) -> [MCPServiceTaskSnapshot] {
     let sessionID = task.effectiveSessionID ?? task.taskID
-    return tasks
+    return
+      tasks
       .filter {
         $0.projectID == task.projectID
+          && $0.providerIdentifier == task.providerIdentifier
           && ($0.effectiveSessionID ?? $0.taskID) == sessionID
       }
       .sorted { $0.updatedAt < $1.updatedAt }
@@ -159,7 +162,7 @@ package enum WorkbenchAgentTaskPickerContent {
     var grouped: [String: [MCPServiceTaskSnapshot]] = [:]
     var order: [String] = []
     for task in tasks {
-      let key = task.effectiveSessionID ?? task.taskID
+      let key = scopedSessionKey(task)
       if grouped[key] == nil {
         order.append(key)
         grouped[key] = []
@@ -170,7 +173,7 @@ package enum WorkbenchAgentTaskPickerContent {
       guard let list = grouped[key], let first = list.first else { return nil }
       let sorted = list.sorted { $0.updatedAt < $1.updatedAt }
       return WorkbenchSessionItem(
-        sessionID: key,
+        sessionID: first.effectiveSessionID ?? first.taskID,
         providerID: first.providerIdentifier,
         providerDisplayName: first.providerDisplayName,
         providerSystemImage: first.providerSystemImage,
@@ -178,6 +181,11 @@ package enum WorkbenchAgentTaskPickerContent {
         tasks: sorted
       )
     }
+  }
+
+  private static func scopedSessionKey(_ task: MCPServiceTaskSnapshot) -> String {
+    [task.projectID, task.providerIdentifier, task.effectiveSessionID ?? task.taskID]
+      .joined(separator: "\u{1F}")
   }
 
   package static func groupedSessions(

@@ -179,6 +179,45 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
     XCTAssertEqual(titleWithTurns, "这是第一轮提示词 [2轮]")
   }
 
+  func testSessionsStaySeparateWhenProviderOrProjectReusesSessionID() throws {
+    let antigravityFirst = sessionTask(
+      taskID: "agy-1",
+      projectID: "project-1",
+      providerID: "antigravity",
+      sessionID: "shared-session",
+      updatedAt: "2026-08-28T00:00:01Z"
+    )
+    let antigravitySecond = sessionTask(
+      taskID: "agy-2",
+      projectID: "project-2",
+      providerID: "antigravity",
+      sessionID: "shared-session",
+      updatedAt: "2026-08-28T00:00:02Z"
+    )
+    let openCode = sessionTask(
+      taskID: "opencode-1",
+      projectID: "project-1",
+      providerID: "opencode",
+      sessionID: "shared-session",
+      updatedAt: "2026-08-28T00:00:03Z"
+    )
+
+    let sessions = WorkbenchAgentTaskPickerContent.sessions(
+      tasks: [antigravityFirst, antigravitySecond, openCode]
+    )
+
+    XCTAssertEqual(sessions.count, 3)
+    XCTAssertEqual(Set(sessions.map(\.id)).count, 3)
+    XCTAssertEqual(
+      Set(sessions.map { [$0.projectID, $0.providerID, $0.sessionID] }),
+      Set([
+        ["project-1", "antigravity", "shared-session"],
+        ["project-2", "antigravity", "shared-session"],
+        ["project-1", "opencode", "shared-session"],
+      ])
+    )
+  }
+
   func testGroupedSessionsCategorizesByProvider() {
     let codexTask = MCPServiceTaskSnapshot(
       taskID: "codex-1",
@@ -211,15 +250,21 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
       updatedAt: "2026-08-28T00:00:03Z"
     )
 
-    let groups = WorkbenchAgentTaskPickerContent.groupedSessions(tasks: [codexTask, agyTask, openCodeTask])
-    XCTAssertEqual(groups.map(\.providerID), ["codex", "antigravity", "opencode"])
+    let groups = WorkbenchAgentTaskPickerContent.groupedSessions(
+      tasks: [codexTask, agyTask, openCodeTask]
+    )
+    XCTAssertEqual(
+      groups.map(\.providerID),
+      ["codex", "antigravity", "opencode"],
+    )
     XCTAssertEqual(groups[0].sessions.count, 1)
     XCTAssertEqual(groups[1].sessions.count, 1)
     XCTAssertEqual(groups[2].sessions.count, 1)
   }
 
   func testCleanTitleSanitizesToolFailureErrors() {
-    let rawError = "Antigravity could not run native tool 'view_file': operation timed out while executing"
+    let rawError =
+      "Antigravity could not run native tool 'view_file': operation timed out while executing"
     let cleaned = WorkbenchTaskTextPresentation.cleanTitle(rawError)
     XCTAssertEqual(cleaned, "工具 view_file 执行异常")
 
@@ -242,6 +287,26 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
       supervisorStatus: "disabled",
       localApprovalRequired: false,
       updatedAt: "2026-08-28T00:00:00Z"
+    )
+  }
+
+  private func sessionTask(
+    taskID: String,
+    projectID: String,
+    providerID: String,
+    sessionID: String,
+    updatedAt: String
+  ) -> MCPServiceTaskSnapshot {
+    MCPServiceTaskSnapshot(
+      taskID: taskID,
+      projectID: projectID,
+      status: "completed",
+      providerID: providerID,
+      threadID: providerID == "codex" ? sessionID : nil,
+      providerSessionID: providerID == "codex" ? nil : sessionID,
+      supervisorStatus: "disabled",
+      localApprovalRequired: false,
+      updatedAt: updatedAt
     )
   }
 }
