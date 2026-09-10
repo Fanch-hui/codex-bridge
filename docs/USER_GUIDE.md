@@ -258,7 +258,7 @@ Bridge 登记的是 `agy` CLI，不是 Antigravity Desktop App：
 7. 点击“登记并 Probe”，确认状态为“可用”，再打开“启用”。
 8. 到 `设置 → Antigravity 执行默认偏好` 刷新模型并选择默认 model/effort/访问权限。
 
-当前兼容范围为 `1.1.21 <= agy < 1.2.0`。Probe 还会检查当前帮助中是否存在 stream-json、plan、accept-edits、sandbox、conversation、model 和 effort 能力。
+兼容性由当前 CLI 的实际接口决定。Probe 读取 `--version` 用于展示，并检查 `--help` 中的 stream-json、plan、sandbox 和工具权限参数；accept-edits、conversation、model 和 effort 等可选能力按探测结果开放。
 
 - `Read Only` 使用 `--mode plan`。
 - `Write` 使用 `--mode accept-edits`。

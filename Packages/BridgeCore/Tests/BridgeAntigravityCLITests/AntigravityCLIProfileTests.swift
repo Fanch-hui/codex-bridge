@@ -7,7 +7,7 @@ import XCTest
 @testable import BridgeAntigravityCLI
 
 final class AntigravityCLIProfileTests: XCTestCase {
-  func testSemanticVersionParsingAndCompatibilityBoundaries() {
+  func testSemanticVersionParsing() {
     XCTAssertEqual(
       AntigravityCLISemanticVersion("agy 1.1.21"),
       AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 21)
@@ -19,19 +19,9 @@ final class AntigravityCLIProfileTests: XCTestCase {
     XCTAssertNil(AntigravityCLISemanticVersion("1.1"))
     XCTAssertNil(AntigravityCLISemanticVersion("agy latest"))
 
-    let compatibility = AntigravityCLICompatibility()
-    XCTAssertFalse(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 20)))
-    XCTAssertTrue(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 21)))
-    XCTAssertTrue(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 99)))
-    XCTAssertTrue(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 2, patch: 0)))
-    XCTAssertTrue(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 2, patch: 99)))
-    XCTAssertFalse(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 3, patch: 0)))
+    for version in ["1.1.20", "1.2.0", "1.3.0", "2.0.0"] {
+      XCTAssertNotNil(AntigravityCLISemanticVersion(version))
+    }
     XCTAssertEqual(
       AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 22).stringValue,
       "1.1.22"

@@ -11,7 +11,7 @@ Evidence checked on 2026-08-17 against official repositories and releases. Versi
 | openai/tunnel-client | 0.0.10 | helper executable | Apache-2.0 + NOTICE | `BridgeTunnel` process boundary; not an SPM binary target | [release](https://github.com/openai/tunnel-client/releases/tag/v0.0.10) |
 | OpenCode | user-selected compatible installation (`1.18.20 <= version < 1.19.0`) | external ACP executable | OpenCode's own distribution terms | `BridgeOpenCodeACP` process boundary; never bundled and never an SPM dependency | [OpenCode connection guide](./OPENCODE_CONNECTION_GUIDE.md) |
 | DeepSeek Harness | user-built pinned source tag `dsh-v0.1.1-rc.2` | external ACP executable | upstream project terms | `BridgeDeepSeekHarnessACP` process boundary; Bridge bundles only its validated `cordis.yml` template and never bundles Harness or reads its `.env` | [DeepSeek Harness guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) |
-| Antigravity CLI | user-selected compatible installation (`1.1.21 <= version < 1.2.0`) | external `agy` executable | provider distribution terms | `BridgeAntigravityCLI` process boundary; never bundled or authenticated by Bridge | [user guide](./USER_GUIDE.md#54-antigravity) |
+| Antigravity CLI | user-selected installation with the required CLI capabilities | external `agy` executable | provider distribution terms | `BridgeAntigravityCLI` process boundary; never bundled or authenticated by Bridge | [user guide](./USER_GUIDE.md#54-antigravity) |
 | @modelcontextprotocol/inspector | 2.1.0 | development CLI | MIT | test-only Streamable HTTP acceptance gate; never bundled in the App | [release](https://github.com/modelcontextprotocol/inspector/releases/tag/2.1.0) |
 
 ## Version and platform facts
