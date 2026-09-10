@@ -6,7 +6,7 @@ import SwiftUI
 struct BridgeServiceWorkbenchInspectorContext {
   let currentActiveTask: MCPServiceTaskSnapshot?
   let currentTask: MCPServiceTaskSnapshot?
-  let availableTasks: [MCPServiceTaskSnapshot]
+  let projectTasks: [MCPServiceTaskSnapshot]
   let steerableTask: MCPServiceTaskSnapshot?
   let canSubmitSteer: Bool
   let canInterruptAndContinue: Bool
@@ -16,10 +16,13 @@ struct BridgeServiceWorkbenchInspectorContext {
   init(model: BridgeServiceAppModel, steerInput: String) {
     let activeTask = Self.currentActiveTask(in: model)
     let selectedTask = Self.currentTask(in: model, fallback: activeTask)
+    let projectTasks = model.tasks.filter { task in
+      model.selectedProjectID == nil || task.projectID == model.selectedProjectID
+    }
 
     currentActiveTask = activeTask
     currentTask = selectedTask
-    availableTasks = model.tasks
+    self.projectTasks = projectTasks
     steerableTask = Self.steerableTask(in: model, task: selectedTask)
     canSubmitSteer = Self.canSubmitSteer(steerInput)
     canInterruptAndContinue = Self.canInterruptAndContinue(in: model, task: selectedTask)
@@ -220,7 +223,7 @@ struct BridgeServiceWorkbenchInspectorHeader: View {
       HStack(spacing: 6) {
         WorkbenchAgentTaskPicker(
           model: model,
-          tasks: context.availableTasks,
+          tasks: context.projectTasks,
           threads: model.threads
         )
         Spacer()
