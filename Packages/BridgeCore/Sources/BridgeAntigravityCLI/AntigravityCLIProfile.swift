@@ -53,7 +53,7 @@ public struct AntigravityCLICompatibility: Equatable, Sendable {
 
   public init(
     minimumVersion: AntigravityCLISemanticVersion = .init(major: 1, minor: 1, patch: 21),
-    maximumExclusiveVersion: AntigravityCLISemanticVersion = .init(major: 1, minor: 2, patch: 0)
+    maximumExclusiveVersion: AntigravityCLISemanticVersion = .init(major: 1, minor: 3, patch: 0)
   ) {
     self.minimumVersion = minimumVersion
     self.maximumExclusiveVersion = maximumExclusiveVersion

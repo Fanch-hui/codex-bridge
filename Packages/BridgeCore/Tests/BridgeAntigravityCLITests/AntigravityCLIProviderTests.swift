@@ -132,7 +132,7 @@ final class AntigravityCLIProviderTests: XCTestCase {
     XCTAssertEqual(calls.map(\.argv), [["/bin/echo", "--version"], ["/bin/echo", "--help"]])
   }
 
-  func testProbeMarksUnsupportedVersionForReview() async throws {
+  func testProbeAcceptsCurrentVersionAndHelpSurface() async throws {
     let projectRoot = try AntigravityCLITestSupport.temporaryDirectory(
       prefix: "agy-version-project")
     let home = try AntigravityCLITestSupport.temporaryDirectory(prefix: "agy-version-home")
@@ -140,7 +140,66 @@ final class AntigravityCLIProviderTests: XCTestCase {
       try? FileManager.default.removeItem(atPath: projectRoot)
       try? FileManager.default.removeItem(atPath: home)
     }
-    let version = "agy version 1.2.0\n"
+    let versionAndHelp =
+      """
+      agy version 1.2.0
+      --mode Set the agent execution mode (accept-edits, plan)
+      --conversation Resume a previous conversation by ID
+      --model Model for the current CLI session
+      --effort Reasoning effort for the current CLI session (low|medium|high)
+      --sandbox Run in a sandbox with terminal restrictions enabled
+      --dangerously-skip-permissions Auto-approve all tool permission requests
+      --input-format stream-json reads one NDJSON message per line and runs a turn for each
+      --output-format stream-json
+      """
+    let commandRunner = RecordingAntigravityCommandRunner(
+      result: AntigravityCLICommandResult(
+        standardOutput: BoundedProcessOutput(
+          head: versionAndHelp,
+          tail: versionAndHelp,
+          byteCount: versionAndHelp.utf8.count,
+          truncated: false
+        ),
+        standardError: BoundedProcessOutput(head: "", tail: "", byteCount: 0, truncated: false),
+        termination: .exited(0),
+        timedOut: false
+      )
+    )
+    let provider = try AntigravityCLIProvider(
+      configuration: AntigravityCLIProviderConfiguration(
+        launchBuilder: AntigravityCLILaunchBuilder(),
+        commandRunner: commandRunner,
+        sourceEnvironment: ["HOME": home, "TMPDIR": projectRoot]
+      )
+    )
+    let installation = try AgentInstallation(
+      id: AgentInstallationID(rawValue: "agy-version"),
+      providerID: .antigravity,
+      executablePath: "/bin/echo"
+    )
+
+    let result = await provider.probe(
+      try AgentProbeRequest(installation: installation, projectRoot: projectRoot)
+    )
+
+    XCTAssertTrue(result.available)
+    XCTAssertFalse(result.reviewRequired)
+    XCTAssertEqual(result.installation.version, "1.2.0")
+    XCTAssertEqual(result.installation.protocolRevision, "stream-json-v1")
+    XCTAssertTrue(result.capabilities.effective.contains(.workspaceRead))
+    XCTAssertTrue(result.capabilities.effective.contains(.workspaceWriteInPlace))
+    XCTAssertTrue(result.capabilities.effective.contains(.sessionContinue))
+  }
+
+  func testProbeMarksNextMinorVersionForReview() async throws {
+    let projectRoot = try AntigravityCLITestSupport.temporaryDirectory(
+      prefix: "agy-version-project")
+    let home = try AntigravityCLITestSupport.temporaryDirectory(prefix: "agy-version-home")
+    defer {
+      try? FileManager.default.removeItem(atPath: projectRoot)
+      try? FileManager.default.removeItem(atPath: home)
+    }
+    let version = "agy version 1.3.0\n"
     let commandRunner = RecordingAntigravityCommandRunner(
       result: AntigravityCLICommandResult(
         standardOutput: BoundedProcessOutput(

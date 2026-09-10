@@ -26,8 +26,12 @@ final class AntigravityCLIProfileTests: XCTestCase {
       compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 21)))
     XCTAssertTrue(
       compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 99)))
-    XCTAssertFalse(
+    XCTAssertTrue(
       compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 2, patch: 0)))
+    XCTAssertTrue(
+      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 2, patch: 99)))
+    XCTAssertFalse(
+      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 3, patch: 0)))
     XCTAssertEqual(
       AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 22).stringValue,
       "1.1.22"
