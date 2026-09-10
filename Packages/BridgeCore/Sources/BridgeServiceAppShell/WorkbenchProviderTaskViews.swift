@@ -56,10 +56,7 @@ struct WorkbenchAgentTaskPicker: View {
                   model.openSession(session)
                 } label: {
                   Label(
-                    WorkbenchTaskTextPresentation.sessionMenuTitle(
-                      title: session.title,
-                      turnCount: session.turnCount
-                    ),
+                    sessionTitle(session),
                     systemImage: isSessionSelected(session)
                       ? "checkmark" : session.providerSystemImage
                   )
@@ -111,12 +108,7 @@ struct WorkbenchAgentTaskPicker: View {
       tasks: tasks,
       selectedTaskID: model.selectedTaskID
     ) {
-      let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
-        title: session.title,
-        turnCount: session.turnCount,
-        maximumCharacters: 30
-      )
-      return "\(session.providerDisplayName) · \(title)"
+      return "\(session.providerDisplayName) · \(sessionTitle(session, maximumCharacters: 30))"
     }
     if let thread = threads.first(where: { $0.threadID == model.selectedThreadID }) {
       return "Codex · \(threadTitle(thread))"
@@ -130,6 +122,19 @@ struct WorkbenchAgentTaskPicker: View {
 
   private var orphanThreads: [MCPThreadSummary] {
     WorkbenchAgentTaskPickerContent.orphanThreads(tasks: tasks, threads: threads)
+  }
+
+  private func sessionTitle(
+    _ session: WorkbenchSessionItem,
+    maximumCharacters: Int = 36
+  ) -> String {
+    let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
+      title: session.title,
+      turnCount: session.turnCount,
+      maximumCharacters: maximumCharacters
+    )
+    guard session.projectID != model.selectedProjectID else { return title }
+    return "\(model.projectName(for: session.projectID)) · \(title)"
   }
 
   private func threadTitle(_ thread: MCPThreadSummary) -> String {
