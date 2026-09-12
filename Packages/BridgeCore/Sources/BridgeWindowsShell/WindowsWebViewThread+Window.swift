@@ -16,7 +16,6 @@
 
     func bringToTop() {
       guard let hwnd = windowHandle() else { return }
-      _ = BringWindowToTop(hwnd)
       _ = SetWindowPos(
         hwnd,
         nil,

@@ -48,6 +48,10 @@
       disableDefaultContextMenu || disableStatusBar || disableDevTools || disableZoomControl
     }
 
+    var defaultZoomFactor: Double? {
+      purpose == .desktopUI ? 1.0 : nil
+    }
+
     static func == (lhs: WindowsWebViewConfiguration, rhs: WindowsWebViewConfiguration) -> Bool {
       lhs.purpose == rhs.purpose && lhs.profileName == rhs.profileName
         && lhs.initialURL == rhs.initialURL

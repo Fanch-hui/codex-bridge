@@ -69,6 +69,7 @@
     static let environmentCreateController = 3
     static let controllerPutIsVisible = 4
     static let controllerPutBounds = 6
+    static let controllerPutZoomFactor = 8
     static let controllerClose = 24
     static let controllerGetCoreWebView2 = 25
     static let controller2PutDefaultBackgroundColor = 27
@@ -165,6 +166,12 @@
     @convention(c) (
       UnsafeMutableRawPointer?,
       Bool
+    ) -> HRESULT
+
+  typealias WebView2PutDoubleFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      Double
     ) -> HRESULT
 
   typealias WebView2GetCoreWebView2Fn =

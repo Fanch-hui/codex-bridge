@@ -85,6 +85,10 @@
       lock.withLock { worker }?.setVisible(visible)
     }
 
+    func applyLayout(to bounds: RECT, visible: Bool) {
+      lock.withLock { worker }?.applyLayout(to: bounds, visible: visible)
+    }
+
     func setState(_ state: BridgeDesktopUIState) {
       let shouldSend = lock.withLock { () -> Bool in
         guard latestState != state else { return false }

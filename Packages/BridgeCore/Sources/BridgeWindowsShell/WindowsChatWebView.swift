@@ -43,11 +43,7 @@
       lock.withLock { snapshot.currentURL }
     }
 
-    func attach(
-      to window: HWND?,
-      onStateChanged: (@Sendable (State) -> Void)? = nil,
-      onNavigationChanged: (@Sendable (Bool, Bool) -> Void)? = nil
-    ) {
+    func attach(to window: HWND?) {
       guard let window else { return }
       let initialURL = currentURL ?? Self.chatURL
       let next = WindowsWebViewThread(
@@ -55,10 +51,6 @@
         configuration: .chatBrowser(initialURL: initialURL),
         updateState: { [weak self] state, detail in
           self?.store(state: state, errorDetail: detail)
-          onStateChanged?(state)
-          if state == .active {
-            WindowsMainWindow.enqueue(.refreshAll)
-          }
         },
         onWebMessage: nil,
         onNavigationChanged: { [weak self] canGoBack, canGoForward, currentURL in
@@ -67,7 +59,6 @@
             canGoForward: canGoForward,
             currentURL: currentURL
           )
-          onNavigationChanged?(canGoBack, canGoForward)
         }
       )
       guard
@@ -86,6 +77,10 @@
 
     func setVisible(_ visible: Bool) {
       lock.withLock { worker }?.setVisible(visible)
+    }
+
+    func applyLayout(to bounds: RECT, visible: Bool) {
+      lock.withLock { worker }?.applyLayout(to: bounds, visible: visible)
     }
 
     func goBack() {

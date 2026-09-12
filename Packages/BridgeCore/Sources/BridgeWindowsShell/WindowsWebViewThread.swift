@@ -107,21 +107,18 @@
     }
 
     func resize(to bounds: RECT) {
-      let changed = lock.withLock { () -> Bool in
-        guard !sameBounds(pendingBounds, bounds) else { return false }
-        pendingBounds = bounds
-        return true
-      }
-      if changed { post(Message.synchronize) }
+      updatePendingLayout(bounds: bounds)
     }
 
     func setVisible(_ visible: Bool) {
-      let changed = lock.withLock { () -> Bool in
-        guard pendingVisible != visible else { return false }
-        pendingVisible = visible
-        return true
-      }
-      if changed { post(Message.synchronize) }
+      updatePendingLayout(visible: visible)
+    }
+
+    /// Applies the controller geometry and visibility as one message. WebView2
+    /// may repaint as soon as either property changes, so sending them separately
+    /// can expose one frame with stale geometry or visibility during a resize.
+    func applyLayout(to bounds: RECT, visible: Bool) {
+      updatePendingLayout(bounds: bounds, visible: visible)
     }
 
     func goBack() { post(Message.goBack) }
@@ -178,9 +175,13 @@
       guard !shouldStop else { return }
       createEnvironment()
       while GetMessageW(&message, nil, 0, 0) {
-        handle(message.message)
-        _ = TranslateMessage(&message)
-        _ = DispatchMessageW(&message)
+        switch Self.messageRoute(for: message) {
+        case .thread:
+          handle(message.message)
+        case .window:
+          _ = TranslateMessage(&message)
+          _ = DispatchMessageW(&message)
+        }
       }
     }
 
@@ -241,6 +242,7 @@
       }
       self.controller = controller
       webView2AddRef(controller)
+      resetDesktopUIZoomFactor(controller)
 
       if let color = configuration.defaultBackgroundColor {
         var controller2Pointer: UnsafeMutableRawPointer?
@@ -456,6 +458,22 @@
       if values.1 && configuration.purpose == .chatBrowser && (boundsChanged || visibilityChanged) {
         bringToTop()
       }
+    }
+
+    @discardableResult
+    private func updatePendingLayout(bounds: RECT? = nil, visible: Bool? = nil) -> Bool {
+      let changed = lock.withLock { () -> Bool in
+        let nextBounds = bounds ?? pendingBounds
+        let nextVisible = visible ?? pendingVisible
+        guard !sameBounds(pendingBounds, nextBounds) || pendingVisible != nextVisible else {
+          return false
+        }
+        pendingBounds = nextBounds
+        pendingVisible = nextVisible
+        return true
+      }
+      if changed { post(Message.synchronize) }
+      return changed
     }
 
     private func sameBounds(_ lhs: RECT, _ rhs: RECT) -> Bool {

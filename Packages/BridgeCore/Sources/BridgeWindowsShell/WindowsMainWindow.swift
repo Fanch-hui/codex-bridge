@@ -66,6 +66,7 @@
     }
 
     static func selectPage(_ page: WindowsMainPage) {
+      guard renderedPage != page else { return }
       renderedPage = page
       layout()
     }
@@ -158,7 +159,13 @@
     /// host cannot load it, so a broken install never degrades to a silent blank frame.
     static func refreshSurfaces() {
       guard let window else { return }
-      desktopUI?.setVisible(desktopUI?.isReady == true)
+      let visible = desktopUI?.isReady == true
+      var area = RECT()
+      if GetClientRect(window, &area) {
+        desktopUI?.applyLayout(to: area, visible: visible)
+      } else {
+        desktopUI?.setVisible(visible)
+      }
       WindowsShellFailure.present(desktopFailureText(), in: window)
     }
 

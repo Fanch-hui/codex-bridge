@@ -6,7 +6,7 @@
     static func layout() {
       var area = RECT()
       guard GetClientRect(window, &area) else { return }
-      desktopUI?.resize(to: area)
+      desktopUI?.applyLayout(to: area, visible: desktopUI?.isReady == true)
       WindowsShellFailure.layout(in: area)
       layoutChat(in: area)
     }
@@ -21,14 +21,12 @@
       }
       chatBounds = browserViewportRect(viewport, in: bounds)
       let visible = !isEmpty(chatBounds)
-      chat?.resize(to: chatBounds)
-      chat?.setVisible(visible)
+      chat?.applyLayout(to: chatBounds, visible: visible)
     }
 
     private static func hideChat() {
       chatBounds = RECT()
-      chat?.resize(to: RECT())
-      chat?.setVisible(false)
+      chat?.applyLayout(to: RECT(), visible: false)
     }
 
     static func browserViewportRect(
@@ -39,10 +37,14 @@
       let scale = dpiScale(overrideDpi: overrideDpi)
       let width = Double(max(Int32(0), bounds.right - bounds.left))
       let height = Double(max(Int32(0), bounds.bottom - bounds.top))
-      let x = min(width, max(0, finite(viewport.x) * scale))
-      let y = min(height, max(0, finite(viewport.y) * scale))
-      let right = min(width, max(x, x + max(0, finite(viewport.width) * scale)))
-      let bottom = min(height, max(y, y + max(0, finite(viewport.height) * scale)))
+      let rawX = finite(viewport.x) * scale
+      let rawY = finite(viewport.y) * scale
+      let rawRight = rawX + max(0, finite(viewport.width) * scale)
+      let rawBottom = rawY + max(0, finite(viewport.height) * scale)
+      let x = min(width, max(0, rawX))
+      let y = min(height, max(0, rawY))
+      let right = min(width, max(x, rawRight))
+      let bottom = min(height, max(y, rawBottom))
       return RECT(
         left: bounds.left + Int32(x.rounded(.down)),
         top: bounds.top + Int32(y.rounded(.down)),
