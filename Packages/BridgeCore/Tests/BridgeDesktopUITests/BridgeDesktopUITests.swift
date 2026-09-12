@@ -20,7 +20,7 @@ final class BridgeDesktopUITests: XCTestCase {
     let script = try BridgeDesktopUIResources.read(.appJS)
     XCTAssertTrue(script.contains(#"emit("ready")"#))
     XCTAssertTrue(script.contains("window.chrome.webview.addEventListener"))
-    XCTAssertTrue(script.contains("toggle-sidebar"))
+    XCTAssertTrue(index.contains("sidebar.js"))
     XCTAssertTrue(script.contains("measureBrowserViewport"))
     XCTAssertTrue(script.contains("root.dataset.platform"))
     XCTAssertTrue(index.contains("feedback-layer"))
