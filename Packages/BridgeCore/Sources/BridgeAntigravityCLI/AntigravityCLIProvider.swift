@@ -2,7 +2,6 @@ import BridgeAgentCore
 import Foundation
 
 public struct AntigravityCLIProviderConfiguration: Sendable {
-  public let compatibility: AntigravityCLICompatibility
   public let launchBuilder: AntigravityCLILaunchBuilder
   public let commandRunner: any AntigravityCLICommandRunning
   public let requestTimeout: Duration
@@ -13,7 +12,6 @@ public struct AntigravityCLIProviderConfiguration: Sendable {
   public let transportFactory: AntigravityCLITransportFactory
 
   public init(
-    compatibility: AntigravityCLICompatibility = .init(),
     launchBuilder: AntigravityCLILaunchBuilder = .init(),
     commandRunner: any AntigravityCLICommandRunning = AntigravityCLICommandRunner(),
     requestTimeout: Duration = .seconds(30),
@@ -26,7 +24,6 @@ public struct AntigravityCLIProviderConfiguration: Sendable {
       try AntigravityCLIProcessTransport.launch(configuration: launch.process)
     }
   ) {
-    self.compatibility = compatibility
     self.launchBuilder = launchBuilder
     self.commandRunner = commandRunner
     self.requestTimeout = requestTimeout

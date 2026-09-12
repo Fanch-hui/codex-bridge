@@ -177,6 +177,7 @@ Salience budget：窗口大部分为系统 canvas 和安静工作区；强调色
 - 使用 SwiftUI semantic text styles，支持系统文字大小；不设置负 tracking，不使用全大写装饰标签。
 - 页面标题、section heading、body、caption、monospaced evidence 五类角色足够；数字对齐时使用 monospaced digits。
 - 长任务契约和报告正文限制可读行宽；Diff/日志允许横向代码滚动但页面本身不横溢。
+- `BridgeDesktopUI` 是 macOS 与 Windows 的共享网页表面；Windows 主题只适配字体渲染、语义色、组件表面与焦点状态，布局、间距、密度和字号层级沿用共享 CSS。
 
 ## Layout, Grid, Spacing, And Density
 

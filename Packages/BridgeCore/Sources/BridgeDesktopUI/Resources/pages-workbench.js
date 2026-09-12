@@ -59,7 +59,12 @@
       return;
     }
     var detail = page.selectedTask, row = S.safeArray(page.tasks).find(function (t) {
-      return t.taskID === detail.taskID || (detail.sessionID && t.sessionID === detail.sessionID);
+      return t.taskID === detail.taskID || (
+        detail.sessionID &&
+        t.sessionID === detail.sessionID &&
+        t.providerID === detail.providerID &&
+        t.projectID === page.selectedProjectID
+      );
     }) || {};
     if (detail.currentStep) {
       var stepCard = S.node("div", "page-card current-step-card");

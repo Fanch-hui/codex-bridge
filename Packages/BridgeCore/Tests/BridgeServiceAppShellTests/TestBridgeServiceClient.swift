@@ -77,6 +77,7 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
   private var workbenchProjectSelections: [String?] = []
   private var taskSnapshotsValue: [MCPServiceTaskSnapshot]?
   private var taskControlActions: [String] = []
+  var submittedAgentTasks: [IPCAgentSubmitRequest] = []
   private var approvalsValue: [IPCApprovalSummary] = [
     IPCApprovalSummary(
       approvalID: "approval-1",
@@ -113,7 +114,7 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
   private var permissionRemediationApplyRequests: [IPCAgentPermissionRemediationApplyRequest] = []
   private var approvalResolutionDelay: Duration = .zero
   private var failApprovalReplyAfterResolution = false
-  private let agentProvidersValue = [
+  private var agentProvidersValue = [
     IPCAgentProviderSummary(
       providerID: "opencode",
       displayName: "OpenCode",
@@ -199,6 +200,10 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
       agentModelOptionsValue = models
     }
     failAgentModels = fail
+  }
+
+  func configureAgentProviders(_ providers: [IPCAgentProviderSummary]) {
+    agentProvidersValue = providers
   }
 
   func configureAgentInstallations(_ installations: [IPCAgentInstallationSummary]) {
@@ -829,6 +834,17 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
 
   func deleteTask(taskID: String) async throws {
     deletedTaskIDs.append(taskID)
+  }
+
+  func submitAgentTask(
+    _ request: IPCAgentSubmitRequest
+  ) async throws -> IPCAgentSubmitResponse {
+    submittedAgentTasks.append(request)
+    return IPCAgentSubmitResponse(taskID: "task-resumed-1", status: "awaiting_local_approval")
+  }
+
+  func submittedAgentTasksValue() -> [IPCAgentSubmitRequest] {
+    submittedAgentTasks
   }
 
   func deletedTaskIDsValue() -> [String] {

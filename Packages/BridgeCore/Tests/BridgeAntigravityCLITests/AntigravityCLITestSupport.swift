@@ -23,6 +23,30 @@ enum AntigravityCLITestSupport {
     try JSONDecoder().decode(type, from: data(json))
   }
 
+  static func commandResult(
+    output: String,
+    error: String = "",
+    termination: ManagedProcessTermination = .exited(0),
+    timedOut: Bool = false
+  ) -> AntigravityCLICommandResult {
+    AntigravityCLICommandResult(
+      standardOutput: BoundedProcessOutput(
+        head: output,
+        tail: output,
+        byteCount: output.utf8.count,
+        truncated: false
+      ),
+      standardError: BoundedProcessOutput(
+        head: error,
+        tail: error,
+        byteCount: error.utf8.count,
+        truncated: false
+      ),
+      termination: termination,
+      timedOut: timedOut
+    )
+  }
+
   static func initializationFrame(
     conversationID: String = "conversation-1",
     cwd: String,

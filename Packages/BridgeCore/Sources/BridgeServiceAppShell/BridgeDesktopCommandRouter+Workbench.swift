@@ -68,7 +68,8 @@ extension BridgeDesktopCommandRouter {
       guard !sessionTasks.isEmpty, sessionTasks.allSatisfy({ $0.isTerminal }) else { return }
       model.deleteSession(
         selectedTask.effectiveSessionID ?? selectedTask.taskID,
-        inProject: selectedTask.projectID
+        inProject: selectedTask.projectID,
+        providerID: selectedTask.providerIdentifier
       )
     case .steerTask:
       steer(payload, model: model)

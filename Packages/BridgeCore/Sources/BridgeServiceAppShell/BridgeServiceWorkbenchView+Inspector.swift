@@ -178,9 +178,13 @@ struct BridgeServiceWorkbenchInspectorHeader: View {
         } label: {
           Text(model.projectName(for: model.selectedProjectID ?? ""))
             .font(.subheadline.weight(.bold))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: 180, alignment: .leading)
             .foregroundStyle(.primary)
         }
         .menuStyle(.borderlessButton)
+        .frame(maxWidth: 180, alignment: .leading)
 
         Spacer()
 
@@ -247,7 +251,11 @@ struct BridgeServiceWorkbenchInspectorHeader: View {
     .alert("删除当前会话？", isPresented: $showDeleteConfirmation) {
       Button("删除", role: .destructive) {
         guard let task = context.currentTask else { return }
-        model.deleteSession(task.effectiveSessionID ?? task.taskID, inProject: task.projectID)
+        model.deleteSession(
+          task.effectiveSessionID ?? task.taskID,
+          inProject: task.projectID,
+          providerID: task.providerIdentifier
+        )
       }
       Button("取消", role: .cancel) {}
     } message: {

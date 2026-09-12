@@ -38,25 +38,22 @@ agy CLI 原生 Sandbox + Permissions
 
 ## 2. 兼容要求
 
-当前 Bridge 接受：
-
-```text
-1.1.21 <= agy < 1.2.0
-```
-
-Probe 还会检查当前 `agy --help` 是否提供：
+Bridge 根据安装的 CLI 实际接口判断兼容性。Probe 读取 `agy --version` 用于识别和展示，并检查 `agy --help` 是否提供必需接口：
 
 - `--input-format stream-json`
 - `--output-format stream-json`
 - `--mode plan`
-- `--mode accept-edits`
 - `--sandbox`
 - `--dangerously-skip-permissions`
+
+以下可选能力按当前帮助中的声明开放：
+
+- `--mode accept-edits`
 - `--conversation`
 - `--model`
 - `--effort`
 
-仅版本号匹配但缺少这些能力，安装仍会显示不可用。
+必需接口齐全时，CLI 升级后继续通过同一 Probe；缺少必需接口时，Probe 会报告协议能力不兼容。
 
 ## 3. 安装并找到正确的 AGY 二进制
 
@@ -385,7 +382,7 @@ awaiting_local_approval
 | --- | --- |
 | 找不到可执行文件 | 运行 `command -v agy`；在文件选择器按 `⌘⇧G` 粘贴该绝对路径 |
 | 误选 Desktop App | 重新登记真实 `agy` CLI；Bridge 不运行 Antigravity Desktop |
-| Probe 版本不兼容 | 使用 `1.1.21 <= agy < 1.2.0` 且当前 `--help` 包含必需能力的版本 |
+| Probe 提示缺少协议能力 | 检查当前 `agy --help` 是否包含 stream-json、plan、sandbox 和工具权限参数 |
 | 显示 `needs_review` | 二进制已变化；核对来源和版本后“接受替换并 Probe” |
 | Bridge 中提示未登录 | 用同一 macOS 用户在普通 `HOME` 下交互运行 `agy` 完成登录 |
 | `permission_mode=request-review` 后工具被拒绝 | 在交互式 AGY 用 `/settings` 选择 `proceed-in-sandbox`，并用 `/permissions` 添加窄 allow 规则 |

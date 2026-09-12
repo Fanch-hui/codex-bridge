@@ -1,3 +1,4 @@
+import BridgeIPC
 import BridgeMCP
 import BridgeServiceAppCore
 import SwiftUI
@@ -21,6 +22,7 @@ struct BridgeServiceWorkbenchInspectorFooter: View {
     .background(Color(nsColor: .windowBackgroundColor))
   }
 
+  @ViewBuilder
   private func runningSteerBar(task: MCPServiceTaskSnapshot) -> some View {
     HStack(spacing: 6) {
       TextField("输入插入指令...", text: $steerInput)
@@ -55,23 +57,38 @@ struct BridgeServiceWorkbenchInspectorFooter: View {
     }
   }
 
+  @ViewBuilder
   private func failedRetryBar(task: MCPServiceTaskSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       if canResume(task) {
-        TextField("补充说明（可选，留空则直接接续）...", text: $steerInput)
-          .textFieldStyle(.roundedBorder)
-          .onSubmit { resume(task: task) }
+        HStack(spacing: 6) {
+          TextField("补充说明（可选，留空则直接接续）...", text: $steerInput)
+            .textFieldStyle(.roundedBorder)
+            .onSubmit {
+              resume(task: task)
+            }
+        }
       }
       HStack(spacing: 8) {
         if canResume(task) {
-          Button("接着中断任务继续") { resume(task: task) }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+          Button {
+            resume(task: task)
+          } label: {
+            Label("接着中断任务继续", systemImage: "play.fill")
+          }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.small)
+          .help("保留当前会话上下文，从中断处接续执行")
         }
         if task.canRestart {
-          Button("重新开始") { restart(task: task) }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+          Button {
+            restart(task: task)
+          } label: {
+            Label("重新开始", systemImage: "arrow.counterclockwise")
+          }
+          .buttonStyle(.bordered)
+          .controlSize(.small)
+          .help("使用原始指令在当前项目开启全新会话")
         }
         Spacer()
       }

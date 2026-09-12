@@ -32,11 +32,11 @@ Actions 原生编译并运行冒烟测试；ARM64 在同一 x64 runner 上交叉
 | 服务端监听 | `BridgeServiceXPCListener` | `ServiceRequestListener` / `ServiceListenerFactory` | `BridgeServicePipeListener`（每连接一个会话线程 + 请求路由器） |
 | 密钥存储 | Keychain（`KeychainSecretStore`） | `SecretStore` 协议 / `SecretStoreFactory` | 凭据管理器（`WindowsCredentialStore`，CredReadW/WriteW/DeleteW，blob ≤ 2560 字节） |
 | 内嵌 ChatGPT 页 | WKWebView（`ChatGPTWebView`） | 平台壳各自实现 | WebView2（`WindowsChatWebView`，经 WebView2Loader.dll 的最小 COM 绑定） |
-| 桌面 UI | SwiftUI/AppKit（`BridgeServiceAppShell`） | `BridgeServiceAppCore`（跨平台模型层与任务呈现） | Win32 消息循环 + WebView2，复刻同一六页导航、状态语义与真实操作闭环 |
-| 后台服务注册 | `SMAppService` LaunchAgent | —（Windows 为按需拉起） | 壳启动时探测管道，不存在则拉起同目录 `codex-bridge-service.exe` |
+| 桌面 UI | WKWebView（`BridgeServiceAppShell`） | `BridgeDesktopUI`（共享页面、状态与命令）+ `BridgeServiceAppCore`（共享模型与会话呈现） | Win32 消息循环 + WebView2 加载同一份本地页面 |
+| 后台服务注册 | `SMAppService` LaunchAgent | 共享设置页的注册与注销命令 | `WindowsServiceRegistration` 管理 HKCU Run；壳也能按需拉起同目录服务 |
 | 文件安全边界 | openat + O_NOFOLLOW 相对 fd 遍历 | `SecureFileReader` / `SecureProjectFileWriter` / `SecureProjectDirectoryMutation` | 逐组件 reparse-point 校验 + CreateFileW（CREATE_NEW / 暂存替换 / MoveFileExW） |
 | Provider 路径与工件 | POSIX 路径、fd/stat 身份 | `AgentPathSemantics` / `SecureFileArtifactSnapshot` / `SecureFileArtifactReader` | 盘符、UNC、大小写与 `;` PATH 语义；逐组件 reparse 校验后按句柄读取身份与摘要 |
-| Codex app-server 发现 | App bundle / Homebrew / 用户工具目录，最后经 `/usr/bin/env` | `AppServerConfiguration` | `PATH`、用户安装目录与 npm/Bun/standalone 包；`.cmd` 只解析到真实 `codex.exe`，并校验 PE 架构；找不到时明确失败 |
+| Codex app-server 发现 | App bundle / Homebrew / 用户工具目录，最后经 `/usr/bin/env` | `AppServerConfiguration` | `PATH`、用户安装目录与 npm/Bun/standalone 包；优先解析并校验真实 `codex.exe`，未找到时经 `%ComSpec% /d /s /c` 回退到 PATH |
 | 代码签名校验 | SecCode（SecStaticCode/SecCode） | `TunnelCodeSignatureVerifier` | SHA-256 固定摘要 + PE/COFF 架构校验（`WindowsTunnelExecutable`），动态校验复查进程主镜像；无 Authenticode（见已知限制 1） |
 | SHA-256 | swift-crypto（macOS 上转发 CryptoKit） | `import Crypto` | swift-crypto（BoringSSL 后端） |
 
@@ -45,13 +45,13 @@ Actions 原生编译并运行冒烟测试；ARM64 在同一 x64 runner 上交叉
 Windows 使用 Swift 6.3.3 工具链（swift.org 官方支持 x86_64 与 aarch64）：
 构建机还需 Visual Studio C++/Windows SDK、vcpkg sqlite3 和 WiX Toolset 3；WiX
 `dark.exe` 仅用于从 Swift 官方 MSM 提取 portable runtime。构建 EXE 安装包还需
-Inno Setup 7.1.0。CI 从官方固定版本地址下载编译器并先校验 SHA-256，不依赖 runner
+Inno Setup 7.1.0。CI 从官方固定版本地址下载编译器，不依赖 runner
 预装版本。
 
 ```powershell
-powershell -File Scripts\build-windows.ps1            # 构建服务 + 壳
-powershell -File Scripts\build-windows.ps1 -Test      # 附带冒烟测试
-powershell -File Scripts\build-windows.ps1 -Installer `
+pwsh -File Scripts\build-windows.ps1            # 构建服务 + 壳
+pwsh -File Scripts\build-windows.ps1 -Test      # 附带冒烟测试
+pwsh -File Scripts\build-windows.ps1 -Installer `
   -ISCCPath 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe'
 ```
 
@@ -126,6 +126,10 @@ Windows 可通过 `CODEX_BRIDGE_CODEX_EXECUTABLE` 指定 `codex.exe` 或标准 n
 
 macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 `Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore`。
+
+本地脚本与 CI 使用 `Scripts/windows-swift-arguments.ps1` 生成同一组 Swift 参数：
+`swiftbuild` 后端、SQLite 编译定义，以及显式的 vcpkg include/lib 路径。
+测试进程还需将 SQLite 和 Swift XCTest/Testing runtime 加入 PATH。
 
 ## 已知限制与语义差异
 
@@ -212,6 +216,9 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
    复用同一 Service API 与状态语义。Swift Windows 的 `MainActor` 与入口线程不绑定；
    `WindowsWebViewThread` 独占 STA COM、消息循环和 WebView2 接口，主窗口只通过线程安全
    命令同步尺寸、显隐和浏览器操作。
+   两个平台从 `BridgeDesktopUI` 加载同一份 HTML/JS/CSS，布局、排版与命令语义共用；
+   Windows 主题只负责字体与组件呈现。会话按项目、Provider 和 session ID 共同分组，
+   续接、重新开始、Steer 与删除使用共享会话语义；工作台只展示当前项目的会话。
 
 ## 验证路径与 CI 现状
 

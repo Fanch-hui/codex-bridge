@@ -131,7 +131,7 @@ struct MCPClientConnectionsView: View {
         Text("完整").tag(MCPServiceExposureMode.full)
       }
       .pickerStyle(.segmented)
-      .frame(maxWidth: 420)
+      .frame(maxWidth: 240)
       .disabled(!profile.enabled)
 
       Text(

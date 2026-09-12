@@ -151,18 +151,9 @@ if ($Test -or -not [string]::IsNullOrWhiteSpace($TestFilter)) {
 
 Push-Location $packagePath
 try {
-  $swiftArguments = @(
-    "-Xswiftc", "-DSQLITE_DISABLE_SNAPSHOT",
-    "-Xswiftc", "-I$vcpkgIncludeDirectory",
-    "-Xswiftc", "-Xcc", "-Xswiftc", "-I$vcpkgIncludeDirectory",
-    "-Xcc", "-DNOMINMAX",
-    "-Xcc", "-I$vcpkgIncludeDirectory",
-    "-Xlinker", "-libpath:$vcpkgLibraryDirectory",
-    "--build-system", "swiftbuild"
-  )
-  if ($targetTriple) {
-    $swiftArguments += @("--triple", $targetTriple)
-  }
+  . (Join-Path $PSScriptRoot "windows-swift-arguments.ps1")
+  $swiftArguments = @(Get-WindowsSwiftArguments `
+    -VcpkgInstalledRoot $vcpkgInstalledRoot -TargetTriple $targetTriple)
   $buildArguments = @($swiftArguments) + @("-c", "release")
   swift build @buildArguments --product codex-bridge-service
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -194,6 +185,7 @@ try {
         "BridgeServiceApplicationWindowsTests",
         "BridgeServiceCoreWindowsTests",
         "BridgeDirectCommandWindowsTests",
+        "BridgeDeepSeekHarnessACPWindowsTests",
         "BridgeWindowsShellTests"
       )
     }

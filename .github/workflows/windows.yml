@@ -185,13 +185,10 @@ jobs:
           swift --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $targetTriple = "${{ matrix.target_triple }}"
-          $swiftArguments = @("-Xswiftc", "-DSQLITE_DISABLE_SNAPSHOT")
-          if ($targetTriple) {
-            $swiftArguments += @("--triple", $targetTriple)
-            foreach ($libraryPath in ($env:TARGET_LIBRARY_PATHS -split ";")) {
-              $swiftArguments += @("-Xlinker", "-libpath:$libraryPath")
-            }
-          }
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
+          $swiftArguments = @(Get-WindowsSwiftArguments `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
+            -TargetTriple $targetTriple -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
           $buildArguments = @($swiftArguments) + @("-c", "release")
           swift build @buildArguments --product codex-bridge-windows-app
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -256,32 +253,27 @@ jobs:
         working-directory: Packages/BridgeCore
         shell: pwsh
         run: |
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeDomainTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeAgentCoreTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeSecurityTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeCodexRPCTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeDesktopUITests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceAppCoreTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceHostWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeTunnelWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeCodexServiceWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceApplicationWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceCoreWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeDirectCommandWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeWindowsShellTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
+          $swiftArguments = @(Get-WindowsSwiftArguments `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
+            -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
+          $developerRoot = Split-Path -Parent (Split-Path -Parent $env:SDKROOT)
+          $testRuntimePaths = Get-ChildItem "$developerRoot\Library" -Directory |
+            ForEach-Object { Join-Path $_.FullName "usr\bin64" } |
+            Where-Object { Test-Path $_ }
+          $env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join ";"
+          $filters = @(
+            "BridgeDomainTests", "BridgeAgentCoreTests", "BridgeSecurityTests",
+            "BridgeCodexRPCTests", "BridgeOpenCodeACPTests", "BridgeDesktopUITests",
+            "BridgeServiceAppCoreTests", "BridgeServiceHostWindowsTests", "BridgeTunnelWindowsTests",
+            "BridgeCodexServiceWindowsTests", "BridgeServiceApplicationWindowsTests",
+            "BridgeServiceCoreWindowsTests", "BridgeDirectCommandWindowsTests",
+            "BridgeDeepSeekHarnessACPWindowsTests", "BridgeWindowsShellTests"
+          )
+          foreach ($filter in $filters) {
+            swift test @swiftArguments --filter $filter
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - name: Install pinned Inno Setup 7.1.0
         shell: pwsh
         run: |

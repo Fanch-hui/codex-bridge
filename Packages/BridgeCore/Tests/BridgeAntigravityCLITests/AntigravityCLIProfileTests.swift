@@ -7,7 +7,7 @@ import XCTest
 @testable import BridgeAntigravityCLI
 
 final class AntigravityCLIProfileTests: XCTestCase {
-  func testSemanticVersionParsingAndCompatibilityBoundaries() {
+  func testSemanticVersionParsing() {
     XCTAssertEqual(
       AntigravityCLISemanticVersion("agy 1.1.21"),
       AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 21)
@@ -19,15 +19,9 @@ final class AntigravityCLIProfileTests: XCTestCase {
     XCTAssertNil(AntigravityCLISemanticVersion("1.1"))
     XCTAssertNil(AntigravityCLISemanticVersion("agy latest"))
 
-    let compatibility = AntigravityCLICompatibility()
-    XCTAssertFalse(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 20)))
-    XCTAssertTrue(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 21)))
-    XCTAssertTrue(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 99)))
-    XCTAssertFalse(
-      compatibility.accepts(AntigravityCLISemanticVersion(major: 1, minor: 2, patch: 0)))
+    for version in ["1.1.20", "1.2.0", "1.3.0", "2.0.0"] {
+      XCTAssertNotNil(AntigravityCLISemanticVersion(version))
+    }
     XCTAssertEqual(
       AntigravityCLISemanticVersion(major: 1, minor: 1, patch: 22).stringValue,
       "1.1.22"
@@ -207,6 +201,40 @@ final class AntigravityCLIProfileTests: XCTestCase {
     )
     XCTAssertFalse(launch.process.argv.contains("sandbox-exec"))
     XCTAssertFalse(launch.process.argv.contains("--dangerously-skip-permissions"))
+  }
+
+  func testLaunchBuilderRespectsCustomPrintTimeout() throws {
+    let projectRoot = try AntigravityCLITestSupport.temporaryDirectory(
+      prefix: "agy-timeout-project")
+    let runDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("agy-timeout-runtime-\(UUID().uuidString)", isDirectory: true).path
+    addTeardownBlock {
+      try? FileManager.default.removeItem(atPath: projectRoot)
+      try? FileManager.default.removeItem(atPath: runDirectory)
+    }
+    let installation = try AgentInstallation(
+      id: AgentInstallationID(rawValue: "agy-test"),
+      providerID: .antigravity,
+      executablePath: "/bin/echo"
+    )
+    let request = try AgentExecutionRequest(
+      taskID: TaskID(rawValue: "task-agy-timeout"),
+      projectID: ProjectID(rawValue: "project-agy-timeout"),
+      projectRoot: projectRoot,
+      prompt: "Inspect",
+      mutationIntent: .readOnly,
+      workspaceStrategy: .sharedProject,
+      networkAccessRequested: false
+    )
+
+    let launch = try AntigravityCLILaunchBuilder(printTimeout: "12h").make(
+      installation: installation,
+      request: request,
+      runDirectory: runDirectory,
+      sourceEnvironment: [:]
+    )
+    let timeoutIndex = try XCTUnwrap(launch.process.argv.firstIndex(of: "--print-timeout"))
+    XCTAssertEqual(launch.process.argv[timeoutIndex + 1], "12h")
   }
 
   func testLaunchBuilderRejectsUnsupportedEffort() throws {

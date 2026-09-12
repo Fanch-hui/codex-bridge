@@ -3,6 +3,12 @@ import Foundation
 
 enum SkillActionInterpreter {
   static func resolveInterpreter(_ name: String) -> String? {
+    #if os(Windows)
+      // Resolve shared POSIX shell paths through the Windows executable search path.
+      if let shell = windowsShellInterpreterName(name) {
+        return resolveExecutable(shell)
+      }
+    #endif
     if AgentPathSemantics.isAbsolute(name, style: .current) {
       #if os(Windows)
         return resolveExecutable(name)
@@ -44,6 +50,14 @@ enum SkillActionInterpreter {
       guard parts.count >= 2 else { return nil }
       command = parts[1]
     }
+    #if os(Windows)
+      if let shell = windowsShellInterpreterName(command) {
+        guard let resolved = resolveExecutable(shell),
+          fileManager.isReadableFile(atPath: resolved)
+        else { return nil }
+        return resolved
+      }
+    #endif
     if AgentPathSemantics.isAbsolute(command, style: .current) {
       #if os(Windows)
         guard let resolved = resolveExecutable(command),
@@ -86,4 +100,17 @@ enum SkillActionInterpreter {
       ).resolve(name)
     #endif
   }
+
+  #if os(Windows)
+    private static func windowsShellInterpreterName(_ name: String) -> String? {
+      switch name.lowercased() {
+      case "/bin/sh", "/usr/bin/sh":
+        return "sh"
+      case "/bin/bash", "/usr/bin/bash":
+        return "bash"
+      default:
+        return nil
+      }
+    }
+  #endif
 }

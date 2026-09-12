@@ -125,10 +125,16 @@ extension BridgeServiceAppModel {
     }
   }
 
-  public func deleteSession(_ sessionID: String, inProject projectID: String? = nil) {
+  public func deleteSession(
+    _ sessionID: String,
+    inProject projectID: String? = nil,
+    providerID: String? = nil
+  ) {
     let targetProjectID = projectID ?? selectedProjectID
+    let targetProviderID = providerID.map(AgentProviderPresentation.identifier)
     let relatedTasks = tasks.filter { task in
       (targetProjectID == nil || task.projectID == targetProjectID)
+        && (targetProviderID == nil || task.providerIdentifier == targetProviderID)
         && (task.effectiveSessionID ?? task.taskID) == sessionID
     }
     guard !relatedTasks.isEmpty, relatedTasks.allSatisfy({ $0.isTerminal }) else { return }

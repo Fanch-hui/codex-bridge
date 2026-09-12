@@ -99,6 +99,41 @@ test("retry preserves its draft across snapshots and resumes the selected task",
   assert.equal(ui.input(), null);
 });
 
+test("session fallback keeps provider scope when session IDs collide", () => {
+  const ui = runtime();
+  const state = {
+    selectedProjectID: "project-a",
+    selectedTask: {
+      taskID: "task-opencode",
+      sessionID: "shared-session",
+      providerID: "opencode",
+      canResume: true,
+      canRestart: true
+    },
+    tasks: [
+      {
+        taskID: "task-antigravity",
+        sessionID: "shared-session",
+        projectID: "project-a",
+        providerID: "antigravity",
+        canSteer: true
+      },
+      {
+        taskID: "task-opencode",
+        sessionID: "shared-session",
+        projectID: "project-a",
+        providerID: "opencode",
+        canSteer: false
+      }
+    ],
+    steerModes: [{ id: "queued", title: "当前轮结束后继续" }],
+    engineStatus: "已结束"
+  };
+  ui.render(state);
+  assert.ok(ui.button("接着中断任务继续"));
+  assert.equal(ui.button("发送指令"), null);
+});
+
 test("conversation refresh preserves reading position and follows the bottom only when requested", () => {
   const ui = runtime(), content = { scrollTop: 0, scrollHeight: 900, clientHeight: 300 };
   ui.conversation.captureViewport(content, page("a"))();
