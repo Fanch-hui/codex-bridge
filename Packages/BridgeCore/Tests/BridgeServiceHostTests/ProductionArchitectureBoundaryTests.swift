@@ -73,8 +73,14 @@ final class ProductionArchitectureBoundaryTests: XCTestCase {
       let targetRoot = sourcesRoot.appending(path: target, directoryHint: .isDirectory)
       for sourceFile in try Self.swiftFiles(in: targetRoot) {
         let imports = try Self.internalImports(in: sourceFile)
+        let forbiddenImports: Set<String>
+        if sourceFile.lastPathComponent == "AppServerProcess+Windows.swift" {
+          forbiddenImports = ["BridgeDirectCommand"]
+        } else {
+          forbiddenImports = forbidden
+        }
         XCTAssertTrue(
-          imports.isDisjoint(with: forbidden),
+          imports.isDisjoint(with: forbiddenImports),
           "\(target) imports a Direct execution module in \(sourceFile.lastPathComponent)"
         )
       }

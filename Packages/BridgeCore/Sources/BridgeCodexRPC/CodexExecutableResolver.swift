@@ -45,8 +45,11 @@
     private let architecture: CodexWindowsArchitecture
     private let validator: Validator
     private let regularFileCheck: RegularFileCheck
+    private let packagedInstallations: @Sendable () -> [String]
 
     init(
+      packagedInstallations: @escaping @Sendable () -> [String] =
+        CodexWindowsPackageDiscovery.installationDirectories,
       environment: [String: String] = ProcessInfo.processInfo.environment,
       architecture: CodexWindowsArchitecture = .current,
       validator: @escaping Validator = CodexWindowsNativeExecutable.isValid,
@@ -56,6 +59,7 @@
       self.architecture = architecture
       self.validator = validator
       self.regularFileCheck = regularFileCheck
+      self.packagedInstallations = packagedInstallations
     }
 
     func resolve(explicitPath: String? = nil) -> String? {
@@ -98,6 +102,10 @@
       ) {
         result.append(contentsOf: expandedExplicitPaths(configured))
       }
+      result.append(
+        contentsOf: packagedInstallations().map {
+          CodexWindowsPath.join($0, "app", "resources", "codex.exe")
+        })
       appendOfficialInstallations(
         localAppData: localAppData,
         programFiles: programFiles,

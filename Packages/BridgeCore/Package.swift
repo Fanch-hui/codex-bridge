@@ -273,6 +273,11 @@ var windowsApplicationLinkerFlags = [
       ]
     ),
     .testTarget(
+      name: "BridgeProcessWindowsTests",
+      dependencies: ["BridgeProcess"],
+      path: "Tests/BridgeProcessWindowsTests"
+    ),
+    .testTarget(
       name: "BridgeCodexServiceWindowsTests",
       dependencies: ["BridgeCodexService"],
       path: "Tests/BridgeCodexServiceWindowsTests"
@@ -403,7 +408,7 @@ let package = Package(
     ),
     .target(
       name: "BridgeCodexRPC",
-      dependencies: ["BridgeAgentCore", "BridgeSecurity"]
+      dependencies: ["BridgeAgentCore", "BridgeProcess", "BridgeSecurity"]
     ),
     .target(
       name: "BridgeProjects",

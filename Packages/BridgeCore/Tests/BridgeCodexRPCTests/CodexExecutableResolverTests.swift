@@ -23,6 +23,7 @@
       try fixture.write("@echo off\r\n", to: fixture.path("AppData", "Roaming", "npm", "codex.cmd"))
 
       let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] },
         environment: fixture.environment(path: npmDirectory),
         architecture: .current
       )
@@ -51,6 +52,7 @@
       try fixture.write("@echo off\r\n", to: shim)
 
       let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] },
         environment: fixture.environment(path: npmDirectory),
         architecture: .amd64
       )
@@ -73,7 +75,8 @@
         architecture: .current
       )
       let environment = fixture.environment(path: customDirectory)
-      let resolver = CodexExecutableResolver(environment: environment, architecture: .current)
+      let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] }, environment: environment, architecture: .current)
 
       XCTAssertEqual(
         CodexWindowsPath.normalize(try XCTUnwrap(resolver.resolve())),
@@ -91,6 +94,7 @@
         to: fixture.path("Tools", "Codex", "codex.exe")
       )
       let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] },
         environment: fixture.environment(path: directory),
         architecture: .current
       )
@@ -108,6 +112,7 @@
         architecture: .arm64
       )
       let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] },
         environment: fixture.environment(path: directory),
         architecture: .amd64
       )
@@ -130,7 +135,8 @@
       let amd64 = try fixture.makeNativeExecutable(packageRoot: packageRoot, architecture: .amd64)
       let environment = fixture.environment(path: fixture.path("AppData", "Roaming", "npm"))
 
-      let resolver = CodexExecutableResolver(environment: environment, architecture: .arm64)
+      let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] }, environment: environment, architecture: .arm64)
       let resolved = try XCTUnwrap(resolver.resolve())
 
       XCTAssertEqual(CodexWindowsPath.normalize(resolved), CodexWindowsPath.normalize(amd64))
@@ -153,10 +159,14 @@
       let environment = fixture.environment(path: fixture.path("AppData", "Roaming", "npm"))
 
       let amd64Resolved = try XCTUnwrap(
-        CodexExecutableResolver(environment: environment, architecture: .amd64).resolve()
+        CodexExecutableResolver(
+          packagedInstallations: { [] }, environment: environment, architecture: .amd64
+        ).resolve()
       )
       let arm64Resolved = try XCTUnwrap(
-        CodexExecutableResolver(environment: environment, architecture: .arm64).resolve()
+        CodexExecutableResolver(
+          packagedInstallations: { [] }, environment: environment, architecture: .arm64
+        ).resolve()
       )
 
       XCTAssertEqual(CodexWindowsPath.normalize(amd64Resolved), CodexWindowsPath.normalize(amd64))
@@ -172,7 +182,8 @@
         architecture: .current
       )
       let environment = fixture.environment(path: fixture.path("Project", "bin"))
-      let resolver = CodexExecutableResolver(environment: environment, architecture: .current)
+      let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] }, environment: environment, architecture: .current)
 
       XCTAssertEqual(
         CodexWindowsPath.normalize(try XCTUnwrap(resolver.resolve())),
@@ -189,7 +200,8 @@
         architecture: .current
       )
       let environment = fixture.environment(path: fixture.path("Project", "bin"))
-      let resolver = CodexExecutableResolver(environment: environment, architecture: .current)
+      let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] }, environment: environment, architecture: .current)
 
       XCTAssertEqual(
         CodexWindowsPath.normalize(try XCTUnwrap(resolver.resolve())),
@@ -206,7 +218,8 @@
         architecture: .current
       )
       let environment = fixture.environment(path: fixture.path("Project", "bin"))
-      let resolver = CodexExecutableResolver(environment: environment, architecture: .current)
+      let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] }, environment: environment, architecture: .current)
 
       XCTAssertEqual(
         CodexWindowsPath.normalize(try XCTUnwrap(resolver.resolve())),
@@ -228,7 +241,8 @@
       environment.removeValue(forKey: "LOCALAPPDATA")
       environment["HOME"] = fixture.path("User")
 
-      let resolver = CodexExecutableResolver(environment: environment, architecture: .current)
+      let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] }, environment: environment, architecture: .current)
 
       XCTAssertEqual(
         CodexWindowsPath.normalize(try XCTUnwrap(resolver.resolve())),

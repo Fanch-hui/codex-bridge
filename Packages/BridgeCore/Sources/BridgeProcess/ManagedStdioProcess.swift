@@ -26,7 +26,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   private var inputClosed = false
   private var handlesClosed = false
   #if os(Windows)
-    private var windowsProcess: Foundation.Process?
+    private var windowsProcessHandle: HANDLE?
   #endif
 
   public var identity: ManagedProcessIdentity? {
@@ -35,13 +35,20 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     return identityStorage
   }
 
+  deinit {
+    #if os(Windows)
+      if let handle = windowsProcessHandle { _ = CloseHandle(handle) }
+    #endif
+  }
+
   public init(
     argv: [String],
     workingDirectory: String?,
     environment: [String: String],
     mergeStandardError: Bool,
     onStandardOutput: @escaping OutputHandler,
-    onStandardError: @escaping OutputHandler = { _ in }
+    onStandardError: @escaping OutputHandler = { _ in },
+    readOutput: Bool = true
   ) throws {
     #if os(Windows)
       guard let executable = argv.first,
@@ -60,7 +67,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       let inputPipe = Pipe()
       let outputPipe = Pipe()
       let errorPipe = mergeStandardError ? nil : Pipe()
-      let launched: Foundation.Process
+      let launched: (pid: Int32, handle: HANDLE)
       do {
         launched = try Self.spawnWindows(
           argv: argv,
@@ -84,11 +91,11 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       outputPipe.fileHandleForWriting.closeFile()
       errorPipe?.fileHandleForWriting.closeFile()
 
-      pid = Int32(launched.processIdentifier)
-      windowsProcess = launched
+      pid = launched.pid
       standardInputHandle = inputPipe.fileHandleForWriting
       standardOutputHandle = outputPipe.fileHandleForReading
       standardErrorHandle = errorPipe?.fileHandleForReading
+      windowsProcessHandle = launched.handle
       identityStorage = Self.identity(of: pid)
     #else
       guard let executable = argv.first,
@@ -140,15 +147,28 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       identityStorage = Self.identity(of: processID)
     #endif
 
-    standardOutputHandle.readabilityHandler = { [weak self] handle in
-      guard let self else { return }
-      consumeAvailableData(handle, sink: standardOutputSink)
-    }
-    standardErrorHandle?.readabilityHandler = { [weak self] handle in
-      guard let self else { return }
-      consumeAvailableData(handle, sink: standardErrorSink)
+    if readOutput {
+      standardOutputHandle.readabilityHandler = { [weak self] handle in
+        guard let self else { return }
+        consumeAvailableData(handle, sink: standardOutputSink)
+      }
+      standardErrorHandle?.readabilityHandler = { [weak self] handle in
+        guard let self else { return }
+        consumeAvailableData(handle, sink: standardErrorSink)
+      }
     }
   }
+
+  /// Returns the parent-side standard input handle for a caller that owns a
+  /// separate transport reader.
+  public var standardInputFileHandle: FileHandle { standardInputHandle }
+
+  /// Returns the parent-side standard output handle for a caller that owns a
+  /// separate transport reader.
+  public var standardOutputFileHandle: FileHandle { standardOutputHandle }
+
+  /// Returns the parent-side standard error handle when stderr is not merged.
+  public var standardErrorFileHandle: FileHandle? { standardErrorHandle }
 
   public func writeStdin(_ data: Data) throws {
     inputLock.lock()
@@ -238,7 +258,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     guard isRunning else { return }
     #if os(Windows)
       // Windows has no process groups; terminate the process itself.
-      Self.terminateProcessByID(pid)
+      terminateWindowsProcess()
     #else
       _ = systemKill(-pid, SIGTERM)
     #endif
@@ -248,7 +268,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     guard isRunning else { return }
     #if os(Windows)
       // Windows cannot deliver SIGINT without a shared console; force termination.
-      Self.terminateProcessByID(pid)
+      terminateWindowsProcess()
     #else
       _ = systemKill(-pid, SIGINT)
     #endif
@@ -256,7 +276,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
 
   public func killGroup() {
     #if os(Windows)
-      if isRunning { Self.terminateProcessByID(pid) }
+      if isRunning { terminateWindowsProcess() }
     #else
       if isRunning { _ = systemKill(-pid, SIGKILL) }
     #endif
@@ -338,6 +358,15 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     standardErrorHandle?.closeFile()
     outputLock.unlock()
     closeStdin()
+    #if os(Windows)
+      lock.lock()
+      _ = reapIfExitedLocked()
+      if terminationStorage != nil, let handle = windowsProcessHandle {
+        _ = CloseHandle(handle)
+        windowsProcessHandle = nil
+      }
+      lock.unlock()
+    #endif
   }
 
   private func consumeAvailableData(_ handle: FileHandle, sink: OutputHandler) {
@@ -359,9 +388,11 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   private func reapIfExitedLocked() -> ManagedProcessTermination? {
     if let terminationStorage { return terminationStorage }
     #if os(Windows)
-      guard let process = windowsProcess else { return nil }
-      guard !process.isRunning else { return nil }
-      let termination = ManagedProcessTermination.exited(Int32(process.terminationStatus))
+      guard let handle = windowsProcessHandle else { return nil }
+      guard WaitForSingleObject(handle, 0) == WAIT_OBJECT_0 else { return nil }
+      var exitCode: DWORD = 0
+      guard GetExitCodeProcess(handle, &exitCode) else { return nil }
+      let termination = ManagedProcessTermination.exited(Int32(bitPattern: exitCode))
       terminationStorage = termination
       return termination
     #else
@@ -379,15 +410,10 @@ public final class ManagedStdioProcess: @unchecked Sendable {
 
 #if os(Windows)
   extension ManagedStdioProcess {
-    /// Bridges a ucrt descriptor to its WinSDK handle; nil when the descriptor
-    /// does not wrap a kernel handle.
-    fileprivate static func terminateProcessByID(_ processID: Int32) -> Bool {
-      let handle = OpenProcess(
-        DWORD(PROCESS_TERMINATE),
-        false,
-        DWORD(UInt32(bitPattern: processID))
-      )
-      defer { _ = CloseHandle(handle) }
+    fileprivate func terminateWindowsProcess() -> Bool {
+      lock.lock()
+      defer { lock.unlock() }
+      guard let handle = windowsProcessHandle else { return false }
       return TerminateProcess(handle, 1)
     }
   }

@@ -264,7 +264,7 @@ jobs:
           $env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join ";"
           $filters = @(
             "BridgeDomainTests", "BridgeAgentCoreTests", "BridgeSecurityTests",
-            "BridgeCodexRPCTests", "BridgeOpenCodeACPTests", "BridgeDesktopUITests",
+            "BridgeCodexRPCTests", "BridgeProcessWindowsTests", "BridgeOpenCodeACPTests", "BridgeDesktopUITests",
             "BridgeServiceAppCoreTests", "BridgeServiceHostWindowsTests", "BridgeTunnelWindowsTests",
             "BridgeCodexServiceWindowsTests", "BridgeServiceApplicationWindowsTests",
             "BridgeServiceCoreWindowsTests", "BridgeDirectCommandWindowsTests",
