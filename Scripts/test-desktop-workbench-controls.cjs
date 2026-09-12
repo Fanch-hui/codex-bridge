@@ -3,15 +3,23 @@ const { test } = require("node:test");
 const { createHarness } = require("./desktop-ui-test-support.cjs");
 
 function runtime() {
-  const ui = createHarness(["pages-common.js", "pages-workbench-controls.js", "pages-workbench-conversation.js"], ["workbench-inspector-footer"]);
+  const ui = createHarness([
+    "pages-common.js",
+    "pages-form-draft.js",
+    "pages-settings-models.js",
+    "pages-workbench-controls.js",
+    "pages-workbench-conversation.js"
+  ], ["workbench-inspector-footer"]);
   const footer = ui.roots[0], commands = [];
   return {
     document: ui.document, footer, commands, conversation: ui.window.CodexBridgeDesktopWorkbenchConversation,
+    settingsModels: ui.window.CodexBridgeDesktopSettingsModels,
     render: page => ui.window.CodexBridgeDesktopWorkbenchControls.render(page, (command, payload) => {
       commands.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
     }),
     input: () => ui.document.getElementById("workbench-task-input"),
-    button: title => ui.find(footer, node => node.tagName === "button" && node.textContent === title)
+    button: title => ui.find(footer, node => node.tagName === "button" && node.textContent === title),
+    buttonIn: (root, title) => ui.find(root, node => node.tagName === "button" && node.textContent === title)
   };
 }
 
@@ -26,6 +34,19 @@ function page(taskID, extra = {}) {
 
 function type(input, text) { input.value = text; input.dispatch("input"); }
 
+function settingsPage(extra = {}) {
+  return {
+    models: [{ modelID: "gpt-5.6", displayName: "GPT", reasoningEfforts: [{ id: "medium", title: "中" }] }],
+    executionModel: "gpt-5.6", executionEffort: "medium",
+    supervisorModel: "gpt-5.6", supervisorEffort: "medium",
+    effortOptions: [{ id: "medium", title: "中" }],
+    supervisorEffortOptions: [{ id: "medium", title: "中" }],
+    accessMode: "request-approval", accessOptions: [{ id: "request-approval", title: "请求批准" }],
+    fastModeEnabled: false, canSavePreferences: true, canRefreshModels: true,
+    ...extra
+  };
+}
+
 test("stream snapshots preserve input identity, focus and selection", () => {
   const ui = runtime();
   ui.render(page("task-a"));
@@ -39,6 +60,35 @@ test("stream snapshots preserve input identity, focus and selection", () => {
   assert.equal(input.value, "继续检查共享模块");
   assert.equal(input.selectionStart, 2);
   assert.equal(input.selectionEnd, 5);
+});
+
+test("model footer refresh reports count, busy state and errors", () => {
+  const ui = runtime();
+  const state = { ...page("task-a"), modelCount: 0, canRefreshModels: true };
+  ui.render(state);
+  assert.ok(ui.button("获取模型"));
+  ui.button("获取模型").dispatch("click");
+  assert.deepEqual(ui.commands, [{ command: "refreshModels", payload: {} }]);
+
+  ui.render({ ...state, modelCount: 4 });
+  assert.ok(ui.button("刷新模型"));
+  ui.render({ ...state, modelCount: 4, isRefreshingModels: true });
+  assert.ok(ui.button("获取中…").disabled);
+  ui.render({ ...state, modelCount: 0, modelError: "Codex 不可用" });
+  assert.ok(ui.button("获取模型"));
+});
+
+test("settings model card refreshes the shared catalog", () => {
+  const ui = runtime(), commands = [];
+  const editor = ui.settingsModels.preferences(settingsPage(), (command, payload) => {
+    commands.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
+  });
+  assert.ok(ui.buttonIn(editor.root, "刷新模型"));
+  ui.buttonIn(editor.root, "刷新模型").dispatch("click");
+  assert.deepEqual(commands, [{ command: "refreshModels", payload: {} }]);
+  editor.update(settingsPage({ modelCount: 0, models: [], isRefreshingModels: true }), () => {});
+  assert.ok(ui.buttonIn(editor.root, "获取中…").disabled);
+  assert.match(editor.root.querySelector(".model-refresh-status").textContent, /正在获取/);
 });
 
 test("task drafts remain isolated and survive returning to a task", () => {

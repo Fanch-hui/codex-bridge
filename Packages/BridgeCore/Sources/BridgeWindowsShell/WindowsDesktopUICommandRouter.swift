@@ -10,6 +10,8 @@
         return nil
       case .refresh:
         return .refreshAll
+      case .refreshModels:
+        return .refreshModels
       case .selectPage:
         return payload.navigation.map(select)
       case .openWorkbench:

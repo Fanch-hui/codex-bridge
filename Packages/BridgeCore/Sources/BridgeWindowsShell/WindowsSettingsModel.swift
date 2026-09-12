@@ -11,12 +11,14 @@
     let displayBox: AuxiliaryDisplayBox<WindowsSettingsDisplay>
     let feedback: WindowsDesktopFeedbackStore
 
-    private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
-    private(set) var models: [MCPModelSummary] = []
-    private(set) var preferences: IPCModelPreferences?
+    var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
+    var models: [MCPModelSummary] = []
+    var preferences: IPCModelPreferences?
     private(set) var instructions = ""
     private(set) var directMode = "require"
     private(set) var taskStartMode = "require"
+    var isRefreshingModels = false
+    var modelError: String?
     var keepServiceRunningAfterExit = true
     var serviceRegistered = false
     var busy = false
@@ -55,6 +57,9 @@
           saveDirectApprovalEnabled: false,
           saveTaskStartApprovalEnabled: false,
           statusText: statusText,
+          busy: false,
+          isRefreshingModels: false,
+          modelError: nil,
           keepServiceRunningAfterExit: keepServiceRunningAfterExit,
           serviceRegistered: serviceRegistered
         )
@@ -83,13 +88,12 @@
         return
       }
       var failures: [String] = []
-      do {
-        let catalog = try await client.modelCatalog()
-        models = catalog.models
-        preferences = catalog.preferences
-      } catch {
-        failures.append("模型：\(BridgeServiceErrorMessage.message(error))")
+      isRefreshingModels = true
+      publishDisplay()
+      if await loadModelCatalog(forceRefresh: false) == nil {
+        failures.append("模型：\(modelError ?? "无法读取模型目录")")
       }
+      isRefreshingModels = false
       do {
         instructions = try await client.customInstructions()
       } catch {
@@ -260,6 +264,9 @@
         saveDirectApprovalEnabled: connectionState == .connected && !busy,
         saveTaskStartApprovalEnabled: connectionState == .connected && !busy,
         statusText: statusText,
+        busy: busy,
+        isRefreshingModels: isRefreshingModels,
+        modelError: modelError,
         supervisorAvailable: false,
         executionModel: current?.executionModel ?? "",
         executionEffort: current?.executionEffort ?? "",

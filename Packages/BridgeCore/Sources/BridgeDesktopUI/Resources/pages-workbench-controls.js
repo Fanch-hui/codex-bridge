@@ -35,8 +35,17 @@
     }
     S.clear(status);
     status.appendChild(S.node("span", "footer-status-text", page ? page.engineStatus || "等待引擎状态" : "等待本机 Service"));
-    var refresh = S.button("刷新", "refresh", {}, emit, "footer-refresh-btn link-button", !page);
+    var count = modelCount(page);
+    var refreshing = !!(page && page.isRefreshingModels);
+    var title = refreshing ? "获取中…" : count > 0 ? "刷新模型" : "获取模型";
+    var disabled = !page || refreshing || page.canRefreshModels === false;
+    var refresh = S.button(title, "refreshModels", {}, emit, "footer-refresh-btn link-button", disabled);
     status.appendChild(refresh);
+  }
+
+  function modelCount(page) {
+    if (!page) return 0;
+    return typeof page.modelCount === "number" ? Math.max(0, page.modelCount) : S.safeArray(page.models).length;
   }
 
   function draftFor(taskID) {

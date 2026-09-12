@@ -144,13 +144,15 @@ extension BridgeServiceAppModel {
 
   func refresh(
     silent: Bool,
-    includeCatalog: Bool
+    includeCatalog: Bool,
+    forceCatalogRefresh: Bool = false
   ) async {
     guard !stopped else { return }
     if refreshInProgress {
       pendingRefresh = true
       pendingVisibleRefresh = pendingVisibleRefresh || !silent
       pendingCatalogRefresh = pendingCatalogRefresh || includeCatalog
+      pendingForceCatalogRefresh = pendingForceCatalogRefresh || forceCatalogRefresh
       return
     }
     registrationStatus = registration.status
@@ -162,7 +164,10 @@ extension BridgeServiceAppModel {
       return
     }
     guard let client else {
-      await connect(includeCatalog: includeCatalog)
+      await connect(
+        includeCatalog: includeCatalog,
+        forceCatalogRefresh: forceCatalogRefresh
+      )
       return
     }
 
@@ -178,7 +183,8 @@ extension BridgeServiceAppModel {
       await refreshCollections(
         client: client,
         includeCatalog: includeCatalog,
-        includeThreads: !silent
+        includeThreads: !silent,
+        forceCatalogRefresh: forceCatalogRefresh
       )
     } catch {
       await closeClient()
@@ -194,13 +200,22 @@ extension BridgeServiceAppModel {
     guard pendingRefresh, !stopped else { return }
     let visible = pendingVisibleRefresh
     let includeCatalog = pendingCatalogRefresh
+    let forceCatalogRefresh = pendingForceCatalogRefresh
     pendingRefresh = false
     pendingVisibleRefresh = false
     pendingCatalogRefresh = false
-    await refresh(silent: !visible, includeCatalog: includeCatalog)
+    pendingForceCatalogRefresh = false
+    await refresh(
+      silent: !visible,
+      includeCatalog: includeCatalog,
+      forceCatalogRefresh: forceCatalogRefresh
+    )
   }
 
-  func connect(includeCatalog: Bool) async {
+  func connect(
+    includeCatalog: Bool,
+    forceCatalogRefresh: Bool = false
+  ) async {
     pollingTask?.cancel()
     pollingTask = nil
     await closeClient()
@@ -230,7 +245,8 @@ extension BridgeServiceAppModel {
         await refreshCollections(
           client: candidate,
           includeCatalog: includeCatalog,
-          includeThreads: true
+          includeThreads: true,
+          forceCatalogRefresh: forceCatalogRefresh
         )
         startPolling()
         return

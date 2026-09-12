@@ -59,6 +59,13 @@
     card.appendChild(hint);
     var draft = D.bind(controls);
     var actions = S.node("div", "form-actions");
+    var modelStatus, refreshModels;
+    if (!supervisor) {
+      modelStatus = S.node("p", "hint model-refresh-status");
+      card.appendChild(modelStatus);
+      refreshModels = S.button("获取模型", "refreshModels", {}, emit, "small", false);
+      actions.appendChild(refreshModels);
+    }
     var save = S.button(supervisor ? "保存 Supervisor" : "保存模型偏好", null, {}, emit, "small primary", !page.canSavePreferences);
     actions.appendChild(save);
     card.appendChild(actions);
@@ -93,11 +100,31 @@
       if (access) values.access = next.accessMode;
       draft.update(values);
       save.disabled = !next.canSavePreferences;
+      if (modelStatus) {
+        modelStatus.textContent = modelRefreshStatus(next);
+        modelStatus.hidden = false;
+      }
+      if (refreshModels) {
+        var count = modelCount(next);
+        refreshModels.textContent = next.isRefreshingModels ? "获取中…" : count > 0 ? "刷新模型" : "获取模型";
+        refreshModels.disabled = next.isRefreshingModels === true || next.canRefreshModels === false;
+      }
       if (supervisor) toggle.control.disabled = !next.canSavePreferences;
       updateDependent(false);
     }
     update(page, emit);
     return { root: card, update: update };
+  }
+
+  function modelCount(page) {
+    if (!page) return 0;
+    return typeof page.modelCount === "number" ? Math.max(0, page.modelCount) : S.safeArray(page.models).length;
+  }
+
+  function modelRefreshStatus(page) {
+    if (page.isRefreshingModels) return "正在获取 Codex 模型…";
+    if (page.modelError) return "模型获取失败：" + page.modelError;
+    return "已获取 " + modelCount(page) + " 个 Codex 模型。";
   }
 
   global.CodexBridgeDesktopSettingsModels = {

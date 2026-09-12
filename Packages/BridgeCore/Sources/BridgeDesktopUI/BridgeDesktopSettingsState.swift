@@ -194,6 +194,10 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let servicePlatform: String
   public let serviceDescription: String
   public let statusMessage: String?
+  public let modelCount: Int?
+  public let canRefreshModels: Bool?
+  public let isRefreshingModels: Bool?
+  public let modelError: String?
 
   public init(
     header: BridgeDesktopPageHeader,
@@ -224,7 +228,11 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     canChangeService: Bool = false,
     servicePlatform: String = "macOS",
     serviceDescription: String = "后台 Service 在 App 退出后继续提供本机 MCP 服务。",
-    statusMessage: String? = nil
+    statusMessage: String? = nil,
+    modelCount: Int? = nil,
+    canRefreshModels: Bool? = nil,
+    isRefreshingModels: Bool? = nil,
+    modelError: String? = nil
   ) {
     self.header = header
     self.models = models
@@ -255,5 +263,9 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     self.servicePlatform = servicePlatform
     self.serviceDescription = serviceDescription
     self.statusMessage = statusMessage
+    self.modelCount = modelCount
+    self.canRefreshModels = canRefreshModels
+    self.isRefreshingModels = isRefreshingModels
+    self.modelError = modelError
   }
 }

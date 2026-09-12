@@ -22,7 +22,9 @@
       browserCanGoForward: Bool = false,
       feedback: BridgeDesktopFeedback? = nil
     ) -> BridgeDesktopUIState {
-      BridgeDesktopUIState(
+      let modelRefreshInProgress = settings?.isRefreshingModels == true
+      let canRefreshModels = settings?.busy != true
+      return BridgeDesktopUIState(
         hostContext: BridgeDesktopHostContext(platform: .windows),
         navigation: navigation(
           workbench: workbench,
@@ -31,7 +33,7 @@
         selectedNavigation: selectedNavigation,
         connectionLabel: connectionLabel(for: workbench.connectionState),
         connectionTone: connectionTone(for: workbench.connectionState),
-        isRefreshing: isRefreshing,
+        isRefreshing: isRefreshing || modelRefreshInProgress,
         feedback: feedback,
         overview: overview(
           workbench: workbench,
@@ -45,7 +47,9 @@
           browserURL: browserURL,
           browserStatus: browserStatus,
           browserCanGoBack: browserCanGoBack,
-          browserCanGoForward: browserCanGoForward
+          browserCanGoForward: browserCanGoForward,
+          modelRefreshInProgress: modelRefreshInProgress,
+          canRefreshModels: canRefreshModels
         ),
         projects: projectsPage(
           workbench: workbench,

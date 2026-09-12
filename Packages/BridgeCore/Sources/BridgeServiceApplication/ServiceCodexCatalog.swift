@@ -208,6 +208,11 @@ public actor ServiceCodexCatalog {
     }
   }
 
+  public func refreshModels(deadline: ContinuousClock.Instant) async throws -> MCPModelList {
+    modelCache = nil
+    return try await listModels(deadline: deadline)
+  }
+
   private func makeModelsFetchTask() -> Task<MCPModelList, any Error> {
     let configuration = self.configuration
     let fetchDeadline =

@@ -1054,6 +1054,28 @@ final class BridgeServiceAppModelTests: XCTestCase {
     XCTAssertNotNil(model.modelCatalogError)
   }
 
+  func testExplicitModelRefreshUsesForceCatalogAndPublishesCompletion() async throws {
+    let registration = TestServiceRegistration(status: .enabled)
+    let client = TestBridgeServiceClient()
+    let model = BridgeServiceAppModel(
+      registration: registration,
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+
+    await model.startAsync()
+    model.refreshModels()
+
+    try await waitUntil {
+      let refreshes = await client.modelCatalogRefreshValues()
+      return !model.isRefreshing && refreshes.last == true
+    }
+    XCTAssertEqual(model.models.map(\.modelID), ["fixture-model"])
+    XCTAssertNil(model.modelCatalogError)
+  }
+
   func testSupervisorEnabledToggleReachesServiceClient() async throws {
     let registration = TestServiceRegistration(status: .enabled)
     let client = TestBridgeServiceClient()

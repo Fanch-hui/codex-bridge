@@ -101,6 +101,15 @@
       )
       XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: refresh), .refreshAll)
 
+      let refreshModels = BridgeDesktopCommandEnvelope(
+        requestID: "refresh-models-1",
+        command: .refreshModels
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: refreshModels),
+        .refreshModels
+      )
+
       let page = BridgeDesktopCommandEnvelope(
         requestID: "page-1",
         command: .selectPage,

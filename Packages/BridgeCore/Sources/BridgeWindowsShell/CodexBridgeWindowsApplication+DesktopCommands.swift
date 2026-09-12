@@ -14,6 +14,9 @@
       case .setBrowserEnabled(let enabled):
         model.setChatBrowserEnabled(enabled)
         return true
+      case .refreshModels:
+        Task { @MainActor in await auxiliary.refreshModels(model: model) }
+        return true
       case .loadEarlierConversation(let taskID):
         guard model.selectedTaskID == taskID else { return true }
         Task { @MainActor in

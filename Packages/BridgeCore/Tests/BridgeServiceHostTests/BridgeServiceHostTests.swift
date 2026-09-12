@@ -838,7 +838,7 @@ final class BridgeServiceHostTests: XCTestCase {
       Task { await client.invalidate() }
     }
 
-    let defaults = try await client.modelCatalog()
+    let defaults = try await client.modelCatalog(forceRefresh: true)
     let preferences = defaults.preferences
     XCTAssertEqual(preferences.executionModel, "execution-model")
     XCTAssertEqual(preferences.executionEffort, "high")

@@ -32,7 +32,11 @@ extension BridgeDesktopUIStateBuilder {
       browser: browserSlot(from: model),
       projectStatus: projectStatus,
       projectStatusTone: projectStatusTone,
-      engineStatus: engineStatus(from: model)
+      engineStatus: engineStatus(from: model),
+      modelCount: model.models.count,
+      canRefreshModels: !model.isRefreshing,
+      isRefreshingModels: model.isRefreshing,
+      modelError: model.modelCatalogError
     )
   }
 

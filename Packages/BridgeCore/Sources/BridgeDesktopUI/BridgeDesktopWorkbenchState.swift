@@ -242,6 +242,10 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let projectStatus: String?
   public let projectStatusTone: String?
   public let engineStatus: String?
+  public let modelCount: Int?
+  public let canRefreshModels: Bool?
+  public let isRefreshingModels: Bool?
+  public let modelError: String?
 
   public init(
     header: BridgeDesktopPageHeader,
@@ -258,7 +262,11 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     browser: BridgeDesktopBrowserSlot = .init(),
     projectStatus: String? = nil,
     projectStatusTone: String? = nil,
-    engineStatus: String? = nil
+    engineStatus: String? = nil,
+    modelCount: Int? = nil,
+    canRefreshModels: Bool? = nil,
+    isRefreshingModels: Bool? = nil,
+    modelError: String? = nil
   ) {
     self.header = header
     self.projects = projects
@@ -275,5 +283,9 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     self.projectStatus = projectStatus
     self.projectStatusTone = projectStatusTone
     self.engineStatus = engineStatus
+    self.modelCount = modelCount
+    self.canRefreshModels = canRefreshModels
+    self.isRefreshingModels = isRefreshingModels
+    self.modelError = modelError
   }
 }

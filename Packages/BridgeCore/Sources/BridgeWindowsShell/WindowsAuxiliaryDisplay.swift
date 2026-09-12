@@ -125,6 +125,9 @@
     let saveDirectApprovalEnabled: Bool
     let saveTaskStartApprovalEnabled: Bool
     let statusText: String
+    var busy: Bool = false
+    var isRefreshingModels: Bool = false
+    var modelError: String? = nil
     var supervisorAvailable: Bool = false
     var executionModel: String = ""
     var executionEffort: String = ""

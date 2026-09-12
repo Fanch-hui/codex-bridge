@@ -5,10 +5,27 @@ import BridgeProjects
 import BridgeSecurity
 import BridgeServiceApplication
 import BridgeServiceCore
+import Foundation
 import MCP
 import XCTest
 
 final class BridgeServiceApplicationTests: XCTestCase {
+  func testForceModelCatalogRefreshBypassesTheServiceCache() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    let spawnLog = fixture.root.appending(path: "catalog-spawns.log").path
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceCountingModelCatalogScript(spawnLog: spawnLog)
+    )
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+
+    _ = try await application.serviceModelCatalog(deadline: deadline)
+    _ = try await application.serviceModelCatalog(deadline: deadline, forceRefresh: true)
+
+    let spawns = try String(contentsOfFile: spawnLog).split(separator: "\n")
+    XCTAssertEqual(spawns.count, 2)
+  }
+
   func testGetTaskRedactsProviderSummaryBeforeMCPValidation() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     let creation = try await fixture.tasks.submit(

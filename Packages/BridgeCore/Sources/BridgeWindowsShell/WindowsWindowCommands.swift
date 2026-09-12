@@ -17,6 +17,7 @@
   enum MainWindowCommand: Equatable {
     case selectPage(index: Int)
     case refreshAll
+    case refreshModels
     case openTask(id: String)
     case browserBack
     case browserForward

@@ -180,6 +180,7 @@
     var models: [MCPModelSummary] = []
     var modelPreferences: IPCModelPreferences?
     var modelError: String?
+    var connectionRefreshInProgress = false
 
     public convenience init() {
       self.init(feedback: WindowsDesktopFeedbackStore())
@@ -215,6 +216,9 @@
 
     /// Verifies the pipe transport with a `status()` round trip, then loads tasks.
     public func connectAndRefresh() async {
+      guard !connectionRefreshInProgress else { return }
+      connectionRefreshInProgress = true
+      defer { connectionRefreshInProgress = false }
       connectionState = .connecting
       publishDisplay()
       do {
@@ -228,14 +232,15 @@
           agentProviders = []
           agentInstallations = []
         }
-        if let catalog = try? await client.modelCatalog() {
+        do {
+          let catalog = try await client.modelCatalog()
           models = catalog.models
           modelPreferences = catalog.preferences
           modelError = nil
-        } else {
+        } catch {
           models = []
           modelPreferences = nil
-          modelError = "尚未读取到 Codex 模型目录"
+          modelError = "模型目录读取失败：\(BridgeServiceErrorMessage.message(error))"
         }
         selectedProjectID =
           projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID

@@ -7,7 +7,8 @@ extension BridgeServiceAppModel {
   func refreshCollections(
     client: any BridgeServiceClientProtocol,
     includeCatalog: Bool,
-    includeThreads: Bool
+    includeThreads: Bool,
+    forceCatalogRefresh: Bool = false
   ) async {
     async let projectResult = optional { try await client.projects() }
     async let agentCatalogResult = optional { try await client.agentCatalog() }
@@ -64,7 +65,7 @@ extension BridgeServiceAppModel {
       mcpClients = value
     }
     if includeCatalog {
-      await refreshModelCatalog(client: client)
+      await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)
     }
   }
 
@@ -143,9 +144,12 @@ extension BridgeServiceAppModel {
     }
   }
 
-  private func refreshModelCatalog(client: any BridgeServiceClientProtocol) async {
+  private func refreshModelCatalog(
+    client: any BridgeServiceClientProtocol,
+    forceRefresh: Bool
+  ) async {
     do {
-      let catalog = try await client.modelCatalog()
+      let catalog = try await client.modelCatalog(forceRefresh: forceRefresh)
       models = catalog.models
       modelPreferences = catalog.preferences
       modelCatalogError = nil

@@ -88,6 +88,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func removeProject(projectID: String) async throws
   func models() async throws -> MCPModelList
   func modelCatalog() async throws -> IPCModelCatalogResponse
+  func modelCatalog(forceRefresh: Bool) async throws -> IPCModelCatalogResponse
   func modelPreferences() async throws -> IPCModelPreferences
   func setModelPreferences(_ preferences: IPCModelPreferences) async throws
   func setSupervisorEnabled(_ enabled: Bool) async throws
@@ -138,6 +139,10 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func modelCatalog(forceRefresh _: Bool) async throws -> IPCModelCatalogResponse {
+    try await modelCatalog()
+  }
+
   public func agentNativePermissionPolicy(
     installationID _: String
   ) async throws -> IPCAgentNativePermissionPolicyResponse {

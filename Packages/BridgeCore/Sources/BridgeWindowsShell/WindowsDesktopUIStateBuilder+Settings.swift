@@ -7,6 +7,7 @@
       agentDefaults: WindowsAgentDefaultsDisplay?
     ) -> BridgeDesktopSettingsState? {
       guard let settings else { return nil }
+      let canRefreshModels = !settings.busy
       return BridgeDesktopSettingsState(
         header: header(
           "设置",
@@ -41,7 +42,11 @@
         canChangeService: true,
         servicePlatform: "Windows",
         serviceDescription: "Windows 用户登录自动启动后台 Service，退出窗口后继续运行。",
-        statusMessage: settings.statusText
+        statusMessage: settings.statusText,
+        modelCount: settings.modelOptions.count,
+        canRefreshModels: canRefreshModels && !settings.isRefreshingModels,
+        isRefreshingModels: settings.isRefreshingModels,
+        modelError: settings.modelError
       )
     }
 

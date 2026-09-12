@@ -38,6 +38,7 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
   private var customInstructionsValue = "Fixture global instructions"
   private var workbenchPermissionModeValue: String?
   private let failModelCatalog: Bool
+  private var modelCatalogRefreshes: [Bool] = []
   private let failThreadList: Bool
   private var statusDelay: Duration = .zero
   private var failSubscription = false
@@ -741,6 +742,15 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
       models: catalog.models,
       preferences: modelPreferencesValue
     )
+  }
+
+  func modelCatalog(forceRefresh: Bool) async throws -> IPCModelCatalogResponse {
+    modelCatalogRefreshes.append(forceRefresh)
+    return try await modelCatalog()
+  }
+
+  func modelCatalogRefreshValues() -> [Bool] {
+    modelCatalogRefreshes
   }
 
   func modelPreferences() async throws -> IPCModelPreferences {

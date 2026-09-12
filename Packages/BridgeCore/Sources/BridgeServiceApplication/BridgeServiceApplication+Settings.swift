@@ -31,10 +31,16 @@ extension BridgeServiceApplication {
   }
 
   public func serviceModelCatalog(
-    deadline: ContinuousClock.Instant
+    deadline: ContinuousClock.Instant,
+    forceRefresh: Bool = false
   ) async throws -> ServiceModelCatalog {
     try Self.checkDeadline(deadline)
-    let models = try await catalog.listModels(deadline: deadline)
+    let models: MCPModelList
+    if forceRefresh {
+      models = try await catalog.refreshModels(deadline: deadline)
+    } else {
+      models = try await catalog.listModels(deadline: deadline)
+    }
     let preferences = try await resolvedDefaultModelPreferences(models: models.models)
     return ServiceModelCatalog(models: models, preferences: preferences)
   }

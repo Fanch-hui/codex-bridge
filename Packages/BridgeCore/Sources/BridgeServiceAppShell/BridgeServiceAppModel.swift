@@ -195,6 +195,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var pendingRefresh = false
   var pendingVisibleRefresh = false
   var pendingCatalogRefresh = false
+  var pendingForceCatalogRefresh = false
   var chatWebViewSleepTask: Task<Void, Never>?
   var toastDismissTask: Task<Void, Never>?
   var workbenchProjectSyncTask: Task<Void, Never>?
@@ -355,6 +356,16 @@ public final class BridgeServiceAppModel: ObservableObject {
   public func refresh() {
     Task { [weak self] in
       await self?.refresh(silent: false, includeCatalog: true)
+    }
+  }
+
+  public func refreshModels() {
+    Task { [weak self] in
+      await self?.refresh(
+        silent: false,
+        includeCatalog: true,
+        forceCatalogRefresh: true
+      )
     }
   }
 

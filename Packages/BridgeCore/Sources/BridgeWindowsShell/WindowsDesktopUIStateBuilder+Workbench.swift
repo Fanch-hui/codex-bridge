@@ -9,7 +9,9 @@
       browserURL: String? = nil,
       browserStatus: String? = nil,
       browserCanGoBack: Bool = false,
-      browserCanGoForward: Bool = false
+      browserCanGoForward: Bool = false,
+      modelRefreshInProgress: Bool = false,
+      canRefreshModels: Bool = true
     ) -> BridgeDesktopWorkbenchState {
       let projects = management.project.projectItems.map {
         choice($0.projectID, $0.name, detail: $0.detail)
@@ -45,7 +47,11 @@
         ),
         projectStatus: projectStatus,
         projectStatusTone: projectStatusTone,
-        engineStatus: engineStatus(for: display)
+        engineStatus: engineStatus(for: display),
+        modelCount: display.availableModelCount,
+        canRefreshModels: canRefreshModels,
+        isRefreshingModels: modelRefreshInProgress,
+        modelError: display.modelError
       )
     }
 

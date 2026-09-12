@@ -51,7 +51,11 @@ extension BridgeDesktopUIStateBuilder {
       canChangeService: true,
       servicePlatform: "macOS",
       serviceDescription: "LaunchAgent 后台 Service 可在 App 退出后继续提供本机 MCP 服务。",
-      statusMessage: model.modelCatalogError ?? model.errorMessage
+      statusMessage: model.modelCatalogError ?? model.errorMessage,
+      modelCount: model.models.count,
+      canRefreshModels: !model.isRefreshing,
+      isRefreshingModels: model.isRefreshing,
+      modelError: model.modelCatalogError
     )
   }
 

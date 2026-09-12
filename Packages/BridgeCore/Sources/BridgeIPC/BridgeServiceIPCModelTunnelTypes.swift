@@ -80,6 +80,18 @@ public struct IPCSupervisorEnabledRequest: Codable, Equatable, Sendable {
   }
 }
 
+public struct IPCModelCatalogRequest: Codable, Equatable, Sendable {
+  public let forceRefresh: Bool
+
+  public init(forceRefresh: Bool = false) {
+    self.forceRefresh = forceRefresh
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case forceRefresh = "force_refresh"
+  }
+}
+
 public struct IPCDirectApprovalModeRequest: Codable, Equatable, Sendable {
   public let mode: String
 
