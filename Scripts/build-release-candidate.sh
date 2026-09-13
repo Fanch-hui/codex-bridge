@@ -109,12 +109,23 @@ for architecture in "${architectures[@]}"; do
     print -u2 "Bundled helper digest does not match its signed resource."
     exit 65
   }
+  for binary in "${service_binary}" "${bundled_helper}" \
+    "${archived_app}"/Contents/Frameworks/*.dylib(N); do
+    /usr/bin/codesign --force --sign - "${binary}"
+    /usr/bin/codesign --verify --strict "${binary}"
+  done
+  actual_bundled_sha256="$(/usr/bin/shasum -a 256 "${bundled_helper}")"
+  print -r -- "${actual_bundled_sha256%% *}" > "${bundled_digest}"
+  /usr/bin/codesign --force --sign - \
+    --entitlements "${repository_root}/App/CodexBridge.entitlements" "${archived_app}"
+  /usr/bin/codesign --verify --deep --strict --verbose=2 "${archived_app}"
 
   /bin/mkdir -m 0700 "${disk_image_directory}"
   /usr/bin/ditto -c -k --sequesterRsrc --keepParent \
     "${archived_app}" \
     "${candidate_directory}/${artifact_base}.zip"
   /usr/bin/ditto "${archived_app}" "${disk_image_directory}/CodexBridge.app"
+  /usr/bin/codesign --verify --deep --strict "${disk_image_directory}/CodexBridge.app"
   /bin/ln -s /Applications "${disk_image_directory}/Applications"
   /usr/bin/hdiutil create \
     -quiet \
