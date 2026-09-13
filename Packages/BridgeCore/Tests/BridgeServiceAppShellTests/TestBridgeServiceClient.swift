@@ -99,6 +99,7 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
       baseURL: String?,
       apiKey: String?
     )?
+  private var agentModelOptionsByModel: [String: [IPCAgentModelSummary]] = [:]
   private var agentModelOptionsValue: [IPCAgentModelSummary] = []
   private var agentModelOptionsByInstallation: [String: [IPCAgentModelSummary]] = [:]
   private var agentModelDefaultValue: String?
@@ -207,6 +208,10 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
       agentModelOptionsValue = models
     }
     failAgentModels = fail
+  }
+
+  func configureSelectedModelResponse(_ modelID: String, models: [IPCAgentModelSummary]) {
+    agentModelOptionsByModel[modelID] = models
   }
 
   func configureAgentProviders(_ providers: [IPCAgentProviderSummary]) {
@@ -579,7 +584,8 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
     )
     guard !failAgentModels else { throw BridgeServiceClientError.unavailable }
     return IPCAgentModelsResponse(
-      models: agentModelOptionsByInstallation[installationID] ?? agentModelOptionsValue
+      models: modelID.flatMap { agentModelOptionsByModel[$0] } ?? agentModelOptionsByInstallation[
+        installationID] ?? agentModelOptionsValue
     )
   }
 

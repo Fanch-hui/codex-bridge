@@ -64,10 +64,6 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(index.contains("workbench-browser-toolbar"))
     XCTAssertTrue(index.contains("workbench-inspector-header"))
     XCTAssertTrue(index.contains("workbench-inspector-footer"))
-    let projectsScript = try BridgeDesktopUIResources.read(.pagesProjectsJS)
-    XCTAssertTrue(projectsScript.contains("CodexBridgeDesktopProjectWorkspace"))
-    XCTAssertTrue(
-      try BridgeDesktopUIResources.read(.pagesProjectEditorsJS).contains("saveProjectBlacklist"))
     let projectCollections = try BridgeDesktopUIResources.read(.pagesProjectCollectionsJS)
     XCTAssertTrue(projectCollections.contains("addSessionRows"))
     XCTAssertTrue(projectCollections.contains("addThreadTranscript"))
@@ -88,6 +84,7 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(index.contains("pages-connections-editor.js"))
     XCTAssertTrue(index.contains("pages-agent-connectors.js"))
     XCTAssertTrue(index.contains("pages-agent-connector-row.js"))
+    XCTAssertTrue(index.contains("pages-agent-headless-consent.js"))
     XCTAssertTrue(index.contains("pages-codex-connection.js"))
     let agentConnectors = try BridgeDesktopUIResources.read(.pagesAgentConnectorsJS)
     XCTAssertTrue(agentConnectors.contains("CodexBridgeDesktopAgentConnectorRow"))
@@ -96,6 +93,8 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(agentConnectorRow.contains("apiKey.control.value = \"\""))
     XCTAssertTrue(agentConnectorRow.contains("enabled === true"))
     XCTAssertFalse(agentConnectorRow.contains("global.confirm"))
+    let headlessConsent = try BridgeDesktopUIResources.read(.pagesAgentHeadlessConsentJS)
+    XCTAssertTrue(headlessConsent.contains("Always Proceed"))
     let codexConnection = try BridgeDesktopUIResources.read(.pagesCodexConnectionJS)
     XCTAssertTrue(codexConnection.contains("refreshModels"))
     XCTAssertFalse(codexConnection.contains("installationID"))
@@ -108,15 +107,11 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(settingsScript.contains("nativePermissionPolicy"))
     let nativePermissionScript = try BridgeDesktopUIResources.read(.pagesNativePermissionsJS)
     XCTAssertTrue(nativePermissionScript.contains("setAgentNativePermissionMode"))
-    XCTAssertTrue(
-      try BridgeDesktopUIResources.read(.pagesSettingsNativeJS).contains(
-        "addAgentNativePermissionRule"))
-    XCTAssertTrue(
-      try BridgeDesktopUIResources.read(.pagesSettingsNativeJS).contains(
-        "replaceAgentNativePermissionRule"))
-    XCTAssertTrue(
-      try BridgeDesktopUIResources.read(.pagesSettingsNativeJS).contains(
-        "removeAgentNativePermissionRule"))
+    let nativeSettings = try BridgeDesktopUIResources.read(.pagesSettingsNativeJS)
+    XCTAssertTrue(nativeSettings.contains("AGY 无头运行权限"))
+    XCTAssertTrue(nativeSettings.contains("Always Proceed"))
+    XCTAssertFalse(nativeSettings.contains("addAgentNativePermissionRule"))
+    XCTAssertFalse(nativeSettings.contains("removeAgentNativePermissionRule"))
     XCTAssertTrue(nativePermissionScript.contains("prepareAgentPermissionRemediation"))
     XCTAssertTrue(nativePermissionScript.contains("applyAgentPermissionRemediation"))
     XCTAssertTrue(nativePermissionScript.contains("oneTimeToolAutoApproval"))
@@ -353,6 +348,30 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertEqual(BridgeDesktopPresentation.reasoningTitle("extra_high"), "极高")
     XCTAssertEqual(BridgeDesktopPresentation.reasoningTitle("none"), "none")
     XCTAssertEqual(BridgeDesktopPresentation.extendedReasoningTitle("none"), "无")
+  }
+
+  func testModelOptionsKeepModelSpecificReasoningDefaults() throws {
+    let options = [
+      BridgeDesktopModelOption(
+        modelID: "model-a",
+        displayName: "Model A",
+        reasoningEfforts: [BridgeDesktopChoice(id: "low", title: "低")],
+        defaultReasoningEffort: "low"
+      ),
+      BridgeDesktopModelOption(
+        modelID: "model-b",
+        displayName: "Model B",
+        reasoningEfforts: [BridgeDesktopChoice(id: "high", title: "高")],
+        defaultReasoningEffort: "high"
+      ),
+    ]
+
+    let decoded = try JSONDecoder().decode(
+      [BridgeDesktopModelOption].self,
+      from: JSONEncoder().encode(options)
+    )
+    XCTAssertEqual(decoded.map(\.defaultReasoningEffort), ["low", "high"])
+    XCTAssertEqual(decoded.map { $0.reasoningEfforts.map(\.id) }, [["low"], ["high"]])
   }
 
   func testSettingsPatchPreservesPartialUpdateIntent() {

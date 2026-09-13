@@ -42,7 +42,7 @@
       case .refreshLogs, .selectLog, .setLogSearch, .setLogProjectFilter,
         .setLogKindFilter, .copyLogs:
         runLogs(command)
-      case .refreshSettings, .saveSettingsPreferences,
+      case .refreshSettings, .saveSettingsPreferences, .saveDirectConfiguration,
         .saveSettingsInstructions, .setSettingsDirectApprovalMode,
         .setSettingsTaskStartApprovalMode,
         .registerService, .unregisterService, .setKeepServiceRunning:
@@ -189,6 +189,8 @@
       switch command {
       case .refreshSettings:
         Task { await settings.refresh() }
+      case .saveDirectConfiguration(let json):
+        Task { await settings.saveDirectConfiguration(json) }
       case .saveSettingsPreferences(let preferences):
         Task { await settings.savePreferences(preferences) }
       case .saveSettingsInstructions(let text):

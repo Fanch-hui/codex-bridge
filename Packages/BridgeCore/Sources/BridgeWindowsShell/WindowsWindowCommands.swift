@@ -94,6 +94,7 @@
     case unregisterService
     case setKeepServiceRunning(Bool)
     case saveSettingsPreferences(preferences: IPCModelPreferences)
+    case saveDirectConfiguration(json: String)
     case saveSettingsInstructions(text: String)
     case setSettingsDirectApprovalMode(mode: String)
     case setSettingsTaskStartApprovalMode(mode: String)
@@ -154,7 +155,12 @@
     case copyLocalMCPEndpoint
     case rotateMCPClientCredential(id: String)
     case selectAgent(id: String)
-    case connectAgentFromDesktop(providerID: String, baseURL: String?, apiKey: String?)
+    case connectAgentFromDesktop(
+      providerID: String,
+      baseURL: String?,
+      apiKey: String?,
+      alwaysProceedConfirmed: Bool
+    )
     case setAgentEnabled(id: String, enabled: Bool)
     case reprobeAgent(id: String, acceptReplacement: Bool)
     case removeAgent(id: String)

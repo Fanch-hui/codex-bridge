@@ -93,9 +93,38 @@
 .markdown-body a { color: var(--accent); }
 .conversation-actions, .retry-form .form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .retry-form h4 { margin: 0 0 8px; }
-.session-row { display: flex; align-items: center; gap: 10px; }
+.session-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .session-open { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 9px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
 .session-open .row-main { min-width: 0; }
+.session-confirmation { flex: 1 1 100%; }
+.project-collection-card { padding: 0; overflow: hidden; }
+.project-collection-summary, .project-agent-session-summary { display: flex; align-items: center; gap: 9px; min-width: 0; cursor: pointer; list-style: none; }
+.project-collection-summary { padding: 14px 18px; }
+.project-collection-summary::-webkit-details-marker, .project-agent-session-summary::-webkit-details-marker { display: none; }
+.project-collection-summary::after, .project-agent-session-summary::after { margin-left: auto; color: var(--text-tertiary); content: "⌄"; font-size: 15px; }
+.project-collection-card[open] > .project-collection-summary::after, .project-agent-session-group[open] > .project-agent-session-summary::after { content: "⌃"; }
+.project-collection-title { min-width: 0; overflow: hidden; font-size: 14px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.project-collection-body { min-width: 0; padding: 0 18px 18px; }
+.project-collection-description { margin: 0 0 10px; font-size: 12px; line-height: 1.45; }
+.project-agent-session-group { border-top: 1px solid var(--separator); }
+.project-agent-session-summary { padding: 10px 0; }
+.project-agent-icon, .skill-icon { width: 17px; height: 17px; flex: 0 0 auto; color: var(--accent); }
+.project-agent-name { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.project-session-list, .project-thread-list, .project-skill-list { display: grid; gap: 4px; max-height: 360px; overflow-y: auto; min-width: 0; }
+.project-session-list { padding: 0 0 10px; }
+.project-session-list .list-row, .project-thread-list .list-row { padding: 9px 8px; }
+.project-session-list .list-row.selected { background: var(--accent-soft); }
+.project-thread-list { padding-top: 2px; }
+.project-thread-row .row-detail { white-space: normal; overflow-wrap: anywhere; }
+.project-skill-list { padding-top: 2px; }
+.skill-row { display: grid; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--separator); border-radius: 8px; background: var(--surface-muted); }
+.skill-heading { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.skill-heading .row-title { white-space: normal; overflow-wrap: anywhere; }
+.skill-heading .status-badge { flex: 0 0 auto; }
+.skill-description { max-height: 150px; min-width: 0; margin: 0; overflow: auto; overflow-wrap: anywhere; line-height: 1.5; }
+.skill-description p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.project-thread-transcript .project-collection-description { margin-top: 8px; }
+.project-thread-transcript .conversation-list { max-height: 480px; overflow-y: auto; }
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 20px; }
 .filter-bar .search-field { flex: 1 1 260px; }
 .filter-bar input, .filter-bar select { min-height: 32px; padding: 6px 9px; border: 1px solid var(--separator); border-radius: 7px; color: var(--text); background: var(--surface); font: inherit; }
@@ -187,3 +216,15 @@
 .workbench-controls .retry-form { margin: 0; padding: 0; background: transparent; }
 
 .project-detail-host { min-width: 0; }
+
+.settings-content-stack { display: grid; gap: 20px; }
+.settings-content-stack > .page-section { margin-top: 0; }
+.settings-stack > .page-card + .page-card { margin-top: 0; }
+.project-collections-stack { display: grid; gap: 12px; margin-top: 12px; }
+.project-collections-stack > .page-card + .page-card { margin-top: 0; }
+.direct-settings-card > section { margin-top: 16px; }
+.direct-settings-card > section > h4 { margin: 0 0 8px; }
+.direct-command-input { display: flex; align-items: flex-end; gap: 10px; }
+.direct-command-input > .field { flex: 1; min-width: 0; }
+.direct-command-input > .button { flex: none; margin-bottom: 1px; }
+.direct-settings-card .list-body:not([hidden]) { margin-bottom: 10px; }

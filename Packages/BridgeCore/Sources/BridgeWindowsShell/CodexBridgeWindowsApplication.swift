@@ -63,6 +63,7 @@
         refreshAll(model: model, management: management, auxiliary: auxiliary)
       case .openTask(let id):
         model.selectTask(id: id)
+        synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
         selectedPage = .workbench
         onUI { WindowsMainWindow.selectPage(.workbench) }
       case .browserBack:
@@ -82,6 +83,7 @@
         }
       case .selectTask(let index):
         model.selectTask(at: index)
+        synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
       case .selectWorkbenchProject(let index):
         management.selectProject(at: index)
         auxiliary.run(.selectWorkspaceProject(index: index))

@@ -11,7 +11,7 @@ extension BridgeDesktopUIStateBuilder {
     return BridgeDesktopProjectsState(
       header: BridgeDesktopPageHeader(
         title: "项目",
-        subtitle: "管理注册目录、访问权限、Direct 命令与只读项目资源。",
+        subtitle: "管理注册目录、访问权限与项目资源。",
         symbol: BridgeServiceNavigation.projects.symbol
       ),
       rows: model.projects.map { project in
@@ -131,7 +131,7 @@ extension BridgeDesktopUIStateBuilder {
   private static func threadRow(_ thread: MCPThreadSummary) -> BridgeDesktopThreadRow {
     BridgeDesktopThreadRow(
       threadID: thread.threadID,
-      title: thread.title ?? "未命名会话",
+      title: ThreadHistoryPresentation.title(thread),
       status: thread.status,
       updatedAt: thread.updatedAt,
       preview: thread.preview

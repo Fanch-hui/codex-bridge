@@ -333,7 +333,7 @@ extension BridgeServiceAppModel {
     )
   }
 
-  private func saveAgentDefaults(
+  func saveAgentDefaults(
     providerID: String,
     model: String?,
     permissionMode: String?,

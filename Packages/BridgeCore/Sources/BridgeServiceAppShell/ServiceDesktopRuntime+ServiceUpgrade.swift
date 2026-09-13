@@ -1,21 +1,21 @@
 import Foundation
 
 extension BridgeServiceAppModel {
-  func scheduleAgentDiscoveryUpgradeIfNeeded() {
-    guard registration.supportsAutomaticRecovery, !didAttemptAgentDiscoveryUpgrade,
+  func scheduleServiceUpgradeIfNeeded() {
+    guard registration.supportsAutomaticRecovery, !didAttemptServiceUpgrade,
       !stopped, connectionState == .connected, !agentProviders.isEmpty,
-      agentProviders.allSatisfy({ $0.discoveryState == nil }),
+      agentProviders.allSatisfy({ $0.discoveryState == nil }) || directConfiguration == nil,
       let status = serviceStatus?.status,
       !["active", "pending"].contains(status.executionState),
       status.pendingApprovalCount == 0, !tasks.contains(where: \.isActive)
     else { return }
-    didAttemptAgentDiscoveryUpgrade = true
+    didAttemptServiceUpgrade = true
     Task { [weak self] in
-      await self?.upgradeAgentDiscoveryService()
+      await self?.upgradeService()
     }
   }
 
-  private func upgradeAgentDiscoveryService() async {
+  private func upgradeService() async {
     guard !stopped else { return }
     do {
       guard try await registration.recoverUnavailableService(), !stopped else { return }

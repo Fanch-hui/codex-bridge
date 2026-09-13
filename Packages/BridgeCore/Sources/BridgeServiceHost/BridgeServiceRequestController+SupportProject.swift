@@ -62,7 +62,8 @@ extension BridgeServiceRequestController {
       try ServiceCommandBlacklistRule(
         id: rule.ruleID,
         executable: rule.executable,
-        pattern: rule.pattern
+        pattern: rule.pattern,
+        arguments: rule.arguments
       )
     }
   }

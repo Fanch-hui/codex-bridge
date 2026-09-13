@@ -111,6 +111,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
   public let discoveredExecutablePath: String?
   public let discoveredConfigurationPath: String?
   public let requiresConfiguration: Bool
+  public let requiresHeadlessAlwaysProceed: Bool?
   public let supportsModelSelection: Bool
   public let supportsEffortSelection: Bool
   public let supportsSteer: Bool
@@ -127,6 +128,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     discoveredExecutablePath: String? = nil,
     discoveredConfigurationPath: String? = nil,
     requiresConfiguration: Bool = false,
+    requiresHeadlessAlwaysProceed: Bool? = nil,
     supportsModelSelection: Bool = true,
     supportsEffortSelection: Bool = true,
     supportsSteer: Bool = false,
@@ -142,6 +144,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     self.discoveredExecutablePath = discoveredExecutablePath
     self.discoveredConfigurationPath = discoveredConfigurationPath
     self.requiresConfiguration = requiresConfiguration
+    self.requiresHeadlessAlwaysProceed = requiresHeadlessAlwaysProceed
     self.supportsModelSelection = supportsModelSelection
     self.supportsEffortSelection = supportsEffortSelection
     self.supportsSteer = supportsSteer

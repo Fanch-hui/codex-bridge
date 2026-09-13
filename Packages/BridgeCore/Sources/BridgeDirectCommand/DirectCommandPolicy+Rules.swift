@@ -119,7 +119,9 @@ extension DirectCommandPolicy {
             ? executable == ruleExecutable
             : normalizedBasename == relativeRule
         #endif
-        if matchesExecutable {
+        if matchesExecutable,
+          rule.arguments.map({ Array(argv.dropFirst()).starts(with: $0) }) ?? true
+        {
           return true
         }
       }
@@ -199,7 +201,7 @@ extension DirectCommandPolicy {
           executable, projectRoot: project.root.canonicalPath)
         || request.isValidatedSkillScript
       guard allowed else { return .denied(.commandNotRegistered) }
-      if matchedBuiltInRule != nil,
+      if matched == nil, matchedBuiltInRule != nil,
         !safeBuiltInInvocation(
           policyArgv,
           projectRoot: project.root.canonicalPath,

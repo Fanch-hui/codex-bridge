@@ -187,6 +187,7 @@ extension BridgeDesktopUIStateBuilder {
       discoveredExecutablePath: provider.discoveredExecutablePath,
       discoveredConfigurationPath: provider.discoveredConfigurationPath,
       requiresConfiguration: provider.requiresConfiguration,
+      requiresHeadlessAlwaysProceed: provider.requiresHeadlessAlwaysProceed,
       supportsModelSelection: provider.supportsModelSelection,
       supportsEffortSelection: provider.supportsEffortSelection,
       supportsSteer: provider.supportsSteer,

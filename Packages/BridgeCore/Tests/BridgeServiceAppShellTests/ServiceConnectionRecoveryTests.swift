@@ -26,11 +26,11 @@ final class ServiceConnectionRecoveryTests: XCTestCase {
       )
     }
     setExecution("active")
-    model.scheduleAgentDiscoveryUpgradeIfNeeded()
-    XCTAssertFalse(model.didAttemptAgentDiscoveryUpgrade)
+    model.scheduleServiceUpgradeIfNeeded()
+    XCTAssertFalse(model.didAttemptServiceUpgrade)
     setExecution("idle")
-    model.scheduleAgentDiscoveryUpgradeIfNeeded()
-    model.scheduleAgentDiscoveryUpgradeIfNeeded()
+    model.scheduleServiceUpgradeIfNeeded()
+    model.scheduleServiceUpgradeIfNeeded()
     for _ in 0..<100 where registration.recoveries == 0 {
       try await Task.sleep(for: .milliseconds(1))
     }

@@ -150,7 +150,10 @@
         else { return }
       }
       if !effort.isEmpty {
-        let effectiveModel = requestedModel ?? persistedDefaults[providerID]?.model
+        let effectiveModel =
+          requestedModel
+          ?? catalog.first(where: { !$0.supportedReasoningEfforts.isEmpty })?.modelID
+          ?? catalog.first?.modelID
         guard provider.supportsEffortSelection,
           catalog.first(where: { $0.modelID == effectiveModel })?
             .supportedReasoningEfforts.contains(effort) == true
@@ -171,12 +174,12 @@
           permissionMode: permissionMode,
           effort: effort.isEmpty ? nil : effort
         )
-        let refreshedCatalog = await refreshedCatalogAfterSave(
+        persistedDefaults[providerID] = persisted
+        let refreshedCatalog = try await refreshedCatalogAfterSave(
           providerID: providerID,
           provider: provider,
           installation: installation,
-          persistedDefault: persisted,
-          fallback: catalog
+          persistedDefault: persisted
         )
         persistedDefaults[providerID] = persisted
         modelCatalogs[providerID] = refreshedCatalog
@@ -200,27 +203,22 @@
       providerID: String,
       provider: IPCAgentProviderSummary,
       installation: IPCAgentInstallationSummary?,
-      persistedDefault: IPCAgentModelDefaultResponse,
-      fallback: [IPCAgentModelSummary]
-    ) async -> [IPCAgentModelSummary] {
+      persistedDefault: IPCAgentModelDefaultResponse
+    ) async throws -> [IPCAgentModelSummary] {
       guard provider.supportsModelSelection else { return [] }
-      do {
-        let catalog = try await loadModels(
-          provider: provider,
-          installation: installation,
-          modelID: nil
-        )
-        guard providerID != "deepseek-harness", let modelID = persistedDefault.model else {
-          return catalog.models
-        }
-        return try await loadModels(
-          provider: provider,
-          installation: installation,
-          modelID: modelID
-        ).models
-      } catch {
-        return fallback
+      let catalog = try await loadModels(
+        provider: provider,
+        installation: installation,
+        modelID: nil
+      )
+      guard providerID != "deepseek-harness", let modelID = persistedDefault.model else {
+        return catalog.models
       }
+      return try await loadModels(
+        provider: provider,
+        installation: installation,
+        modelID: modelID
+      ).models
     }
 
     private func modelSpecificResponse(

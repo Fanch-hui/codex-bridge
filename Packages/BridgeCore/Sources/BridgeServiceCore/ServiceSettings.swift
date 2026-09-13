@@ -21,6 +21,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case mcpLocalPort = "mcp.local_port"
   case qwenStudioEnabled = "mcp.client.qwen-studio.enabled"
   case qwenStudioExposureMode = "mcp.client.qwen-studio.exposure_mode"
+  case directConfiguration = "direct.configuration"
   case directApprovalMode = "direct.approval_mode"
   case taskStartApprovalMode = "tasks.start_approval_mode"
   case defaultExecutionModel = "models.execution.default"

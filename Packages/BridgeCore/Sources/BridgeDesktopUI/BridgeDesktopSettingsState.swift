@@ -4,17 +4,20 @@ public struct BridgeDesktopModelOption: Codable, Equatable, Sendable {
   public let modelID: String
   public let displayName: String
   public let reasoningEfforts: [BridgeDesktopChoice]
+  public let defaultReasoningEffort: String?
   public let supportsFastMode: Bool?
 
   public init(
     modelID: String,
     displayName: String,
     reasoningEfforts: [BridgeDesktopChoice] = [],
+    defaultReasoningEffort: String? = nil,
     supportsFastMode: Bool? = nil
   ) {
     self.modelID = modelID
     self.displayName = displayName
     self.reasoningEfforts = reasoningEfforts
+    self.defaultReasoningEffort = defaultReasoningEffort
     self.supportsFastMode = supportsFastMode
   }
 }
@@ -31,6 +34,8 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
   public let permissionMode: String
   public let permissionOptions: [BridgeDesktopChoice]
   public let supportsWorkspaceWrite: Bool?
+  public let canSelectModel: Bool?
+  public let canSelectEffort: Bool?
   public let canSave: Bool
   public let canRefreshModels: Bool
   public let isRefreshingModels: Bool
@@ -51,7 +56,9 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
     canSave: Bool = true,
     canRefreshModels: Bool = false,
     isRefreshingModels: Bool = false,
-    errorMessage: String? = nil
+    errorMessage: String? = nil,
+    canSelectModel: Bool? = nil,
+    canSelectEffort: Bool? = nil
   ) {
     self.providerID = providerID
     self.providerName = providerName
@@ -64,6 +71,8 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
     self.permissionMode = permissionMode
     self.permissionOptions = permissionOptions
     self.supportsWorkspaceWrite = supportsWorkspaceWrite
+    self.canSelectModel = canSelectModel
+    self.canSelectEffort = canSelectEffort
     self.canSave = canSave
     self.canRefreshModels = canRefreshModels
     self.isRefreshingModels = isRefreshingModels
@@ -193,6 +202,7 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let canChangeService: Bool
   public let servicePlatform: String
   public let serviceDescription: String
+  public let direct: BridgeDesktopDirectState?
   public let statusMessage: String?
   public let modelCount: Int?
   public let canRefreshModels: Bool?
@@ -232,7 +242,8 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     modelCount: Int? = nil,
     canRefreshModels: Bool? = nil,
     isRefreshingModels: Bool? = nil,
-    modelError: String? = nil
+    modelError: String? = nil,
+    direct: BridgeDesktopDirectState? = nil
   ) {
     self.header = header
     self.models = models
@@ -262,6 +273,7 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     self.canChangeService = canChangeService
     self.servicePlatform = servicePlatform
     self.serviceDescription = serviceDescription
+    self.direct = direct
     self.statusMessage = statusMessage
     self.modelCount = modelCount
     self.canRefreshModels = canRefreshModels

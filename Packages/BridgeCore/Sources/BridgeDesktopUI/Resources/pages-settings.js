@@ -15,7 +15,7 @@
     S.clear(container);
     var header = S.node("div");
     container.appendChild(header);
-    var content = S.node("div");
+    var content = S.node("div", "settings-content-stack");
     container.appendChild(content);
     var models = group(content, "模型与执行默认偏好");
     var preferences = M.preferences(page, emit);
@@ -26,6 +26,8 @@
     models.appendChild(agents.root);
     var native = global.CodexBridgeDesktopSettingsNative.create();
     models.appendChild(native.root);
+    var direct = global.CodexBridgeDesktopDirect.create();
+    content.appendChild(direct.root);
     var safety = group(content, "安全策略与全局指令");
     var approvals = S.node("div");
     safety.appendChild(approvals);
@@ -47,6 +49,7 @@
         unavailable.hidden = !!next;
         S.pageHeader(header, next ? next.header : { title: "设置", subtitle: "正在从本机 Service 读取偏好设置。", symbol: "gearshape" });
         if (!next) return;
+        direct.update(next.direct, nextEmit);
         preferences.update(next, nextEmit);
         supervisor.root.hidden = !next.supervisorAvailable;
         supervisor.update(next, nextEmit);

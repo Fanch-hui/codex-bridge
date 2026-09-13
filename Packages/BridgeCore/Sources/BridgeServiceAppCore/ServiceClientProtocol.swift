@@ -13,6 +13,10 @@ public protocol BridgeTaskConversationClient: Sendable {
 }
 
 public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Sendable {
+  func directConfiguration() async throws -> IPCDirectConfiguration
+  func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
+    -> IPCDirectConfiguration
+
   func status() async throws -> IPCServiceStatusResponse
   func projects() async throws -> [MCPProjectSummary]
   func registerProject(_ request: IPCProjectRegistrationRequest) async throws -> MCPProjectDetail
@@ -36,6 +40,12 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     providerID: String,
     baseURL: String?,
     apiKey: String?
+  ) async throws -> IPCAgentInstallationSummary
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed: Bool
   ) async throws -> IPCAgentInstallationSummary
   func reprobeAgentInstallation(
     installationID: String,
@@ -145,6 +155,13 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func directConfiguration() async throws -> IPCDirectConfiguration {
+    throw BridgeServiceClientError.unavailable
+  }
+  public func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
+    -> IPCDirectConfiguration
+  { throw BridgeServiceClientError.unavailable }
+
   public func modelCatalog(forceRefresh _: Bool) async throws -> IPCModelCatalogResponse {
     try await modelCatalog()
   }
@@ -193,6 +210,19 @@ extension BridgeServiceClientProtocol {
     apiKey _: String?
   ) async throws -> IPCAgentInstallationSummary {
     throw BridgeServiceClientError.unavailable
+  }
+
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed _: Bool
+  ) async throws -> IPCAgentInstallationSummary {
+    try await connectAgentInstallation(
+      providerID: providerID,
+      baseURL: baseURL,
+      apiKey: apiKey
+    )
   }
 
   public func reprobeAgentInstallation(

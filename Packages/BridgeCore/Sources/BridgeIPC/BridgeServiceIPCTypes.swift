@@ -3,6 +3,8 @@ import Foundation
 
 public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case status
+  case getDirectConfiguration = "get_direct_configuration"
+  case updateDirectConfiguration = "update_direct_configuration"
   case listProjects = "list_projects"
   case registerProject = "register_project"
   case updateProjectPolicy = "update_project_policy"

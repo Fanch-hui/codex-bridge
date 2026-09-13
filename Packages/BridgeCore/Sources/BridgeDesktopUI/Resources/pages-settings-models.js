@@ -19,18 +19,25 @@
 
   function effortOptions(model, models, fallback, includeDefault) {
     var selected = S.safeArray(models).find(function (item) { return item.modelID === model; });
-    var options = selected && selected.reasoningEfforts && selected.reasoningEfforts.length
-      ? selected.reasoningEfforts : S.safeArray(fallback);
+    var hasCatalog = S.safeArray(models).length > 0;
+    var options = selected ? S.safeArray(selected.reasoningEfforts)
+      : hasCatalog ? [] : S.safeArray(fallback);
     return includeDefault ? [{ id: "", title: "Provider 默认" }].concat(options) : options;
   }
 
-  function chooseEffort(control, options, changedModel) {
+  function defaultEffort(model, models) {
+    var selected = S.safeArray(models).find(function (item) { return item.modelID === model; });
+    return selected && selected.defaultReasoningEffort ? selected.defaultReasoningEffort : "";
+  }
+
+  function chooseEffort(control, options, changedModel, preferred) {
     var current = control.value;
-    D.selectOptions(control, options);
-    if (changedModel && !options.some(function (item) { return item.id === current && item.enabled !== false; })) {
-      var first = options.find(function (item) { return item.enabled !== false; });
-      control.value = first ? first.id : "";
-    }
+    D.selectOptions(control, options, false);
+    var valid = options.find(function (item) { return item.id === current && item.enabled !== false; });
+    if (valid) { control.value = current; return; }
+    var selected = options.find(function (item) { return item.id === preferred && item.enabled !== false; })
+      || options.find(function (item) { return item.enabled !== false; });
+    control.value = selected ? selected.id : "";
   }
 
   function create(page, emit, supervisor) {
@@ -73,15 +80,29 @@
       var state = context.page;
       var fallback = supervisor && S.safeArray(state.supervisorEffortOptions).length ? state.supervisorEffortOptions : state.effortOptions;
       var options = effortOptions(model.control.value, state.models, fallback, false);
-      chooseEffort(effort.control, changedModel ? options : S.choices(state[effortKey], options), changedModel);
-      if (supervisor) return;
       var selected = S.safeArray(state.models).find(function (item) { return item.modelID === model.control.value; });
+      chooseEffort(
+        effort.control,
+        options,
+        changedModel,
+        selected && selected.defaultReasoningEffort
+      );
+      effort.control.disabled = !state.canSavePreferences || options.length === 0;
+      if (supervisor) return;
       var supported = selected && selected.supportsFastMode === true;
       toggle.control.disabled = !state.canSavePreferences || !supported;
       hint.hidden = !!supported;
       if (!supported) toggle.control.checked = false;
     }
-    model.control.addEventListener("change", function () { updateDependent(true); });
+    model.control.addEventListener("change", function () {
+      updateDependent(true);
+      context.emit(supervisor ? "setSupervisorModel" : "setExecutionModel", supervisor
+        ? { supervisorModel: model.control.value } : { modelID: model.control.value });
+    });
+    effort.control.addEventListener("change", function () {
+      if (!effort.control.disabled) context.emit(supervisor ? "setSupervisorEffort" : "setExecutionEffort",
+        supervisor ? { supervisorEffort: effort.control.value } : { effort: effort.control.value });
+    });
     save.addEventListener("click", function () {
       if (save.disabled) return;
       var values = draft.values();
@@ -94,7 +115,7 @@
       context.page = next;
       context.emit = nextEmit;
       D.selectOptions(model.control, S.choices(next[modelKey], modelChoices(next.models)));
-      D.selectOptions(effort.control, S.choices(next[effortKey], effortOptions(model.control.value, next.models, next.effortOptions, false)));
+      D.selectOptions(effort.control, effortOptions(model.control.value, next.models, next.effortOptions, false), false);
       if (access) D.selectOptions(access.control, S.choices(next.accessMode, next.accessOptions));
       var values = { model: next[modelKey], effort: next[effortKey], enabled: supervisor ? next.supervisorEnabled : next.fastModeEnabled };
       if (access) values.access = next.accessMode;
@@ -130,6 +151,7 @@
   global.CodexBridgeDesktopSettingsModels = {
     preferences: function (page, emit) { return create(page, emit, false); },
     supervisor: function (page, emit) { return create(page, emit, true); },
-    check: check, modelChoices: modelChoices, effortOptions: effortOptions, chooseEffort: chooseEffort
+    check: check, modelChoices: modelChoices, effortOptions: effortOptions,
+    chooseEffort: chooseEffort, defaultEffort: defaultEffort
   };
 }(window));

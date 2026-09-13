@@ -20,8 +20,14 @@
         supervisorModel: settings.supervisorModel,
         supervisorEffort: settings.supervisorEffort,
         supervisorAvailable: false,
-        effortOptions: settings.effortValues.map { effortChoice($0) },
-        supervisorEffortOptions: settings.effortValues.map { effortChoice($0) },
+        effortOptions: effortOptions(
+          for: settings.executionModel,
+          models: settings.modelOptions
+        ),
+        supervisorEffortOptions: effortOptions(
+          for: settings.supervisorModel,
+          models: settings.modelOptions
+        ),
         accessMode: settings.accessMode,
         accessOptions: settings.accessValues.map { accessChoice($0) },
         supervisorEnabled: false,
@@ -46,19 +52,16 @@
         modelCount: settings.modelOptions.count,
         canRefreshModels: canRefreshModels && !settings.isRefreshingModels,
         isRefreshingModels: settings.isRefreshingModels,
-        modelError: settings.modelError
+        modelError: settings.modelError,
+        direct: settings.direct
       )
     }
 
-    private static func effortChoice(
-      _ value: String,
-      includesDefault: Bool = false
-    ) -> BridgeDesktopChoice {
-      choice(
-        value,
-        BridgeDesktopPresentation.extendedReasoningTitle(value),
-        enabled: includesDefault || !value.isEmpty
-      )
+    private static func effortOptions(
+      for modelID: String,
+      models: [BridgeDesktopModelOption]
+    ) -> [BridgeDesktopChoice] {
+      models.first(where: { $0.modelID == modelID })?.reasoningEfforts ?? []
     }
 
     private static func accessChoice(_ value: String) -> BridgeDesktopChoice {

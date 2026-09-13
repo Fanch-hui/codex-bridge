@@ -6,7 +6,7 @@ function runtime() {
   const ui = createHarness([
     "pages-common.js", "pages-form-draft.js", "pages-native-permissions.js",
     "pages-settings-models.js", "pages-settings-agents.js", "pages-settings-instructions.js",
-    "pages-settings-native.js", "pages-settings.js"
+    "pages-settings-native.js", "pages-direct.js", "pages-settings.js"
   ], ["settings-content"]);
   const commands = [];
   const emit = (command, payload) => commands.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
@@ -80,7 +80,7 @@ test("model drafts persist and Fast capability follows the chosen model", () => 
   assert.equal(card.querySelectorAll("select")[0], controls[0]);
   assert.equal(controls[0].value, "standard");
   ui.button("保存模型偏好").dispatch("click");
-  assert.deepEqual(ui.commands[0].payload, { executionModel: "standard", executionEffort: "medium", accessMode: "workspace-write", fastModeEnabled: false });
+  assert.deepEqual(ui.commands.find(item => item.command === "saveSettings").payload, { executionModel: "standard", executionEffort: "medium", accessMode: "workspace-write", fastModeEnabled: false });
   controls[0].value = "fast"; controls[0].dispatch("change");
   assert.equal(fast.disabled, false);
 });
@@ -122,9 +122,10 @@ test("agent permission defaults remain editable without an installation", () => 
   };
   ui.render(page({ agentDefaults: [agent] }));
   const card = ui.section("外部 Agent 默认偏好");
-  assert.equal(card.querySelector(".hint").textContent.includes("尚未登记可用安装"), true);
-  assert.equal(ui.button("保存 Agent 默认", card).disabled, false);
-  ui.button("保存 Agent 默认", card).dispatch("click");
+  assert.equal(card.querySelector(".hint").textContent.includes("自动获取模型"), true);
+  const permission = card.querySelectorAll("select")[2];
+  assert.equal(permission.disabled, false);
+  permission.dispatch("change");
   assert.equal(ui.commands.at(-1).payload.installationID, null);
 });
 
@@ -155,26 +156,19 @@ test("Supervisor and Agent editors retain drafts while updating capabilities and
   ui.render(page({ canSavePreferences: false, agentDefaults: [{ ...agent, canSave: false }] }));
   assert.equal(toggle.checked, true); assert.equal(ui.button("保存 Supervisor").disabled, true);
   ui.render(page({ agentDefaults: [agent] }), (command, payload) => received.push({ command, payload }));
-  ui.button("保存 Agent 默认").dispatch("click");
+  permission.dispatch("change");
   assert.equal(permission.value, "plan");
   assert.equal(received[0].payload.permissionMode, "plan");
   assert.equal(received[0].payload.installationID, "install-a");
 });
 
-test("native rule text stays composing through loading and saving snapshots", () => {
+test("native AGY permissions are presented as connection-managed status", () => {
   const ui = runtime();
-  const policy = { installationID: "agy-a", installationName: "AGY", toolPermission: "default", availableModes: [], availableActions: ["command"], canEdit: true, rules: [] };
+  const policy = { installationID: "agy-a", installationName: "AGY", toolPermission: "always-proceed", availableModes: [], availableActions: ["command"], canEdit: false, rules: [] };
   ui.render(page({ nativePermissionPolicy: policy }));
-  const native = ui.section("AGY CLI Global 工具权限");
-  const target = native.querySelector("input");
-  target.dispatch("compositionstart"); type(target, "swift test 中文"); target.focus();
-  ui.render(page({ nativePermissionPolicy: { ...policy, isSaving: true, canEdit: false } }));
-  assert.equal(native.querySelector("input"), target);
-  assert.equal(target.value, "swift test 中文");
-  assert.equal(ui.document.activeElement, target);
-  assert.equal(ui.button("添加规则").disabled, true);
-  target.dispatch("compositionend");
-  ui.render(page({ nativePermissionPolicy: policy }));
-  ui.button("添加规则").dispatch("click");
-  assert.equal(ui.commands[0].payload.target, "swift test 中文");
+  const native = ui.section("AGY 无头运行权限");
+  assert.equal(native.querySelector(".page-message").textContent.includes("已启用 Always Proceed"), true);
+  assert.equal(native.querySelectorAll("button").length, 0);
+  ui.render(page({ nativePermissionPolicy: { ...policy, toolPermission: "request-review" } }));
+  assert.equal(native.querySelector(".page-message").textContent.includes("连接 AGY 时需要同意启用"), true);
 });

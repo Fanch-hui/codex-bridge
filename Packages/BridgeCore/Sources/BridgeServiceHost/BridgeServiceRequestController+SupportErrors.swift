@@ -23,7 +23,15 @@ extension BridgeServiceRequestController {
       return mapAgentRegistryError(error)
     }
     if let error = error as? ServiceAgentConnectionError {
-      return .init(code: "agent_installation_not_found", message: error.localizedDescription)
+      switch error {
+      case .installationNotFound:
+        return .init(code: "agent_installation_not_found", message: error.localizedDescription)
+      case .headlessPermissionConfirmationRequired:
+        return .init(
+          code: "agent_headless_permission_confirmation_required",
+          message: error.localizedDescription
+        )
+      }
     }
     if let error = error as? ServiceAgentCredentialError {
       return mapAgentCredentialError(error)

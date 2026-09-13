@@ -98,7 +98,11 @@ extension BridgeDesktopCommandRouter {
       else { return }
     }
     let current = model.agentModelDefault(for: providerID)
-    let effectiveModel = selectedModel ?? current.model
+    let options = model.agentModelOptions(for: providerID)
+    let effectiveModel =
+      selectedModel
+      ?? options.first(where: { !$0.supportedReasoningEfforts.isEmpty })?.modelID
+      ?? options.first?.modelID
     let selectedEffort = payload.effort.flatMap { validatedID($0, maximumBytes: 64) }
     if let selectedEffort {
       guard provider.supportsEffortSelection,
@@ -113,9 +117,17 @@ extension BridgeDesktopCommandRouter {
       providerID: providerID
     )
     guard let permission else { return }
-    model.saveAgentModelDefault(selectedModel, providerID: providerID)
-    model.saveAgentPermissionMode(permission, providerID: providerID)
-    model.saveAgentEffort(selectedEffort, providerID: providerID)
+    model.saveAgentDefaults(
+      providerID: providerID, model: selectedModel, permissionMode: permission,
+      effort: selectedEffort)
+    if selectedModel != current.model {
+      let installationID =
+        payload.installationID
+        ?? model.agentInstallations.first {
+          $0.providerID == providerID && $0.isEnabled && $0.availability == "available"
+        }?.installationID
+      model.refreshAgentModelCatalog(installationID: installationID, providerID: providerID)
+    }
   }
 
   private static func validatedAgentPermission(

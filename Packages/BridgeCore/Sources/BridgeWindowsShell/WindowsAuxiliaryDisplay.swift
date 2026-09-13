@@ -139,6 +139,7 @@
     var modelOptions: [BridgeDesktopModelOption] = []
     var keepServiceRunningAfterExit: Bool = true
     var serviceRegistered: Bool = false
+    var direct: BridgeDesktopDirectState? = nil
   }
 
   final class AuxiliaryDisplayBox<Value: Equatable & Sendable>: @unchecked Sendable {

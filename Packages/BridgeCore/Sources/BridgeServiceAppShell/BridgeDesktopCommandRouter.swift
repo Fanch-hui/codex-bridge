@@ -10,6 +10,8 @@ enum BridgeDesktopCommandRouter {
     model: BridgeServiceAppModel
   ) {
     switch envelope.command {
+    case .saveDirectConfiguration:
+      model.saveDirectConfiguration(envelope.payload.value)
     case .ready:
       return
     case .refresh:

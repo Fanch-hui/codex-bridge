@@ -54,7 +54,7 @@ extension BridgeServiceApplication {
     else {
       throw BridgeMCPQueryError.contractRejected
     }
-    let project = try await writableProject(request.projectID)
+    let project = try await applyingDirectConfiguration(to: writableProject(request.projectID))
     let unresolvedPolicyRequest = DirectCommandRequest(
       projectID: project.id,
       commandID: request.commandID,

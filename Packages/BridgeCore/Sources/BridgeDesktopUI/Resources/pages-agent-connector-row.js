@@ -1,6 +1,7 @@
 (function (global) {
   "use strict";
   var Details = global.CodexBridgeDesktopAgentConnectorDetails;
+  var HeadlessConsent = global.CodexBridgeDesktopAgentHeadlessConsent;
   function create(provider, dependencies) {
     var S = dependencies.S;
     var D = dependencies.D;
@@ -48,6 +49,10 @@
         if (installation && installation.canReprobe) sendReprobe(installation, context.acceptReplacement);
     });
     row.appendChild(reviewConfirmation.root);
+    var headlessConfirmation = HeadlessConsent.create(S, function () {
+      sendConnect(action, true);
+    });
+    row.appendChild(headlessConfirmation.root);
 
     var details = S.node("details", "agent-details");
     var summary = S.node("summary", null, "查看详情");
@@ -104,22 +109,26 @@
           ? (primary.availability === "available" ? "连接" : "重试")
           : discoveryState(currentProvider) === "discovered" ? "连接" : "重试";
         action.disabled = !ready;
-        actionHint.textContent = "连接成功后会显示在本行状态中。";
+        actionHint.textContent = currentProvider.requiresHeadlessAlwaysProceed
+          ? "连接前需要同意为 AGY 启用无头模式 Always Proceed。"
+          : "连接成功后会显示在本行状态中。";
       } else {
         action.disabled = true;
         actionHint.textContent = isConnectedValue ? "" : discoveryMessage(currentProvider);
       }
     }
 
-    function sendConnect(button) {
+    function sendConnect(button, alwaysProceedConfirmed) {
       if (button.disabled) return;
       var values = draft.values();
       pending = { revision: context.revision, kind: "connect" };
+      headlessConfirmation.close();
       refreshAction();
       context.emit("connectAgent", {
         providerID: currentProvider.providerID,
         baseURL: currentProvider.requiresConfiguration ? values.baseURL : null,
-        apiKey: currentProvider.requiresConfiguration ? values.apiKey : null
+        apiKey: currentProvider.requiresConfiguration ? values.apiKey : null,
+        confirmed: !!alwaysProceedConfirmed
       });
       apiKey.control.value = "";
       draft.update({ baseURL: baseURL.control.value, apiKey: "" });
@@ -220,6 +229,7 @@
       if (!primary || primary.availability !== "needs_review") {
         reviewConfirmation.close();
       }
+      if (!HeadlessConsent.required(nextProvider)) headlessConfirmation.close();
       var message = detailsBody.querySelector(".agent-discovery-message");
       if (!installations.length) {
         if (!message) {
@@ -237,7 +247,11 @@
       control.addEventListener("compositionend", refreshAction);
     });
     action.addEventListener("click", function () {
-      if (actionMode === "review") reviewConfirmation.open(); else if (actionMode === "connect") sendConnect(action);
+      if (actionMode === "review") reviewConfirmation.open();
+      else if (actionMode === "connect") {
+        if (HeadlessConsent.required(currentProvider)) headlessConfirmation.open();
+        else sendConnect(action, false);
+      }
     });
     configSave.addEventListener("click", function () { sendConnect(configSave); });
     return { root: row, update: update };

@@ -24,6 +24,7 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
   public let supportsSkillSelection: Bool
   public let supportsSupervisor: Bool
   public let allowsNetworkAccess: Bool
+  public let requiresHeadlessAlwaysProceed: Bool
   public let workspaceEnforcement: String
   public let approvalEnforcement: String
   public let networkEnforcement: String
@@ -51,6 +52,7 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
     supportsSkillSelection: Bool = false,
     supportsSupervisor: Bool = false,
     allowsNetworkAccess: Bool = false,
+    requiresHeadlessAlwaysProceed: Bool = false,
     workspaceEnforcement: String = "unavailable",
     approvalEnforcement: String = "unavailable",
     networkEnforcement: String = "unavailable",
@@ -77,6 +79,7 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
     self.supportsSkillSelection = supportsSkillSelection
     self.supportsSupervisor = supportsSupervisor
     self.allowsNetworkAccess = allowsNetworkAccess
+    self.requiresHeadlessAlwaysProceed = requiresHeadlessAlwaysProceed
     self.workspaceEnforcement = workspaceEnforcement
     self.approvalEnforcement = approvalEnforcement
     self.networkEnforcement = networkEnforcement
@@ -233,6 +236,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     supportsEffortSelection: true,
     supportsSkillSelection: true,
     allowsNetworkAccess: true,
+    requiresHeadlessAlwaysProceed: true,
     workspaceEnforcement: "provider_native",
     approvalEnforcement: "provider_soft_deny",
     networkEnforcement: "provider_native",

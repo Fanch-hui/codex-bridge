@@ -14,6 +14,7 @@
         discoveredExecutablePath: provider.discoveredExecutablePath,
         discoveredConfigurationPath: provider.discoveredConfigurationPath,
         requiresConfiguration: provider.requiresConfiguration,
+        requiresHeadlessAlwaysProceed: provider.requiresHeadlessAlwaysProceed,
         supportsModelSelection: provider.supportsModelSelection,
         supportsEffortSelection: provider.supportsEffortSelection,
         supportsSteer: provider.supportsSteer,
@@ -57,7 +58,8 @@
         displayName: model.displayName,
         reasoningEfforts: model.supportedReasoningEfforts.map {
           BridgeDesktopChoice(id: $0, title: DirectWorkspacePresentation.effortLabel($0))
-        }
+        },
+        defaultReasoningEffort: model.defaultReasoningEffort
       )
     }
   }

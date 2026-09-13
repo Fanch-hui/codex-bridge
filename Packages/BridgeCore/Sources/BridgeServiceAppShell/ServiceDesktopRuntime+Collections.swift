@@ -10,6 +10,7 @@ extension BridgeServiceAppModel {
     includeThreads: Bool,
     forceCatalogRefresh: Bool = false
   ) async {
+    async let directConfigurationResult = optional { try await client.directConfiguration() }
     async let projectResult = optional { try await client.projects() }
     let scanAgents = agentProviders.isEmpty || forceCatalogRefresh
     async let agentCatalogResult = optional {
@@ -26,6 +27,7 @@ extension BridgeServiceAppModel {
     }
     async let mcpClientResult = optional { try await client.mcpClients() }
 
+    if let value = await directConfigurationResult { directConfiguration = value }
     if let value = await projectResult {
       applyProjectSnapshot(value)
     }
@@ -69,8 +71,13 @@ extension BridgeServiceAppModel {
     }
     if includeCatalog {
       await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)
+      for installation in agentInstallations
+      where installation.isEnabled && installation.availability == "available" {
+        refreshAgentModelCatalog(
+          installationID: installation.installationID, providerID: installation.providerID)
+      }
     }
-    scheduleAgentDiscoveryUpgradeIfNeeded()
+    scheduleServiceUpgradeIfNeeded()
   }
 
   private func applyProjectSnapshot(_ value: [MCPProjectSummary]) {

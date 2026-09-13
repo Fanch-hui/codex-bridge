@@ -34,7 +34,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectDetail {
     try Self.checkDeadline(deadline)
-    let project = try await readableProject(projectID)
+    let project = try await applyingDirectConfiguration(to: readableProject(projectID))
     return Self.projectDetail(project)
   }
 
@@ -43,7 +43,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectDetail {
     try Self.checkDeadline(deadline)
-    return Self.projectDetail(try await managedProject(projectID))
+    return Self.projectDetail(try await applyingDirectConfiguration(to: managedProject(projectID)))
   }
 
   public func serviceProjectCommands(
@@ -51,7 +51,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectCommands {
     try Self.checkDeadline(deadline)
-    let project = try await readableProject(projectID)
+    let project = try await applyingDirectConfiguration(to: readableProject(projectID))
     let commands = project.workspaceCommands.map(Self.projectCommand)
     var recommendedUsage: [String: MCPRecommendedCommandUsage] = [:]
     for rule in commandPolicy.effectiveSafeCommandRules {
@@ -127,7 +127,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectChanges {
     try Self.checkDeadline(deadline)
-    let project = try await readableProject(projectID)
+    let project = try await applyingDirectConfiguration(to: readableProject(projectID))
     let changes = try await mutations.changes(projectID: project.id)
     return MCPProjectChanges(
       changedFiles: changes.changedFiles,

@@ -38,9 +38,9 @@
     };
   }
 
-  function selectOptions(control, choices) {
+  function selectOptions(control, choices, preserveMissing) {
     var value = control.value;
-    var options = S.choices(value, choices);
+    var options = preserveMissing === false ? S.safeArray(choices) : S.choices(value, choices);
     var signature = JSON.stringify(options);
     if (control.__choiceSignature === signature) return;
     control.__choiceSignature = signature;

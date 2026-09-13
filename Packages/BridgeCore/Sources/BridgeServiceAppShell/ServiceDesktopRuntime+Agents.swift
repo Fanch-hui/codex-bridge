@@ -32,7 +32,8 @@ extension BridgeServiceAppModel {
   func connectAgentInstallation(
     providerID: String,
     baseURL: String? = nil,
-    apiKey: String? = nil
+    apiKey: String? = nil,
+    alwaysProceedConfirmed: Bool = false
   ) {
     guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
       errorMessage = "未找到可连接的 Agent Provider。"
@@ -43,7 +44,8 @@ extension BridgeServiceAppModel {
         try await client.connectAgentInstallation(
           providerID: provider.providerID,
           baseURL: baseURL,
-          apiKey: apiKey
+          apiKey: apiKey,
+          alwaysProceedConfirmed: alwaysProceedConfirmed
         )
       },
       successMessage: { installation in
@@ -119,6 +121,10 @@ extension BridgeServiceAppModel {
         let catalog = try await client.agentCatalog()
         self.agentProviders = catalog.providers
         self.agentInstallations = catalog.installations
+        if let installation, installation.isEnabled, installation.availability == "available" {
+          self.refreshAgentModelCatalog(
+            installationID: installation.installationID, providerID: installation.providerID)
+        }
         let isSuccess = installation?.availability == "available" || installation == nil
         self.postToast(
           successMessage(installation),

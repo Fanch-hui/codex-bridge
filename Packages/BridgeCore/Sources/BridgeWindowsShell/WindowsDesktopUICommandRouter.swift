@@ -182,7 +182,8 @@
         return .connectAgentFromDesktop(
           providerID: providerID,
           baseURL: AgentConnectionInput.baseURL(payload.baseURL),
-          apiKey: AgentConnectionInput.apiKey(payload.apiKey)
+          apiKey: AgentConnectionInput.apiKey(payload.apiKey),
+          alwaysProceedConfirmed: payload.confirmed == true
         )
       case .registerAgent:
         guard let providerID = nonEmpty(payload.providerID),
@@ -236,6 +237,8 @@
         .removeAgentNativePermissionRule, .prepareAgentPermissionRemediation,
         .applyAgentPermissionRemediation:
         return nativePermissionCommand(envelope.command, payload: payload)
+      case .saveDirectConfiguration:
+        return payload.value.map { .saveDirectConfiguration(json: $0) }
       case .setDirectApprovalMode:
         return nonEmpty(payload.mode).map(MainWindowCommand.setSettingsDirectApprovalMode)
       case .setTaskStartApprovalMode:

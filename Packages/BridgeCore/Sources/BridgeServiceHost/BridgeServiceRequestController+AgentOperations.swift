@@ -85,6 +85,7 @@ extension BridgeServiceRequestController {
       baseURL: payload.baseURL,
       apiKey: payload.apiKey,
       candidates: candidates,
+      alwaysProceedConfirmed: payload.alwaysProceedConfirmed,
       deadline: Self.deadline()
     )
     return try BridgeServiceIPCCodec.success(
@@ -172,6 +173,7 @@ extension BridgeServiceRequestController {
       discoveredExecutablePath: discovery?.executablePath,
       discoveredConfigurationPath: discovery?.configurationPath,
       requiresConfiguration: policy?.requiresConfiguration ?? false,
+      requiresHeadlessAlwaysProceed: policy?.requiresHeadlessAlwaysProceed ?? false,
       registrationTrustProfile: policy?.registrationTrustProfile.rawValue ?? "managed",
       supportsModelSelection: policy?.supportsModelSelection ?? true,
       supportsEffortSelection: policy?.supportsEffortSelection ?? true,

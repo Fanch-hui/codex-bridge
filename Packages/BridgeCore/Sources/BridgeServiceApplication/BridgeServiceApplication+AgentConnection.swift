@@ -5,9 +5,15 @@ import Foundation
 
 public enum ServiceAgentConnectionError: Error, LocalizedError, Sendable {
   case installationNotFound
+  case headlessPermissionConfirmationRequired
 
   public var errorDescription: String? {
-    "未找到本机 Agent，请确认已安装对应的命令行程序。"
+    switch self {
+    case .installationNotFound:
+      "未找到本机 Agent，请确认已安装对应的命令行程序。"
+    case .headlessPermissionConfirmationRequired:
+      "AGY 无头任务需要自动通过工具执行，请先同意将本机 AGY 全局工具策略设为 Always Proceed（总是通过）。"
+    }
   }
 }
 
@@ -17,10 +23,15 @@ extension BridgeServiceApplication {
     baseURL: String?,
     apiKey: String?,
     candidates: [ServiceAgentRegistrationRequest],
+    alwaysProceedConfirmed: Bool = false,
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
     try Self.checkDeadline(deadline)
     let registry = try requiredAgentRegistry()
+    try requireHeadlessPermissionConfirmation(
+      providerID: providerID,
+      confirmed: alwaysProceedConfirmed
+    )
     let matchingCandidates = candidates.filter { $0.providerID == providerID }
     guard !matchingCandidates.isEmpty else {
       throw ServiceAgentConnectionError.installationNotFound
@@ -34,7 +45,20 @@ extension BridgeServiceApplication {
       do {
         try await configureConnectionCredentials(candidate, baseURL: baseURL, apiKey: apiKey)
         let record = try await registry.connect(candidate)
-        if record.availability == .available { return record }
+        if record.availability == .available {
+          do {
+            try await ensureHeadlessPermission(
+              providerID: providerID,
+              installationID: record.id,
+              registry: registry,
+              deadline: deadline
+            )
+          } catch {
+            _ = try? await registry.setEnabled(false, installationID: record.id)
+            throw error
+          }
+          return record
+        }
         lastRecord = record
       } catch {
         lastError = error
@@ -43,6 +67,40 @@ extension BridgeServiceApplication {
     if let lastRecord { return lastRecord }
     if let lastError { throw lastError }
     throw ServiceAgentConnectionError.installationNotFound
+  }
+
+  private func requireHeadlessPermissionConfirmation(
+    providerID: AgentProviderID,
+    confirmed: Bool
+  ) throws {
+    guard
+      ServiceAgentProviderPolicyRegistry.policy(for: providerID)?.requiresHeadlessAlwaysProceed
+        == true
+    else { return }
+    guard confirmed else {
+      throw ServiceAgentConnectionError.headlessPermissionConfirmationRequired
+    }
+  }
+
+  private func ensureHeadlessPermission(
+    providerID: AgentProviderID,
+    installationID: AgentInstallationID,
+    registry: ServiceAgentRegistry,
+    deadline: ContinuousClock.Instant
+  ) async throws {
+    guard
+      ServiceAgentProviderPolicyRegistry.policy(for: providerID)?.requiresHeadlessAlwaysProceed
+        == true
+    else { return }
+    try Self.checkDeadline(deadline)
+    let current = try await registry.nativePermissionPolicy(installationID: installationID)
+    guard current.toolPermission != "always-proceed" else { return }
+    _ = try await registry.updateNativePermissionPolicy(
+      installationID: installationID,
+      mutation: .setToolPermission("always-proceed"),
+      expectedRevision: current.revision
+    )
+    try Self.checkDeadline(deadline)
   }
 
   private func configureConnectionCredentials(

@@ -42,7 +42,7 @@
   function renderContentBody(content, page, emit) {
     S.clear(content);
     if (!page.selectedTask && page.history && page.history.selectedThreadID) {
-      content.appendChild(S.node("h3", "detail-title", page.history.selectedThreadTitle || "Codex 外部历史会话"));
+      content.appendChild(S.node("h3", "detail-title", page.history.selectedThreadTitle || "Codex 历史会话"));
       if (S.safeArray(page.history.conversation).length) {
         global.CodexBridgeDesktopWorkbenchConversation.render(content, page.history.conversation, page, emit);
       } else {

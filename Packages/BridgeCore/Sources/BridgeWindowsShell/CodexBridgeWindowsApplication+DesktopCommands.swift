@@ -37,6 +37,9 @@
         return true
       case .selectTaskByID(id: let taskID):
         model.selectTask(id: taskID)
+        synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
+        selectedPage = .workbench
+        onUI { WindowsMainWindow.selectPage(.workbench) }
         return true
       case .interruptTask(let taskID):
         Task { @MainActor in await model.interruptTask(id: taskID) }
@@ -156,12 +159,18 @@
           management.selectProvider(at: index)
         }
         return true
-      case .connectAgentFromDesktop(let providerID, let baseURL, let apiKey):
+      case .connectAgentFromDesktop(
+        let providerID,
+        let baseURL,
+        let apiKey,
+        let alwaysProceedConfirmed
+      ):
         Task { @MainActor in
           await management.connectAgent(
             providerID: providerID,
             baseURL: baseURL,
-            apiKey: apiKey
+            apiKey: apiKey,
+            alwaysProceedConfirmed: alwaysProceedConfirmed
           )
           await auxiliary.agentDefaults.refresh()
         }

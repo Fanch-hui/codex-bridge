@@ -123,16 +123,20 @@
     defaultOpt.value = ""; taskSelect.appendChild(defaultOpt);
     var history = page.history || {}, historicalThreads = S.safeArray(history.threads);
     var curTask = null;
-    tasks.forEach(function (t) {
-      var opt = S.node("option", null, "[" + t.provider + "] " + t.title + " (" + t.status + ")");
-      opt.value = t.taskID;
-      if (t.taskID === page.selectedTaskID || t.selected) { opt.selected = true; curTask = t; }
-      taskSelect.appendChild(opt);
+    groupTasks(tasks).forEach(function (group) {
+      var taskGroup = S.node("optgroup"); taskGroup.label = group.label + " 会话";
+      group.tasks.forEach(function (t) {
+        var opt = S.node("option", null, t.title + " (" + t.status + ")");
+        opt.value = t.taskID;
+        if (t.taskID === page.selectedTaskID || t.selected) { opt.selected = true; curTask = t; }
+        taskGroup.appendChild(opt);
+      });
+      taskSelect.appendChild(taskGroup);
     });
     if (historicalThreads.length) {
-      var group = S.node("optgroup"); group.label = "Codex 外部历史会话";
+      var group = S.node("optgroup"); group.label = "Codex 历史会话（未关联 Bridge 任务）";
       historicalThreads.forEach(function (thread) {
-        var option = S.node("option", null, thread.title);
+        var option = S.node("option", null, thread.title || thread.preview || thread.threadID);
         option.value = "history:" + thread.threadID;
         option.dataset.threadID = thread.threadID;
         option.selected = !page.selectedTaskID && thread.threadID === history.selectedThreadID;
@@ -150,7 +154,7 @@
 
     var taskFace = S.node("span", "task-dropdown-face");
     var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 会话 (" + (tasks.length + S.safeArray(page.history && page.history.threads).length) + ")");
-    if (!curTask && history.selectedThreadID) taskFaceLabel = "Codex · " + (history.selectedThreadTitle || "外部历史会话");
+    if (!curTask && history.selectedThreadID) taskFaceLabel = "Codex · " + (history.selectedThreadTitle || "历史会话");
     taskFace.appendChild(S.node("span", "task-title-text", taskFaceLabel));
     taskFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
     taskWrap.appendChild(taskFace);
@@ -160,6 +164,20 @@
       row4.appendChild(S.button("中断", "interruptTask", { taskID: curTask.taskID }, emit, "small danger", false));
     }
     return row4;
+  }
+
+  function groupTasks(tasks) {
+    var groups = [], byProvider = new Map();
+    tasks.forEach(function (task) {
+      var key = task.providerID || task.provider || "unknown";
+      var group = byProvider.get(key);
+      if (!group) {
+        group = { label: task.provider || task.providerID || "未知 Agent", tasks: [] };
+        byProvider.set(key, group); groups.push(group);
+      }
+      group.tasks.push(task);
+    });
+    return groups;
   }
 
   var browserSignature, headerSignature;

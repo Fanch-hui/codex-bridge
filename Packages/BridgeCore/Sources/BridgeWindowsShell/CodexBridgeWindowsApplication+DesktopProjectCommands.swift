@@ -105,6 +105,7 @@
         onUI { WindowsMainWindow.selectPage(.workbench) }
         Task { @MainActor in
           await model.openWorkbenchThread(threadID: threadID, projectID: projectID)
+          synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
         }
       default:
         return false

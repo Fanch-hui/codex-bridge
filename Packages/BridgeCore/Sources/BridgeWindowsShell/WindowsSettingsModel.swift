@@ -13,6 +13,7 @@
 
     var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     var models: [MCPModelSummary] = []
+    var directConfiguration: IPCDirectConfiguration?
     var preferences: IPCModelPreferences?
     private(set) var instructions = ""
     private(set) var directMode = "require"
@@ -94,6 +95,7 @@
         failures.append("模型：\(modelError ?? "无法读取模型目录")")
       }
       isRefreshingModels = false
+      directConfiguration = try? await client.directConfiguration()
       do {
         instructions = try await client.customInstructions()
       } catch {
@@ -237,6 +239,7 @@
           reasoningEfforts: model.reasoningEfforts.map {
             BridgeDesktopChoice(id: $0, title: DirectWorkspacePresentation.effortLabel($0))
           },
+          defaultReasoningEffort: model.defaultReasoningEffort,
           supportsFastMode: model.supportsFastMode
         )
       }
@@ -277,15 +280,25 @@
         taskStartApprovalMode: taskStartMode,
         modelOptions: modelOptions,
         keepServiceRunningAfterExit: keepServiceRunningAfterExit,
-        serviceRegistered: serviceRegistered
+        serviceRegistered: serviceRegistered,
+        direct: directConfiguration.map {
+          BridgeDesktopDirectState(
+            commandMode: $0.commandMode, allowedCommands: $0.allowedCommands,
+            deniedCommands: $0.deniedCommands, usesProjectDefaults: $0.usesProjectDefaults == true,
+            canSave: connectionState == .connected && !busy)
+        }
       )
       displayBox.store(value)
     }
 
     private func availableEffortValues() -> [String] {
-      DirectWorkspacePresentation.effortValues(
-        catalog: models.flatMap(\.reasoningEfforts),
-        selected: [preferences?.executionEffort, preferences?.supervisorEffort].compactMap { $0 }
+      let catalog =
+        preferences.flatMap { value in
+          models.first(where: { $0.modelID == value.executionModel })?.reasoningEfforts
+        } ?? []
+      return DirectWorkspacePresentation.effortValues(
+        catalog: catalog,
+        selected: [preferences?.executionEffort].compactMap { $0 }
       )
     }
   }

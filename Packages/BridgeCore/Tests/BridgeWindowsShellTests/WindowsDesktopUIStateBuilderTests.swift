@@ -76,6 +76,32 @@
       XCTAssertFalse(state.connections?.codex?.canRefresh == true)
     }
 
+    func testSettingsUseEachSelectedModelReasoningEfforts() {
+      var settings = makeSettings()
+      settings.executionModel = "model-a"
+      settings.supervisorModel = "model-b"
+      settings.modelOptions = [
+        BridgeDesktopModelOption(
+          modelID: "model-a",
+          displayName: "Model A",
+          reasoningEfforts: [BridgeDesktopChoice(id: "low", title: "低")]
+        ),
+        BridgeDesktopModelOption(
+          modelID: "model-b",
+          displayName: "Model B",
+          reasoningEfforts: [BridgeDesktopChoice(id: "high", title: "高")]
+        ),
+      ]
+
+      let page = WindowsDesktopUIStateBuilder.settingsPage(
+        settings: settings,
+        agentDefaults: nil
+      )
+
+      XCTAssertEqual(page?.effortOptions.map(\.id), ["low"])
+      XCTAssertEqual(page?.supervisorEffortOptions.map(\.id), ["high"])
+    }
+
     func testLegacyRowsDoNotCreateSyntheticRecentTaskIdentifiers() {
       let workbench = makeWorkbench(recentTaskRows: ["本机任务 — 已结束"])
       let state = WindowsDesktopUIStateBuilder.build(
@@ -265,7 +291,8 @@
         .connectAgentFromDesktop(
           providerID: "deepseek-harness",
           baseURL: "https://api.example.test",
-          apiKey: "secret"
+          apiKey: "secret",
+          alwaysProceedConfirmed: false
         )
       )
 

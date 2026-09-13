@@ -95,7 +95,8 @@
     func connectAgent(
       providerID: String,
       baseURL: String? = nil,
-      apiKey: String? = nil
+      apiKey: String? = nil,
+      alwaysProceedConfirmed: Bool = false
     ) async {
       guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
         reportAgentFailure("未找到可连接的 Agent Provider。")
@@ -128,7 +129,8 @@
         let installation = try await client.connectAgentInstallation(
           providerID: provider.providerID,
           baseURL: AgentConnectionInput.baseURL(baseURL),
-          apiKey: AgentConnectionInput.apiKey(apiKey)
+          apiKey: AgentConnectionInput.apiKey(apiKey),
+          alwaysProceedConfirmed: alwaysProceedConfirmed
         )
         selectedProviderID = provider.providerID
         selectedInstallationID = installation.installationID

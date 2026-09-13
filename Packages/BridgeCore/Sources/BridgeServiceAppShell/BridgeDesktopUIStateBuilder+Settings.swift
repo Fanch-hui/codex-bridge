@@ -55,7 +55,13 @@ extension BridgeDesktopUIStateBuilder {
       modelCount: model.models.count,
       canRefreshModels: !model.isRefreshing,
       isRefreshingModels: model.isRefreshing,
-      modelError: model.modelCatalogError
+      modelError: model.modelCatalogError,
+      direct: model.directConfiguration.map {
+        BridgeDesktopDirectState(
+          commandMode: $0.commandMode, allowedCommands: $0.allowedCommands,
+          deniedCommands: $0.deniedCommands, usesProjectDefaults: $0.usesProjectDefaults == true,
+          canSave: model.connectionState == .connected && !model.isSavingDirectConfiguration)
+      }
     )
   }
 
@@ -76,6 +82,7 @@ extension BridgeDesktopUIStateBuilder {
       reasoningEfforts: model.reasoningEfforts.map {
         BridgeDesktopChoice(id: $0, title: reasoningTitle($0))
       },
+      defaultReasoningEffort: model.defaultReasoningEffort,
       supportsFastMode: model.supportsFastMode
     )
   }
@@ -117,7 +124,8 @@ extension BridgeDesktopUIStateBuilder {
           displayName: item.displayName,
           reasoningEfforts: item.supportedReasoningEfforts.map {
             BridgeDesktopChoice(id: $0, title: BridgeDesktopPresentation.reasoningTitle($0))
-          }
+          },
+          defaultReasoningEffort: item.defaultReasoningEffort
         )
       }
       return BridgeDesktopAgentDefaultState(
@@ -139,7 +147,12 @@ extension BridgeDesktopUIStateBuilder {
         canRefreshModels: provider.supportsModelSelection
           && installation?.effectiveCapabilities.contains("selection.model") == true,
         isRefreshingModels: model.isRefreshingAgentModels(for: provider.providerID),
-        errorMessage: model.agentModelRefreshError(for: provider.providerID)
+        errorMessage: model.agentModelRefreshError(for: provider.providerID) ?? model.errorMessage,
+        canSelectModel: provider.supportsModelSelection
+          && installation?.effectiveCapabilities.contains("selection.model") == true,
+        canSelectEffort: provider.supportsEffortSelection
+          && model.supportsAgentEffortSelection(
+            providerID: provider.providerID, installationID: installation?.installationID)
       )
     }
   }

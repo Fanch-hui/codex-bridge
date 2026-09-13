@@ -135,7 +135,8 @@ extension BridgeServiceApplication {
     MCPCommandBlacklistRule(
       ruleID: Self.safe(rule.id, maximum: 128),
       executable: rule.executable.map { Self.safe($0, maximum: 4_096) },
-      pattern: rule.pattern.map { Self.safe($0, maximum: 4_096) }
+      pattern: rule.pattern.map { Self.safe($0, maximum: 4_096) },
+      arguments: rule.arguments
     )
   }
 

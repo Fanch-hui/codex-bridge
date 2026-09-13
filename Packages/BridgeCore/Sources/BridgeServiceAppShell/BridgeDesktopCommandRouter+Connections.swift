@@ -151,7 +151,8 @@ extension BridgeDesktopCommandRouter {
     model.connectAgentInstallation(
       providerID: providerID,
       baseURL: baseURL,
-      apiKey: apiKey
+      apiKey: apiKey,
+      alwaysProceedConfirmed: payload.confirmed == true
     )
   }
 

@@ -37,7 +37,7 @@
       return BridgeDesktopProjectsState(
         header: header(
           "项目",
-          "管理项目登记、访问权限与执行边界。",
+          "管理项目登记、访问权限与项目资源。",
           "folder.fill"
         ),
         rows: projectRows,

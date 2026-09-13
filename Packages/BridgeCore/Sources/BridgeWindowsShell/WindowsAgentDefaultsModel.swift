@@ -219,8 +219,12 @@
     }
 
     func availableEffortValues() -> [String] {
-      DirectWorkspacePresentation.effortValues(
-        catalog: models.flatMap(\.supportedReasoningEfforts),
+      let catalog =
+        selectedModelID.flatMap { modelID in
+          models.first(where: { $0.modelID == modelID })?.supportedReasoningEfforts
+        } ?? []
+      return DirectWorkspacePresentation.effortValues(
+        catalog: catalog,
         selected: [selectedEffort],
         includesProviderDefault: true
       )

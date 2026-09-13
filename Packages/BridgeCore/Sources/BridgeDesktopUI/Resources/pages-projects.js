@@ -13,7 +13,7 @@
     toolbar.appendChild(S.node("span", "toolbar-spacer")); toolbar.appendChild(add);
     var layout = S.node("div", "split-layout"), list = S.node("section", "list-panel");
     var detailHost = S.node("div", "project-detail-host"), empty = S.node("section", "detail-panel");
-    S.empty(empty, "请选择一个项目", "从左侧列表选择目录后，可以配置访问权限和 Direct 命令。");
+    S.empty(empty, "请选择一个项目", "从左侧列表选择目录后，可以配置访问权限并查看项目资源。");
     detailHost.appendChild(empty); layout.appendChild(list); layout.appendChild(detailHost);
     container.appendChild(header); container.appendChild(toolbar); container.appendChild(layout);
     return { header: header, add: add, layout: layout, list: list, detailHost: detailHost, empty: empty };
@@ -67,7 +67,7 @@
   }
 
   function createDetail(projectID) {
-    var current = { project: null, emit: null };
+    var current = { project: null, emit: null }, collectionsSignature = null;
     var root = S.node("section", "detail-panel"), header = S.node("div", "detail-panel-header");
     var title = S.node("div"), name = S.node("h3");
     title.appendChild(name); title.appendChild(S.node("p", "muted mono", projectID)); header.appendChild(title);
@@ -79,24 +79,33 @@
     header.appendChild(remove); root.appendChild(header);
     var body = S.node("div", "detail-body"), description = S.node("p", "muted");
     var policy = global.CodexBridgeDesktopProjectEditors.policy(projectID);
-    var workspace = global.CodexBridgeDesktopProjectWorkspace.create(projectID);
-    var collections = S.node("div");
-    body.appendChild(description); body.appendChild(policy.root); body.appendChild(workspace.root);
+    var collections = S.node("div", "project-collections-stack");
+    body.appendChild(description); body.appendChild(policy.root);
     body.appendChild(collections); root.appendChild(body);
     return {
       root: root,
       setAvailable: function (available) {
-        remove.disabled = !available; policy.setAvailable(available); workspace.setAvailable(available);
+        remove.disabled = !available; policy.setAvailable(available);
       },
       update: function (page, project, emit) {
         current.project = project; current.emit = emit;
         name.textContent = project.name; description.textContent = page.selectedProjectDetail || "";
         description.hidden = !page.selectedProjectDetail; remove.disabled = !page.canRemove;
         policy.update(page, project, emit);
-        workspace.root.hidden = !page.workspace;
-        workspace.update(page.workspace, emit);
-        S.clear(collections);
-        global.CodexBridgeDesktopProjectCollections.render(collections, page, emit);
+        var nextCollectionsSignature = JSON.stringify({
+          verificationCommands: page.verificationCommands,
+          sessions: page.sessions,
+          threads: page.threads,
+          selectedThreadID: page.selectedThreadID,
+          selectedThreadTitle: page.selectedThreadTitle,
+          selectedThreadConversation: page.selectedThreadConversation,
+          skills: page.skills
+        });
+        if (nextCollectionsSignature !== collectionsSignature) {
+          S.clear(collections);
+          global.CodexBridgeDesktopProjectCollections.render(collections, page, emit);
+          collectionsSignature = nextCollectionsSignature;
+        }
       }
     };
   }

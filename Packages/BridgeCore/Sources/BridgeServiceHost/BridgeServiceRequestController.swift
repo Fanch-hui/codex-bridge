@@ -84,6 +84,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
 
   func handleOperation(_ request: BridgeServiceIPCRequest) async throws -> Data {
     switch request.operation {
+    case .getDirectConfiguration, .updateDirectConfiguration:
+      return try await handleDirectConfiguration(request)
     case .status:
       return try await handleStatus(request)
     case .listProjects:

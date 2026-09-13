@@ -33,6 +33,7 @@ final class ServiceAgentProviderPolicyTests: XCTestCase {
     XCTAssertTrue(policy.supportsSkillSelection)
     XCTAssertFalse(policy.supportsSupervisor)
     XCTAssertTrue(policy.allowsNetworkAccess)
+    XCTAssertTrue(policy.requiresHeadlessAlwaysProceed)
     XCTAssertEqual(policy.workspaceEnforcement, "provider_native")
     XCTAssertEqual(policy.approvalEnforcement, "provider_soft_deny")
     XCTAssertEqual(policy.networkEnforcement, "provider_native")

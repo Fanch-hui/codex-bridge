@@ -120,8 +120,10 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var openCodeDefaultPermissionMode = "build"
   @Published public internal(set) var openCodeDefaultEffort: String?
   @Published public internal(set) var isManagingAgents = false
+  @Published var directConfiguration: IPCDirectConfiguration?
+  @Published var isSavingDirectConfiguration = false
   @Published var agentOperationRevision = 0
-  var didAttemptAgentDiscoveryUpgrade = false
+  var didAttemptServiceUpgrade = false
   @Published public internal(set) var isRefreshingAgentModels = false
   @Published public internal(set) var agentModelRefreshError: String?
   @Published public internal(set) var tasks: [MCPServiceTaskSnapshot] = []
