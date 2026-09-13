@@ -11,7 +11,10 @@ extension BridgeServiceAppModel {
     forceCatalogRefresh: Bool = false
   ) async {
     async let projectResult = optional { try await client.projects() }
-    async let agentCatalogResult = optional { try await client.agentCatalog() }
+    let scanAgents = agentProviders.isEmpty || forceCatalogRefresh
+    async let agentCatalogResult = optional {
+      try await client.agentCatalog(forceRefresh: scanAgents)
+    }
     async let taskResult = optional {
       try await client.tasks(IPCTaskListRequest(limit: 200))
     }
@@ -67,6 +70,7 @@ extension BridgeServiceAppModel {
     if includeCatalog {
       await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)
     }
+    scheduleAgentDiscoveryUpgradeIfNeeded()
   }
 
   private func applyProjectSnapshot(_ value: [MCPProjectSummary]) {

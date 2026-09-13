@@ -109,7 +109,8 @@
           providerRequiresConfiguration: provider.requiresConfiguration,
           hasExistingInstallation: hasExistingInstallation,
           baseURL: baseURL,
-          apiKey: apiKey
+          apiKey: apiKey,
+          hasExistingConfiguration: provider.discoveredConfigurationPath != nil
         )
       else {
         reportAgentFailure("请填写 \(provider.displayName) 的 Base URL 和 API key。")
@@ -137,7 +138,7 @@
           reportAgentSuccess("已连接并验证 \(installation.displayName)。")
         } else {
           reportAgentFailure(
-            "Agent 已发现，但 Probe 状态为 \(state)。",
+            "Agent 已发现，但检查状态为 \(state)。",
             installationID: installation.installationID
           )
         }
@@ -178,7 +179,7 @@
       }
       guard !agentBusy else { return }
       setAgentBusy(true)
-      setAgentStatus("正在登记并 Probe Agent…")
+      setAgentStatus("正在添加并检查 Agent…")
       defer { setAgentBusy(false) }
       do {
         let installation = try await client.registerAgentInstallation(
@@ -210,7 +211,7 @@
         return
       }
       guard !enabled || installation.availability == "available" else {
-        reportAgentFailure("只有 Probe 可用的 Agent 才能启用。")
+        reportAgentFailure("请先通过连接检查。")
         return
       }
       guard connectionState == .connected else {
@@ -227,7 +228,7 @@
           enabled: enabled
         )
         await refreshAgents()
-        reportAgentSuccess(enabled ? "Agent 已启用。" : "Agent 已停用。", installationID: installationID)
+        reportAgentSuccess(enabled ? "Agent 已连接。" : "Agent 已断开。", installationID: installationID)
       } catch {
         reportAgentFailure(
           "Agent 启停失败：\(BridgeServiceErrorMessage.message(error))", installationID: installationID)
@@ -238,16 +239,16 @@
       async
     {
       guard let installationID = requestedID ?? selectedInstallationID else {
-        reportAgentFailure("请先选择要 Probe 的 Agent 安装。")
+        reportAgentFailure("请先选择要检查的 Agent。")
         return
       }
       guard connectionState == .connected else {
-        reportAgentFailure("后台 Service 未连接，无法 Probe Agent。")
+        reportAgentFailure("后台 Service 未连接，无法检查 Agent。")
         return
       }
       guard !agentBusy else { return }
       setAgentBusy(true)
-      setAgentStatus(acceptReplacement ? "正在接受替换并 Probe…" : "正在 Probe Agent…")
+      setAgentStatus(acceptReplacement ? "正在确认更新并检查…" : "正在检查 Agent…")
       defer { setAgentBusy(false) }
       do {
         let installation = try await client.reprobeAgentInstallation(
@@ -256,10 +257,10 @@
         )
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
-        reportAgentSuccess("Probe 完成：\(state)。", installationID: installationID)
+        reportAgentSuccess("检查完成：\(state)。", installationID: installationID)
       } catch {
         reportAgentFailure(
-          "Agent Probe 失败：\(BridgeServiceErrorMessage.message(error))",
+          "Agent 检查失败：\(BridgeServiceErrorMessage.message(error))",
           installationID: installationID)
       }
     }
@@ -275,7 +276,7 @@
       }
       guard !agentBusy else { return }
       setAgentBusy(true)
-      setAgentStatus("正在移除 Agent 登记…")
+      setAgentStatus("正在移除 Agent 连接…")
       defer { setAgentBusy(false) }
       do {
         try await client.removeAgentInstallation(installationID: installationID)

@@ -9,7 +9,7 @@
     section.appendChild(S.node("h3", null, "Codex 执行引擎"));
     var card = S.node("div", "page-card connection-card");
     var titleRow = S.node("div", "section-heading-row");
-    var title = S.node("h3", null, "连接本机 Codex");
+    var title = S.node("h3", null, "Codex");
     var badge = S.badge("未知", "neutral");
     titleRow.appendChild(title);
     titleRow.appendChild(badge);
@@ -44,7 +44,7 @@
       if (codex.modelError) {
         diagnostics.appendChild(S.node("div", "page-message error", "模型目录读取失败：" + codex.modelError));
       }
-      refresh.textContent = codex.isRefreshing ? "刷新中…" : count > 0 ? "刷新模型" : "连接 Codex";
+      refresh.textContent = codex.isRefreshing ? "刷新中…" : isConnected(codex, count) ? "刷新模型" : "连接";
       refresh.disabled = codex.isRefreshing === true || codex.canRefresh !== true;
     }
 
@@ -55,16 +55,20 @@
     return { root: section, update: update };
   }
 
+  function isConnected(codex, count) {
+    return typeof codex.isConnected === "boolean" ? codex.isConnected : count > 0 && !codex.modelError;
+  }
+
   function statusLabel(codex, count) {
     if (codex.modelError) return "模型目录失败";
     if (codex.isRefreshing) return "刷新中…";
-    return count > 0 ? "模型目录可用" : "待连接";
+    return isConnected(codex, count) ? "已连接" : "未连接";
   }
 
   function statusTone(codex, count) {
     if (codex.modelError) return "error";
     if (codex.isRefreshing) return "running";
-    if (count > 0) return "success";
+    if (isConnected(codex, count)) return "success";
     return "neutral";
   }
 

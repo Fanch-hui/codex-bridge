@@ -21,6 +21,7 @@
     private var agentLoading = false
     var projectBusy = false
     var agentBusy = false
+    private var agentOperationRevision = 0
     private var projectStatusText = "尚未加载项目。"
     private var agentStatusText = "尚未加载 Agent 目录。"
 
@@ -108,7 +109,7 @@
       agentLoading = true
       publishDisplay()
       do {
-        let catalog = try await client.agentCatalog()
+        let catalog = try await client.agentCatalog(forceRefresh: agentProviders.isEmpty)
         connectionState = .connected
         agentProviders = catalog.providers
         agentInstallations = catalog.installations
@@ -232,7 +233,9 @@
         removeEnabled: agentActions && selectedAgent != nil,
         statusText: agentStatusText,
         providerItems: desktopProviderItems,
-        installationItems: desktopInstallationItems
+        installationItems: desktopInstallationItems,
+        isManagingAgents: agentBusy || agentLoading,
+        agentOperationRevision: agentOperationRevision
       )
       displayBox.store(
         WindowsManagementDisplay(
@@ -281,6 +284,7 @@
     }
 
     func setAgentBusy(_ value: Bool) {
+      if agentBusy && !value { agentOperationRevision &+= 1 }
       agentBusy = value
       publishDisplay()
     }

@@ -21,6 +21,24 @@ final class InstalledServiceConnectionTests: XCTestCase {
     }
   }
 
+  func testInstalledAgentDiscoveryDoesNotChangeRegistrations() async throws {
+    guard ProcessInfo.processInfo.environment["CODEX_BRIDGE_TEST_INSTALLED_SERVICE"] == "1" else {
+      throw XCTSkip("Requires the installed macOS service.")
+    }
+    let client = BridgeServiceClient()
+    do {
+      let before = try await client.agentCatalog()
+      let after = try await client.agentCatalog(forceRefresh: true)
+      XCTAssertFalse(after.providers.isEmpty)
+      XCTAssertTrue(after.providers.allSatisfy { $0.discoveryState != nil })
+      XCTAssertEqual(before.installations, after.installations)
+      await client.invalidate()
+    } catch {
+      await client.invalidate()
+      throw error
+    }
+  }
+
   func testInstalledServiceRespondsToConnectionQueries() async throws {
     guard ProcessInfo.processInfo.environment["CODEX_BRIDGE_TEST_INSTALLED_SERVICE"] == "1" else {
       throw XCTSkip("Requires the installed macOS service.")

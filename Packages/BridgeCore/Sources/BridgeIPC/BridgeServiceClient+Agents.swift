@@ -1,8 +1,12 @@
 extension BridgeServiceClient {
   public func agentCatalog() async throws -> IPCAgentCatalogResponse {
+    try await agentCatalog(forceRefresh: false)
+  }
+
+  public func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse {
     try await call(
       operation: .getAgentCatalog,
-      payload: Optional<IPCMutationResponse>.none
+      payload: forceRefresh ? IPCAgentCatalogRequest(forceRefresh: true) : nil
     )
   }
 

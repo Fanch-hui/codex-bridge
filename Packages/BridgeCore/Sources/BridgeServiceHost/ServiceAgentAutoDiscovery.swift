@@ -46,7 +46,7 @@ enum ServiceAgentAutoDiscovery {
     }
   }
 
-  private static func commandLineRequests(
+  static func commandLineRequests(
     providerID: AgentProviderID,
     names: [String],
     displayName: String,

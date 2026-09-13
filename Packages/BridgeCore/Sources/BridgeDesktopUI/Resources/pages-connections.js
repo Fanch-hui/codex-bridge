@@ -55,13 +55,10 @@
     agentsCard.appendChild(S.node(
       "p",
       "card-subtitle",
-      "Bridge 会自动查找本机安装、验证并启用。"
+      "Bridge 会自动查找本机安装；点击连接后才会启用。"
     ));
     var agentConnectors = global.CodexBridgeDesktopAgentConnectors.create(emit);
     agentsCard.appendChild(agentConnectors.root);
-    agentsCard.appendChild(S.node("h4", "agent-subheading", "已连接安装"));
-    var installations = S.node("div");
-    agentsCard.appendChild(installations);
     var agentEditor = E.createAgentRegistration(emit);
     var manual = S.node("details", "agent-manual-registration");
     manual.appendChild(S.node("summary", null, "高级：按路径登记已有安装"));
@@ -101,7 +98,7 @@
           context
         );
         clientsEditor.update(page.clients, nextEmit);
-        renderAgents(installations, agentConnectors, agentEditor, page, nextEmit);
+        renderAgents(agentConnectors, agentEditor, page, nextEmit);
         status.textContent = page.statusMessage || "";
         status.hidden = !page.statusMessage;
       }
@@ -200,86 +197,15 @@
     }
   }
 
-  function renderAgents(container, connectors, editor, page, emit) {
-    S.clear(container);
-    S.safeArray(page.installations).forEach(function (installation) {
-      container.appendChild(agentRow(installation, emit));
-    });
-    if (!page.installations || page.installations.length === 0) {
-      container.appendChild(S.node("div", "list-empty", "尚未登记本机 Agent。"));
-    }
+  function renderAgents(connectors, editor, page, emit) {
     var providers = S.safeArray(page.providers).filter(function (provider) { return provider.providerID !== "codex"; });
-    connectors.update(providers, page.installations, page.canRegisterAgent, emit);
+    connectors.update(providers, page.installations, {
+      canConnect: page.canRegisterAgent,
+      busy: page.isManagingAgents === true,
+      revision: page.agentOperationRevision,
+      acceptReplacement: true
+    }, emit);
     editor.update(providers, page.canRegisterAgent, emit);
-  }
-
-  function agentRow(installation, emit) {
-    var row = S.node("div", "agent-row");
-    row.appendChild(S.icon("cpu.fill", "service-icon"));
-    var main = S.node("div", "row-main");
-    var heading = S.node("div", "client-heading");
-    heading.appendChild(S.node("div", "row-title", installation.displayName));
-    heading.appendChild(S.badge(
-      availabilityLabel(installation.availability),
-      availabilityTone(installation.availability)
-    ));
-    main.appendChild(heading);
-    main.appendChild(S.node("div", "row-detail mono", installation.providerID + " · " + installation.executablePath));
-    main.appendChild(S.node("div", "row-detail", (installation.version || "未识别")
-      + " · ACP " + (installation.protocolRevision || "未协商")
-      + " · Adapter r" + installation.adapterRevision));
-    main.appendChild(S.node("div", "row-detail", "状态：" + availabilityLabel(installation.availability)
-      + " · 有效能力：" + (installation.effectiveCapabilities || []).length + " 项"));
-    if (installation.lastProbeError) main.appendChild(S.node("div", "row-detail", installation.lastProbeError));
-    row.appendChild(main);
-    var actions = S.node("div", "client-controls");
-    var enabled = S.node("label", "check-field");
-    var checkbox = S.node("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = installation.enabled;
-    checkbox.disabled = !installation.canToggle;
-    checkbox.addEventListener("change", function () {
-      emit("setAgentEnabled", { installationID: installation.installationID, enabled: checkbox.checked });
-    });
-    enabled.appendChild(checkbox);
-    enabled.appendChild(S.node("span", null, "启用"));
-    actions.appendChild(enabled);
-    actions.appendChild(S.button("重新 Probe", "reprobeAgent", {
-      installationID: installation.installationID,
-      acceptReplacement: false
-    }, emit, "small", !installation.canReprobe));
-    if (installation.availability === "needs_review" && installation.canReprobe) {
-      var accept = S.button("接受替换并 Probe", null, {}, null, "small primary", false);
-      accept.addEventListener("click", function () {
-        if (global.confirm("接受新的 Agent 可执行文件并重新 Probe？")) {
-          emit("reprobeAgent", { installationID: installation.installationID, acceptReplacement: true });
-        }
-      });
-      actions.appendChild(accept);
-    }
-    var remove = S.button("移除登记", null, {}, null, "small danger", !installation.canRemove);
-    remove.addEventListener("click", function () {
-      if (global.confirm("移除这个 Agent 登记？本机可执行文件不会被删除。")) {
-        emit("removeAgent", { installationID: installation.installationID });
-      }
-    });
-    actions.appendChild(remove);
-    row.appendChild(actions);
-    return row;
-  }
-
-  function availabilityLabel(value) {
-    if (value === "available") return "可用";
-    if (value === "needs_review") return "需复核";
-    if (value === "unavailable") return "不可用";
-    return "未知";
-  }
-
-  function availabilityTone(value) {
-    if (value === "available") return "success";
-    if (value === "needs_review") return "warning";
-    if (value === "unavailable") return "error";
-    return "neutral";
   }
 
   function addFact(container, title, value) {

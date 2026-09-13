@@ -20,6 +20,7 @@ public actor ServiceComposition {
   public let tasks: ServiceTaskManager
   public let settings: ServiceSettings
   public let agentRegistry: ServiceAgentRegistry
+  let agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog
   public let execution: ExecutionManager
   public let supervisor: SupervisorManager
   public let coordinator: ServiceExecutionCoordinator
@@ -96,6 +97,11 @@ public actor ServiceComposition {
       providers: agentProviders
     )
     _ = try await agentRegistry.refreshInstallationStates()
+    let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog()
+    _ = await agentDiscoveryCatalog.summaries(
+      providerIDs: agentProviders.map(\.descriptor.providerID),
+      existingInstallations: try await agentRegistry.installations()
+    )
     let agentRunner = ServiceAgentTaskRunner(
       registry: agentRegistry,
       providers: Dictionary(
@@ -182,6 +188,7 @@ public actor ServiceComposition {
       tasks: tasks,
       settings: settings,
       agentRegistry: agentRegistry,
+      agentDiscoveryCatalog: agentDiscoveryCatalog,
       execution: execution,
       supervisor: supervisor,
       coordinator: coordinator,
@@ -202,6 +209,7 @@ public actor ServiceComposition {
     tasks: ServiceTaskManager,
     settings: ServiceSettings,
     agentRegistry: ServiceAgentRegistry,
+    agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog,
     execution: ExecutionManager,
     supervisor: SupervisorManager,
     coordinator: ServiceExecutionCoordinator,
@@ -219,6 +227,7 @@ public actor ServiceComposition {
     self.tasks = tasks
     self.settings = settings
     self.agentRegistry = agentRegistry
+    self.agentDiscoveryCatalog = agentDiscoveryCatalog
     self.execution = execution
     self.supervisor = supervisor
     self.coordinator = coordinator

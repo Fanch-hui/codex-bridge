@@ -22,10 +22,15 @@ extension BridgeDesktopUIStateBuilder {
       codex: codexState(from: model),
       clients: clientRows(from: model),
       providers: model.agentProviders.map(providerRow),
-      installations: model.agentInstallations.map(installationRow),
+      installations: model.agentInstallations.map {
+        installationRow(
+          $0, canManage: model.connectionState == .connected && !model.isManagingAgents)
+      },
       canRegisterAgent: model.connectionState == .connected
         && !model.isManagingAgents
         && !model.agentProviders.isEmpty,
+      isManagingAgents: model.isManagingAgents,
+      agentOperationRevision: model.agentOperationRevision,
       statusMessage: ServiceStatusPresentation.connectionMessage(
         status: model.serviceStatus?.status,
         currentMessage: model.errorMessage
@@ -41,7 +46,9 @@ extension BridgeDesktopUIStateBuilder {
       modelCount: model.models.count,
       modelError: model.modelCatalogError,
       isRefreshing: model.isRefreshing,
-      canRefresh: !model.isRefreshing
+      canRefresh: !model.isRefreshing,
+      isConnected: model.connectionState == .connected && !model.models.isEmpty
+        && model.modelCatalogError == nil
     )
   }
 
@@ -175,6 +182,10 @@ extension BridgeDesktopUIStateBuilder {
       providerID: provider.providerID,
       displayName: provider.displayName,
       adapterRevision: provider.adapterRevision,
+      discoveryState: provider.discoveryState,
+      discoveryMessage: provider.discoveryMessage,
+      discoveredExecutablePath: provider.discoveredExecutablePath,
+      discoveredConfigurationPath: provider.discoveredConfigurationPath,
       requiresConfiguration: provider.requiresConfiguration,
       supportsModelSelection: provider.supportsModelSelection,
       supportsEffortSelection: provider.supportsEffortSelection,
@@ -186,7 +197,8 @@ extension BridgeDesktopUIStateBuilder {
   }
 
   private static func installationRow(
-    _ installation: IPCAgentInstallationSummary
+    _ installation: IPCAgentInstallationSummary,
+    canManage: Bool
   ) -> BridgeDesktopAgentInstallationRow {
     BridgeDesktopAgentInstallationRow(
       installationID: installation.installationID,
@@ -204,9 +216,9 @@ extension BridgeDesktopUIStateBuilder {
       lastProbeError: installation.lastProbeError,
       lastProbedAt: installation.lastProbedAt,
       updatedAt: installation.updatedAt,
-      canToggle: true,
-      canReprobe: true,
-      canRemove: true
+      canToggle: canManage && (installation.isEnabled || installation.availability == "available"),
+      canReprobe: canManage,
+      canRemove: canManage
     )
   }
 }

@@ -38,6 +38,8 @@
     let statusText: String
     var providerItems: [BridgeDesktopAgentProviderRow] = []
     var installationItems: [BridgeDesktopAgentInstallationRow] = []
+    var isManagingAgents = false
+    var agentOperationRevision = 0
   }
 
   struct WindowsManagementDisplay: Equatable, Sendable {

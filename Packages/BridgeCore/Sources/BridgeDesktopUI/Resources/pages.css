@@ -117,14 +117,27 @@
 .client-exposure-hint { margin: 8px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
 .agent-row { align-items: flex-start; }
 .agent-row .row-detail { white-space: normal; }
-.agent-subheading { margin: 20px 0 0; color: var(--text-secondary); font-size: 13px; }
-.agent-connectors { display: grid; gap: 8px; }
-.agent-connect-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--separator); }
+.agent-connectors { display: grid; }
+.agent-connect-row { display: grid; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--separator); }
 .agent-connect-row:last-child { border-bottom: 0; }
-.agent-connect-controls { min-width: min(390px, 100%); }
-.agent-connect-fields { margin-bottom: 8px; }
+.agent-connect-header { display: flex; align-items: flex-start; gap: 10px; }
+.agent-connect-main { min-width: 0; flex: 1 1 auto; }
+.agent-connect-actionbar { display: flex; align-items: center; gap: 10px; padding-left: 28px; }
+.agent-action-hint, .agent-provider-detail, .agent-discovery-message { color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+.agent-config-panel { display: grid; gap: 8px; padding-left: 28px; }
+.agent-connect-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .agent-connect-fields[hidden] { display: none; }
-.agent-connect-controls .form-guide-note { margin-top: 8px; }
+.agent-details { margin-left: 28px; }
+.agent-details summary { color: var(--text-secondary); font-size: 12px; cursor: pointer; }
+.agent-details[open] summary { color: var(--text); }
+.agent-details-body { display: grid; gap: 10px; padding: 10px 0 0; }
+.agent-provider-detail, .agent-discovery-message { margin: 0; }
+.agent-installation-detail { display: grid; gap: 5px; padding: 10px 12px; border: 1px solid var(--separator); border-radius: 7px; background: var(--surface-muted); }
+.agent-installation-heading, .agent-installation-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.agent-installation-actions { margin-top: 4px; }
+.agent-error { color: var(--error); }
+.agent-confirmation { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 10px; border-radius: 7px; background: var(--accent-soft); color: var(--text); font-size: 12px; }
+.agent-confirmation span { flex: 1 1 220px; }
 .agent-manual-registration { margin-top: 14px; border-top: 1px solid var(--separator); }
 .agent-manual-registration summary { padding-top: 14px; color: var(--text-secondary); font-size: 12px; cursor: pointer; }
 .agent-manual-registration[open] summary { color: var(--text); }
@@ -163,8 +176,8 @@
 }
 
 @media (max-width: 700px) {
-  .agent-connect-row { grid-template-columns: 1fr; }
-  .agent-connect-controls { min-width: 0; }
+  .agent-connect-fields { grid-template-columns: 1fr; }
+  .agent-connect-actionbar, .agent-config-panel, .agent-details { padding-left: 0; margin-left: 0; }
 }
 
 .workbench-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }

@@ -17,6 +17,7 @@ public enum BridgeServiceRegistrationError: Error, LocalizedError, Sendable {
 @MainActor
 public protocol BridgeServiceRegistrationManaging: AnyObject {
   var status: BridgeServiceRegistrationStatus { get }
+  var supportsAutomaticRecovery: Bool { get }
 
   func register() throws
   func unregister() async throws
@@ -25,11 +26,14 @@ public protocol BridgeServiceRegistrationManaging: AnyObject {
 }
 
 extension BridgeServiceRegistrationManaging {
+  public var supportsAutomaticRecovery: Bool { false }
   public func recoverUnavailableService() async throws -> Bool { false }
 }
 
 @MainActor
 public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationManaging {
+  public var supportsAutomaticRecovery: Bool { true }
+
   private let service: SMAppService
   private let plistName: String
   private let machServiceName: String

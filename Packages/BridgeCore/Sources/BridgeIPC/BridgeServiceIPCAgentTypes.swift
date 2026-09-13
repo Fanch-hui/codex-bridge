@@ -4,6 +4,10 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
   public let providerID: String
   public let displayName: String
   public let adapterRevision: Int
+  public let discoveryState: String?
+  public let discoveryMessage: String?
+  public let discoveredExecutablePath: String?
+  public let discoveredConfigurationPath: String?
   public let requiresConfiguration: Bool
   public let registrationTrustProfile: String
   public let supportsModelSelection: Bool
@@ -21,6 +25,10 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     providerID: String,
     displayName: String,
     adapterRevision: Int,
+    discoveryState: String? = nil,
+    discoveryMessage: String? = nil,
+    discoveredExecutablePath: String? = nil,
+    discoveredConfigurationPath: String? = nil,
     requiresConfiguration: Bool = false,
     registrationTrustProfile: String = "managed",
     supportsModelSelection: Bool = true,
@@ -37,6 +45,10 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     self.providerID = providerID
     self.displayName = displayName
     self.adapterRevision = adapterRevision
+    self.discoveryState = discoveryState
+    self.discoveryMessage = discoveryMessage
+    self.discoveredExecutablePath = discoveredExecutablePath
+    self.discoveredConfigurationPath = discoveredConfigurationPath
     self.requiresConfiguration = requiresConfiguration
     self.registrationTrustProfile = registrationTrustProfile
     self.supportsModelSelection = supportsModelSelection
@@ -55,6 +67,10 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     case providerID = "provider_id"
     case displayName = "display_name"
     case adapterRevision = "adapter_revision"
+    case discoveryState = "discovery_state"
+    case discoveryMessage = "discovery_message"
+    case discoveredExecutablePath = "discovered_executable_path"
+    case discoveredConfigurationPath = "discovered_configuration_path"
     case requiresConfiguration = "requires_configuration"
     case registrationTrustProfile = "registration_trust_profile"
     case supportsModelSelection = "supports_model_selection"
@@ -75,6 +91,16 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
       providerID: try container.decode(String.self, forKey: .providerID),
       displayName: try container.decode(String.self, forKey: .displayName),
       adapterRevision: try container.decode(Int.self, forKey: .adapterRevision),
+      discoveryState: try container.decodeIfPresent(String.self, forKey: .discoveryState),
+      discoveryMessage: try container.decodeIfPresent(String.self, forKey: .discoveryMessage),
+      discoveredExecutablePath: try container.decodeIfPresent(
+        String.self,
+        forKey: .discoveredExecutablePath
+      ),
+      discoveredConfigurationPath: try container.decodeIfPresent(
+        String.self,
+        forKey: .discoveredConfigurationPath
+      ),
       requiresConfiguration: try container.decodeIfPresent(
         Bool.self,
         forKey: .requiresConfiguration
@@ -207,6 +233,18 @@ public struct IPCAgentCatalogResponse: Codable, Equatable, Sendable {
   ) {
     self.providers = providers
     self.installations = installations
+  }
+}
+
+public struct IPCAgentCatalogRequest: Codable, Equatable, Sendable {
+  public let forceRefresh: Bool
+
+  public init(forceRefresh: Bool = false) {
+    self.forceRefresh = forceRefresh
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case forceRefresh = "force_refresh"
   }
 }
 

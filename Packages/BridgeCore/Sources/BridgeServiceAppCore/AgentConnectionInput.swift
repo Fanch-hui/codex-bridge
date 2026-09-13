@@ -13,12 +13,13 @@ public enum AgentConnectionInput {
     providerRequiresConfiguration: Bool,
     hasExistingInstallation: Bool,
     baseURL: String?,
-    apiKey: String?
+    apiKey: String?,
+    hasExistingConfiguration: Bool = false
   ) -> Bool {
     guard providerRequiresConfiguration else { return true }
     let hasBaseURL = Self.baseURL(baseURL) != nil
     let hasAPIKey = Self.apiKey(apiKey) != nil
-    if !hasExistingInstallation { return hasBaseURL && hasAPIKey }
+    if !hasExistingInstallation && !hasExistingConfiguration { return hasBaseURL && hasAPIKey }
     return hasBaseURL == hasAPIKey
   }
 

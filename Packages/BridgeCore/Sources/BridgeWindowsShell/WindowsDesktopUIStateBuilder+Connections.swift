@@ -58,6 +58,8 @@
         providers: management.agent.providerItems,
         installations: management.agent.installationItems,
         canRegisterAgent: management.agent.registerEnabled,
+        isManagingAgents: management.agent.isManagingAgents,
+        agentOperationRevision: management.agent.agentOperationRevision,
         statusMessage: message.isEmpty ? nil : message
       )
     }
@@ -72,7 +74,9 @@
           connectionState: service.label,
           modelCount: workbench.availableModelCount,
           modelError: workbench.modelError,
-          canRefresh: false
+          canRefresh: false,
+          isConnected: workbench.connectionState == .connected && workbench.availableModelCount > 0
+            && workbench.modelError == nil
         )
       }
       return BridgeDesktopCodexConnectionState(
@@ -80,7 +84,9 @@
         modelCount: settings.modelOptions.count,
         modelError: settings.modelError,
         isRefreshing: settings.isRefreshingModels,
-        canRefresh: !settings.busy && !settings.isRefreshingModels
+        canRefresh: !settings.busy && !settings.isRefreshingModels,
+        isConnected: workbench.connectionState == .connected && !settings.modelOptions.isEmpty
+          && settings.modelError == nil
       )
     }
 

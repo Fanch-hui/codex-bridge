@@ -46,19 +46,22 @@ public struct BridgeDesktopCodexConnectionState: Codable, Equatable, Sendable {
   public let modelError: String?
   public let isRefreshing: Bool
   public let canRefresh: Bool
+  public let isConnected: Bool?
 
   public init(
     connectionState: String = "unknown",
     modelCount: Int = 0,
     modelError: String? = nil,
     isRefreshing: Bool = false,
-    canRefresh: Bool = false
+    canRefresh: Bool = false,
+    isConnected: Bool? = nil
   ) {
     self.connectionState = connectionState
     self.modelCount = modelCount
     self.modelError = modelError
     self.isRefreshing = isRefreshing
     self.canRefresh = canRefresh
+    self.isConnected = isConnected
   }
 }
 
@@ -103,6 +106,10 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
   public let providerID: String
   public let displayName: String
   public let adapterRevision: Int
+  public let discoveryState: String?
+  public let discoveryMessage: String?
+  public let discoveredExecutablePath: String?
+  public let discoveredConfigurationPath: String?
   public let requiresConfiguration: Bool
   public let supportsModelSelection: Bool
   public let supportsEffortSelection: Bool
@@ -115,6 +122,10 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     providerID: String,
     displayName: String,
     adapterRevision: Int,
+    discoveryState: String? = nil,
+    discoveryMessage: String? = nil,
+    discoveredExecutablePath: String? = nil,
+    discoveredConfigurationPath: String? = nil,
     requiresConfiguration: Bool = false,
     supportsModelSelection: Bool = true,
     supportsEffortSelection: Bool = true,
@@ -126,6 +137,10 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     self.providerID = providerID
     self.displayName = displayName
     self.adapterRevision = adapterRevision
+    self.discoveryState = discoveryState
+    self.discoveryMessage = discoveryMessage
+    self.discoveredExecutablePath = discoveredExecutablePath
+    self.discoveredConfigurationPath = discoveredConfigurationPath
     self.requiresConfiguration = requiresConfiguration
     self.supportsModelSelection = supportsModelSelection
     self.supportsEffortSelection = supportsEffortSelection
@@ -210,6 +225,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let providers: [BridgeDesktopAgentProviderRow]
   public let installations: [BridgeDesktopAgentInstallationRow]
   public let canRegisterAgent: Bool
+  public let isManagingAgents: Bool?
+  public let agentOperationRevision: Int?
   public let statusMessage: String?
 
   public init(
@@ -225,6 +242,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     providers: [BridgeDesktopAgentProviderRow] = [],
     installations: [BridgeDesktopAgentInstallationRow] = [],
     canRegisterAgent: Bool = true,
+    isManagingAgents: Bool? = nil,
+    agentOperationRevision: Int? = nil,
     statusMessage: String? = nil
   ) {
     self.header = header
@@ -239,6 +258,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.providers = providers
     self.installations = installations
     self.canRegisterAgent = canRegisterAgent
+    self.isManagingAgents = isManagingAgents
+    self.agentOperationRevision = agentOperationRevision
     self.statusMessage = statusMessage
   }
 }

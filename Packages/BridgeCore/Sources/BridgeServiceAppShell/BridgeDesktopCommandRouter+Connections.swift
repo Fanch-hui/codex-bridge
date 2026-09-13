@@ -141,7 +141,8 @@ extension BridgeDesktopCommandRouter {
         providerRequiresConfiguration: provider.requiresConfiguration,
         hasExistingInstallation: hasExistingInstallation,
         baseURL: baseURL,
-        apiKey: apiKey
+        apiKey: apiKey,
+        hasExistingConfiguration: provider.discoveredConfigurationPath != nil
       )
     else {
       model.errorMessage = "请填写 \(provider.displayName) 的 Base URL 和 API key。"

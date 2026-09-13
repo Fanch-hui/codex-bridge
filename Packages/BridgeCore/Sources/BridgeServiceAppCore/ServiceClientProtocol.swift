@@ -28,6 +28,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setWorkbenchProject(projectID: String?) async throws
   func setWorkbenchPermissionMode(_ mode: String) async throws
   func agentCatalog() async throws -> IPCAgentCatalogResponse
+  func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse
   func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
   ) async throws -> IPCAgentInstallationSummary
@@ -170,6 +171,10 @@ extension BridgeServiceClientProtocol {
     _: IPCAgentPermissionRemediationApplyRequest
   ) async throws -> IPCAgentNativePermissionPolicyResponse {
     throw BridgeServiceClientError.unavailable
+  }
+
+  public func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse {
+    try await agentCatalog()
   }
 
   public func agentCatalog() async throws -> IPCAgentCatalogResponse {

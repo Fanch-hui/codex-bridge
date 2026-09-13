@@ -23,8 +23,8 @@ extension BridgeServiceAppModel {
       successMessage: { installation in
         let name = installation?.displayName ?? displayName
         return installation?.availability == "available"
-          ? "已登记并验证 \(name)，确认启用后才会进入可选目录"
-          : "已登记 \(name)，但 Probe 尚未通过"
+          ? "已登记并验证 \(name)，点击连接后即可使用"
+          : "已登记 \(name)，但连接检查未通过"
       }
     )
   }
@@ -50,7 +50,7 @@ extension BridgeServiceAppModel {
         guard let installation else { return "Agent 连接请求已完成" }
         return installation.availability == "available"
           ? "已连接并验证 \(installation.displayName)"
-          : "已发现 \(installation.displayName)，但 Probe 尚未通过"
+          : "已发现 \(installation.displayName)，但连接检查未通过"
       }
     )
   }
@@ -68,8 +68,8 @@ extension BridgeServiceAppModel {
       },
       successMessage: { installation in
         installation?.availability == "available"
-          ? "Agent Probe 已通过"
-          : "Agent Probe 未通过，请查看安装状态"
+          ? "Agent 检查通过"
+          : "Agent 检查未通过，请查看原因"
       }
     )
   }
@@ -83,7 +83,7 @@ extension BridgeServiceAppModel {
         )
       },
       successMessage: { installation in
-        installation?.isEnabled == true ? "Agent 安装已启用" : "Agent 安装已停用"
+        installation?.isEnabled == true ? "Agent 已连接" : "Agent 已断开"
       }
     )
   }
@@ -94,7 +94,7 @@ extension BridgeServiceAppModel {
         try await client.removeAgentInstallation(installationID: installationID)
         return nil
       },
-      successMessage: { _ in "已移除 Agent 安装登记" }
+      successMessage: { _ in "已移除 Agent 连接" }
     )
   }
 
@@ -109,7 +109,10 @@ extension BridgeServiceAppModel {
     errorMessage = nil
     Task { [weak self] in
       guard let self else { return }
-      defer { self.isManagingAgents = false }
+      defer {
+        self.isManagingAgents = false
+        self.agentOperationRevision &+= 1
+      }
       do {
         let client = try self.currentClient()
         let installation = try await operation(client)

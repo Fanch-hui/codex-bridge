@@ -68,7 +68,7 @@ extension ServiceAgentAutoDiscovery {
     return requests
   }
 
-  private static func deepSeekExecutableCandidates(
+  static func deepSeekExecutableCandidates(
     existingInstallations: [ServiceAgentInstallationRecord],
     environment: [String: String]
   ) -> [String] {
@@ -87,7 +87,7 @@ extension ServiceAgentAutoDiscovery {
     return uniquePaths(candidates)
   }
 
-  private static func deepSeekConfigurationCandidates(
+  static func deepSeekConfigurationCandidates(
     existingInstallations: [ServiceAgentInstallationRecord],
     environment: [String: String]
   ) -> [String] {

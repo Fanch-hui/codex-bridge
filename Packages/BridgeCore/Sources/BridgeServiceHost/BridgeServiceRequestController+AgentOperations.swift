@@ -7,6 +7,10 @@ import Foundation
 
 extension BridgeServiceRequestController {
   func handleGetAgentCatalog(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let catalogRequest = try BridgeServiceIPCCodec.optionalPayload(
+      IPCAgentCatalogRequest.self,
+      from: request
+    )
     let deadline = Self.deadline()
     let providers = try await composition.application.serviceManagedAgentProviderDescriptors(
       deadline: deadline
@@ -14,10 +18,17 @@ extension BridgeServiceRequestController {
     let installations = try await composition.application.serviceManagedAgentInstallations(
       deadline: deadline
     )
+    let discovery = await composition.agentDiscoveryCatalog.summaries(
+      providerIDs: providers.map(\.providerID),
+      existingInstallations: installations,
+      forceRefresh: catalogRequest?.forceRefresh ?? false
+    )
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
       payload: IPCAgentCatalogResponse(
-        providers: providers.map(Self.agentProviderSummary),
+        providers: providers.map { provider in
+          Self.agentProviderSummary(provider, discovery: discovery[provider.providerID])
+        },
         installations: installations.map(Self.agentInstallationSummary)
       )
     )
@@ -148,13 +159,18 @@ extension BridgeServiceRequestController {
   }
 
   private static func agentProviderSummary(
-    _ descriptor: AgentProviderDescriptor
+    _ descriptor: AgentProviderDescriptor,
+    discovery: ServiceAgentDiscoverySummary?
   ) -> IPCAgentProviderSummary {
     let policy = ServiceAgentProviderPolicyRegistry.policy(for: descriptor.providerID)
     return IPCAgentProviderSummary(
       providerID: descriptor.providerID.rawValue,
       displayName: descriptor.displayName,
       adapterRevision: descriptor.adapterRevision,
+      discoveryState: discovery?.state,
+      discoveryMessage: discovery?.message,
+      discoveredExecutablePath: discovery?.executablePath,
+      discoveredConfigurationPath: discovery?.configurationPath,
       requiresConfiguration: policy?.requiresConfiguration ?? false,
       registrationTrustProfile: policy?.registrationTrustProfile.rawValue ?? "managed",
       supportsModelSelection: policy?.supportsModelSelection ?? true,

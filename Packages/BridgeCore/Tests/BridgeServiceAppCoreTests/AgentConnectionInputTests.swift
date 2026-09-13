@@ -10,6 +10,19 @@ final class AgentConnectionInputTests: XCTestCase {
     XCTAssertNil(AgentConnectionInput.apiKey("\0"))
   }
 
+  func testDiscoveredConfigurationCanConnectWithoutNewCredentials() {
+    XCTAssertTrue(
+      AgentConnectionInput.isValid(
+        providerRequiresConfiguration: true, hasExistingInstallation: false,
+        baseURL: nil, apiKey: nil, hasExistingConfiguration: true
+      ))
+    XCTAssertFalse(
+      AgentConnectionInput.isValid(
+        providerRequiresConfiguration: true, hasExistingInstallation: false,
+        baseURL: "https://api.example.test", apiKey: nil, hasExistingConfiguration: true
+      ))
+  }
+
   func testExistingConfigurationMayBeReusedOrReplacedAsAPair() {
     XCTAssertTrue(
       AgentConnectionInput.isValid(
