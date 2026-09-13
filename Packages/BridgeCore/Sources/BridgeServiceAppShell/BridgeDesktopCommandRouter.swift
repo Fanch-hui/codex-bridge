@@ -54,7 +54,8 @@ enum BridgeDesktopCommandRouter {
     case .setMCPClientEnabled, .setMCPClientExposure, .copyMCPClientConfiguration,
       .copyLocalMCPEndpoint,
       .rotateMCPClientCredential, .rotateLocalMCPEndpoint, .configureTunnel,
-      .connectTunnel, .disconnectTunnel, .clearTunnel, .registerAgent, .beginAgentRegistration,
+      .connectTunnel, .disconnectTunnel, .clearTunnel, .connectAgent, .registerAgent,
+      .beginAgentRegistration,
       .selectAgent,
       .setAgentEnabled, .reprobeAgent, .removeAgent, .refreshAgentModels:
       handleConnections(envelope, model: model)

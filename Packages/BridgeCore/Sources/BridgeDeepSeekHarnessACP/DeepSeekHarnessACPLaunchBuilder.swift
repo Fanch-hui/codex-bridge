@@ -226,6 +226,13 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
         environment[key] = value
       }
     }
+    for key in ["DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "DEEPSEEK_SEARCH_BASE_URL"] {
+      if let value = sourceEnvironment[key], !value.isEmpty, !value.contains("\0"),
+        value.rangeOfCharacter(from: .controlCharacters) == nil
+      {
+        environment[key] = value
+      }
+    }
     #if os(Windows)
       environment["USERPROFILE"] = home
       environment["TEMP"] = temporary

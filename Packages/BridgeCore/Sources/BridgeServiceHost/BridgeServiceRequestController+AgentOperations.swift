@@ -54,6 +54,34 @@ extension BridgeServiceRequestController {
     )
   }
 
+  func handleConnectAgentInstallation(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let payload = try BridgeServiceIPCCodec.payload(
+      IPCAgentConnectRequest.self,
+      from: request
+    )
+    let providerID = AgentProviderID(rawValue: payload.providerID)
+    let existingInstallations = try await composition.agentRegistry.installations(
+      providerID: providerID
+    )
+    let candidates = try ServiceAgentAutoDiscovery.registrationRequests(
+      providerID: providerID,
+      dataPaths: composition.paths,
+      existingInstallations: existingInstallations,
+      credentialsProvided: payload.baseURL != nil || payload.apiKey != nil
+    )
+    let record = try await composition.application.serviceConnectManagedAgent(
+      providerID: providerID,
+      baseURL: payload.baseURL,
+      apiKey: payload.apiKey,
+      candidates: candidates,
+      deadline: Self.deadline()
+    )
+    return try BridgeServiceIPCCodec.success(
+      requestID: request.requestID,
+      payload: Self.agentInstallationSummary(record)
+    )
+  }
+
   private static func registrationArtifacts(
     providerID: AgentProviderID,
     executablePath: String,

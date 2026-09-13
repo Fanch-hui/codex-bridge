@@ -102,14 +102,16 @@ Bridge 只接受已登记项目。项目硬策略优先于 Workbench 默认和�
 
 远程请求省略 `project_id` 时使用这里选中的项目。若显式传入 `project_id`，它必须来自 MCP `list_projects`，不能填写项目显示名。远程客户端通常应省略权限覆盖字段，使用 Workbench 的统一默认值。
 
-### 4. 配置执行 Provider
+### 4. 连接本机 Agent
 
-- **Codex**：默认 Provider，不在“本机 Agent 引擎连接”中登记。请先确认 Codex 在当前登录或模型 Provider 配置下能够运行，再到 `设置 → Codex 执行默认偏好` 配置执行偏好。Bridge 不读取 Codex 认证文件，也不以模型列表是否可用作为普通任务的执行门槛；无法取得目录时，新任务跟随 Codex 当前默认模型和 effort。
-- **OpenCode**：`连接 → 本机 Agent 引擎连接 → 登记 Agent → OpenCode`，选择真实 `opencode` 可执行文件并 Probe。详见 [OpenCode 连接指南](./docs/OPENCODE_CONNECTION_GUIDE.md)。
-- **DeepSeek Harness**：登记官方 `dsh-v0.1.1-rc.2` 构建出的 `packages/examples/acp-demo/lib/bin.js`，再选择 DSH 源码树之外的 `cordis.yml`；为隔离凭据，建议 Profile 也位于任务项目和 Bridge 仓库之外。`.env` 与 `cordis.yml` 同目录，由 Harness 自己读取。详见 [DeepSeek Harness 接入指南](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)。
-- **Antigravity**：先用 `command -v agy` 找到真实 CLI，在目标项目中交互登录，并通过 `/settings`、`/permissions` 配置 headless 所需的命令、URL 与 MCP 规则；不要登记 Desktop App。详见 [Antigravity / AGY 连接与权限指南](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)。
+在 `连接 → 本机 Agent 引擎连接` 中点击对应 Agent 的“一键连接”。macOS 与 Windows 共用自动发现、验证和启用流程。
 
-外部 Provider 登记成功后还要打开“启用”，然后到 `设置` 中刷新该 Provider 的模型目录并保存默认模型/effort。模型 ID 以当前 Provider 实际返回值为准，不要跨 Provider 猜别名。
+- **Codex**：使用已有自动发现通道连接本机 Codex，沿用当前登录与模型 Provider 配置。
+- **OpenCode**：自动查找本机 CLI 并连接，沿用 OpenCode 的配置。详见 [OpenCode 连接指南](./docs/OPENCODE_CONNECTION_GUIDE.md)。
+- **DeepSeek Harness**：安装并构建受支持的 DSH 后，输入 Base URL 与 API key，点击“一键连接”。Bridge 自动准备运行配置，API key 保存在系统凭据存储中。详见 [DeepSeek Harness 接入指南](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)。
+- **Antigravity**：自动查找 `agy` CLI 并连接，沿用其登录和权限设置。详见 [Antigravity / AGY 连接与权限指南](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)。
+
+连接成功后自动启用，可在 `设置` 中选择 Provider 实际返回的模型与 effort。Agent 本身的登录、API 服务可用性和执行权限仍由对应 Provider 管理。
 
 ### 外部 Provider 权限要点
 

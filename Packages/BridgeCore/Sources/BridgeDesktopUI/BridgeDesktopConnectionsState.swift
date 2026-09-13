@@ -40,6 +40,28 @@ public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
   }
 }
 
+public struct BridgeDesktopCodexConnectionState: Codable, Equatable, Sendable {
+  public let connectionState: String
+  public let modelCount: Int
+  public let modelError: String?
+  public let isRefreshing: Bool
+  public let canRefresh: Bool
+
+  public init(
+    connectionState: String = "unknown",
+    modelCount: Int = 0,
+    modelError: String? = nil,
+    isRefreshing: Bool = false,
+    canRefresh: Bool = false
+  ) {
+    self.connectionState = connectionState
+    self.modelCount = modelCount
+    self.modelError = modelError
+    self.isRefreshing = isRefreshing
+    self.canRefresh = canRefresh
+  }
+}
+
 public struct BridgeDesktopMCPClientRow: Codable, Equatable, Sendable {
   public let clientID: String
   public let displayName: String
@@ -183,6 +205,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let canCopyLocalMCPURL: Bool
   public let canRotateLocalMCPEndpoint: Bool
   public let tunnel: BridgeDesktopTunnelState
+  public let codex: BridgeDesktopCodexConnectionState?
   public let clients: [BridgeDesktopMCPClientRow]
   public let providers: [BridgeDesktopAgentProviderRow]
   public let installations: [BridgeDesktopAgentInstallationRow]
@@ -197,6 +220,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     canCopyLocalMCPURL: Bool = false,
     canRotateLocalMCPEndpoint: Bool = false,
     tunnel: BridgeDesktopTunnelState,
+    codex: BridgeDesktopCodexConnectionState? = nil,
     clients: [BridgeDesktopMCPClientRow] = [],
     providers: [BridgeDesktopAgentProviderRow] = [],
     installations: [BridgeDesktopAgentInstallationRow] = [],
@@ -210,6 +234,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.canCopyLocalMCPURL = canCopyLocalMCPURL
     self.canRotateLocalMCPEndpoint = canRotateLocalMCPEndpoint
     self.tunnel = tunnel
+    self.codex = codex
     self.clients = clients
     self.providers = providers
     self.installations = installations

@@ -1,6 +1,8 @@
 # DeepSeek Harness 接入指南
 
-本指南说明如何取得 Bridge 当前支持的 DeepSeek Harness（DSH）、构建正确 ACP 可执行文件、准备外部 `cordis.yml` 与 `.env`、在 App 中登记并从 ChatGPT/Qwen 提交任务。
+本指南说明如何取得 Bridge 当前支持的 DeepSeek Harness（DSH）、构建 ACP 入口、一键连接并从 ChatGPT/Qwen 提交任务。
+
+安装并构建 DSH 后，在 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key，点击“一键连接”。Mac 与 Windows 共用自动发现、配置、验证和启用流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。下文的外部 Profile 与 `.env` 步骤用于高级手动登记。
 
 DSH 的 Provider ID 固定为：
 
@@ -253,30 +255,16 @@ Search endpoint 必须同时满足：
 
 “主模型能回答”“网关支持 `/messages`”或“认证成功”都不能单独证明 Web Search 可用。自定义网关若用不同的搜索凭据，而当前模板只配置 `DEEPSEEK_API_KEY`，需要先确认该 Key 对两个端点都有效；不要让 Bridge 读取或转换凭据来弥补网关配置差异。
 
-## 9. 在 Codex Bridge 登记 DSH
+## 9. 在 Codex Bridge 连接 DSH
 
-1. 打开 `CodexBridge.app`。
-2. 进入 `连接 → 本机 Agent 引擎连接`。
-3. 点击“登记 Agent”。
-4. 选择“DeepSeek Harness”。
-5. 在“选择 DeepSeek Harness 可执行文件”中选择：
+1. 进入 `连接 → 本机 Agent 引擎连接`。
+2. 在 DeepSeek Harness 中输入 Base URL 与 API key。
+3. 点击“一键连接”，等待自动发现、配置和 Probe。
+4. 检查安装状态；Probe 成功后自动启用。
 
-   ```text
-   <dsh-source>/packages/examples/acp-demo/lib/bin.js
-   ```
+高级手动登记可指定 `<dsh-source>/packages/examples/acp-demo/lib/bin.js` 与外部 `<dsh-profile>/cordis.yml`，并在 Probe 成功后启用。
 
-6. 点击“下一步”。
-7. 在“选择 DeepSeek Harness cordis.yml”中选择：
-
-   ```text
-   <dsh-profile>/cordis.yml
-   ```
-
-8. 点击“登记并 Probe”。
-9. 检查安装卡片显示的版本、protocol、Adapter revision 和状态。
-10. 状态为“可用”后，打开“启用”。
-
-登记成功不会自动启用。Probe 成功只证明本地安装、版本、协议和基础 ACP Session 可用；Probe/模型刷新使用禁网检查，不能证明你的 API Key、账号额度、主模型请求或 Web Search 已经真实成功。
+Probe 验证本地安装、协议和基础 ACP Session；API 服务认证及实际模型请求在执行任务时验证。
 
 ## 10. 刷新模型和设置默认值
 

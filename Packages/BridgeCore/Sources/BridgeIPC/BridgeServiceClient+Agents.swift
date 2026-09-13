@@ -12,6 +12,21 @@ extension BridgeServiceClient {
     try await call(operation: .registerAgentInstallation, payload: request)
   }
 
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String? = nil,
+    apiKey: String? = nil
+  ) async throws -> IPCAgentInstallationSummary {
+    try await call(
+      operation: .connectAgentInstallation,
+      payload: IPCAgentConnectRequest(
+        providerID: providerID,
+        baseURL: baseURL,
+        apiKey: apiKey
+      )
+    )
+  }
+
   public func reprobeAgentInstallation(
     installationID: String,
     acceptReplacement: Bool

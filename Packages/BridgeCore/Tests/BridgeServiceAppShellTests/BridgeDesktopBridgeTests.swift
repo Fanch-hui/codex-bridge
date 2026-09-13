@@ -40,6 +40,9 @@ final class BridgeDesktopBridgeTests: XCTestCase {
       state.connections?.providers.map { $0.providerID } ?? [],
       model.agentProviders.map { $0.providerID }
     )
+    XCTAssertEqual(state.connections?.codex?.modelCount, model.models.count)
+    XCTAssertEqual(state.connections?.codex?.modelError, model.modelCatalogError)
+    XCTAssertEqual(state.connections?.codex?.isRefreshing, model.isRefreshing)
   }
 
   func testWorkbenchHistoryIncludesOrphansAndUsesSelectedTranscript() {

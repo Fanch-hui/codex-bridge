@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
   import Foundation
 
   enum WindowsDesktopUICommandRouter {
@@ -176,6 +177,13 @@
         return .disconnectTunnel
       case .clearTunnel:
         return .clearTunnel
+      case .connectAgent:
+        guard let providerID = nonEmpty(payload.providerID) else { return nil }
+        return .connectAgentFromDesktop(
+          providerID: providerID,
+          baseURL: AgentConnectionInput.baseURL(payload.baseURL),
+          apiKey: AgentConnectionInput.apiKey(payload.apiKey)
+        )
       case .registerAgent:
         guard let providerID = nonEmpty(payload.providerID),
           let executable = nonEmpty(payload.executable),
@@ -298,6 +306,7 @@
     private static func optionalValue(_ value: String?) -> String? {
       nonEmpty(value)
     }
+
   }
 
 #endif

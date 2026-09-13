@@ -92,6 +92,60 @@
       }
     }
 
+    func connectAgent(
+      providerID: String,
+      baseURL: String? = nil,
+      apiKey: String? = nil
+    ) async {
+      guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
+        reportAgentFailure("未找到可连接的 Agent Provider。")
+        return
+      }
+      let hasExistingInstallation = agentInstallations.contains {
+        $0.providerID == providerID
+      }
+      guard
+        AgentConnectionInput.isValid(
+          providerRequiresConfiguration: provider.requiresConfiguration,
+          hasExistingInstallation: hasExistingInstallation,
+          baseURL: baseURL,
+          apiKey: apiKey
+        )
+      else {
+        reportAgentFailure("请填写 \(provider.displayName) 的 Base URL 和 API key。")
+        return
+      }
+      guard connectionState == .connected else {
+        reportAgentFailure("后台 Service 未连接，无法连接 Agent。")
+        return
+      }
+      guard !agentBusy else { return }
+      setAgentBusy(true)
+      setAgentStatus("正在自动发现并连接 Agent…")
+      defer { setAgentBusy(false) }
+      do {
+        let installation = try await client.connectAgentInstallation(
+          providerID: provider.providerID,
+          baseURL: AgentConnectionInput.baseURL(baseURL),
+          apiKey: AgentConnectionInput.apiKey(apiKey)
+        )
+        selectedProviderID = provider.providerID
+        selectedInstallationID = installation.installationID
+        await refreshAgents()
+        let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
+        if installation.availability == "available" {
+          reportAgentSuccess("已连接并验证 \(installation.displayName)。")
+        } else {
+          reportAgentFailure(
+            "Agent 已发现，但 Probe 状态为 \(state)。",
+            installationID: installation.installationID
+          )
+        }
+      } catch {
+        reportAgentFailure("Agent 连接失败：\(BridgeServiceErrorMessage.message(error))")
+      }
+    }
+
     func registerAgent(
       providerID: String,
       executablePath: String,

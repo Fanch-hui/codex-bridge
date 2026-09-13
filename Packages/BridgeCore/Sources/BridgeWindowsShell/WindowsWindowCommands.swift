@@ -154,6 +154,7 @@
     case copyLocalMCPEndpoint
     case rotateMCPClientCredential(id: String)
     case selectAgent(id: String)
+    case connectAgentFromDesktop(providerID: String, baseURL: String?, apiKey: String?)
     case setAgentEnabled(id: String, enabled: Bool)
     case reprobeAgent(id: String, acceptReplacement: Bool)
     case removeAgent(id: String)

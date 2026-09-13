@@ -9,7 +9,7 @@ extension BridgeDesktopUIStateBuilder {
     return BridgeDesktopConnectionsState(
       header: BridgeDesktopPageHeader(
         title: "连接",
-        subtitle: "管理本地 MCP、Secure Tunnel 和已登记 Agent 安装。",
+        subtitle: "管理本地 MCP、Codex、本机 Agent 和 Secure Tunnel。",
         symbol: BridgeServiceNavigation.connections.symbol
       ),
       summaryRows: connectionSummary(from: model, tunnel: tunnel),
@@ -18,11 +18,26 @@ extension BridgeDesktopUIStateBuilder {
       canCopyLocalMCPURL: model.safeLocalMCPDescription != nil,
       canRotateLocalMCPEndpoint: model.connectionState == .connected,
       tunnel: tunnelState(tunnel, connection: model.connectionState),
+      codex: codexState(from: model),
       clients: clientRows(from: model),
       providers: model.agentProviders.map(providerRow),
       installations: model.agentInstallations.map(installationRow),
-      canRegisterAgent: model.connectionState == .connected && !model.agentProviders.isEmpty,
+      canRegisterAgent: model.connectionState == .connected
+        && !model.isManagingAgents
+        && !model.agentProviders.isEmpty,
       statusMessage: model.errorMessage
+    )
+  }
+
+  private static func codexState(
+    from model: BridgeServiceAppModel
+  ) -> BridgeDesktopCodexConnectionState {
+    BridgeDesktopCodexConnectionState(
+      connectionState: model.connectionState.label,
+      modelCount: model.models.count,
+      modelError: model.modelCatalogError,
+      isRefreshing: model.isRefreshing,
+      canRefresh: !model.isRefreshing
     )
   }
 

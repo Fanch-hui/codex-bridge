@@ -58,6 +58,24 @@
       XCTAssertEqual(state.overview?.notices.map(\.id), ["local-approvals"])
     }
 
+    func testConnectionsExposeCodexModelRefreshState() {
+      var settings = makeSettings()
+      settings.modelOptions = [
+        BridgeDesktopModelOption(modelID: "gpt-5.6", displayName: "GPT-5.6")
+      ]
+      settings.isRefreshingModels = true
+      let state = WindowsDesktopUIStateBuilder.build(
+        workbench: makeWorkbench(),
+        management: makeManagement(),
+        connections: makeConnections(tunnel: nil),
+        settings: settings
+      )
+
+      XCTAssertEqual(state.connections?.codex?.modelCount, 1)
+      XCTAssertTrue(state.connections?.codex?.isRefreshing == true)
+      XCTAssertFalse(state.connections?.codex?.canRefresh == true)
+    }
+
     func testLegacyRowsDoNotCreateSyntheticRecentTaskIdentifiers() {
       let workbench = makeWorkbench(recentTaskRows: ["本机任务 — 已结束"])
       let state = WindowsDesktopUIStateBuilder.build(
@@ -230,6 +248,24 @@
           modelID: nil,
           permissionMode: "workspace-write",
           effort: nil
+        )
+      )
+
+      let agentConnection = BridgeDesktopCommandEnvelope(
+        requestID: "agent-connect-1",
+        command: .connectAgent,
+        payload: .init(
+          providerID: "deepseek-harness",
+          baseURL: "https://api.example.test",
+          apiKey: "secret"
+        )
+      )
+      XCTAssertEqual(
+        WindowsDesktopUICommandRouter.command(for: agentConnection),
+        .connectAgentFromDesktop(
+          providerID: "deepseek-harness",
+          baseURL: "https://api.example.test",
+          apiKey: "secret"
         )
       )
 

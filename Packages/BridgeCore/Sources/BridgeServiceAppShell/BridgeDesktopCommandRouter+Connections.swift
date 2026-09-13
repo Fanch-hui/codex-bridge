@@ -2,6 +2,7 @@ import AppKit
 import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
+import BridgeServiceAppCore
 
 extension BridgeDesktopCommandRouter {
   static func handleConnections(
@@ -53,6 +54,8 @@ extension BridgeDesktopCommandRouter {
     case .clearTunnel:
       guard connected(model), tunnel(model)?.configured == true else { return }
       model.clearTunnel()
+    case .connectAgent:
+      connectAgent(payload, model: model)
     case .registerAgent:
       registerAgent(payload, model: model)
     case .beginAgentRegistration:
@@ -118,6 +121,36 @@ extension BridgeDesktopCommandRouter {
       displayName: displayName,
       executableURL: executableURL,
       configurationURL: configurationURL
+    )
+  }
+
+  private static func connectAgent(
+    _ payload: BridgeDesktopCommandPayload,
+    model: BridgeServiceAppModel
+  ) {
+    guard connected(model), let providerID = validatedID(payload.providerID, maximumBytes: 128),
+      let provider = model.agentProviders.first(where: { $0.providerID == providerID })
+    else { return }
+    let baseURL = AgentConnectionInput.baseURL(payload.baseURL)
+    let apiKey = AgentConnectionInput.apiKey(payload.apiKey)
+    let hasExistingInstallation = model.agentInstallations.contains {
+      $0.providerID == providerID
+    }
+    guard
+      AgentConnectionInput.isValid(
+        providerRequiresConfiguration: provider.requiresConfiguration,
+        hasExistingInstallation: hasExistingInstallation,
+        baseURL: baseURL,
+        apiKey: apiKey
+      )
+    else {
+      model.errorMessage = "请填写 \(provider.displayName) 的 Base URL 和 API key。"
+      return
+    }
+    model.connectAgentInstallation(
+      providerID: providerID,
+      baseURL: baseURL,
+      apiKey: apiKey
     )
   }
 

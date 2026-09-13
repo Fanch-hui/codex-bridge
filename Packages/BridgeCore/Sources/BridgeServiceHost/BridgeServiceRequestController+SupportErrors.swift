@@ -3,6 +3,7 @@ import BridgeCodexService
 import BridgeDeepSeekHarnessACP
 import BridgeIPC
 import BridgeMCP
+import BridgeServiceApplication
 import BridgeServiceCore
 import BridgeTunnel
 import Foundation
@@ -20,6 +21,12 @@ extension BridgeServiceRequestController {
     }
     if let error = error as? ServiceAgentRegistryError {
       return mapAgentRegistryError(error)
+    }
+    if let error = error as? ServiceAgentConnectionError {
+      return .init(code: "agent_installation_not_found", message: error.localizedDescription)
+    }
+    if let error = error as? ServiceAgentCredentialError {
+      return mapAgentCredentialError(error)
     }
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
@@ -102,11 +109,48 @@ extension BridgeServiceRequestController {
         code: "agent_installation_needs_review",
         message: "The Agent executable changed and requires explicit local review."
       )
+    case .connectionProbeFailed:
+      return .init(
+        code: "agent_connection_probe_failed",
+        message: "The Agent installation did not pass the connection Probe."
+      )
     case .registrationInProgress:
       return .init(
         code: "agent_registration_in_progress",
         message: "This Agent executable is already being registered.",
         retryable: true
+      )
+    }
+  }
+
+  private static func mapAgentCredentialError(
+    _ error: ServiceAgentCredentialError
+  ) -> BridgeServiceIPCError {
+    switch error {
+    case .unsupportedProvider:
+      return .init(
+        code: "agent_credentials_unsupported",
+        message: "The Agent Provider does not accept connection credentials."
+      )
+    case .invalidBaseURL:
+      return .init(
+        code: "agent_base_url_invalid",
+        message: "The Agent Base URL is invalid."
+      )
+    case .invalidAPIKey:
+      return .init(
+        code: "agent_api_key_invalid",
+        message: "The Agent API key is invalid."
+      )
+    case .invalidConfigurationPath:
+      return .init(
+        code: "agent_configuration_invalid",
+        message: "The Agent configuration path is invalid."
+      )
+    case .invalidStoredAPIKey:
+      return .init(
+        code: "agent_credentials_unavailable",
+        message: "The stored Agent credentials are unavailable."
       )
     }
   }

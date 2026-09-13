@@ -236,6 +236,28 @@ public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
   }
 }
 
+public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
+  public let providerID: String
+  public let baseURL: String?
+  public let apiKey: String?
+
+  public init(
+    providerID: String,
+    baseURL: String? = nil,
+    apiKey: String? = nil
+  ) {
+    self.providerID = providerID
+    self.baseURL = baseURL
+    self.apiKey = apiKey
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case providerID = "provider_id"
+    case baseURL = "base_url"
+    case apiKey = "api_key"
+  }
+}
+
 public struct IPCAgentReprobeRequest: Codable, Equatable, Sendable {
   public let installationID: String
   public let acceptReplacement: Bool

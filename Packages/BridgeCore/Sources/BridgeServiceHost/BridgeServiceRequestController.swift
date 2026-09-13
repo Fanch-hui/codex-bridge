@@ -106,6 +106,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleSetWorkbenchPermissionMode(request)
     case .getAgentCatalog:
       return try await handleGetAgentCatalog(request)
+    case .connectAgentInstallation:
+      return try await handleConnectAgentInstallation(request)
     case .registerAgentInstallation:
       return try await handleRegisterAgentInstallation(request)
     case .reprobeAgentInstallation:

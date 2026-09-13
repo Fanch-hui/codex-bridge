@@ -10,6 +10,7 @@ extension DeepSeekHarnessACPProvider {
     let runDirectory = try makeRunDirectory(prefix: "run")
     var client: DeepSeekHarnessACPClient?
     do {
+      let sourceEnvironment = try await configuration.runtimeEnvironment(for: installation)
       let launch = try configuration.launchBuilder.make(
         installation: installation,
         projectRoot: request.projectRoot,
@@ -18,7 +19,7 @@ extension DeepSeekHarnessACPProvider {
         reasoningEffort: request.effort,
         mutationIntent: request.mutationIntent,
         networkAllowed: request.networkAccessRequested,
-        sourceEnvironment: configuration.sourceEnvironment
+        sourceEnvironment: sourceEnvironment
       )
       let connected = makeClient(transport: try configuration.transportFactory(launch))
       client = connected

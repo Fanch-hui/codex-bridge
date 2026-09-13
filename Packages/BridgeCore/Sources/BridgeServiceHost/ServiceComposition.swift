@@ -65,6 +65,15 @@ public actor ServiceComposition {
     let projects = ServiceProjectService(store: store)
     let tasks = ServiceTaskManager(store: store)
     let settings = ServiceSettings(store: store)
+    let deepSeekBaseURL = try await settings.string(for: .deepSeekHarnessBaseURL)
+    let deepSeekConfigurationPath = try await settings.string(
+      for: .deepSeekHarnessManagedConfigurationPath
+    )
+    let agentCredentials = ServiceAgentCredentialEnvironment(
+      secretStore: secretStore,
+      deepSeekBaseURL: deepSeekBaseURL,
+      managedDeepSeekConfigurationPath: deepSeekConfigurationPath
+    )
     let agentProviders: [any AgentProvider] = [
       try AntigravityCLIProvider(),
       try OpenCodeACPProvider(
@@ -75,7 +84,10 @@ public actor ServiceComposition {
       try DeepSeekHarnessACPProvider(
         configuration: DeepSeekHarnessACPProviderConfiguration(
           runtimeBaseDirectory: paths.agentStateURL
-            .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path
+            .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path,
+          environmentProvider: { [agentCredentials] installation in
+            try await agentCredentials.runtimeEnvironment(for: installation)
+          }
         )
       ),
     ]
@@ -136,6 +148,7 @@ public actor ServiceComposition {
       catalog: catalog,
       runtimeStatus: runtimeStatus,
       agentRegistry: agentRegistry,
+      agentCredentials: agentCredentials,
       directCommands: DirectCommandSessionManager(
         orphanPIDFileURL: paths.supervisorScratchURL.appending(path: "direct-command-pids.txt")
       )

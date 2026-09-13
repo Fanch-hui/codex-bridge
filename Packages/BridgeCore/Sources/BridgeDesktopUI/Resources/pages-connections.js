@@ -1,6 +1,5 @@
 (function (global) {
   "use strict";
-
   var S = global.CodexBridgeDesktopPageSupport;
   var E = global.CodexBridgeDesktopConnectionsEditors;
 
@@ -22,11 +21,11 @@
 
     var summary = S.node("div", "connection-summary");
     content.appendChild(summary);
-
+    var codex = global.CodexBridgeDesktopCodexConnection.create(emit);
+    content.appendChild(codex.root);
     var localSection = S.section(content, "本地 MCP 客户端通道");
     var localCard = S.node("div", "page-card connection-card");
     localSection.appendChild(localCard);
-
     var tunnelSection = S.section(content, "远程 AI 客户端 (OpenAI Secure Tunnel)");
     var tunnelCard = S.node("div", "page-card connection-card");
     var tunnelTitle = S.node("div", "section-heading-row");
@@ -50,14 +49,24 @@
     var clientsSection = S.section(content, "本地 MCP 客户端");
     var clientsEditor = E.createClients(emit);
     clientsSection.appendChild(clientsEditor.root);
-
     var agentsSection = S.section(content, "本机 Agent 引擎连接");
     var agentsCard = S.node("div", "page-card connection-card");
-    agentsCard.appendChild(S.node("h3", null, "已登记安装"));
+    agentsCard.appendChild(S.node("h3", null, "连接本机 Agent"));
+    agentsCard.appendChild(S.node(
+      "p",
+      "card-subtitle",
+      "Bridge 会自动查找本机安装、验证并启用。"
+    ));
+    var agentConnectors = global.CodexBridgeDesktopAgentConnectors.create(emit);
+    agentsCard.appendChild(agentConnectors.root);
+    agentsCard.appendChild(S.node("h4", "agent-subheading", "已连接安装"));
     var installations = S.node("div");
     agentsCard.appendChild(installations);
     var agentEditor = E.createAgentRegistration(emit);
-    agentsCard.appendChild(agentEditor.root);
+    var manual = S.node("details", "agent-manual-registration");
+    manual.appendChild(S.node("summary", null, "高级：按路径登记已有安装"));
+    manual.appendChild(agentEditor.root);
+    agentsCard.appendChild(manual);
     agentsSection.appendChild(agentsCard);
 
     var status = S.node("div", "page-message");
@@ -74,11 +83,12 @@
             subtitle: "正在从本机 Service 读取连接状态。",
             symbol: "point.3.connected.trianglepath.dotted"
           });
-          S.empty(unavailable, "连接页暂不可用", "连接本机 Service 后，可以管理 MCP 客户端、Secure Tunnel 与 Agent。");
+          S.empty(unavailable, "连接页暂不可用", "连接本机 Service 后，可以管理 MCP 客户端、Codex、Secure Tunnel 与 Agent。");
           return;
         }
         S.pageHeader(header, page.header);
         renderSummary(summary, page);
+        codex.update(page.codex, nextEmit);
         renderLocalMCP(localCard, page, context);
         renderTunnel(
           tunnelBadge,
@@ -91,7 +101,7 @@
           context
         );
         clientsEditor.update(page.clients, nextEmit);
-        renderAgents(installations, agentEditor, page, nextEmit);
+        renderAgents(installations, agentConnectors, agentEditor, page, nextEmit);
         status.textContent = page.statusMessage || "";
         status.hidden = !page.statusMessage;
       }
@@ -190,7 +200,7 @@
     }
   }
 
-  function renderAgents(container, editor, page, emit) {
+  function renderAgents(container, connectors, editor, page, emit) {
     S.clear(container);
     S.safeArray(page.installations).forEach(function (installation) {
       container.appendChild(agentRow(installation, emit));
@@ -198,7 +208,9 @@
     if (!page.installations || page.installations.length === 0) {
       container.appendChild(S.node("div", "list-empty", "尚未登记本机 Agent。"));
     }
-    editor.update(page.providers, page.canRegisterAgent, emit);
+    var providers = S.safeArray(page.providers).filter(function (provider) { return provider.providerID !== "codex"; });
+    connectors.update(providers, page.installations, page.canRegisterAgent, emit);
+    editor.update(providers, page.canRegisterAgent, emit);
   }
 
   function agentRow(installation, emit) {

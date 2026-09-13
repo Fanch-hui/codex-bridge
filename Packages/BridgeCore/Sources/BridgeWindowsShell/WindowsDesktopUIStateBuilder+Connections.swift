@@ -5,7 +5,8 @@
     static func connectionsPage(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
-      connections: WindowsConnectionDisplay?
+      connections: WindowsConnectionDisplay?,
+      settings: WindowsSettingsDisplay?
     ) -> BridgeDesktopConnectionsState? {
       guard let connections else { return nil }
       let service = statusLabel(workbench.connectionState)
@@ -19,7 +20,7 @@
       return BridgeDesktopConnectionsState(
         header: header(
           "连接",
-          "管理本地 MCP、Secure Tunnel 和已登记 Agent 安装。",
+          "管理本地 MCP、Codex、本机 Agent 和 Secure Tunnel。",
           "point.3.connected.trianglepath.dotted"
         ),
         summaryRows: [
@@ -52,11 +53,34 @@
           && connections.endpointText.hasPrefix("http"),
         canRotateLocalMCPEndpoint: connections.rotateEndpointEnabled,
         tunnel: tunnel,
+        codex: codexState(workbench: workbench, settings: settings),
         clients: connections.clientItems,
         providers: management.agent.providerItems,
         installations: management.agent.installationItems,
         canRegisterAgent: management.agent.registerEnabled,
         statusMessage: message.isEmpty ? nil : message
+      )
+    }
+
+    private static func codexState(
+      workbench: WindowsWorkbenchDisplay,
+      settings: WindowsSettingsDisplay?
+    ) -> BridgeDesktopCodexConnectionState {
+      let service = statusLabel(workbench.connectionState)
+      guard let settings else {
+        return BridgeDesktopCodexConnectionState(
+          connectionState: service.label,
+          modelCount: workbench.availableModelCount,
+          modelError: workbench.modelError,
+          canRefresh: false
+        )
+      }
+      return BridgeDesktopCodexConnectionState(
+        connectionState: service.label,
+        modelCount: settings.modelOptions.count,
+        modelError: settings.modelError,
+        isRefreshing: settings.isRefreshingModels,
+        canRefresh: !settings.busy && !settings.isRefreshingModels
       )
     }
 

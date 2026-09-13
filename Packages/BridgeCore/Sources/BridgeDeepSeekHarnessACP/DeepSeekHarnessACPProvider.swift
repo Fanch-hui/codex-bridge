@@ -3,6 +3,9 @@ import BridgeAgentCore
 import Foundation
 
 public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
+  public typealias EnvironmentProvider =
+    @Sendable (AgentInstallation) async throws -> [String: String]
+
   public let clientInfo: DeepSeekHarnessACPClientInfo
   public let launchBuilder: DeepSeekHarnessACPLaunchBuilder
   public let requestTimeout: Duration
@@ -10,6 +13,7 @@ public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
   public let eventBufferLimit: Int
   public let runtimeBaseDirectory: String
   public let sourceEnvironment: [String: String]
+  public let environmentProvider: EnvironmentProvider
   public let transportFactory: DeepSeekHarnessACPTransportFactory
 
   public init(
@@ -25,6 +29,7 @@ public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
     runtimeBaseDirectory: String = FileManager.default.temporaryDirectory
       .appendingPathComponent("CodexBridge/DeepSeekHarnessACP", isDirectory: true).path,
     sourceEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+    environmentProvider: EnvironmentProvider? = nil,
     transportFactory: @escaping DeepSeekHarnessACPTransportFactory = { launch in
       try ACPProcessTransport.launch(configuration: launch.process)
     }
@@ -36,7 +41,20 @@ public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
     self.eventBufferLimit = max(1, eventBufferLimit)
     self.runtimeBaseDirectory = runtimeBaseDirectory
     self.sourceEnvironment = sourceEnvironment
+    self.environmentProvider =
+      environmentProvider ?? { _ in
+        var environment = sourceEnvironment
+        for key in Array(environment.keys)
+        where key.caseInsensitiveCompare("DEEPSEEK_API_KEY") == .orderedSame {
+          environment.removeValue(forKey: key)
+        }
+        return environment
+      }
     self.transportFactory = transportFactory
+  }
+
+  func runtimeEnvironment(for installation: AgentInstallation) async throws -> [String: String] {
+    try await environmentProvider(installation)
   }
 }
 

@@ -58,6 +58,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case connectTunnel
   case disconnectTunnel
   case clearTunnel
+  case connectAgent
   case registerAgent
   case beginAgentRegistration
   case selectAgent
@@ -122,6 +123,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let pattern: String?
   public let displayName: String?
   public let configurationPath: String?
+  public let baseURL: String?
+  public let apiKey: String?
   public let exposureMode: String?
   public let modelID: String?
   public let effort: String?
@@ -180,6 +183,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     pattern: String? = nil,
     displayName: String? = nil,
     configurationPath: String? = nil,
+    baseURL: String? = nil,
+    apiKey: String? = nil,
     exposureMode: String? = nil,
     modelID: String? = nil,
     effort: String? = nil,
@@ -237,6 +242,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.pattern = pattern
     self.displayName = displayName
     self.configurationPath = configurationPath
+    self.baseURL = baseURL
+    self.apiKey = apiKey
     self.exposureMode = exposureMode
     self.modelID = modelID
     self.effort = effort

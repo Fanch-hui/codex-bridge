@@ -102,14 +102,16 @@ In Workbench:
 
 When a remote request omits `project_id`, the selected Workbench project is authoritative. An explicit ID must come from MCP `list_projects`, not from a display name. Remote clients should normally omit permission overrides and use the Workbench default.
 
-### 4. Configure providers
+### 4. Connect local agents
 
-- **Codex** is the default provider and is not registered under local agent connections. Complete official Codex/ChatGPT authentication, then select model, effort, access, and optional Fast tier in Settings. Bridge does not read Codex credentials.
-- **OpenCode**: `Connections → Local Agent Engine Connections → Register Agent → OpenCode`; select the real `opencode` executable and Probe it. See the [OpenCode guide](./docs/OPENCODE_CONNECTION_GUIDE.md).
-- **DeepSeek Harness**: build pinned tag `dsh-v0.1.1-rc.2`, register `packages/examples/acp-demo/lib/bin.js`, then select an external `cordis.yml`. The adjacent `.env` is loaded by Harness itself. See the [DeepSeek Harness guide](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md).
-- **Antigravity**: use `command -v agy` to locate the actual CLI, sign in interactively from the target project, and configure headless command, URL, and MCP rules through `/settings` and `/permissions`; do not register the Desktop application. See the [Antigravity / AGY guide (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md).
+Open `Connections → Local Agent Engine Connections` and click the agent's one-click connection button. macOS and Windows share discovery, validation, and activation.
 
-After registering an external provider, enable it, then refresh its model catalog in Settings. Model IDs and effort values are provider-native and must not be guessed or aliased across providers.
+- **Codex** uses its existing automatic discovery and current authentication/provider configuration.
+- **OpenCode** discovers the local CLI and uses its existing configuration. See the [OpenCode guide](./docs/OPENCODE_CONNECTION_GUIDE.md).
+- **DeepSeek Harness**: install and build the supported DSH version, enter the Base URL and API key, then connect. Bridge prepares the runtime profile and stores the key in the system credential store. See the [DeepSeek Harness guide](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md).
+- **Antigravity** discovers the `agy` CLI and uses its existing sign-in and permission settings. See the [Antigravity / AGY guide (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md).
+
+A successful connection enables the agent. Select provider-native models and effort values in Settings. Authentication, API availability, and execution permissions are managed by the corresponding provider.
 
 ### External-provider permission essentials
 

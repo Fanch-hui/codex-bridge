@@ -60,7 +60,8 @@
         connections: connectionsPage(
           workbench: workbench,
           management: management,
-          connections: connections
+          connections: connections,
+          settings: settings
         ),
         settings: settingsPage(
           settings: settings,

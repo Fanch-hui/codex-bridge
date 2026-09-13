@@ -5,6 +5,7 @@ public enum ServiceAgentRegistryError: Error, Equatable, LocalizedError, Sendabl
   case providerUnavailable(AgentProviderID)
   case installationUnavailable(AgentInstallationID)
   case installationNeedsReview(AgentInstallationID)
+  case connectionProbeFailed(AgentInstallationID)
   case registrationInProgress(AgentProviderID)
 
   public var errorDescription: String? {
@@ -15,6 +16,8 @@ public enum ServiceAgentRegistryError: Error, Equatable, LocalizedError, Sendabl
       "The Agent installation is unavailable."
     case .installationNeedsReview:
       "The Agent installation changed and requires local review."
+    case .connectionProbeFailed:
+      "The Agent installation did not pass the connection Probe."
     case .registrationInProgress:
       "The Agent executable is already being registered."
     }

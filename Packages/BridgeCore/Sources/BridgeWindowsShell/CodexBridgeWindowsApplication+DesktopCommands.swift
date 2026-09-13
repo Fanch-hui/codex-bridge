@@ -156,6 +156,16 @@
           management.selectProvider(at: index)
         }
         return true
+      case .connectAgentFromDesktop(let providerID, let baseURL, let apiKey):
+        Task { @MainActor in
+          await management.connectAgent(
+            providerID: providerID,
+            baseURL: baseURL,
+            apiKey: apiKey
+          )
+          await auxiliary.agentDefaults.refresh()
+        }
+        return true
       case .setAgentEnabled(let id, let enabled):
         guard
           let index = management.agentInstallations.firstIndex(where: { $0.installationID == id })

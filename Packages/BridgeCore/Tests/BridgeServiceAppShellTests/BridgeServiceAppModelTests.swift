@@ -325,6 +325,44 @@ final class BridgeServiceAppModelTests: XCTestCase {
     await model.shutdownUI()
   }
 
+  func testAgentConnectionPassesProviderConfigurationToService() async throws {
+    let registration = TestServiceRegistration(status: .enabled)
+    let client = TestBridgeServiceClient()
+    await client.configureAgentProviders([
+      IPCAgentProviderSummary(
+        providerID: "deepseek-harness",
+        displayName: "DeepSeek Harness",
+        adapterRevision: 1,
+        requiresConfiguration: true
+      )
+    ])
+    let model = BridgeServiceAppModel(
+      registration: registration,
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+
+    model.connectAgentInstallation(
+      providerID: "deepseek-harness",
+      baseURL: "https://api.example.test",
+      apiKey: "key-1"
+    )
+    try await waitUntil {
+      model.agentInstallations.count == 1 && !model.isManagingAgents
+    }
+
+    let requestValue = await client.agentConnectionRequest()
+    let request = try XCTUnwrap(requestValue)
+    XCTAssertEqual(request.providerID, "deepseek-harness")
+    XCTAssertEqual(request.baseURL, "https://api.example.test")
+    XCTAssertEqual(request.apiKey, "key-1")
+    XCTAssertTrue(model.agentInstallations[0].isEnabled)
+    await model.shutdownUI()
+  }
+
   func testGlobalCustomInstructionsReachServiceClient() async throws {
     let registration = TestServiceRegistration(status: .enabled)
     let client = TestBridgeServiceClient()

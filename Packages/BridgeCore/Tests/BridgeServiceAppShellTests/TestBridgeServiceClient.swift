@@ -93,6 +93,12 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
   ]
   private var agentInstallationsValue: [IPCAgentInstallationSummary] = []
   private var agentActions: [String] = []
+  private var agentConnectionRequestValue:
+    (
+      providerID: String,
+      baseURL: String?,
+      apiKey: String?
+    )?
   private var agentModelOptionsValue: [IPCAgentModelSummary] = []
   private var agentModelOptionsByInstallation: [String: [IPCAgentModelSummary]] = [:]
   private var agentModelDefaultValue: String?
@@ -267,6 +273,14 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
 
   func registrationRequest() -> IPCAgentRegistrationRequest? {
     registrationRequestValue
+  }
+
+  func agentConnectionRequest() -> (
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?
+  )? {
+    agentConnectionRequestValue
   }
 
   func configureNativePermissionPolicy(
@@ -468,6 +482,25 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
     )
     agentInstallationsValue = [installation]
     agentActions.append("register:\(request.providerID)")
+    return installation
+  }
+
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?
+  ) async throws -> IPCAgentInstallationSummary {
+    agentConnectionRequestValue = (providerID, baseURL, apiKey)
+    agentActions.append("connect:\(providerID)")
+    let installation = makeAgentInstallation(
+      providerID: providerID,
+      installationID: "agent-installation-1",
+      displayName: agentProvidersValue.first(where: { $0.providerID == providerID })?.displayName
+        ?? providerID,
+      executablePath: "/auto/\(providerID)",
+      isEnabled: true
+    )
+    agentInstallationsValue = [installation]
     return installation
   }
 
@@ -1048,6 +1081,7 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
   }
 
   private func makeAgentInstallation(
+    providerID: String = "opencode",
     installationID: String,
     displayName: String,
     executablePath: String,
@@ -1055,7 +1089,7 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
   ) -> IPCAgentInstallationSummary {
     IPCAgentInstallationSummary(
       installationID: installationID,
-      providerID: "opencode",
+      providerID: providerID,
       displayName: displayName,
       executablePath: executablePath,
       version: "1.18.22",

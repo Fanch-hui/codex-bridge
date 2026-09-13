@@ -31,6 +31,11 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
   ) async throws -> IPCAgentInstallationSummary
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?
+  ) async throws -> IPCAgentInstallationSummary
   func reprobeAgentInstallation(
     installationID: String,
     acceptReplacement: Bool
@@ -173,6 +178,14 @@ extension BridgeServiceClientProtocol {
 
   public func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
+  ) async throws -> IPCAgentInstallationSummary {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func connectAgentInstallation(
+    providerID _: String,
+    baseURL _: String?,
+    apiKey _: String?
   ) async throws -> IPCAgentInstallationSummary {
     throw BridgeServiceClientError.unavailable
   }

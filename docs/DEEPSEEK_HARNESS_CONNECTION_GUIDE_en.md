@@ -118,17 +118,16 @@ The packaged profile currently uses `DEEPSEEK_API_KEY` for both paths. If a cust
 
 Bridge launches DSH with the profile directory as its working directory, so Harness loads the adjacent `.env` itself. Bridge does not open, persist, summarize, log, or return its contents.
 
-## 5. Register in the app
+## 5. Connect in the app
 
 1. Open `Connections → Local Agent Engine Connections`.
-2. Click “Register Agent” and choose DeepSeek Harness.
-3. Select `<dsh-source>/packages/examples/acp-demo/lib/bin.js`.
-4. Continue and select `<dsh-profile>/cordis.yml`.
-5. Click “Register and Probe”.
-6. Review version, protocol, adapter revision, and availability.
-7. When status is available, enable the installation.
+2. Enter the Base URL and API key under DeepSeek Harness.
+3. Click the one-click connection button and wait for discovery, configuration, and Probe.
+4. Check availability; a successful Probe enables the agent.
 
-Registration does not enable the provider automatically. Probe confirms local identity, compatibility, and a basic ACP session; it runs without network access and does not prove API-key validity, account credit, model execution, or Web Search.
+macOS and Windows share this flow. The API key is stored in the system credential store and passed to Harness through its process environment. The external profile and `.env` instructions above apply to advanced manual registration, which accepts the ACP entry point and `cordis.yml` paths.
+
+Probe validates the local installation, protocol, and basic ACP session. API authentication and model execution are verified when running a task.
 
 ## 6. Refresh models and defaults
 

@@ -38,6 +38,8 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessDefaultModel = "agent.deepseek-harness.default_model"
   case deepSeekHarnessDefaultPermissionMode = "agent.deepseek-harness.default_permission_mode"
   case deepSeekHarnessDefaultEffort = "agent.deepseek-harness.default_effort"
+  case deepSeekHarnessBaseURL = "agent.deepseek-harness.base_url"
+  case deepSeekHarnessManagedConfigurationPath = "agent.deepseek-harness.managed_configuration_path"
   case antigravityDefaultModel = "agent.antigravity.default_model"
   case antigravityDefaultPermissionMode = "agent.antigravity.default_permission_mode"
   case antigravityDefaultEffort = "agent.antigravity.default_effort"

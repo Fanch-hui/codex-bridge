@@ -35,7 +35,7 @@ Scripts/build-release-candidate.sh \
 
 The generated files use the product version in their names and include a `RELEASE-CANDIDATE.txt` warning. v0.4.0 上传 Release 时只上传两个架构的 DMG/ZIP、SBOM 和 `SHA256SUMS`；警告文件不作为下载资产上传。
 
-OpenCode、DeepSeek Harness 与 Antigravity 都是用户自行安装或构建并明确登记的外部运行时，发布包不包含它们。App 只包含对应适配器、登记/Probe UI，以及 DSH 所需的受验证 `cordis.yml` 模板；不包含或读取 Provider 凭据与 DSH `.env`。
+OpenCode、DeepSeek Harness 与 Antigravity 是用户安装或构建的外部运行时。App 包含对应适配器、共用的一键连接 UI 和 DSH `cordis.yml` 模板。DSH 一键配置将用户输入的 API key 保存到系统凭据存储，运行时经环境注入；高级手动 Profile 的 `.env` 由 Harness 自行加载。
 
 ## 3. Optional Developer ID signing (not used for v0.4.0)
 

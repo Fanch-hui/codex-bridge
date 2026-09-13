@@ -29,6 +29,32 @@ extension BridgeServiceAppModel {
     )
   }
 
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String? = nil,
+    apiKey: String? = nil
+  ) {
+    guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
+      errorMessage = "未找到可连接的 Agent Provider。"
+      return
+    }
+    runAgentMutation(
+      operation: { client in
+        try await client.connectAgentInstallation(
+          providerID: provider.providerID,
+          baseURL: baseURL,
+          apiKey: apiKey
+        )
+      },
+      successMessage: { installation in
+        guard let installation else { return "Agent 连接请求已完成" }
+        return installation.availability == "available"
+          ? "已连接并验证 \(installation.displayName)"
+          : "已发现 \(installation.displayName)，但 Probe 尚未通过"
+      }
+    )
+  }
+
   func reprobeAgentInstallation(
     _ installationID: String,
     acceptReplacement: Bool

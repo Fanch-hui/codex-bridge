@@ -79,11 +79,20 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
     XCTAssertTrue(connectionsScript.contains("acceptReplacement: true"))
     XCTAssertTrue(connectionsScript.contains("现有客户端地址将立即失效"))
+    XCTAssertTrue(connectionsScript.contains("provider.providerID !== \"codex\""))
     let connectionsEditor = try BridgeDesktopUIResources.read(.pagesConnectionsEditorJS)
     XCTAssertTrue(connectionsEditor.contains("现有配置将立即失效"))
     XCTAssertTrue(connectionsEditor.contains("CodexBridgeDesktopFormDraft"))
     XCTAssertTrue(connectionsEditor.contains("configureTunnel"))
     XCTAssertTrue(index.contains("pages-connections-editor.js"))
+    XCTAssertTrue(index.contains("pages-agent-connectors.js"))
+    XCTAssertTrue(index.contains("pages-codex-connection.js"))
+    let agentConnectors = try BridgeDesktopUIResources.read(.pagesAgentConnectorsJS)
+    XCTAssertTrue(agentConnectors.contains("connectAgent"))
+    XCTAssertTrue(agentConnectors.contains("apiKey.control.value = \"\""))
+    let codexConnection = try BridgeDesktopUIResources.read(.pagesCodexConnectionJS)
+    XCTAssertTrue(codexConnection.contains("refreshModels"))
+    XCTAssertFalse(codexConnection.contains("installationID"))
     let settingsScript = try BridgeDesktopUIResources.read(.pagesSettingsJS)
     XCTAssertTrue(settingsScript.contains("settings-stack"))
     XCTAssertTrue(
@@ -105,6 +114,21 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(nativePermissionScript.contains("prepareAgentPermissionRemediation"))
     XCTAssertTrue(nativePermissionScript.contains("applyAgentPermissionRemediation"))
     XCTAssertTrue(nativePermissionScript.contains("oneTimeToolAutoApproval"))
+  }
+
+  func testCodexConnectionStateRoundTripsThroughJSON() throws {
+    let state = BridgeDesktopCodexConnectionState(
+      connectionState: "已连接",
+      modelCount: 3,
+      modelError: nil,
+      isRefreshing: false,
+      canRefresh: true
+    )
+    let decoded = try JSONDecoder().decode(
+      BridgeDesktopCodexConnectionState.self,
+      from: JSONEncoder().encode(state)
+    )
+    XCTAssertEqual(decoded, state)
   }
 
   func testStateRoundTripsThroughJSON() throws {
@@ -204,6 +228,27 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertEqual(envelope.command, .updateBrowserViewport)
     XCTAssertEqual(envelope.payload.viewport?.width, 640)
     XCTAssertTrue(envelope.payload.viewport?.visible == true)
+  }
+
+  func testAgentConnectionCommandCarriesTransientInputs() throws {
+    let envelope = BridgeDesktopCommandEnvelope(
+      requestID: "agent-connect-1",
+      command: .connectAgent,
+      payload: BridgeDesktopCommandPayload(
+        providerID: "deepseek-harness",
+        baseURL: "https://api.example.test",
+        apiKey: "secret"
+      )
+    )
+    let decoded = try JSONDecoder().decode(
+      BridgeDesktopCommandEnvelope.self,
+      from: JSONEncoder().encode(envelope)
+    )
+
+    XCTAssertEqual(decoded.command, .connectAgent)
+    XCTAssertEqual(decoded.payload.providerID, "deepseek-harness")
+    XCTAssertEqual(decoded.payload.baseURL, "https://api.example.test")
+    XCTAssertEqual(decoded.payload.apiKey, "secret")
   }
 
   func testNativePermissionContractsRoundTripThroughJSON() throws {
