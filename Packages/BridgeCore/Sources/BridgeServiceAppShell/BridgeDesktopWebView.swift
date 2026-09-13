@@ -37,9 +37,6 @@ struct BridgeDesktopWebView: NSViewRepresentable {
 
   func updateNSView(_ nsView: WKWebView, context: Context) {
     let state = BridgeDesktopUIStateBuilder.build(from: model)
-    if state.selectedNavigation != .workbench {
-      model.chatBrowserViewport = nil
-    }
     context.coordinator.update(
       state: state,
       webView: nsView

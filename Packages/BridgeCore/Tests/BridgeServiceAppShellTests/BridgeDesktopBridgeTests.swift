@@ -1,6 +1,7 @@
 import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
+import Combine
 import Foundation
 import XCTest
 
@@ -102,6 +103,28 @@ final class BridgeDesktopBridgeTests: XCTestCase {
       BridgeDesktopLogPresentation.category(for: "task.failed"),
       "other"
     )
+  }
+
+  func testNavigationClearsViewportWithoutRepeatedPublications() {
+    let model = BridgeServiceAppModel(
+      registration: BridgeDesktopTestServiceRegistration(status: .enabled),
+      clientFactory: { TestBridgeServiceClient() },
+      pollInterval: nil
+    )
+    model.selection = .workbench
+    model.chatBrowserViewport = BridgeDesktopBrowserViewport(
+      x: 0, y: 0, width: 300, height: 400, visible: true
+    )
+    var publications = 0
+    let observation = model.$chatBrowserViewport.dropFirst().sink { _ in
+      publications += 1
+    }
+    model.selection = .overview
+    XCTAssertNil(model.chatBrowserViewport)
+    model.updateChatBrowserVisibility()
+    model.updateChatBrowserVisibility()
+    XCTAssertEqual(publications, 1)
+    withExtendedLifetime(observation) {}
   }
 
   func testBrowserViewportCommandAcceptsFiniteLocalGeometryOnly() {

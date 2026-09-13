@@ -317,6 +317,9 @@ extension BridgeServiceAppModel {
   }
 
   func updateChatBrowserVisibility() {
+    if selection != .workbench, chatBrowserViewport != nil {
+      chatBrowserViewport = nil
+    }
     cancelChatBrowserSleep()
     guard isChatBrowserEnabled, selection != .workbench, chatWebView != nil else { return }
     let delay = chatBrowserSleepDelay

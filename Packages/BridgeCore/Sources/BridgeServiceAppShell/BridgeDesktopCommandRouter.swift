@@ -81,7 +81,6 @@ enum BridgeDesktopCommandRouter {
   ) {
     guard let selection = BridgeServiceNavigation(rawValue: navigation.rawValue) else { return }
     model.selection = selection
-    if selection != .workbench { model.chatBrowserViewport = nil }
     if selection == .settings { loadNativePermissionPolicyIfNeeded(model) }
   }
 
