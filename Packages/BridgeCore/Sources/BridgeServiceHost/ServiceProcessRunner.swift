@@ -119,13 +119,9 @@ public enum ServiceProcessRunner {
         legacyDataRootURL: LegacyConfigurationImporter.defaultSourceRoot()
       )
     )
-    let endpoint = try await composition.startLocalMCP()
     let listener: (any ServiceRequestListener)?
     if options.foreground {
       listener = nil
-      FileHandle.standardOutput.write(
-        Data("Codex Bridge service ready on 127.0.0.1:\(endpoint.port).\n".utf8)
-      )
     } else {
       #if os(Windows)
         let active = try ServiceListenerFactory.makeListenerOrThrow(composition: composition)
@@ -134,6 +130,20 @@ public enum ServiceProcessRunner {
       #endif
       active.resume()
       listener = active
+    }
+
+    do {
+      let endpoint = try await composition.startLocalMCP()
+      if options.foreground {
+        FileHandle.standardOutput.write(
+          Data("Codex Bridge service ready on 127.0.0.1:\(endpoint.port).\n".utf8)
+        )
+      }
+    } catch {
+      guard !options.foreground else { throw error }
+      FileHandle.standardError.write(
+        Data("Codex Bridge local MCP is unavailable; service control remains available.\n".utf8)
+      )
     }
 
     await ServiceTerminationSignal.wait()

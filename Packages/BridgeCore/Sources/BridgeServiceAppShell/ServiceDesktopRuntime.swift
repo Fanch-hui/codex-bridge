@@ -212,66 +212,6 @@ extension BridgeServiceAppModel {
     )
   }
 
-  func connect(
-    includeCatalog: Bool,
-    forceCatalogRefresh: Bool = false
-  ) async {
-    pollingTask?.cancel()
-    pollingTask = nil
-    await closeClient()
-    registrationStatus = registration.status
-    guard registrationStatus == .enabled else {
-      connectionState =
-        registrationStatus == .requiresApproval
-        ? .requiresApproval
-        : .unavailable
-      return
-    }
-
-    connectionState = .connecting
-    var lastError: (any Error)?
-    for attempt in 0..<maximumConnectionAttempts {
-      guard !stopped, registration.status == .enabled else { return }
-      let candidate = clientFactory()
-      do {
-        let status = try await candidate.status()
-        serviceStatus = status
-        applyWorkbenchPermissionMode(status.workbenchPermissionMode)
-        client = candidate
-        connectionState = .connected
-        registrationStatus = .enabled
-        lastRefreshAt = Date()
-        errorMessage = nil
-        await refreshCollections(
-          client: candidate,
-          includeCatalog: includeCatalog,
-          includeThreads: true,
-          forceCatalogRefresh: forceCatalogRefresh
-        )
-        startPolling()
-        return
-      } catch {
-        lastError = error
-        await candidate.close()
-        guard attempt + 1 < maximumConnectionAttempts else { break }
-        do {
-          try await Task.sleep(for: connectionRetryDelay)
-        } catch {
-          return
-        }
-      }
-    }
-
-    registrationStatus = registration.status
-    connectionState =
-      registrationStatus == .requiresApproval
-      ? .requiresApproval
-      : .unavailable
-    if let lastError {
-      errorMessage = Self.message(lastError)
-    }
-  }
-
   func reconcileThreadSelection() {
     guard let selectedThreadID else { return }
     let remainsVisible = threads.contains { $0.threadID == selectedThreadID }
@@ -436,13 +376,13 @@ extension BridgeServiceAppModel {
     BridgeServiceErrorMessage.message(error)
   }
 
-  private func closeClient() async {
+  func closeClient() async {
     let current = client
     client = nil
     await current?.close()
   }
 
-  private func startPolling() {
+  func startPolling() {
     guard let pollInterval, pollingTask == nil else { return }
     pollingTask = Task { [weak self] in
       while !Task.isCancelled {

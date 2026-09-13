@@ -38,7 +38,6 @@ final class QwenStudioMCPHostTests: XCTestCase {
       Task { await composition.shutdown() }
       try? FileManager.default.removeItem(at: root)
     }
-    let chatSecret = try secrets.load(ServiceMCPSecretProvider.reference)
     XCTAssertThrowsError(
       try secrets.load(ServiceMCPSecretProvider.qwenStudioReference)
     )
@@ -62,6 +61,7 @@ final class QwenStudioMCPHostTests: XCTestCase {
       clientID: MCPClientID.qwenStudio.rawValue,
       mode: .full
     )
+    let chatSecret = try secrets.load(ServiceMCPSecretProvider.reference)
     let enabled = try await xpc.mcpClients()
     let qwen = try XCTUnwrap(
       enabled.first { $0.clientID == MCPClientID.qwenStudio.rawValue }

@@ -65,10 +65,12 @@ public protocol SecretStore: Sendable {
     public static let maximumSecretBytes = 16 * 1024
 
     private let service: String
+    private let allowsUserInteraction: Bool
 
-    public init(service: String = Self.defaultService) {
+    public init(service: String = Self.defaultService, allowsUserInteraction: Bool = true) {
       precondition(!service.isEmpty && service.utf8.count <= 255)
       self.service = service
+      self.allowsUserInteraction = allowsUserInteraction
     }
 
     public func store(_ secret: Data, for reference: SecretReference) throws {
@@ -118,6 +120,8 @@ public protocol SecretStore: Sendable {
         kSecAttrService: service,
         kSecAttrAccount: reference.rawValue,
         kSecAttrSynchronizable: false,
+        kSecUseAuthenticationUI: allowsUserInteraction
+          ? kSecUseAuthenticationUIAllow : kSecUseAuthenticationUIFail,
       ]
     }
 

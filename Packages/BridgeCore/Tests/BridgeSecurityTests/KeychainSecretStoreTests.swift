@@ -25,7 +25,10 @@ final class KeychainSecretStoreTests: XCTestCase {
   }
 
   func testRealKeychainRoundTripUpdateAndRemoval() throws {
-    let store = KeychainSecretStore(service: "com.openai.codex-bridge.tests.\(UUID().uuidString)")
+    let store = KeychainSecretStore(
+      service: "com.openai.codex-bridge.tests.\(UUID().uuidString)",
+      allowsUserInteraction: false
+    )
     let reference = SecretReference.random(prefix: "round-trip")
     let initial = Data("fixture-secret-one".utf8)
     let replacement = Data("fixture-secret-two".utf8)

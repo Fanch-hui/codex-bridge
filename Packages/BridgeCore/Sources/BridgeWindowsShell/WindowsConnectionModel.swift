@@ -243,7 +243,10 @@
           copyConfigurationEnabled: isQwen && enabled && !busy,
           rotateCredentialEnabled: isQwen && enabled && !busy,
           rotateEndpointEnabled: connectionState == .connected && !busy,
-          statusText: statusText,
+          statusText: ServiceStatusPresentation.connectionMessage(
+            status: serviceStatus?.status,
+            currentMessage: statusText
+          ) ?? statusText,
           clientItems: desktopClients,
           tunnel: projectedTunnel
         )

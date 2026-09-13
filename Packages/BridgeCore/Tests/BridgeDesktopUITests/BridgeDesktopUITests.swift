@@ -77,6 +77,7 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertFalse(commonScript.contains("innerHTML"))
     let connectionsScript = try BridgeDesktopUIResources.read(.pagesConnectionsJS)
     XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
+    XCTAssertTrue(connectionsScript.contains("page.statusMessage"))
     XCTAssertTrue(connectionsScript.contains("acceptReplacement: true"))
     XCTAssertTrue(connectionsScript.contains("现有客户端地址将立即失效"))
     XCTAssertTrue(connectionsScript.contains("provider.providerID !== \"codex\""))

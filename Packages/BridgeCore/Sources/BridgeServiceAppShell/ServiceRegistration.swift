@@ -21,6 +21,11 @@ public protocol BridgeServiceRegistrationManaging: AnyObject {
   func register() throws
   func unregister() async throws
   func openSystemSettings()
+  func recoverUnavailableService() async throws -> Bool
+}
+
+extension BridgeServiceRegistrationManaging {
+  public func recoverUnavailableService() async throws -> Bool { false }
 }
 
 @MainActor
@@ -87,6 +92,13 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
 
   public func openSystemSettings() {
     SMAppService.openSystemSettingsLoginItems()
+  }
+
+  public func recoverUnavailableService() async throws -> Bool {
+    guard status == .enabled else { return false }
+    try await unregister()
+    try register()
+    return status == .enabled
   }
 
   private var userLaunchAgentPlistURL: URL {

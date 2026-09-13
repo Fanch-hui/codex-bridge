@@ -233,6 +233,74 @@ final class BridgeServiceHostTests: XCTestCase {
     XCTAssertEqual(reloaded, rotated)
   }
 
+  func testMCPCredentialFailureLeavesServiceControlPlaneAvailable() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "bridge-service-mcp-access-denied-\(UUID().uuidString)",
+      directoryHint: .isDirectory
+    )
+    let secrets = AccessDeniedServiceHostSecretStore()
+    let unavailable = AppServerConfiguration(
+      executableURL: URL(fileURLWithPath: "/bin/false"),
+      arguments: []
+    )
+    let composition = try await ServiceComposition.make(
+      configuration: ServiceCompositionConfiguration(
+        appVersion: "0.4.0",
+        dataRootURL: root,
+        executionAppServer: unavailable,
+        supervisorAppServer: unavailable,
+        catalogAppServer: unavailable,
+        clientInfo: .bridge(version: "mcp-access-denied-tests")
+      ),
+      secretStore: secrets
+    )
+    defer {
+      Task { await composition.shutdown() }
+      try? FileManager.default.removeItem(at: root)
+    }
+
+    XCTAssertEqual(secrets.loadCount, 0)
+    let chatAdmitted = await composition.mcpClients.admission.isEnabled(.chatGPT)
+    XCTAssertFalse(chatAdmitted)
+    let initialStatuses = try await composition.mcpClientStatuses()
+    XCTAssertEqual(initialStatuses.count, 2)
+    XCTAssertEqual(secrets.loadCount, 0)
+
+    let pair = xpcClient(composition: composition)
+    let client = pair.0
+    let listener = pair.1
+    defer {
+      listener.invalidate()
+      Task { await client.invalidate() }
+    }
+    let initialStatus = try await client.status()
+    XCTAssertEqual(initialStatus.status.mcpState, "stopped")
+    let initialAgents = try await client.agentCatalog()
+    XCTAssertEqual(initialAgents.providers.count, 3)
+    XCTAssertTrue(initialAgents.installations.isEmpty)
+
+    do {
+      _ = try await composition.startLocalMCP()
+      XCTFail("MCP startup must report a denied credential store.")
+    } catch let error as SecretStoreError {
+      XCTAssertEqual(error, .accessDenied)
+    }
+
+    XCTAssertEqual(secrets.loadCount, 1)
+    let runtime = await composition.runtimeStatus.current()
+    XCTAssertEqual(runtime.mcpState, "failed")
+    XCTAssertTrue(
+      runtime.degradations.contains(
+        "MCP: MCP credentials are unavailable because the system credential store cannot be accessed."
+      )
+    )
+    let status = try await client.status()
+    XCTAssertEqual(status.status.mcpState, "failed")
+    let agents = try await client.agentCatalog()
+    XCTAssertEqual(agents.providers.count, initialAgents.providers.count)
+    XCTAssertTrue(agents.installations.isEmpty)
+  }
+
   func testCompositionServesReadOnlyThenFullMCPWithoutChangingSecret()
     async throws
   {

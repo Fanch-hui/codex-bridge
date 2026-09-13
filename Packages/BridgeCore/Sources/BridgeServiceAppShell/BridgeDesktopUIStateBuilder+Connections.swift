@@ -1,6 +1,7 @@
 import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
+import BridgeServiceAppCore
 
 extension BridgeDesktopUIStateBuilder {
   static func connections(from model: BridgeServiceAppModel) -> BridgeDesktopConnectionsState {
@@ -25,7 +26,10 @@ extension BridgeDesktopUIStateBuilder {
       canRegisterAgent: model.connectionState == .connected
         && !model.isManagingAgents
         && !model.agentProviders.isEmpty,
-      statusMessage: model.errorMessage
+      statusMessage: ServiceStatusPresentation.connectionMessage(
+        status: model.serviceStatus?.status,
+        currentMessage: model.errorMessage
+      )
     )
   }
 

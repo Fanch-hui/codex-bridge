@@ -85,6 +85,10 @@ public final class MCPClientCredentialAuthenticator: @unchecked Sendable {
   private var credentials: [MCPClientCredential]
   private var lastAuthenticatedAt: [MCPClientID: Date] = [:]
 
+  public init() {
+    credentials = []
+  }
+
   public init(credentials: [MCPClientCredential]) throws {
     self.credentials = []
     try replaceCredentials(credentials)

@@ -34,6 +34,32 @@ final class ServiceHostTestSecretStore: SecretStore, @unchecked Sendable {
   }
 }
 
+final class AccessDeniedServiceHostSecretStore: SecretStore, @unchecked Sendable {
+  private let lock = NSLock()
+  private var loads = 0
+
+  func store(_ secret: Data, for reference: SecretReference) throws {
+    throw SecretStoreError.accessDenied
+  }
+
+  func load(_ reference: SecretReference) throws -> Data {
+    lock.lock()
+    loads += 1
+    lock.unlock()
+    throw SecretStoreError.accessDenied
+  }
+
+  func remove(_ reference: SecretReference) throws {
+    throw SecretStoreError.accessDenied
+  }
+
+  var loadCount: Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return loads
+  }
+}
+
 struct ServiceHostFixture {
   let root: URL
   let secrets: ServiceHostTestSecretStore

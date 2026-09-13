@@ -46,6 +46,40 @@ final class BridgeDesktopBridgeTests: XCTestCase {
     XCTAssertEqual(state.connections?.codex?.isRefreshing, model.isRefreshing)
   }
 
+  func testConnectionsExposeMCPFailureWithoutDisablingAgentConnection() {
+    let model = BridgeServiceAppModel(
+      registration: BridgeDesktopTestServiceRegistration(status: .enabled),
+      clientFactory: { TestBridgeServiceClient() },
+      pollInterval: nil
+    )
+    model.connectionState = .connected
+    model.agentProviders = [
+      IPCAgentProviderSummary(
+        providerID: "opencode",
+        displayName: "OpenCode",
+        adapterRevision: 1
+      )
+    ]
+    model.serviceStatus = IPCServiceStatusResponse(
+      status: BridgeStatusSnapshot(
+        appVersion: "test",
+        mcpState: "failed",
+        tunnelState: "stopped",
+        executionState: "ready",
+        supervisorState: "ready",
+        degradations: ["MCP: 本地 MCP 凭据不可用"],
+        pendingApprovalCount: 0
+      ),
+      localMCPURL: nil,
+      exposureMode: .readOnly
+    )
+
+    let state = BridgeDesktopUIStateBuilder.build(from: model)
+
+    XCTAssertEqual(state.connections?.statusMessage, "MCP: 本地 MCP 凭据不可用")
+    XCTAssertTrue(state.connections?.canRegisterAgent == true)
+  }
+
   func testWorkbenchHistoryIncludesOrphansAndUsesSelectedTranscript() {
     let model = BridgeServiceAppModel(
       registration: BridgeDesktopTestServiceRegistration(status: .enabled),

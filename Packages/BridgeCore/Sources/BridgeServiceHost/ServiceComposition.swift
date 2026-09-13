@@ -170,7 +170,7 @@ public actor ServiceComposition {
       store: secretStore,
       randomBytes: randomBytes
     )
-    let mcpClients = try await ServiceMCPClientRegistry.make(
+    let mcpClients = try ServiceMCPClientRegistry.makeDeferred(
       settings: settings,
       secrets: secretProvider
     )
@@ -236,31 +236,37 @@ public actor ServiceComposition {
     if let mcpEndpoint { return mcpEndpoint }
     await tunnel.pauseForMCPRestart()
     await stopMCP()
-    let persistedPort = configuration.mcpPort == 0 ? try await settings.localMCPPort() : nil
-    let requestedPort = configuration.mcpPort == 0 ? persistedPort ?? 0 : configuration.mcpPort
-    let chatGPTSecret = try await mcpClients.chatGPTCredential()
-    let server = MCPBridgeServer(
-      appVersion: configuration.appVersion,
-      service: application,
-      exposureMode: { [mcpClients] clientID in
-        await mcpClients.exposureMode(for: clientID)
-      },
-      httpConfiguration: try MCPHTTPConfiguration(
-        clientAuthenticator: mcpClients.authenticator,
-        port: requestedPort
-      ),
-      clientAdmission: mcpClients.admission
-    )
+    var requestedPort = configuration.mcpPort
+    var server: MCPBridgeServer?
+    var attemptedServerStart = false
     do {
-      let endpoint = try await server.start()
+      let persistedPort = configuration.mcpPort == 0 ? try await settings.localMCPPort() : nil
+      requestedPort = configuration.mcpPort == 0 ? persistedPort ?? 0 : configuration.mcpPort
+      try await mcpClients.prepareForLocalMCP()
+      let chatGPTSecret = try await mcpClients.chatGPTCredential()
+      let activeServer = MCPBridgeServer(
+        appVersion: configuration.appVersion,
+        service: application,
+        exposureMode: { [mcpClients] clientID in
+          await mcpClients.exposureMode(for: clientID)
+        },
+        httpConfiguration: try MCPHTTPConfiguration(
+          clientAuthenticator: mcpClients.authenticator,
+          port: requestedPort
+        ),
+        clientAdmission: mcpClients.admission
+      )
+      server = activeServer
+      attemptedServerStart = true
+      let endpoint = try await activeServer.start()
       guard !isShutdown else {
-        await server.stop()
+        await activeServer.stop()
         throw CancellationError()
       }
       if configuration.mcpPort == 0, persistedPort == nil {
         try await settings.setLocalMCPPort(endpoint.port)
       }
-      mcpServer = server
+      mcpServer = activeServer
       mcpEndpoint = endpoint
       await runtimeStatus.updateMCP(state: "ready")
       if tunnelBootstrapped {
@@ -277,17 +283,20 @@ public actor ServiceComposition {
       }
       return endpoint
     } catch {
-      if mcpServer !== server {
+      if let server, mcpServer !== server {
         await server.stop()
       }
-      let state = requestedPort == 0 ? "failed" : "local_port_unavailable"
+      let portUnavailable = attemptedServerStart && requestedPort != 0
+      let state = portUnavailable ? "local_port_unavailable" : "failed"
       await runtimeStatus.updateMCP(
         state: state,
-        degradation: requestedPort == 0
-          ? "Local MCP could not start."
-          : "Local MCP port \(requestedPort) is unavailable."
+        degradation: Self.mcpDegradation(
+          error: error,
+          portUnavailable: portUnavailable,
+          requestedPort: requestedPort
+        )
       )
-      if requestedPort != 0 {
+      if portUnavailable {
         throw ServiceLocalMCPError.localPortUnavailable(requestedPort)
       }
       throw error
@@ -483,6 +492,25 @@ public actor ServiceComposition {
     case .readOnly: .readOnly
     case .full: .full
     }
+  }
+
+  private static func mcpDegradation(
+    error: any Error,
+    portUnavailable: Bool,
+    requestedPort: Int
+  ) -> String {
+    if let storeError = error as? SecretStoreError {
+      switch storeError {
+      case .accessDenied, .keychainFailure:
+        return
+          "MCP credentials are unavailable because the system credential store cannot be accessed."
+      default:
+        break
+      }
+    }
+    return portUnavailable
+      ? "Local MCP port \(requestedPort) is unavailable."
+      : "Local MCP could not start."
   }
 }
 

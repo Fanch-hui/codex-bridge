@@ -69,6 +69,11 @@
     func perform(_ data: Data) async throws -> Data {
       try await withCheckedThrowingContinuation { continuation in
         let completion = XPCClientCompletion(continuation)
+        if (try? BridgeServiceIPCCodec.decodeRequest(data).operation) == .status {
+          DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+            completion.resume(throwing: BridgeServiceClientError.unavailable)
+          }
+        }
         guard
           let proxy = connection.remoteObjectProxyWithErrorHandler({ _ in
             completion.resume(throwing: BridgeServiceClientError.unavailable)
