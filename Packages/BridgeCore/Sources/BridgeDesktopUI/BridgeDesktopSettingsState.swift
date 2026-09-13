@@ -202,6 +202,11 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let canChangeService: Bool
   public let servicePlatform: String
   public let serviceDescription: String
+  public let serviceStatus: String?
+  public let serviceStatusTitle: String?
+  public let serviceStatusMessage: String?
+  public let serviceStatusTone: BridgeDesktopStatusTone?
+  public let serviceActions: [BridgeDesktopActionLink]?
   public let direct: BridgeDesktopDirectState?
   public let statusMessage: String?
   public let modelCount: Int?
@@ -238,6 +243,11 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     canChangeService: Bool = false,
     servicePlatform: String = "macOS",
     serviceDescription: String = "后台 Service 在 App 退出后继续提供本机 MCP 服务。",
+    serviceStatus: String? = nil,
+    serviceStatusTitle: String? = nil,
+    serviceStatusMessage: String? = nil,
+    serviceStatusTone: BridgeDesktopStatusTone? = nil,
+    serviceActions: [BridgeDesktopActionLink]? = nil,
     statusMessage: String? = nil,
     modelCount: Int? = nil,
     canRefreshModels: Bool? = nil,
@@ -273,6 +283,11 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     self.canChangeService = canChangeService
     self.servicePlatform = servicePlatform
     self.serviceDescription = serviceDescription
+    self.serviceStatus = serviceStatus
+    self.serviceStatusTitle = serviceStatusTitle
+    self.serviceStatusMessage = serviceStatusMessage
+    self.serviceStatusTone = serviceStatusTone
+    self.serviceActions = serviceActions
     self.direct = direct
     self.statusMessage = statusMessage
     self.modelCount = modelCount

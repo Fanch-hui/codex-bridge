@@ -53,7 +53,7 @@
     entries.forEach(function (entry) {
       var item = S.node("article", "conversation-entry " + (entry.role === "用户" ? "entry-user" : "entry-agent"));
       item.appendChild(S.node("div", "entry-role", entry.role));
-      item.appendChild(S.markdown(entry.text, "entry-text markdown-body"));
+      item.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
       list.appendChild(item);
     });
     card.appendChild(list);
@@ -116,7 +116,7 @@
         if (skill.actionCount) heading.appendChild(S.badge("动作 " + skill.actionCount, "neutral"));
         row.appendChild(heading);
         if (skill.description) {
-          row.appendChild(S.markdown(skill.description, "skill-description markdown-body"));
+          row.appendChild(S.markdown(skill.description, "skill-description markdown-body", skill.descriptionHTML));
         } else {
           row.appendChild(S.node("p", "skill-description muted", "暂无说明。"));
         }

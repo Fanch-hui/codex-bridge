@@ -14,16 +14,8 @@
       footer.appendChild(status);
     }
     var detail = page && page.selectedTask;
-    var row = detail && S.safeArray(page.tasks).find(function (task) {
-      return task.taskID === detail.taskID || (
-        detail.sessionID &&
-        task.sessionID === detail.sessionID &&
-        task.providerID === detail.providerID &&
-        task.projectID === page.selectedProjectID
-      );
-    });
     var modes = page ? S.safeArray(page.steerModes) : [];
-    var kind = row && row.canSteer ? "steer" : detail && (detail.canResume || detail.canRestart) ? "retry" : "";
+    var kind = detail && detail.canSteer === true ? "steer" : detail && (detail.canResume || detail.canRestart) ? "retry" : "";
     var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, detail.canRestart, modes]) : "";
     if (key !== currentKey) {
       var focused = captureFocus();

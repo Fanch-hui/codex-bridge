@@ -5,6 +5,7 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case hostContextJS = "host-context.js"
   case stylesCSS = "styles.css"
   case pagesCSS = "pages.css"
+  case markdownCSS = "markdown.css"
   case workbenchCSS = "workbench.css"
   case responsiveCSS = "responsive.css"
   case windowsThemeCSS = "windows-theme.css"
@@ -35,6 +36,7 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case pagesSettingsJS = "pages-settings.js"
   case feedbackJS = "feedback.js"
   case sidebarJS = "sidebar.js"
+  case iconsJS = "icons.js"
   case appJS = "app.js"
   case pagesJS = "pages.js"
 }

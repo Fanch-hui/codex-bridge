@@ -1,3 +1,4 @@
+import BridgeServiceAppCore
 import Foundation
 
 public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
@@ -135,6 +136,7 @@ public struct BridgeDesktopSkillRow: Codable, Equatable, Sendable {
   public let name: String
   public let scope: String?
   public let description: String?
+  public let descriptionHTML: String?
   public let actionCount: Int
   public let enabled: Bool
 
@@ -150,6 +152,9 @@ public struct BridgeDesktopSkillRow: Codable, Equatable, Sendable {
     self.name = name
     self.scope = scope
     self.description = description
+    self.descriptionHTML = description.map {
+      AgentMarkdownHTMLRenderer.render($0)
+    }
     self.actionCount = actionCount
     self.enabled = enabled
   }

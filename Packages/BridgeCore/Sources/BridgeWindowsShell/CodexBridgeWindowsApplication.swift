@@ -72,6 +72,15 @@
         onUI { WindowsMainWindow.chat?.goForward() }
       case .browserReload:
         onUI { WindowsMainWindow.chat?.reload() }
+      case .openExternalURL(let value):
+        onUI { openExternalURL(value) }
+      case .copyTunnelID:
+        guard let id = model.serviceStatus?.tunnel.tunnelID, !id.isEmpty else { return }
+        if WindowsClipboard.write(id, owner: WindowsMainWindow.currentWindow()) {
+          management.feedback.postToast("已复制 Tunnel ID")
+        } else {
+          management.feedback.postAlert("无法复制 Tunnel ID")
+        }
       case .openChatExternally:
         onUI { openChatExternally() }
       case .refreshTasks:

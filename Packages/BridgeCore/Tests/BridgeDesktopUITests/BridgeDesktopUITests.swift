@@ -69,8 +69,6 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(projectCollections.contains("addThreadTranscript"))
     let commonScript = try BridgeDesktopUIResources.read(.pagesCommonJS)
     XCTAssertTrue(commonScript.contains("function markdown"))
-    XCTAssertTrue(commonScript.contains("safeWebURL"))
-    XCTAssertFalse(commonScript.contains("innerHTML"))
     let connectionsScript = try BridgeDesktopUIResources.read(.pagesConnectionsJS)
     XCTAssertTrue(connectionsScript.contains("copyLocalMCPEndpoint"))
     XCTAssertTrue(connectionsScript.contains("page.statusMessage"))

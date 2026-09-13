@@ -12,6 +12,14 @@ enum BridgeDesktopCommandRouter {
     switch envelope.command {
     case .saveDirectConfiguration:
       model.saveDirectConfiguration(envelope.payload.value)
+    case .openExternalURL:
+      guard let url = BridgeDesktopExternalURL.resolve(envelope.payload.value) else { return }
+      NSWorkspace.shared.open(url)
+    case .copyTunnelID:
+      guard let id = model.serviceStatus?.tunnel.tunnelID, !id.isEmpty else { return }
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(id, forType: .string)
+      model.postToast("已复制 Tunnel ID", symbol: "doc.on.doc")
     case .ready:
       return
     case .refresh:

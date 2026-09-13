@@ -18,11 +18,14 @@
       if (appr.relativePaths && appr.relativePaths.length) addListBlock(card, "涉及路径", appr.relativePaths);
       var actions = S.node("div", "approval-actions");
       var decs = appr.decisionOptions && appr.decisionOptions.length ? appr.decisionOptions : ["allow", "deny"];
-      if (appr.canDeny && !decs.some(function (d) { return d.toLowerCase() === "deny"; })) decs = decs.concat(["deny"]);
+      if (appr.canDeny && !decs.some(function (d) { return d.toLowerCase() === "deny"; })) {
+        decs = decs.concat(["deny"]);
+      }
       decs.forEach(function (dec) {
-        var isDeny = dec.toLowerCase() === "deny", allowed = isDeny ? appr.canDeny : appr.canAllow;
+        var normalized = dec.toLowerCase(), isDeny = normalized === "deny";
+        var allowed = isDeny ? appr.canDeny : appr.canAllow;
         var cmd = appr.isDirect ? "resolveDirectApproval" : "resolveApproval";
-        actions.appendChild(S.button(isDeny ? "拒绝" : (dec.toLowerCase() === "allow" ? "允许" : dec), cmd,
+        actions.appendChild(S.button(decisionLabel(appr, dec), cmd,
           { approvalID: appr.approvalID, taskID: appr.taskID, decision: dec }, emit,
           isDeny ? "small danger" : "small primary", appr.resolving || !allowed));
       });
@@ -84,8 +87,8 @@
     card.appendChild(grid);
 
     var actions = S.node("div", "form-actions");
-    if (row.canInterrupt) actions.appendChild(S.button("中断", "interruptTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (row.canStop) actions.appendChild(S.button("停止", "stopTask", { taskID: detail.taskID }, emit, "small danger", false));
+    if (detail.canInterrupt) actions.appendChild(S.button("中断", "interruptTask", { taskID: detail.taskID }, emit, "small danger", false));
+    if (detail.canStop) actions.appendChild(S.button("停止", "stopTask", { taskID: detail.taskID }, emit, "small danger", false));
     if (row.canDelete) {
       var rm = S.button("删除会话", null, {}, emit, "small danger", false);
       rm.addEventListener("click", function () {
@@ -99,8 +102,22 @@
     if (detail.resultSummary) addTextBlock(card, "结果摘要", detail.resultSummary);
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(card, "变更文件", detail.changedFiles);
     if (detail.activity && detail.activity.length) addActivityBlock(card, detail.activity);
-    if (detail.conversation && detail.conversation.length) global.CodexBridgeDesktopWorkbenchConversation.render(card, detail.conversation, page, emit);
+    if ((detail.conversation && detail.conversation.length) || detail.conversationState) {
+      global.CodexBridgeDesktopWorkbenchConversation.render(card, detail.conversation || [], page, emit);
+    }
     content.appendChild(card);
+  }
+
+  function decisionLabel(approval, decision) {
+    var labels = approval.decisionLabels || {};
+    if (labels[decision]) return labels[decision];
+    switch (decision.toLowerCase()) {
+    case "allow": return "仅本次允许";
+    case "allow_for_session": return "本次会话允许";
+    case "allow_similar_commands": return "允许此类命令";
+    case "deny": return "拒绝";
+    default: return decision;
+    }
   }
 
   function addDetail(c, k, v) { var it = S.node("div", "detail-item"); it.appendChild(S.node("dt", null, k)); it.appendChild(S.node("dd", null, v)); c.appendChild(it); }

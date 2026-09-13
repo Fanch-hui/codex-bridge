@@ -10,6 +10,7 @@ public final class TaskConversationModel: Identifiable {
   #if canImport(Combine)
     @Published public private(set) var entries: [Entry] = []
     @Published public private(set) var isStreaming = false
+    @Published public private(set) var isLoading = true
     @Published public private(set) var activity: Activity = .idle
     @Published public private(set) var errorMessage: String?
     @Published public private(set) var isLoadingEarlier = false
@@ -20,6 +21,7 @@ public final class TaskConversationModel: Identifiable {
   #else
     public private(set) var entries: [Entry] = []
     public private(set) var isStreaming = false
+    public private(set) var isLoading = true
     public private(set) var activity: Activity = .idle
     public private(set) var errorMessage: String?
     public private(set) var isLoadingEarlier = false
@@ -78,6 +80,7 @@ public final class TaskConversationModel: Identifiable {
   }
 
   public func start() async {
+    defer { isLoading = false }
     await loadPriorTasks()
     if isTerminal {
       await reloadAuthoritativeSnapshot()

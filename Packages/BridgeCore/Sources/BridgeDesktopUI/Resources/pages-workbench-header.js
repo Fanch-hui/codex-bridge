@@ -160,8 +160,8 @@
     taskWrap.appendChild(taskFace);
     row4.appendChild(taskWrap);
 
-    if (curTask && (curTask.canInterrupt || curTask.isRunning)) {
-      row4.appendChild(S.button("中断", "interruptTask", { taskID: curTask.taskID }, emit, "small danger", false));
+    if (page.selectedTask && page.selectedTask.canInterrupt === true) {
+      row4.appendChild(S.button("中断", "interruptTask", { taskID: page.selectedTask.taskID }, emit, "small danger", false));
     }
     return row4;
   }
@@ -187,7 +187,7 @@
     var detail = page.selectedTask || {}, history = page.history || {};
     var header = JSON.stringify([
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode,
-      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode,
+      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canInterrupt,
       S.safeArray(page.tasks).map(function (t) {
         return [t.taskID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
       }),

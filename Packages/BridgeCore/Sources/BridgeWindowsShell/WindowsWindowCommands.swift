@@ -22,6 +22,8 @@
     case browserBack
     case browserForward
     case browserReload
+    case openExternalURL(String)
+    case copyTunnelID
     case openChatExternally
     case refreshTasks
     case startService

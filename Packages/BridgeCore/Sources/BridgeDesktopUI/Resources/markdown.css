@@ -1,0 +1,10 @@
+.markdown-table-wrap { max-width: 100%; margin: 7px 0 0; overflow-x: auto; }
+.markdown-table { min-width: 360px; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid var(--separator); border-radius: 7px; background: var(--surface); }
+.markdown-table th, .markdown-table td { min-width: 72px; padding: 7px 10px; border-right: 1px solid var(--separator); border-bottom: 1px solid var(--separator); overflow-wrap: anywhere; vertical-align: top; }
+.markdown-table th { color: var(--text); background: var(--accent-soft); font-weight: 650; }
+.markdown-table .markdown-align-leading { text-align: left; }
+.markdown-table .markdown-align-center { text-align: center; }
+.markdown-table .markdown-align-trailing { text-align: right; }
+.markdown-table th:last-child, .markdown-table td:last-child { border-right: 0; }
+.markdown-table tbody tr:last-child td { border-bottom: 0; }
+.markdown-cursor { color: var(--accent); }

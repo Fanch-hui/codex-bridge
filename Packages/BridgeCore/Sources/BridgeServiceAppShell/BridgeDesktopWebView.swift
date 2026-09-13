@@ -48,12 +48,17 @@ struct BridgeDesktopWebView: NSViewRepresentable {
     weak var model: BridgeServiceAppModel?
     private var latestState: BridgeDesktopUIState?
     private var didFinishLoading = false
+    private let conversationObservation = DesktopConversationObservation()
 
     init(model: BridgeServiceAppModel) {
       self.model = model
     }
 
     func update(state: BridgeDesktopUIState, webView: WKWebView) {
+      conversationObservation.observe(model?.conversation) { [weak self, weak webView] in
+        guard let self, let model = self.model, let webView else { return }
+        self.update(state: BridgeDesktopUIStateBuilder.build(from: model), webView: webView)
+      }
       guard latestState != state else { return }
       latestState = state
       sendLatestState(to: webView)

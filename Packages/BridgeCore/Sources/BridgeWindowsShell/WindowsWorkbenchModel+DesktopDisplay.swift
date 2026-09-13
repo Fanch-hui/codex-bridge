@@ -47,7 +47,8 @@
       conversation: TaskConversationModel?,
       selectedThreadPage: MCPThreadReadPage?,
       permissionRemediation: BridgeDesktopPermissionRemediationState?,
-      canResume: Bool
+      canResume: Bool,
+      canSteer: Bool
     ) -> BridgeDesktopTaskDetail {
       let entries: [BridgeDesktopConversationEntry]
       if let selectedThreadPage {
@@ -97,6 +98,13 @@
         changedFiles: task.changedFiles,
         activity: activity,
         conversation: entries,
+        conversationState: BridgeDesktopConversationState(
+          conversation: conversation,
+          activity: CodexActivityPresentation(task: task, activity: conversation?.activity ?? .idle)
+        ),
+        canInterrupt: TaskInspectorPresentation.canInterrupt(task),
+        canStop: task.isActive,
+        canSteer: canSteer,
         permissionRemediation: permissionRemediation,
         turnCount: resolvedSession.turnCount,
         canResume: canResume,

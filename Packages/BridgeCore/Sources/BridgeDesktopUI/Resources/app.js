@@ -3,34 +3,8 @@
 
   var state = null;
   var requestSequence = 0;
-  var iconPaths = {
-    "gauge.with.needle": '<path d="M4 14a8 8 0 1 1 16 0"/><path d="m12 12 4-4"/><path d="M5.5 17h13"/>',
-    "bubble.left.and.text.bubble.right.fill": '<path d="M4 5.5A3.5 3.5 0 0 1 7.5 2h5A3.5 3.5 0 0 1 16 5.5v3A3.5 3.5 0 0 1 12.5 12H9l-3.5 2v-2.4A3.5 3.5 0 0 1 4 8.5z"/><path d="M10 14.5A3.5 3.5 0 0 0 13.5 18h2l3 2v-2.3A3.5 3.5 0 0 0 20 15v-1"/>',
-    "folder.fill": '<path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H9l2 2h7.5A2.5 2.5 0 0 1 21 8.5v7A2.5 2.5 0 0 1 18.5 18h-13A2.5 2.5 0 0 1 3 15.5z"/>',
-    "list.dash.header.rectangle": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 13h3M7 16h6"/>',
-    "point.3.connected.trianglepath.dotted": '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="m7 7 3.5 8M17 7l-3.5 8M7 6h10"/>',
-    "gearshape": '<circle cx="12" cy="12" r="3"/><path d="m19 13 2-1-2-1-.5-2 1-1.7-2.3-2.3-1.7 1-2-.5-1-2-1 2-2 .5-1.7-1L5.5 6.3l1 1.7-.5 2-2 1 2 1 .5 2-1 1.7 2.3 2.3 1.7-1 2 .5 1 2 1-2 2-.5 1.7 1 2.3-2.3-1-1.7z"/>',
-    "sidebar.left": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M6 8h1M6 11h1"/>',
-    "arrow.clockwise": '<path d="M20 11a8 8 0 0 0-14-4L4 9"/><path d="M4 5v4h4M4 13a8 8 0 0 0 14 4l2-2"/><path d="M20 19v-4h-4"/>',
-    "bolt.fill": '<path d="m13 2-8 11h6l-1 9 8-12h-6z"/>',
-    "shield.lefthalf.filled": '<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="M12 3v18"/>',
-    "cpu.fill": '<rect x="7" y="7" width="10" height="10" rx="1"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/>',
-    "list.bullet.rectangle": '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
-    "checkmark.circle.fill": '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/>',
-    "circle.dashed": '<circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>',
-    "link": '<path d="m9 15-2 2a3 3 0 0 1-4-4l3-3a3 3 0 0 1 4 0M15 9l2-2a3 3 0 0 1 4 4l-3 3a3 3 0 0 1-4 0M8 16l8-8"/>',
-    "terminal": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>',
-    "trash": '<path d="M4 7h16M10 11v5M14 11v5M6 7l1 13h10l1-13M9 7V4h6v3"/>',
-    "network": '<circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="m8 11 8-4M8 13l8 4"/>',
-    "sparkles": '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/>',
-    "chevron.left": '<path d="m15 18-6-6 6-6"/>',
-    "chevron.right": '<path d="m9 18 6-6-6-6"/>',
-    "chevron.down": '<path d="m6 9 6 6 6-6"/>',
-    "lock.fill": '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-    "safari": '<circle cx="12" cy="12" r="9"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
-    "doc.text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',
-    "bubble.left.and.bubble.right": '<path d="M4 6h8a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H8l-4 3V6z"/><path d="M18 9h2a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1l-3 2v-2"/>'
-  };
+  var navigationNodes = new Map();
+  var iconPaths = window.CodexBridgeDesktopIcons;
 
   function iconMarkup(symbol) {
     return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (iconPaths[symbol] || iconPaths["circle.dashed"]) + "</svg>";
@@ -71,22 +45,30 @@
   }
 
   function renderNavigation(items, selected) {
-    var container = document.getElementById("navigation");
-    container.innerHTML = "";
-    (items || []).forEach(function (item) {
-      var button = document.createElement("button");
-      button.type = "button";
-      button.title = item.title;
-      button.setAttribute("aria-label", item.title);
+    var container = document.getElementById("navigation"), active = new Set();
+    (items || []).forEach(function (item, index) {
+      active.add(item.navigation);
+      var button = navigationNodes.get(item.navigation);
+      if (!button) {
+        button = document.createElement("button"); button.type = "button";
+        button.appendChild(iconElement(item.symbol, "icon"));
+        button.appendChild(elementWithText("span", "nav-title", item.title));
+        button.appendChild(elementWithText("span", "nav-badge", ""));
+        button.addEventListener("click", function () { emit("selectPage", { navigation: item.navigation }); });
+        navigationNodes.set(item.navigation, button);
+        setIcons(button);
+      }
+      button.title = item.title; button.setAttribute("aria-label", item.title);
       button.className = "nav-item" + (item.navigation === selected ? " is-selected" : "");
       button.setAttribute("aria-current", item.navigation === selected ? "page" : "false");
-      button.appendChild(iconElement(item.symbol, "icon"));
-      button.appendChild(elementWithText("span", "nav-title", item.title));
-      if (item.badge !== null && item.badge !== undefined) button.appendChild(elementWithText("span", "nav-badge", item.badge));
-      button.addEventListener("click", function () { emit("selectPage", { navigation: item.navigation }); });
-      container.appendChild(button);
+      button.querySelector(".nav-title").textContent = item.title;
+      var badge = button.querySelector(".nav-badge");
+      badge.hidden = item.badge == null; badge.textContent = item.badge == null ? "" : item.badge;
+      if (container.children[index] !== button) container.insertBefore(button, container.children[index] || null);
     });
-    setIcons(container);
+    navigationNodes.forEach(function (button, key) {
+      if (!active.has(key)) { button.remove(); navigationNodes.delete(key); }
+    });
   }
 
   function iconElement(symbol, className) {
@@ -239,6 +221,7 @@
     document.getElementById("connection-label").textContent = state.connectionLabel;
     document.getElementById("refresh-indicator").classList.toggle("is-visible", !!state.isRefreshing);
     document.querySelector(".refresh-button").classList.toggle("is-refreshing", !!state.isRefreshing);
+    document.querySelector(".refresh-button").disabled = !!state.isRefreshing;
     renderFeedback(state.feedback);
     if (state.selectedNavigation === "overview") renderOverview(state.overview);
     globalPages(state, emit);
@@ -250,6 +233,15 @@
   }
 
   document.addEventListener("click", function (event) {
+    var link = event.target.closest("a[href]");
+    if (link) {
+      event.preventDefault();
+      try {
+        var url = new URL(link.href);
+        if (url.protocol === "http:" || url.protocol === "https:") emit("openExternalURL", { value: url.href });
+      } catch (_) {}
+      return;
+    }
     var action = event.target.closest("[data-action]");
     if (!action) return;
     if (action.dataset.action === "refresh") emit("refresh");

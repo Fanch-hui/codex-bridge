@@ -9,6 +9,10 @@ extension BridgeDesktopUIStateBuilder {
     let models = model.models.map(modelOption)
     let executionModel = preferences?.executionModel ?? ""
     let supervisorModel = preferences?.supervisorModel ?? ""
+    let service = servicePresentation(
+      status: model.registrationStatus,
+      keepServiceRunningAfterExit: model.keepServiceRunningAfterAppExit
+    )
     return BridgeDesktopSettingsState(
       header: BridgeDesktopPageHeader(
         title: "设置",
@@ -51,6 +55,11 @@ extension BridgeDesktopUIStateBuilder {
       canChangeService: true,
       servicePlatform: "macOS",
       serviceDescription: "LaunchAgent 后台 Service 可在 App 退出后继续提供本机 MCP 服务。",
+      serviceStatus: service.status,
+      serviceStatusTitle: service.title,
+      serviceStatusMessage: service.message,
+      serviceStatusTone: service.tone,
+      serviceActions: service.actions,
       statusMessage: model.modelCatalogError ?? model.errorMessage,
       modelCount: model.models.count,
       canRefreshModels: !model.isRefreshing,

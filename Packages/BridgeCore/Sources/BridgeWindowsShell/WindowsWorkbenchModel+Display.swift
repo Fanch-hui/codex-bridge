@@ -90,6 +90,9 @@
           canResume: TaskInspectorPresentation.canResume(
             $0,
             providerSupportsSessionContinuation: providerSupportsSessionContinuation(for: $0)
+          ),
+          canSteer: TaskInspectorPresentation.canSteer(
+            $0, providerSupportsSteer: providerSupportsSteer(for: $0)
           )
         )
       }

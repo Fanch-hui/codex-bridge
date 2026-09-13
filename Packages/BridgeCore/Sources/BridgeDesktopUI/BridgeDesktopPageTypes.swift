@@ -1,3 +1,4 @@
+import BridgeServiceAppCore
 import Foundation
 
 public struct BridgeDesktopActivityRow: Codable, Equatable, Sendable {
@@ -35,6 +36,7 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
   public let symbol: String?
   public let isFinal: Bool
   public let status: String?
+  public let markdownHTML: String?
 
   public init(
     id: String,
@@ -62,6 +64,7 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
     self.symbol = symbol
     self.isFinal = isFinal
     self.status = status
+    markdownHTML = AgentMarkdownHTMLRenderer.render(text, isFinal: isFinal)
   }
 }
 

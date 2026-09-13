@@ -35,6 +35,12 @@
         return .browserForward
       case .browserReload:
         return .browserReload
+      case .openExternalURL:
+        return BridgeDesktopExternalURL.resolve(payload.value).map {
+          .openExternalURL($0.absoluteString)
+        }
+      case .copyTunnelID:
+        return .copyTunnelID
       case .openBrowserExternally:
         return .openChatExternally
       case .setBrowserEnabled:

@@ -1,3 +1,4 @@
+import BridgeServiceAppCore
 import Foundation
 
 public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
@@ -78,6 +79,7 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
   public let displayCommand: String?
   public let relativePaths: [String]
   public let reason: String?
+  public let decisionLabels: [String: String]?
   public let decisionOptions: [String]
   public let canAllow: Bool
   public let canDeny: Bool
@@ -111,6 +113,10 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
     self.displayCommand = displayCommand
     self.relativePaths = relativePaths
     self.reason = reason
+    self.decisionLabels = Dictionary(
+      decisionOptions.map { ($0, ApprovalPresentation.decisionTitle($0)) },
+      uniquingKeysWith: { first, _ in first }
+    )
     self.decisionOptions = decisionOptions
     self.canAllow = canAllow
     self.canDeny = canDeny
@@ -156,73 +162,6 @@ public struct BridgeDesktopPermissionRemediationState: Codable, Equatable, Senda
     self.isApplying = isApplying
     self.didApply = didApply
     self.errorMessage = errorMessage
-  }
-}
-
-public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
-  public let taskID: String
-  public let sessionID: String
-  public let title: String
-  public let projectName: String
-  public let status: String
-  public let provider: String
-  public let providerID: String
-  public let model: String?
-  public let permissionMode: String?
-  public let currentStep: String?
-  public let resultSummary: String?
-  public let failureCode: String?
-  public let changedFiles: [String]
-  public let activity: [BridgeDesktopActivityRow]
-  public let conversation: [BridgeDesktopConversationEntry]
-  public let permissionRemediation: BridgeDesktopPermissionRemediationState?
-  public let turnCount: Int
-  public let canResume: Bool
-  public let canRestart: Bool
-  public let updatedAt: String
-
-  public init(
-    taskID: String,
-    sessionID: String? = nil,
-    title: String,
-    projectName: String,
-    status: String,
-    provider: String,
-    providerID: String = "codex",
-    model: String? = nil,
-    permissionMode: String? = nil,
-    currentStep: String? = nil,
-    resultSummary: String? = nil,
-    failureCode: String? = nil,
-    changedFiles: [String] = [],
-    activity: [BridgeDesktopActivityRow] = [],
-    conversation: [BridgeDesktopConversationEntry] = [],
-    permissionRemediation: BridgeDesktopPermissionRemediationState? = nil,
-    turnCount: Int = 1,
-    canResume: Bool = false,
-    canRestart: Bool = false,
-    updatedAt: String
-  ) {
-    self.taskID = taskID
-    self.sessionID = sessionID ?? taskID
-    self.title = title
-    self.projectName = projectName
-    self.status = status
-    self.provider = provider
-    self.providerID = providerID
-    self.model = model
-    self.permissionMode = permissionMode
-    self.currentStep = currentStep
-    self.resultSummary = resultSummary
-    self.failureCode = failureCode
-    self.changedFiles = changedFiles
-    self.activity = activity
-    self.conversation = conversation
-    self.permissionRemediation = permissionRemediation
-    self.turnCount = max(1, turnCount)
-    self.canResume = canResume
-    self.canRestart = canRestart
-    self.updatedAt = updatedAt
   }
 }
 

@@ -16,6 +16,8 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case browserForward
   case browserReload
   case setBrowserEnabled
+  case openExternalURL
+  case copyTunnelID
   case openBrowserExternally
   case loadEarlierConversation
   case refreshConversation

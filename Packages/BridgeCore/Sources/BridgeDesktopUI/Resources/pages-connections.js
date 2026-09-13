@@ -38,6 +38,8 @@
     tunnelCard.appendChild(tunnelSubtitle);
     var tunnelFacts = S.node("div", "detail-grid");
     tunnelCard.appendChild(tunnelFacts);
+    var tunnelIDBlock = S.node("div");
+    tunnelCard.appendChild(tunnelIDBlock);
     var tunnelDiagnostics = S.node("div");
     tunnelCard.appendChild(tunnelDiagnostics);
     var tunnelEditor = E.createTunnelForm(emit);
@@ -91,6 +93,7 @@
           tunnelBadge,
           tunnelSubtitle,
           tunnelFacts,
+          tunnelIDBlock,
           tunnelDiagnostics,
           tunnelEditor,
           tunnelActions,
@@ -150,6 +153,7 @@
     badge,
     subtitle,
     facts,
+    tunnelIDBlock,
     diagnostics,
     editor,
     actions,
@@ -162,10 +166,10 @@
       ? "Helper 已就绪，可按需连接远程通道。"
       : "当前环境没有可用 Helper，远程隧道不能启动。";
     S.clear(facts);
-    addFact(facts, "绑定 Tunnel ID", tunnel.tunnelID || "未配置");
     addFact(facts, "Helper", tunnel.helperAvailable ? "就绪" : "未打包");
     addFact(facts, "远程任务接收", tunnel.acceptsRemoteSubmissions ? "允许" : "关闭");
     addFact(facts, "配置状态", tunnel.configured ? "已配置" : "未配置");
+    renderTunnelID(tunnelIDBlock, tunnel, context);
     S.clear(diagnostics);
     if (!tunnel.helperAvailable) {
       diagnostics.appendChild(S.node("div", "page-message warning", "Helper 辅助工具缺失，本地 MCP 仍可用，但远程隧道不能启动。"));
@@ -213,6 +217,22 @@
     item.appendChild(S.node("dt", null, title));
     item.appendChild(S.node("dd", null, value));
     container.appendChild(item);
+  }
+
+  function renderTunnelID(container, tunnel, context) {
+    S.clear(container);
+    var tunnelID = typeof tunnel.tunnelID === "string" ? tunnel.tunnelID.trim() : "";
+    if (!tunnelID) return;
+
+    var block = S.node("div", "page-message");
+    var heading = S.node("div", "section-heading-row");
+    heading.appendChild(S.node("span", "muted", "已绑定的 Tunnel ID"));
+    var copy = S.button("复制", null, {}, null, "small", false);
+    copy.addEventListener("click", function () { context.emit("copyTunnelID", {}); });
+    heading.appendChild(copy);
+    block.appendChild(heading);
+    block.appendChild(S.node("div", "mono", tunnelID));
+    container.appendChild(block);
   }
 
   function tunnelTone(tunnel) {
