@@ -31,6 +31,17 @@ enum DeepSeekHarnessACPDiagnostic {
     }
   }
 
+  static func startupSummary(_ output: String) -> String {
+    if output.contains("only the launching environment may set") {
+      return "DSH 的连接配置需要通过启动环境传入。"
+    }
+    let lines = output.split(separator: "\n").map(String.init)
+    let diagnostic =
+      lines.first { $0.hasPrefix("Error:") || $0.hasPrefix("Error [") }
+      ?? lines.last(where: { !$0.hasPrefix("    at ") && !$0.hasPrefix("Node.js ") }) ?? ""
+    return sanitizeProviderMessage(diagnostic)
+  }
+
   static func sanitizeProviderMessage(_ message: String) -> String {
     var value = normalizeControlCharacters(message)
     value = replace(value, pattern: bearerPattern, template: "[redacted]")

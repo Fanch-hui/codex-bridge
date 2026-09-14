@@ -1,3 +1,4 @@
+import BridgeACP
 import BridgeAgentCore
 import Foundation
 
@@ -68,12 +69,19 @@ extension DeepSeekHarnessACPProvider {
       )
     } catch {
       await client?.shutdown()
+      let stderr: String
+      if let transport = await client?.transport as? ACPProcessTransport {
+        stderr = DeepSeekHarnessACPDiagnostic.startupSummary(
+          transport.standardErrorSnapshot().tail)
+      } else {
+        stderr = ""
+      }
       cleanup(runDirectory: runDirectory, probeRoot: probeRoot)
       return unavailableProbe(
         request.installation,
         reason: resolvingCredentials
           ? "无法读取 DSH 连接凭据，请检查系统钥匙串访问权限。"
-          : Self.probeReason(error),
+          : Self.probeReason(error) + (stderr.isEmpty ? "" : " \(stderr)"),
         reviewRequired: Self.requiresReview(error)
       )
     }

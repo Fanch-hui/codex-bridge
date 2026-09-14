@@ -65,6 +65,8 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
       launch.process.argv,
       [
         fixture.node,
+        "--import",
+        URL(fileURLWithPath: run).appendingPathComponent("profile-env.mjs").absoluteString,
         fixture.executable,
         "--profile",
         "acp",
@@ -74,8 +76,7 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
     )
     XCTAssertEqual(
       URL(fileURLWithPath: launch.process.workingDirectory).standardizedFileURL.path,
-      URL(fileURLWithPath: fixture.configuration).deletingLastPathComponent().standardizedFileURL
-        .path
+      URL(fileURLWithPath: run).standardizedFileURL.path
     )
     let patch = try String(contentsOfFile: launch.process.argv.last!, encoding: .utf8)
     XCTAssertTrue(patch.contains("- id: llm-deepseek"))

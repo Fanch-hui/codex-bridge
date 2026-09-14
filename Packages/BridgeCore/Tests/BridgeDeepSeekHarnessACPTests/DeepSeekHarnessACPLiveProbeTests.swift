@@ -33,7 +33,17 @@ final class DeepSeekHarnessACPLiveProbeTests: XCTestCase {
     try Data(Self.mcpScript.utf8).write(to: script)
     let first = try fixture.client(run: "first")
     addTeardownBlock { await first.shutdown() }
-    let initialized = try await first.initialize()
+    let initialized: DeepSeekHarnessACPInitialization
+    do {
+      initialized = try await first.initialize()
+    } catch {
+      if let transport = await first.transport as? ACPProcessTransport {
+        XCTFail(
+          DeepSeekHarnessACPDiagnostic.sanitizeProviderMessage(
+            transport.standardErrorSnapshot().tail))
+      }
+      throw error
+    }
     XCTAssertTrue(initialized.supportsResumeSession)
     XCTAssertTrue(initialized.supportsMCPHTTP)
     let marker = fixture.root.appendingPathComponent("first-mcp.log")
@@ -90,6 +100,8 @@ private struct LiveDSHFixture {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     let configuration = root.appendingPathComponent("cordis.yml")
     try DeepSeekHarnessACPProfile.bundledConfigurationTemplate().write(to: configuration)
+    try Data("DEEPSEEK_BASE_URL=https://api.deepseek.com\nDEEPSEEK_API_KEY=fixture-only\n".utf8)
+      .write(to: root.appendingPathComponent(".env"))
     environment = ["HOME": root.path, "PATH": "/opt/homebrew/opt/node@22/bin:/usr/bin:/bin"]
     let paths = try DeepSeekHarnessACPProfile.resolveArtifacts(
       executablePath: executable, configurationPath: configuration.path,

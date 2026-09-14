@@ -88,8 +88,11 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
         reasoningEffort: reasoningEffort,
         mutationIntent: mutationIntent
       )
+      let bootstrap = try DeepSeekHarnessACPProfileBootstrap.prepare(
+        configurationDirectory: configurationDirectory, runDirectory: runtime)
       argv = [
         validated.nodeInterpreterPath,
+        "--import", bootstrap,
         validated.executablePath,
         "--profile",
         "acp",
@@ -115,7 +118,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     return DeepSeekHarnessACPLaunchConfiguration(
       process: ACPProcessTransportConfiguration(
         argv: argv,
-        workingDirectory: configurationDirectory,
+        workingDirectory: modern ? runtime : configurationDirectory,
         environment: environment,
         maximumFrameBytes: maximumFrameBytes,
         maximumStandardErrorBytes: maximumStandardErrorBytes,
