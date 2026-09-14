@@ -24,8 +24,6 @@
     models.appendChild(preferences.root);
     models.appendChild(supervisor.root);
     models.appendChild(agents.root);
-    var native = global.CodexBridgeDesktopSettingsNative.create();
-    models.appendChild(native.root);
     var direct = global.CodexBridgeDesktopDirect.create();
     content.appendChild(direct.root);
     var safety = group(content, "安全策略与全局指令");
@@ -55,7 +53,6 @@
         supervisor.update(next, nextEmit);
         agents.update(next, nextEmit);
         instructions.update(next, nextEmit);
-        native.update(next.nativePermissionPolicy, nextEmit);
         approvalEditor.update(next, nextEmit);
         serviceEditor.update(next, nextEmit);
         status.textContent = next.statusMessage || "";

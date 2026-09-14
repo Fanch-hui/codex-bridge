@@ -195,9 +195,6 @@
   function errorMessage(message) { return S.node("div", "page-message", "⚠ " + message); }
 
   global.CodexBridgeDesktopNativePermissions = {
-    settingsCard: function (policy, emit) {
-      return policy ? global.CodexBridgeDesktopSettingsNative.card(policy, emit).root : null;
-    },
     installationField: installationField,
     modeField: modeField,
     ruleFields: ruleFields,
