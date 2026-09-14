@@ -23,10 +23,12 @@ extension DeepSeekHarnessACPProvider {
       return unavailableProbe(request.installation, reason: "Probe runtime is unavailable.")
     }
     var client: DeepSeekHarnessACPClient?
+    var resolvingCredentials = true
     do {
       let sourceEnvironment = try await configuration.runtimeEnvironment(
         for: request.installation
       )
+      resolvingCredentials = false
       let launch = try configuration.launchBuilder.make(
         installation: request.installation,
         projectRoot: probeRoot.path,
@@ -69,7 +71,9 @@ extension DeepSeekHarnessACPProvider {
       cleanup(runDirectory: runDirectory, probeRoot: probeRoot)
       return unavailableProbe(
         request.installation,
-        reason: Self.probeReason(error),
+        reason: resolvingCredentials
+          ? "无法读取 DSH 连接凭据，请检查系统钥匙串访问权限。"
+          : Self.probeReason(error),
         reviewRequired: Self.requiresReview(error)
       )
     }

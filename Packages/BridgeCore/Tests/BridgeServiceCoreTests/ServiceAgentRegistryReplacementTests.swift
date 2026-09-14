@@ -82,7 +82,10 @@ final class ServiceAgentRegistryReplacementTests: XCTestCase {
       )
       XCTFail("A failed replacement Probe must throw.")
     } catch let error as ServiceAgentRegistryError {
-      XCTAssertEqual(error, .connectionProbeFailed(original.id))
+      XCTAssertEqual(
+        error,
+        .replacementProbeFailed(
+          original.id, reason: "The replacement fixture rejected the executable."))
     }
 
     let persisted = try await registry.installation(id: original.id)

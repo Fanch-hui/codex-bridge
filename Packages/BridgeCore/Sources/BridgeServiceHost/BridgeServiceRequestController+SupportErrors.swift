@@ -125,6 +125,8 @@ extension BridgeServiceRequestController {
         code: "agent_connection_probe_failed",
         message: "The Agent installation did not pass the connection Probe."
       )
+    case .replacementProbeFailed(_, let reason):
+      return .init(code: "agent_connection_probe_failed", message: reason)
     case .registrationInProgress:
       return .init(
         code: "agent_registration_in_progress",

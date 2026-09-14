@@ -50,7 +50,9 @@ extension ServiceAgentRegistry {
       createdAt: existing.createdAt
     )
     guard candidate.availability == .available else {
-      throw ServiceAgentRegistryError.connectionProbeFailed(existing.id)
+      throw ServiceAgentRegistryError.replacementProbeFailed(
+        existing.id, reason: candidate.lastProbeError ?? "The Agent replacement did not pass Probe."
+      )
     }
     try await store.updateAgentInstallation(
       candidate,
