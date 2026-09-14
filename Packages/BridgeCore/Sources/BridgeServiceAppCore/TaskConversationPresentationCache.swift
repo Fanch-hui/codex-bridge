@@ -23,6 +23,21 @@ public struct TaskConversationPresentationCache {
     return snapshot
   }
 
+  public mutating func snapshot(
+    for taskID: String, priorTaskIDs: [String]
+  ) -> TaskConversationPresentationSnapshot? {
+    if let current = snapshot(for: taskID) { return current }
+    for priorID in priorTaskIDs.reversed() {
+      guard let prior = snapshot(for: priorID) else { continue }
+      let entries = prior.entries.map { entry in
+        priorTaskIDs.contains(where: { entry.key.hasPrefix("\($0):") })
+          ? entry : entry.prefixed(for: priorID)
+      }
+      return TaskConversationPresentationSnapshot(entries: entries, canLoadEarlier: false)
+    }
+    return nil
+  }
+
   public mutating func store(
     _ snapshot: TaskConversationPresentationSnapshot?,
     for taskID: String

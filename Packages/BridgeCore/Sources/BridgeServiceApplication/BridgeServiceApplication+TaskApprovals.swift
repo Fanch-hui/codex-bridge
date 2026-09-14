@@ -144,18 +144,19 @@ extension BridgeServiceApplication {
   func approveAndStartTask(
     _ taskID: TaskID,
     automatically: Bool = false,
-    authorization: ServiceTaskExecutionAuthorization? = nil
+    authorization: ServiceTaskExecutionAuthorization? = nil,
+    summary: String? = nil
   ) async throws {
     let started: ServiceTaskRecord
     do {
       started = try await tasks.approveAndBegin(
         taskID: taskID,
-        summary:
-          authorization != nil
-          ? "The local user approved this provider invocation with one-time tool and network access."
-          : automatically
-            ? "The configured local policy automatically approved this provider invocation."
-            : "The local user approved this provider invocation.",
+        summary: summary
+          ?? (authorization != nil
+            ? "The local user approved this provider invocation with one-time tool and network access."
+            : automatically
+              ? "The configured local policy automatically approved this provider invocation."
+              : "The local user approved this provider invocation."),
         authorization: authorization
       )
     } catch ServiceStoreError.invalidTaskTransition {

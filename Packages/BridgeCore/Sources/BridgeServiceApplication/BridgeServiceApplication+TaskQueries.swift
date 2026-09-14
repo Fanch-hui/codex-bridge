@@ -46,9 +46,10 @@ extension BridgeServiceApplication {
       installationID: task.installationID,
       executionModel: task.executionModel,
       executionEffort: task.executionEffort,
-      threadID: isCodexProvider ? task.state.codexThreadID : nil,
+      threadID: isCodexProvider ? task.state.codexThreadID ?? task.requestedThreadID : nil,
       turnID: isCodexProvider ? task.state.codexTurnID : nil,
-      providerSessionID: isCodexProvider ? nil : task.state.providerSessionID,
+      providerSessionID: isCodexProvider
+        ? nil : task.state.providerSessionID ?? task.requestedThreadID,
       providerRunID: isCodexProvider ? nil : task.state.providerRunID,
       permissionMode: task.permissionMode.rawValue,
       networkAccess: task.networkAllowed,

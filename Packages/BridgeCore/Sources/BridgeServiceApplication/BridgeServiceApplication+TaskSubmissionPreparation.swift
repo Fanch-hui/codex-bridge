@@ -7,6 +7,7 @@ extension BridgeServiceApplication {
   func prepareTaskSubmission(
     _ submission: MCPServiceTaskSubmission,
     sourceClientID: String,
+    source: ServiceTaskSource,
     deadline: ContinuousClock.Instant
   ) async throws -> PreparedTaskSubmission {
     let projectID = try await submissionProjectID(explicit: submission.projectID)
@@ -20,6 +21,7 @@ extension BridgeServiceApplication {
         providerRaw: providerRaw,
         project: project,
         sourceClientID: sourceClientID,
+        source: source,
         workbenchPermissionMode: workbenchPermissionMode,
         deadline: deadline
       )
@@ -57,8 +59,8 @@ extension BridgeServiceApplication {
       projectID: project.id,
       request: ServiceTaskRequest(
         projectID: project.id,
-        source: .mcpClient,
-        sourceClientID: sourceClientID,
+        source: source,
+        sourceClientID: source == .mcpClient ? sourceClientID : "",
         clientRequestID: submission.clientRequestID,
         prompt: taskPrompt,
         requestedThreadID: submission.threadID,

@@ -100,7 +100,8 @@ extension BridgeServiceAppModel {
       client: client,
       isTerminal: task?.isTerminal == true
     )
-    conversation.restorePresentation(conversationPresentationCache.snapshot(for: taskID))
+    conversation.restorePresentation(
+      conversationPresentationCache.snapshot(for: taskID, priorTaskIDs: priorTaskIDs))
     self.conversation = conversation
     Task {
       await conversation.start()

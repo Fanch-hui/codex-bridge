@@ -94,9 +94,8 @@ extension BridgeServiceApplication {
 }
 
 extension BridgeServiceApplication {
-  /// Local App submission path for agent providers. Mirrors the MCP
-  /// `submit_task` semantics: persists as awaiting_local_approval and never
-  /// auto-starts.
+  /// Local App submission path for agent providers. The desktop app is the
+  /// local user surface, so its task starts immediately without MCP approval.
   public func serviceSubmitAgentTask(
     projectID: String,
     providerID: String,
@@ -131,9 +130,8 @@ extension BridgeServiceApplication {
       acceptanceCriteria: acceptanceCriteria,
       clientRequestID: clientRequestID ?? "app-\(UUID().uuidString.lowercased())"
     )
-    let receipt = try await serviceSubmitTask(
+    let receipt = try await serviceSubmitTaskFromLocalApp(
       submission,
-      invocationContext: MCPInvocationContext(clientID: MCPClientID(rawValue: "macos.app")),
       deadline: deadline
     )
     return (receipt.taskID, receipt.status)

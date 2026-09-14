@@ -679,6 +679,34 @@ final class BridgeServiceApplicationTests: XCTestCase {
     XCTAssertEqual(denied.resultSummary, "The local user denied this provider invocation.")
   }
 
+  func testMCPInvocationCannotClaimTheLocalAppSource() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceModelCatalogScript
+    )
+    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+
+    let receipt = try await application.serviceSubmitTask(
+      MCPServiceTaskSubmission(
+        projectID: fixture.project.id.rawValue,
+        prompt: "Claim the local App source.",
+        clientRequestID: "mcp-source-spoof"
+      ),
+      invocationContext: MCPInvocationContext(
+        clientID: MCPClientID(rawValue: "macos.app")
+      ),
+      deadline: deadline
+    )
+
+    let stored = try await fixture.tasks.task(id: TaskID(rawValue: receipt.taskID))
+    let task = try XCTUnwrap(stored)
+    XCTAssertEqual(task.source, .mcpClient)
+    XCTAssertEqual(task.sourceClientID, "macos.app")
+    XCTAssertEqual(task.state.status, .awaitingLocalApproval)
+    XCTAssertTrue(receipt.localApprovalRequired)
+  }
+
   func testModelPreferencesArePersistedAndUsedForNewTasks() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     let application = makeServiceApplication(

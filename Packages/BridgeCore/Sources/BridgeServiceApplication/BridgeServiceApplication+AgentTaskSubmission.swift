@@ -13,6 +13,7 @@ extension BridgeServiceApplication {
     providerRaw: String,
     project: ServiceProjectRecord,
     sourceClientID: String,
+    source: ServiceTaskSource,
     workbenchPermissionMode: ServicePermissionMode?,
     deadline: ContinuousClock.Instant
   ) async throws -> PreparedTaskSubmission {
@@ -202,8 +203,8 @@ extension BridgeServiceApplication {
       projectID: project.id,
       request: ServiceTaskRequest(
         projectID: project.id,
-        source: .mcpClient,
-        sourceClientID: sourceClientID,
+        source: source,
+        sourceClientID: source == .mcpClient ? sourceClientID : "",
         clientRequestID: submission.clientRequestID,
         prompt: prompt,
         requestedThreadID: submission.threadID,

@@ -324,7 +324,8 @@
         client: client,
         isTerminal: task.isTerminal
       )
-      next.restorePresentation(conversationPresentationCache.snapshot(for: task.taskID))
+      next.restorePresentation(
+        conversationPresentationCache.snapshot(for: task.taskID, priorTaskIDs: priorTaskIDs))
       conversation = next
       conversationWasTerminal = task.isTerminal
       Task { [weak self, weak next] in

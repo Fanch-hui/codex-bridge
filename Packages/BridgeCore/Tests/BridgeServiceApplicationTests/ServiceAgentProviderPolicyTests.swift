@@ -463,15 +463,18 @@ final class ServiceAgentProviderPolicyTests: XCTestCase {
     let openCodeInstallations = try await registry.installations(providerID: .openCode)
     XCTAssertTrue(openCodeInstallations.isEmpty)
 
-    let receipt = try await application.serviceSubmitAgentTask(
-      projectID: fixture.project.id.rawValue,
-      providerID: AgentProviderID.deepSeekHarness.rawValue,
-      installationID: "ainst-catalog-deepseek",
-      model: "private-backend/model-v1",
-      effort: "max",
-      permissionMode: "read-only",
-      prompt: "Inspect the workspace.",
-      permissionModeOverride: true,
+    let receipt = try await application.serviceSubmitTask(
+      MCPServiceTaskSubmission(
+        projectID: fixture.project.id.rawValue,
+        prompt: "Inspect the workspace.",
+        providerID: AgentProviderID.deepSeekHarness.rawValue,
+        installationID: "ainst-catalog-deepseek",
+        executionModel: "private-backend/model-v1",
+        executionEffort: "max",
+        modelOverride: true,
+        permissionMode: "read-only",
+        permissionModeOverride: true
+      ),
       deadline: ContinuousClock.now.advanced(by: .seconds(10))
     )
     let storedTask = try await fixture.store.task(id: TaskID(rawValue: receipt.taskID))

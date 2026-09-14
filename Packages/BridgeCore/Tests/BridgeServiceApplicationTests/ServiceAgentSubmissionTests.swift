@@ -1025,15 +1025,21 @@ final class ServiceAgentSubmissionTests: XCTestCase {
       deadline: ContinuousClock.now.advanced(by: .seconds(10))
     )
 
-    XCTAssertEqual(first.status, ServiceTaskStatus.awaitingLocalApproval.rawValue)
+    XCTAssertEqual(first.status, ServiceTaskStatus.running.rawValue)
     XCTAssertEqual(replay.taskID, first.taskID)
     XCTAssertEqual(replay.status, first.status)
     let stored = try await fixture.tasks.task(id: TaskID(rawValue: first.taskID))
     let task = try XCTUnwrap(stored)
+    XCTAssertEqual(task.source, .macOSApp)
+    XCTAssertFalse(task.requiresLocalStartApproval)
     XCTAssertEqual(task.clientRequestID, "managed-agent-request-1")
     XCTAssertEqual(task.executionModel, "opencode/x-preview-f-free")
     XCTAssertEqual(task.executionEffort, "high")
     XCTAssertEqual(task.permissionMode, .readOnly)
+    provider.finish(taskID: TaskID(rawValue: first.taskID))
+    _ = try await waitForTask(fixture, taskID: first.taskID) {
+      $0.state.status == .failed
+    }
   }
 
   func testOpenCodeSubmissionUsesWorkbenchWriteForUnmarkedReadOnly() async throws {

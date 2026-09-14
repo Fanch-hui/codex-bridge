@@ -37,6 +37,15 @@ extension TaskConversationModel {
       self.isFinal = isFinal
     }
 
+    public func prefixed(for taskID: String) -> Self {
+      Self(
+        IPCTaskConversationMessage(
+          messageID: messageID, key: key, role: role, kind: kind, content: content,
+          toolName: toolName, toolStatus: toolStatus, toolArguments: toolArguments
+        ), isFinal: true, keyPrefix: taskID
+      )
+    }
+
     public init(key: String, role: String, kind: String, content: String, isFinal: Bool) {
       self.key = key
       self.role = role
