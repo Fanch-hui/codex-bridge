@@ -156,6 +156,7 @@
     case copyMCPClientConfiguration(id: String)
     case copyLocalMCPEndpoint
     case rotateMCPClientCredential(id: String)
+    case saveDeepSeekSearchConfiguration(baseURL: String?)
     case saveDeepSeekHarnessMCPServer(IPCDeepSeekHarnessMCPServerInput)
     case deleteDeepSeekHarnessMCPServer(id: String)
     case setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool)

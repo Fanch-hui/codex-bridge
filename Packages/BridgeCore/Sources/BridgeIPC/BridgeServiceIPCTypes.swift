@@ -57,6 +57,8 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case updateAgentNativePermissionPolicy = "update_agent_native_permission_policy"
   case getAgentPermissionRemediation = "get_agent_permission_remediation"
   case applyAgentPermissionRemediation = "apply_agent_permission_remediation"
+  case getDeepSeekSearchConfiguration = "get_deepseek_search_configuration"
+  case saveDeepSeekSearchConfiguration = "save_deepseek_search_configuration"
   case listDeepSeekHarnessMCPServers = "list_deepseek_harness_mcp_servers"
   case saveDeepSeekHarnessMCPServer = "save_deepseek_harness_mcp_server"
   case deleteDeepSeekHarnessMCPServer = "delete_deepseek_harness_mcp_server"

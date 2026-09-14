@@ -125,6 +125,7 @@ extension BridgeServiceAppModel {
       resolvedTaskApprovalKeys = []
       resolvedDirectApprovalKeys = []
       mcpClients = []
+      deepSeekSearchBaseURL = nil
       deepSeekHarnessMCPServers = []
       models = []
       modelPreferences = nil

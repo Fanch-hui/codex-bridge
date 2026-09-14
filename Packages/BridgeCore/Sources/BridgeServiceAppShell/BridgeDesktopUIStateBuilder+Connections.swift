@@ -22,6 +22,7 @@ extension BridgeDesktopUIStateBuilder {
       codex: codexState(from: model),
       clients: clientRows(from: model),
       deepSeekHarnessMCPServers: deepSeekHarnessMCPRows(from: model),
+      deepSeekSearchBaseURL: model.deepSeekSearchBaseURL,
       canManageDeepSeekHarnessMCP: model.connectionState == .connected,
       providers: model.agentProviders.map(providerRow),
       installations: model.agentInstallations.map {

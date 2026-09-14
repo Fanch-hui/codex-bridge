@@ -288,6 +288,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let tunnel: BridgeDesktopTunnelState
   public let codex: BridgeDesktopCodexConnectionState?
   public let clients: [BridgeDesktopMCPClientRow]
+  public var deepSeekSearchBaseURL: String? = nil
   public let deepSeekHarnessMCPServers: [BridgeDesktopDeepSeekHarnessMCPRow]
   public let canManageDeepSeekHarnessMCP: Bool
   public let providers: [BridgeDesktopAgentProviderRow]
@@ -308,6 +309,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     codex: BridgeDesktopCodexConnectionState? = nil,
     clients: [BridgeDesktopMCPClientRow] = [],
     deepSeekHarnessMCPServers: [BridgeDesktopDeepSeekHarnessMCPRow] = [],
+    deepSeekSearchBaseURL: String? = nil,
     canManageDeepSeekHarnessMCP: Bool = false,
     providers: [BridgeDesktopAgentProviderRow] = [],
     installations: [BridgeDesktopAgentInstallationRow] = [],
@@ -325,6 +327,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.tunnel = tunnel
     self.codex = codex
     self.clients = clients
+    self.deepSeekSearchBaseURL = deepSeekSearchBaseURL
     self.deepSeekHarnessMCPServers = deepSeekHarnessMCPServers
     self.canManageDeepSeekHarnessMCP = canManageDeepSeekHarnessMCP
     self.providers = providers

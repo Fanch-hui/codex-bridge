@@ -149,6 +149,11 @@
         auxiliary.connections.selectClient(at: index)
         Task { @MainActor in await auxiliary.connections.rotateSelectedCredential(clientID: id) }
         return true
+      case .saveDeepSeekSearchConfiguration(let baseURL):
+        Task { @MainActor in
+          await auxiliary.connections.saveDeepSeekSearchConfiguration(baseURL: baseURL)
+        }
+        return true
       case .saveDeepSeekHarnessMCPServer(let request):
         Task { @MainActor in await auxiliary.connections.saveDeepSeekHarnessMCPServer(request) }
         return true

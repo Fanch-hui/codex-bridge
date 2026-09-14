@@ -15,6 +15,7 @@
     var connectionState = WindowsWorkbenchDisplay.ConnectionState.idle
     var serviceStatus: IPCServiceStatusResponse?
     var clients: [IPCMCPClientStatus] = []
+    var deepSeekSearchBaseURL: String?
     var deepSeekHarnessMCPServers: [IPCDeepSeekHarnessMCPServerSummary] = []
     var selectedClientID: String?
     var busy = false
@@ -41,9 +42,11 @@
       do {
         async let statusRequest = client.status()
         async let clientsRequest = client.mcpClients()
+        async let searchRequest = client.deepSeekSearchConfiguration()
         async let deepSeekHarnessMCPRequest = client.deepSeekHarnessMCPServers()
         serviceStatus = try await statusRequest
         clients = try await clientsRequest
+        if let search = try? await searchRequest { deepSeekSearchBaseURL = search.baseURL }
         if let deepSeekHarnessMCPResponse = try? await deepSeekHarnessMCPRequest {
           deepSeekHarnessMCPServers = deepSeekHarnessMCPResponse.servers
         }
@@ -283,6 +286,7 @@
             currentMessage: statusText
           ) ?? statusText,
           clientItems: desktopClients,
+          deepSeekSearchBaseURL: deepSeekSearchBaseURL,
           deepSeekHarnessMCPItems: deepSeekHarnessMCPServers.map { server in
             BridgeDesktopDeepSeekHarnessMCPRow(
               id: server.id,

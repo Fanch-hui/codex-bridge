@@ -9,6 +9,34 @@
     container.__connectionsPage.update(page, emit);
   }
 
+  function createDeepSeekSearch(emit) {
+    var root = S.node("details", "page-card connection-card");
+    root.appendChild(S.node("summary", null, "DeepSeek Harness 搜索服务"));
+    root.appendChild(S.node("p", "card-subtitle",
+      "搜索地址独立于聊天地址，复用 DSH API key。修改后对新任务和继续对话生效。"));
+    var field = S.textField("搜索 Base URL", "", "https://api.deepseek.com/anthropic/v1");
+    root.appendChild(field.wrapper);
+    root.appendChild(S.node("p", "card-subtitle",
+      "填写支持搜索工具的 Anthropic Messages API 基础地址，不包含 /messages。留空沿用已有配置或 DSH 默认地址。"));
+    var draft = global.CodexBridgeDesktopFormDraft.bind({ baseURL: field.control });
+    var save = S.button("保存搜索配置", null, {}, null, "small primary", true);
+    var actions = S.node("div", "form-actions");
+    actions.appendChild(save);
+    root.appendChild(actions);
+    var context = { emit: emit };
+    save.addEventListener("click", function () {
+      context.emit("saveDeepSeekSearchConfiguration", { baseURL: field.control.value.trim() });
+    });
+    return {
+      root: root,
+      update: function (page, nextEmit) {
+        context.emit = nextEmit;
+        draft.update({ baseURL: page.deepSeekSearchBaseURL || "" });
+        save.disabled = page.canManageDeepSeekHarnessMCP !== true;
+      }
+    };
+  }
+
   function create(container, emit) {
     S.clear(container);
     var context = { emit: emit };
@@ -51,6 +79,8 @@
     var clientsSection = S.section(content, "本地 MCP 客户端");
     var clientsEditor = E.createClients(emit);
     clientsSection.appendChild(clientsEditor.root);
+    var search = createDeepSeekSearch(emit);
+    content.appendChild(search.root);
     var dshMCPSection = S.section(content, "DeepSeek Harness MCP");
     var dshMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
     dshMCPSection.appendChild(dshMCP.root);
@@ -104,6 +134,7 @@
           context
         );
         clientsEditor.update(page.clients, nextEmit);
+        search.update(page, nextEmit);
         dshMCP.update(page, nextEmit);
         renderAgents(agentConnectors, agentEditor, page, nextEmit);
         status.textContent = page.statusMessage || "";
