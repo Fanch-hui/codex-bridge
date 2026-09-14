@@ -209,7 +209,7 @@ extension BridgeServiceRequestController {
       return .init(
         code: "agent_artifact_invalid",
         message:
-          "The selected DeepSeek Harness build is incomplete or incompatible (\(field)). Use the pinned dsh-v0.1.1-rc.2 build and select packages/examples/acp-demo/lib/bin.js."
+          "The selected DeepSeek Harness build is incomplete or incompatible (\(field)). Select the built apps/cli/lib/bin.js entry, or packages/examples/acp-demo/lib/bin.js for an ACP demo build."
       )
     case .templateMismatch:
       return .init(

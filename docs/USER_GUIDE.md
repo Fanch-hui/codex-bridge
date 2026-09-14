@@ -181,36 +181,45 @@ OpenCode 运行 `opencode acp --cwd <项目根>`。`Read Only` 映射 Plan，`Wr
 
 ### 5.3 DeepSeek Harness
 
-DSH 对版本和构建工件做精确校验。当前要求：
+DSH 连接按入口能力、工件身份和运行时边界校验，不把 DSH、agent、pnpm 或 ACP SDK 的具体包版本作为白名单。升级或替换后需要重新 Probe。本指南按官方 `dsh-v0.1.5-rc.2` 核对；这个 tag 只是本次核对的参考点，不是 Bridge 必须使用的版本。
 
-| 组件 | 要求 |
+| 组件 | 兼容边界 |
 | --- | --- |
-| DSH tag/package | `dsh-v0.1.1-rc.2` / `0.1.1-rc.2` |
-| ACP protocol | `1` |
+| DSH 源码与 package version | 官方源码；版本随上游，Bridge 不做精确版本锁定 |
+| ACP wire protocol | `1` |
 | Node | `^22.19.0` 或 `>=24.0.0`，不支持 Node 23 |
-| pnpm | `11.7.0` |
-| ACP SDK | `0.25.1` |
+| pnpm、agent 与 ACP SDK | 使用当前源码声明并安装的版本；Bridge 不做单独的精确版本锁定 |
 
-正确登记文件是官方源码构建后的：
+现代入口是官方源码构建后的：
+
+```text
+<deepseek-harness-source>/apps/cli/lib/bin.js
+```
+
+旧版 ACP Demo 入口仍保持兼容，已登记旧入口时可以继续使用：
 
 ```text
 <deepseek-harness-source>/packages/examples/acp-demo/lib/bin.js
 ```
 
-不是 `dsh`、`pnpm dsh web`、源码目录或 Web UI。最小准备流程：
+不要选择 `dsh`、`pnpm dsh web`、源码 TypeScript、源码目录或 Web UI。最小准备流程：
 
 ```bash
 git clone https://github.com/deepseek-ai/deepseek-harness.git deepseek-harness
 cd deepseek-harness
+
+# 可选：复现本指南的核对版本；不是 Bridge 版本要求
 git fetch --tags origin
-git checkout --detach dsh-v0.1.1-rc.2
+git checkout --detach dsh-v0.1.5-rc.2
 
 node --version
 pnpm --version
-pnpm install --frozen-lockfile
+pnpm install
 pnpm run build
-test -f packages/examples/acp-demo/lib/bin.js
+test -f apps/cli/lib/bin.js
 ```
+
+现代入口由 Bridge 以 `--profile acp --patch <Bridge 私有运行配置>` 启动；旧版 ACP Demo 入口继续以 `--config <Bridge 私有运行副本>/cordis.yml` 启动。完整源码树必须保留，不能只复制 `bin.js`。
 
 然后准备外部 Profile。运行时强制要求它位于 DSH 源码树之外；为隔离凭据，建议也放在任务项目和 Bridge 仓库之外：
 
@@ -220,7 +229,7 @@ test -f packages/examples/acp-demo/lib/bin.js
 └── .env
 ```
 
-- `cordis.yml` 应优先从当前 Bridge 随包模板复制，不要使用上游的泛化示例手工重建；最终以 Bridge 的 Profile 结构校验和 Probe 为准。
+- 新建 Profile 时可从当前 Bridge 随包模板复制 `cordis.yml`；已有外部 `cordis.yml` 应保留，不要为了升级覆盖用户配置。它继续作为 Bridge 的模型和 effort 配置来源，最终以 Profile 结构校验和 Probe 为准。
 - `.env` 与 `cordis.yml` 必须同目录。
 - 在 `.env` 中填写 `DEEPSEEK_API_KEY`、主模型 Base URL 和独立的 Web Search Base URL。
 - DeepSeek API Key 可在 [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys) 创建；只在本机 `.env` 中粘贴真实值。
@@ -228,11 +237,13 @@ test -f packages/examples/acp-demo/lib/bin.js
 App 中依次执行：
 
 1. `连接 → 本机 Agent 引擎连接 → 登记 Agent → DeepSeek Harness`。
-2. 选择 `packages/examples/acp-demo/lib/bin.js`。
+2. 优先选择 `apps/cli/lib/bin.js`；已登记旧版时可继续选择 `packages/examples/acp-demo/lib/bin.js`。
 3. 点击“下一步”，选择外部 Profile 的 `cordis.yml`。
 4. 点击“登记并 Probe”。
 5. 状态为“可用”后打开“启用”。
 6. 到 `设置 → DeepSeek Harness 执行默认偏好` 刷新模型并保存默认值。模型 ID 来自 ACP 动态目录；effort 来自经过验证的 DSH Profile，当前 thinking 启用时为 `off/low/high/max`，不是按模型由 ACP 单独广告。
+
+现代入口使用外部 `cordis.yml` 读取模型和 effort 后生成本次运行的私有 ACP patch，原 `cordis.yml` 不会被改写；旧版入口仍使用私有 `cordis.yml`。
 
 DSH 当前只创建新 Session，不支持从历史任务恢复 Session；支持排队继续和“中断当前轮后继续”。完整构建、模板、API endpoint 与故障排查见 [DeepSeek Harness 接入指南](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)。
 
@@ -532,7 +543,7 @@ Bridge 可发现已登记项目中的 `SKILL.md`，但只执行其中明确暴�
 | 找不到项目 | 是否在“项目”登记；Workbench 是否选择了正确项目；客户端是否使用真实 `project_id` |
 | 外部 Provider 不可选 | 是否登记、Probe 为可用、打开启用；任务是否显式填写正确 `provider_id` |
 | Provider `needs_review` | 二进制、运行时、manifest/lock 或配置身份是否更新；确认来源后重新 Probe |
-| DSH 找不到正确文件 | 选择固定 tag 构建后的 `packages/examples/acp-demo/lib/bin.js`，不是 `dsh` 或 Web UI |
+| DSH 找不到正确文件 | 选择官方构建后的 `apps/cli/lib/bin.js`，或兼容的 `packages/examples/acp-demo/lib/bin.js`；不是 `dsh` 或 Web UI |
 | DSH Probe 成功但 API 失败 | `.env` 是否与 `cordis.yml` 同目录；Key、Base URL、账号额度是否由 Provider 侧有效 |
 | DSH 主模型正常但搜索失败 | 检查独立 `DEEPSEEK_SEARCH_BASE_URL` 和 `web_search_20250305` 支持 |
 | DSH 已批准启动但仍停住 | 查看工作台“等待本机审批”；DSH 运行期只支持“仅本次允许/拒绝”，`full-access` 不会跳过 |

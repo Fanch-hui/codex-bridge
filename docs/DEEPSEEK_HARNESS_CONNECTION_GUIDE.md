@@ -1,6 +1,6 @@
 # DeepSeek Harness 接入指南
 
-本指南说明如何取得 Bridge 当前支持的 DeepSeek Harness（DSH）、构建 ACP 入口、一键连接并从 ChatGPT/Qwen 提交任务。
+本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建 ACP 入口、一键连接并从 ChatGPT/Qwen 提交任务。
 
 安装并构建 DSH 后，在 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key，点击“一键连接”。Mac 与 Windows 共用自动发现、配置、验证和启用流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。下文的外部 Profile 与 `.env` 步骤用于高级手动登记。
 
@@ -12,18 +12,18 @@ deepseek-harness
 
 省略 `provider_id` 时 Bridge 使用 Codex，不会自动改用 DSH。
 
-## 1. 当前锁定版本
+## 1. 兼容边界与本次核对版本
 
-Bridge 对 DSH 的源码工件、Node、manifest、lock、ACP 版本和 Profile 结构做精确校验。Bridge 不读取 Git 元数据；表中的官方 tag 是用户取得正确源码版本时应 checkout 的来源标识。
+Bridge 不把 DSH、agent、pnpm 或 ACP SDK 的具体包版本作为白名单。它校验入口布局和包身份、源码清单与依赖锁文件的工件身份、真实 Node 解释器身份、ACP 握手与 wire protocol，以及外部 Profile 结构；升级或替换后需要重新 Probe。Bridge 不读取 Git 元数据，也不把 tag 当作兼容性证明。
 
-| 组件 | 要求 |
+本次文档按官方 `dsh-v0.1.5-rc.2` 核对。这个 tag 只是本次核对的参考点，不是 Bridge 必须 checkout 的版本；其他官方修订版只要通过工件校验、Node 最低范围、ACP protocol 1 和 Probe，也可以继续使用。
+
+| 组件 | 兼容边界 |
 | --- | --- |
-| 官方源码 tag | `dsh-v0.1.1-rc.2` |
-| package version | `0.1.1-rc.2` |
-| ACP protocol | `1` |
-| Node | `^22.19.0` 或 `>=24.0.0` |
-| pnpm | `11.7.0` |
-| ACP SDK | `0.25.1` |
+| DSH 源码与 package version | 官方源码；版本随上游，Bridge 不做精确版本锁定 |
+| ACP wire protocol | `1` |
+| Node runtime | `^22.19.0` 或 `>=24.0.0` |
+| pnpm、agent 与 ACP SDK | 使用当前源码声明并安装的版本；Bridge 不做单独的精确版本锁定 |
 
 Node 版本解释：
 
@@ -31,28 +31,24 @@ Node 版本解释：
 - 支持 Node 24.0.0 及更高版本。
 - 不支持 Node 22.18.x 或 Node 23.x。
 
-不要登记其他 DSH tag 后期待 Bridge 忽略工件差异。Bridge 实际校验 package/lock/runtime/protocol，而不是用 Git tag 自证来源；升级适配器需要代码、模板、fixture 与兼容门一起更新。
+现代入口已接入分组模型目录、所选模型的推理强度、推理文本与上下文用量通知。标准 ACP 完成响应依据结束原因、最终正文和工具状态处理；旧版执行证据扩展仍会校验。
+
+新版上游已提供 `session/resume` 和 MCP 接入，但 Bridge 当前仍为每个新任务创建 Session，并发送空 MCP 列表。上游 ACP 暂无原生实时 Steer 和历史消息重放，因此不能完全替代 Codex 链路。
 
 ## 2. 获取官方源码
 
-只从 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 获取源码：
+只从 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 获取源码。可直接使用当前官方分支或其他官方修订版；如需复现本次核对点，可 checkout `dsh-v0.1.5-rc.2`，但这不是 Bridge 的版本白名单：
 
 ```bash
 git clone https://github.com/deepseek-ai/deepseek-harness.git deepseek-harness
 cd deepseek-harness
 
+# 可选：复现本次文档核对点
 git fetch --tags origin
-git checkout --detach dsh-v0.1.1-rc.2
-git describe --tags --exact-match
+git checkout --detach dsh-v0.1.5-rc.2
 ```
 
-最后一条命令应输出：
-
-```text
-dsh-v0.1.1-rc.2
-```
-
-不要把第三方重新打包的同名脚本、全局 `dsh` 命令或其他分支当作当前兼容版本。
+不要把第三方重新打包的同名脚本、全局 `dsh` 命令或源码 TypeScript 文件当作 Bridge 的 ACP 入口。
 
 ## 3. 准备 Node 和 pnpm
 
@@ -63,48 +59,49 @@ node --version
 pnpm --version
 ```
 
-示例合格结果：
-
-```text
-v22.19.0
-11.7.0
-```
-
-或 Node 24+ 与 pnpm 11.7.0。请按 Node/pnpm 官方方式安装兼容版本；不要仅在交互式 shell alias 中伪装版本。
+Node 使用上面的最低范围。pnpm 使用当前 DSH 源码 `package.json` 声明的 package manager 或兼容版本；本次核对的源码声明为 `pnpm@11.7.0`，但 Bridge 不把它作为精确门槛。请按 Node/pnpm 官方方式安装兼容版本；不要仅在交互式 shell alias 中伪装版本。
 
 DSH 的 ACP entrypoint 通常使用 `#!/usr/bin/env node`。Bridge 不会把 `/usr/bin/env` 误当成 Node，而会继续解析真实 Node 可执行文件并冻结其身份。macOS LaunchAgent 的 PATH 比终端小；如果 Node 只在 `nvm`、`asdf` 等交互式 shell 初始化后可见，Probe 可能找不到它。应确保已构建 entrypoint 的 shebang 能在 Service 环境解析到受支持的真实 Node 安装，然后以 App Probe 结果为准。
 
 不要读取或复制 Node 安装目录中的无关认证文件来解决 PATH 问题。
 
-## 4. 安装依赖并构建 ACP Demo
+## 4. 安装依赖并构建 ACP 入口
 
-在已经 checkout 固定 tag 的 DSH 源码根目录运行：
+在 DSH 源码根目录运行。新版官方 README 与根目录 `package.json` 使用以下命令：
 
 ```bash
-pnpm install --frozen-lockfile
+pnpm install
 pnpm run build
 ```
 
-确认正确产物存在：
+确认现代 ACP 产物存在：
 
 ```bash
-test -f packages/examples/acp-demo/lib/bin.js
+test -f apps/cli/lib/bin.js
 ```
 
-Bridge 要登记的就是这个构建产物的绝对路径：
+现代 DSH 要登记的构建产物绝对路径是：
+
+```text
+<dsh-source>/apps/cli/lib/bin.js
+```
+
+旧版 ACP Demo 入口仍保持兼容。已经登记或仍在使用旧入口时，可以继续使用：
 
 ```text
 <dsh-source>/packages/examples/acp-demo/lib/bin.js
 ```
+
+现代入口启动时使用 `--profile acp --patch <Bridge 私有运行配置>`；旧 ACP Demo 入口继续使用 `--config <Bridge 私有运行副本>/cordis.yml`。Bridge 会按入口类型选择对应启动方式。
 
 ### 不要选择这些对象
 
 ```text
 dsh
 pnpm dsh web
+apps/cli/src/bin.ts
 packages/examples/acp-demo/src/
 packages/examples/acp-demo/src/bin.ts
-apps/cli/
 DSH Web UI
 整个 deepseek-harness 文件夹
 ```
@@ -112,24 +109,29 @@ DSH Web UI
 Bridge 实际执行语义是：
 
 ```text
+<真实 Node> <dsh-source>/apps/cli/lib/bin.js \
+  --profile acp \
+  --patch <Bridge 私有运行配置>
+```
+
+不需要先启动 `pnpm dsh web`，也不需要保持终端或浏览器中的 DSH UI 打开。旧版入口的实际调用仍是：
+
+```text
 <真实 Node> <dsh-source>/packages/examples/acp-demo/lib/bin.js \
   --config <Bridge 私有运行副本>/cordis.yml
 ```
-
-不需要先启动 `pnpm dsh web`，也不需要保持终端或浏览器中的 DSH UI 打开。
 
 ## 5. 为什么 Bridge 需要完整源码树
 
 虽然文件选择器只选择 `lib/bin.js`，Bridge 还会从它向上定位唯一 DSH 源根，并检查：
 
-- `package.json` 中的名称、版本、Node engine 与 package manager；
-- `pnpm-lock.yaml` 中固定 ACP SDK 版本；
-- entrypoint 文件身份与 SHA；
-- 真实 Node 解释器路径、版本与文件身份；
-- ACP initialize/session 行为；
-- Adapter revision。
+- `package.json` 与依赖锁文件是否属于同一完整源码树；现代入口还检查包身份与入口布局；
+- entrypoint、源码清单、依赖锁文件和 Node 解释器的路径、文件身份与 SHA；
+- Node runtime 是否满足最低范围；
+- ACP initialize/session 行为与 wire protocol 1；
+- 当前入口所需的 Profile/patch 结构。
 
-因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、`pnpm-lock.yaml` 或 `node_modules` 会使 Probe/运行失败。DSH 更新后，即使路径相同，Bridge 也会要求重新复核，而不是静默信任替换后的文件。
+因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。DSH 更新后，即使路径相同，Bridge 也会因工件身份变化要求重新 Probe，而不是静默信任替换后的文件。
 
 ## 6. 准备外部 Profile
 
@@ -148,11 +150,11 @@ Bridge 实际执行语义是：
 └── .env
 ```
 
-`cordis.yml` 与 `.env` 必须在同一目录。Bridge 以该目录作为 Harness 工作目录，因此 DSH 可以自己加载旁边的 `.env`。Bridge 不打开、保存、摘要、日志记录或回传 `.env` 内容。
+`cordis.yml` 与 `.env` 必须在同一目录。外部 `cordis.yml` 继续作为 Bridge 的模型和 effort 配置来源；现代 DSH 启动时，Bridge 从它读取并校验这些值，再为本次运行生成私有 ACP patch，原文件不会被改写。旧版 ACP Demo 入口仍使用私有运行副本的 `cordis.yml`。Bridge 以该目录作为 Harness 工作目录，因此 DSH 可以自己加载旁边的 `.env`。Bridge 不打开、保存、摘要、日志记录或回传 `.env` 内容。
 
 ### 6.1 从 Bridge 随包模板复制 `cordis.yml`
 
-优先使用与当前 Bridge 版本匹配的完整模板；最终是否兼容由 Profile 结构校验和 Probe 决定。
+新建 Profile 时，可以复制当前 Bridge 随包的完整模板。已有外部 Profile 应保留原来的 `cordis.yml`，不要为了升级覆盖用户配置；最终是否兼容由 Profile 结构校验和 Probe 决定。
 
 从源码工作区复制：
 
@@ -174,11 +176,11 @@ cp /Applications/CodexBridge.app/Contents/Resources/BridgeCore_BridgeDeepSeekHar
   /path/to/dsh-profile/cordis.yml
 ```
 
-如果 App 不在 `/Applications`，从实际安装位置的相同 Bundle 相对路径复制。旧模板可能缺少当前能力或无法通过结构校验，因此应优先复制当前 App 的版本。
+如果 App 不在 `/Applications`，从实际安装位置的相同 Bundle 相对路径复制。只有在创建新 Profile 或用户主动更新配置时才复制模板；已有 `cordis.yml` 继续作为模型和 effort 来源。
 
 ### 6.2 不要手工重建或精简模板
 
-随包 `cordis.yml` 已包含 Bridge 当前验证过的组合，包括：
+随包 `cordis.yml` 是 Bridge 的 Profile 结构模板，包括：
 
 - workspace/sandbox 模式；
 - 文件读取、搜索和编辑；
@@ -189,6 +191,8 @@ cp /Applications/CodexBridge.app/Contents/Resources/BridgeCore_BridgeDeepSeekHar
 - workflow/todo；
 - ACP 工具与 execution evidence；
 - 私有状态和快照目录。
+
+现代入口不会直接把这份旧式 `cordis.yml` 传给 DSH，而是读取其中受支持的模型和 effort 配置，生成本次运行的私有 `acp.patch.yml`，通过 `--profile acp --patch` 启动；用户原来的 `cordis.yml` 保持不变。旧版 ACP Demo 入口继续使用私有 `cordis.yml` 和 `--config`。
 
 普通用户不应删除插件、改写 sandbox 结构或把模板改成另一种通用 DSH 配置。模型目录、默认模型、thinking/reasoning effort 是预期的可配置内容；兼容的尾部扩展也可能通过归一化结构校验，但任何改动都应重新 Probe，结构不兼容时会触发 `templateMismatch` 或 `needs_review`。
 
@@ -262,7 +266,7 @@ Search endpoint 必须同时满足：
 3. 点击“一键连接”，等待自动发现、配置和 Probe。
 4. 检查安装状态；Probe 成功后自动启用。
 
-高级手动登记可指定 `<dsh-source>/packages/examples/acp-demo/lib/bin.js` 与外部 `<dsh-profile>/cordis.yml`，并在 Probe 成功后启用。
+高级手动登记可指定现代 `<dsh-source>/apps/cli/lib/bin.js`，或兼容的 `<dsh-source>/packages/examples/acp-demo/lib/bin.js`，并关联外部 `<dsh-profile>/cordis.yml`；在 Probe 成功后启用。
 
 Probe 验证本地安装、协议和基础 ACP Session；API 服务认证及实际模型请求在执行任务时验证。
 
@@ -501,36 +505,36 @@ waiting_for_codex_approval
 
 ### `available`
 
-表示当前受信任本地安装、固定版本、协议和基础 Session Probe 通过。它不证明 API Key 或真实网络任务成功。
+表示当前受信任本地安装、工件身份、Node 最低范围、ACP wire protocol 和基础 Session Probe 通过。它不证明 API Key 或真实网络任务成功。
 
 ### `needs_review`
 
 常见原因：
 
 - `bin.js` 被重新构建或替换；
-- DSH 源码切换 tag；
-- `package.json` 或 `pnpm-lock.yaml` 变化；
+- DSH 源码升级或切换修订版；
+- `package.json` 或依赖锁文件变化；
 - Node 解释器路径/身份变化；
 - Adapter revision 变化；
 - `cordis.yml` 模板结构变化。
 
 处理：
 
-1. 核对路径仍是固定 tag 构建出的 `packages/examples/acp-demo/lib/bin.js`。
-2. 核对 Node 与 pnpm 版本。
-3. 从当前 Bridge 随包模板重新复制 `cordis.yml`，保留本机 `.env` 不变。
+1. 核对路径是当前官方构建出的 `apps/cli/lib/bin.js`，或仍在使用的兼容入口 `packages/examples/acp-demo/lib/bin.js`。
+2. 核对 Node 满足最低范围，并确认源码根目录仍包含清单、依赖锁文件和运行模块。
+3. 保留现有 `cordis.yml` 与 `.env`；只有配置结构确实需要迁移时，才基于当前 Bridge 模板合并变更。
 4. 确认替换来源可信后点击“接受替换并 Probe”。
 5. Probe 成功后再启用。
 
 ### `unavailable`
 
-表示当前不能执行。查看安装卡片或 `list_agents.unavailable_reason`，优先检查路径、版本、Node、manifest、lock、模板和 ACP 握手。
+表示当前不能执行。查看安装卡片或 `list_agents.unavailable_reason`，优先检查入口路径、工件身份、Node、manifest、依赖锁文件、模板和 ACP 握手。
 
 ## 15. 常见故障
 
 | 现象 | 优先检查 |
 | --- | --- |
-| 选择文件后提示 artifact 无效 | 是否选择固定 tag 构建后的 `packages/examples/acp-demo/lib/bin.js`；是否保留完整源码树 |
+| 选择文件后提示 artifact 无效 | 是否选择官方构建后的 `apps/cli/lib/bin.js`，或兼容的 `packages/examples/acp-demo/lib/bin.js`；是否保留完整源码树 |
 | Node 不支持 | 使用 Node 22.19.0+ 的 22.x 或 Node 24+；不要使用 Node 23 |
 | App 找不到 Node | Node 是否只存在于交互式 shell PATH；Service 能否解析 shebang 指向的真实 Node |
 | 找不到 manifest/lock | 是否把 `bin.js` 单独复制走；源根是否仍有 `package.json` 和 `pnpm-lock.yaml` |

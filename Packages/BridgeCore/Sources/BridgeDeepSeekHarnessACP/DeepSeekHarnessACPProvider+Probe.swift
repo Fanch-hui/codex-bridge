@@ -45,14 +45,20 @@ extension DeepSeekHarnessACPProvider {
         id: request.installation.id,
         providerID: .deepSeekHarness,
         executablePath: launch.resolvedExecutablePath,
-        version: DeepSeekHarnessACPConstants.releaseVersion,
+        version: try request.installation.artifacts.first(where: { $0.role == .runtimeManifest })
+          .flatMap {
+            try DeepSeekHarnessACPArtifactRuntime.runtimeVersion(
+              executablePath: launch.resolvedExecutablePath, manifestPath: $0.canonicalPath
+            )
+          }
+          ?? initialization.agentVersion,
         protocolRevision: String(DeepSeekHarnessACPConstants.acpProtocolVersion),
         artifacts: request.installation.artifacts
       )
       return AgentProbeResult(
         installation: installation,
         available: true,
-        capabilities: Self.capabilitySnapshot
+        capabilities: Self.capabilities(executablePath: launch.resolvedExecutablePath)
       )
     } catch {
       await client?.shutdown()

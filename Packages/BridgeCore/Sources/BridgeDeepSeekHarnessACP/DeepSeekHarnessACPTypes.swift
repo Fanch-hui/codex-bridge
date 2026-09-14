@@ -224,6 +224,9 @@ public struct DeepSeekHarnessACPToolUpdate: Equatable, Sendable {
 
 public enum DeepSeekHarnessACPClientEvent: Equatable, Sendable {
   case textDelta(sessionID: String, text: String)
+  case reasoningDelta(sessionID: String, text: String)
+  case usageUpdated(sessionID: String, usedTokens: Int, contextSize: Int)
+  case configurationUpdated(sessionID: String)
   case toolUpdated(DeepSeekHarnessACPToolUpdate)
   case permissionRequested(DeepSeekHarnessACPPermissionRequest)
   case approvalAutomaticallyDenied(sessionID: String, toolCallID: String)

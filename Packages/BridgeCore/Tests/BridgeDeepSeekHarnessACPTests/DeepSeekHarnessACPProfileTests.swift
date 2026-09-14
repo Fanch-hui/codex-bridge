@@ -108,25 +108,17 @@ final class DeepSeekHarnessACPProfileTests: XCTestCase {
     XCTAssertEqual(artifacts[.launchConfiguration], fixture.configuration)
   }
 
-  func testDependencyLockRequiresExactSDKVersion() throws {
-    let fixture = try makeProfileFixture(
-      prefix: "deepseek-sdk-prefix",
-      lockVersion: "0.25.10"
-    )
+  func testRegistrationAcceptsUpdatedPackageAndDependencyVersions() throws {
+    let fixture = try makeProfileFixture(prefix: "deepseek-updated-sdk", lockVersion: "1.0.0")
     addTeardownBlock { fixture.remove() }
-
-    XCTAssertThrowsError(
-      try DeepSeekHarnessACPProfile.resolveArtifacts(
-        executablePath: fixture.executable,
-        configurationPath: fixture.configuration,
-        sourceEnvironment: ["PATH": "/usr/bin:/bin"]
-      )
-    ) { error in
-      XCTAssertEqual(
-        error as? DeepSeekHarnessACPError,
-        .artifactInvalid("dependency_lock.acp_sdk")
-      )
-    }
+    try Data("{\"version\":\"2.0.0\",\"packageManager\":\"pnpm@12.0.0\"}".utf8)
+      .write(to: URL(fileURLWithPath: fixture.root).appendingPathComponent("package.json"))
+    let artifacts = try DeepSeekHarnessACPProfile.resolveArtifacts(
+      executablePath: fixture.executable,
+      configurationPath: fixture.configuration,
+      sourceEnvironment: ["PATH": "/usr/bin:/bin"]
+    )
+    XCTAssertEqual(Set(artifacts.keys), Set(AgentInstallationArtifactRole.allCases))
   }
 
   func testRegistrationDiscoveryResolvesEnvNodeShebangWithoutFreezingEnvTool() throws {

@@ -80,8 +80,11 @@ extension ServiceAgentAutoDiscovery {
       if let value = environmentValue(key, environment: environment) { candidates.append(value) }
     }
     candidates.append(
-      contentsOf: deepSeekSourceRoots(environment: environment).map {
-        pathJoin($0, "packages", "examples", "acp-demo", "lib", "bin.js")
+      contentsOf: deepSeekSourceRoots(environment: environment).flatMap {
+        [
+          pathJoin($0, "apps", "cli", "lib", "bin.js"),
+          pathJoin($0, "packages", "examples", "acp-demo", "lib", "bin.js"),
+        ]
       }
     )
     return uniquePaths(candidates)

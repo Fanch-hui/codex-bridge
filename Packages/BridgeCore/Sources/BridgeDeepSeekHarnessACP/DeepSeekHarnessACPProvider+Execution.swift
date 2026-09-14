@@ -25,7 +25,7 @@ extension DeepSeekHarnessACPProvider {
       client = connected
       let initialization = try await connected.initialize()
       try validate(initialization)
-      let capabilities = Self.capabilitySnapshot
+      let capabilities = Self.capabilities(executablePath: launch.resolvedExecutablePath)
       try require(request.requiredCapabilities, from: capabilities)
       let session = try await connected.newSession(cwd: request.projectRoot)
       let binding = try AgentBinding(
@@ -48,7 +48,8 @@ extension DeepSeekHarnessACPProvider {
         initialClientEventSequence: initialSequence,
         inactivityTimeout: configuration.inactivityTimeout,
         eventBufferLimit: configuration.eventBufferLimit,
-        requiresExecutionEvidence: true,
+        requiresExecutionEvidence: !DeepSeekHarnessACPModernLaunch.isModernEntry(
+          launch.resolvedExecutablePath),
         cleanup: {
           DeepSeekHarnessACPLaunchBuilder.removeRunDirectory(launch.runDirectory)
         }

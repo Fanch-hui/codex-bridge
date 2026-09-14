@@ -218,6 +218,36 @@ final class DeepSeekHarnessACPEventNormalizerTests: XCTestCase {
     XCTAssertEqual(approval.options.map(\.kind), ["allow_once", "reject_once"])
   }
 
+  func testPermissionReferenceUsesObservedToolDetails() async throws {
+    let binding = try AgentBinding(
+      providerID: .deepSeekHarness, installationID: .init(rawValue: "installation"),
+      providerSessionID: "session", providerRunID: "run"
+    )
+    let normalizer = DeepSeekHarnessACPEventNormalizer(
+      taskID: .init(rawValue: "task"), binding: binding)
+    _ = try await normalizer.normalize(
+      .init(
+        sequence: 0,
+        event: .toolUpdated(
+          .init(
+            sessionID: "session", toolCallID: "shell", title: "Run tests", kind: "execute",
+            status: .pending, rawInput: .object(["command": .string("swift test")])
+          ))))
+    let request = DeepSeekHarnessACPPermissionRequest(
+      approvalID: "approval", requestID: .string("rpc"), sessionID: "session", toolCallID: "shell",
+      title: "DeepSeek Harness permission request", kind: nil, rawInput: nil,
+      options: [try .init(id: "reject-once", name: "Reject", kind: "reject_once")]
+    )
+    let event = try await normalizer.normalize(
+      .init(sequence: 1, event: .permissionRequested(request)))
+    guard case .approvalRequested(let approval) = event?.event else {
+      return XCTFail("Expected approval")
+    }
+    XCTAssertEqual(approval.title, "Run tests")
+    XCTAssertEqual(approval.kind, .command)
+    XCTAssertEqual(approval.normalizedCommand, "swift test")
+  }
+
   func testEmptyToolTitleFallsBackToKindAndThenTool() async throws {
     let binding = try AgentBinding(
       providerID: .deepSeekHarness,

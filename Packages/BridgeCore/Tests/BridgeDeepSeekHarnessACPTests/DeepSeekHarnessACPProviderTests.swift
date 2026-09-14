@@ -55,6 +55,18 @@ final class DeepSeekHarnessACPProviderTests: XCTestCase {
     }
   }
 
+  func testInitializationAcceptsUpdatedAgentVersion() throws {
+    let provider = try DeepSeekHarnessACPProvider()
+    for version in ["0.1.5-rc.2", "2.0.0", "2027.1"] {
+      XCTAssertNoThrow(
+        try provider.validate(
+          .init(
+            protocolVersion: 1, agentName: "deepseek-harness-acp",
+            agentTitle: nil, agentVersion: version
+          )))
+    }
+  }
+
   func testEffectiveCapabilitiesIncludeWritableWorkspaceAndInteractiveApproval() {
     let snapshot = DeepSeekHarnessACPProvider.capabilitySnapshot
     XCTAssertEqual(

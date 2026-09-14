@@ -68,7 +68,7 @@ public struct DeepSeekHarnessACPProvider: AgentProvider, Sendable {
     descriptor = try AgentProviderDescriptor(
       providerID: .deepSeekHarness,
       displayName: "DeepSeek Harness",
-      adapterRevision: 6
+      adapterRevision: 7
     )
   }
 
@@ -86,8 +86,7 @@ public struct DeepSeekHarnessACPProvider: AgentProvider, Sendable {
       throw AgentRuntimeError.unsupportedProtocol(String(initialization.protocolVersion))
     }
     guard initialization.agentName != nil || initialization.agentVersion != nil else { return }
-    guard initialization.agentName == DeepSeekHarnessACPConstants.agentName,
-      initialization.agentVersion == DeepSeekHarnessACPConstants.agentVersion
+    guard initialization.agentName == DeepSeekHarnessACPConstants.agentName
     else {
       throw AgentRuntimeError.unsupportedProtocol("unexpected_deepseek_harness_identity")
     }

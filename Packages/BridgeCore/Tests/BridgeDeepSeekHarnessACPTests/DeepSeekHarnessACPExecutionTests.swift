@@ -250,6 +250,35 @@ final class DeepSeekHarnessACPExecutionTests: XCTestCase {
     XCTAssertTrue(sent.contains { $0.method == "session/cancel" })
   }
 
+  func testStandardACPCompletesFromFinalTextAndSettledTools() async throws {
+    let events = try await runEvidenceScenario(
+      text: "Read the project instructions.", toolStatus: "completed",
+      includeExecutionEvidence: false, requiresExecutionEvidence: false
+    )
+    XCTAssertTrue(
+      events.contains {
+        if case .completed = $0.event { return true }
+        return false
+      })
+  }
+
+  func testStandardACPDoesNotCompleteAfterToolFailure() async throws {
+    let events = try await runEvidenceScenario(
+      text: "The tool failed.", toolStatus: "failed",
+      includeExecutionEvidence: false, requiresExecutionEvidence: false
+    )
+    XCTAssertFalse(
+      events.contains {
+        if case .completed = $0.event { return true }
+        return false
+      })
+    XCTAssertTrue(
+      events.contains {
+        if case .failed = $0.event { return true }
+        return false
+      })
+  }
+
   private func runScenario(stopReason: String, text: String) async throws -> [AgentEventEnvelope] {
     let transport = ScriptedDeepSeekHarnessTransport()
     await transport.setHandler { message, transport in
@@ -304,6 +333,7 @@ final class DeepSeekHarnessACPExecutionTests: XCTestCase {
     text: String,
     toolStatus: String? = nil,
     includeExecutionEvidence: Bool = true,
+    requiresExecutionEvidence: Bool = true,
     reportedToolCalls: Int? = nil,
     outcome: String = "completed"
   ) async throws -> [AgentEventEnvelope] {
@@ -379,7 +409,7 @@ final class DeepSeekHarnessACPExecutionTests: XCTestCase {
       prompt: "run",
       initialClientEventSequence: await client.eventSequence,
       inactivityTimeout: .seconds(30),
-      requiresExecutionEvidence: true,
+      requiresExecutionEvidence: requiresExecutionEvidence,
       cleanup: {}
     )
     await execution.start()

@@ -594,7 +594,7 @@ final class BridgeServiceHostTests: XCTestCase {
         return XCTFail("Expected a stable remote artifact validation error.")
       }
       XCTAssertEqual(remote.code, "agent_artifact_invalid")
-      XCTAssertTrue(remote.message.contains("dsh-v0.1.1-rc.2"))
+      XCTAssertTrue(remote.message.contains("apps/cli/lib/bin.js"))
       XCTAssertTrue(remote.message.contains("packages/examples/acp-demo/lib/bin.js"))
     }
   }

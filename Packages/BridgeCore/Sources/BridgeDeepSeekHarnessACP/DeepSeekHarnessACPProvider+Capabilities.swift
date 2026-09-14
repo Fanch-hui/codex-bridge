@@ -1,6 +1,18 @@
 import BridgeAgentCore
 
 extension DeepSeekHarnessACPProvider {
+  static func capabilities(executablePath: String) -> AgentCapabilitySnapshot {
+    guard DeepSeekHarnessACPModernLaunch.isModernEntry(executablePath) else {
+      return capabilitySnapshot
+    }
+    let presentation: Set<AgentCapability> = [.reasoningDelta, .usage]
+    return AgentCapabilitySnapshot(
+      advertised: capabilitySnapshot.advertised.union(presentation),
+      observed: capabilitySnapshot.observed.union(presentation),
+      enforced: capabilitySnapshot.enforced.union(presentation)
+    )
+  }
+
   public static let capabilitySnapshot = AgentCapabilitySnapshot(
     advertised: [
       .sessionCreate,

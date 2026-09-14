@@ -68,14 +68,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
       mutationIntent: mutationIntent,
       sourceEnvironment: sourceEnvironment
     )
-    let runtimeConfiguration = try prepareRuntimeProfile(
-      sourceRoot: validated.sourceRoot,
-      runDirectory: runtime,
-      configurationData: validated.configurationData,
-      modelID: modelID,
-      reasoningEffort: reasoningEffort,
-      mutationIntent: mutationIntent
-    )
+    let modern = DeepSeekHarnessACPModernLaunch.isModernEntry(validated.executablePath)
     guard
       let configurationDirectory = DeepSeekHarnessACPPathSupport.existingParentDirectory(
         of: validated.configurationPath
@@ -83,12 +76,40 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     else {
       throw AgentRuntimeError.processUnavailable
     }
-    let argv = [
-      validated.nodeInterpreterPath,
-      validated.executablePath,
-      "--config",
-      runtimeConfiguration,
-    ]
+    let argv: [String]
+    if modern {
+      let patch = try DeepSeekHarnessACPModernLaunch.preparePatch(
+        configurationData: validated.configurationData,
+        template: profile.configurationTemplate,
+        runDirectory: runtime,
+        modelID: modelID,
+        reasoningEffort: reasoningEffort,
+        mutationIntent: mutationIntent
+      )
+      argv = [
+        validated.nodeInterpreterPath,
+        validated.executablePath,
+        "--profile",
+        "acp",
+        "--patch",
+        patch,
+      ]
+    } else {
+      let configuration = try prepareRuntimeProfile(
+        sourceRoot: validated.sourceRoot,
+        runDirectory: runtime,
+        configurationData: validated.configurationData,
+        modelID: modelID,
+        reasoningEffort: reasoningEffort,
+        mutationIntent: mutationIntent
+      )
+      argv = [
+        validated.nodeInterpreterPath,
+        validated.executablePath,
+        "--config",
+        configuration,
+      ]
+    }
     return DeepSeekHarnessACPLaunchConfiguration(
       process: ACPProcessTransportConfiguration(
         argv: argv,
