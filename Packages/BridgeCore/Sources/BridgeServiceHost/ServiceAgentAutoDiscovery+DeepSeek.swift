@@ -10,11 +10,12 @@ extension ServiceAgentAutoDiscovery {
     preferGeneratedConfiguration: Bool,
     environment: [String: String]
   ) throws -> [ServiceAgentRegistrationRequest] {
-    var executables = deepSeekExecutableCandidates(
-      existingInstallations: existingInstallations,
-      environment: environment
-    )
-    .compactMap(canonicalRegularFile)
+    var executables =
+      ([managedDeepSeekExecutable(dataPaths: dataPaths)]
+      + deepSeekExecutableCandidates(
+        existingInstallations: existingInstallations,
+        environment: environment
+      )).compactMap(canonicalRegularFile)
     #if os(Windows)
       executables = executables.filter { !isWindowsGUIExecutable($0) }
     #endif

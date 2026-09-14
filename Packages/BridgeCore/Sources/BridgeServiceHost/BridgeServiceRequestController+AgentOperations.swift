@@ -118,9 +118,14 @@ extension BridgeServiceRequestController {
       IPCAgentReprobeRequest.self,
       from: request
     )
+    let replacement = try await deepSeekReplacementRequest(
+      installationID: AgentInstallationID(rawValue: payload.installationID),
+      acceptReplacement: payload.acceptReplacement
+    )
     let record = try await composition.application.serviceReprobeManagedAgent(
       installationID: AgentInstallationID(rawValue: payload.installationID),
       acceptReplacement: payload.acceptReplacement,
+      replacementRequest: replacement,
       deadline: Self.deadline()
     )
     return try BridgeServiceIPCCodec.success(

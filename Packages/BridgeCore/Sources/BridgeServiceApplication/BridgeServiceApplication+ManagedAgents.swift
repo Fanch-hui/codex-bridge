@@ -48,13 +48,19 @@ extension BridgeServiceApplication {
   public func serviceReprobeManagedAgent(
     installationID: AgentInstallationID,
     acceptReplacement: Bool,
+    replacementRequest: ServiceAgentRegistrationRequest? = nil,
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
     try Self.checkDeadline(deadline)
-    let record = try await requiredAgentRegistry().reprobe(
-      installationID: installationID,
-      acceptReplacement: acceptReplacement
-    )
+    let registry = try requiredAgentRegistry()
+    let record: ServiceAgentInstallationRecord
+    if acceptReplacement, let replacementRequest {
+      record = try await registry.replaceAndProbe(
+        installationID: installationID, request: replacementRequest)
+    } else {
+      record = try await registry.reprobe(
+        installationID: installationID, acceptReplacement: acceptReplacement)
+    }
     try Self.checkDeadline(deadline)
     return record
   }

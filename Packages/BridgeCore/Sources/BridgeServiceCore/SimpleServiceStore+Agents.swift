@@ -46,7 +46,10 @@ extension SimpleServiceStore {
     }
   }
 
-  public func updateAgentInstallation(_ installation: ServiceAgentInstallationRecord) throws {
+  public func updateAgentInstallation(
+    _ installation: ServiceAgentInstallationRecord,
+    allowExecutableReplacement: Bool = false
+  ) throws {
     let capabilities = try Self.encodeCapabilities(installation.capabilities)
     do {
       try database.write { db in
@@ -55,7 +58,7 @@ extension SimpleServiceStore {
         }
         let existing = try Self.decodeAgentInstallation(row, in: db)
         guard existing.providerID == installation.providerID,
-          existing.executablePath == installation.executablePath,
+          allowExecutableReplacement || existing.executablePath == installation.executablePath,
           existing.createdAt == installation.createdAt,
           installation.updatedAt >= existing.updatedAt
         else {
@@ -77,7 +80,7 @@ extension SimpleServiceStore {
         try db.execute(
           sql: """
             UPDATE bridge_service_agent_installations
-            SET display_name = ?, canonical_executable_path = ?, executable_device = ?,
+            SET display_name = ?, executable_path = ?, canonical_executable_path = ?, executable_device = ?,
                 executable_inode = ?, executable_size = ?, executable_mtime_ns = ?,
                 executable_sha256 = ?, version = ?, protocol_revision = ?,
                 adapter_revision = ?, trust_profile = ?, security_profile_id = ?,
@@ -304,6 +307,7 @@ extension SimpleServiceStore {
   ) -> StatementArguments {
     let mutable: [DatabaseValueConvertible?] = [
       installation.displayName,
+      installation.executablePath,
       installation.executableIdentity.canonicalPath,
       String(installation.executableIdentity.device),
       String(installation.executableIdentity.inode),

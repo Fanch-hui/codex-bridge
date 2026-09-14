@@ -3,6 +3,10 @@ import BridgeServiceApplication
 import BridgeServiceCore
 import Foundation
 
+#if canImport(Darwin)
+  import Darwin
+#endif
+
 enum ServiceAgentAutoDiscovery {
   static func registrationRequests(
     providerID: AgentProviderID,
@@ -135,12 +139,19 @@ enum ServiceAgentAutoDiscovery {
       path.rangeOfCharacter(from: .controlCharacters) == nil
     else { return nil }
     let canonical = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
-    var directory = ObjCBool(false)
-    let attributes = try? FileManager.default.attributesOfItem(atPath: canonical)
-    guard FileManager.default.fileExists(atPath: canonical, isDirectory: &directory),
-      !directory.boolValue,
-      attributes?[.type] as? FileAttributeType == .typeRegular
-    else { return nil }
+    #if canImport(Darwin)
+      var metadata = stat()
+      guard stat(canonical, &metadata) == 0,
+        metadata.st_mode & S_IFMT == S_IFREG
+      else { return nil }
+    #else
+      var directory = ObjCBool(false)
+      let attributes = try? FileManager.default.attributesOfItem(atPath: canonical)
+      guard FileManager.default.fileExists(atPath: canonical, isDirectory: &directory),
+        !directory.boolValue,
+        attributes?[.type] as? FileAttributeType == .typeRegular
+      else { return nil }
+    #endif
     return AgentPathSemantics.canonicalPath(canonical)
   }
 

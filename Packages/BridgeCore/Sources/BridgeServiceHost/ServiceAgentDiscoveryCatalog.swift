@@ -131,7 +131,7 @@ extension ServiceAgentAutoDiscovery {
       existingInstallations: existingInstallations,
       environment: environment
     )
-    .compactMap(canonicalRegularFile)
+    .lazy.compactMap(canonicalRegularFile)
     .first(where: { path in
       #if os(Windows)
         return !isWindowsGUIExecutable(path)
@@ -145,7 +145,7 @@ extension ServiceAgentAutoDiscovery {
       existingInstallations: existingInstallations,
       environment: environment
     )
-    .compactMap(canonicalRegularFile)
+    .lazy.compactMap(canonicalRegularFile)
     .first
     return ServiceAgentDiscoverySummary(
       state: "discovered",
