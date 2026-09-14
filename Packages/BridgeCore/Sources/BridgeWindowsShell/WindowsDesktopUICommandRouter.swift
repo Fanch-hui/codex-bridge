@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import BridgeIPC
   import BridgeServiceAppCore
   import Foundation
 

@@ -2,6 +2,7 @@
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
+  import Foundation
 
   extension CodexBridgeWindowsApplication {
     static func runDesktopCommand(
