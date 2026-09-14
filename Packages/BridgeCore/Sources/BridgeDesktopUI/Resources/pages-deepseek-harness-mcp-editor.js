@@ -15,11 +15,11 @@
     return { wrapper: wrapper, control: control };
   }
 
-  function secretEditor(title) {
+  function secretEditor(title, namePlaceholder) {
     var root = S.node("div", "dsh-mcp-secrets");
     var heading = S.node("div", "dsh-mcp-secret-heading");
     heading.appendChild(S.node("span", null, title));
-    var add = S.button("添加", null, {}, null, "small", false);
+    var add = S.button("添加一行", null, {}, null, "small", false);
     heading.appendChild(add);
     root.appendChild(heading);
     var list = S.node("div", "dsh-mcp-secret-list");
@@ -28,7 +28,7 @@
 
     function makeEntry(name, configured) {
       var row = S.node("div", "dsh-mcp-secret-row");
-      var key = S.textField("名称", name, "例如：API_KEY");
+      var key = S.textField("名称", name, namePlaceholder);
       var value = S.textField("值", "", configured ? "已配置，留空保留" : "尚未配置");
       value.control.type = "password";
       value.control.autocomplete = "new-password";
@@ -42,9 +42,10 @@
       row.appendChild(remove);
       list.appendChild(row);
       entries.push({ row: row, key: key.control, value: value.control });
+      return key.control;
     }
 
-    add.addEventListener("click", function () { makeEntry("", false); });
+    add.addEventListener("click", function () { makeEntry("", false).focus(); });
     return {
       root: root,
       reset: function (configuredNames) {
@@ -56,6 +57,7 @@
             typeof item === "string" || item.hasValue !== false
           );
         });
+        if (!entries.length) makeEntry("", false);
       },
       values: function () {
         return entries.map(function (entry) {
@@ -90,8 +92,8 @@
     fields.appendChild(url.wrapper);
     fields.appendChild(args.wrapper);
     root.appendChild(fields);
-    var environment = secretEditor("环境变量");
-    var headers = secretEditor("HTTP 请求头");
+    var environment = secretEditor("环境变量", "例如：API_KEY");
+    var headers = secretEditor("HTTP 请求头", "例如：Authorization");
     root.appendChild(environment.root);
     root.appendChild(headers.root);
     var actions = S.node("div", "form-actions");
