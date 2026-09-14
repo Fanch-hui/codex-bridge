@@ -224,6 +224,20 @@ final class WorkbenchApprovalPresentationTests: XCTestCase {
     XCTAssertEqual(CodexTranscriptPresentation.statusLabel("cancelled"), "已取消")
   }
 
+  func testNonGitCommandOutputUsesNeutralStatus() {
+    XCTAssertEqual(
+      CodexTranscriptPresentation.resolvedToolStatus(
+        providerID: "deepseek-harness", name: "run_command", status: "failed",
+        output: "fatal: not a git repository (or any of the parent directories): .git"
+      ), "not_git")
+    XCTAssertEqual(CodexTranscriptPresentation.statusLabel("not_git"), "非 Git 项目")
+    XCTAssertEqual(
+      CodexTranscriptPresentation.resolvedToolStatus(
+        providerID: "codex", name: "command_execution", status: "failed",
+        output: "fatal: detected dubious ownership in repository"
+      ), "failed")
+  }
+
   func testMarkdownTextParsesCommonFormattingWithoutSyntaxCharacters() throws {
     let parsed = try XCTUnwrap(
       AgentMarkdownText.attributedString(

@@ -107,6 +107,7 @@
     if (entry.kind === "reasoning") {
       return S.icon(entry.symbol || "brain.head.profile", "entry-symbol entry-status-reasoning");
     }
+    if (status === "not_git") return S.icon("folder", "entry-symbol entry-status-completed");
     if (status === "failed") return S.icon("xmark.circle.fill", "entry-symbol entry-status-error");
     if (status === "cancelled") return S.icon("xmark.circle", "entry-symbol entry-status-completed");
     if (status === "declined") return S.icon("minus.circle.fill", "entry-symbol entry-status-declined");
@@ -119,6 +120,7 @@
   function toolStatusLabel(entry) {
     switch (normalizeStatus(entry.toolStatus)) {
     case "completed": return "";
+    case "not_git": return "非 Git 项目";
     case "failed": return "失败";
     case "declined": return "已拒绝";
     case "cancelled": return "已取消";
@@ -129,6 +131,7 @@
 
   function toolStatusTone(entry) {
     var status = normalizeStatus(entry.toolStatus);
+    if (status === "not_git") return "neutral";
     if (status === "failed") return "error";
     if (status === "declined") return "warning";
     if (status === "completed" || status === "cancelled") return "neutral";

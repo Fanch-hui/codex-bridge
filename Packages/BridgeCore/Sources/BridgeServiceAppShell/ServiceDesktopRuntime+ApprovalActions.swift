@@ -98,6 +98,10 @@ extension BridgeServiceAppModel {
     resolvingApprovalKeys.remove(resolutionKey)
     resolvedTaskApprovalKeys.insert(resolutionKey)
     approvals.removeAll { $0.approvalID == approval.approvalID }
+    if decision != "deny" {
+      selection = .workbench
+      openTask(approval.taskID)
+    }
     postToast(
       decision == "deny" ? "已拒绝 \(providerName) 操作" : "已批准 \(providerName) 操作",
       symbol: decision == "deny" ? "xmark.shield.fill" : "checkmark.shield.fill",

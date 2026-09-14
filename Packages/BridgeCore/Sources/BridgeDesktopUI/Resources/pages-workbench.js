@@ -129,9 +129,7 @@
     actions.appendChild(S.button("刷新任务", "refreshTasks", {}, emit, "small", false));
     card.appendChild(actions);
 
-    if (detail.resultSummary) addTextBlock(card, "结果摘要", detail.resultSummary);
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(card, "变更文件", detail.changedFiles);
-    if (detail.activity && detail.activity.length) addActivityBlock(card, detail.activity);
     if ((detail.conversation && detail.conversation.length) || detail.conversationState) {
       global.CodexBridgeDesktopWorkbenchConversation.render(card, detail.conversation || [], page, emit);
     }
@@ -151,22 +149,11 @@
   }
 
   function addDetail(c, k, v) { var it = S.node("div", "detail-item"); it.appendChild(S.node("dt", null, k)); it.appendChild(S.node("dd", null, v)); c.appendChild(it); }
-  function addTextBlock(c, title, text) { c.appendChild(S.node("h4", "subsection-title", title)); c.appendChild(S.node("p", "muted", text)); }
   function addListBlock(c, title, values) {
     c.appendChild(S.node("h4", "subsection-title", title));
     var list = S.node("div", "activity-list");
     values.forEach(function (v) { list.appendChild(S.node("div", "path-row mono", v)); });
     c.appendChild(list);
-  }
-
-  function addActivityBlock(container, values) {
-    container.appendChild(S.node("h4", "subsection-title", "实时活动"));
-    var list = S.node("div", "activity-list");
-    values.forEach(function (a) {
-      var row = S.node("div", "activity-row");
-      row.appendChild(S.node("span", "muted mono", a.occurredAt)); row.appendChild(S.node("span", null, a.summary)); list.appendChild(row);
-    });
-    container.appendChild(list);
   }
 
   function render(page, emit) {

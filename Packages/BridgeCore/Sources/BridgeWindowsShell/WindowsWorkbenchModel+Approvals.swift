@@ -89,6 +89,7 @@
       }
       guard resolvingApprovalIDs.insert(approvalID).inserted else { return }
       let selectionGeneration = selectedApprovalID == approvalID ? approvalSelectionGeneration : nil
+      let taskIDToReveal = approvedTaskID(for: approvalID, decision: decision)
       if selectedApprovalID == approvalID { approvalStatusText = "正在处理审批…" }
       publishDisplay()
 
@@ -100,6 +101,9 @@
         )
         removeApproval(approvalID)
         await reloadTasksAndApprovals()
+        if let taskIDToReveal {
+          revealApprovedTask(taskID: taskIDToReveal)
+        }
         finishApprovalResolution(
           approvalID,
           selectionGeneration: selectionGeneration,
@@ -118,6 +122,24 @@
           message: message,
           succeeded: false
         )
+      }
+    }
+
+    private func approvedTaskID(
+      for approvalID: ApprovalPresentation.Identifier,
+      decision: String
+    ) -> String? {
+      guard decision != "deny", case .task(let rawID) = approvalID else { return nil }
+      return approvals.first(where: { $0.approvalID == rawID })?.taskID
+    }
+
+    private func revealApprovedTask(taskID: String) {
+      guard let task = tasks.first(where: { $0.taskID == taskID }) else { return }
+      if selectedTaskID == task.taskID {
+        openConversation(for: task)
+        publishDisplay()
+      } else {
+        selectTask(id: task.taskID)
       }
     }
 

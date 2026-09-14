@@ -118,8 +118,7 @@ extension BridgeServiceAppModel {
       let conversation,
       conversation.taskID == selectedTaskBeforeRefresh.taskID
     {
-      closeConversation()
-      openConversation(taskID: selectedTaskBeforeRefresh.taskID)
+      openTask(selectedTaskBeforeRefresh.taskID)
     }
     guard selectedTaskID == nil, selectedThreadID == nil, conversation == nil else { return }
     guard let selectedProjectID else { return }

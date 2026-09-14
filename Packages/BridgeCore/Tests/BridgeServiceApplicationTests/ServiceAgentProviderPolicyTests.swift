@@ -27,7 +27,7 @@ final class ServiceAgentProviderPolicyTests: XCTestCase {
     XCTAssertTrue(policy.supportsSessionContinuation)
     XCTAssertTrue(policy.supportsSteer)
     XCTAssertFalse(policy.supportsInteractiveApproval)
-    XCTAssertTrue(policy.supportsOneTimeToolAutoApproval)
+    XCTAssertFalse(policy.supportsOneTimeToolAutoApproval)
     XCTAssertTrue(policy.supportsModelSelection)
     XCTAssertTrue(policy.supportsEffortSelection)
     XCTAssertTrue(policy.supportsSkillSelection)

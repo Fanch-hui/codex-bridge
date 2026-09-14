@@ -184,6 +184,10 @@
         )
       }
       if entry.kind == "tool_call" {
+        let toolStatus = CodexTranscriptPresentation.resolvedToolStatus(
+          providerID: providerID, name: entry.toolName, status: entry.toolStatus,
+          output: entry.content
+        )
         let presentation = CodexTranscriptPresentation.tool(
           providerID: providerID,
           name: entry.toolName,
@@ -195,10 +199,10 @@
           text: entry.content,
           kind: entry.kind,
           toolName: entry.toolName,
-          toolStatus: entry.toolStatus,
+          toolStatus: toolStatus,
           toolArguments: entry.toolArguments,
           displayTitle: presentation.title,
-          displayStatus: CodexTranscriptPresentation.statusLabel(entry.toolStatus),
+          displayStatus: CodexTranscriptPresentation.statusLabel(toolStatus),
           symbol: presentation.systemImage,
           isFinal: entry.isFinal,
           status: entry.isFinal ? "final" : "streaming"

@@ -232,7 +232,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     supportsSessionContinuation: true,
     supportsSteer: true,
     supportsInteractiveApproval: false,
-    supportsOneTimeToolAutoApproval: true,
+    supportsOneTimeToolAutoApproval: false,
     supportsModelSelection: true,
     supportsEffortSelection: true,
     supportsSkillSelection: true,

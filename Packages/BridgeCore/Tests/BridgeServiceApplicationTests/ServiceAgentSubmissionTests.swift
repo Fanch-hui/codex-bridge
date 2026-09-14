@@ -1744,7 +1744,7 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     XCTAssertNil(completed.state.codexThreadID)
   }
 
-  func testAntigravityLocalApprovalCanGrantOneTimeToolAndNetworkAccess() async throws {
+  func testAntigravityLocalApprovalUsesConfiguredAlwaysProceedPolicy() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     _ = try await fixture.projects.updateAccessPolicy(
       ProjectAccessPolicy(
@@ -1779,22 +1779,21 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     let taskID = TaskID(rawValue: receipt.taskID)
     let approvals = try await application.pendingTaskStartApprovals(taskID: taskID)
     let approval = try XCTUnwrap(approvals.first)
-    XCTAssertTrue(approval.oneTimeToolAutoApprovalAvailable)
+    XCTAssertFalse(approval.oneTimeToolAutoApprovalAvailable)
 
     try await application.resolveTaskStartApproval(
       taskID: taskID,
       approvalID: approval.approvalID,
       approved: true,
-      oneTimeToolAutoApproval: true,
       deadline: deadline
     )
     let running = try await waitForTask(fixture, taskID: receipt.taskID) {
       $0.state.status == .running
     }
-    XCTAssertEqual(running.accessMode, .fullAccess)
-    XCTAssertTrue(running.networkAllowed)
+    XCTAssertEqual(running.accessMode, .requestApproval)
+    XCTAssertFalse(running.networkAllowed)
     let request = try XCTUnwrap(provider.startedRequests.first)
-    XCTAssertEqual(request.toolApprovalPolicy, .autoApprove)
+    XCTAssertEqual(request.toolApprovalPolicy, .providerManaged)
     XCTAssertEqual(request.mutationIntent, .readOnly)
 
     try emit(

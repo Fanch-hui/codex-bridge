@@ -90,6 +90,7 @@ package enum CodexTranscriptPresentation {
     switch status?.lowercased() {
     case "completed": ""
     case "failed": "失败"
+    case "not_git": "非 Git 项目"
     case "declined": "已拒绝"
     case "cancelled": "已取消"
     case "pending": "等待执行"
@@ -97,4 +98,13 @@ package enum CodexTranscriptPresentation {
     }
   }
 
+  package static func resolvedToolStatus(
+    providerID: String?, name: String?, status: String?, output: String
+  ) -> String? {
+    guard status?.lowercased() == "failed",
+      category(providerID: providerID, name: name) == .command,
+      output.lowercased().contains("fatal: not a git repository")
+    else { return status }
+    return "not_git"
+  }
 }
