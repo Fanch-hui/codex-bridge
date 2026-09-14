@@ -37,7 +37,7 @@
 .inspector-header, .inspector-approvals, .inspector-footer { flex: 0 0 auto; }
 .inspector-header { max-height: 35%; overflow-y: auto; }
 .inspector-footer { max-height: 35%; overflow-y: auto; }
-.inspector-approvals { max-height: 20%; overflow-y: auto; }
+.inspector-approvals { max-height: 40%; overflow-y: auto; }
 .inspector-content { overflow-x: hidden; overflow-wrap: anywhere; }
 .inspector-content .task-detail-card { padding: 0; border: 0; background: transparent; }
 .inspector-content .detail-grid { gap: 10px; }

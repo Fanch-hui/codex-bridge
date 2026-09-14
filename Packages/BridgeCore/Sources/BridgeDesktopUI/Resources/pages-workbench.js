@@ -6,21 +6,25 @@
 
   function renderApprovals(page, emit) {
     var container = document.getElementById("workbench-inspector-approvals");
+    renderStable(container, JSON.stringify(page.approvals || []), function () {
     S.clear(container);
     if (!page.approvals || page.approvals.length === 0) return;
     var section = S.node("div", "approvals-tray");
     page.approvals.forEach(function (appr) {
       var card = S.node("article", "approval-card");
       card.appendChild(S.node("h4", null, appr.title || appr.kind));
-      card.appendChild(S.node("p", null, appr.summary));
-      if (appr.displayCommand) card.appendChild(S.node("pre", "mono", appr.displayCommand));
-      if (appr.reason) card.appendChild(S.node("p", null, appr.reason));
-      if (appr.relativePaths && appr.relativePaths.length) addListBlock(card, "涉及路径", appr.relativePaths);
+      var body = S.node("div", "approval-body");
+      card.appendChild(body);
+      body.appendChild(S.node("p", null, appr.summary));
+      if (appr.displayCommand) body.appendChild(S.node("pre", "mono", appr.displayCommand));
+      if (appr.reason) body.appendChild(S.node("p", null, appr.reason));
+      if (appr.relativePaths && appr.relativePaths.length) addListBlock(body, "涉及路径", appr.relativePaths);
       var actions = S.node("div", "approval-actions");
       var decs = appr.decisionOptions && appr.decisionOptions.length ? appr.decisionOptions : ["allow", "deny"];
       if (appr.canDeny && !decs.some(function (d) { return d.toLowerCase() === "deny"; })) {
         decs = decs.concat(["deny"]);
       }
+      decs = decs.filter(function (decision, index) { return decs.indexOf(decision) === index; });
       decs.forEach(function (dec) {
         var normalized = dec.toLowerCase(), isDeny = normalized === "deny";
         var allowed = isDeny ? appr.canDeny : appr.canAllow;
@@ -34,12 +38,47 @@
       card.appendChild(actions); section.appendChild(card);
     });
     container.appendChild(section);
+    });
+  }
+
+  function renderStable(container, signature, render) {
+    if (!container.__renderState) {
+      var state = container.__renderState = { pressed: false, signature: null, pending: null };
+      container.addEventListener("pointerdown", function () { state.pressed = true; });
+      container.addEventListener("keydown", function (event) {
+        if ((event.key === "Enter" || event.key === " ") && event.target.closest("button")) {
+          state.pressed = true;
+        }
+      });
+      function release() {
+        setTimeout(function () {
+          state.pressed = false;
+          var pending = state.pending;
+          state.pending = null;
+          if (pending) pending();
+        }, 0);
+      }
+      global.addEventListener("pointerup", release);
+      global.addEventListener("pointercancel", release);
+      global.addEventListener("keyup", release);
+      global.addEventListener("blur", release);
+    }
+    var state = container.__renderState;
+    if (state.pressed) {
+      state.pending = function () { renderStable(container, signature, render); };
+      return;
+    }
+    if (state.signature === signature) return;
+    render();
+    state.signature = signature;
   }
 
   function renderContent(page, emit) {
     var content = document.getElementById("workbench-inspector-content");
-    var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
-    try { renderContentBody(content, page, emit); } finally { restore(); }
+    renderStable(content, JSON.stringify(page), function () {
+      var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
+      try { renderContentBody(content, page, emit); } finally { restore(); }
+    });
   }
 
   function renderContentBody(content, page, emit) {

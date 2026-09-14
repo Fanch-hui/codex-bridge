@@ -177,7 +177,7 @@ extension BridgeDesktopUIStateBuilder {
         displayCommand: approval.displayCommand,
         relativePaths: approval.relativePaths,
         reason: approval.reason,
-        decisionOptions: (approval.decisionOptions ?? ["allow"]) + ["deny"],
+        decisionOptions: presentation.allowDecisions + ["deny"],
         canAllow: !presentation.allowDecisions.isEmpty,
         canDeny: true,
         resolving: model.isResolvingApproval(approval),
