@@ -27,6 +27,23 @@
     tb.appendChild(urlPill);
     tb.appendChild(S.node("div", "toolbar-spacer"));
 
+    if (browser.canOpenExternally) {
+      var extBtn = S.button("", "openBrowserExternally", {}, emit, "browser-external-btn link-button");
+      extBtn.appendChild(S.icon("safari", "external-icon"));
+      extBtn.appendChild(S.node("span", null, "在外部浏览器打开"));
+      tb.appendChild(extBtn);
+    }
+    slot.classList.toggle("browser-hidden", !(browser.visible && browser.enabled));
+    S.clear(note);
+    note.textContent = browser.status || "由宿主加载真实 ChatGPT 工作区";
+    document.querySelector(".workbench-layout").classList.toggle("browser-collapsed", !browser.enabled);
+  }
+
+  function renderInspectorHeader(page, emit) {
+    var header = document.getElementById("workbench-inspector-header");
+    S.clear(header);
+    var browser = page.browser || {};
+    var controls = S.node("div", "inspector-browser-controls");
     var toggleWrap = S.node("label", "browser-toggle-wrap");
     toggleWrap.appendChild(S.node("span", "browser-toggle-title", "内置浏览器"));
     var toggleBtn = S.node("button", "switch-toggle" + (browser.enabled ? " is-active" : ""));
@@ -37,30 +54,10 @@
     toggleBtn.appendChild(S.node("span", "switch-thumb"));
     toggleBtn.addEventListener("click", function () { emit("setBrowserEnabled", { enabled: !browser.enabled }); });
     toggleWrap.appendChild(toggleBtn);
-    tb.appendChild(toggleWrap);
+    controls.appendChild(toggleWrap);
+    header.appendChild(controls);
 
-    if (browser.canOpenExternally) {
-      var extBtn = S.button("", "openBrowserExternally", {}, emit, "browser-external-btn link-button");
-      extBtn.appendChild(S.icon("safari", "external-icon"));
-      extBtn.appendChild(S.node("span", null, "在外部浏览器打开"));
-      tb.appendChild(extBtn);
-    }
-    slot.classList.toggle("browser-hidden", !(browser.visible && browser.enabled));
-    S.clear(note);
-    if (!browser.enabled) {
-      var ph = S.node("div", "browser-disabled-placeholder");
-      ph.appendChild(S.icon("circle.dashed", "placeholder-icon"));
-      ph.appendChild(S.node("div", "placeholder-title", "内置浏览器已关闭"));
-      ph.appendChild(S.node("div", "placeholder-sub", "点击右上角开关重新开启，登录状态会保留。"));
-      note.appendChild(ph);
-    } else {
-      note.textContent = browser.status || "由宿主加载真实 ChatGPT 工作区";
-    }
-  }
 
-  function renderInspectorHeader(page, emit) {
-    var header = document.getElementById("workbench-inspector-header");
-    S.clear(header);
     // Row 1: Project folder icon + Project dropdown + Status badge
     var row1 = S.node("div", "inspector-header-row row-project"), pGroup = S.node("div", "project-selector-group");
     pGroup.appendChild(S.icon("folder.fill", "project-folder-icon"));
@@ -172,6 +169,7 @@
     if (browser !== browserSignature) { renderBrowser(page, emit); browserSignature = browser; }
     var detail = page.selectedTask || {};
     var header = JSON.stringify([
+      page.browser && page.browser.enabled, page.browser && page.browser.canToggle,
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode,
       page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canInterrupt,
       S.safeArray(page.tasks).map(function (t) {

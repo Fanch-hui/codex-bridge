@@ -28,7 +28,6 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 #chat-browser-slot { position: relative; flex: 1 1 0; min-height: 0; background: var(--surface); }
 #chat-browser-slot.browser-hidden { display: grid; }
 .browser-slot-note { display: grid; place-items: center; height: 100%; padding: 24px; color: var(--text-secondary); text-align: center; }
-.browser-disabled-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 0; text-align: center; gap: 8px; }
 .placeholder-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
 .placeholder-sub { font-size: 12px; color: var(--text-tertiary); }
 .inspector-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface); overflow: hidden; }
@@ -70,3 +69,8 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .inspector-approvals .approval-card h4 { flex: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .inspector-approvals .approval-body { min-height: 0; max-height: 120px; overflow-y: auto; overflow-wrap: anywhere; }
 .inspector-approvals .approval-actions { flex: none; padding-top: 8px; border-top: 1px solid var(--separator); }
+
+.workbench-layout.browser-collapsed { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.workbench-layout.browser-collapsed .browser-pane,
+.workbench-layout.browser-collapsed .workbench-divider { display: none; }
+.inspector-browser-controls { display: flex; justify-content: flex-end; }

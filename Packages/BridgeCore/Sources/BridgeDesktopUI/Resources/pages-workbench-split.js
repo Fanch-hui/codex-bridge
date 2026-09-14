@@ -96,7 +96,7 @@
   }
 
   function beginDrag(event, layout, divider, inspector) {
-    if (event.button !== 0 || layout.classList.contains("inspector-hidden")) return;
+    if (event.button !== 0 || (layout.classList.contains("inspector-hidden") || layout.classList.contains("browser-collapsed"))) return;
     event.preventDefault();
     var axis = axisValues(layout);
     var startCoordinate = axis.stacked ? event.clientY : event.clientX;
@@ -122,7 +122,7 @@
   }
 
   function keyboardResize(event, layout, divider) {
-    if (layout.classList.contains("inspector-hidden")) return;
+    if ((layout.classList.contains("inspector-hidden") || layout.classList.contains("browser-collapsed"))) return;
     var axis = axisValues(layout);
     var step = event.shiftKey ? 48 : 16;
     var delta = 0;
@@ -139,6 +139,7 @@
   }
 
   function updateLayoutAccessibility(layout) {
+    if (layout.classList.contains("browser-collapsed")) return;
     var inspector = document.getElementById("workbench-inspector-pane");
     if (!inspector) return;
     var axis = axisValues(layout);
