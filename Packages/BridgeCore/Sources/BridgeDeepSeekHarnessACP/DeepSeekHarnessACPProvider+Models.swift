@@ -25,10 +25,18 @@ extension DeepSeekHarnessACPProvider {
     var client: DeepSeekHarnessACPClient?
     do {
       let sourceEnvironment = try await configuration.runtimeEnvironment(for: installation)
+      let remoteModels =
+        DeepSeekHarnessACPModernLaunch.isModernEntry(installation.executablePath)
+        ? try await DeepSeekHarnessACPRemoteModels.fetch(environment: sourceEnvironment) : nil
+      let launchModel = remoteModels.flatMap { models in
+        selectedModelID.flatMap { models.contains($0) ? $0 : nil } ?? models.first
+      }
       let launch = try configuration.launchBuilder.make(
         installation: installation,
         projectRoot: catalogRoot.path,
         runDirectory: runDirectory,
+        modelID: launchModel,
+        catalogModelIDs: remoteModels,
         networkAllowed: false,
         sourceEnvironment: sourceEnvironment
       )
@@ -42,6 +50,9 @@ extension DeepSeekHarnessACPProvider {
           $0.id == "model" || $0.category == "model"
         }), !modelOption.values.isEmpty
       else {
+        if remoteModels != nil {
+          throw DeepSeekHarnessModelCatalogError.invalidResponse
+        }
         await connected.shutdown()
         cleanup(runDirectory: launch.runDirectory, probeRoot: catalogRoot)
         return fallback

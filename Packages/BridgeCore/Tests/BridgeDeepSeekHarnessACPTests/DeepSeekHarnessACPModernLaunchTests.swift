@@ -52,6 +52,7 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
       runDirectory: run,
       persistentStateDirectory: persistentState,
       modelID: "vendor/model-v2",
+      catalogModelIDs: ["vendor/model-v2", "vendor/model-v3"],
       reasoningEffort: "high",
       mutationIntent: .workspaceWrite,
       networkAllowed: false,
@@ -84,6 +85,8 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
     XCTAssertTrue(patch.contains("reasoningEffort: \"high\""))
     XCTAssertTrue(patch.contains("model: \"vendor/model-v2\""))
     XCTAssertTrue(patch.contains("- id: \"vendor/model-v2\""))
+    XCTAssertTrue(patch.contains("- id: \"vendor/model-v3\""))
+    XCTAssertFalse(patch.contains("- id: \"deepseek-v4-pro\""))
     XCTAssertTrue(patch.contains("mode: workspace-write"))
     XCTAssertTrue(patch.contains("workspaceRoot: !!js process.env.DSH_WORKSPACE_ROOT"))
     XCTAssertTrue(patch.contains("- id: session-persistence-jsonl"))

@@ -48,6 +48,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     runDirectory: String,
     persistentStateDirectory: String? = nil,
     modelID: String? = nil,
+    catalogModelIDs: [String]? = nil,
     reasoningEffort: String? = nil,
     mutationIntent: AgentMutationIntent = .readOnly,
     networkAllowed _: Bool,
@@ -85,6 +86,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
         template: profile.configurationTemplate,
         runDirectory: runtime,
         modelID: modelID,
+        catalogModelIDs: catalogModelIDs,
         reasoningEffort: reasoningEffort,
         mutationIntent: mutationIntent
       )

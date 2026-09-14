@@ -41,6 +41,7 @@ enum DeepSeekHarnessACPModernLaunch {
     template: Data,
     runDirectory: String,
     modelID: String?,
+    catalogModelIDs: [String]? = nil,
     reasoningEffort: String?,
     mutationIntent: AgentMutationIntent
   ) throws -> String {
@@ -54,7 +55,7 @@ enum DeepSeekHarnessACPModernLaunch {
       modelID: modelID,
       reasoningEffort: reasoningEffort
     )
-    var modelIDs = sourceProfile.modelIDs
+    var modelIDs = catalogModelIDs ?? sourceProfile.modelIDs
     if !modelIDs.contains(selection.modelID) {
       modelIDs.append(selection.modelID)
     }

@@ -42,6 +42,10 @@ extension BridgeServiceRequestController {
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
     }
+    if let error = error as? DeepSeekHarnessModelCatalogError {
+      return .init(
+        code: "agent_model_catalog_failed", message: error.localizedDescription, retryable: true)
+    }
     if let error = error as? DeepSeekHarnessACPError {
       return mapDeepSeekHarnessError(error)
     }
