@@ -40,6 +40,18 @@ extension BridgeDesktopCommandRouter {
       guard connected(model), clientID(payload.clientID) == MCPClientID.qwenStudio.rawValue
       else { return }
       model.rotateQwenStudioCredential()
+    case .saveDeepSeekHarnessMCPServer:
+      saveDeepSeekHarnessMCPServer(payload, model: model)
+    case .deleteDeepSeekHarnessMCPServer:
+      guard connected(model), let id = validatedID(payload.mcpServerID, maximumBytes: 128) else {
+        return
+      }
+      model.deleteDeepSeekHarnessMCPServer(id: id)
+    case .setDeepSeekHarnessMCPServerEnabled:
+      guard connected(model), let id = validatedID(payload.mcpServerID, maximumBytes: 128),
+        let enabled = payload.enabled
+      else { return }
+      model.setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled)
     case .rotateLocalMCPEndpoint:
       guard connected(model) else { return }
       model.rotateLocalMCPEndpoint()
@@ -104,6 +116,40 @@ extension BridgeDesktopCommandRouter {
       !runtimeKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else { return }
     model.configureTunnel(tunnelID: tunnelID, runtimeKey: runtimeKey)
+  }
+
+  private static func saveDeepSeekHarnessMCPServer(
+    _ payload: BridgeDesktopCommandPayload,
+    model: BridgeServiceAppModel
+  ) {
+    guard connected(model), let name = validatedID(payload.name, maximumBytes: 256),
+      let transport = validatedID(payload.mcpTransport, maximumBytes: 16),
+      transport == "stdio" || transport == "http"
+    else { return }
+    let command = payload.mcpCommand.flatMap { validatedText($0, maximumBytes: 8 * 1_024) }
+    let url = payload.mcpURL.flatMap { validatedText($0, maximumBytes: 4 * 1_024) }
+    if transport == "stdio" && (command?.isEmpty != false || url != nil) { return }
+    if transport == "http" && (url?.isEmpty != false || command != nil) { return }
+    let environment = payload.mcpEnvironmentSecrets ?? []
+    let headers = payload.mcpHeaderSecrets ?? []
+    guard environment.allSatisfy({ validSecret($0) }), headers.allSatisfy({ validSecret($0) })
+    else { return }
+    model.saveDeepSeekHarnessMCPServer(
+      id: validatedID(payload.mcpServerID, maximumBytes: 128),
+      name: name,
+      transport: transport,
+      command: transport == "stdio" ? command : nil,
+      arguments: transport == "stdio" ? payload.arguments ?? [] : [],
+      url: transport == "http" ? url : nil,
+      environment: environment,
+      headers: headers
+    )
+  }
+
+  private static func validSecret(_ input: BridgeDesktopSecretInput) -> Bool {
+    guard let name = validatedID(input.name, maximumBytes: 256) else { return false }
+    guard let value = input.value else { return true }
+    return validatedText(value, maximumBytes: 16 * 1_024) != nil && !name.isEmpty
   }
 
   private static func registerAgent(

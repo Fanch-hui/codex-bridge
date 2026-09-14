@@ -25,6 +25,14 @@ final class WorkbenchTaskRetryActionTests: XCTestCase {
         supportsSteer: true
       )
     ])
+    await client.configureAgentInstallations([
+      .init(
+        installationID: "agy-inst-1", providerID: "antigravity", displayName: "Antigravity",
+        executablePath: "/tmp/agy", adapterRevision: 1, trustProfile: "user_trusted",
+        isEnabled: true, availability: "available",
+        effectiveCapabilities: ["lifecycle.session_continue"],
+        lastProbeError: nil, lastProbedAt: nil, updatedAt: "2026-09-14T00:00:00Z")
+    ])
     let registration = MockRegistration()
     let model = BridgeServiceAppModel(
       registration: registration,

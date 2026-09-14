@@ -149,6 +149,18 @@
         auxiliary.connections.selectClient(at: index)
         Task { @MainActor in await auxiliary.connections.rotateSelectedCredential(clientID: id) }
         return true
+      case .saveDeepSeekHarnessMCPServer(let request):
+        Task { @MainActor in await auxiliary.connections.saveDeepSeekHarnessMCPServer(request) }
+        return true
+      case .deleteDeepSeekHarnessMCPServer(let id):
+        Task { @MainActor in await auxiliary.connections.deleteDeepSeekHarnessMCPServer(id: id) }
+        return true
+      case .setDeepSeekHarnessMCPServerEnabled(let id, let enabled):
+        Task {
+          @MainActor in
+          await auxiliary.connections.setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled)
+        }
+        return true
       case .configureTunnel, .connectTunnel, .disconnectTunnel, .clearTunnel:
         return runTunnelCommand(command, connections: auxiliary.connections)
       case .selectAgent(let id):

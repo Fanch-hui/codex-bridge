@@ -102,6 +102,69 @@ public struct BridgeDesktopMCPClientRow: Codable, Equatable, Sendable {
   }
 }
 
+public struct BridgeDesktopDeepSeekHarnessMCPRow: Codable, Equatable, Sendable {
+  public let id: String
+  public let name: String
+  public let enabled: Bool
+  public let transport: String
+  public let command: String?
+  public let arguments: [String]
+  public let url: String?
+  public let environment: [BridgeDesktopSecretSummary]
+  public let headers: [BridgeDesktopSecretSummary]
+  public let canToggle: Bool
+  public let canEdit: Bool
+  public let canDelete: Bool
+
+  public init(
+    id: String,
+    name: String,
+    enabled: Bool,
+    transport: String,
+    command: String? = nil,
+    arguments: [String] = [],
+    url: String? = nil,
+    environment: [BridgeDesktopSecretSummary] = [],
+    headers: [BridgeDesktopSecretSummary] = [],
+    canToggle: Bool = true,
+    canEdit: Bool = true,
+    canDelete: Bool = true
+  ) {
+    self.id = id
+    self.name = name
+    self.enabled = enabled
+    self.transport = transport
+    self.command = command
+    self.arguments = arguments
+    self.url = url
+    self.environment = environment
+    self.headers = headers
+    self.canToggle = canToggle
+    self.canEdit = canEdit
+    self.canDelete = canDelete
+  }
+}
+
+public struct BridgeDesktopSecretInput: Codable, Equatable, Sendable {
+  public let name: String
+  public let value: String?
+
+  public init(name: String, value: String? = nil) {
+    self.name = name
+    self.value = value
+  }
+}
+
+public struct BridgeDesktopSecretSummary: Codable, Equatable, Sendable {
+  public let name: String
+  public let hasValue: Bool
+
+  public init(name: String, hasValue: Bool) {
+    self.name = name
+    self.hasValue = hasValue
+  }
+}
+
 public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
   public let providerID: String
   public let displayName: String
@@ -225,6 +288,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let tunnel: BridgeDesktopTunnelState
   public let codex: BridgeDesktopCodexConnectionState?
   public let clients: [BridgeDesktopMCPClientRow]
+  public let deepSeekHarnessMCPServers: [BridgeDesktopDeepSeekHarnessMCPRow]
+  public let canManageDeepSeekHarnessMCP: Bool
   public let providers: [BridgeDesktopAgentProviderRow]
   public let installations: [BridgeDesktopAgentInstallationRow]
   public let canRegisterAgent: Bool
@@ -242,6 +307,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     tunnel: BridgeDesktopTunnelState,
     codex: BridgeDesktopCodexConnectionState? = nil,
     clients: [BridgeDesktopMCPClientRow] = [],
+    deepSeekHarnessMCPServers: [BridgeDesktopDeepSeekHarnessMCPRow] = [],
+    canManageDeepSeekHarnessMCP: Bool = false,
     providers: [BridgeDesktopAgentProviderRow] = [],
     installations: [BridgeDesktopAgentInstallationRow] = [],
     canRegisterAgent: Bool = true,
@@ -258,6 +325,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.tunnel = tunnel
     self.codex = codex
     self.clients = clients
+    self.deepSeekHarnessMCPServers = deepSeekHarnessMCPServers
+    self.canManageDeepSeekHarnessMCP = canManageDeepSeekHarnessMCP
     self.providers = providers
     self.installations = installations
     self.canRegisterAgent = canRegisterAgent

@@ -3,23 +3,58 @@ import BridgeAgentCore
 import Foundation
 
 extension DeepSeekHarnessACPClient {
-  public func newSession(cwd: String) async throws -> DeepSeekHarnessACPSession {
+  public func newSession(
+    cwd: String,
+    mcpServers: [ACPJSONValue] = []
+  ) async throws -> DeepSeekHarnessACPSession {
     try requireInitialized()
     try validateAbsolutePath(cwd, field: "session.cwd")
     guard activeSessionID == nil else { throw DeepSeekHarnessACPError.sessionMismatch }
+    let mcpServers = try Self.validatedMCPServers(mcpServers)
     try beginSessionOperation()
     defer { endSessionOperation() }
     let response = try await request(
       method: "session/new",
       params: .object([
         "cwd": .string(cwd),
-        "mcpServers": .array([]),
+        "mcpServers": .array(mcpServers),
         "additionalDirectories": .array([]),
       ])
     )
     guard let sessionID = response.value["sessionId"]?.stringValue else {
       throw DeepSeekHarnessACPError.malformedResponse
     }
+    try validateIdentifier(sessionID, field: "session.id")
+    let configOptions = try Self.parseConfigOptions(response.value["configOptions"])
+    activeSessionID = sessionID
+    return DeepSeekHarnessACPSession(id: sessionID, configOptions: configOptions)
+  }
+
+  public func resumeSession(
+    id: String,
+    cwd: String,
+    mcpServers: [ACPJSONValue] = []
+  ) async throws -> DeepSeekHarnessACPSession {
+    try requireInitialized()
+    guard initializationStorage?.supportsResumeSession == true else {
+      throw AgentRuntimeError.capabilityUnavailable(.sessionContinue)
+    }
+    try validateIdentifier(id, field: "session.id")
+    try validateAbsolutePath(cwd, field: "session.cwd")
+    guard activeSessionID == nil else { throw DeepSeekHarnessACPError.sessionMismatch }
+    let mcpServers = try Self.validatedMCPServers(mcpServers)
+    try beginSessionOperation()
+    defer { endSessionOperation() }
+    let response = try await request(
+      method: "session/resume",
+      params: .object([
+        "sessionId": .string(id),
+        "cwd": .string(cwd),
+        "mcpServers": .array(mcpServers),
+      ])
+    )
+    let sessionID = response.value["sessionId"]?.stringValue ?? id
+    guard sessionID == id else { throw DeepSeekHarnessACPError.sessionMismatch }
     try validateIdentifier(sessionID, field: "session.id")
     let configOptions = try Self.parseConfigOptions(response.value["configOptions"])
     activeSessionID = sessionID
@@ -102,9 +137,25 @@ extension DeepSeekHarnessACPClient {
     )
   }
 
+  public func closeSession(id: String) async throws {
+    try requireInitialized()
+    guard initializationStorage?.supportsCloseSession == true else {
+      throw AgentRuntimeError.capabilityUnavailable(.sessionContinue)
+    }
+    try validateIdentifier(id, field: "session.id")
+    try requireSession(id)
+    try beginSessionOperation()
+    defer { endSessionOperation() }
+    _ = try await request(
+      method: "session/close",
+      params: .object(["sessionId": .string(id)])
+    )
+    activeSessionID = nil
+  }
+
   public func shutdown() async {
-    guard !closed else { return }
-    closed = true
+    guard !closed, !shuttingDown else { return }
+    shuttingDown = true
     let pending = Array(pendingPermissions.values)
     pendingPermissions.removeAll()
     for request in pending {
@@ -123,6 +174,17 @@ extension DeepSeekHarnessACPClient {
         )
       )
     }
+    if let activeSessionID, initializationStorage?.supportsCloseSession == true {
+      let broker = broker
+      _ = await Task {
+        try? await broker.request(
+          method: "session/close",
+          params: .object(["sessionId": .string(activeSessionID)]),
+          timeout: .seconds(3)
+        )
+      }.value
+    }
+    closed = true
     initializationTask?.cancel()
     initializationTask = nil
     activeSessionID = nil
@@ -130,6 +192,15 @@ extension DeepSeekHarnessACPClient {
     readerTask = nil
     eventContinuation.finish()
     await broker.close()
+  }
+
+  private static func validatedMCPServers(
+    _ servers: [ACPJSONValue]
+  ) throws -> [ACPJSONValue] {
+    guard servers.count <= 64 else {
+      throw AgentRuntimeError.invalidRequest("session.mcpServers")
+    }
+    return servers
   }
 
   private static func parseExecutionEvidence(

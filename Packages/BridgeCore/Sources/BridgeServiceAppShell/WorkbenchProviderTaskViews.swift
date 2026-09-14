@@ -116,13 +116,6 @@ struct WorkbenchExternalTaskCard: View {
           .font(.caption2)
           .foregroundStyle(.secondary)
 
-        if task.providerIdentifier == "deepseek-harness" {
-          Text("每个任务使用独立会话")
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-            .help("DeepSeek Harness 当前不支持续接历史会话。")
-        }
-
         if let failureDescription = task.failureDescription {
           Label {
             Text(failureDescription)

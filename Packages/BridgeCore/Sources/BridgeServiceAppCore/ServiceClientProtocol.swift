@@ -136,6 +136,11 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setTaskStartApprovalMode(_ mode: String) async throws
   func setExposureMode(_ mode: MCPServiceExposureMode) async throws
   func mcpClients() async throws -> [IPCMCPClientStatus]
+  func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse
+  func saveDeepSeekHarnessMCPServer(
+    _ request: IPCDeepSeekHarnessMCPServerInput
+  ) async throws -> IPCDeepSeekHarnessMCPServerSummary
+  func deleteDeepSeekHarnessMCPServer(id: String) async throws
   func setMCPClientEnabled(clientID: String, enabled: Bool) async throws
   func setMCPClientExposureMode(clientID: String, mode: MCPServiceExposureMode) async throws
   func exportMCPClientConfiguration(clientID: String) async throws -> String
@@ -346,6 +351,20 @@ extension BridgeServiceClientProtocol {
   }
 
   public func mcpClients() async throws -> [IPCMCPClientStatus] {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func saveDeepSeekHarnessMCPServer(
+    _: IPCDeepSeekHarnessMCPServerInput
+  ) async throws -> IPCDeepSeekHarnessMCPServerSummary {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func deleteDeepSeekHarnessMCPServer(id _: String) async throws {
     throw BridgeServiceClientError.unavailable
   }
 

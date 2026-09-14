@@ -54,7 +54,7 @@ extension MCPServiceTaskSnapshot {
   }
 
   public var canResumeSession: Bool {
-    isFailedOrInterrupted && effectiveSessionID != nil
+    isTerminal && effectiveSessionID != nil
   }
 
   public var canRestart: Bool {

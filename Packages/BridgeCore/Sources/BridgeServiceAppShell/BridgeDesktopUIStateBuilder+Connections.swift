@@ -21,6 +21,8 @@ extension BridgeDesktopUIStateBuilder {
       tunnel: tunnelState(tunnel, connection: model.connectionState),
       codex: codexState(from: model),
       clients: clientRows(from: model),
+      deepSeekHarnessMCPServers: deepSeekHarnessMCPRows(from: model),
+      canManageDeepSeekHarnessMCP: model.connectionState == .connected,
       providers: model.agentProviders.map(providerRow),
       installations: model.agentInstallations.map {
         installationRow(
@@ -168,6 +170,31 @@ extension BridgeDesktopUIStateBuilder {
       canCopyConfiguration: qwen,
       canRotateCredential: qwen
     )
+  }
+
+  private static func deepSeekHarnessMCPRows(
+    from model: BridgeServiceAppModel
+  ) -> [BridgeDesktopDeepSeekHarnessMCPRow] {
+    model.deepSeekHarnessMCPServers.map { server in
+      BridgeDesktopDeepSeekHarnessMCPRow(
+        id: server.id,
+        name: server.name,
+        enabled: server.enabled,
+        transport: server.transport,
+        command: server.command,
+        arguments: server.args,
+        url: server.url,
+        environment: server.environment.map {
+          BridgeDesktopSecretSummary(name: $0.name, hasValue: $0.hasValue)
+        },
+        headers: server.headers.map {
+          BridgeDesktopSecretSummary(name: $0.name, hasValue: $0.hasValue)
+        },
+        canToggle: true,
+        canEdit: true,
+        canDelete: true
+      )
+    }
   }
 
   private static func providerRow(

@@ -75,12 +75,9 @@ extension BridgeDesktopCommandRouter {
       steer(payload, model: model)
     case .resumeTask:
       guard let selectedTask = task(payload.taskID, in: model), connected(model) else { return }
-      let supportsContinuation =
-        selectedTask.isCodexTask
-        || selectedTask.providerID.flatMap { providerID in
-          model.agentProviders.first(where: { $0.providerID == providerID })?
-            .supportsSessionContinuation
-        } == true
+      let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
+        for: selectedTask, providers: model.agentProviders, installations: model.agentInstallations
+      )
       guard
         TaskInspectorPresentation.canResume(
           selectedTask,

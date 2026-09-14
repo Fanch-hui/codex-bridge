@@ -174,12 +174,9 @@
 
     func providerSupportsSessionContinuation(for task: MCPServiceTaskSnapshot?) -> Bool {
       guard let task else { return false }
-      if task.isCodexTask { return true }
-      let providerID = task.providerIdentifier
-      return agentProviders.contains {
-        AgentProviderPresentation.identifier($0.providerID) == providerID
-          && $0.supportsSessionContinuation
-      }
+      return TaskInspectorPresentation.supportsSessionContinuation(
+        for: task, providers: agentProviders, installations: agentInstallations
+      )
     }
 
     private func metadata(for task: MCPServiceTaskSnapshot?) -> String {

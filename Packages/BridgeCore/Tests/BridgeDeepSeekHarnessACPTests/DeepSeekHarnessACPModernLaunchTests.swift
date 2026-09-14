@@ -32,10 +32,12 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
     let fixture = try makeFixture(prefix: "modern-launch")
     let project = try makeDirectory(prefix: "modern-project")
     let run = try makeDirectory(prefix: "modern-run")
+    let persistentState = try makeDirectory(prefix: "modern-persistent-state")
     addTeardownBlock {
       fixture.remove()
       try? FileManager.default.removeItem(atPath: project)
       try? FileManager.default.removeItem(atPath: run)
+      try? FileManager.default.removeItem(atPath: persistentState)
     }
 
     let extended =
@@ -48,6 +50,7 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
       installation: installation,
       projectRoot: project,
       runDirectory: run,
+      persistentStateDirectory: persistentState,
       modelID: "vendor/model-v2",
       reasoningEffort: "high",
       mutationIntent: .workspaceWrite,
@@ -82,6 +85,8 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
     XCTAssertTrue(patch.contains("- id: \"vendor/model-v2\""))
     XCTAssertTrue(patch.contains("mode: workspace-write"))
     XCTAssertTrue(patch.contains("workspaceRoot: !!js process.env.DSH_WORKSPACE_ROOT"))
+    XCTAssertTrue(patch.contains("- id: session-persistence-jsonl"))
+    XCTAssertTrue(patch.contains("root: !!js process.env.DSH_SNAPSHOT_SESSIONS_ROOT"))
     XCTAssertFalse(patch.contains("DEEPSEEK_API_KEY"))
     XCTAssertEqual(
       try Data(contentsOf: URL(fileURLWithPath: fixture.configuration)),
@@ -89,6 +94,7 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
     )
     XCTAssertEqual(launch.process.environment["DSH_PERMISSION_MODE"], "workspace-write")
     XCTAssertTrue(launch.process.environment["DSH_HOME"]?.hasPrefix(run) == true)
+    XCTAssertEqual(launch.process.environment["DSH_SNAPSHOT_SESSIONS_ROOT"], persistentState)
   }
 
   private func makeFixture(prefix: String) throws -> ModernFixture {

@@ -46,6 +46,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     installation: AgentInstallation,
     projectRoot: String,
     runDirectory: String,
+    persistentStateDirectory: String? = nil,
     modelID: String? = nil,
     reasoningEffort: String? = nil,
     mutationIntent: AgentMutationIntent = .readOnly,
@@ -65,6 +66,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
       nodeInterpreter: validated.nodeInterpreterPath,
       projectRoot: project,
       runDirectory: runtime,
+      persistentStateDirectory: persistentStateDirectory,
       mutationIntent: mutationIntent,
       sourceEnvironment: sourceEnvironment
     )
@@ -207,6 +209,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     nodeInterpreter: String,
     projectRoot: String,
     runDirectory: String,
+    persistentStateDirectory: String?,
     mutationIntent: AgentMutationIntent,
     sourceEnvironment: [String: String]
   ) throws -> [String: String] {
@@ -217,7 +220,15 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     let xdgState = try DeepSeekHarnessACPPathSupport.append("xdg-state", to: runDirectory)
     let temporary = try DeepSeekHarnessACPPathSupport.append("tmp", to: runDirectory)
     let dshHome = try DeepSeekHarnessACPPathSupport.append("dsh-home", to: runDirectory)
-    let snapshots = try DeepSeekHarnessACPPathSupport.append("snapshots", to: runDirectory)
+    let snapshots: String
+    if let persistentStateDirectory {
+      snapshots = try DeepSeekHarnessACPPathSupport.preparePrivateDirectory(
+        persistentStateDirectory,
+        field: "persistentStateDirectory"
+      )
+    } else {
+      snapshots = try DeepSeekHarnessACPPathSupport.append("snapshots", to: runDirectory)
+    }
     for path in [xdgConfig, xdgCache, xdgData, xdgState, temporary, dshHome, snapshots] {
       try DeepSeekHarnessACPPathSupport.createPrivateDirectory(path)
     }

@@ -56,6 +56,9 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case copyLocalMCPEndpoint
   case rotateMCPClientCredential
   case rotateLocalMCPEndpoint
+  case saveDeepSeekHarnessMCPServer
+  case deleteDeepSeekHarnessMCPServer
+  case setDeepSeekHarnessMCPServerEnabled
   case configureTunnel
   case connectTunnel
   case disconnectTunnel
@@ -106,6 +109,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let providerID: String?
   public let installationID: String?
   public let clientID: String?
+  public let mcpServerID: String?
   public let logID: String?
   public let commandID: String?
   public let ruleID: String?
@@ -128,6 +132,11 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let configurationPath: String?
   public let baseURL: String?
   public let apiKey: String?
+  public let mcpTransport: String?
+  public let mcpCommand: String?
+  public let mcpURL: String?
+  public let mcpEnvironmentSecrets: [BridgeDesktopSecretInput]?
+  public let mcpHeaderSecrets: [BridgeDesktopSecretInput]?
   public let exposureMode: String?
   public let modelID: String?
   public let effort: String?
@@ -166,6 +175,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     providerID: String? = nil,
     installationID: String? = nil,
     clientID: String? = nil,
+    mcpServerID: String? = nil,
     logID: String? = nil,
     commandID: String? = nil,
     ruleID: String? = nil,
@@ -188,6 +198,11 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     configurationPath: String? = nil,
     baseURL: String? = nil,
     apiKey: String? = nil,
+    mcpTransport: String? = nil,
+    mcpCommand: String? = nil,
+    mcpURL: String? = nil,
+    mcpEnvironmentSecrets: [BridgeDesktopSecretInput]? = nil,
+    mcpHeaderSecrets: [BridgeDesktopSecretInput]? = nil,
     exposureMode: String? = nil,
     modelID: String? = nil,
     effort: String? = nil,
@@ -225,6 +240,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.providerID = providerID
     self.installationID = installationID
     self.clientID = clientID
+    self.mcpServerID = mcpServerID
     self.logID = logID
     self.commandID = commandID
     self.ruleID = ruleID
@@ -247,6 +263,11 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.configurationPath = configurationPath
     self.baseURL = baseURL
     self.apiKey = apiKey
+    self.mcpTransport = mcpTransport
+    self.mcpCommand = mcpCommand
+    self.mcpURL = mcpURL
+    self.mcpEnvironmentSecrets = mcpEnvironmentSecrets
+    self.mcpHeaderSecrets = mcpHeaderSecrets
     self.exposureMode = exposureMode
     self.modelID = modelID
     self.effort = effort

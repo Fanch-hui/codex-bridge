@@ -128,6 +128,9 @@ enum DeepSeekHarnessACPModernLaunch {
       - id: approval
         config:
           policy: ask
+      - id: session-persistence-jsonl
+        config:
+          root: !!js process.env.DSH_SNAPSHOT_SESSIONS_ROOT
       """
   }
 

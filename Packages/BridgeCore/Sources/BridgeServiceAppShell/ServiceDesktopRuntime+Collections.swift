@@ -26,6 +26,9 @@ extension BridgeServiceAppModel {
       try await client.taskStartApprovalMode()
     }
     async let mcpClientResult = optional { try await client.mcpClients() }
+    async let deepSeekHarnessMCPResult = optional {
+      try await client.deepSeekHarnessMCPServers()
+    }
 
     if let value = await directConfigurationResult { directConfiguration = value }
     if let value = await projectResult {
@@ -68,6 +71,11 @@ extension BridgeServiceAppModel {
     }
     if let value = await mcpClientResult, mcpClients != value {
       mcpClients = value
+    }
+    if let value = await deepSeekHarnessMCPResult,
+      deepSeekHarnessMCPServers != value.servers
+    {
+      deepSeekHarnessMCPServers = value.servers
     }
     if includeCatalog {
       await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)

@@ -65,11 +65,22 @@ actor ScriptedDeepSeekHarnessTransport: ACPTransport {
   }
 }
 
-func deepSeekInitializationResult(id: ACPRequestID) -> ACPWireMessage {
+func deepSeekInitializationResult(id: ACPRequestID, modernCapabilities: Bool = false)
+  -> ACPWireMessage
+{
   return ACPWireMessage(
     id: id,
     result: .object([
       "protocolVersion": .integer(1),
+      "agentCapabilities": .object(
+        modernCapabilities
+          ? [
+            "mcpCapabilities": .object(["http": .bool(true)]),
+            "sessionCapabilities": .object([
+              "close": .object([:]),
+              "resume": .object([:]),
+            ]),
+          ] : [:]),
       "agentInfo": .object([
         "name": .string(DeepSeekHarnessACPConstants.agentName),
         "version": .string(DeepSeekHarnessACPConstants.agentVersion),

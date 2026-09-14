@@ -149,12 +149,9 @@ extension BridgeDesktopUIStateBuilder {
     _ task: MCPServiceTaskSnapshot,
     model: BridgeServiceAppModel
   ) -> Bool {
-    let supportsContinuation =
-      task.isCodexTask
-      || task.providerID.flatMap { providerID in
-        model.agentProviders.first(where: { $0.providerID == providerID })?
-          .supportsSessionContinuation
-      } == true
+    let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
+      for: task, providers: model.agentProviders, installations: model.agentInstallations
+    )
     return TaskInspectorPresentation.canResume(
       task,
       providerSupportsSessionContinuation: supportsContinuation

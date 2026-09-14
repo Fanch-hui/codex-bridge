@@ -158,6 +158,20 @@
 .connection-card .card-subtitle { margin: 5px 0 14px; color: var(--text-secondary); font-size: 12px; }
 .client-row, .agent-row { padding: 12px 0; border-bottom: 1px solid var(--separator); border-radius: 0; }
 .client-row:last-child, .agent-row:last-child { border-bottom: 0; }
+.dsh-mcp-row { display: flex; align-items: flex-start; gap: 12px; }
+.dsh-mcp-card { display: grid; gap: 10px; }
+.dsh-mcp-card .card-subtitle { margin-bottom: 0; }
+.dsh-mcp-status { margin: 0; line-height: 1.45; }
+.dsh-mcp-editor { padding-top: 12px; border-top: 1px solid var(--separator); }
+.dsh-mcp-editor .field.full { grid-column: 1 / -1; }
+.dsh-mcp-editor textarea { min-height: 74px; }
+.dsh-mcp-secrets { margin-top: 12px; }
+.dsh-mcp-secret-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.dsh-mcp-secret-list { display: grid; gap: 8px; margin-top: 8px; }
+.dsh-mcp-secret-row { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(180px, 1.2fr) auto; align-items: end; gap: 8px; }
+.dsh-mcp-secret-row .button { margin-bottom: 1px; }
+.dsh-mcp-confirmation { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 9px; padding: 9px 10px; border-radius: 7px; background: var(--warning-soft); color: var(--text); font-size: 12px; }
+.dsh-mcp-confirmation span { flex: 1 1 220px; }
 .client-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .client-heading h3 { margin: 0; }
 .client-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
@@ -225,6 +239,7 @@
 @media (max-width: 700px) {
   .agent-connect-fields { grid-template-columns: 1fr; }
   .agent-connect-actionbar, .agent-config-panel, .agent-details { padding-left: 0; margin-left: 0; }
+  .dsh-mcp-secret-row { grid-template-columns: 1fr; }
 }
 
 .workbench-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }

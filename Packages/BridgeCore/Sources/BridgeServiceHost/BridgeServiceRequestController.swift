@@ -190,6 +190,12 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleGetAgentPermissionRemediation(request)
     case .applyAgentPermissionRemediation:
       return try await handleApplyAgentPermissionRemediation(request)
+    case .listDeepSeekHarnessMCPServers:
+      return try await handleListDeepSeekHarnessMCPServers(request)
+    case .saveDeepSeekHarnessMCPServer:
+      return try await handleSaveDeepSeekHarnessMCPServer(request)
+    case .deleteDeepSeekHarnessMCPServer:
+      return try await handleDeleteDeepSeekHarnessMCPServer(request)
     case .setExposureMode:
       return try await handleSetExposureMode(request)
     case .listMCPClients:

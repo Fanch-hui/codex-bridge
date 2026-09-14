@@ -156,6 +156,9 @@
     case copyMCPClientConfiguration(id: String)
     case copyLocalMCPEndpoint
     case rotateMCPClientCredential(id: String)
+    case saveDeepSeekHarnessMCPServer(IPCDeepSeekHarnessMCPServerInput)
+    case deleteDeepSeekHarnessMCPServer(id: String)
+    case setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool)
     case selectAgent(id: String)
     case connectAgentFromDesktop(
       providerID: String,

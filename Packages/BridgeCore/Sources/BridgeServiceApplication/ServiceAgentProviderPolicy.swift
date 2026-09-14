@@ -197,7 +197,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     displayName: "DeepSeek Harness",
     requiresConfiguration: true,
     supportsWorkspaceWrite: true,
-    supportsSessionContinuation: false,
+    supportsSessionContinuation: true,
     supportsSteer: true,
     supportsInteractiveApproval: true,
     supportsModelSelection: true,
@@ -209,18 +209,19 @@ public enum ServiceAgentProviderPolicyRegistry {
     approvalEnforcement: "local_app",
     networkEnforcement: "provider_native",
     allowedCapabilities: [
-      .sessionCreate, .interrupt, .steer, .steerInterruptAndContinue, .textDelta,
+      .sessionCreate, .sessionContinue, .interrupt, .steer, .steerInterruptAndContinue, .textDelta,
+      .reasoningDelta, .usage, .mcpClient,
       .toolLifecycle, .workspaceRead,
       .workspaceWriteInPlace, .oneShotApproval, .structuredApprovalPayload, .modelSelection,
       .effortSelection, .shell, .webSearch, .webFetch, .codeExecution, .subagents, .workflow,
       .skills,
     ],
     requiredArtifactRoles: Set(AgentInstallationArtifactRole.allCases),
-    requiredVersion: "0.1.1-rc.2",
     requiredProtocolRevision: "1",
     registrationTrustProfile: .userTrusted,
     registrationSecurityProfileID: controlledReadOnlyProfileID,
-    requiresExactRegistrationProfile: true
+    requiresExactRegistrationProfile: true,
+    selectionsRequireObservedCapabilities: true
   )
 
   public static let antigravity = ServiceAgentProviderPolicy(

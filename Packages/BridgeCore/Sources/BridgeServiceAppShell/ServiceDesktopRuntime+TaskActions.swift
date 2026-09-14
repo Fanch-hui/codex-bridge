@@ -50,11 +50,9 @@ extension BridgeServiceAppModel {
     _ task: MCPServiceTaskSnapshot,
     prompt: String? = nil
   ) {
-    let supportsContinuation =
-      task.isCodexTask
-      || task.providerID.flatMap { providerID in
-        agentProviders.first(where: { $0.providerID == providerID })?.supportsSessionContinuation
-      } == true
+    let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
+      for: task, providers: agentProviders, installations: agentInstallations
+    )
     guard
       TaskInspectorPresentation.canResume(
         task,

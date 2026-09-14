@@ -6,12 +6,16 @@ public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
   public typealias EnvironmentProvider =
     @Sendable (AgentInstallation) async throws -> [String: String]
 
+  public typealias MCPServersProvider = @Sendable () async throws -> [AgentMCPServerConfiguration]
+
+  public let mcpServersProvider: MCPServersProvider
   public let clientInfo: DeepSeekHarnessACPClientInfo
   public let launchBuilder: DeepSeekHarnessACPLaunchBuilder
   public let requestTimeout: Duration
   public let inactivityTimeout: Duration
   public let eventBufferLimit: Int
   public let runtimeBaseDirectory: String
+  public let persistentStateBaseDirectory: String?
   public let sourceEnvironment: [String: String]
   public let environmentProvider: EnvironmentProvider
   public let transportFactory: DeepSeekHarnessACPTransportFactory
@@ -28,18 +32,22 @@ public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
     eventBufferLimit: Int = DeepSeekHarnessACPConstants.maximumEventBuffer,
     runtimeBaseDirectory: String = FileManager.default.temporaryDirectory
       .appendingPathComponent("CodexBridge/DeepSeekHarnessACP", isDirectory: true).path,
+    persistentStateBaseDirectory: String? = nil,
     sourceEnvironment: [String: String] = ProcessInfo.processInfo.environment,
     environmentProvider: EnvironmentProvider? = nil,
+    mcpServersProvider: @escaping MCPServersProvider = { [] },
     transportFactory: @escaping DeepSeekHarnessACPTransportFactory = { launch in
       try ACPProcessTransport.launch(configuration: launch.process)
     }
   ) throws {
+    self.mcpServersProvider = mcpServersProvider
     self.clientInfo = clientInfo
     self.launchBuilder = try launchBuilder ?? DeepSeekHarnessACPLaunchBuilder()
     self.requestTimeout = requestTimeout
     self.inactivityTimeout = inactivityTimeout
     self.eventBufferLimit = max(1, eventBufferLimit)
     self.runtimeBaseDirectory = runtimeBaseDirectory
+    self.persistentStateBaseDirectory = persistentStateBaseDirectory
     self.sourceEnvironment = sourceEnvironment
     self.environmentProvider =
       environmentProvider ?? { _ in
@@ -68,7 +76,7 @@ public struct DeepSeekHarnessACPProvider: AgentProvider, Sendable {
     descriptor = try AgentProviderDescriptor(
       providerID: .deepSeekHarness,
       displayName: "DeepSeek Harness",
-      adapterRevision: 7
+      adapterRevision: 8
     )
   }
 

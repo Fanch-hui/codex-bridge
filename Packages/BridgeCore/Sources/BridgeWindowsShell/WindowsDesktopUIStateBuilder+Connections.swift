@@ -55,6 +55,8 @@
         tunnel: tunnel,
         codex: codexState(workbench: workbench, settings: settings),
         clients: connections.clientItems,
+        deepSeekHarnessMCPServers: connections.deepSeekHarnessMCPItems,
+        canManageDeepSeekHarnessMCP: connections.connectionState == .connected,
         providers: management.agent.providerItems,
         installations: management.agent.installationItems,
         canRegisterAgent: management.agent.registerEnabled,

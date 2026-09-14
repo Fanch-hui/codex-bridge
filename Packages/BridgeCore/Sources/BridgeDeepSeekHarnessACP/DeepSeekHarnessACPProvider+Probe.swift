@@ -58,7 +58,11 @@ extension DeepSeekHarnessACPProvider {
       return AgentProbeResult(
         installation: installation,
         available: true,
-        capabilities: Self.capabilities(executablePath: launch.resolvedExecutablePath)
+        capabilities: Self.capabilities(
+          executablePath: launch.resolvedExecutablePath,
+          initialization: initialization,
+          persistenceAvailable: configuration.persistentStateBaseDirectory != nil
+        )
       )
     } catch {
       await client?.shutdown()

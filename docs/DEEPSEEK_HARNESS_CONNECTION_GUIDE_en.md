@@ -27,7 +27,7 @@ Node 22.18.x and Node 23 are not supported. Node 22.19.0+ within 22.x and Node 2
 
 The modern entry supports grouped model choices, selected-model reasoning options, reasoning text, and context usage updates. Standard ACP completion checks the stop reason, final answer, and tool states; the older execution-evidence extension is still validated when present.
 
-Upstream now provides `session/resume` and MCP integration. Bridge still creates a new session per task and sends an empty MCP list. Native real-time steer and transcript replay remain unavailable in upstream ACP, so this is not full Codex parity.
+Modern DSH sessions support cross-process continuation and the MCP servers configured in the App. Native real-time steer and transcript replay remain unavailable in upstream ACP; displayed history comes from Bridge task records.
 
 ## 2. Clone and build the correct entry point
 
@@ -225,7 +225,7 @@ Web Search, URL fetch, and external APIs require explicit network intent:
 }
 ```
 
-Only when the user explicitly requests overrides should the client add `model_override`, exact model/Profile-supported effort values, or `permission_mode_override`. Do not pass a historical `thread_id` or Codex Supervisor fields. DSH creates a fresh session for each task; historical-session resume is not supported. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
+Only when the user explicitly requests overrides should the client add `model_override`, exact model/Profile-supported effort values, or `permission_mode_override`. Omit Codex Supervisor fields. For continuation, pass the `provider_session_id` of a completed task as `thread_id` when `lifecycle.session_continue` is available. The project and installation must match, and persistent session data must still exist. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
 
 Remote submissions normally enter `awaiting_local_approval`. Review project, provider, access mode, network intent, and prompt in Workbench before approving the start. Automatic remote-start approval is disabled by default and never approves later DSH permission requests or Direct operations.
 
@@ -264,3 +264,9 @@ Do not paste `.env` or raw authentication responses into support reports. Probe 
 - [DeepSeek API Keys](https://platform.deepseek.com/api_keys)
 - [Detailed Chinese DSH guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
 - [Detailed user guide](./USER_GUIDE.md)
+
+## MCP configuration and continuation
+
+Use the DSH MCP section on Connections to manage stdio and Streamable HTTP servers. Stdio commands require absolute paths; enter arguments one per line. HTTP servers are attached only to tasks with network access enabled. Environment and header values use the system credential store and are never returned to the editor. Leave a saved value blank to retain it, or remove its row to delete it. Changes apply to the next task or continuation.
+
+Choose Continue conversation on an ended task to retain its context after a Service restart. Sessions cleared by older temporary-runtime versions cannot be recovered.

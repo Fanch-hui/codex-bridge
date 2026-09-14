@@ -36,6 +36,9 @@ extension BridgeServiceRequestController {
     if let error = error as? ServiceAgentCredentialError {
       return mapAgentCredentialError(error)
     }
+    if let error = error as? ServiceDeepSeekHarnessMCPError {
+      return mapDeepSeekHarnessMCPError(error)
+    }
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
     }
@@ -198,6 +201,17 @@ extension BridgeServiceRequestController {
         code: "agent_permission_remediation_unavailable",
         message: "A safe native permission rule could not be derived for this tool call."
       )
+    }
+  }
+
+  private static func mapDeepSeekHarnessMCPError(
+    _ error: ServiceDeepSeekHarnessMCPError
+  ) -> BridgeServiceIPCError {
+    switch error {
+    case .serverNotFound:
+      return .init(code: "dsh_mcp_server_not_found", message: error.localizedDescription)
+    case .secretStoreUnavailable, .invalidStoredSecret:
+      return .init(code: "dsh_mcp_credentials_unavailable", message: error.localizedDescription)
     }
   }
 

@@ -170,6 +170,15 @@
         return .copyLocalMCPEndpoint
       case .rotateMCPClientCredential:
         return nonEmpty(payload.clientID).map(MainWindowCommand.rotateMCPClientCredential)
+      case .saveDeepSeekHarnessMCPServer:
+        return saveDeepSeekHarnessMCPServer(payload)
+      case .deleteDeepSeekHarnessMCPServer:
+        return nonEmpty(payload.mcpServerID).map(MainWindowCommand.deleteDeepSeekHarnessMCPServer)
+      case .setDeepSeekHarnessMCPServerEnabled:
+        guard let id = nonEmpty(payload.mcpServerID), let enabled = payload.enabled else {
+          return nil
+        }
+        return .setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled)
       case .rotateLocalMCPEndpoint:
         return .rotateLocalMCPEndpoint
       case .configureTunnel:
@@ -304,6 +313,39 @@
         return .beginProjectRegistration
       }
       return .registerProject(name: name, path: path)
+    }
+
+    private static func saveDeepSeekHarnessMCPServer(
+      _ payload: BridgeDesktopCommandPayload
+    ) -> MainWindowCommand? {
+      guard let name = nonEmpty(payload.name),
+        let transport = nonEmpty(payload.mcpTransport),
+        transport == "stdio" || transport == "http"
+      else { return nil }
+      let command = nonEmpty(payload.mcpCommand)
+      let url = nonEmpty(payload.mcpURL)
+      if transport == "stdio" && command == nil { return nil }
+      if transport == "http" && url == nil { return nil }
+      let id = nonEmpty(payload.mcpServerID) ?? UUID().uuidString.lowercased()
+      let environment = (payload.mcpEnvironmentSecrets ?? []).map {
+        IPCDeepSeekHarnessMCPSecretInput(name: $0.name, value: $0.value)
+      }
+      let headers = (payload.mcpHeaderSecrets ?? []).map {
+        IPCDeepSeekHarnessMCPSecretInput(name: $0.name, value: $0.value)
+      }
+      return .saveDeepSeekHarnessMCPServer(
+        IPCDeepSeekHarnessMCPServerInput(
+          id: id,
+          name: name,
+          enabled: payload.enabled ?? true,
+          transport: transport,
+          command: transport == "stdio" ? command : nil,
+          args: transport == "stdio" ? payload.arguments ?? [] : [],
+          url: transport == "http" ? url : nil,
+          environment: environment,
+          headers: headers
+        )
+      )
     }
 
     private static func nonEmpty(_ value: String?) -> String? {

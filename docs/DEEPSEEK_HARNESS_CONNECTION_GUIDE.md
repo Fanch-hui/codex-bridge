@@ -33,7 +33,7 @@ Node 版本解释：
 
 现代入口已接入分组模型目录、所选模型的推理强度、推理文本与上下文用量通知。标准 ACP 完成响应依据结束原因、最终正文和工具状态处理；旧版执行证据扩展仍会校验。
 
-新版上游已提供 `session/resume` 和 MCP 接入，但 Bridge 当前仍为每个新任务创建 Session，并发送空 MCP 列表。上游 ACP 暂无原生实时 Steer 和历史消息重放，因此不能完全替代 Codex 链路。
+现代 DSH 会话支持跨进程续聊，并接收 App 中配置的 MCP 服务。上游 ACP 暂无原生实时 Steer 和历史消息重放；界面历史消息来自 Bridge 保存的任务记录。
 
 ## 2. 获取官方源码
 
@@ -443,7 +443,7 @@ list_agents
 规则：
 
 - `installation_id` 通常可以省略，由 Bridge 选择已启用且可用的安装。
-- DSH 当前只支持新建 Session，不要传历史 `thread_id`。
+- 新建会话省略 `thread_id`；续聊时传同项目、同安装实例已结束任务的 `provider_session_id`，并确认 `list_agents` 包含 `lifecycle.session_continue`。
 - 不要传 Codex Supervisor 字段。
 - `skill_name` 只在用户明确选择已发现的 Bridge Skill 时使用。
 - 模型 ID 和 effort 不能从 Codex/OpenCode/Antigravity 复制。
@@ -497,9 +497,19 @@ waiting_for_codex_approval
 - 普通 `steer_task` 会把补充指令排队，在当前 prompt 完成后作为下一次 prompt 发送。
 - DSH 还支持“中断当前轮后继续”，先中断当前执行，再在同一当前 Session 中发送后续 prompt。
 - 这两者都不是 Codex 的 in-flight steer。
-- 历史终态 DSH 任务当前不能通过 `provider_session_id` 恢复；新任务会创建新 Session。
+- 现代入口的已结束任务可点击“继续对话”发送下一条指令；Service 重启后仍沿用原会话上下文。恢复需要同项目、同安装实例且持久会话数据仍存在。旧版临时会话已清理的数据无法补回。
 
 任务控制使用当前 `provider_run_id` 作为 `expected_turn_id`，避免对已经切换的运行发送过期控制命令。
+
+### 13.5 MCP 服务
+
+在 `连接 → DeepSeek Harness → MCP 服务` 添加、编辑、停用或删除服务：
+
+- 本地命令（stdio）：填写可执行文件的绝对路径与参数，参数逐行填写。
+- HTTP：填写 Streamable HTTP MCP 地址；任务允许网络访问时才接入。
+- 环境变量与请求头：敏感值写入系统凭据存储，保存后只显示是否已配置。编辑时留空保留原值，删除对应行移除该值。
+
+配置全局用于 App 启动的 DSH，与本机 DSH 的个人配置独立。变更在下一次新任务或续聊时生效，正在执行的任务保持当前连接。外部 MCP 工具权限由 DSH 和服务自身处理。
 
 ## 14. `available`、`needs_review` 与 `unavailable`
 

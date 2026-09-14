@@ -41,6 +41,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessDefaultEffort = "agent.deepseek-harness.default_effort"
   case deepSeekHarnessBaseURL = "agent.deepseek-harness.base_url"
   case deepSeekHarnessManagedConfigurationPath = "agent.deepseek-harness.managed_configuration_path"
+  case deepSeekHarnessMCPServers = "agent.deepseek-harness.mcp.servers"
   case antigravityDefaultModel = "agent.antigravity.default_model"
   case antigravityDefaultPermissionMode = "agent.antigravity.default_permission_mode"
   case antigravityDefaultEffort = "agent.antigravity.default_effort"
@@ -109,6 +110,30 @@ public actor ServiceSettings {
       allowEmpty: true
     )
     try await set(instructions, for: .customInstructions)
+  }
+
+  public func deepSeekHarnessMCPServers() async throws
+    -> [ServiceDeepSeekHarnessMCPServerRecord]
+  {
+    guard let value = try await string(for: .deepSeekHarnessMCPServers) else { return [] }
+    guard let data = value.data(using: .utf8) else { throw ServiceStoreError.corruptRecord }
+    do {
+      return try JSONDecoder().decode([ServiceDeepSeekHarnessMCPServerRecord].self, from: data)
+    } catch {
+      throw ServiceStoreError.corruptRecord
+    }
+  }
+
+  public func setDeepSeekHarnessMCPServers(
+    _ servers: [ServiceDeepSeekHarnessMCPServerRecord]
+  ) async throws {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard let data = try? encoder.encode(servers), let value = String(data: data, encoding: .utf8)
+    else {
+      throw ServiceStoreError.invalidArgument("dsh.mcp.servers")
+    }
+    try await set(value, for: .deepSeekHarnessMCPServers)
   }
 
   public func setExposureMode(_ mode: ServiceMCPExposureMode) async throws {

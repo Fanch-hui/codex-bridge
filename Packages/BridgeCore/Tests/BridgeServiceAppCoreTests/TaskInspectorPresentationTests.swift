@@ -90,6 +90,19 @@ final class TaskInspectorPresentationTests: XCTestCase {
     XCTAssertFalse(TaskInspectorPresentation.canInterrupt(completed))
   }
 
+  func testCompletedAgentSessionCanContinueWhenProviderSupportsIt() {
+    let completed = MCPServiceTaskSnapshot(
+      taskID: "task-1", projectID: "project-1", source: "macos.app", status: "completed",
+      providerID: "deepseek-harness", providerSessionID: "session-1",
+      networkAccess: false, supervisorStatus: "disabled", localApprovalRequired: false,
+      updatedAt: "2026-09-14T00:00:00Z"
+    )
+    XCTAssertTrue(
+      TaskInspectorPresentation.canResume(completed, providerSupportsSessionContinuation: true))
+    XCTAssertFalse(
+      TaskInspectorPresentation.canResume(completed, providerSupportsSessionContinuation: false))
+  }
+
   func testTaskActionResultOnlyAppliesToOriginalSelection() {
     XCTAssertTrue(
       TaskInspectorPresentation.shouldApplyTaskActionResult(

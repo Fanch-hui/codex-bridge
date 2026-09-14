@@ -10,11 +10,16 @@ extension DeepSeekHarnessACPProvider {
     let runDirectory = try makeRunDirectory(prefix: "run")
     var client: DeepSeekHarnessACPClient?
     do {
+      let persistentStateDirectory = try makePersistentStateDirectory(
+        installation: installation,
+        request: request
+      )
       let sourceEnvironment = try await configuration.runtimeEnvironment(for: installation)
       let launch = try configuration.launchBuilder.make(
         installation: installation,
         projectRoot: request.projectRoot,
         runDirectory: runDirectory,
+        persistentStateDirectory: persistentStateDirectory,
         modelID: request.model,
         reasoningEffort: request.effort,
         mutationIntent: request.mutationIntent,
@@ -25,9 +30,37 @@ extension DeepSeekHarnessACPProvider {
       client = connected
       let initialization = try await connected.initialize()
       try validate(initialization)
-      let capabilities = Self.capabilities(executablePath: launch.resolvedExecutablePath)
+      let capabilities = Self.capabilities(
+        executablePath: launch.resolvedExecutablePath,
+        initialization: initialization,
+        persistenceAvailable: configuration.persistentStateBaseDirectory != nil
+      )
       try require(request.requiredCapabilities, from: capabilities)
-      let session = try await connected.newSession(cwd: request.projectRoot)
+      let servers = try await configuration.mcpServersProvider()
+      let mcpServers = try DeepSeekHarnessACPMCP.parameters(
+        servers: servers, initialization: initialization,
+        networkAllowed: request.networkAccessRequested
+      )
+      let session: DeepSeekHarnessACPSession
+      if let requestedSessionID = request.requestedSessionID {
+        guard persistentStateDirectory != nil,
+          DeepSeekHarnessACPModernLaunch.isModernEntry(launch.resolvedExecutablePath),
+          initialization.supportsResumeSession
+        else {
+          throw AgentRuntimeError.capabilityUnavailable(.sessionContinue)
+        }
+        session = try await connected.resumeSession(
+          id: requestedSessionID,
+          cwd: request.projectRoot, mcpServers: mcpServers
+        )
+      } else {
+        session = try await connected.newSession(cwd: request.projectRoot, mcpServers: mcpServers)
+      }
+      try await applyRequestedSelection(
+        request: request,
+        session: session,
+        client: connected
+      )
       let binding = try AgentBinding(
         providerID: .deepSeekHarness,
         installationID: installation.id,
@@ -97,9 +130,6 @@ extension DeepSeekHarnessACPProvider {
         || request.workspaceStrategy == .exclusiveProject
     else {
       throw AgentRuntimeError.invalidRequest("request.workspaceStrategy")
-    }
-    guard request.requestedSessionID == nil else {
-      throw AgentRuntimeError.capabilityUnavailable(.sessionContinue)
     }
     _ = try configuration.launchBuilder.profile.resolvedSelection(
       for: installation,

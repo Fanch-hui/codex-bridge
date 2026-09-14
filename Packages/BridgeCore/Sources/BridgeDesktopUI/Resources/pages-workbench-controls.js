@@ -103,14 +103,14 @@
     var form = S.node("div", "retry-form"), draft = draftFor(detail.taskID);
     var actions = S.node("div", "form-actions");
     if (detail.canResume) {
-      var input = inputField(detail, "补充说明", "可选。留空则直接接续未完成任务");
+      var input = inputField(detail, "补充说明", "输入下一条指令，沿用当前会话上下文");
       form.appendChild(input.wrapper);
       function resume() {
         var value = input.control.value;
         draft.input = ""; input.control.value = "";
         emit("resumeTask", { taskID: detail.taskID, input: value || null });
       }
-      var button = S.button("接着中断任务继续", null, {}, emit, "small primary", false);
+      var button = S.button("继续对话", null, {}, emit, "small primary", false);
       button.addEventListener("click", resume);
       input.control.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); resume(); }

@@ -256,6 +256,10 @@ DSH 当前只创建新 Session，不支持从历史任务恢复 Session；支持
 
 DSH 当前只接受 `allow_once` / `reject_once`。打开“自动批准远程 Agent 启动请求”只能省去第 4 步的启动批准；`auto-review`、`full-access` 和 `network_access=true` 都不会自动批准 DSH 的运行期工具请求。
 
+DSH 的 MCP 服务在连接页单独管理，支持绝对路径 stdio 命令与 HTTP 地址；环境变量和请求头敏感值由系统凭据存储保管。HTTP MCP 仅用于允许网络的任务。配置更新在下次新任务或续聊生效。
+
+现代 DSH 的已结束任务可用“继续对话”沿用上下文，Service 重启后仍可恢复；恢复限定原项目与安装实例。旧版临时会话清理后的数据无法恢复。
+
 ### 5.4 Antigravity
 
 Bridge 登记的是 `agy` CLI，不是 Antigravity Desktop App：

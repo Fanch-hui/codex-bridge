@@ -15,6 +15,7 @@
     var connectionState = WindowsWorkbenchDisplay.ConnectionState.idle
     var serviceStatus: IPCServiceStatusResponse?
     var clients: [IPCMCPClientStatus] = []
+    var deepSeekHarnessMCPServers: [IPCDeepSeekHarnessMCPServerSummary] = []
     var selectedClientID: String?
     var busy = false
     var statusText = "尚未读取 MCP 客户端状态。"
@@ -40,8 +41,12 @@
       do {
         async let statusRequest = client.status()
         async let clientsRequest = client.mcpClients()
+        async let deepSeekHarnessMCPRequest = client.deepSeekHarnessMCPServers()
         serviceStatus = try await statusRequest
         clients = try await clientsRequest
+        if let deepSeekHarnessMCPResponse = try? await deepSeekHarnessMCPRequest {
+          deepSeekHarnessMCPServers = deepSeekHarnessMCPResponse.servers
+        }
         connectionState = .connected
         reconcileSelection()
         statusText = "MCP 客户端状态已刷新。"
@@ -123,6 +128,36 @@
       await mutate("正在重新生成本地 MCP Endpoint…", success: "本地 MCP Endpoint 已重新生成。") {
         _ = try await self.client.rotateLocalMCPEndpoint()
       }
+    }
+
+    func saveDeepSeekHarnessMCPServer(
+      _ request: IPCDeepSeekHarnessMCPServerInput
+    ) async {
+      await mutate("正在保存 DSH MCP…", success: "DSH MCP 已保存。") {
+        _ = try await self.client.saveDeepSeekHarnessMCPServer(request)
+      }
+    }
+
+    func deleteDeepSeekHarnessMCPServer(id: String) async {
+      await mutate("正在删除 DSH MCP…", success: "DSH MCP 已删除。") {
+        try await self.client.deleteDeepSeekHarnessMCPServer(id: id)
+      }
+    }
+
+    func setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool) async {
+      guard let server = deepSeekHarnessMCPServers.first(where: { $0.id == id }) else { return }
+      let request = IPCDeepSeekHarnessMCPServerInput(
+        id: server.id,
+        name: server.name,
+        enabled: enabled,
+        transport: server.transport,
+        command: server.command,
+        args: server.args,
+        url: server.url,
+        environment: server.environment.map { IPCDeepSeekHarnessMCPSecretInput(name: $0.name) },
+        headers: server.headers.map { IPCDeepSeekHarnessMCPSecretInput(name: $0.name) }
+      )
+      await saveDeepSeekHarnessMCPServer(request)
     }
 
     func didCopyConfiguration(_ success: Bool) {
@@ -248,6 +283,26 @@
             currentMessage: statusText
           ) ?? statusText,
           clientItems: desktopClients,
+          deepSeekHarnessMCPItems: deepSeekHarnessMCPServers.map { server in
+            BridgeDesktopDeepSeekHarnessMCPRow(
+              id: server.id,
+              name: server.name,
+              enabled: server.enabled,
+              transport: server.transport,
+              command: server.command,
+              arguments: server.args,
+              url: server.url,
+              environment: server.environment.map {
+                BridgeDesktopSecretSummary(name: $0.name, hasValue: $0.hasValue)
+              },
+              headers: server.headers.map {
+                BridgeDesktopSecretSummary(name: $0.name, hasValue: $0.hasValue)
+              },
+              canToggle: !busy,
+              canEdit: !busy,
+              canDelete: !busy
+            )
+          },
           tunnel: projectedTunnel
         )
       )

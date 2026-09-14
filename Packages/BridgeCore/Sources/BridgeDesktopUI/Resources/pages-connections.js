@@ -51,6 +51,9 @@
     var clientsSection = S.section(content, "本地 MCP 客户端");
     var clientsEditor = E.createClients(emit);
     clientsSection.appendChild(clientsEditor.root);
+    var dshMCPSection = S.section(content, "DeepSeek Harness MCP");
+    var dshMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
+    dshMCPSection.appendChild(dshMCP.root);
     var agentsSection = S.section(content, "本机 Agent 引擎连接");
     var agentsCard = S.node("div", "page-card connection-card");
     agentsCard.appendChild(S.node("h3", null, "连接本机 Agent"));
@@ -101,6 +104,7 @@
           context
         );
         clientsEditor.update(page.clients, nextEmit);
+        dshMCP.update(page, nextEmit);
         renderAgents(agentConnectors, agentEditor, page, nextEmit);
         status.textContent = page.statusMessage || "";
         status.hidden = !page.statusMessage;

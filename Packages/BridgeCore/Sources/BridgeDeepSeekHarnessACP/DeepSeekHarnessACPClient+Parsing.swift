@@ -3,6 +3,40 @@ import BridgeAgentCore
 import Foundation
 
 extension DeepSeekHarnessACPClient {
+  static func parseInitialization(_ value: ACPJSONValue) throws
+    -> DeepSeekHarnessACPInitialization
+  {
+    guard let object = value.objectValue,
+      let protocolVersion = object["protocolVersion"]?.intValue
+    else {
+      throw DeepSeekHarnessACPError.malformedResponse
+    }
+    let agentInfo: [String: ACPJSONValue]?
+    if let value = object["agentInfo"] {
+      guard let decoded = value.objectValue,
+        decoded["name"]?.stringValue != nil,
+        decoded["version"]?.stringValue != nil
+      else {
+        throw DeepSeekHarnessACPError.malformedResponse
+      }
+      agentInfo = decoded
+    } else {
+      agentInfo = nil
+    }
+    let capabilities = object["agentCapabilities"]?.objectValue ?? [:]
+    let sessionCapabilities = capabilities["sessionCapabilities"]?.objectValue ?? [:]
+    let mcpCapabilities = capabilities["mcpCapabilities"]?.objectValue ?? [:]
+    return DeepSeekHarnessACPInitialization(
+      protocolVersion: protocolVersion,
+      agentName: agentInfo?["name"]?.stringValue,
+      agentTitle: agentInfo?["title"]?.stringValue,
+      agentVersion: agentInfo?["version"]?.stringValue,
+      supportsResumeSession: sessionCapabilities["resume"]?.objectValue != nil,
+      supportsCloseSession: sessionCapabilities["close"]?.objectValue != nil,
+      supportsMCPHTTP: mcpCapabilities["http"]?.boolValue == true
+    )
+  }
+
   static func parseConfigOptions(_ value: ACPJSONValue?) throws
     -> [DeepSeekHarnessACPConfigOption]
   {

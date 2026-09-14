@@ -142,7 +142,7 @@ test("retry preserves its draft across snapshots and resumes the selected task",
   type(input, "请继续上次检查");
   ui.render(state);
   assert.equal(ui.input(), input);
-  ui.button("接着中断任务继续").dispatch("click");
+  ui.button("继续对话").dispatch("click");
   assert.deepEqual(ui.commands, [{ command: "resumeTask", payload: { taskID: "task-a", input: "请继续上次检查" } }]);
   assert.equal(input.value, "");
   ui.render({ history: { selectedThreadID: "history-a" }, tasks: [] });
@@ -180,7 +180,7 @@ test("session fallback keeps provider scope when session IDs collide", () => {
     engineStatus: "已结束"
   };
   ui.render(state);
-  assert.ok(ui.button("接着中断任务继续"));
+  assert.ok(ui.button("继续对话"));
   assert.equal(ui.button("发送指令"), null);
 });
 

@@ -19,6 +19,7 @@ public actor ServiceComposition {
   public let projects: ServiceProjectService
   public let tasks: ServiceTaskManager
   public let settings: ServiceSettings
+  public let deepSeekHarnessMCP: ServiceDeepSeekHarnessMCPConfiguration
   public let agentRegistry: ServiceAgentRegistry
   let agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog
   public let execution: ExecutionManager
@@ -66,6 +67,8 @@ public actor ServiceComposition {
     let projects = ServiceProjectService(store: store)
     let tasks = ServiceTaskManager(store: store)
     let settings = ServiceSettings(store: store)
+    let deepSeekHarnessMCP = ServiceDeepSeekHarnessMCPConfiguration(
+      settings: settings, secretStore: secretStore)
     let deepSeekBaseURL = try await settings.string(for: .deepSeekHarnessBaseURL)
     let deepSeekConfigurationPath = try await settings.string(
       for: .deepSeekHarnessManagedConfigurationPath
@@ -86,8 +89,13 @@ public actor ServiceComposition {
         configuration: DeepSeekHarnessACPProviderConfiguration(
           runtimeBaseDirectory: paths.agentStateURL
             .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path,
+          persistentStateBaseDirectory: paths.agentStateURL
+            .appendingPathComponent("DeepSeekHarnessSessions", isDirectory: true).path,
           environmentProvider: { [agentCredentials] installation in
             try await agentCredentials.runtimeEnvironment(for: installation)
+          },
+          mcpServersProvider: { [deepSeekHarnessMCP] in
+            try await deepSeekHarnessMCP.enabledRuntimeConfigurations()
           }
         )
       ),
@@ -187,6 +195,7 @@ public actor ServiceComposition {
       projects: projects,
       tasks: tasks,
       settings: settings,
+      deepSeekHarnessMCP: deepSeekHarnessMCP,
       agentRegistry: agentRegistry,
       agentDiscoveryCatalog: agentDiscoveryCatalog,
       execution: execution,
@@ -208,6 +217,7 @@ public actor ServiceComposition {
     projects: ServiceProjectService,
     tasks: ServiceTaskManager,
     settings: ServiceSettings,
+    deepSeekHarnessMCP: ServiceDeepSeekHarnessMCPConfiguration,
     agentRegistry: ServiceAgentRegistry,
     agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog,
     execution: ExecutionManager,
@@ -226,6 +236,7 @@ public actor ServiceComposition {
     self.projects = projects
     self.tasks = tasks
     self.settings = settings
+    self.deepSeekHarnessMCP = deepSeekHarnessMCP
     self.agentRegistry = agentRegistry
     self.agentDiscoveryCatalog = agentDiscoveryCatalog
     self.execution = execution
