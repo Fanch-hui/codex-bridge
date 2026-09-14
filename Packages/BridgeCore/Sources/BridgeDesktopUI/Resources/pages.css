@@ -161,7 +161,10 @@
 .dsh-mcp-row { display: flex; align-items: flex-start; gap: 12px; }
 .dsh-mcp-card { display: grid; gap: 10px; }
 .dsh-mcp-card .card-subtitle { margin-bottom: 0; }
-.dsh-mcp-status { margin: 0; line-height: 1.45; }
+.dsh-mcp-card > .section-heading-row { margin: 0; }
+.dsh-mcp-card > .section-heading-row h3 { margin: 0; }
+.dsh-mcp-card .dsh-mcp-summary { margin: 3px 0 0; }
+.dsh-mcp-editor .dsh-mcp-transport-hint { margin-bottom: 12px; }
 .dsh-mcp-editor { padding-top: 12px; border-top: 1px solid var(--separator); }
 .dsh-mcp-editor .field.full { grid-column: 1 / -1; }
 .dsh-mcp-editor textarea { min-height: 74px; }

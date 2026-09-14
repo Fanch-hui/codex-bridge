@@ -7,16 +7,14 @@
   function create(emit) {
     var card = S.node("div", "page-card connection-card dsh-mcp-card");
     var heading = S.node("div", "section-heading-row");
-    heading.appendChild(S.node("h3", null, "DeepSeek Harness MCP"));
+    var title = S.node("div");
+    title.appendChild(S.node("h3", null, "DeepSeek Harness MCP"));
+    var summary = S.node("p", "card-subtitle dsh-mcp-summary");
+    title.appendChild(summary);
+    heading.appendChild(title);
     var add = S.button("添加 MCP", null, {}, null, "small primary", true);
     heading.appendChild(add);
     card.appendChild(heading);
-    card.appendChild(S.node(
-      "p", "card-subtitle",
-      "配置用于新任务及下次续聊。HTTP 服务需要任务允许网络；stdio 命令请使用绝对路径，参数不要填写密钥，敏感值放入环境变量或请求头。"
-    ));
-    var status = S.node("p", "dsh-mcp-status muted");
-    card.appendChild(status);
     var list = S.node("div", "dsh-mcp-list");
     card.appendChild(list);
     var editor = E.create(emit);
@@ -24,7 +22,6 @@
     card.appendChild(editor.root);
     var rows = new Map();
     var context = { emit: emit, canManage: false };
-    var empty = null;
 
     add.addEventListener("click", function () {
       if (context.canManage) editor.begin(null, context.emit);
@@ -88,7 +85,8 @@
       var configured = S.safeArray(server.environment).concat(S.safeArray(server.headers))
         .filter(function (item) { return typeof item === "string" || item.hasValue !== false; }).length;
       row.detail.textContent = server.transport + " · " + detail
-        + (configured ? " · 已配置密钥 " + configured + " 项" : "");
+        + (configured ? " · " + (server.transport === "http" ? "请求头 " : "环境变量 ")
+          + configured + " 项" : "");
       row.toggle.textContent = row.enabled ? "停用" : "启用";
       row.toggle.disabled = !context.canManage || server.canToggle === false;
       row.edit.disabled = !context.canManage || server.canEdit === false;
@@ -106,8 +104,6 @@
       context.canManage = page.canManageDeepSeekHarnessMCP === true;
       add.disabled = !context.canManage;
       editor.setCanManage(context.canManage);
-      status.textContent = page.deepSeekHarnessMCPStatusMessage
-        || "配置用于新任务及下次续聊；HTTP 服务需要任务允许网络。";
       var visible = new Set();
       var position = 0;
       S.safeArray(page.deepSeekHarnessMCPServers).forEach(function (server) {
@@ -126,15 +122,9 @@
           rows.delete(id);
         }
       });
-      if (!visible.size) {
-        if (!empty) {
-          empty = S.node("div", "list-empty", "尚未配置 DSH MCP 服务。");
-          list.appendChild(empty);
-        }
-      } else if (empty) {
-        empty.remove();
-        empty = null;
-      }
+      summary.textContent = visible.size
+        ? "已配置 " + visible.size + " 个 MCP 服务。" : "尚未添加 MCP 服务。";
+      list.hidden = visible.size === 0;
     }
 
     return { root: card, update: update };

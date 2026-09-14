@@ -72,6 +72,9 @@
 
   function create(emit) {
     var root = S.node("div", "dsh-mcp-editor");
+    root.appendChild(S.node("p", "card-subtitle", "保存后，将在新任务或继续对话时生效。"));
+    var transportHint = S.node("p", "card-subtitle dsh-mcp-transport-hint");
+    root.appendChild(transportHint);
     var fields = S.node("div", "form-grid");
     var name = S.textField("名称", "", "例如：filesystem");
     var transport = S.selectField("传输方式", "stdio", [
@@ -87,8 +90,8 @@
     fields.appendChild(url.wrapper);
     fields.appendChild(args.wrapper);
     root.appendChild(fields);
-    var environment = secretEditor("环境变量（密码值）");
-    var headers = secretEditor("HTTP 请求头（密码值）");
+    var environment = secretEditor("环境变量");
+    var headers = secretEditor("HTTP 请求头");
     root.appendChild(environment.root);
     root.appendChild(headers.root);
     var actions = S.node("div", "form-actions");
@@ -118,6 +121,9 @@
 
     function updateTransport() {
       var isHTTP = transport.control.value === "http";
+      transportHint.textContent = isHTTP
+        ? "HTTP 服务仅在任务允许联网时连接。"
+        : "命令需填写绝对路径；参数每行一个。";
       command.wrapper.hidden = isHTTP;
       args.wrapper.hidden = isHTTP;
       url.wrapper.hidden = !isHTTP;
