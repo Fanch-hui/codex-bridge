@@ -261,8 +261,7 @@ Search endpoint 必须同时满足：
 
 ## 9. 在 Codex Bridge 连接 DSH
 
-搜索地址单独在 `连接 → DeepSeek Harness 搜索服务` 中配置。填写提供商支持原生搜索工具的 Anthropic Messages API 基础地址，不包含 `/messages`；搜索复用 DSH API key。App 保存的搜索地址通过 `DEEPSEEK_SEARCH_BASE_URL` 注入，优先于外部 Profile 的 `.env`，不会改变聊天 Base URL。留空则沿用已有配置或 DSH 官方默认地址；修改在新任务及继续对话时生效。
-
+搜索默认复用聊天 Base URL 和 API key，所填地址需支持搜索工具使用的 Anthropic Messages 接口。外部 Profile 中显式设置的 `DEEPSEEK_SEARCH_BASE_URL` 仍优先生效。
 
 1. 进入 `连接 → 本机 Agent 引擎连接`。
 2. 在 DeepSeek Harness 中输入 Base URL 与 API key。

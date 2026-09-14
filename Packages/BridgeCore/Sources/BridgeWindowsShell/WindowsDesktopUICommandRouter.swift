@@ -170,8 +170,6 @@
         return .copyLocalMCPEndpoint
       case .rotateMCPClientCredential:
         return nonEmpty(payload.clientID).map(MainWindowCommand.rotateMCPClientCredential)
-      case .saveDeepSeekSearchConfiguration:
-        return .saveDeepSeekSearchConfiguration(baseURL: payload.baseURL)
       case .saveDeepSeekHarnessMCPServer:
         return saveDeepSeekHarnessMCPServer(payload)
       case .deleteDeepSeekHarnessMCPServer:

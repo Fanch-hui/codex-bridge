@@ -18,7 +18,6 @@
     let rotateEndpointEnabled: Bool
     let statusText: String
     var clientItems: [BridgeDesktopMCPClientRow] = []
-    var deepSeekSearchBaseURL: String? = nil
     var deepSeekHarnessMCPItems: [BridgeDesktopDeepSeekHarnessMCPRow] = []
     var tunnel: BridgeDesktopTunnelState? = nil
   }

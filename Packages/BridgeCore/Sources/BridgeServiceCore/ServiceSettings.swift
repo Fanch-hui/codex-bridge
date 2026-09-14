@@ -39,7 +39,6 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessDefaultModel = "agent.deepseek-harness.default_model"
   case deepSeekHarnessDefaultPermissionMode = "agent.deepseek-harness.default_permission_mode"
   case deepSeekHarnessDefaultEffort = "agent.deepseek-harness.default_effort"
-  case deepSeekHarnessSearchBaseURL = "agent.deepseek-harness.search_base_url"
   case deepSeekHarnessBaseURL = "agent.deepseek-harness.base_url"
   case deepSeekHarnessManagedConfigurationPath = "agent.deepseek-harness.managed_configuration_path"
   case deepSeekHarnessMCPServers = "agent.deepseek-harness.mcp.servers"

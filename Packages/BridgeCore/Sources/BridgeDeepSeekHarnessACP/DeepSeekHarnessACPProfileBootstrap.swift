@@ -18,6 +18,9 @@ enum DeepSeekHarnessACPProfileBootstrap {
           process.env[name] = values[name];
         }
       }
+      if (process.env.DEEPSEEK_SEARCH_BASE_URL === undefined && process.env.DEEPSEEK_BASE_URL) {
+        process.env.DEEPSEEK_SEARCH_BASE_URL = process.env.DEEPSEEK_BASE_URL;
+      }
       """
     let path = URL(fileURLWithPath: runDirectory).appendingPathComponent("profile-env.mjs")
     try Data(script.utf8).write(to: path, options: .atomic)

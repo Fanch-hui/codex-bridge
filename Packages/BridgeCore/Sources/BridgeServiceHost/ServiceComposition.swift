@@ -91,10 +91,8 @@ public actor ServiceComposition {
             .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path,
           persistentStateBaseDirectory: paths.agentStateURL
             .appendingPathComponent("DeepSeekHarnessSessions", isDirectory: true).path,
-          environmentProvider: { [agentCredentials, settings] installation in
-            let environment = try await agentCredentials.runtimeEnvironment(for: installation)
-            return try await ServiceDeepSeekSearchConfiguration(settings: settings).applying(
-              to: environment)
+          environmentProvider: { [agentCredentials] installation in
+            try await agentCredentials.runtimeEnvironment(for: installation)
           },
           mcpServersProvider: { [deepSeekHarnessMCP] in
             try await deepSeekHarnessMCP.enabledRuntimeConfigurations()

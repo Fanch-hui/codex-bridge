@@ -40,9 +40,6 @@ extension BridgeDesktopCommandRouter {
       guard connected(model), clientID(payload.clientID) == MCPClientID.qwenStudio.rawValue
       else { return }
       model.rotateQwenStudioCredential()
-    case .saveDeepSeekSearchConfiguration:
-      guard connected(model) else { return }
-      model.saveDeepSeekSearchConfiguration(baseURL: payload.baseURL)
     case .saveDeepSeekHarnessMCPServer:
       saveDeepSeekHarnessMCPServer(payload, model: model)
     case .deleteDeepSeekHarnessMCPServer:

@@ -56,7 +56,6 @@
         codex: codexState(workbench: workbench, settings: settings),
         clients: connections.clientItems,
         deepSeekHarnessMCPServers: connections.deepSeekHarnessMCPItems,
-        deepSeekSearchBaseURL: connections.deepSeekSearchBaseURL,
         canManageDeepSeekHarnessMCP: connections.connectionState == .connected,
         providers: management.agent.providerItems,
         installations: management.agent.installationItems,

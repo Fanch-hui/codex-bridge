@@ -136,9 +136,6 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setTaskStartApprovalMode(_ mode: String) async throws
   func setExposureMode(_ mode: MCPServiceExposureMode) async throws
   func mcpClients() async throws -> [IPCMCPClientStatus]
-  func deepSeekSearchConfiguration() async throws -> IPCDeepSeekSearchConfiguration
-  func saveDeepSeekSearchConfiguration(_ request: IPCDeepSeekSearchConfiguration) async throws
-    -> IPCDeepSeekSearchConfiguration
   func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse
   func saveDeepSeekHarnessMCPServer(
     _ request: IPCDeepSeekHarnessMCPServerInput
@@ -357,14 +354,6 @@ extension BridgeServiceClientProtocol {
     throw BridgeServiceClientError.unavailable
   }
 
-  public func deepSeekSearchConfiguration() async throws -> IPCDeepSeekSearchConfiguration {
-    throw BridgeServiceClientError.unavailable
-  }
-  public func saveDeepSeekSearchConfiguration(_ request: IPCDeepSeekSearchConfiguration)
-    async throws -> IPCDeepSeekSearchConfiguration
-  {
-    throw BridgeServiceClientError.unavailable
-  }
   public func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse {
     throw BridgeServiceClientError.unavailable
   }

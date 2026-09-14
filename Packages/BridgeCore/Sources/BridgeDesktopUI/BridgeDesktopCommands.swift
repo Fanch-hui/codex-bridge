@@ -56,7 +56,6 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case copyLocalMCPEndpoint
   case rotateMCPClientCredential
   case rotateLocalMCPEndpoint
-  case saveDeepSeekSearchConfiguration
   case saveDeepSeekHarnessMCPServer
   case deleteDeepSeekHarnessMCPServer
   case setDeepSeekHarnessMCPServerEnabled

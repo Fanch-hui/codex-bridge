@@ -6,6 +6,34 @@ import XCTest
 @testable import BridgeDeepSeekHarnessACP
 
 final class DeepSeekHarnessACPLiveProbeTests: XCTestCase {
+  func testProfileBootstrapUsesChatEndpointForSearch() throws {
+    #if os(macOS)
+      let fixture = try LiveDSHFixture()
+      defer { fixture.remove() }
+      let bootstrap = try DeepSeekHarnessACPProfileBootstrap.prepare(
+        configurationDirectory: fixture.root.path, runDirectory: fixture.root.path)
+      let node = try XCTUnwrap(fixture.installation.artifacts.first { $0.role == .nodeInterpreter })
+      for explicitSearch in [false, true] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: node.canonicalPath)
+        process.environment = fixture.environment
+        if explicitSearch {
+          process.environment?["DEEPSEEK_SEARCH_BASE_URL"] = "https://search.example.test"
+        }
+        let expected = explicitSearch ? "https://search.example.test" : "https://api.deepseek.com"
+        process.arguments = [
+          "--import", bootstrap, "-e",
+          "if (process.env.DEEPSEEK_SEARCH_BASE_URL !== '\(expected)') process.exit(1)",
+        ]
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0)
+      }
+    #else
+      throw XCTSkip("Node bootstrap smoke test runs on macOS.")
+    #endif
+  }
+
   func testInstalledCLIHandshakeAndModelCatalog() async throws {
     let fixture = try LiveDSHFixture()
     addTeardownBlock { fixture.remove() }

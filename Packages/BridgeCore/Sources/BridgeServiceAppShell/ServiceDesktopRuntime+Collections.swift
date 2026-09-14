@@ -26,7 +26,6 @@ extension BridgeServiceAppModel {
       try await client.taskStartApprovalMode()
     }
     async let mcpClientResult = optional { try await client.mcpClients() }
-    async let deepSeekSearchResult = optional { try await client.deepSeekSearchConfiguration() }
     async let deepSeekHarnessMCPResult = optional {
       try await client.deepSeekHarnessMCPServers()
     }
@@ -73,7 +72,6 @@ extension BridgeServiceAppModel {
     if let value = await mcpClientResult, mcpClients != value {
       mcpClients = value
     }
-    if let value = await deepSeekSearchResult { deepSeekSearchBaseURL = value.baseURL }
     if let value = await deepSeekHarnessMCPResult,
       deepSeekHarnessMCPServers != value.servers
     {
