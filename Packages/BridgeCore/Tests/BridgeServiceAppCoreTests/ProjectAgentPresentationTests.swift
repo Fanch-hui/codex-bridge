@@ -22,7 +22,7 @@ final class ProjectAgentPresentationTests: XCTestCase {
     XCTAssertTrue(item.rowText.contains("Bridge"))
     XCTAssertEqual(item.readPermission, "allowed")
     XCTAssertTrue(item.detailText.contains("写入：需要本机批准"))
-    XCTAssertTrue(item.detailText.contains("Git：clean"))
+    XCTAssertTrue(item.detailText.contains("Git：Git 干净"))
   }
 
   func testProviderPresentationExposesRegistrationAndCapabilities() {
