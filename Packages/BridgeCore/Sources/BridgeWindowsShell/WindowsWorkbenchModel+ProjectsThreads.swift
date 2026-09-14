@@ -4,33 +4,6 @@
   import BridgeServiceAppCore
 
   extension WindowsWorkbenchModel {
-    func loadThreads() async {
-      guard connectionState == .connected, let projectID = selectedProjectID else {
-        threads = []
-        selectedThreadID = nil
-        selectedThreadPage = nil
-        publishDisplay()
-        return
-      }
-      do {
-        let page = try await client.threads(IPCThreadListRequest(projectID: projectID))
-        guard selectedProjectID == projectID else { return }
-        threads = page.threads
-        if let selectedThreadID,
-          !threads.contains(where: { $0.threadID == selectedThreadID })
-        {
-          self.selectedThreadID = nil
-          selectedThreadPage = nil
-        }
-        publishDisplay()
-      } catch {
-        guard selectedProjectID == projectID else { return }
-        threads = []
-        actionText = "读取 Codex 历史会话失败：\(BridgeServiceErrorMessage.message(error))"
-        publishDisplay()
-      }
-    }
-
     func selectDefaultTaskIfNeeded() {
       guard selectedTaskID == nil, selectedThreadID == nil else { return }
       guard
@@ -58,7 +31,6 @@
       publishDisplay()
       do {
         try await client.setWorkbenchProject(projectID: projectID)
-        await loadThreads()
         await loadTasks()
         guard selectedProjectID == projectID else { return }
         actionText = "工作台项目已切换。"
@@ -90,11 +62,7 @@
     public func selectWorkbenchItem(at index: Int) async {
       if visibleSessions.indices.contains(index) {
         selectTask(id: visibleSessions[index].latestTask.taskID)
-        return
       }
-      let threadIndex = index - visibleSessions.count
-      guard orphanThreads.indices.contains(threadIndex) else { return }
-      await openThread(orphanThreads[threadIndex].threadID)
     }
 
     public func openWorkbenchThread(threadID: String, projectID: String) async {

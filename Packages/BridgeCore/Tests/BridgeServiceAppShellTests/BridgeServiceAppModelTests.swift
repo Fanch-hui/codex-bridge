@@ -1416,7 +1416,7 @@ final class BridgeServiceAppModelTests: XCTestCase {
     XCTAssertEqual(model.serviceStatus?.workbenchProjectID, "project-1")
   }
 
-  func testSelectingWorkbenchProjectDoesNotPromoteThreadCatalogFailureToGlobalError()
+  func testSelectingWorkbenchProjectDoesNotReadUnlinkedCodexThreads()
     async throws
   {
     let registration = TestServiceRegistration(status: .enabled)
@@ -1433,9 +1433,8 @@ final class BridgeServiceAppModelTests: XCTestCase {
     model.selectProject("project-1")
 
     try await waitUntil {
-      let calls = await client.threadCallCounts()
       let selections = await client.workbenchProjectSelectionsValue()
-      return calls.list == 2 && selections == ["project-1"]
+      return selections == ["project-1"]
     }
     XCTAssertEqual(model.selectedProjectID, "project-1")
     XCTAssertEqual(model.connectionState, .connected)
@@ -1515,14 +1514,14 @@ final class BridgeServiceAppModelTests: XCTestCase {
 
     await model.startAsync()
     var calls = await client.threadCallCounts()
-    XCTAssertEqual(calls.list, 1)
+    XCTAssertEqual(calls.list, 0)
     XCTAssertEqual(calls.read, 0)
-    XCTAssertEqual(model.threads.map(\.threadID), ["thread-1"])
+    XCTAssertTrue(model.threads.isEmpty)
     XCTAssertNil(model.selectedThread)
 
     try await Task.sleep(for: .milliseconds(90))
     calls = await client.threadCallCounts()
-    XCTAssertEqual(calls.list, 1)
+    XCTAssertEqual(calls.list, 0)
     XCTAssertEqual(calls.read, 0)
     await model.shutdownUI()
   }

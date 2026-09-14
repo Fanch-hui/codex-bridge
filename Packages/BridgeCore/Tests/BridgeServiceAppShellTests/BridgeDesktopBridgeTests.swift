@@ -119,7 +119,7 @@ final class BridgeDesktopBridgeTests: XCTestCase {
     XCTAssertTrue(state.connections?.canRegisterAgent == true)
   }
 
-  func testWorkbenchHistoryIncludesOrphansAndUsesSelectedTranscript() {
+  func testWorkbenchHistoryExcludesUnlinkedCodexThreads() {
     let model = BridgeServiceAppModel(
       registration: BridgeDesktopTestServiceRegistration(status: .enabled),
       clientFactory: { TestBridgeServiceClient() },
@@ -150,10 +150,10 @@ final class BridgeDesktopBridgeTests: XCTestCase {
     )
 
     let state = BridgeDesktopUIStateBuilder.workbench(from: model)
-    XCTAssertEqual(state.history.threads.map(\.threadID), ["orphan"])
-    XCTAssertEqual(state.history.selectedThreadID, "orphan")
-    XCTAssertEqual(state.history.selectedThreadTitle, "历史会话")
-    XCTAssertEqual(state.history.conversation.map(\.text), ["已有的完整记录"])
+    XCTAssertTrue(state.history.threads.isEmpty)
+    XCTAssertNil(state.history.selectedThreadID)
+    XCTAssertNil(state.history.selectedThreadTitle)
+    XCTAssertTrue(state.history.conversation.isEmpty)
     XCTAssertNil(state.selectedTask)
 
     model.selectedTaskID = "task-1"

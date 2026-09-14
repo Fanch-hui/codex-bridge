@@ -222,8 +222,7 @@ struct BridgeServiceWorkbenchInspectorHeader: View {
       HStack(spacing: 6) {
         WorkbenchAgentTaskPicker(
           model: model,
-          tasks: context.projectTasks,
-          threads: model.threads
+          tasks: context.projectTasks
         )
         Spacer()
         if let activeTask = context.currentActiveTask, canInterrupt(activeTask) {

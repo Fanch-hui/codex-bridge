@@ -22,6 +22,17 @@
     return node("span", "status-badge " + (tone || "neutral"), value || "未知");
   }
 
+  function gitStateBadge(gitState) {
+    if (gitState === null || gitState === undefined || gitState === "") return null;
+    switch (gitState) {
+      case "clean": return { label: "Git干净", tone: "success" };
+      case "dirty": return { label: "有未提交改动", tone: "warning" };
+      case "not_git": return { label: "非Git项目", tone: "neutral" };
+      case "check_failed": return { label: "检查失败", tone: "error" };
+      default: return { label: "检查失败", tone: "error" };
+    }
+  }
+
   function button(title, command, payload, emit, className, disabled) {
     var element = node("button", "button " + (className || ""), title);
     element.type = "button";
@@ -115,6 +126,7 @@
     clear: clear,
     icon: icon,
     badge: badge,
+    gitStateBadge: gitStateBadge,
     button: button,
     selectField: selectField,
     textField: textField,

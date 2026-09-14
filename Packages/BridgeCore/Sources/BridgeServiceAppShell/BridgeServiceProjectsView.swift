@@ -260,17 +260,9 @@ struct BridgeServiceProjectsView: View {
     return WorkbenchAgentTaskPickerContent.sessions(tasks: projectTasks)
   }
 
-  private var orphanThreads: [MCPThreadSummary] {
-    let projectTasks = model.tasks.filter { $0.projectID == model.selectedProjectID }
-    return WorkbenchAgentTaskPickerContent.orphanThreads(
-      tasks: projectTasks,
-      threads: model.threads
-    )
-  }
-
   private var sessionsSection: some View {
     VStack(alignment: .leading, spacing: 12) {
-      if projectSessions.isEmpty && orphanThreads.isEmpty {
+      if projectSessions.isEmpty {
         NativeCard {
           HStack(spacing: 10) {
             Image(systemName: "bubble.left.and.bubble.right")
@@ -347,92 +339,6 @@ struct BridgeServiceProjectsView: View {
             )
           }
 
-          ForEach(orphanThreads, id: \.threadID) { thread in
-            HStack(spacing: 0) {
-              Button {
-                model.openThread(thread.threadID)
-              } label: {
-                HStack(spacing: 12) {
-                  Image(systemName: AgentProviderPresentation.systemImage("codex"))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-
-                  VStack(alignment: .leading, spacing: 2) {
-                    Text(thread.title ?? thread.preview ?? thread.threadID)
-                      .font(.body.weight(.medium))
-                      .lineLimit(1)
-                      .foregroundStyle(.primary)
-
-                    Text("Codex 外部历史 · \(thread.threadID)")
-                      .font(.system(size: 11, design: .monospaced))
-                      .foregroundStyle(.secondary)
-                  }
-
-                  Spacer()
-
-                  StatusBadge(thread.status, tone: thread.status == "busy" ? .running : .neutral)
-
-                  Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-                .frame(maxWidth: .infinity, alignment: .leading)
-              }
-              .buttonStyle(.plain)
-            }
-            .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-              RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 0.8)
-            )
-          }
-        }
-      }
-
-      if let selectedThread = model.selectedThread {
-        threadTranscript(selectedThread)
-      }
-    }
-  }
-
-  private func task(for thread: MCPThreadSummary) -> MCPServiceTaskSnapshot? {
-    model.tasks.first {
-      $0.projectID == model.selectedProjectID && $0.threadID == thread.threadID
-    }
-  }
-
-  private func threadTranscript(_ page: MCPThreadReadPage) -> some View {
-    let entries = page.entries.enumerated().map { index, entry in
-      TaskConversationModel.Entry(
-        historicalThreadEntry: entry,
-        threadID: page.thread.threadID,
-        index: index
-      )
-    }
-    return NativeCard {
-      VStack(alignment: .leading, spacing: 14) {
-        HStack {
-          Label("Thread 对话历史", systemImage: "bubble.left.and.text.bubble.right.fill")
-            .font(.subheadline.weight(.semibold))
-          Spacer()
-          Text("共 \(page.entries.count) 条记录")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-
-        if page.entries.isEmpty {
-          Text("该 Thread 没有可展示的文本消息。")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          LazyVStack(alignment: .leading, spacing: 10) {
-            ForEach(entries) { entry in
-              MessageBubble(entry: entry, streaming: false, providerID: "codex")
-            }
-          }
         }
       }
     }

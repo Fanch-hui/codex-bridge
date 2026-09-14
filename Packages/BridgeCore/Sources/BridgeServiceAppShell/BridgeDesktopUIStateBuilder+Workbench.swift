@@ -18,7 +18,9 @@ extension BridgeDesktopUIStateBuilder {
         symbol: BridgeServiceNavigation.workbench.symbol
       ),
       projects: model.projects.map {
-        BridgeDesktopChoice(id: $0.projectID, title: $0.name, detail: $0.gitState)
+        BridgeDesktopChoice(
+          id: $0.projectID, title: $0.name,
+          detail: ProjectAgentPresentation.gitStateLabel($0.gitState))
       },
       selectedProjectID: model.selectedProjectID,
       permissionMode: model.workbenchPermissionMode,

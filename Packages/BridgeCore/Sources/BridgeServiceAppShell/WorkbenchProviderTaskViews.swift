@@ -7,7 +7,6 @@ package typealias WorkbenchAgentTaskPickerContent = WorkbenchSessionCatalog
 struct WorkbenchAgentTaskPicker: View {
   @ObservedObject var model: BridgeServiceAppModel
   let tasks: [MCPServiceTaskSnapshot]
-  let threads: [MCPThreadSummary]
 
   var body: some View {
     HStack(spacing: 6) {
@@ -42,23 +41,6 @@ struct WorkbenchAgentTaskPicker: View {
             }
           }
 
-          if !orphanThreads.isEmpty {
-            Section {
-              ForEach(orphanThreads, id: \.threadID) { thread in
-                Button {
-                  model.openThread(thread.threadID)
-                } label: {
-                  Label(
-                    threadTitle(thread),
-                    systemImage: thread.threadID == model.selectedThreadID
-                      ? "checkmark" : AgentProviderPresentation.systemImage("codex")
-                  )
-                }
-              }
-            } header: {
-              Label("Codex 外部历史会话", systemImage: AgentProviderPresentation.systemImage("codex"))
-            }
-          }
         } label: {
           Text(selectedItemLabel)
             .font(.caption.weight(.medium))
@@ -90,25 +72,11 @@ struct WorkbenchAgentTaskPicker: View {
       )
       return "\(session.providerDisplayName) · \(title)"
     }
-    if let thread = threads.first(where: { $0.threadID == model.selectedThreadID }) {
-      return "Codex · \(threadTitle(thread))"
-    }
     return "选择 Agent 会话（\(itemCount)）"
   }
 
   private var itemCount: Int {
-    WorkbenchSessionCatalog.itemCount(tasks: tasks, threads: threads)
-  }
-
-  private var orphanThreads: [MCPThreadSummary] {
-    WorkbenchSessionCatalog.orphanThreads(tasks: tasks, threads: threads)
-  }
-
-  private func threadTitle(_ thread: MCPThreadSummary) -> String {
-    WorkbenchThreadTitlePresentation.compact(
-      thread.title ?? thread.preview ?? thread.threadID,
-      maximumCharacters: 36
-    )
+    WorkbenchSessionCatalog.sessions(tasks: tasks).count
   }
 }
 

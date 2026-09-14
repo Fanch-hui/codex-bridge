@@ -58,7 +58,9 @@
       var text = S.node("div", "row-main");
       text.appendChild(S.node("div", "row-title", project.name));
       text.appendChild(S.node("div", "row-detail", project.detail || project.projectID));
-      row.appendChild(text); row.appendChild(S.badge(project.gitState || "未检查", project.gitState ? "success" : "neutral"));
+      row.appendChild(text);
+      var gitState = S.gitStateBadge(project.gitState);
+      if (gitState) row.appendChild(S.badge(gitState.label, gitState.tone));
       row.addEventListener("click", function () { context.emit("selectProject", { projectID: project.projectID }); });
       body.appendChild(row);
     });
@@ -95,10 +97,6 @@
         var nextCollectionsSignature = JSON.stringify({
           verificationCommands: page.verificationCommands,
           sessions: page.sessions,
-          threads: page.threads,
-          selectedThreadID: page.selectedThreadID,
-          selectedThreadTitle: page.selectedThreadTitle,
-          selectedThreadConversation: page.selectedThreadConversation,
           skills: page.skills
         });
         if (nextCollectionsSignature !== collectionsSignature) {

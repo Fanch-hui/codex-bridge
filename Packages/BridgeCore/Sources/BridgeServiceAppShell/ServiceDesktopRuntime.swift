@@ -183,7 +183,7 @@ extension BridgeServiceAppModel {
       await refreshCollections(
         client: client,
         includeCatalog: includeCatalog,
-        includeThreads: !silent,
+        includeProjectResources: !silent,
         forceCatalogRefresh: forceCatalogRefresh
       )
     } catch {

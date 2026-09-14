@@ -36,6 +36,7 @@
     var page = pages[state.selectedNavigation];
     if (page) page.render(state[state.selectedNavigation], emit);
     if (state.selectedNavigation === "workbench") {
+      if (global.CodexBridgeDesktopWorkbenchSplit) global.CodexBridgeDesktopWorkbenchSplit.sync();
       global.requestAnimationFrame(function () { measureBrowserViewport(emit); });
     }
   }

@@ -39,7 +39,7 @@ extension BridgeServiceAppModel {
         await refreshCollections(
           client: candidate,
           includeCatalog: includeCatalog,
-          includeThreads: true,
+          includeProjectResources: true,
           forceCatalogRefresh: forceCatalogRefresh
         )
         startPolling()

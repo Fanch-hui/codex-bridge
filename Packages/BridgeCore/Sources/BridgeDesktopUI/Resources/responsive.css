@@ -52,9 +52,13 @@
 
 @media (max-width: 700px) {
   .toolbar { padding-inline: 18px; }
-  .workbench-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 2fr) minmax(0, 3fr); }
+  .workbench-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(180px, 1fr) 8px minmax(180px, var(--workbench-inspector-height)); }
   .workbench-layout.inspector-hidden { grid-template-rows: minmax(0, 1fr); }
   .browser-pane { border-right: 0; border-bottom: 1px solid var(--separator); }
+  .workbench-divider { width: auto; min-width: 0; height: 8px; min-height: 8px; cursor: row-resize; }
+  .workbench-divider::before { width: 34px; height: 2px; }
+  .workbench-divider:hover::before, .workbench-divider:focus-visible::before, .workbench-divider.is-dragging::before { width: 48px; height: 2px; }
+  body.workbench-is-resizing { cursor: row-resize; }
   .inspector-header { gap: 6px; padding: 10px 14px; }
   .inspector-subtitle { display: none; }
   .form-grid, .form-grid.three { grid-template-columns: minmax(0, 1fr); }

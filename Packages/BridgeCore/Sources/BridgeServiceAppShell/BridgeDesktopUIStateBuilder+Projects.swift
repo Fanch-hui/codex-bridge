@@ -87,7 +87,7 @@ extension BridgeDesktopUIStateBuilder {
   private static func projectDetailText(_ detail: MCPProjectDetail?) -> String? {
     guard let detail else { return nil }
     var lines = ["项目 ID：\(detail.projectID)"]
-    if let gitState = detail.gitState, !gitState.isEmpty {
+    if let gitState = ProjectAgentPresentation.gitStateLabel(detail.gitState) {
       lines.append("Git：\(gitState)")
     }
     if let count = detail.threadCount {

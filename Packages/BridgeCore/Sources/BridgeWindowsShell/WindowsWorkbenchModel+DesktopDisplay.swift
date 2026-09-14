@@ -45,20 +45,12 @@
       session: WorkbenchSessionItem?,
       projectName: String,
       conversation: TaskConversationModel?,
-      selectedThreadPage: MCPThreadReadPage?,
       permissionRemediation: BridgeDesktopPermissionRemediationState?,
       canResume: Bool,
       canSteer: Bool
     ) -> BridgeDesktopTaskDetail {
-      let entries: [BridgeDesktopConversationEntry]
-      if let selectedThreadPage {
-        entries = ThreadHistoryPresentation.entries(selectedThreadPage).map {
-          BridgeDesktopConversationEntry(id: $0.id, role: $0.role, text: $0.text)
-        }
-      } else {
-        entries = (conversation?.entries ?? []).map {
-          conversationEntry($0, providerID: task.providerIdentifier)
-        }
+      let entries = (conversation?.entries ?? []).map {
+        conversationEntry($0, providerID: task.providerIdentifier)
       }
       let activity = task.recentActivity.map {
         BridgeDesktopActivityRow(

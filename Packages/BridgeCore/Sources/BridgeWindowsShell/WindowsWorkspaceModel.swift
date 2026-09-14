@@ -143,18 +143,15 @@
         } catch {
           loadedSkills = []
         }
-        let loadedThreads =
-          (try? await client.threads(
-            IPCThreadListRequest(projectID: projectID)
-          ).threads) ?? []
         guard selectedProjectID == projectID else { return }
         detail = loadedDetail
         skills = loadedSkills
-        threads = loadedThreads
+        threads = []
+        selectedThreadID = nil
+        selectedThreadPage = nil
         syncWorkspace()
         reconcileSkillSelection()
-        reconcileThreadSelection()
-        statusText = "已加载 Direct、\(loadedSkills.count) 个 Skills 和 \(loadedThreads.count) 个 Threads。"
+        statusText = "已加载 Direct 和 \(loadedSkills.count) 个 Skills。"
       } catch {
         guard selectedProjectID == projectID else { return }
         statusText = "命令读取失败：\(BridgeServiceErrorMessage.message(error))"

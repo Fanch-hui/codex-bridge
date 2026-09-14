@@ -44,15 +44,6 @@
 
   function renderContentBody(content, page, emit) {
     S.clear(content);
-    if (!page.selectedTask && page.history && page.history.selectedThreadID) {
-      content.appendChild(S.node("h3", "detail-title", page.history.selectedThreadTitle || "Codex 历史会话"));
-      if (S.safeArray(page.history.conversation).length) {
-        global.CodexBridgeDesktopWorkbenchConversation.render(content, page.history.conversation, page, emit);
-      } else {
-        content.appendChild(S.node("p", "muted", "此会话暂无对话记录。"));
-      }
-      return;
-    }
     if (!page.selectedTask) {
       var empty = S.node("div", "workbench-empty-state");
       empty.appendChild(S.icon("sparkles", "empty-sparkle-icon"));

@@ -119,9 +119,8 @@
     var row4 = S.node("div", "inspector-header-row row-tasks"), taskWrap = S.node("div", "task-picker-wrap");
     taskWrap.appendChild(S.icon("list.bullet.rectangle", "task-picker-icon"));
     var taskSelect = S.node("select", "task-native-select"), tasks = page.tasks || [];
-    var defaultOpt = S.node("option", null, "选择 Agent 会话 (" + (tasks.length + S.safeArray(page.history && page.history.threads).length) + ")");
+    var defaultOpt = S.node("option", null, "选择 Agent 会话 (" + tasks.length + ")");
     defaultOpt.value = ""; taskSelect.appendChild(defaultOpt);
-    var history = page.history || {}, historicalThreads = S.safeArray(history.threads);
     var curTask = null;
     groupTasks(tasks).forEach(function (group) {
       var taskGroup = S.node("optgroup"); taskGroup.label = group.label + " 会话";
@@ -133,28 +132,15 @@
       });
       taskSelect.appendChild(taskGroup);
     });
-    if (historicalThreads.length) {
-      var group = S.node("optgroup"); group.label = "Codex 历史会话（未关联 Bridge 任务）";
-      historicalThreads.forEach(function (thread) {
-        var option = S.node("option", null, thread.title || thread.preview || thread.threadID);
-        option.value = "history:" + thread.threadID;
-        option.dataset.threadID = thread.threadID;
-        option.selected = !page.selectedTaskID && thread.threadID === history.selectedThreadID;
-        group.appendChild(option);
-      });
-      taskSelect.appendChild(group);
-    }
     taskSelect.setAttribute("aria-label", "当前 Agent 会话");
     taskSelect.addEventListener("change", function () {
       var option = taskSelect.options[taskSelect.selectedIndex];
-      if (option && option.dataset.threadID) emit("openThread", { threadID: option.dataset.threadID, projectID: page.selectedProjectID });
-      else if (taskSelect.value) emit("selectTask", { taskID: taskSelect.value });
+      if (option && taskSelect.value) emit("selectTask", { taskID: taskSelect.value });
     });
     taskWrap.appendChild(taskSelect);
 
     var taskFace = S.node("span", "task-dropdown-face");
-    var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 会话 (" + (tasks.length + S.safeArray(page.history && page.history.threads).length) + ")");
-    if (!curTask && history.selectedThreadID) taskFaceLabel = "Codex · " + (history.selectedThreadTitle || "历史会话");
+    var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 会话 (" + tasks.length + ")");
     taskFace.appendChild(S.node("span", "task-title-text", taskFaceLabel));
     taskFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
     taskWrap.appendChild(taskFace);
@@ -184,15 +170,13 @@
   function render(page, emit) {
     var browser = JSON.stringify(page.browser || {});
     if (browser !== browserSignature) { renderBrowser(page, emit); browserSignature = browser; }
-    var detail = page.selectedTask || {}, history = page.history || {};
+    var detail = page.selectedTask || {};
     var header = JSON.stringify([
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode,
       page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canInterrupt,
       S.safeArray(page.tasks).map(function (t) {
         return [t.taskID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
-      }),
-      S.safeArray(history.threads).map(function (t) { return [t.threadID, t.title]; }),
-      history.selectedThreadID, history.selectedThreadTitle
+      })
     ]);
     if (header !== headerSignature) { renderInspectorHeader(page, emit); headerSignature = header; }
   }

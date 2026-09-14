@@ -7,7 +7,7 @@ extension BridgeServiceAppModel {
   func refreshCollections(
     client: any BridgeServiceClientProtocol,
     includeCatalog: Bool,
-    includeThreads: Bool,
+    includeProjectResources: Bool,
     forceCatalogRefresh: Bool = false
   ) async {
     async let directConfigurationResult = optional { try await client.directConfiguration() }
@@ -43,15 +43,15 @@ extension BridgeServiceAppModel {
       projectDetails[projectID] = detail
     }
 
-    var shouldRefreshThreads = includeThreads || threadCatalogRefreshDue()
+    var shouldRefreshProjectResources = includeProjectResources || threadCatalogRefreshDue()
     if let value = await taskResult {
-      shouldRefreshThreads =
-        shouldRefreshThreads || Self.taskCatalogChanged(from: tasks, to: value)
+      shouldRefreshProjectResources =
+        shouldRefreshProjectResources || Self.taskCatalogChanged(from: tasks, to: value)
       applyTaskSnapshot(value)
     }
 
-    if shouldRefreshThreads, let projectID = selectedProjectID {
-      await refreshThreadCollections(client: client, projectID: projectID)
+    if shouldRefreshProjectResources, let projectID = selectedProjectID {
+      await refreshProjectResources(client: client, projectID: projectID)
     }
 
     if let value = await approvalResult {
@@ -137,21 +137,14 @@ extension BridgeServiceAppModel {
     }
   }
 
-  private func refreshThreadCollections(
+  private func refreshProjectResources(
     client: any BridgeServiceClientProtocol,
     projectID: String
   ) async {
     lastThreadCatalogRefreshAt = Date()
-    async let skillResult = optional { try await client.skills(projectID: projectID) }
-    let threadPage = await optional {
-      try await client.threads(IPCThreadListRequest(projectID: projectID, limit: 100))
-    }
-    if selectedProjectID == projectID, let value = await skillResult {
+    let skillResult = await optional { try await client.skills(projectID: projectID) }
+    if selectedProjectID == projectID, let value = skillResult {
       skills = value.skills
-    }
-    if selectedProjectID == projectID, let threadPage {
-      threads = threadPage.threads
-      reconcileThreadSelection()
     }
   }
 

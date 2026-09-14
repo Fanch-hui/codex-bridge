@@ -21,10 +21,6 @@
         .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
     }
 
-    var orphanThreads: [MCPThreadSummary] {
-      WorkbenchSessionCatalog.orphanThreads(tasks: visibleTasks, threads: threads)
-    }
-
     func publishDisplay() {
       let runningCount = tasks.filter { $0.isRunning }.count
       let task = selectedTask
@@ -38,20 +34,13 @@
           $0.id == selected.id && $0.providerID == selected.providerID
         })
       }
-      let selectedThreadIndex = selectedThreadID.flatMap { selectedID in
-        orphanThreads.firstIndex(where: { $0.threadID == selectedID })
-      }
-      let workbenchRows =
-        visibleSessions.map(Self.sessionRowText) + orphanThreads.map(Self.threadRowText)
-      let selectedIndex =
-        selectedSessionIndex ?? selectedThreadIndex.map { visibleSessions.count + $0 }
-      let conversationText =
-        selectedThreadPage.map(Self.threadConversationText)
-        ?? TaskInspectorPresentation.conversationText(
-          entries: conversation?.entries ?? [],
-          isStreaming: conversation?.isStreaming == true || task?.isRunning == true,
-          errorMessage: conversation?.errorMessage
-        )
+      let workbenchRows = visibleSessions.map(Self.sessionRowText)
+      let selectedIndex = selectedSessionIndex
+      let conversationText = TaskInspectorPresentation.conversationText(
+        entries: conversation?.entries ?? [],
+        isStreaming: conversation?.isStreaming == true || task?.isRunning == true,
+        errorMessage: conversation?.errorMessage
+      )
       let approvalItems = approvalPresentationItems()
       let selectedApprovalIndex = selectedApprovalID.flatMap { selectedID in
         approvalItems.firstIndex(where: { $0.id == selectedID })
@@ -85,7 +74,6 @@
           session: selectedSession,
           projectName: projectName(for: $0.projectID),
           conversation: conversation,
-          selectedThreadPage: selectedThreadPage,
           permissionRemediation: desktopPermissionRemediation(for: $0),
           canResume: TaskInspectorPresentation.canResume(
             $0,
@@ -155,7 +143,7 @@
           detailText: errorMessage,
           taskItems: taskItems,
           selectedTaskDetail: selectedTaskDetail,
-          history: threadHistory(),
+          history: BridgeDesktopThreadHistoryState(),
           approvalItems: typedApprovals,
           browserEnabled: isChatBrowserEnabled,
           supportsImmediateSteer: task?.installationID.flatMap { installationID in
@@ -201,10 +189,6 @@
           projectName: projectName(for: task.projectID)
         )
       }
-      if let thread = selectedThreadPage?.thread {
-        return
-          "Codex 历史会话\r\n\(thread.title ?? thread.preview ?? thread.threadID)\r\n状态：\(thread.status)"
-      }
       return "未选择任务或会话"
     }
 
@@ -220,10 +204,6 @@
         turnCount: session.turnCount
       )
       return "\(session.providerDisplayName) · \(title) — \(state)"
-    }
-
-    private static func threadRowText(_ thread: MCPThreadSummary) -> String {
-      "Codex · \(thread.title ?? thread.preview ?? thread.threadID) — \(thread.status)"
     }
 
     private static func recentTaskPresentation(
@@ -245,12 +225,5 @@
       )
     }
 
-    private static func threadConversationText(_ page: MCPThreadReadPage) -> String {
-      guard !page.entries.isEmpty else { return "此 Codex 会话暂无可显示记录。" }
-      return page.entries.map { entry in
-        let role = entry.role == "user" ? "用户" : (entry.role == "assistant" ? "Codex" : entry.role)
-        return "\(role)：\(entry.text)"
-      }.joined(separator: "\r\n\r\n")
-    }
   }
 #endif

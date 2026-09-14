@@ -6,10 +6,6 @@
   function renderReadonlyCollections(container, page, emit) {
     if (page.verificationCommands && page.verificationCommands.length) addValues(container, "验证命令", page.verificationCommands, true);
     addSessionRows(container, page.sessions, page.selectedProjectID, emit);
-    addThreadRows(container, page.threads, page.selectedProjectID, emit);
-    if (page.selectedThreadConversation && page.selectedThreadConversation.length) {
-      addThreadTranscript(container, page.selectedThreadTitle, page.selectedThreadConversation);
-    }
     addSkillRows(container, page.skills, page.selectedProjectID);
   }
 
@@ -42,53 +38,6 @@
         card.body.appendChild(groupDetails);
       });
     }
-    container.appendChild(card.root);
-  }
-
-  function addThreadTranscript(container, title, entries) {
-    var card = S.node("section", "page-card project-thread-transcript");
-    card.appendChild(S.node("h3", null, title || "Codex 历史会话"));
-    card.appendChild(S.node("p", "muted project-collection-description", "这是 Codex 的项目历史记录，尚未关联到当前 Bridge 任务。"));
-    var list = S.node("div", "conversation-list");
-    entries.forEach(function (entry) {
-      var item = S.node("article", "conversation-entry " + (entry.role === "用户" ? "entry-user" : "entry-agent"));
-      item.appendChild(S.node("div", "entry-role", entry.role));
-      item.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
-      list.appendChild(item);
-    });
-    card.appendChild(list);
-    container.appendChild(card);
-  }
-
-  function addThreadRows(container, threads, projectID, emit) {
-    var values = S.safeArray(threads);
-    var card = collectionCard(
-      projectID,
-      "threads",
-      "Codex 历史会话（未关联 Bridge 任务）",
-      values.length,
-      "这里显示 Codex 中属于当前项目、但没有对应 Bridge 任务的历史记录。"
-    );
-    var list = S.node("div", "project-thread-list");
-    if (!values.length) {
-      list.appendChild(S.node("div", "list-empty", "暂无 Codex 历史会话。"));
-    } else {
-      values.forEach(function (thread) {
-        var row = S.node("button", "list-row project-thread-row");
-        row.type = "button";
-        var copy = S.node("div", "row-main");
-        copy.appendChild(S.node("div", "row-title", thread.title || thread.preview || thread.threadID));
-        copy.appendChild(S.node("div", "row-detail", thread.preview || "Codex 项目历史记录"));
-        row.appendChild(S.icon("bubble.left.and.text.bubble.right.fill", "icon"));
-        row.appendChild(copy);
-        row.appendChild(S.badge(thread.status || "未知", "neutral"));
-        row.addEventListener("click", function () {
-          emit("openThread", { threadID: thread.threadID, projectID: projectID });
-        });
-        list.appendChild(row);
-      });
-    }
-    card.body.appendChild(list);
     container.appendChild(card.root);
   }
 

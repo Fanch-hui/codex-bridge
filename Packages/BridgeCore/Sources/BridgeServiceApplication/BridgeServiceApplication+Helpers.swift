@@ -79,19 +79,25 @@ extension BridgeServiceApplication {
     return prompt + "\n\nAcceptance criteria:\n" + lines.joined(separator: "\n")
   }
 
-  static func projectSummary(_ source: ServiceProjectRecord) -> MCPProjectSummary {
+  static func projectSummary(_ source: ServiceProjectRecord, gitState: String? = nil)
+    -> MCPProjectSummary
+  {
     MCPProjectSummary(
       projectID: source.id.rawValue,
       name: safe(source.name, maximum: 1_024),
-      capabilities: capabilities(source.accessPolicy)
+      capabilities: capabilities(source.accessPolicy),
+      gitState: gitState
     )
   }
 
-  static func projectDetail(_ project: ServiceProjectRecord) -> MCPProjectDetail {
+  static func projectDetail(_ project: ServiceProjectRecord, gitState: String? = nil)
+    -> MCPProjectDetail
+  {
     MCPProjectDetail(
       projectID: project.id.rawValue,
       name: safe(project.name, maximum: 1_024),
       capabilities: capabilities(project.accessPolicy),
+      gitState: gitState,
       verificationCommands: [],
       directWorkspace: MCPDirectWorkspace(
         fileWritePermission: project.accessPolicy.write.rawValue,

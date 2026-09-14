@@ -33,7 +33,6 @@
         threads = []
         Task {
           try? await client.setWorkbenchProject(projectID: task.projectID)
-          await loadThreads()
         }
       }
       selectedTaskID = task.taskID

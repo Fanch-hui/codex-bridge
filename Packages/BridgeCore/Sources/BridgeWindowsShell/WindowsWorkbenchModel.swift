@@ -252,7 +252,6 @@
           : workbenchPermissionMode
         errorMessage = nil
         await refreshTasks()
-        await loadThreads()
       } catch {
         fail(BridgeServiceErrorMessage.message(error))
       }
