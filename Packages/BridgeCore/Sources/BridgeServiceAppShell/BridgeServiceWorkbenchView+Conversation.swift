@@ -45,7 +45,12 @@ private struct BridgeServiceWorkbenchObservedLiveRegion: View {
   var body: some View {
     let activity = CodexActivityPresentation(
       task: context.currentTask ?? context.currentActiveTask,
-      activity: conversation.activity
+      activity: conversation.activity,
+      pendingUserInput: (context.currentTask ?? context.currentActiveTask).map { task in
+        model.approvals.contains { approval in
+          approval.taskID == task.taskID && approval.kind == "user_input"
+        }
+      } ?? false
     )
     BridgeServiceWorkbenchInspectorBody(
       model: model,

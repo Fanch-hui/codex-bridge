@@ -24,6 +24,9 @@
     func publishDisplay() {
       let runningCount = tasks.filter { $0.isRunning }.count
       let task = selectedTask
+      let pendingUserInputTaskIDs = Set(
+        approvals.filter { $0.kind == "user_input" }.map(\.taskID)
+      )
       let selectedSession = task.flatMap { selectedTask in
         visibleSessions.first { session in
           session.tasks.contains(where: { $0.taskID == selectedTask.taskID })
@@ -65,7 +68,8 @@
           canResume: TaskInspectorPresentation.canResume(
             latest,
             providerSupportsSessionContinuation: providerSupportsSessionContinuation(for: latest)
-          )
+          ),
+          pendingUserInput: session.tasks.contains { pendingUserInputTaskIDs.contains($0.taskID) }
         )
       }
       let selectedTaskDetail = task.map {
@@ -81,7 +85,8 @@
           ),
           canSteer: TaskInspectorPresentation.canSteer(
             $0, providerSupportsSteer: providerSupportsSteer(for: $0)
-          )
+          ),
+          pendingUserInput: pendingUserInputTaskIDs.contains($0.taskID)
         )
       }
       let typedApprovals = approvalPresentationItems().enumerated().compactMap {

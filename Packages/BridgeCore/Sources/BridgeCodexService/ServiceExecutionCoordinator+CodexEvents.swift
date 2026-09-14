@@ -36,6 +36,7 @@ extension ServiceExecutionCoordinator {
         await supervision.observe(task: updated, kind: .progress, summary: summary)
 
       case .approvalRequested(let approval):
+        guard approval.isBlocking else { return }
         let updated = try await tasks.markWaitingForCodexApproval(taskID: taskID)
         await supervision.observe(
           task: updated,

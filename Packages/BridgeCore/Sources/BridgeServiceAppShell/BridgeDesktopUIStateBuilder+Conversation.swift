@@ -22,7 +22,7 @@ extension BridgeDesktopUIStateBuilder {
         )
       } ?? task.workbenchTitle,
       projectName: model.projectName(for: task.projectID),
-      status: taskStatusLabel(task.status),
+      status: BridgeDesktopUIStateBuilder.displayStatus(task, model: model),
       provider: task.providerDisplayName,
       providerID: task.providerIdentifier,
       model: taskModelLabel(task, model: model),
@@ -39,7 +39,11 @@ extension BridgeDesktopUIStateBuilder {
       conversationState: BridgeDesktopConversationState(
         conversation: model.conversation,
         activity: CodexActivityPresentation(
-          task: task, activity: model.conversation?.activity ?? .idle)
+          task: task,
+          activity: model.conversation?.activity ?? .idle,
+          pendingUserInput: model.approvals.contains {
+            $0.taskID == task.taskID && $0.kind == "user_input"
+          })
       ),
       canInterrupt: TaskInspectorPresentation.canInterrupt(task),
       canStop: task.isActive,

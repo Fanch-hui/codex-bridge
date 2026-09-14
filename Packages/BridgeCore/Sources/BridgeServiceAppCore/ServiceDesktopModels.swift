@@ -153,7 +153,11 @@ public struct CodexActivityPresentation: Equatable {
   public let isActive: Bool
   public let showsBubble: Bool
 
-  public init(task: MCPServiceTaskSnapshot?, activity: TaskConversationModel.Activity) {
+  public init(
+    task: MCPServiceTaskSnapshot?,
+    activity: TaskConversationModel.Activity,
+    pendingUserInput: Bool = false
+  ) {
     guard let task else {
       statusText = "已连接本机 Codex 引擎"
       detailText = nil
@@ -162,6 +166,13 @@ public struct CodexActivityPresentation: Equatable {
       return
     }
     let providerName = task.providerDisplayName
+    if pendingUserInput {
+      statusText = "等待你的回答…"
+      detailText = "需要回答"
+      isActive = true
+      showsBubble = true
+      return
+    }
     detailText = task.currentStep
     switch task.status {
     case "starting":

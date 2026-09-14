@@ -210,12 +210,14 @@ extension BridgeServiceApplication {
   public func resolveCodexApproval(
     taskID: TaskID,
     approvalID: String,
-    decision: LocalApprovalDecision
+    decision: LocalApprovalDecision,
+    answers: [String: [String]]? = nil
   ) async throws {
     try await coordinator.resolveApproval(
       taskID: taskID,
       approvalID: approvalID,
-      decision: decision
+      decision: decision,
+      answers: answers
     )
   }
 }

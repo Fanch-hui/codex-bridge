@@ -47,20 +47,26 @@
 
     public func resolveSelectedApproval(
       decision: String,
-      oneTimeToolAutoApproval: Bool = false
+      oneTimeToolAutoApproval: Bool = false,
+      answers: [String: [String]]? = nil
     ) async {
       guard let approvalID = selectedApprovalID else {
         setApprovalStatus("请先选择要处理的审批。")
         return
       }
       await resolveApproval(
-        approvalID, decision: decision, oneTimeToolAutoApproval: oneTimeToolAutoApproval)
+        approvalID,
+        decision: decision,
+        oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+        answers: answers
+      )
     }
 
     func resolveApproval(
       _ approvalID: ApprovalPresentation.Identifier,
       decision: String,
-      oneTimeToolAutoApproval: Bool = false
+      oneTimeToolAutoApproval: Bool = false,
+      answers: [String: [String]]? = nil
     ) async {
       guard connectionState == .connected else {
         setApprovalStatus("后台 Service 未连接，无法处理审批。")
@@ -97,7 +103,8 @@
         try await sendApprovalDecision(
           approvalID,
           decision: decision,
-          oneTimeToolAutoApproval: oneTimeToolAutoApproval
+          oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+          answers: answers
         )
         removeApproval(approvalID)
         await reloadTasksAndApprovals()
@@ -146,7 +153,8 @@
     private func sendApprovalDecision(
       _ approvalID: ApprovalPresentation.Identifier,
       decision: String,
-      oneTimeToolAutoApproval: Bool
+      oneTimeToolAutoApproval: Bool,
+      answers: [String: [String]]?
     ) async throws {
       switch approvalID {
       case .task(let rawID):
@@ -158,7 +166,8 @@
             taskID: approval.taskID,
             approvalID: approval.approvalID,
             decision: decision,
-            oneTimeToolAutoApproval: oneTimeToolAutoApproval ? true : nil
+            oneTimeToolAutoApproval: oneTimeToolAutoApproval ? true : nil,
+            answers: answers
           )
         )
       case .direct(let rawID):

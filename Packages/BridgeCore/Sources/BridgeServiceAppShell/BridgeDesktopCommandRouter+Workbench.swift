@@ -169,6 +169,17 @@ extension BridgeDesktopCommandRouter {
       payload.taskID == nil || payload.taskID == approval.taskID,
       let decision = validatedID(payload.decision, maximumBytes: 128)
     else { return }
+    let answers: [String: [String]]?
+    if approval.kind == "user_input" {
+      guard let input = validatedText(payload.input, maximumBytes: 64 * 1_024),
+        let data = input.data(using: .utf8),
+        let decoded = try? JSONDecoder().decode([String: [String]].self, from: data),
+        !decoded.isEmpty
+      else { return }
+      answers = decoded
+    } else {
+      answers = nil
+    }
     let projectID = model.tasks.first(where: { $0.taskID == approval.taskID })?.projectID
     let presentation = ApprovalPresentation.task(
       approval,
@@ -185,7 +196,8 @@ extension BridgeDesktopCommandRouter {
     model.resolveApproval(
       approval,
       decision: decision,
-      oneTimeToolAutoApproval: oneTimeToolAutoApproval
+      oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+      answers: answers
     )
   }
 

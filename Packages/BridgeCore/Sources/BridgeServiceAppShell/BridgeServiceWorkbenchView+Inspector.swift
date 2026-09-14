@@ -30,7 +30,12 @@ struct BridgeServiceWorkbenchInspectorContext {
     providerSubtitle = Self.providerSubtitle(for: selectedTask)
     activity = CodexActivityPresentation(
       task: selectedTask ?? activeTask,
-      activity: model.conversation?.activity ?? .idle
+      activity: model.conversation?.activity ?? .idle,
+      pendingUserInput: (selectedTask ?? activeTask).map { task in
+        model.approvals.contains { approval in
+          approval.taskID == task.taskID && approval.kind == "user_input"
+        }
+      } ?? false
     )
   }
 

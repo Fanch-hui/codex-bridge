@@ -164,7 +164,7 @@ extension BridgeServiceRequestController {
     }
     let taskID = TaskID(rawValue: payload.taskID)
     if payload.approvalID.hasPrefix("bridge-task-start:") {
-      guard decision == .allow || decision == .deny else {
+      guard payload.answers == nil, decision == .allow || decision == .deny else {
         throw ServiceStoreError.invalidArgument("approval.decision")
       }
       try await composition.application.resolveTaskStartApproval(
@@ -178,7 +178,8 @@ extension BridgeServiceRequestController {
       try await composition.application.resolveCodexApproval(
         taskID: taskID,
         approvalID: payload.approvalID,
-        decision: decision
+        decision: decision,
+        answers: payload.answers
       )
     }
     return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)

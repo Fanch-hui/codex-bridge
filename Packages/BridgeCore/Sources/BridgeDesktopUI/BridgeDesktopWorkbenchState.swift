@@ -85,6 +85,7 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
   public let canDeny: Bool
   public let resolving: Bool
   public let oneTimeToolAutoApprovalAvailable: Bool?
+  public let questions: [BridgeDesktopApprovalQuestion]
 
   public init(
     approvalID: String,
@@ -101,7 +102,8 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
     canAllow: Bool = true,
     canDeny: Bool = true,
     resolving: Bool = false,
-    oneTimeToolAutoApprovalAvailable: Bool? = nil
+    oneTimeToolAutoApprovalAvailable: Bool? = nil,
+    questions: [BridgeDesktopApprovalQuestion] = []
   ) {
     self.approvalID = approvalID
     self.taskID = taskID
@@ -122,6 +124,7 @@ public struct BridgeDesktopApprovalRow: Codable, Equatable, Sendable {
     self.canDeny = canDeny
     self.resolving = resolving
     self.oneTimeToolAutoApprovalAvailable = oneTimeToolAutoApprovalAvailable
+    self.questions = questions
   }
 }
 

@@ -158,6 +158,7 @@ public enum ExecutionApprovalKind: String, Codable, Equatable, Sendable {
   case command
   case fileChange = "file_change"
   case permissions
+  case userInput = "user_input"
 }
 
 public enum LocalApprovalDecision: String, Codable, Equatable, Hashable, Sendable {
@@ -168,6 +169,41 @@ public enum LocalApprovalDecision: String, Codable, Equatable, Hashable, Sendabl
 
   public var isApproval: Bool {
     self != .deny
+  }
+}
+
+public struct ExecutionUserInputOption: Codable, Equatable, Sendable {
+  public let label: String
+  public let description: String
+
+  public init(label: String, description: String) {
+    self.label = label
+    self.description = description
+  }
+}
+
+public struct ExecutionUserInputQuestion: Codable, Equatable, Sendable {
+  public let id: String
+  public let header: String
+  public let question: String
+  public let isOther: Bool
+  public let isSecret: Bool
+  public let options: [ExecutionUserInputOption]
+
+  public init(
+    id: String,
+    header: String,
+    question: String,
+    isOther: Bool = false,
+    isSecret: Bool = false,
+    options: [ExecutionUserInputOption] = []
+  ) {
+    self.id = id
+    self.header = header
+    self.question = question
+    self.isOther = isOther
+    self.isSecret = isSecret
+    self.options = options
   }
 }
 
@@ -183,6 +219,8 @@ public struct ExecutionApprovalRequest: Codable, Equatable, Sendable {
   public let relativePaths: [String]
   public let reason: String?
   public let availableDecisions: [LocalApprovalDecision]
+  public let questions: [ExecutionUserInputQuestion]
+  public let isBlocking: Bool
 
   public init(
     id: String,
@@ -195,7 +233,9 @@ public struct ExecutionApprovalRequest: Codable, Equatable, Sendable {
     displayCommand: String? = nil,
     relativePaths: [String] = [],
     reason: String? = nil,
-    availableDecisions: [LocalApprovalDecision] = [.allow, .deny]
+    availableDecisions: [LocalApprovalDecision] = [.allow, .deny],
+    questions: [ExecutionUserInputQuestion] = [],
+    isBlocking: Bool = true
   ) throws {
     try ExecutionValidation.identifier(id, field: "approval.id", maximumBytes: 128)
     try ExecutionValidation.identifier(itemID, field: "approval.itemID", maximumBytes: 256)
@@ -226,6 +266,8 @@ public struct ExecutionApprovalRequest: Codable, Equatable, Sendable {
     self.relativePaths = relativePaths
     self.reason = reason
     self.availableDecisions = availableDecisions
+    self.questions = questions
+    self.isBlocking = isBlocking
   }
 }
 

@@ -132,6 +132,50 @@ final class CodexApprovalWireDecoderTests: XCTestCase {
     XCTAssertEqual(permissions.permissions.network?.enabled, false)
   }
 
+  func testDecodesUserInputWithoutItemEvidenceAndNormalizesNullOptions() throws {
+    let params: [String: JSONValue] = [
+      "threadId": .string("thread-1"),
+      "turnId": .string("turn-1"),
+      "itemId": .string("item-question"),
+      "isBlocking": .bool(true),
+      "questions": .array([
+        .object([
+          "id": .string("language"),
+          "header": .string("Language"),
+          "question": .string("Which language should I use?"),
+          "isOther": .bool(true),
+          "isSecret": .bool(false),
+          "options": .array([
+            .object([
+              "label": .string("Swift"),
+              "description": .string("Use Swift."),
+            ])
+          ]),
+        ]),
+        .object([
+          "id": .string("notes"),
+          "header": .string("Notes"),
+          "question": .string("Any additional notes?"),
+          "options": .null,
+        ]),
+      ]),
+    ]
+
+    guard
+      case .userInput(let input) = try CodexApprovalWireDecoder.decode(
+        request(method: "item/tool/requestUserInput", params: params)
+      )
+    else { return XCTFail("Expected user input request") }
+
+    XCTAssertTrue(input.isBlocking)
+    XCTAssertEqual(input.correlation.startedAtMilliseconds, 0)
+    XCTAssertEqual(input.questions.count, 2)
+    XCTAssertEqual(input.questions[0].options.count, 1)
+    XCTAssertEqual(input.questions[1].options, [])
+    XCTAssertTrue(input.questions[0].isOther)
+    XCTAssertFalse(input.questions[1].isSecret)
+  }
+
   func testDecodesCommandAndFileItemEvidence() throws {
     let command = RPCNotification(
       method: "item/started",

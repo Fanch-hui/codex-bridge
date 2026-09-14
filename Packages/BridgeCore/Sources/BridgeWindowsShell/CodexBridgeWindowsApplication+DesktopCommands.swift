@@ -69,12 +69,14 @@
         let approvalID,
         let taskID,
         let decision,
-        let oneTimeToolAutoApproval):
+        let oneTimeToolAutoApproval,
+        let answersJSON):
         return resolveTaskApproval(
           approvalID: approvalID,
           taskID: taskID,
           decision: decision,
           oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+          answersJSON: answersJSON,
           model: model
         )
       case .resolveDirectApproval(let approvalID, let decision):
@@ -335,6 +337,7 @@
       taskID: String,
       decision: String,
       oneTimeToolAutoApproval: Bool,
+      answersJSON: String?,
       model: WindowsWorkbenchModel
     ) -> Bool {
       guard
@@ -342,15 +345,30 @@
           item.id == .task(approvalID)
         }), model.approvals.contains(where: { $0.approvalID == approvalID && $0.taskID == taskID })
       else { return true }
+      let requiresAnswers =
+        model.approvals.first { $0.approvalID == approvalID }?.kind == "user_input"
+      let answers = decodeAnswers(answersJSON)
+      guard !requiresAnswers || answers != nil else { return true }
       model.selectApproval(at: index)
       Task { @MainActor in
         await model.resolveApproval(
           .task(approvalID),
           decision: decision,
-          oneTimeToolAutoApproval: oneTimeToolAutoApproval
+          oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+          answers: answers
         )
       }
       return true
+    }
+
+    private static func decodeAnswers(_ rawValue: String?) -> [String: [String]]? {
+      guard let rawValue else { return nil }
+      guard rawValue.utf8.count <= 64 * 1_024,
+        let data = rawValue.data(using: .utf8),
+        let answers = try? JSONDecoder().decode([String: [String]].self, from: data),
+        !answers.isEmpty
+      else { return nil }
+      return answers
     }
 
     private static func resolveDirectApproval(

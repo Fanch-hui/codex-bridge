@@ -75,7 +75,7 @@
       case "运行中", "正在启动": "running"
       case "已完成": "success"
       case "失败": "error"
-      case "等待本机批准", "等待 Codex 审批": "warning"
+      case "等待回答", "等待本机批准", "等待 Codex 审批": "warning"
       default: "neutral"
       }
     }
@@ -86,6 +86,9 @@
       }
       if let detail = display.selectedTaskDetail, let step = detail.currentStep, !step.isEmpty {
         return "\(detail.provider) \(step)"
+      }
+      if display.selectedTaskDetail?.status == "等待回答" {
+        return "等待你的回答"
       }
       if let defaultModel = display.defaultModel, !defaultModel.isEmpty {
         return "已连接本机 Codex 引擎 · 默认模型：\(defaultModel)"

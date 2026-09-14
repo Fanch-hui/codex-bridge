@@ -10,7 +10,8 @@
       projectName: String,
       selectedTaskID: String?,
       canSteer: Bool,
-      canResume: Bool
+      canResume: Bool,
+      pendingUserInput: Bool = false
     ) -> BridgeDesktopTaskRow {
       let task = session.latestTask
       return BridgeDesktopTaskRow(
@@ -25,7 +26,7 @@
         source: task.sourceDisplayName,
         provider: task.providerDisplayName,
         providerID: task.providerIdentifier,
-        status: desktopStatusLabel(task),
+        status: desktopStatusLabel(task, pendingUserInput: pendingUserInput),
         updatedAt: task.updatedAt,
         turnCount: session.turnCount,
         selected: session.tasks.contains(where: { $0.taskID == selectedTaskID }),
@@ -47,7 +48,8 @@
       conversation: TaskConversationModel?,
       permissionRemediation: BridgeDesktopPermissionRemediationState?,
       canResume: Bool,
-      canSteer: Bool
+      canSteer: Bool,
+      pendingUserInput: Bool = false
     ) -> BridgeDesktopTaskDetail {
       let entries = (conversation?.entries ?? []).map {
         conversationEntry($0, providerID: task.providerIdentifier)
@@ -79,7 +81,7 @@
           turnCount: resolvedSession.turnCount
         ),
         projectName: projectName,
-        status: desktopStatusLabel(task),
+        status: desktopStatusLabel(task, pendingUserInput: pendingUserInput),
         provider: task.providerDisplayName,
         providerID: task.providerIdentifier,
         model: taskModelLabel(task),
@@ -92,7 +94,11 @@
         conversation: entries,
         conversationState: BridgeDesktopConversationState(
           conversation: conversation,
-          activity: CodexActivityPresentation(task: task, activity: conversation?.activity ?? .idle)
+          activity: CodexActivityPresentation(
+            task: task,
+            activity: conversation?.activity ?? .idle,
+            pendingUserInput: pendingUserInput
+          )
         ),
         canInterrupt: TaskInspectorPresentation.canInterrupt(task),
         canStop: task.isActive,
@@ -135,7 +141,19 @@
           canAllow: connected && !resolving && !item.allowDecisions.isEmpty,
           canDeny: connected && !resolving,
           resolving: resolving,
-          oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable
+          oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable,
+          questions: approval.questions?.map {
+            BridgeDesktopApprovalQuestion(
+              id: $0.id,
+              header: $0.header,
+              question: $0.question,
+              isOther: $0.isOther,
+              isSecret: $0.isSecret,
+              options: $0.options.map {
+                BridgeDesktopApprovalOption(label: $0.label, description: $0.description)
+              }
+            )
+          } ?? []
         )
       case .direct(let approvalID):
         guard let approval = directApprovals.first(where: { $0.approvalID == approvalID }) else {
@@ -228,7 +246,11 @@
       return "\(model) · \(BridgeDesktopPresentation.extendedReasoningTitle(effort))"
     }
 
-    private static func desktopStatusLabel(_ task: MCPServiceTaskSnapshot) -> String {
+    private static func desktopStatusLabel(
+      _ task: MCPServiceTaskSnapshot,
+      pendingUserInput: Bool = false
+    ) -> String {
+      if pendingUserInput { return "等待回答" }
       switch task.status {
       case "awaiting_local_approval": return "等待本机批准"
       case "starting": return "正在启动"

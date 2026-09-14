@@ -48,10 +48,15 @@ extension BridgeDesktopUIStateBuilder {
     if let taskID = model.selectedTaskID,
       let task = model.tasks.first(where: { $0.taskID == taskID })
     {
+      if hasPendingUserInput(task, model: model) {
+        return ("等待回答", "warning")
+      }
       if task.isRunning {
         return ("运行中", "running")
       }
-      return (taskStatusLabel(task.status), statusTone(task.status))
+      let status = displayStatus(task, model: model)
+      let tone = hasPendingUserInput(task, model: model) ? "warning" : statusTone(task.status)
+      return (status, tone)
     }
     if model.runningTaskCount > 0 {
       return ("运行中", "running")
@@ -64,7 +69,7 @@ extension BridgeDesktopUIStateBuilder {
     case "running", "starting": "running"
     case "completed": "success"
     case "failed": "error"
-    case "awaiting_local_approval", "waiting_for_codex_approval": "warning"
+    case "等待回答", "awaiting_local_approval", "waiting_for_codex_approval": "warning"
     default: "neutral"
     }
   }
@@ -79,7 +84,8 @@ extension BridgeDesktopUIStateBuilder {
       } ?? model.tasks.first(where: { $0.isRunning })
     return CodexActivityPresentation(
       task: task,
-      activity: model.conversation?.activity ?? .idle
+      activity: model.conversation?.activity ?? .idle,
+      pendingUserInput: task.map { hasPendingUserInput($0, model: model) } ?? false
     ).statusText
   }
 
@@ -127,7 +133,7 @@ extension BridgeDesktopUIStateBuilder {
       source: task.sourceDisplayName,
       provider: task.providerDisplayName,
       providerID: task.providerIdentifier,
-      status: taskStatusLabel(task.status),
+      status: displayStatus(task, model: model),
       updatedAt: task.updatedAt,
       turnCount: session.turnCount,
       selected: session.tasks.contains(where: { $0.taskID == model.selectedTaskID }),
@@ -181,7 +187,8 @@ extension BridgeDesktopUIStateBuilder {
         canAllow: !presentation.allowDecisions.isEmpty,
         canDeny: true,
         resolving: model.isResolvingApproval(approval),
-        oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable
+        oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable,
+        questions: approval.questions?.map(desktopQuestion) ?? []
       )
     }
     let directRows = model.directApprovals.map { approval in
@@ -203,6 +210,35 @@ extension BridgeDesktopUIStateBuilder {
       )
     }
     return taskRows + directRows
+  }
+
+  private static func hasPendingUserInput(
+    _ task: MCPServiceTaskSnapshot,
+    model: BridgeServiceAppModel
+  ) -> Bool {
+    model.approvals.contains { $0.taskID == task.taskID && $0.kind == "user_input" }
+  }
+
+  static func displayStatus(
+    _ task: MCPServiceTaskSnapshot,
+    model: BridgeServiceAppModel
+  ) -> String {
+    hasPendingUserInput(task, model: model) ? "等待回答" : taskStatusLabel(task.status)
+  }
+
+  private static func desktopQuestion(
+    _ question: IPCUserInputQuestion
+  ) -> BridgeDesktopApprovalQuestion {
+    BridgeDesktopApprovalQuestion(
+      id: question.id,
+      header: question.header,
+      question: question.question,
+      isOther: question.isOther,
+      isSecret: question.isSecret,
+      options: question.options.map {
+        BridgeDesktopApprovalOption(label: $0.label, description: $0.description)
+      }
+    )
   }
 
   static func permissionRemediation(

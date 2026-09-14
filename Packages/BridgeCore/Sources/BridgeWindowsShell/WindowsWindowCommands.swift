@@ -116,7 +116,8 @@
       approvalID: String,
       taskID: String,
       decision: String,
-      oneTimeToolAutoApproval: Bool
+      oneTimeToolAutoApproval: Bool,
+      answersJSON: String?
     )
     case resolveDirectApproval(id: String, decision: String)
     case selectProjectByID(id: String)
@@ -215,5 +216,22 @@
     case patchSettings(BridgeDesktopSettingsPatch)
     case updateBrowserViewport(viewport: BridgeDesktopBrowserViewport)
     case dismissFeedback(id: String)
+  }
+
+  extension MainWindowCommand {
+    static func resolveTaskApproval(
+      approvalID: String,
+      taskID: String,
+      decision: String,
+      oneTimeToolAutoApproval: Bool
+    ) -> Self {
+      .resolveTaskApproval(
+        approvalID: approvalID,
+        taskID: taskID,
+        decision: decision,
+        oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+        answersJSON: nil
+      )
+    }
   }
 #endif

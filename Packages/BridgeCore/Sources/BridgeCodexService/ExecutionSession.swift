@@ -175,7 +175,11 @@ package actor ExecutionSession {
     }
   }
 
-  func respondToApproval(id: String, decision: LocalApprovalDecision) async throws {
+  func respondToApproval(
+    id: String,
+    decision: LocalApprovalDecision,
+    answers: [String: [String]]? = nil
+  ) async throws {
     guard !terminal, let pending = pendingApprovals[id] else {
       throw ExecutionServiceError.approvalUnavailable(id)
     }
@@ -183,7 +187,7 @@ package actor ExecutionSession {
       await fail(code: "approval_binding_mismatch", summary: "Codex approval binding mismatch.")
       throw ExecutionServiceError.bindingMismatch
     }
-    let result = try pending.response.value(for: decision)
+    let result = try pending.response.value(for: decision, answers: answers)
     pendingApprovals.removeValue(forKey: id)
     approvalBarriers.insert(id)
     do {

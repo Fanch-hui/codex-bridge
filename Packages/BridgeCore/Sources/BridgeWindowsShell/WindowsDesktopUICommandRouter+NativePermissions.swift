@@ -19,7 +19,8 @@
           approvalID: approvalID,
           taskID: taskID,
           decision: decision,
-          oneTimeToolAutoApproval: oneTimeToolAutoApproval
+          oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+          answersJSON: optionalValue(payload.input)
         )
       case .resolveDirectApproval:
         guard let approvalID = value(payload.approvalID),

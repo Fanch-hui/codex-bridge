@@ -20,7 +20,18 @@ extension BridgeServiceRequestController {
       displayCommand: approval.displayCommand,
       relativePaths: approval.relativePaths,
       reason: approval.reason,
-      decisionOptions: approval.availableDecisions.map(\.rawValue)
+      decisionOptions: approval.availableDecisions.map(\.rawValue),
+      questions: approval.questions.isEmpty
+        ? nil
+        : approval.questions.map { question in
+          IPCUserInputQuestion(
+            id: question.id, header: question.header, question: question.question,
+            isOther: question.isOther, isSecret: question.isSecret,
+            options: question.options.map {
+              IPCUserInputOption(label: $0.label, description: $0.description)
+            }
+          )
+        }
     )
   }
 

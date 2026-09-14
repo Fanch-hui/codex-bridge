@@ -24,25 +24,37 @@ extension ServiceExecutionCoordinator {
   public func resolveApproval(
     taskID: TaskID,
     approvalID: String,
-    decision: LocalApprovalDecision
+    decision: LocalApprovalDecision,
+    answers: [String: [String]]? = nil
   ) async throws {
     if let pending = pendingAgentApprovals[approvalID] {
       guard pending.request.taskID == taskID else {
         throw ExecutionServiceError.bindingMismatch
       }
+      guard answers == nil else {
+        throw ExecutionServiceError.invalidRequest("approval.answers")
+      }
       try await resolveAgentApproval(pending, taskID: taskID, decision: decision)
       return
     }
+    let pending = await execution.pendingApprovals(taskID: taskID).first { $0.id == approvalID }
     try await execution.respondToApproval(
       taskID: taskID,
       approvalID: approvalID,
-      decision: decision
+      decision: decision,
+      answers: answers
     )
     do {
-      let updated = try await tasks.resumeAfterCodexApproval(
-        taskID: taskID,
-        approved: decision.isApproval
-      )
+      let updated: ServiceTaskRecord
+      if pending?.isBlocking == false {
+        guard let current = try await tasks.task(id: taskID) else {
+          throw ExecutionServiceError.approvalUnavailable(approvalID)
+        }
+        updated = current
+      } else {
+        updated = try await tasks.resumeAfterCodexApproval(
+          taskID: taskID, approved: decision.isApproval)
+      }
       await execution.finalizeApproval(
         taskID: taskID,
         approvalID: approvalID,
@@ -51,9 +63,11 @@ extension ServiceExecutionCoordinator {
       await supervision.observe(
         task: updated,
         kind: .progress,
-        summary: decision == .allow
-          ? "The local user approved a Codex operation."
-          : "The local user denied a Codex operation; Codex may choose a safer path."
+        summary: pending?.kind == .userInput
+          ? "The local user answered a Codex question."
+          : decision == .allow
+            ? "The local user approved a Codex operation."
+            : "The local user denied a Codex operation; Codex may choose a safer path."
       )
     } catch {
       await execution.finalizeApproval(
