@@ -130,7 +130,7 @@ extension BridgeServiceAppModel {
       from: catalogResponse
     )
     let response: IPCAgentModelsResponse
-    if let defaultModel, !defaultWasRemoved, providerID != "deepseek-harness" {
+    if let defaultModel, !defaultWasRemoved {
       response = try await client.agentModels(
         installationID: installationID,
         projectID: projectID,

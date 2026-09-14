@@ -950,7 +950,7 @@ final class BridgeServiceAppModelTests: XCTestCase {
     XCTAssertEqual(model.agentModelOptions, [option])
   }
 
-  func testRefreshingDeepSeekCatalogUsesOneLiveSnapshotForModelAndEffort() async throws {
+  func testRefreshingDeepSeekCatalogLoadsSelectedModelEfforts() async throws {
     let registration = TestServiceRegistration(status: .enabled)
     let client = TestBridgeServiceClient()
     let option = IPCAgentModelSummary(
@@ -959,7 +959,10 @@ final class BridgeServiceAppModelTests: XCTestCase {
       supportedReasoningEfforts: ["off", "high"],
       defaultReasoningEffort: "high"
     )
-    await client.configureAgentModels([option])
+    await client.configureAgentModels([
+      IPCAgentModelSummary(modelID: option.modelID, displayName: option.displayName)
+    ])
+    await client.configureSelectedModelResponse(option.modelID, models: [option])
     _ = try await client.setAgentDefaults(
       providerID: "deepseek-harness",
       model: option.modelID,
@@ -989,7 +992,7 @@ final class BridgeServiceAppModelTests: XCTestCase {
       let requestCount = await client.agentModelRequestCountValue()
       return !model.isRefreshingAgentModels(for: "deepseek-harness")
         && model.agentModelOptions(for: "deepseek-harness") == [option]
-        && requestCount == requestCountBeforeRefresh + 1
+        && requestCount == requestCountBeforeRefresh + 2
     }
     XCTAssertEqual(model.agentModelDefault(for: "deepseek-harness").model, option.modelID)
     XCTAssertEqual(model.agentModelDefault(for: "deepseek-harness").effort, "high")

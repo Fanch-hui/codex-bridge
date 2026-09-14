@@ -211,7 +211,7 @@
         installation: installation,
         modelID: nil
       )
-      guard providerID != "deepseek-harness", let modelID = persistedDefault.model else {
+      guard let modelID = persistedDefault.model else {
         return catalog.models
       }
       return try await loadModels(
@@ -229,7 +229,7 @@
       catalogResponse: IPCAgentModelsResponse,
       defaultWasRemoved: Bool
     ) async throws -> IPCAgentModelsResponse {
-      guard providerID != "deepseek-harness", !defaultWasRemoved,
+      guard !defaultWasRemoved,
         let modelID = persistedDefault.model
       else { return catalogResponse }
       return try await loadModels(
