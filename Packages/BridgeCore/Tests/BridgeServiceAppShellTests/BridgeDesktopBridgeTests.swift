@@ -46,45 +46,6 @@ final class BridgeDesktopBridgeTests: XCTestCase {
     XCTAssertEqual(state.connections?.codex?.isRefreshing, model.isRefreshing)
   }
 
-  func testSettingsMapReasoningEffortsPerSelectedModel() {
-    let model = BridgeServiceAppModel(
-      registration: BridgeDesktopTestServiceRegistration(status: .enabled),
-      clientFactory: { TestBridgeServiceClient() },
-      pollInterval: nil
-    )
-    model.models = [
-      MCPModelSummary(
-        modelID: "execution-model",
-        displayName: "Execution",
-        isDefault: true,
-        reasoningEfforts: ["low"],
-        defaultReasoningEffort: "low"
-      ),
-      MCPModelSummary(
-        modelID: "supervisor-model",
-        displayName: "Supervisor",
-        isDefault: false,
-        reasoningEfforts: ["high"],
-        defaultReasoningEffort: "high"
-      ),
-    ]
-    model.modelPreferences = IPCModelPreferences(
-      executionModel: "execution-model",
-      executionEffort: "low",
-      supervisorModel: "supervisor-model",
-      supervisorEffort: "high",
-      supervisorEnabled: true,
-      accessMode: "request-approval",
-      fastModeEnabled: false
-    )
-
-    let settings = BridgeDesktopUIStateBuilder.settings(from: model)
-
-    XCTAssertEqual(settings.effortOptions.map(\.id), ["low"])
-    XCTAssertEqual(settings.supervisorEffortOptions.map(\.id), ["high"])
-    XCTAssertEqual(settings.models.map(\.defaultReasoningEffort), ["low", "high"])
-  }
-
   func testConnectionsExposeMCPFailureWithoutDisablingAgentConnection() {
     let model = BridgeServiceAppModel(
       registration: BridgeDesktopTestServiceRegistration(status: .enabled),

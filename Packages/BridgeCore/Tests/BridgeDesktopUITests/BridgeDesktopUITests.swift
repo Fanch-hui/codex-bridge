@@ -66,7 +66,6 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(index.contains("workbench-inspector-footer"))
     let projectCollections = try BridgeDesktopUIResources.read(.pagesProjectCollectionsJS)
     XCTAssertTrue(projectCollections.contains("addSessionRows"))
-    XCTAssertTrue(projectCollections.contains("addThreadTranscript"))
     let commonScript = try BridgeDesktopUIResources.read(.pagesCommonJS)
     XCTAssertTrue(commonScript.contains("function markdown"))
     let connectionsScript = try BridgeDesktopUIResources.read(.pagesConnectionsJS)

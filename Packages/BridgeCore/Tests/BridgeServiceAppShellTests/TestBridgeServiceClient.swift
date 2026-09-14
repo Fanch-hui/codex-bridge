@@ -800,18 +800,6 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
     modelPreferencesValue = preferences
   }
 
-  func setSupervisorEnabled(_ enabled: Bool) async throws {
-    modelPreferencesValue = IPCModelPreferences(
-      executionModel: modelPreferencesValue.executionModel,
-      executionEffort: modelPreferencesValue.executionEffort,
-      supervisorModel: modelPreferencesValue.supervisorModel,
-      supervisorEffort: modelPreferencesValue.supervisorEffort,
-      supervisorEnabled: enabled,
-      accessMode: modelPreferencesValue.accessMode,
-      fastModeEnabled: modelPreferencesValue.fastModeEnabled
-    )
-  }
-
   func threads(_ request: IPCThreadListRequest) async throws -> MCPThreadPage {
     threadListCalls += 1
     if failThreadList { throw BridgeServiceClientError.unavailable }

@@ -1,7 +1,6 @@
 import BridgeAgentCore
 import BridgeDomain
 import BridgeServiceCore
-import BridgeSupervisor
 import Foundation
 
 extension ServiceExecutionCoordinator {
@@ -45,29 +44,18 @@ extension ServiceExecutionCoordinator {
       answers: answers
     )
     do {
-      let updated: ServiceTaskRecord
       if pending?.isBlocking == false {
-        guard let current = try await tasks.task(id: taskID) else {
+        guard try await tasks.task(id: taskID) != nil else {
           throw ExecutionServiceError.approvalUnavailable(approvalID)
         }
-        updated = current
       } else {
-        updated = try await tasks.resumeAfterCodexApproval(
+        _ = try await tasks.resumeAfterCodexApproval(
           taskID: taskID, approved: decision.isApproval)
       }
       await execution.finalizeApproval(
         taskID: taskID,
         approvalID: approvalID,
         committed: true
-      )
-      await supervision.observe(
-        task: updated,
-        kind: .progress,
-        summary: pending?.kind == .userInput
-          ? "The local user answered a Codex question."
-          : decision == .allow
-            ? "The local user approved a Codex operation."
-            : "The local user denied a Codex operation; Codex may choose a safer path."
       )
     } catch {
       await execution.finalizeApproval(
@@ -115,16 +103,9 @@ extension ServiceExecutionCoordinator {
 
     pendingAgentApprovals.removeValue(forKey: approval.approvalID)
     do {
-      let updated = try await tasks.resumeAfterCodexApproval(
+      _ = try await tasks.resumeAfterCodexApproval(
         taskID: taskID,
         approved: decision.isApproval
-      )
-      await supervision.observe(
-        task: updated,
-        kind: .progress,
-        summary: decision.isApproval
-          ? "The local user approved an agent operation."
-          : "The local user denied an agent operation."
       )
     } catch {
       await failAgentApproval(

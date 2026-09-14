@@ -56,19 +56,12 @@ extension BridgeServiceApplication {
       effort: preferences.executionEffort,
       models: models
     )
-    _ = try Self.select(
-      modelID: preferences.supervisorModel,
-      effort: preferences.supervisorEffort,
-      models: models
-    )
     try Self.checkDeadline(deadline)
     try await settings.setModelPreferences(preferences)
   }
 
   public func setSupervisorEnabled(_ enabled: Bool) async throws {
-    #if os(Windows)
-      guard !enabled else { throw BridgeMCPQueryError.contractRejected }
-    #endif
-    try await settings.setSupervisorEnabled(enabled)
+    guard !enabled else { throw BridgeMCPQueryError.contractRejected }
+    try await settings.setSupervisorEnabled(false)
   }
 }

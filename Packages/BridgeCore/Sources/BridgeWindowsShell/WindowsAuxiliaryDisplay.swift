@@ -107,13 +107,10 @@
     let modelRows: [String]
     let modelIDs: [String]
     let selectedExecutionModelIndex: Int?
-    let selectedSupervisorModelIndex: Int?
     let effortValues: [String]
     let selectedExecutionEffortIndex: Int?
-    let selectedSupervisorEffortIndex: Int?
     let accessValues: [String]
     let selectedAccessIndex: Int?
-    let supervisorEnabled: Bool
     let fastModeEnabled: Bool
     let directApprovalValues: [String]
     let selectedDirectApprovalIndex: Int?
@@ -128,11 +125,8 @@
     var busy: Bool = false
     var isRefreshingModels: Bool = false
     var modelError: String? = nil
-    var supervisorAvailable: Bool = false
     var executionModel: String = ""
     var executionEffort: String = ""
-    var supervisorModel: String = ""
-    var supervisorEffort: String = ""
     var accessMode: String = "request-approval"
     var directApprovalMode: String = "require"
     var taskStartApprovalMode: String = "require"

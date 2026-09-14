@@ -288,8 +288,6 @@
       case .setFastMode:
         guard let enabled = payload.fastModeEnabled ?? payload.enabled else { return nil }
         return .patchSettings(BridgeDesktopSettingsPatch(fastModeEnabled: enabled))
-      case .setSupervisorModel, .setSupervisorEffort, .setSupervisorEnabled:
-        return nil
       case .registerService:
         return .registerService
       case .unregisterService:

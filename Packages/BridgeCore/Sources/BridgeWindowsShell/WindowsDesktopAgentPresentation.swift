@@ -19,7 +19,6 @@
         supportsEffortSelection: provider.supportsEffortSelection,
         supportsSteer: provider.supportsSteer,
         supportsWorkspaceWrite: provider.supportsWorkspaceWrite,
-        supportsSupervisor: false,
         detail: ProjectAgentPresentation.provider(provider).detailText
       )
     }

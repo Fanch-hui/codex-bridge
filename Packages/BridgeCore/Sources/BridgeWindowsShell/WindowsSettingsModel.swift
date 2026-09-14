@@ -40,13 +40,10 @@
           modelRows: [],
           modelIDs: [],
           selectedExecutionModelIndex: nil,
-          selectedSupervisorModelIndex: nil,
           effortValues: [],
           selectedExecutionEffortIndex: nil,
-          selectedSupervisorEffortIndex: nil,
           accessValues: WindowsSettingsModel.accessValues,
           selectedAccessIndex: 0,
-          supervisorEnabled: false,
           fastModeEnabled: false,
           directApprovalValues: WindowsSettingsModel.approvalValues,
           selectedDirectApprovalIndex: 0,
@@ -119,7 +116,7 @@
     func savePreferences(_ value: IPCModelPreferences) async {
       guard connectionState == .connected, !busy else { return }
       guard !value.executionModel.isEmpty, !value.supervisorModel.isEmpty else {
-        let message = "执行模型和 Supervisor 模型不能为空。"
+        let message = "模型设置不完整。"
         statusText = message
         feedback.postAlert(message, title: "模型设置无法保存")
         publishDisplay()
@@ -222,12 +219,8 @@
       let modelIDs = models.map(\.modelID)
       let effortValues = availableEffortValues()
       let executionIndex = current.flatMap { modelIDs.firstIndex(of: $0.executionModel) }
-      let supervisorIndex = current.flatMap { modelIDs.firstIndex(of: $0.supervisorModel) }
       let executionEffortIndex = current.flatMap {
         effortValues.firstIndex(of: $0.executionEffort)
-      }
-      let supervisorEffortIndex = current.flatMap {
-        effortValues.firstIndex(of: $0.supervisorEffort)
       }
       let accessIndex = current.flatMap { Self.accessValues.firstIndex(of: $0.accessMode) }
       let directIndex = Self.approvalValues.firstIndex(of: directMode)
@@ -248,13 +241,10 @@
         modelRows: models.map { "\($0.displayName) · \($0.modelID)" },
         modelIDs: modelIDs,
         selectedExecutionModelIndex: executionIndex,
-        selectedSupervisorModelIndex: supervisorIndex,
         effortValues: effortValues,
         selectedExecutionEffortIndex: executionEffortIndex,
-        selectedSupervisorEffortIndex: supervisorEffortIndex,
         accessValues: Self.accessValues,
         selectedAccessIndex: accessIndex,
-        supervisorEnabled: false,
         fastModeEnabled: current?.fastModeEnabled ?? false,
         directApprovalValues: Self.approvalValues,
         selectedDirectApprovalIndex: directIndex,
@@ -270,11 +260,8 @@
         busy: busy,
         isRefreshingModels: isRefreshingModels,
         modelError: modelError,
-        supervisorAvailable: false,
         executionModel: current?.executionModel ?? "",
         executionEffort: current?.executionEffort ?? "",
-        supervisorModel: current?.supervisorModel ?? "",
-        supervisorEffort: current?.supervisorEffort ?? "",
         accessMode: current?.accessMode ?? "request-approval",
         directApprovalMode: directMode,
         taskStartApprovalMode: taskStartMode,

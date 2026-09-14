@@ -23,7 +23,6 @@ public actor ServiceComposition {
   public let agentRegistry: ServiceAgentRegistry
   let agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog
   public let execution: ExecutionManager
-  public let supervisor: SupervisorManager
   public let coordinator: ServiceExecutionCoordinator
   public let catalog: ServiceCodexCatalog
   public let runtimeStatus: ServiceRuntimeStatus
@@ -123,18 +122,10 @@ public actor ServiceComposition {
         synchronizeCodexProjects: configuration.synchronizeCodexProjects
       )
     )
-    let supervisor = SupervisorManager(
-      configuration: SupervisorManagerConfiguration(
-        appServer: configuration.supervisorAppServer,
-        clientInfo: configuration.clientInfo,
-        scratchRootURL: paths.supervisorScratchURL
-      )
-    )
     let coordinator = ServiceExecutionCoordinator(
       tasks: tasks,
       projects: projects,
       execution: execution,
-      supervisor: supervisor,
       agentRunner: agentRunner,
       providerDisplayNameResolver: {
         ServiceAgentProviderPolicyRegistry.displayName(for: $0)
@@ -199,7 +190,6 @@ public actor ServiceComposition {
       agentRegistry: agentRegistry,
       agentDiscoveryCatalog: agentDiscoveryCatalog,
       execution: execution,
-      supervisor: supervisor,
       coordinator: coordinator,
       catalog: catalog,
       runtimeStatus: runtimeStatus,
@@ -221,7 +211,6 @@ public actor ServiceComposition {
     agentRegistry: ServiceAgentRegistry,
     agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog,
     execution: ExecutionManager,
-    supervisor: SupervisorManager,
     coordinator: ServiceExecutionCoordinator,
     catalog: ServiceCodexCatalog,
     runtimeStatus: ServiceRuntimeStatus,
@@ -240,7 +229,6 @@ public actor ServiceComposition {
     self.agentRegistry = agentRegistry
     self.agentDiscoveryCatalog = agentDiscoveryCatalog
     self.execution = execution
-    self.supervisor = supervisor
     self.coordinator = coordinator
     self.catalog = catalog
     self.runtimeStatus = runtimeStatus

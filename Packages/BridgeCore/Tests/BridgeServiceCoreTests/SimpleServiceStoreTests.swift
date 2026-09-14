@@ -582,14 +582,14 @@ final class SimpleServiceStoreTests: XCTestCase {
     XCTAssertEqual(reopenedWorkbenchProject, "prj-policy")
   }
 
-  func testSupervisorEnabledDefaultsTrueAndPersistsToggle() async throws {
+  func testSupervisorRemainsDisabledAcrossLegacyToggleRequests() async throws {
     let fixture = try ServiceCoreFixture()
     defer { fixture.remove() }
     let store = try SimpleServiceStore(path: fixture.databasePath)
     let settings = ServiceSettings(store: store)
 
     let initial = try await settings.isSupervisorEnabled()
-    XCTAssertEqual(initial, true)
+    XCTAssertEqual(initial, false)
 
     try await settings.setSupervisorEnabled(false)
     let reopened = try SimpleServiceStore(path: fixture.databasePath)
@@ -599,7 +599,7 @@ final class SimpleServiceStoreTests: XCTestCase {
 
     try await reopenedSettings.setSupervisorEnabled(true)
     let reenabled = try await reopenedSettings.isSupervisorEnabled()
-    XCTAssertEqual(reenabled, true)
+    XCTAssertEqual(reenabled, false)
   }
 
   func testGlobalCustomInstructionsPersistClearAndValidateContent() async throws {

@@ -291,18 +291,11 @@ public actor ServiceSettings {
   }
 
   public func isSupervisorEnabled() async throws -> Bool {
-    guard let setting = try await store.setting(key: ServiceSettingKey.supervisorEnabled.rawValue)
-    else {
-      return true
-    }
-    guard let enabled = Bool(setting.value) else {
-      throw ServiceStoreError.corruptRecord
-    }
-    return enabled
+    false
   }
 
-  public func setSupervisorEnabled(_ enabled: Bool) async throws {
-    try await set(String(enabled), for: .supervisorEnabled)
+  public func setSupervisorEnabled(_ _: Bool) async throws {
+    try await set("false", for: .supervisorEnabled)
   }
 
   public func openCodeDefaultPermissionMode() async throws -> String {

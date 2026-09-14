@@ -1117,28 +1117,6 @@ final class BridgeServiceAppModelTests: XCTestCase {
     XCTAssertNil(model.modelCatalogError)
   }
 
-  func testSupervisorEnabledToggleReachesServiceClient() async throws {
-    let registration = TestServiceRegistration(status: .enabled)
-    let client = TestBridgeServiceClient()
-    let model = BridgeServiceAppModel(
-      registration: registration,
-      clientFactory: { client },
-      pollInterval: nil,
-      connectionRetryDelay: .milliseconds(1),
-      maximumConnectionAttempts: 1
-    )
-    await model.startAsync()
-    XCTAssertEqual(model.modelPreferences?.supervisorEnabled, true)
-
-    model.setSupervisorEnabled(false)
-
-    try await waitUntil {
-      let snapshot = await client.mutationSnapshot()
-      return snapshot.modelPreferences.supervisorEnabled == false
-    }
-    XCTAssertEqual(model.modelPreferences?.supervisorEnabled, false)
-  }
-
   func testAccessModeAndFastModeReachServiceClient() async throws {
     let registration = TestServiceRegistration(status: .enabled)
     let client = TestBridgeServiceClient()

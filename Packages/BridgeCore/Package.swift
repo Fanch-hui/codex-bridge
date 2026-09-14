@@ -58,10 +58,6 @@ var windowsApplicationLinkerFlags = [
       dependencies: ["BridgeGit"]
     ),
     .testTarget(
-      name: "BridgeSupervisorTests",
-      dependencies: ["BridgeCodexRPC", "BridgeSecurity", "BridgeSupervisor"]
-    ),
-    .testTarget(
       name: "BridgeFilesTests",
       dependencies: ["BridgeFiles", "BridgeDomain", "BridgeProjects", "BridgeSecurity"]
     ),
@@ -115,7 +111,6 @@ var windowsApplicationLinkerFlags = [
         "BridgeProjects",
         "BridgeSecurity",
         "BridgeServiceCore",
-        "BridgeSupervisor",
       ]
     ),
     .testTarget(
@@ -341,7 +336,6 @@ let package = Package(
     .library(name: "BridgeCodexRPC", targets: ["BridgeCodexRPC"]),
     .library(name: "BridgeProjects", targets: ["BridgeProjects"]),
     .library(name: "BridgeGit", targets: ["BridgeGit"]),
-    .library(name: "BridgeSupervisor", targets: ["BridgeSupervisor"]),
     .library(name: "BridgeFiles", targets: ["BridgeFiles"]),
     .library(name: "BridgeMCP", targets: ["BridgeMCP"]),
     .library(name: "BridgeTunnel", targets: ["BridgeTunnel"]),
@@ -422,10 +416,6 @@ let package = Package(
       ]
     ),
     .target(
-      name: "BridgeSupervisor",
-      dependencies: ["BridgeCodexRPC", "BridgeSecurity"]
-    ),
-    .target(
       name: "BridgeFiles",
       dependencies: [
         "BridgeAgentCore",
@@ -490,7 +480,6 @@ let package = Package(
         "BridgeProjects",
         "BridgeSecurity",
         "BridgeServiceCore",
-        "BridgeSupervisor",
         .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),

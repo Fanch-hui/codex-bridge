@@ -219,7 +219,6 @@ extension BridgeDesktopUIStateBuilder {
       supportsEffortSelection: provider.supportsEffortSelection,
       supportsSteer: provider.supportsSteer,
       supportsWorkspaceWrite: provider.supportsWorkspaceWrite,
-      supportsSupervisor: provider.supportsSupervisor,
       detail: detail.isEmpty ? nil : detail
     )
   }

@@ -8,7 +8,6 @@ extension BridgeDesktopUIStateBuilder {
     let preferences = model.modelPreferences
     let models = model.models.map(modelOption)
     let executionModel = preferences?.executionModel ?? ""
-    let supervisorModel = preferences?.supervisorModel ?? ""
     let service = servicePresentation(
       status: model.registrationStatus,
       keepServiceRunningAfterExit: model.keepServiceRunningAfterAppExit
@@ -22,14 +21,9 @@ extension BridgeDesktopUIStateBuilder {
       models: models,
       executionModel: executionModel,
       executionEffort: preferences?.executionEffort ?? "",
-      supervisorModel: supervisorModel,
-      supervisorEffort: preferences?.supervisorEffort ?? "",
-      supervisorAvailable: true,
       effortOptions: effortOptions(for: executionModel, models: model.models),
-      supervisorEffortOptions: effortOptions(for: supervisorModel, models: model.models),
       accessMode: preferences?.accessMode ?? "request-approval",
       accessOptions: accessOptions,
-      supervisorEnabled: preferences?.supervisorEnabled ?? true,
       fastModeEnabled: preferences?.fastModeEnabled ?? false,
       directApprovalMode: model.directApprovalMode,
       directApprovalOptions: modeOptions(

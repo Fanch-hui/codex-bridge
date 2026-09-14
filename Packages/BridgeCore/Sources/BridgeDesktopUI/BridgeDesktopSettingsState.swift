@@ -178,14 +178,9 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let models: [BridgeDesktopModelOption]
   public let executionModel: String
   public let executionEffort: String
-  public let supervisorModel: String
-  public let supervisorEffort: String
-  public let supervisorAvailable: Bool
   public let effortOptions: [BridgeDesktopChoice]
-  public let supervisorEffortOptions: [BridgeDesktopChoice]
   public let accessMode: String
   public let accessOptions: [BridgeDesktopChoice]
-  public let supervisorEnabled: Bool
   public let fastModeEnabled: Bool
   public let directApprovalMode: String
   public let directApprovalOptions: [BridgeDesktopChoice]
@@ -219,14 +214,9 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     models: [BridgeDesktopModelOption] = [],
     executionModel: String = "",
     executionEffort: String = "",
-    supervisorModel: String = "",
-    supervisorEffort: String = "",
-    supervisorAvailable: Bool = true,
     effortOptions: [BridgeDesktopChoice] = [],
-    supervisorEffortOptions: [BridgeDesktopChoice] = [],
     accessMode: String = "request-approval",
     accessOptions: [BridgeDesktopChoice] = [],
-    supervisorEnabled: Bool = true,
     fastModeEnabled: Bool = false,
     directApprovalMode: String = "require",
     directApprovalOptions: [BridgeDesktopChoice] = [],
@@ -259,14 +249,9 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     self.models = models
     self.executionModel = executionModel
     self.executionEffort = executionEffort
-    self.supervisorModel = supervisorModel
-    self.supervisorEffort = supervisorEffort
-    self.supervisorAvailable = supervisorAvailable
     self.effortOptions = effortOptions
-    self.supervisorEffortOptions = supervisorEffortOptions
     self.accessMode = accessMode
     self.accessOptions = accessOptions
-    self.supervisorEnabled = supervisorEnabled
     self.fastModeEnabled = fastModeEnabled
     self.directApprovalMode = directApprovalMode
     self.directApprovalOptions = directApprovalOptions

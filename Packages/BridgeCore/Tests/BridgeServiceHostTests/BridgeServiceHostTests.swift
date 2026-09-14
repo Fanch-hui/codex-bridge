@@ -910,9 +910,9 @@ final class BridgeServiceHostTests: XCTestCase {
     let preferences = defaults.preferences
     XCTAssertEqual(preferences.executionModel, "execution-model")
     XCTAssertEqual(preferences.executionEffort, "high")
-    XCTAssertEqual(preferences.supervisorModel, "gpt-5.6-luna")
-    XCTAssertEqual(preferences.supervisorEffort, "medium")
-    XCTAssertEqual(preferences.supervisorEnabled, true)
+    XCTAssertEqual(preferences.supervisorModel, "")
+    XCTAssertEqual(preferences.supervisorEffort, "")
+    XCTAssertEqual(preferences.supervisorEnabled, false)
     XCTAssertEqual(preferences.accessMode, "request-approval")
     XCTAssertEqual(preferences.fastModeEnabled, false)
 
@@ -921,6 +921,7 @@ final class BridgeServiceHostTests: XCTestCase {
       executionEffort: "medium",
       supervisorModel: "execution-model",
       supervisorEffort: "high",
+      supervisorEnabled: false,
       accessMode: "auto-review",
       fastModeEnabled: true
     )
@@ -932,9 +933,14 @@ final class BridgeServiceHostTests: XCTestCase {
     let disabled = try await client.modelCatalog()
     XCTAssertEqual(disabled.preferences.supervisorEnabled, false)
 
-    try await client.setSupervisorEnabled(true)
-    let reenabled = try await client.modelCatalog()
-    XCTAssertEqual(reenabled.preferences.supervisorEnabled, true)
+    do {
+      try await client.setSupervisorEnabled(true)
+      XCTFail("Expected Supervisor enablement to be unavailable")
+    } catch {
+      XCTAssertTrue(error is BridgeServiceClientError)
+    }
+    let remainsDisabled = try await client.modelCatalog()
+    XCTAssertEqual(remainsDisabled.preferences.supervisorEnabled, false)
   }
 
   func testIPCCodecRejectsOversizeAndMismatchedResponses() throws {

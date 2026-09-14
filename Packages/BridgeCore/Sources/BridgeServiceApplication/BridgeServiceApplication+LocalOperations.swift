@@ -245,10 +245,6 @@ extension BridgeServiceApplication {
   }
 
   public func serviceSupervisorEnabled() async throws -> Bool {
-    #if os(Windows)
-      return false
-    #else
-      try await settings.isSupervisorEnabled()
-    #endif
+    false
   }
 }

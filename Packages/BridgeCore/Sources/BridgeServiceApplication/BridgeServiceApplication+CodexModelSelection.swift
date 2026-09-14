@@ -34,46 +34,7 @@ extension BridgeServiceApplication {
         ?? configuredExecutionEffort,
       models: models
     )
-
-    #if os(Windows)
-      return ModelSelections(execution: execution, supervisor: nil)
-    #endif
-    guard try await settings.isSupervisorEnabled() else {
-      return ModelSelections(execution: execution, supervisor: nil)
-    }
-
-    let explicitSupervisor =
-      usesExplicitOverride
-      && (submission.supervisorModel != nil
-        || submission.supervisorEffort != nil)
-    let configuredSupervisorModel = try await settings.string(for: .defaultSupervisorModel)
-    let configuredSupervisorEffort = try await settings.string(for: .defaultSupervisorEffort)
-    let supervisor: SelectedModel
-    if explicitSupervisor {
-      guard let model = submission.supervisorModel,
-        let effort = submission.supervisorEffort
-      else {
-        throw BridgeMCPQueryError.contractRejected
-      }
-      supervisor = try Self.select(modelID: model, effort: effort, models: models)
-    } else if let configuredSupervisorModel {
-      supervisor = try Self.select(
-        modelID: configuredSupervisorModel,
-        effort: configuredSupervisorEffort,
-        models: models
-      )
-    } else {
-      let recommended =
-        models.first(where: { $0.modelID == "gpt-5.6-luna" })
-        ?? models.first(where: \.isDefault)
-        ?? models[0]
-      supervisor = try Self.select(
-        modelID: recommended.modelID,
-        effort: configuredSupervisorEffort,
-        models: models
-      )
-    }
-    return ModelSelections(execution: execution, supervisor: supervisor)
+    return ModelSelections(execution: execution, supervisor: nil)
   }
 
   func resolvedDefaultModelPreferences(
@@ -93,24 +54,14 @@ extension BridgeServiceApplication {
       models: models
     )
 
-    let configuredSupervisorModel = try await settings.string(for: .defaultSupervisorModel)
-    let configuredSupervisorEffort = try await settings.string(for: .defaultSupervisorEffort)
-    let supervisorModelID =
-      configuredSupervisorModel
-      ?? models.first(where: { $0.modelID == "gpt-5.6-luna" })?.modelID
-      ?? models.first(where: \.isDefault)?.modelID
-      ?? models[0].modelID
-    let supervisor = try Self.select(
-      modelID: supervisorModelID,
-      effort: configuredSupervisorEffort,
-      models: models
-    )
+    let supervisorModel = try await settings.string(for: .defaultSupervisorModel) ?? ""
+    let supervisorEffort = try await settings.string(for: .defaultSupervisorEffort) ?? ""
 
     return ServiceModelPreferences(
       executionModel: execution.model,
       executionEffort: execution.effort,
-      supervisorModel: supervisor.model,
-      supervisorEffort: supervisor.effort,
+      supervisorModel: supervisorModel,
+      supervisorEffort: supervisorEffort,
       accessMode: try await settings.accessMode(),
       fastModeEnabled: try await settings.isFastModeEnabled()
     )

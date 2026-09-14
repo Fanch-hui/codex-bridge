@@ -19,10 +19,8 @@
     container.appendChild(content);
     var models = group(content, "模型与执行默认偏好");
     var preferences = M.preferences(page, emit);
-    var supervisor = M.supervisor(page, emit);
     var agents = global.CodexBridgeDesktopSettingsAgents.create(page, emit);
     models.appendChild(preferences.root);
-    models.appendChild(supervisor.root);
     models.appendChild(agents.root);
     var direct = global.CodexBridgeDesktopDirect.create();
     content.appendChild(direct.root);
@@ -49,8 +47,6 @@
         if (!next) return;
         direct.update(next.direct, nextEmit);
         preferences.update(next, nextEmit);
-        supervisor.root.hidden = !next.supervisorAvailable;
-        supervisor.update(next, nextEmit);
         agents.update(next, nextEmit);
         instructions.update(next, nextEmit);
         approvalEditor.update(next, nextEmit);

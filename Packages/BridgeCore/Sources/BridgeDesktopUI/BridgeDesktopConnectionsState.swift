@@ -179,7 +179,6 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
   public let supportsEffortSelection: Bool
   public let supportsSteer: Bool
   public let supportsWorkspaceWrite: Bool
-  public let supportsSupervisor: Bool
   public let detail: String?
 
   public init(
@@ -196,7 +195,6 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     supportsEffortSelection: Bool = true,
     supportsSteer: Bool = false,
     supportsWorkspaceWrite: Bool = true,
-    supportsSupervisor: Bool = false,
     detail: String? = nil
   ) {
     self.providerID = providerID
@@ -212,7 +210,6 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     self.supportsEffortSelection = supportsEffortSelection
     self.supportsSteer = supportsSteer
     self.supportsWorkspaceWrite = supportsWorkspaceWrite
-    self.supportsSupervisor = supportsSupervisor
     self.detail = detail
   }
 }

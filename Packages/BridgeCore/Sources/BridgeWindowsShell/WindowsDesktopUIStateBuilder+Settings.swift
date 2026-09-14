@@ -18,20 +18,12 @@
         models: settings.modelOptions,
         executionModel: settings.executionModel,
         executionEffort: settings.executionEffort,
-        supervisorModel: settings.supervisorModel,
-        supervisorEffort: settings.supervisorEffort,
-        supervisorAvailable: false,
         effortOptions: effortOptions(
           for: settings.executionModel,
           models: settings.modelOptions
         ),
-        supervisorEffortOptions: effortOptions(
-          for: settings.supervisorModel,
-          models: settings.modelOptions
-        ),
         accessMode: settings.accessMode,
         accessOptions: settings.accessValues.map { accessChoice($0) },
-        supervisorEnabled: false,
         fastModeEnabled: settings.fastModeEnabled,
         directApprovalMode: settings.directApprovalMode,
         directApprovalOptions: settings.directApprovalValues.map { approvalChoice($0) },

@@ -83,9 +83,6 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setExecutionEffort
   case setAccessMode
   case setFastMode
-  case setSupervisorModel
-  case setSupervisorEffort
-  case setSupervisorEnabled
   case setDirectApprovalMode
   case setTaskStartApprovalMode
   case saveSettings
@@ -149,15 +146,12 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let runtimeKey: String?
   public let executionModel: String?
   public let executionEffort: String?
-  public let supervisorModel: String?
-  public let supervisorEffort: String?
   public let accessMode: String?
   public let readPermission: String?
   public let writePermission: String?
   public let networkPermission: String?
   public let enabled: Bool?
   public let acceptReplacement: Bool?
-  public let supervisorEnabled: Bool?
   public let fastModeEnabled: Bool?
   public let keepServiceRunningAfterExit: Bool?
   public let oneTimeToolAutoApproval: Bool?
@@ -215,15 +209,12 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     runtimeKey: String? = nil,
     executionModel: String? = nil,
     executionEffort: String? = nil,
-    supervisorModel: String? = nil,
-    supervisorEffort: String? = nil,
     accessMode: String? = nil,
     readPermission: String? = nil,
     writePermission: String? = nil,
     networkPermission: String? = nil,
     enabled: Bool? = nil,
     acceptReplacement: Bool? = nil,
-    supervisorEnabled: Bool? = nil,
     fastModeEnabled: Bool? = nil,
     keepServiceRunningAfterExit: Bool? = nil,
     oneTimeToolAutoApproval: Bool? = nil,
@@ -280,15 +271,12 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.runtimeKey = runtimeKey
     self.executionModel = executionModel
     self.executionEffort = executionEffort
-    self.supervisorModel = supervisorModel
-    self.supervisorEffort = supervisorEffort
     self.accessMode = accessMode
     self.readPermission = readPermission
     self.writePermission = writePermission
     self.networkPermission = networkPermission
     self.enabled = enabled
     self.acceptReplacement = acceptReplacement
-    self.supervisorEnabled = supervisorEnabled
     self.fastModeEnabled = fastModeEnabled
     self.keepServiceRunningAfterExit = keepServiceRunningAfterExit
     self.oneTimeToolAutoApproval = oneTimeToolAutoApproval

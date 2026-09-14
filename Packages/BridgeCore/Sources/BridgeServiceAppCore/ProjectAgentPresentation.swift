@@ -178,7 +178,6 @@ public enum ProjectAgentPresentation {
     if provider.supportsSteer { values.append("Steer") }
     if provider.supportsWorkspaceWrite { values.append("工作区写入") }
     if provider.supportsSkillSelection { values.append("技能") }
-    if provider.supportsSupervisor { values.append("Supervisor") }
     return values
   }
 }

@@ -33,19 +33,6 @@ extension BridgeDesktopCommandRouter {
         else { return }
       }
       model.setFastMode(enabled)
-    case .setSupervisorModel:
-      guard connected(model), let modelID = modelID(payload.supervisorModel, in: model.models)
-      else { return }
-      model.setSupervisorModel(modelID)
-    case .setSupervisorEffort:
-      guard connected(model), let preferences = model.modelPreferences,
-        let effort = effort(
-          payload.supervisorEffort, for: preferences.supervisorModel, in: model.models)
-      else { return }
-      model.setSupervisorEffort(effort)
-    case .setSupervisorEnabled:
-      guard connected(model), let enabled = payload.supervisorEnabled else { return }
-      model.setSupervisorEnabled(enabled)
     case .setDirectApprovalMode:
       guard connected(model), let mode = approvalMode(payload.mode) else { return }
       model.setDirectApprovalMode(mode)
@@ -147,25 +134,14 @@ extension BridgeDesktopCommandRouter {
     let executionModel =
       payload.executionModel.flatMap { modelID($0, in: model.models) }
       ?? current.executionModel
-    let supervisorModel =
-      payload.supervisorModel.flatMap { modelID($0, in: model.models) }
-      ?? current.supervisorModel
-    guard model.models.contains(where: { $0.modelID == executionModel }),
-      model.models.contains(where: { $0.modelID == supervisorModel })
-    else { return }
+    guard model.models.contains(where: { $0.modelID == executionModel }) else { return }
     let executionEffort =
       payload.executionEffort.flatMap {
         effort($0, for: executionModel, in: model.models)
       } ?? current.executionEffort
-    let supervisorEffort =
-      payload.supervisorEffort.flatMap {
-        effort($0, for: supervisorModel, in: model.models)
-      } ?? current.supervisorEffort
     guard
       model.models.first(where: { $0.modelID == executionModel })?.reasoningEfforts
         .contains(executionEffort) == true,
-      model.models.first(where: { $0.modelID == supervisorModel })?.reasoningEfforts
-        .contains(supervisorEffort) == true,
       accessMode(payload.accessMode ?? current.accessMode) != nil
     else { return }
     let fastModeEnabled = payload.fastModeEnabled ?? current.fastModeEnabled
@@ -178,9 +154,9 @@ extension BridgeDesktopCommandRouter {
       IPCModelPreferences(
         executionModel: executionModel,
         executionEffort: executionEffort,
-        supervisorModel: supervisorModel,
-        supervisorEffort: supervisorEffort,
-        supervisorEnabled: payload.supervisorEnabled ?? current.supervisorEnabled,
+        supervisorModel: current.supervisorModel,
+        supervisorEffort: current.supervisorEffort,
+        supervisorEnabled: current.supervisorEnabled,
         accessMode: payload.accessMode ?? current.accessMode,
         fastModeEnabled: fastModeEnabled
       )

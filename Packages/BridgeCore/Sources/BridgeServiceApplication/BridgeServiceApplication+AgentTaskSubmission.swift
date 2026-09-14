@@ -23,10 +23,7 @@ extension BridgeServiceApplication {
     else {
       throw BridgeMCPQueryError.contractRejected
     }
-    guard
-      policy.supportsSupervisor
-        || (submission.supervisorModel == nil && submission.supervisorEffort == nil)
-    else {
+    guard submission.supervisorModel == nil && submission.supervisorEffort == nil else {
       throw BridgeMCPQueryError.contractRejected
     }
     guard policy.supportsSkillSelection || submission.skillName == nil else {

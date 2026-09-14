@@ -74,7 +74,7 @@ struct ProjectPermissionEditor: View {
           )
         }
 
-        Text("安全原则：MCP 客户端和 Supervisor 永远不能代替本机用户批准 Codex 操作。")
+        Text("安全原则：MCP 客户端不能代替本机用户批准 Codex 操作。")
           .font(.caption2)
           .foregroundStyle(.secondary)
       }

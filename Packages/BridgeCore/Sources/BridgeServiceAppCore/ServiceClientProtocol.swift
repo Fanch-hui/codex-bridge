@@ -107,7 +107,6 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func modelCatalog(forceRefresh: Bool) async throws -> IPCModelCatalogResponse
   func modelPreferences() async throws -> IPCModelPreferences
   func setModelPreferences(_ preferences: IPCModelPreferences) async throws
-  func setSupervisorEnabled(_ enabled: Bool) async throws
   func threads(_ request: IPCThreadListRequest) async throws -> MCPThreadPage
   func skills(projectID: String) async throws -> MCPServiceSkillList
   func readThread(_ request: IPCThreadReadRequest) async throws -> MCPThreadReadPage
