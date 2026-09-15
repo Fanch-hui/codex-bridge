@@ -3,6 +3,54 @@ import Foundation
 import XCTest
 
 final class SkillScannerTests: XCTestCase {
+  func testDefaultRootsFollowCodexHomeAndUserHomeEnvironment() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let codexHome = root.appendingPathComponent("codex-home", isDirectory: true)
+    let codexSkill = codexHome.appendingPathComponent("skills/from-codex-home", isDirectory: true)
+    try makeSkill(at: codexSkill, description: "Codex home")
+
+    let roots = SkillScanner.defaultGlobalRoots(
+      environment: ["CODEX_HOME": codexHome.path, "HOME": root.path],
+      homeDirectory: URL(fileURLWithPath: "/unavailable-home", isDirectory: true)
+    )
+    let scanner = SkillScanner(globalRoots: roots)
+    let manifests = try await scanner.scanSkills(for: nil)
+
+    XCTAssertEqual(manifests.map(\.name), ["from-codex-home"])
+    XCTAssertEqual(manifests.first?.scope, .global)
+  }
+
+  func testRecursesHiddenSystemCollectionWithoutScanningNestedSkillContent() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let skills = root.appendingPathComponent("skills", isDirectory: true)
+    let systemSkill = skills.appendingPathComponent(
+      ".system/skill-creator", isDirectory: true
+    )
+    let parentSkill = skills.appendingPathComponent(
+      "china-legal-skills", isDirectory: true
+    )
+    let nestedSkill = parentSkill.appendingPathComponent(
+      "references/nested-document", isDirectory: true
+    )
+    let packagedSkill = parentSkill.appendingPathComponent(
+      "skills/legal/contract-review", isDirectory: true
+    )
+    try makeSkill(at: systemSkill, description: "system")
+    try makeSkill(at: parentSkill, description: "parent")
+    try makeSkill(at: nestedSkill, description: "nested")
+    try makeSkill(at: packagedSkill, description: "packaged")
+
+    let scanner = SkillScanner(globalRoots: [skills])
+    let manifests = try await scanner.scanSkills(for: nil)
+
+    XCTAssertEqual(
+      manifests.map(\.name), ["china-legal-skills", "contract-review", "skill-creator"]
+    )
+    XCTAssertFalse(manifests.contains { $0.name == "nested-document" })
+  }
+
   func testDiscoversInstalledSkillWhoseDirectoryAndDeclaredNameContainSpaces() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }

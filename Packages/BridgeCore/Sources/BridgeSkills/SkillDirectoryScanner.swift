@@ -33,65 +33,133 @@ struct SkillDirectoryScanner {
   private func scanDirectory(_ directory: URL, scope: SkillScope) throws -> [SkillManifest] {
     guard fileManager.fileExists(atPath: directory.path) else { return [] }
     let resolvedDirectory = directory.resolvingSymlinksInPath().standardizedFileURL
-    let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey]
-    let entries = try fileManager.contentsOfDirectory(
-      at: directory,
-      includingPropertiesForKeys: keys,
-      options: [.skipsHiddenFiles]
+    let discovered = try scanCollection(
+      directory,
+      collectionRoot: resolvedDirectory,
+      scope: scope,
+      depth: 0,
+      traversal: .collectionRoot
     )
-    var manifests: [SkillManifest] = []
-    for entry in entries {
+    return discovered.sorted {
+      if $0.depth != $1.depth { return $0.depth < $1.depth }
+      return $0.manifest.rootPath.localizedCaseInsensitiveCompare($1.manifest.rootPath)
+        == .orderedAscending
+    }.map(\.manifest)
+  }
+
+  private struct DiscoveredManifest {
+    let manifest: SkillManifest
+    let depth: Int
+  }
+
+  private enum Traversal: Equatable {
+    case collectionRoot
+    case nestedCollection
+  }
+
+  private static let excludedContainerNames: Set<String> = [
+    ".git", ".github", "examples", "references",
+  ]
+
+  private func scanCollection(
+    _ directory: URL,
+    collectionRoot: URL,
+    scope: SkillScope,
+    depth: Int,
+    traversal: Traversal
+  ) throws -> [DiscoveredManifest] {
+    let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey]
+    if depth > 0 {
+      let values = try directory.resourceValues(forKeys: Set(keys))
+      guard values.isDirectory == true, values.isSymbolicLink != true else { return [] }
+    }
+    let entries = try fileManager.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: keys, options: []
+    )
+    var manifests: [DiscoveredManifest] = []
+    for entry in entries.sorted(by: {
+      $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent)
+        == .orderedAscending
+    }) {
       let values = try entry.resourceValues(forKeys: Set(keys))
       guard values.isDirectory == true else { continue }
       let name = entry.lastPathComponent
       guard SkillManifestMetadata.isValidSkillName(name), values.isSymbolicLink != true else {
         continue
       }
+      guard !Self.excludedContainerNames.contains(name.lowercased()) else { continue }
       let resolved = entry.resolvingSymlinksInPath().standardizedFileURL
-      guard
-        resolved.path == resolvedDirectory.path
-          || resolved.path.hasPrefix(resolvedDirectory.path + "/")
-      else {
+      guard SkillPathRules.isContained(resolved, in: collectionRoot) else { continue }
+      let document = entry.appendingPathComponent("SKILL.md")
+      if fileManager.fileExists(atPath: document.path) {
+        guard let manifest = try readManifest(at: entry, resolved: resolved, scope: scope) else {
+          continue
+        }
+        manifests.append(DiscoveredManifest(manifest: manifest, depth: depth))
+        if manifests.count >= SkillScanner.maximumSkills {
+          throw SkillError.tooManySkills
+        }
+        let nestedSkills = entry.appendingPathComponent("skills", isDirectory: true)
+        if fileManager.fileExists(atPath: nestedSkills.path) {
+          manifests.append(
+            contentsOf: try scanCollection(
+              nestedSkills,
+              collectionRoot: collectionRoot,
+              scope: scope,
+              depth: depth + 1,
+              traversal: .nestedCollection
+            ))
+          if manifests.count >= SkillScanner.maximumSkills {
+            throw SkillError.tooManySkills
+          }
+        }
         continue
       }
-      let document = entry.appendingPathComponent("SKILL.md")
-      guard fileManager.isReadableFile(atPath: document.path) else { continue }
-      guard let data = try? Data(contentsOf: document),
-        data.count <= SkillScanner.maximumDocumentBytes,
-        let text = String(data: data, encoding: .utf8),
-        let metadata = try? SkillFrontmatter.parse(text)
-      else { continue }
 
-      let declaredName = SkillManifestMetadata.declaredName(from: metadata, fallback: name)
-      let description = SkillManifestMetadata.description(from: metadata)
-      var actions = try SkillActionCatalog.actions(
-        for: entry,
-        metadata: metadata,
-        documentText: text,
-        fileManager: fileManager
-      )
-      if actions.isEmpty {
-        actions = SkillActionCatalog.builtInActions(for: declaredName)
-      }
-      let references = fileManager.fileExists(
-        atPath: entry.appendingPathComponent("references").path
-      )
+      guard
+        traversal == .nestedCollection
+          || name.caseInsensitiveCompare(".system") == .orderedSame
+      else { continue }
       manifests.append(
-        SkillManifest(
-          name: declaredName,
-          description: description,
+        contentsOf: try scanCollection(
+          entry,
+          collectionRoot: collectionRoot,
           scope: scope,
-          rootPath: resolved.path,
-          triggers: SkillManifestMetadata.triggers(from: metadata),
-          actions: actions,
-          hasReferences: references
-        )
-      )
+          depth: depth + 1,
+          traversal: .nestedCollection
+        ))
       if manifests.count >= SkillScanner.maximumSkills {
         throw SkillError.tooManySkills
       }
     }
     return manifests
+  }
+
+  private func readManifest(
+    at directory: URL, resolved: URL, scope: SkillScope
+  ) throws -> SkillManifest? {
+    let document = directory.appendingPathComponent("SKILL.md")
+    guard fileManager.isReadableFile(atPath: document.path),
+      let data = try? Data(contentsOf: document),
+      data.count <= SkillScanner.maximumDocumentBytes,
+      let text = String(data: data, encoding: .utf8),
+      let metadata = try? SkillFrontmatter.parse(text)
+    else { return nil }
+    let name = SkillManifestMetadata.declaredName(
+      from: metadata, fallback: directory.lastPathComponent)
+    var actions = try SkillActionCatalog.actions(
+      for: directory, metadata: metadata, documentText: text, fileManager: fileManager)
+    if actions.isEmpty { actions = SkillActionCatalog.builtInActions(for: name) }
+    return SkillManifest(
+      name: name,
+      description: SkillManifestMetadata.description(from: metadata),
+      scope: scope,
+      rootPath: resolved.path,
+      triggers: SkillManifestMetadata.triggers(from: metadata),
+      actions: actions,
+      hasReferences: fileManager.fileExists(
+        atPath: directory.appendingPathComponent("references").path)
+    )
   }
 
   private func append(

@@ -21,7 +21,10 @@ extension BridgeServiceApplication {
   public func serviceModels(
     deadline: ContinuousClock.Instant
   ) async throws -> MCPModelList {
-    try await catalog.listModels(deadline: deadline)
+    let models = try await catalog.listModels(deadline: deadline)
+    guard !models.models.isEmpty else { return models }
+    let preferences = try await resolvedDefaultModelPreferences(models: models.models)
+    return Self.modelsWithConfiguredDefault(models, preferences: preferences)
   }
 
   public func serviceModelPreferences(
@@ -42,7 +45,10 @@ extension BridgeServiceApplication {
       models = try await catalog.listModels(deadline: deadline)
     }
     let preferences = try await resolvedDefaultModelPreferences(models: models.models)
-    return ServiceModelCatalog(models: models, preferences: preferences)
+    return ServiceModelCatalog(
+      models: Self.modelsWithConfiguredDefault(models, preferences: preferences),
+      preferences: preferences
+    )
   }
 
   public func setServiceModelPreferences(
@@ -63,5 +69,25 @@ extension BridgeServiceApplication {
   public func setSupervisorEnabled(_ enabled: Bool) async throws {
     guard !enabled else { throw BridgeMCPQueryError.contractRejected }
     try await settings.setSupervisorEnabled(false)
+  }
+
+  private static func modelsWithConfiguredDefault(
+    _ models: MCPModelList,
+    preferences: ServiceModelPreferences
+  ) -> MCPModelList {
+    MCPModelList(
+      models: models.models.map { model in
+        MCPModelSummary(
+          modelID: model.modelID,
+          displayName: model.displayName,
+          isDefault: model.modelID == preferences.executionModel,
+          reasoningEfforts: model.reasoningEfforts,
+          defaultReasoningEffort: model.modelID == preferences.executionModel
+            ? preferences.executionEffort : model.defaultReasoningEffort,
+          serviceTiers: model.serviceTiers,
+          additionalSpeedTiers: model.additionalSpeedTiers
+        )
+      }
+    )
   }
 }

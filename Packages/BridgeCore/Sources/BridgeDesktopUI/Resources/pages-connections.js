@@ -103,7 +103,9 @@
           page.tunnel,
           context
         );
-        clientsEditor.update(page.clients, nextEmit);
+        clientsEditor.update(S.safeArray(page.clients).filter(function (client) {
+          return client.clientID !== "openai.chatgpt";
+        }), nextEmit);
         dshMCP.update(page, nextEmit);
         renderAgents(agentConnectors, agentEditor, page, nextEmit);
         status.textContent = page.statusMessage || "";

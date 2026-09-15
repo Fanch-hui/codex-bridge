@@ -2,6 +2,14 @@ import BridgeServiceCore
 import XCTest
 
 final class ServiceSettingsTests: XCTestCase {
+  func testMCPToolsDefaultToFull() async throws {
+    let fixture = try ServiceCoreFixture()
+    defer { fixture.remove() }
+    let settings = ServiceSettings(store: try SimpleServiceStore(path: fixture.databasePath))
+    let mode = try await settings.exposureMode()
+    XCTAssertEqual(mode, .full)
+  }
+
   func testWorkbenchPermissionModeDefaultsToWorkspaceWriteAndPersistsReadOnly()
     async throws
   {

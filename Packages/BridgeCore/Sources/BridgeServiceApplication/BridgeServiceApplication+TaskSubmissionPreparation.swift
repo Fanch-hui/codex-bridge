@@ -90,16 +90,10 @@ extension BridgeServiceApplication {
 
   private func submissionProjectID(explicit: String?) async throws -> String {
     if let explicit { return explicit }
-    if let selected = try await settings.string(for: .workbenchProjectID), !selected.isEmpty,
-      selected.utf8.count <= 128, !selected.contains("\0"),
-      try await projects.project(id: ProjectID(rawValue: selected)) != nil
-    {
-      return selected
-    }
-    guard let fallback = Self.sortedProjects(try await projects.projects()).first else {
+    guard let projectID = try await defaultSubmissionProjectID(in: projects.projects()) else {
       throw BridgeMCPQueryError.projectNotFound
     }
-    return fallback.id.rawValue
+    return projectID
   }
 
   func taskPrompt(

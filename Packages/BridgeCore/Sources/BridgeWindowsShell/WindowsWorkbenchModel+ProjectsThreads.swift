@@ -22,23 +22,35 @@
     public func selectWorkbenchProject(at index: Int) async {
       guard projects.indices.contains(index) else { return }
       let projectID = projects[index].projectID
-      guard projectID != selectedProjectID else { return }
-
-      selectedProjectID = projectID
-      clearWorkbenchSelection()
-      threads = []
-      actionText = "正在切换项目…"
+      let changed = projectID != selectedProjectID
+      guard changed || serviceStatus?.workbenchProjectID != projectID else { return }
+      if changed {
+        selectedProjectID = projectID
+        clearWorkbenchSelection()
+        threads = []
+      }
+      actionText = "正在保存工作台项目…"
       publishDisplay()
       do {
-        try await client.setWorkbenchProject(projectID: projectID)
-        await loadTasks()
+        try await synchronizeWorkbenchProject()
+        if changed { await loadTasks() }
         guard selectedProjectID == projectID else { return }
-        actionText = "工作台项目已切换。"
-        publishDisplay()
+        actionText = "工作台项目已保存。"
       } catch {
-        actionText = "切换项目失败：\(BridgeServiceErrorMessage.message(error))"
-        publishDisplay()
+        guard selectedProjectID == projectID else { return }
+        actionText = "保存工作台项目失败：\(BridgeServiceErrorMessage.message(error))"
       }
+      publishDisplay()
+    }
+
+    func synchronizeWorkbenchProject() async throws {
+      guard let projectID = selectedProjectID,
+        serviceStatus?.workbenchProjectID != projectID
+      else { return }
+      try await client.setWorkbenchProject(projectID: projectID)
+      let status = try await client.status()
+      guard selectedProjectID == projectID else { return }
+      serviceStatus = status
     }
 
     public func selectWorkbenchPermission(at index: Int) async {

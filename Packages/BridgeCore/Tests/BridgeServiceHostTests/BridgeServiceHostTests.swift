@@ -301,42 +301,18 @@ final class BridgeServiceHostTests: XCTestCase {
     XCTAssertTrue(agents.installations.isEmpty)
   }
 
-  func testCompositionServesReadOnlyThenFullMCPWithoutChangingSecret()
-    async throws
-  {
+  func testCompositionPublishesTaskToolsOnStartup() async throws {
     let fixture = try await makeServiceHostFixture(self, startMCP: true)
-    let storedReadOnlyEndpoint = await fixture.composition.endpoint()
-    let readOnlyEndpoint = try XCTUnwrap(storedReadOnlyEndpoint)
+    let storedEndpoint = await fixture.composition.endpoint()
+    let endpoint = try XCTUnwrap(storedEndpoint)
     let storedSecret = try fixture.secrets.load(ServiceMCPSecretProvider.reference)
     let secret = try XCTUnwrap(String(data: storedSecret, encoding: .utf8))
-    let readOnlyClient = try await connectMCP(
-      endpoint: readOnlyEndpoint.localURL,
-      secret: secret
-    )
-    defer { Task { await readOnlyClient.disconnect() } }
+    let client = try await connectMCP(endpoint: endpoint.localURL, secret: secret)
+    defer { Task { await client.disconnect() } }
 
-    let readOnlyTools = try await readOnlyClient.listTools()
-    XCTAssertEqual(readOnlyTools.tools.count, 14)
-    XCTAssertFalse(
-      readOnlyTools.tools.contains(where: {
-        $0.name == MCPServiceToolName.submitTask.rawValue
-      })
-    )
-
-    let fullEndpoint = try await fixture.composition.setExposureMode(.full)
-    let fullClient = try await connectMCP(
-      endpoint: fullEndpoint.localURL,
-      secret: secret
-    )
-    defer { Task { await fullClient.disconnect() } }
-    let fullTools = try await fullClient.listTools()
-    XCTAssertEqual(fullTools.tools.count, 27)
-    XCTAssertTrue(
-      fullTools.tools.contains(where: {
-        $0.name == MCPServiceToolName.submitTask.rawValue
-      })
-    )
-
+    let tools = try await client.listTools()
+    XCTAssertEqual(tools.tools.count, 27)
+    XCTAssertTrue(tools.tools.contains { $0.name == MCPServiceToolName.submitTask.rawValue })
     XCTAssertEqual(secret.utf8.count, 43)
   }
 
@@ -415,7 +391,7 @@ final class BridgeServiceHostTests: XCTestCase {
     let status = try await client.status()
     XCTAssertEqual(status.status.mcpState, "ready")
     XCTAssertEqual(status.status.tunnelState, "stopped")
-    XCTAssertEqual(status.exposureMode, .readOnly)
+    XCTAssertEqual(status.exposureMode, .full)
     XCTAssertNotNil(status.localMCPURL)
 
     let initialCustomInstructions = try await client.customInstructions()

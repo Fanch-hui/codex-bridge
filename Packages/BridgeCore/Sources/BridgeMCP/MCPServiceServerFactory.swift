@@ -72,7 +72,9 @@ public struct MCPServiceServerFactory: Sendable {
     let base =
       "This service exposes only user-approved local projects. List projects, "
       + "Threads and models before submitting work. Task submission never grants local "
-      + "approval; the user must approve execution in the macOS App. When submitting a task, "
+      + "approval; the user must approve execution in the desktop App. Use default_project_id from list_projects "
+      + "as the current default project. Omit project_id when submitting work unless the user explicitly "
+      + "selected a different project; Bridge resolves the latest Workbench selection. When submitting a task, "
       + "omit execution_model, execution_effort, supervisor_model and supervisor_effort unless "
       + "the user explicitly requested a per-task override; Codex Bridge owns those defaults. "
       + "Set model_override to true only for such an explicit request. For OpenCode, omit "

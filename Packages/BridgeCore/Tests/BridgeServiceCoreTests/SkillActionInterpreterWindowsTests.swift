@@ -5,6 +5,15 @@
   @testable import BridgeSkills
 
   final class SkillActionInterpreterWindowsTests: XCTestCase {
+    func testSkillPathContainmentHandlesWindowsCaseAndSeparators() {
+      let root = URL(fileURLWithPath: "C:/Users/Bridge/.codex/skills", isDirectory: true)
+      let child = URL(fileURLWithPath: "c:\\users\\bridge\\.CODEX\\skills\\review")
+      let sibling = URL(fileURLWithPath: "C:/Users/Bridge/.codex/skills-backup/review")
+
+      XCTAssertTrue(SkillPathRules.isContained(child, in: root))
+      XCTAssertFalse(SkillPathRules.isContained(sibling, in: root))
+    }
+
     func testParsedShellActionRunsThroughWindowsShell() async throws {
       guard SkillActionInterpreter.resolveInterpreter("sh") != nil else {
         throw XCTSkip("Git for Windows shell is unavailable")

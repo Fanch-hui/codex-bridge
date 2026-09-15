@@ -561,7 +561,7 @@ final class SimpleServiceStoreTests: XCTestCase {
     )
     _ = try await projects.updateAccessPolicy(policy, projectID: project.id)
     let defaultExposure = try await settings.exposureMode()
-    XCTAssertEqual(defaultExposure, .readOnly)
+    XCTAssertEqual(defaultExposure, .full)
     try await settings.setExposureMode(.full)
     try await settings.set("codex-model", for: .defaultExecutionModel)
     try await settings.set("prj-policy", for: .workbenchProjectID)

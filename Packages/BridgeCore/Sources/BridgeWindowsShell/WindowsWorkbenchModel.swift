@@ -246,6 +246,7 @@
           projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID
           ?? selectedProjectID
           ?? projects.first?.projectID
+        try await synchronizeWorkbenchProject()
         workbenchPermissionMode =
           Self.permissionModes.contains(status.workbenchPermissionMode ?? "")
           ? status.workbenchPermissionMode!

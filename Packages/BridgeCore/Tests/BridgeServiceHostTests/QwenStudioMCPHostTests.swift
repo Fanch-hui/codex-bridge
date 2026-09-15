@@ -96,7 +96,7 @@ final class QwenStudioMCPHostTests: XCTestCase {
     let chatClient = try await connectMCP(endpoint: endpoint.localURL, secret: chatSecret)
     defer { Task { await chatClient.disconnect() } }
     let initialChatTools = try await chatClient.listTools()
-    XCTAssertEqual(initialChatTools.tools.count, 14)
+    XCTAssertEqual(initialChatTools.tools.count, 27)
 
     let pair = xpcClient(composition: composition)
     let xpc = pair.0
@@ -118,7 +118,7 @@ final class QwenStudioMCPHostTests: XCTestCase {
     let endpointAfterModeChange = await composition.endpoint()
     XCTAssertEqual(endpointAfterModeChange?.localURL, endpoint.localURL)
     let chatToolsAfterQwenModeChange = try await chatClient.listTools()
-    XCTAssertEqual(chatToolsAfterQwenModeChange.tools.count, 14)
+    XCTAssertEqual(chatToolsAfterQwenModeChange.tools.count, 27)
     let fullQwen = try await connectMCP(endpoint: endpoint.localURL, secret: qwenSecret)
     defer { Task { await fullQwen.disconnect() } }
     let fullTools = try await fullQwen.listTools()
@@ -132,7 +132,7 @@ final class QwenStudioMCPHostTests: XCTestCase {
 
     try await xpc.rotateMCPClientCredential(clientID: MCPClientID.qwenStudio.rawValue)
     let chatToolsAfterQwenRotation = try await chatClient.listTools()
-    XCTAssertEqual(chatToolsAfterQwenRotation.tools.count, 14)
+    XCTAssertEqual(chatToolsAfterQwenRotation.tools.count, 27)
     let storedChat = try secrets.load(ServiceMCPSecretProvider.reference)
     let storedQwen = try secrets.load(ServiceMCPSecretProvider.qwenStudioReference)
     XCTAssertEqual(String(data: storedChat, encoding: .utf8), chatSecret)
@@ -177,7 +177,7 @@ final class QwenStudioMCPHostTests: XCTestCase {
       enabled: false
     )
     let chatToolsAfterQwenDisable = try await chatClient.listTools()
-    XCTAssertEqual(chatToolsAfterQwenDisable.tools.count, 14)
+    XCTAssertEqual(chatToolsAfterQwenDisable.tools.count, 27)
   }
 
   func testCustomInstructionsInitializeAndRefreshChatGPTAndQwenSessions() async throws {

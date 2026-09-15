@@ -90,7 +90,7 @@ public actor ServiceSettings {
   public func exposureMode() async throws -> ServiceMCPExposureMode {
     guard let setting = try await store.setting(key: ServiceSettingKey.mcpExposureMode.rawValue)
     else {
-      return .readOnly
+      return .full
     }
     guard let mode = ServiceMCPExposureMode(rawValue: setting.value) else {
       throw ServiceStoreError.corruptRecord

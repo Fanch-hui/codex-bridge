@@ -13,12 +13,15 @@ extension BridgeServiceApplication {
     guard (1...100).contains(limit) else { throw BridgeMCPQueryError.contractRejected }
     let all = try await projects.projects()
     let visible = Self.sortedProjects(all.filter { $0.accessPolicy.read == .allowed })
+    let defaultID = try await defaultSubmissionProjectID(in: all)
+    let visibleDefault = visible.first { $0.id.rawValue == defaultID }?.id.rawValue
     let offset = try Self.decodeOffset(cursor, maximum: visible.count)
     let end = min(offset + limit, visible.count)
     let page = await Self.checkedProjectSummaries(Array(visible[offset..<end]), deadline: deadline)
     return MCPProjectPage(
       projects: Array(page),
-      nextCursor: end < visible.count ? "v1.\(end)" : nil
+      nextCursor: end < visible.count ? "v1.\(end)" : nil,
+      defaultProjectID: visibleDefault
     )
   }
 
