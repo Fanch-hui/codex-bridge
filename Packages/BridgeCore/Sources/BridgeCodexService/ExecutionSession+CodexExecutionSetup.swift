@@ -121,7 +121,7 @@ extension ExecutionSession {
     } catch {
       throw ExecutionServiceError.threadUnavailable(threadID)
     }
-    guard read.thread.id == threadID, read.thread.cwd == projectRoot else {
+    guard read.thread.id == threadID, Self.pathsMatch(read.thread.cwd, projectRoot) else {
       throw ExecutionServiceError.threadMismatch(threadID)
     }
     if let projectID, read.thread.projectId != projectID {
@@ -130,7 +130,7 @@ extension ExecutionSession {
           ThreadMetadataUpdateParams(threadId: threadID, projectId: projectID)
         )
         guard updated.thread.id == threadID,
-          updated.thread.cwd == projectRoot,
+          Self.pathsMatch(updated.thread.cwd, projectRoot),
           updated.thread.projectId == projectID
         else {
           throw ExecutionServiceError.threadMismatch(threadID)
@@ -175,8 +175,8 @@ extension ExecutionSession {
     guard Self.isSafeWireIdentifier(response.thread.id),
       expectedThreadID == nil || response.thread.id == expectedThreadID,
       expectedProjectID == nil || response.thread.projectId == expectedProjectID,
-      response.thread.cwd == projectRoot,
-      response.cwd == projectRoot,
+      Self.pathsMatch(response.thread.cwd, projectRoot),
+      Self.pathsMatch(response.cwd, projectRoot),
       response.thread.ephemeral == false,
       posture.model == nil || response.model == posture.model,
       response.approvalPolicy == posture.approvalPolicy,
