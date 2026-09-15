@@ -13,6 +13,7 @@ public struct OutboundRedaction: Equatable, Sendable {
 
 public enum OutboundContentSecurity {
   private enum PathRedactionMode {
+    case none
     case remainderOfLine
     case commandOutput
   }
@@ -108,6 +109,21 @@ public enum OutboundContentSecurity {
     ).text
   }
 
+  /// Sanitizes a command for a local task/approval display. Command paths are
+  /// useful context in this surface, so only credential-shaped values are
+  /// removed; the normal outbound text path still redacts local paths.
+  public static func redactedCommand(
+    _ value: String,
+    maximumUTF8Bytes: Int
+  ) -> String {
+    redaction(
+      of: value,
+      maximumUTF8Bytes: maximumUTF8Bytes,
+      preservingSourceSyntax: false,
+      pathMode: .none
+    ).text
+  }
+
   private static func redaction(
     of value: String,
     maximumUTF8Bytes: Int,
@@ -129,6 +145,8 @@ public enum OutboundContentSecurity {
       }
       let pathRedacted =
         switch pathMode {
+        case .none:
+          secretsRedacted
         case .remainderOfLine:
           redactUnsafePath(in: secretsRedacted, preservingSourceSyntax: preservingSourceSyntax)
         case .commandOutput:

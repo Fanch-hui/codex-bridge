@@ -113,6 +113,60 @@ final class BridgeServiceApplicationTests: XCTestCase {
     XCTAssertLessThanOrEqual(try XCTUnwrap(task["recent_events"]?.arrayValue).count, 6)
   }
 
+  func testGetTaskKeepsCommandDetailsWhileRedactingCredentials() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    let creation = try await fixture.tasks.submit(
+      ServiceTaskRequest(
+        projectID: fixture.project.id,
+        source: .mcpClient,
+        sourceClientID: "chatgpt",
+        prompt: "Inspect the project.",
+        providerID: "opencode",
+        installationID: "ainst-command-display",
+        selectionMode: .explicit,
+        executionModel: serviceDefaultProviderExecutionModel,
+        executionEffort: serviceDefaultProviderExecutionEffort,
+        permissionMode: .readOnly
+      )
+    )
+    let taskID = creation.task.id
+    _ = try await fixture.tasks.approveAndBegin(taskID: taskID)
+    _ = try await fixture.tasks.markAgentExecutionStarted(
+      taskID: taskID,
+      providerSessionID: "session-command-display",
+      providerRunID: "run-command-display"
+    )
+    _ = try await fixture.tasks.recordCommandCompletion(
+      taskID: taskID,
+      summary:
+        #"Codex command completed (exit 0): /usr/bin/git -C "/Users/alice/project" status && curl -H "Authorization: Bearer token-value" https://example.test"#
+    )
+
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceModelCatalogScript
+    )
+    let dispatcher = MCPServiceToolDispatcher(service: application, exposureMode: .full)
+    let result = try await dispatcher.call(
+      .init(
+        name: MCPServiceToolName.getTask.rawValue,
+        arguments: ["task_id": .string(taskID.rawValue)]
+      )
+    )
+
+    XCTAssertNotEqual(result.isError, true)
+    let task = try XCTUnwrap(result.structuredContent?.objectValue?["task"]?.objectValue)
+    let event = try XCTUnwrap(
+      task["recent_events"]?.arrayValue?.first(where: {
+        $0.objectValue?["kind"] == .string(ServiceTaskEventKind.commandCompleted.rawValue)
+      })?.objectValue
+    )
+    let summary = try XCTUnwrap(event["summary"]?.stringValue)
+    XCTAssertTrue(summary.contains("/usr/bin/git"))
+    XCTAssertTrue(summary.contains("/Users/alice/project"))
+    XCTAssertFalse(summary.contains("token-value"))
+  }
+
   func testGetTaskProjectsRecentProviderActivityAndEffectiveUpdateTime() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     let creation = try await fixture.tasks.submit(

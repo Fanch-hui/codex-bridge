@@ -10,14 +10,14 @@
           #"C:\workspace\project\Sources\App.swift"#,
           root: #"C:\workspace\project"#
         ),
-        #"Sources\App.swift"#
+        "Sources/App.swift"
       )
       XCTAssertEqual(
         try ExecutionValidation.relativePath(
           #"\\server\share\project\Sources\App.swift"#,
           root: #"\\server\share\project"#
         ),
-        #"Sources\App.swift"#
+        "Sources/App.swift"
       )
     }
 

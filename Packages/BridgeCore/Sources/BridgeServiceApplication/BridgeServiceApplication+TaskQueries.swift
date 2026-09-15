@@ -1,5 +1,6 @@
 import BridgeDomain
 import BridgeMCP
+import BridgeSecurity
 import BridgeServiceCore
 import Foundation
 
@@ -61,7 +62,7 @@ extension BridgeServiceApplication {
         MCPServiceTaskEvent(
           sequence: $0.id,
           kind: $0.kind.rawValue,
-          summary: Self.safe($0.summary, maximum: 1_024),
+          summary: Self.eventSummary($0),
           occurredAt: iso8601.string(from: $0.createdAt)
         )
       },
@@ -79,6 +80,13 @@ extension BridgeServiceApplication {
       failureCode: task.state.failureCode,
       updatedAt: iso8601.string(from: effectiveUpdatedAt)
     )
+  }
+
+  private static func eventSummary(_ event: ServiceTaskEventRecord) -> String {
+    if event.kind == .commandCompleted {
+      return OutboundContentSecurity.redactedCommand(event.summary, maximumUTF8Bytes: 1_024)
+    }
+    return safe(event.summary, maximum: 1_024)
   }
 
   private func taskActivity(

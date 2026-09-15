@@ -100,6 +100,23 @@ begin
   RemoveEmptyParentsAt(FilePath, ExpandConstant('{app}'));
 end;
 
+function ServiceRunCommand(const AppDirectory: String): String;
+begin
+  Result := '"' + AddBackslash(AppDirectory) + 'codex-bridge-service.exe"';
+end;
+
+function GuiRunCommand(const AppDirectory: String): String;
+begin
+  Result := '"' + AddBackslash(AppDirectory) +
+    'codex-bridge-windows-app.exe" --ensure-service';
+end;
+
+function SameRunCommand(const ConfiguredCommand: String;
+  const ExpectedCommand: String): Boolean;
+begin
+  Result := CompareText(Trim(ConfiguredCommand), ExpectedCommand) = 0;
+end;
+
 #include "CodexBridgeLegacyMigration.iss"
 #include "CodexBridgePreviousInstallMigration.iss"
 
@@ -208,12 +225,11 @@ end;
 procedure RemoveRunEntryForPath(const AppDirectory: String);
 var
   ConfiguredCommand: String;
-  InstalledCommand: String;
 begin
-  InstalledCommand := '"' + AddBackslash(AppDirectory) + 'codex-bridge-service.exe"';
   if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run',
        'CodexBridgeService', ConfiguredCommand) and
-     (CompareText(ConfiguredCommand, InstalledCommand) = 0) then
+     (SameRunCommand(ConfiguredCommand, ServiceRunCommand(AppDirectory)) or
+      SameRunCommand(ConfiguredCommand, GuiRunCommand(AppDirectory))) then
     RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run',
       'CodexBridgeService');
 end;

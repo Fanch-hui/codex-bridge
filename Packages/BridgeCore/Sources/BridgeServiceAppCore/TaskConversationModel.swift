@@ -40,6 +40,7 @@ public final class TaskConversationModel: Identifiable {
 
   private let client: any BridgeTaskConversationClient
   private let isTerminal: Bool
+  private let updateHandler: (@MainActor @Sendable () -> Void)?
   private var priorEntries: [Entry] = []
   private var index: [String: Int] = [:]
   private var hasAppliedPage = false
@@ -71,12 +72,14 @@ public final class TaskConversationModel: Identifiable {
     taskID: String,
     priorTaskIDs: [String] = [],
     client: any BridgeTaskConversationClient,
-    isTerminal: Bool = false
+    isTerminal: Bool = false,
+    updateHandler: (@MainActor @Sendable () -> Void)? = nil
   ) {
     self.taskID = taskID
     self.priorTaskIDs = Array(priorTaskIDs.suffix(Self.maximumPriorTaskCount))
     self.client = client
     self.isTerminal = isTerminal
+    self.updateHandler = updateHandler
   }
 
   public func start() async {
@@ -515,9 +518,11 @@ public final class TaskConversationModel: Identifiable {
   }
 
   private func requestAutoScroll() {
-    guard autoScroll, let key = entries.last?.key else { return }
-    scrollAnchor = key
-    scrollRevision &+= 1
+    if autoScroll, let key = entries.last?.key {
+      scrollAnchor = key
+      scrollRevision &+= 1
+    }
+    updateHandler?()
   }
 
   private func refreshStreamingState() {

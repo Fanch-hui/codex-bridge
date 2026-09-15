@@ -9,6 +9,7 @@
     static var selectedPage = WindowsMainPage.overview
 
     public static func main() async {
+      WindowsServiceRegistration.migrateLegacyRegistration()
       let feedback = WindowsDesktopFeedbackStore()
       let model = WindowsWorkbenchModel(feedback: feedback)
       let management = WindowsManagementModel(client: model.client, feedback: feedback)

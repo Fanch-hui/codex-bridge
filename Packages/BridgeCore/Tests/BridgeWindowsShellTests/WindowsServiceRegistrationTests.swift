@@ -44,6 +44,14 @@ final class WindowsServiceRegistrationTests: XCTestCase {
     XCTAssertEqual(formattedQuoted, #""C:\Path\service.exe""#)
   }
 
+  func testStartupCommandUsesGuiShell() {
+    let applicationPath = #"C:\Program Files\CodexBridge\codex-bridge-windows-app.exe"#
+    XCTAssertEqual(
+      WindowsServiceRegistration.startupCommand(for: applicationPath),
+      #""C:\Program Files\CodexBridge\codex-bridge-windows-app.exe" --ensure-service"#
+    )
+  }
+
   func testUnquotedPathAndNormalization() {
     let raw = #""C:\My Program\Service.EXE""#
     XCTAssertEqual(

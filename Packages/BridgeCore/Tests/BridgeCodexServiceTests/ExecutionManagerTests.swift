@@ -291,7 +291,7 @@ final class ExecutionManagerTests: XCTestCase {
     XCTAssertEqual(approval.kind, .command)
     XCTAssertEqual(approval.binding.threadID, "thread-approval")
     XCTAssertEqual(approval.binding.turnID, "turn-approval")
-    XCTAssertEqual(approval.displayCommand, "[REDACTED]")
+    XCTAssertEqual(approval.displayCommand, "/usr/bin/git status")
 
     let waiting = try await waitForTask(fixture, taskID: task.id) {
       $0.state.status == .waitingForCodexApproval

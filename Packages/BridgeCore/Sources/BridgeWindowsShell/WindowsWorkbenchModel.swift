@@ -181,6 +181,7 @@
     var modelPreferences: IPCModelPreferences?
     var modelError: String?
     var connectionRefreshInProgress = false
+    private var taskPollingTask: Task<Void, Never>?
 
     public convenience init() {
       self.init(feedback: WindowsDesktopFeedbackStore())
@@ -253,6 +254,7 @@
           : workbenchPermissionMode
         errorMessage = nil
         await refreshTasks()
+        startTaskPolling()
       } catch {
         fail(BridgeServiceErrorMessage.message(error))
       }
@@ -265,8 +267,29 @@
     }
 
     public func shutdown() async {
+      taskPollingTask?.cancel()
+      taskPollingTask = nil
       closeConversation()
       await client.close()
+    }
+
+    private func startTaskPolling() {
+      guard taskPollingTask == nil else { return }
+      taskPollingTask = Task { [weak self] in
+        while !Task.isCancelled {
+          do {
+            try await Task.sleep(for: .seconds(2))
+          } catch {
+            return
+          }
+          guard let self, !Task.isCancelled else { return }
+          if self.connectionState == .connected {
+            await self.refreshTasks()
+          } else {
+            await self.connectAndRefresh()
+          }
+        }
+      }
     }
 
     func refreshDisplaySnapshot() {
@@ -323,7 +346,11 @@
         taskID: task.taskID,
         priorTaskIDs: priorTaskIDs,
         client: client,
-        isTerminal: task.isTerminal
+        isTerminal: task.isTerminal,
+        updateHandler: { [weak self] in
+          guard let self, self.conversation?.taskID == task.taskID else { return }
+          self.publishDisplay()
+        }
       )
       next.restorePresentation(
         conversationPresentationCache.snapshot(for: task.taskID, priorTaskIDs: priorTaskIDs))

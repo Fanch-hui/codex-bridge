@@ -55,10 +55,13 @@ public enum WindowsServiceRegistrationError: Error, LocalizedError, Sendable, Eq
     }
 
     public static func register(executablePath: String? = nil) throws {
-      guard let path = executablePath ?? serviceExecutablePath(), !path.isEmpty else {
+      guard let path = executablePath ?? applicationExecutablePath(), !path.isEmpty else {
         throw WindowsServiceRegistrationError.executableNotFound
       }
-      let value = formattedValue(for: path)
+      let value =
+        executablePath == nil
+        ? startupCommand(for: path)
+        : formattedValue(for: path)
       if mockBackendEnabled {
         mockLock.lock()
         defer { mockLock.unlock() }
@@ -79,12 +82,44 @@ public enum WindowsServiceRegistrationError: Error, LocalizedError, Sendable, Eq
     }
 
     public static func serviceExecutablePath() -> String? {
+      guard let directory = moduleDirectory() else { return nil }
+      return directory + "\\codex-bridge-service.exe"
+    }
+
+    /// Returns the GUI shell used by the Run key. Starting the console service
+    /// directly from Explorer allocates a visible console for a moment.
+    public static func applicationExecutablePath() -> String? {
+      currentExecutablePath()
+    }
+
+    public static func startupCommand(for applicationPath: String) -> String {
+      "\(formattedValue(for: applicationPath)) --ensure-service"
+    }
+
+    /// Rewrites registrations made by older builds so the next logon starts
+    /// through the GUI shell and keeps the console service hidden.
+    public static func migrateLegacyRegistration() {
+      guard
+        let registered = readRegisteredValue(),
+        let service = serviceExecutablePath(),
+        normalizePath(registered) == normalizePath(service),
+        let application = applicationExecutablePath()
+      else { return }
+      try? writeRegisteredValue(startupCommand(for: application))
+    }
+
+    private static func currentExecutablePath() -> String? {
       var buffer = [WCHAR](repeating: 0, count: 1024)
       let length = GetModuleFileNameW(nil, &buffer, DWORD(buffer.count))
       guard length > 0, length < DWORD(buffer.count) else { return nil }
-      let executable = String(decoding: buffer.prefix(Int(length)), as: UTF16.self)
-      guard let directoryEnd = executable.lastIndex(of: "\\") else { return nil }
-      return String(executable[..<directoryEnd]) + "\\codex-bridge-service.exe"
+      return String(decoding: buffer.prefix(Int(length)), as: UTF16.self)
+    }
+
+    private static func moduleDirectory() -> String? {
+      guard let executable = currentExecutablePath(),
+        let directoryEnd = executable.lastIndex(of: "\\")
+      else { return nil }
+      return String(executable[..<directoryEnd])
     }
 
     public static func resetForTesting() {
@@ -217,6 +252,10 @@ public enum WindowsServiceRegistrationError: Error, LocalizedError, Sendable, Eq
 
     public static func serviceExecutablePath() -> String? {
       "C:\\Program Files\\CodexBridge\\codex-bridge-service.exe"
+    }
+
+    public static func startupCommand(for applicationPath: String) -> String {
+      "\(formattedValue(for: applicationPath)) --ensure-service"
     }
 
     public static func resetForTesting() {

@@ -58,6 +58,22 @@ final class PathSecurityTests: XCTestCase {
     XCTAssertFalse(OutboundContentSecurity.isSafe("eyJabcdefgh.abcdefgh.abcdefgh"))
   }
 
+  func testCommandDisplayPreservesExecutableAndArgumentsButRedactsSecrets() {
+    let command =
+      #"/usr/bin/git -C "/Users/alice/project" status --porcelain && curl -H "Authorization: Bearer token-value" https://example.test"#
+
+    let displayed = OutboundContentSecurity.redactedCommand(
+      command,
+      maximumUTF8Bytes: 4_096
+    )
+
+    XCTAssertTrue(displayed.contains("/usr/bin/git"))
+    XCTAssertTrue(displayed.contains(#"/Users/alice/project"#))
+    XCTAssertTrue(displayed.contains("status --porcelain"))
+    XCTAssertFalse(displayed.contains("token-value"))
+    XCTAssertTrue(displayed.contains("[REDACTED]"))
+  }
+
   func testPatchTextPassesSecretOnlyCheckDespiteFileMarkers() {
     let patch = """
       *** Begin Patch

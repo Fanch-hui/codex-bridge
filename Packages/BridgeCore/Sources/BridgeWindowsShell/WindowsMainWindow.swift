@@ -29,8 +29,10 @@
     nonisolated(unsafe) static var chat: WindowsChatWebView?
     nonisolated(unsafe) static var desktopUI: WindowsDesktopUIWebView?
     nonisolated(unsafe) static var window: HWND?
+    nonisolated(unsafe) private static var hasRevealedWindow = false
 
     static func create() -> HWND? {
+      hasRevealedWindow = false
       WindowsUIFoundation.initialize()
       let instance = GetModuleHandleW(nil)!
       registerWindowClass(instance)
@@ -43,7 +45,6 @@
       setWindowIcons(window)
       WindowsMainWindowChrome.install(on: window)
       layout()
-      _ = ShowWindow(window, SW_SHOW)
       return window
     }
 
@@ -146,6 +147,7 @@
         WindowsMainWindowChrome.removeTrayIcon()
         WindowsUIFoundation.shutdown()
         WindowsMainWindowLifecycle.reset()
+        hasRevealedWindow = false
         desktopUI = nil
         Self.window = nil
         PostQuitMessage(0)
@@ -159,6 +161,7 @@
     /// host cannot load it, so a broken install never degrades to a silent blank frame.
     static func refreshSurfaces() {
       guard let window else { return }
+      revealWhenReady(window)
       let visible = desktopUI?.isReady == true
       var area = RECT()
       if GetClientRect(window, &area) {
@@ -167,6 +170,15 @@
         desktopUI?.setVisible(visible)
       }
       WindowsShellFailure.present(desktopFailureText(), in: window)
+    }
+
+    private static func revealWhenReady(_ window: HWND) {
+      guard let desktopUI else { return }
+      let failed = desktopUI.state == .failed || desktopUI.state == .unsupported
+      guard desktopUI.isReady || failed || desktopUI.loadStalled else { return }
+      guard !hasRevealedWindow else { return }
+      hasRevealedWindow = true
+      _ = ShowWindow(window, SW_SHOW)
     }
 
     /// Re-applies surface bounds after a tray restore, where Win32 does not reliably

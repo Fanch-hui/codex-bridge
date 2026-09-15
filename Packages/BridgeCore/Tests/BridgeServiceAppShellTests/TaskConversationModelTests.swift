@@ -89,6 +89,34 @@ final class TaskConversationModelTests: XCTestCase {
     XCTAssertEqual(model.entries[1].content, "I will inspect the parser. Done.")
   }
 
+  func testUpdateHandlerFiresAfterStreamingPush() async throws {
+    let client = TestBridgeServiceClient()
+    let updated = expectation(description: "Conversation update is forwarded")
+    let probe = ConversationUpdateProbe(expectation: updated)
+    let model = TaskConversationModel(
+      taskID: "task-1",
+      client: client,
+      updateHandler: { probe.notifyIfEnabled() }
+    )
+
+    await model.start()
+    probe.enabled = true
+    await client.pushConversation(
+      IPCTaskConversationPush(
+        taskID: "task-1",
+        key: "agent:item-1",
+        role: "agent",
+        delta: nil,
+        baseContentLength: 0,
+        fullContent: "updated",
+        final: false
+      )
+    )
+
+    await fulfillment(of: [updated], timeout: 1)
+    XCTAssertEqual(model.entries.last?.content, "updated")
+  }
+
   func testMismatchedDeltaIsDroppedButFullContentStillReplaces() async throws {
     let client = TestBridgeServiceClient()
     let model = TaskConversationModel(taskID: "task-1", client: client)
@@ -674,5 +702,21 @@ final class TaskConversationModelTests: XCTestCase {
       localApprovalRequired: false,
       updatedAt: "2026-08-20T00:00:00Z"
     )
+  }
+}
+
+@MainActor
+private final class ConversationUpdateProbe {
+  var enabled = false
+  private let expectation: XCTestExpectation
+
+  init(expectation: XCTestExpectation) {
+    self.expectation = expectation
+  }
+
+  func notifyIfEnabled() {
+    guard enabled else { return }
+    enabled = false
+    expectation.fulfill()
   }
 }

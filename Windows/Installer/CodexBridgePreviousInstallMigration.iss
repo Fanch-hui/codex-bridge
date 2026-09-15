@@ -141,8 +141,12 @@ function MigrateServiceRunEntry(const PreviousDirectory: String;
   var ErrorMessage: String): Boolean;
 var
   ConfiguredCommand: String;
+  CurrentDirectory: String;
   CurrentCommand: String;
-  PreviousCommand: String;
+  CurrentServiceCommand: String;
+  CommandDirectory: String;
+  PreviousGuiCommand: String;
+  PreviousServiceCommand: String;
 begin
   Result := True;
   ErrorMessage := '';
@@ -150,15 +154,20 @@ begin
        'CodexBridgeService', ConfiguredCommand) then
     Exit;
 
-  CurrentCommand := '"' + AddBackslash(ExpandConstant('{app}')) +
-    'codex-bridge-service.exe"';
-  if CompareText(ConfiguredCommand, CurrentCommand) = 0 then
+  CurrentDirectory := NormalizeInstallPath(ExpandConstant('{app}'));
+  CurrentCommand := GuiRunCommand(CurrentDirectory);
+  if SameRunCommand(ConfiguredCommand, CurrentCommand) then
     Exit;
-  if PreviousDirectory = '' then
+  CurrentServiceCommand := ServiceRunCommand(CurrentDirectory);
+  CommandDirectory := NormalizeInstallPath(PreviousDirectory);
+  if SameRunCommand(ConfiguredCommand, CurrentServiceCommand) then
+    CommandDirectory := CurrentDirectory;
+  if CommandDirectory = '' then
     Exit;
-  PreviousCommand := '"' + AddBackslash(PreviousDirectory) +
-    'codex-bridge-service.exe"';
-  if CompareText(ConfiguredCommand, PreviousCommand) <> 0 then
+  PreviousGuiCommand := GuiRunCommand(CommandDirectory);
+  PreviousServiceCommand := ServiceRunCommand(CommandDirectory);
+  if not SameRunCommand(ConfiguredCommand, PreviousGuiCommand) and
+     not SameRunCommand(ConfiguredCommand, PreviousServiceCommand) then
     Exit;
   if not RegWriteStringValue(HKCU,
        'Software\Microsoft\Windows\CurrentVersion\Run',

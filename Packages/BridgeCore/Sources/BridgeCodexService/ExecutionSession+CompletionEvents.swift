@@ -212,7 +212,7 @@ extension ExecutionSession {
         throw ExecutionServiceError.protocolViolation("command completion status")
       }
       return .commandCompleted(
-        displayCommand: OutboundContentSecurity.redacted(
+        displayCommand: OutboundContentSecurity.redactedCommand(
           command.displayCommand,
           maximumUTF8Bytes: 8 * 1_024
         ),

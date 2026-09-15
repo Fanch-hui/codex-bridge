@@ -63,12 +63,14 @@ package enum ExecutionValidation {
     }
   }
 
-  static func relativePath(_ rawValue: String, root: String) throws -> String {
+  static func relativePath(
+    _ rawValue: String, root: String, style: AgentPathStyle = .current
+  ) throws -> String {
     guard !rawValue.isEmpty, rawValue.utf8.count <= 16_384, !rawValue.contains("\0") else {
       throw ExecutionServiceError.protocolViolation("file path")
     }
     let value: String
-    #if os(Windows)
+    if style == .windows {
       if AgentPathSemantics.isAbsolute(rawValue, style: .windows) {
         guard let candidate = AgentPathSemantics.canonicalPath(rawValue, style: .windows),
           let canonicalRoot = AgentPathSemantics.canonicalPath(root, style: .windows),
@@ -80,15 +82,15 @@ package enum ExecutionValidation {
         else {
           throw ExecutionServiceError.protocolViolation("file path escaped the project")
         }
-        value = relative
+        value = relative.replacingOccurrences(of: "\\", with: "/")
       } else {
         guard let components = AgentPathSemantics.relativeComponents(rawValue, style: .windows)
         else {
           throw ExecutionServiceError.protocolViolation("unsafe relative file path")
         }
-        value = components.joined(separator: "\\")
+        value = components.joined(separator: "/")
       }
-    #else
+    } else {
       if rawValue.hasPrefix("/") {
         let standardized = URL(fileURLWithPath: rawValue).standardizedFileURL.path
         let rootPrefix = root.hasSuffix("/") ? root : root + "/"
@@ -99,7 +101,7 @@ package enum ExecutionValidation {
       } else {
         value = rawValue
       }
-    #endif
+    }
     guard OutboundContentSecurity.isSafeOutboundRelativePath(value) else {
       throw ExecutionServiceError.protocolViolation("unsafe relative file path")
     }
@@ -111,6 +113,16 @@ package enum ExecutionValidation {
     let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !normalized.isEmpty else { return nil }
     return OutboundContentSecurity.redacted(normalized, maximumUTF8Bytes: maximumBytes)
+  }
+
+  static func commandDisplay(_ value: String?, maximumBytes: Int) -> String? {
+    guard let value else { return nil }
+    let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalized.isEmpty else { return nil }
+    return OutboundContentSecurity.redactedCommand(
+      normalized,
+      maximumUTF8Bytes: maximumBytes
+    )
   }
 
   private static func isSafeText(_ value: String, maximumBytes: Int) -> Bool {

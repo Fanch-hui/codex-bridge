@@ -51,7 +51,7 @@ package enum ExecutionApprovalBuilder {
         try requireNetworkPermission(limits)
       }
       let displayCommand =
-        ExecutionValidation.redacted(
+        ExecutionValidation.commandDisplay(
           command.displayCommand ?? evidence.displayCommand,
           maximumBytes: 8 * 1_024
         ) ?? "Command details unavailable"
