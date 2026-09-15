@@ -15,7 +15,7 @@ extension BridgeServiceApplication {
     let workbenchPermissionMode = try await workbenchDefaultPermissionMode(
       sourceClientID: sourceClientID
     )
-    if let providerRaw = submission.providerID {
+    if let providerRaw = submission.providerID, providerRaw != serviceCodexProviderID {
       return try await prepareAgentSubmission(
         submission,
         providerRaw: providerRaw,
