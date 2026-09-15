@@ -80,13 +80,6 @@
       toggle.appendChild(checkbox);
       toggle.appendChild(toggleText);
       controls.appendChild(toggle);
-      var exposure = S.selectField("工具权限", "", [], function (value) {
-        context.emit("setMCPClientExposure", {
-          clientID: row.dataset.clientID,
-          exposureMode: value
-        });
-      }, "client-exposure");
-      controls.appendChild(exposure.wrapper);
       var copy = S.button("复制 Qwen JSON 配置", null, {}, null, "small", true);
       copy.addEventListener("click", function () {
         context.emit("copyMCPClientConfiguration", { clientID: row.dataset.clientID });
@@ -108,7 +101,6 @@
         state: state,
         detail: detail,
         toggle: toggle, checkbox: checkbox, toggleText: toggleText,
-        exposure: exposure.control,
         copy: copy,
         rotate: rotate,
         hint: hint
@@ -125,16 +117,11 @@
       row.checkbox.disabled = !client.canToggle;
       row.toggle.hidden = !client.canToggle;
       row.toggleText.textContent = client.clientID === "qwen.studio" ? "启用 Qwen Studio" : "启用";
-      D.selectOptions(row.exposure, S.choices(client.exposureMode, client.exposureOptions));
-      row.exposure.value = client.exposureMode || "";
-      row.exposure.disabled = !client.enabled;
       row.copy.hidden = !client.canCopyConfiguration;
       row.rotate.hidden = !client.canRotateCredential;
       row.copy.disabled = !client.enabled || !client.canCopyConfiguration;
       row.rotate.disabled = !client.enabled || !client.canRotateCredential;
-      row.hint.textContent = client.exposureMode === "full"
-        ? "向该客户端暴露 Codex 任务与 Direct 工具；项目权限、workspace gate 与本机安全审批仍然生效。"
-        : "仅暴露项目、文件、任务、Thread、模型与 Skill 查询工具。";
+      row.hint.textContent = "提供完整 Agent 任务与工具能力；执行遵循项目权限和本机审批。";
       context.emit = nextEmit;
     }
     function placeRow(card, row, index) {

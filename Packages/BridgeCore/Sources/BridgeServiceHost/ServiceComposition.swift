@@ -67,6 +67,7 @@ public actor ServiceComposition {
     let tasks = ServiceTaskManager(store: store)
     let settings = ServiceSettings(store: store)
     try await settings.setExposureMode(.full)
+    try await settings.setQwenStudioExposureMode(.full)
     let deepSeekHarnessMCP = ServiceDeepSeekHarnessMCPConfiguration(
       settings: settings, secretStore: secretStore)
     let deepSeekBaseURL = try await settings.string(for: .deepSeekHarnessBaseURL)

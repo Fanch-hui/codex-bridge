@@ -170,7 +170,7 @@ public actor ServiceSettings {
   }
 
   public func qwenStudioExposureMode() async throws -> ServiceMCPExposureMode {
-    guard let value = try await string(for: .qwenStudioExposureMode) else { return .readOnly }
+    guard let value = try await string(for: .qwenStudioExposureMode) else { return .full }
     guard let mode = ServiceMCPExposureMode(rawValue: value) else {
       throw ServiceStoreError.corruptRecord
     }

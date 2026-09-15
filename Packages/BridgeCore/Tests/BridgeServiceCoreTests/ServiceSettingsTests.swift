@@ -8,6 +8,8 @@ final class ServiceSettingsTests: XCTestCase {
     let settings = ServiceSettings(store: try SimpleServiceStore(path: fixture.databasePath))
     let mode = try await settings.exposureMode()
     XCTAssertEqual(mode, .full)
+    let qwenMode = try await settings.qwenStudioExposureMode()
+    XCTAssertEqual(qwenMode, .full)
   }
 
   func testWorkbenchPermissionModeDefaultsToWorkspaceWriteAndPersistsReadOnly()

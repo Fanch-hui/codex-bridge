@@ -53,7 +53,7 @@ final class QwenStudioMCPHostTests: XCTestCase {
     XCTAssertEqual(initial.first { $0.clientID == MCPClientID.qwenStudio.rawValue }?.enabled, false)
     XCTAssertEqual(
       initial.first { $0.clientID == MCPClientID.qwenStudio.rawValue }?.exposureMode,
-      .readOnly
+      .full
     )
 
     try await xpc.setMCPClientEnabled(clientID: MCPClientID.qwenStudio.rawValue, enabled: true)
@@ -109,7 +109,9 @@ final class QwenStudioMCPHostTests: XCTestCase {
     let qwenClient = try await connectMCP(endpoint: endpoint.localURL, secret: qwenSecret)
     defer { Task { await qwenClient.disconnect() } }
     let initialQwenTools = try await qwenClient.listTools()
-    XCTAssertEqual(initialQwenTools.tools.count, 14)
+    XCTAssertEqual(initialQwenTools.tools.count, 27)
+    XCTAssertEqual(
+      Set(initialQwenTools.tools.map(\.name)), Set(initialChatTools.tools.map(\.name)))
 
     try await xpc.setMCPClientExposureMode(
       clientID: MCPClientID.qwenStudio.rawValue,
