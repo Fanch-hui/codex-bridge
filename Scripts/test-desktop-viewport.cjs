@@ -26,6 +26,23 @@ test("native browser bounds follow the visible viewport and stop when disabled",
   assert.equal(commands[1].viewport.visible, false);
 });
 
+test("Windows reports the WebView device scale with browser bounds", () => {
+  const ui = createHarness([], ["chat-browser-slot"]);
+  ui.document.documentElement = { dataset: { platform: "windows" } };
+  ui.window.devicePixelRatio = 1.5;
+  const slot = ui.roots[0];
+  slot.classList.contains = () => false;
+  slot.getBoundingClientRect = () => ({ left: 68, top: 100, right: 900, bottom: 800 });
+  ui.window.innerWidth = 1000;
+  ui.window.innerHeight = 900;
+  ui.load("pages.js");
+  const commands = [];
+  ui.window.CodexBridgeDesktopPages.measureBrowserViewport((command, payload) => {
+    commands.push({ command, ...JSON.parse(JSON.stringify(payload)) });
+  });
+  assert.equal(commands[0].viewport.deviceScaleFactor, 1.5);
+});
+
 test("workbench icon roles retain the shared sizing and stroke class", () => {
   const ui = createHarness(["pages-common.js"]);
   const icon = ui.window.CodexBridgeDesktopPageSupport.icon("chevron.down", "dropdown-arrow");
@@ -37,6 +54,9 @@ test("stream updates preserve workbench selectors while control state changes re
   const ui = createHarness(["pages-common.js", "pages-workbench-header.js"], [
     "workbench-browser-toolbar", "chat-browser-slot", "browser-slot-note", "workbench-inspector-header"
   ]);
+  const layout = ui.document.createElement("div");
+  layout.className = "workbench-layout";
+  ui.document.querySelector = selector => layout.querySelector(selector);
   const header = ui.roots[3];
   const page = {
     projects: [{ id: "project", title: "项目" }], selectedProjectID: "project",
@@ -50,6 +70,7 @@ test("stream updates preserve workbench selectors while control state changes re
   render({ ...page, tasks: page.tasks.map(t => ({ ...t, updatedAt: "later" })) }, () => {});
   assert.equal(header.querySelector(".task-native-select"), picker);
   assert.equal(ui.document.activeElement, picker);
-  render({ ...page, tasks: page.tasks.map(t => ({ ...t, canInterrupt: true })) }, () => {});
+  render({ ...page, selectedTask: { ...page.tasks[0], canInterrupt: true },
+    tasks: page.tasks.map(t => ({ ...t, canInterrupt: true })) }, () => {});
   assert.ok(ui.find(header, node => node.tagName === "button" && node.textContent === "中断"));
 });

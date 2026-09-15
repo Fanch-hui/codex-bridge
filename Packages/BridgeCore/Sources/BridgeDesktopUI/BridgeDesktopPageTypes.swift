@@ -111,13 +111,25 @@ public struct BridgeDesktopBrowserViewport: Codable, Equatable, Sendable {
   public let width: Double
   public let height: Double
   public let visible: Bool
+  /// Physical pixels per CSS pixel for a WebView-backed viewport. Windows
+  /// reports the WebView2 value so the native child controller uses the same
+  /// scale as the page, even when the host window's DPI context differs.
+  public let deviceScaleFactor: Double?
 
-  public init(x: Double, y: Double, width: Double, height: Double, visible: Bool) {
+  public init(
+    x: Double,
+    y: Double,
+    width: Double,
+    height: Double,
+    visible: Bool,
+    deviceScaleFactor: Double? = nil
+  ) {
     self.x = x
     self.y = y
     self.width = width
     self.height = height
     self.visible = visible
+    self.deviceScaleFactor = deviceScaleFactor
   }
 }
 

@@ -34,7 +34,7 @@
       in bounds: RECT,
       dpi overrideDpi: UINT? = nil
     ) -> RECT {
-      let scale = dpiScale(overrideDpi: overrideDpi)
+      let scale = viewportScale(viewport, overrideDpi: overrideDpi)
       let width = Double(max(Int32(0), bounds.right - bounds.left))
       let height = Double(max(Int32(0), bounds.bottom - bounds.top))
       let rawX = finite(viewport.x) * scale
@@ -56,6 +56,18 @@
     private static func dpiScale(overrideDpi: UINT? = nil) -> Double {
       let dpi = overrideDpi ?? window.map { GetDpiForWindow($0) } ?? 96
       return Double(dpi == 0 ? 96 : dpi) / 96
+    }
+
+    private static func viewportScale(
+      _ viewport: BridgeDesktopBrowserViewport,
+      overrideDpi: UINT?
+    ) -> Double {
+      if let reported = viewport.deviceScaleFactor, reported.isFinite,
+        reported > 0
+      {
+        return reported
+      }
+      return dpiScale(overrideDpi: overrideDpi)
     }
 
     private static func finite(_ value: Double) -> Double {

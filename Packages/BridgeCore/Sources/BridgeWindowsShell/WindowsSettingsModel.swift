@@ -115,7 +115,7 @@
 
     func savePreferences(_ value: IPCModelPreferences) async {
       guard connectionState == .connected, !busy else { return }
-      guard !value.executionModel.isEmpty, !value.supervisorModel.isEmpty else {
+      guard !value.executionModel.isEmpty else {
         let message = "模型设置不完整。"
         statusText = message
         feedback.postAlert(message, title: "模型设置无法保存")

@@ -56,11 +56,16 @@
       height: height,
       visible: visible
     };
+    if (document.documentElement && document.documentElement.dataset.platform === "windows") {
+      var scale = Number(global.devicePixelRatio);
+      if (isFinite(scale) && scale > 0) viewport.deviceScaleFactor = scale;
+    }
     emitBrowserViewport(emit, viewport);
   }
 
   function emitBrowserViewport(emit, viewport) {
-    var signature = [viewport.x, viewport.y, viewport.width, viewport.height, viewport.visible].join(":");
+    var signature = [viewport.x, viewport.y, viewport.width, viewport.height, viewport.visible,
+      viewport.deviceScaleFactor || ""].join(":");
     if (signature === lastViewport) return;
     lastViewport = signature;
     emit("updateBrowserViewport", { viewport: viewport });

@@ -40,6 +40,24 @@
       XCTAssertEqual(rect.bottom, 675)
     }
 
+    func testWebViewReportedScaleOverridesHostDpi() {
+      let viewport = BridgeDesktopBrowserViewport(
+        x: 200,
+        y: 50,
+        width: 600,
+        height: 400,
+        visible: true,
+        deviceScaleFactor: 1
+      )
+      let bounds = RECT(left: 0, top: 0, right: 1200, bottom: 800)
+      let rect = WindowsMainWindow.browserViewportRect(viewport, in: bounds, dpi: 144)
+
+      XCTAssertEqual(rect.left, 200)
+      XCTAssertEqual(rect.top, 50)
+      XCTAssertEqual(rect.right, 800)
+      XCTAssertEqual(rect.bottom, 450)
+    }
+
     func testViewportClampsToClientBounds() {
       let viewport = BridgeDesktopBrowserViewport(
         x: 1000,
