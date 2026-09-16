@@ -187,6 +187,38 @@ final class DeepSeekHarnessACPExecutionTests: XCTestCase {
     XCTAssertEqual(summary, "fallback result")
   }
 
+  func testStandardACPToolFailurePreservesFinalAnswerAndCompletesTurn() async throws {
+    let events = try await runEvidenceScenario(
+      text: "Completed using a fallback after the edit failed.",
+      toolStatus: "failed",
+      includeExecutionEvidence: false,
+      requiresExecutionEvidence: false
+    )
+
+    XCTAssertTrue(
+      events.contains {
+        if case .tool(let tool) = $0.event {
+          tool.status == .failed
+        } else {
+          false
+        }
+      })
+    XCTAssertTrue(
+      events.contains {
+        if case .content(let update) = $0.event {
+          update.authoritative
+            && update.content == "Completed using a fallback after the edit failed."
+        } else {
+          false
+        }
+      })
+    guard case .completed(let summary, let stopReason) = events.last?.event else {
+      return XCTFail("Expected the completed turn to preserve the recovered tool failure")
+    }
+    XCTAssertEqual(summary, "Completed using a fallback after the edit failed.")
+    XCTAssertEqual(stopReason, "end_turn")
+  }
+
   func testInterruptMapsToInterruptedAndSendsCancel() async throws {
     let transport = ScriptedDeepSeekHarnessTransport()
     let promptState = PromptRequestState()
@@ -262,9 +294,9 @@ final class DeepSeekHarnessACPExecutionTests: XCTestCase {
       })
   }
 
-  func testStandardACPDoesNotCompleteAfterToolFailure() async throws {
+  func testStandardACPToolFailureWithoutFinalAnswerDoesNotComplete() async throws {
     let events = try await runEvidenceScenario(
-      text: "The tool failed.", toolStatus: "failed",
+      text: "", toolStatus: "failed",
       includeExecutionEvidence: false, requiresExecutionEvidence: false
     )
     XCTAssertFalse(

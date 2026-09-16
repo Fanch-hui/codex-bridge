@@ -29,14 +29,6 @@ extension DeepSeekHarnessACPExecution {
         return nil
       }
     }
-    if !requiresExecutionEvidence && result.executionEvidence == nil && observedFailedToolCalls > 0
-    {
-      await failExecution(
-        code: "deepseek_harness_tool_failed",
-        summary: "DeepSeek Harness ended the turn with failed tool calls."
-      )
-      return nil
-    }
     guard stopReason == "end_turn" else {
       switch stopReason {
       case "refusal":
