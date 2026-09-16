@@ -98,7 +98,7 @@
       if (commandArguments && output.indexOf(commandArguments) === 0) output = output.slice(commandArguments.length).trim();
       if (commandArguments) body.appendChild(S.node("pre", "entry-arguments entry-details mono", commandArguments));
       if (output && output !== entry.toolName) {
-        body.appendChild(S.node("pre", "entry-output entry-details mono", output));
+        body.appendChild(S.node("pre", "entry-arguments entry-output entry-details mono", output));
       }
     } else if (entry.text) {
       body.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
