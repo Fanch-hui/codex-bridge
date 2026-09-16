@@ -78,6 +78,7 @@ extension BridgeServiceAppModel {
     if let lastError {
       errorMessage = Self.message(lastError)
     }
+    startPolling()
   }
 
 }

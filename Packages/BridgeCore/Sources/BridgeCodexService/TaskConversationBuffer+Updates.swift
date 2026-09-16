@@ -76,18 +76,23 @@ extension TaskConversationBuffer {
     }
   }
 
-  public func upsertToolCall(taskID: TaskID, call: ExecutionToolCall) async {
+  public func upsertToolCall(
+    taskID: TaskID, call: ExecutionToolCall, output: String? = nil
+  ) async {
     let state = state(taskID: taskID)
     let key = "tool:" + call.itemID
     let isFinal = call.status != .inProgress
+    let existing = state.index[key].flatMap { index in
+      state.entries.indices.contains(index) ? state.entries[index] : nil
+    }
+    let arguments = call.arguments ?? existing?.toolArguments
     let content: String
-    if let index = state.index[key],
-      state.entries.indices.contains(index),
-      !state.entries[index].content.isEmpty
-    {
-      content = state.entries[index].content
+    if let output, !output.isEmpty {
+      let input = Self.toolCallContent(arguments, toolName: call.tool)
+      content = Self.capped(input + "\n" + output)
     } else {
-      content = Self.capped(Self.toolCallContent(call.arguments, toolName: call.tool))
+      content =
+        existing?.content ?? Self.capped(Self.toolCallContent(arguments, toolName: call.tool))
     }
     let entry = Entry(
       key: key,
@@ -96,7 +101,7 @@ extension TaskConversationBuffer {
       content: content,
       toolName: call.tool,
       toolStatus: call.status.rawValue,
-      toolArguments: call.arguments,
+      toolArguments: arguments,
       isFinal: isFinal
     )
     guard apply(entry, in: state) else { return }
@@ -113,7 +118,7 @@ extension TaskConversationBuffer {
         final: isFinal,
         toolName: call.tool,
         toolStatus: call.status.rawValue,
-        toolArguments: call.arguments
+        toolArguments: arguments
       ),
       in: state
     )

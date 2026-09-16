@@ -402,8 +402,10 @@ extension BridgeServiceAppModel {
 
   func nextPollingDelay(base: Duration) -> Duration {
     let needsLiveUpdates =
-      tasks.contains(where: \.isActive) || !approvals.isEmpty || !directApprovals.isEmpty
+      connectionState != .connected || tasks.contains(where: \.isActive) || !approvals.isEmpty
+      || !directApprovals.isEmpty
       || !resolvingApprovalKeys.isEmpty
+      || (serviceStatus?.tunnel.enabled == true && serviceStatus?.tunnel.lifecycle != "ready")
     return needsLiveUpdates ? base : max(base, idlePollInterval)
   }
 

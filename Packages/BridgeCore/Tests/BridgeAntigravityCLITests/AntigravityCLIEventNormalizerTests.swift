@@ -129,7 +129,7 @@ final class AntigravityCLIEventNormalizerTests: XCTestCase {
     guard case .tool(let failedTool) = try XCTUnwrap(failed.first).event else {
       return XCTFail("Expected failed tool event")
     }
-    XCTAssertEqual(failedTool.status, .failed)
+    XCTAssertEqual(failedTool.status, .declined)
     XCTAssertEqual(failedTool.output, "requires approval")
   }
 

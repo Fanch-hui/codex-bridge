@@ -181,6 +181,8 @@
     var modelPreferences: IPCModelPreferences?
     var modelError: String?
     var connectionRefreshInProgress = false
+    var onConnected: (@MainActor () async -> Void)?
+    var isShuttingDown = false
     private var taskPollingTask: Task<Void, Never>?
 
     public convenience init() {
@@ -203,6 +205,7 @@
     /// Launches the service if needed, then verifies connectivity via
     /// `status()` and pulls the task list.
     public func startServiceAndConnect() async {
+      let wasConnected = connectionState == .connected
       connectionState = .connecting
       publishDisplay()
       let launched = await Task.detached(priority: .utility) {
@@ -210,13 +213,18 @@
       }.value
       guard launched else {
         fail("未能连接后台服务：codex-bridge-service.exe 启动失败或管道未就绪。")
+        startTaskPolling()
         return
       }
-      await connectAndRefresh()
+      await connectAndRefresh(notifyOnConnect: !wasConnected)
     }
 
     /// Verifies the pipe transport with a `status()` round trip, then loads tasks.
     public func connectAndRefresh() async {
+      await connectAndRefresh(notifyOnConnect: connectionState != .connected)
+    }
+
+    private func connectAndRefresh(notifyOnConnect: Bool) async {
       guard !connectionRefreshInProgress else { return }
       connectionRefreshInProgress = true
       defer { connectionRefreshInProgress = false }
@@ -254,10 +262,18 @@
           : workbenchPermissionMode
         errorMessage = nil
         await refreshTasks()
+        guard connectionState == .connected else {
+          startTaskPolling()
+          return
+        }
         startTaskPolling()
+        if notifyOnConnect, !isShuttingDown {
+          await onConnected?()
+        }
       } catch {
         fail(BridgeServiceErrorMessage.message(error))
       }
+      startTaskPolling()
     }
 
     public func refreshTasks() async {
@@ -267,6 +283,8 @@
     }
 
     public func shutdown() async {
+      isShuttingDown = true
+      onConnected = nil
       taskPollingTask?.cancel()
       taskPollingTask = nil
       closeConversation()
@@ -284,11 +302,35 @@
           }
           guard let self, !Task.isCancelled else { return }
           if self.connectionState == .connected {
+            await self.refreshServiceStatus()
+            guard self.connectionState == .connected else { continue }
             await self.refreshTasks()
           } else {
-            await self.connectAndRefresh()
+            await self.startServiceAndConnect()
           }
         }
+      }
+    }
+
+    private func refreshServiceStatus() async {
+      do {
+        let status = try await client.status()
+        guard !isShuttingDown, connectionState == .connected else { return }
+        var changed = serviceStatus != status
+        serviceStatus = status
+        if let mode = status.workbenchPermissionMode,
+          Self.permissionModes.contains(mode), workbenchPermissionMode != mode
+        {
+          workbenchPermissionMode = mode
+          changed = true
+        }
+        if errorMessage != nil {
+          errorMessage = nil
+          changed = true
+        }
+        if changed { publishDisplay() }
+      } catch {
+        fail(BridgeServiceErrorMessage.message(error))
       }
     }
 

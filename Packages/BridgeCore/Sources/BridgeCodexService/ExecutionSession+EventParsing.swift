@@ -142,7 +142,7 @@ extension ExecutionSession {
     else {
       return nil
     }
-    return OutboundContentSecurity.redacted(text, maximumUTF8Bytes: 64 * 1_024)
+    return OutboundContentSecurity.redactedToolArguments(text, maximumUTF8Bytes: 64 * 1_024)
   }
 
   private static func reasoningContent(from object: [String: JSONValue]) -> String {

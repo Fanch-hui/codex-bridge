@@ -47,7 +47,7 @@ final class WorkbenchApprovalPresentationTests: XCTestCase {
     )
     XCTAssertEqual(
       CodexTranscriptPresentation.tool(name: "command_execution", status: "failed"),
-      CodexTranscriptToolPresentation(title: "已运行命令", systemImage: "terminal")
+      CodexTranscriptToolPresentation(title: "运行命令", systemImage: "terminal")
     )
   }
 
@@ -218,7 +218,7 @@ final class WorkbenchApprovalPresentationTests: XCTestCase {
         name: "custom operation",
         status: "cancelled"
       ).title,
-      "已使用 DeepSeek Harness 工具：custom operation"
+      "使用 DeepSeek Harness 工具：custom operation"
     )
     XCTAssertEqual(CodexTranscriptPresentation.statusLabel("declined"), "已拒绝")
     XCTAssertEqual(CodexTranscriptPresentation.statusLabel("cancelled"), "已取消")

@@ -14,6 +14,14 @@
       let model = WindowsWorkbenchModel(feedback: feedback)
       let management = WindowsManagementModel(client: model.client, feedback: feedback)
       let auxiliary = WindowsAuxiliaryRuntime(client: model.client, feedback: feedback)
+      model.onConnected = { [weak model, weak management, weak auxiliary] in
+        guard let model, !model.isShuttingDown,
+          let management, let auxiliary
+        else { return }
+        await management.refresh()
+        guard !model.isShuttingDown else { return }
+        await auxiliary.refreshAll()
+      }
       let ui = WindowsUIThread.shared
       guard
         ui.start(),
@@ -25,8 +33,6 @@
       // is not connectable, then connect and load tasks.
       Task {
         await model.startServiceAndConnect()
-        await management.refresh()
-        await auxiliary.refreshAll()
       }
 
       while ui.isRunning() {

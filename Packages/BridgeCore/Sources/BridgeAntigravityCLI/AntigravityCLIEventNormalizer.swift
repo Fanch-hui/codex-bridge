@@ -69,7 +69,8 @@ public actor AntigravityCLIEventNormalizer {
     try validateSession(update.conversationID)
     let isKnownState =
       update.state == "ACTIVE" || update.state == "DONE"
-      || (update.state == "ERROR" && update.stepType == "tool")
+      || ((update.stepType == "tool" || update.subagentInfo != nil)
+        && AntigravityToolStatus.states.contains(update.state))
     guard update.stepIndex >= 0, isKnownState
     else {
       throw AntigravityCLIError.invalidMessage
@@ -208,12 +209,7 @@ public actor AntigravityCLIEventNormalizer {
     let info = update.toolInfo
     let error = info?.error ?? update.error
     let name = Self.safeIdentifier(info?.name ?? update.toolName) ?? "tool"
-    let status: AgentToolStatus
-    if update.state == "ERROR" || error != nil {
-      status = .failed
-    } else {
-      status = update.state == "DONE" ? .completed : .inProgress
-    }
+    let status = AntigravityToolStatus.resolve(state: update.state, error: error)
     let payload = try AgentToolUpdate(
       key: "tool:\(update.stepIndex)",
       name: name,
@@ -253,7 +249,7 @@ public actor AntigravityCLIEventNormalizer {
       name: "subagent",
       title: "Subagent",
       kind: "subagent",
-      status: update.state == "DONE" ? .completed : .inProgress,
+      status: AntigravityToolStatus.resolve(state: update.state, error: update.error),
       output: output
     )
     return try envelope(.tool(payload))
@@ -403,7 +399,7 @@ public actor AntigravityCLIEventNormalizer {
     guard let encoded = value?.encodedString(), encoded.utf8.count <= 64 * 1_024 else {
       return nil
     }
-    return OutboundContentSecurity.isSafeSecrets(encoded) ? encoded : "[REDACTED]"
+    return OutboundContentSecurity.redactedToolArguments(encoded, maximumUTF8Bytes: 64 * 1_024)
   }
 
   private static func safeOutput(_ value: String?) -> String? {

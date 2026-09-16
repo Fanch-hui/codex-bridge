@@ -93,8 +93,13 @@
     item.appendChild(summary);
     var body = S.node("div", "disclosure-body");
     if (entry.kind === "tool_call") {
-      var details = entry.toolArguments || entry.text;
-      if (details) body.appendChild(S.node("pre", "entry-arguments entry-details mono", details));
+      var commandArguments = entry.toolArguments || "";
+      var output = entry.text || "";
+      if (commandArguments && output.indexOf(commandArguments) === 0) output = output.slice(commandArguments.length).trim();
+      if (commandArguments) body.appendChild(S.node("pre", "entry-arguments entry-details mono", commandArguments));
+      if (output && output !== entry.toolName) {
+        body.appendChild(S.node("pre", "entry-output entry-details mono", output));
+      }
     } else if (entry.text) {
       body.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
     }
@@ -114,7 +119,10 @@
     if (status === "completed") {
       return S.icon(entry.symbol || "wrench.and.screwdriver", "entry-symbol entry-status-completed");
     }
-    return S.node("span", "conversation-state-spinner entry-status-spinner", "");
+    if (status === "in_progress" || status === "pending") {
+      return S.node("span", "conversation-state-spinner entry-status-spinner", "");
+    }
+    return S.icon(entry.symbol || "wrench.and.screwdriver", "entry-symbol entry-status-completed");
   }
 
   function toolStatusLabel(entry) {
@@ -125,7 +133,8 @@
     case "declined": return "已拒绝";
     case "cancelled": return "已取消";
     case "pending": return "等待执行";
-    default: return entry.isFinal ? "" : "进行中";
+    case "in_progress": return "进行中";
+    default: return entry.isFinal ? "" : "状态未知";
     }
   }
 
@@ -135,11 +144,17 @@
     if (status === "failed") return "error";
     if (status === "declined") return "warning";
     if (status === "completed" || status === "cancelled") return "neutral";
-    return "running";
+    return status === "in_progress" || status === "pending" ? "running" : "neutral";
   }
 
   function normalizeStatus(value) {
-    return String(value || "").toLowerCase().replace(/[-\s]/g, "_");
+    var status = String(value || "").toLowerCase().replace(/[-\s]/g, "_");
+    if (status === "inprogress" || status === "running" || status === "active") return "in_progress";
+    if (status === "success" || status === "succeeded") return "completed";
+    if (status === "canceled" || status === "interrupted") return "cancelled";
+    if (status === "denied" || status === "rejected") return "declined";
+    if (status === "queued" || status === "waiting") return "pending";
+    return status;
   }
 
   function conversationError(message) {

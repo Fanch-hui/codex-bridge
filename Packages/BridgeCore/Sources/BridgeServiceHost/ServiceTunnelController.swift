@@ -357,9 +357,11 @@ public actor ServiceTunnelController {
     manager: any ServiceTunnelManaging,
     scheduleRestart: Bool
   ) async {
+    let observedGeneration = generation
     let lifecycle = await manager.state()
     let diagnostics = await manager.diagnostics()
     let acceptsRemote = await manager.acceptsRemoteSubmissions()
+    guard observedGeneration == generation else { return }
     let current = ServiceTunnelSnapshot(
       configured: tunnelID != nil && hasRuntimeKey(),
       enabled: enabled,
@@ -389,7 +391,8 @@ public actor ServiceTunnelController {
   }
 
   private func restart(generation: UInt64) async {
-    for delay in restartDelays {
+    var backoff = TunnelReconnectBackoff(restartDelays)
+    while let delay = backoff.next() {
       do {
         try await Task.sleep(for: delay)
       } catch {
@@ -411,6 +414,10 @@ public actor ServiceTunnelController {
           localMCPURL: localMCPURL,
           localMCPHeaderSecret: localMCPHeaderSecret
         )
+        guard generation == self.generation, enabled, !isShutdown else {
+          await candidate.stop()
+          return
+        }
         manager = candidate
         try await candidate.start()
         guard generation == self.generation, enabled, !isShutdown else {
@@ -435,13 +442,19 @@ public actor ServiceTunnelController {
         beginMonitor(generation: generation)
         return
       } catch {
-        await manager?.stop()
+        guard generation == self.generation, !Task.isCancelled else { return }
+        let failed = manager
+        let diagnostics = await failed?.diagnostics()
+        await failed?.stop()
+        guard generation == self.generation, enabled, !isShutdown else { return }
         manager = nil
+        if diagnostics?.actionRequired == true || Self.requiresLocalAction(error) {
+          await markRestartFailure(actionRequired: true)
+          restartTask = nil
+          return
+        }
       }
     }
-    guard generation == self.generation, enabled, !isShutdown else { return }
-    await markRestartFailure(actionRequired: true)
-    restartTask = nil
   }
 
   private func markRestartFailure(actionRequired: Bool) async {
@@ -457,7 +470,7 @@ public actor ServiceTunnelController {
     snapshot = failed
     await publish(
       failed,
-      degradation: "Secure MCP Tunnel restart attempts were exhausted."
+      degradation: "Secure MCP Tunnel requires local action."
     )
   }
 
@@ -604,9 +617,9 @@ public actor ServiceTunnelController {
     if error is TunnelHelperError { return true }
     if let error = error as? TunnelManagerError {
       switch error {
-      case .invalidRuntimeKey, .doctorFailed:
+      case .invalidRuntimeKey:
         return true
-      case .alreadyRunning, .lifecycleBusy, .helperUnavailable, .launchFailed,
+      case .doctorFailed, .alreadyRunning, .lifecycleBusy, .helperUnavailable, .launchFailed,
         .readinessTimedOut, .helperExited, .processTimedOut, .cleanupFailed, .stopped:
         return false
       }

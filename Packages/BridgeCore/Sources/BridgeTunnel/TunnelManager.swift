@@ -203,6 +203,7 @@ public actor TunnelManager {
     }
     if process === child { process = nil }
     let output = diagnostics(for: child)
+    lastDiagnostics = output
     guard
       exit.code == 0
         || TunnelDoctorCompatibility.acceptsNoAuthDoctorCompatibility(

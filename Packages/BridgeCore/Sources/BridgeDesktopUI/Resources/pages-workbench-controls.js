@@ -3,7 +3,22 @@
 
   var S = global.CodexBridgeDesktopPageSupport;
   var drafts = new Map(), currentKey = null;
-  var controls = null, status = null;
+  var controls = null, status = null, refreshButton = null;
+
+  function moveRefreshButtonToFooter() {
+    if (!refreshButton) refreshButton = document.querySelector(".refresh-button");
+    if (!refreshButton || !status) return;
+    refreshButton.classList.add("workbench-refresh-button");
+    status.appendChild(refreshButton);
+  }
+
+  function restoreRefreshButton() {
+    if (!refreshButton) refreshButton = document.querySelector(".refresh-button");
+    var toolbar = document.querySelector(".toolbar");
+    if (!refreshButton || !toolbar) return;
+    refreshButton.classList.remove("workbench-refresh-button");
+    toolbar.appendChild(refreshButton);
+  }
 
   function render(page, emit) {
     var footer = document.getElementById("workbench-inspector-footer");
@@ -33,6 +48,7 @@
     var disabled = !page || refreshing || page.canRefreshModels === false;
     var refresh = S.button(title, "refreshModels", {}, emit, "footer-refresh-btn link-button", disabled);
     status.appendChild(refresh);
+    moveRefreshButtonToFooter();
   }
 
   function modelCount(page) {
@@ -146,5 +162,5 @@
     if (typeof focused.start === "number") element.setSelectionRange(focused.start, focused.end, focused.direction);
   }
 
-  global.CodexBridgeDesktopWorkbenchControls = { render: render };
+  global.CodexBridgeDesktopWorkbenchControls = { render: render, restoreRefreshButton: restoreRefreshButton };
 }(window));
