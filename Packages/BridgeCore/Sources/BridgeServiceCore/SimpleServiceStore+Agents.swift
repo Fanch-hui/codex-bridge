@@ -48,7 +48,8 @@ extension SimpleServiceStore {
 
   public func updateAgentInstallation(
     _ installation: ServiceAgentInstallationRecord,
-    allowExecutableReplacement: Bool = false
+    allowExecutableReplacement: Bool = false,
+    expectedRecord: ServiceAgentInstallationRecord? = nil
   ) throws {
     let capabilities = try Self.encodeCapabilities(installation.capabilities)
     do {
@@ -57,6 +58,7 @@ extension SimpleServiceStore {
           throw ServiceStoreError.unknownAgentInstallation(installation.id)
         }
         let existing = try Self.decodeAgentInstallation(row, in: db)
+        if let expectedRecord, existing != expectedRecord { return }
         guard existing.providerID == installation.providerID,
           allowExecutableReplacement || existing.executablePath == installation.executablePath,
           existing.createdAt == installation.createdAt,

@@ -5,65 +5,15 @@ extension ServiceAgentRegistry {
   public func validateForExecution(
     installationID: AgentInstallationID
   ) async throws -> ServiceAgentInstallationRecord {
-    guard let record = try await store.agentInstallation(id: installationID) else {
+    guard let existing = try await store.agentInstallation(id: installationID) else {
       throw ServiceStoreError.unknownAgentInstallation(installationID)
     }
+    let record = try await refreshedRecord(existing)
     guard record.isSelectable else {
       if record.availability == .needsReview {
         throw ServiceAgentRegistryError.installationNeedsReview(installationID)
       }
       throw ServiceAgentRegistryError.installationUnavailable(installationID)
-    }
-    guard let provider = providers[record.providerID] else {
-      throw ServiceAgentRegistryError.providerUnavailable(record.providerID)
-    }
-    guard provider.descriptor.adapterRevision == record.adapterRevision else {
-      _ = try await persistStateIfNeeded(
-        record,
-        availability: .needsReview,
-        reason: "The Provider adapter changed and requires a new Probe."
-      )
-      throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-    }
-    do {
-      let current = try captureIdentity(record.executablePath)
-      guard current == record.executableIdentity else {
-        _ = try await persistStateIfNeeded(
-          record,
-          availability: .needsReview,
-          reason: "The registered executable changed and requires local review."
-        )
-        throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-      }
-    } catch let error as ServiceAgentRegistryError {
-      throw error
-    } catch {
-      _ = try await persistStateIfNeeded(
-        record,
-        availability: .unavailable,
-        reason: "The registered executable is unavailable."
-      )
-      throw ServiceAgentRegistryError.installationUnavailable(installationID)
-    }
-    do {
-      let currentArtifacts = try captureArtifacts(record.artifacts, at: now())
-      guard artifactsHaveSameIdentity(currentArtifacts, record.artifacts) else {
-        _ = try await persistStateIfNeeded(
-          record,
-          availability: .needsReview,
-          reason: "A registered installation artifact changed and requires local review."
-        )
-        throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-      }
-    } catch let error as ServiceAgentRegistryError {
-      throw error
-    } catch {
-      _ = try await persistStateIfNeeded(
-        record,
-        availability: .needsReview,
-        reason: "A registered installation artifact is unavailable and requires local review."
-      )
-      throw ServiceAgentRegistryError.installationNeedsReview(installationID)
     }
     return record
   }
@@ -73,23 +23,8 @@ extension ServiceAgentRegistry {
     projectRoot: String? = nil,
     selectedModelID: String? = nil
   ) async throws -> [AgentModelDescriptor] {
-    guard let record = try await store.agentInstallation(id: installationID),
-      record.isSelectable
-    else {
-      throw ServiceAgentRegistryError.installationUnavailable(installationID)
-    }
+    let record = try await validateForExecution(installationID: installationID)
     let provider = try provider(for: record.providerID)
-    guard provider.descriptor.adapterRevision == record.adapterRevision else {
-      throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-    }
-    let currentIdentity = try captureIdentity(record.executablePath)
-    guard currentIdentity == record.executableIdentity else {
-      throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-    }
-    let currentArtifacts = try captureArtifacts(record.artifacts, at: now())
-    guard artifactsHaveSameIdentity(currentArtifacts, record.artifacts) else {
-      throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-    }
     let installation = try AgentInstallation(
       id: record.id,
       providerID: record.providerID,
@@ -137,13 +72,6 @@ extension ServiceAgentRegistry {
         reason: "The Provider adapter is unavailable."
       )
     }
-    guard provider.descriptor.adapterRevision == record.adapterRevision else {
-      return try await persistStateIfNeeded(
-        record,
-        availability: .needsReview,
-        reason: "The Provider adapter changed and requires a new Probe."
-      )
-    }
     let current: ServiceAgentExecutableIdentity
     do {
       current = try captureIdentity(record.executablePath)
@@ -154,16 +82,17 @@ extension ServiceAgentRegistry {
         reason: "The registered executable is unavailable."
       )
     }
-    guard current == record.executableIdentity else {
+    guard current.hasSameContent(as: record.executableIdentity) else {
       return try await persistStateIfNeeded(
         record,
         availability: .needsReview,
         reason: "The registered executable changed and requires local review."
       )
     }
+    let currentArtifacts: [ServiceAgentInstallationArtifact]
     do {
-      let currentArtifacts = try captureArtifacts(record.artifacts, at: now())
-      guard artifactsHaveSameIdentity(currentArtifacts, record.artifacts) else {
+      currentArtifacts = try captureArtifacts(record.artifacts, at: now())
+      guard artifactsHaveSameContent(currentArtifacts, record.artifacts) else {
         return try await persistStateIfNeeded(
           record,
           availability: .needsReview,
@@ -176,6 +105,15 @@ extension ServiceAgentRegistry {
         availability: .needsReview,
         reason: "A registered installation artifact is unavailable and requires local review."
       )
+    }
+    let metadataChanged =
+      current != record.executableIdentity
+      || !artifactsHaveSameIdentity(currentArtifacts, record.artifacts)
+    if provider.descriptor.adapterRevision != record.adapterRevision
+      || metadataChanged || record.hasRecoverableIdentityReview
+    {
+      return try await refreshProbe(
+        record, provider: provider, identity: current, artifacts: currentArtifacts)
     }
     return record
   }

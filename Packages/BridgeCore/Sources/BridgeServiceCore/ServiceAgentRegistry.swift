@@ -43,6 +43,7 @@ public actor ServiceAgentRegistry {
   let captureIdentity: IdentityCapture
   let captureArtifactIdentity: ArtifactIdentityCapture
   let now: @Sendable () -> Date
+  var refreshProbes: [AgentInstallationID: Task<ServiceAgentInstallationRecord, Error>] = [:]
   var activeRegistrations: Set<RegistrationKey> = []
 
   public init(

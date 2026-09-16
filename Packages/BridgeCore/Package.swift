@@ -285,12 +285,14 @@ var windowsApplicationLinkerFlags = [
     .testTarget(
       name: "BridgeServiceCoreWindowsTests",
       dependencies: [
+        "BridgeAgentCore",
         "BridgeSkills",
         "BridgeServiceCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Tests/BridgeServiceCoreTests",
       sources: [
+        "ServiceAgentRegistryStabilityTests.swift",
         "ServiceStoreSchemaV15MigrationTests.swift",
         "SkillActionInterpreterWindowsTests.swift",
       ]
