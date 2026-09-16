@@ -55,14 +55,17 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .empty-sparkle-icon { display: inline-flex; width: 28px; height: 28px; color: var(--text-secondary); }
 .empty-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
 .empty-desc { margin: 0; max-width: 300px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
-.inspector-footer { display: flex; flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 8px; min-height: 38px; padding: 8px 14px; border-top: 1px solid var(--separator); background: var(--surface); font-size: 11px; color: var(--text-secondary); }
+.inspector-footer { container-type: inline-size; display: flex; flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 5px; min-height: 32px; padding: 6px 12px; border-top: 1px solid var(--separator); background: var(--surface); font-size: 11px; color: var(--text-secondary); }
 .footer-status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.footer-refresh-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); border: 0; background: transparent; cursor: pointer; }
-.footer-refresh-btn:hover { color: var(--accent); }
-.workbench-status-bar .footer-status-text { flex: 1 1 auto; min-width: 0; }
-.workbench-status-bar .footer-refresh-btn { flex: 0 0 auto; }
-.workbench-status-bar .workbench-refresh-button { width: 28px; height: 28px; flex: 0 0 28px; border: 0; border-radius: 6px; }
-.workbench-status-bar .workbench-refresh-button:hover { background: var(--surface-muted); }
+.workbench-status-bar { min-height: 20px; }
+.workbench-status-bar .footer-status-text { display: block; flex: 1 1 auto; min-width: 0; }
+.workbench-controls .workbench-steer-grid { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 7px; }
+.workbench-controls .workbench-steer-grid.has-mode { grid-template-columns: minmax(0, 1fr) minmax(130px, 180px) auto; }
+.workbench-steer-grid .field.full { grid-column: auto; }
+.workbench-steer-grid .field { gap: 4px; }
+.workbench-steer-grid .form-actions { min-width: max-content; margin-top: 0; }
+.workbench-steer-grid .form-actions .button { min-height: 32px; }
+.workbench-controls .hint { margin: 0; }
 .current-step-card { border-left: 3px solid var(--accent); background: var(--accent-soft); }
 .step-caption { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent); }
 .step-text { margin-top: 4px; font-size: 12px; color: var(--text); }

@@ -25,7 +25,8 @@ function runtime() {
 
 function page(taskID, extra = {}) {
   return {
-    selectedTask: { taskID, sessionID: taskID, ...extra },
+    selectedTaskID: taskID,
+    selectedTask: { taskID, sessionID: taskID, canSteer: !extra.canResume, ...extra },
     tasks: [{ taskID, sessionID: taskID, canSteer: !extra.canResume }],
     steerModes: [{ id: "queued", title: "当前轮结束后继续" }],
     engineStatus: "运行中"
@@ -62,20 +63,19 @@ test("stream snapshots preserve input identity, focus and selection", () => {
   assert.equal(input.selectionEnd, 5);
 });
 
-test("model footer refresh reports count, busy state and errors", () => {
+test("workbench footer refreshes state and conversation with one action", () => {
   const ui = runtime();
-  const state = { ...page("task-a"), modelCount: 0, canRefreshModels: true };
+  const state = { ...page("task-a"), modelCount: 4, canRefreshModels: true };
   ui.render(state);
-  assert.ok(ui.button("获取模型"));
-  ui.button("获取模型").dispatch("click");
-  assert.deepEqual(ui.commands, [{ command: "refreshModels", payload: {} }]);
-
-  ui.render({ ...state, modelCount: 4 });
-  assert.ok(ui.button("刷新模型"));
-  ui.render({ ...state, modelCount: 4, isRefreshingModels: true });
-  assert.ok(ui.button("获取中…").disabled);
-  ui.render({ ...state, modelCount: 0, modelError: "Codex 不可用" });
-  assert.ok(ui.button("获取模型"));
+  assert.equal(ui.button("获取模型"), null);
+  assert.equal(ui.button("刷新模型"), null);
+  assert.equal(ui.button("获取中…"), null);
+  assert.equal(ui.footer.querySelector(".footer-status-text").textContent, "运行中");
+  ui.button("刷新").dispatch("click");
+  assert.deepEqual(ui.commands, [
+    { command: "refresh", payload: {} },
+    { command: "refreshConversation", payload: { taskID: "task-a" } }
+  ]);
 });
 
 test("settings model card refreshes the shared catalog", () => {

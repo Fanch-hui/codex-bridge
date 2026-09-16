@@ -41,7 +41,7 @@
 .inspector-content { overflow-x: hidden; overflow-wrap: anywhere; }
 .inspector-content .task-detail-card { padding: 0; border: 0; background: transparent; }
 .inspector-content .detail-grid { gap: 10px; }
-.workbench-controls .form-grid { grid-template-columns: minmax(0, 1fr); }
+.workbench-controls .form-grid:not(.workbench-steer-grid) { grid-template-columns: minmax(0, 1fr); }
 .project-native-select:focus-visible + .project-dropdown-face,
 .task-native-select:focus-visible + .task-dropdown-face { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -66,4 +66,9 @@
   .recent-source, .recent-time { display: none; }
   .service-row { grid-template-columns: 28px minmax(0, 1fr); gap: 6px; padding-block: 10px; }
   .service-row > .status-badge { grid-column: 2; justify-self: start; }
+}
+
+@container (max-width: 480px) {
+  .workbench-controls .workbench-steer-grid.has-mode { grid-template-columns: minmax(0, 1fr) auto; }
+  .workbench-steer-grid.has-mode > .field.full { grid-column: 1 / -1; }
 }

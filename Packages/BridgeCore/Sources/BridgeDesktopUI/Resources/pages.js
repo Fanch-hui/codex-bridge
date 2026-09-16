@@ -30,9 +30,6 @@
       if (section) section.hidden = !state || state.selectedNavigation !== name;
     });
     if (!state || state.selectedNavigation !== "workbench") {
-      if (global.CodexBridgeDesktopWorkbenchControls) {
-        global.CodexBridgeDesktopWorkbenchControls.restoreRefreshButton();
-      }
       emitBrowserViewport(emit, { x: 0, y: 0, width: 0, height: 0, visible: false });
     }
     if (!state || state.selectedNavigation === "overview") return;

@@ -58,9 +58,6 @@
       if (state && state.isLoadingEarlier) earlier.setAttribute("aria-busy", "true");
       actions.appendChild(earlier);
     }
-    if (page.selectedTaskID) {
-      actions.appendChild(S.button("刷新对话", "refreshConversation", { taskID: page.selectedTaskID }, emit, "small", false));
-    }
     if (actions.childNodes.length) container.appendChild(actions);
   }
 

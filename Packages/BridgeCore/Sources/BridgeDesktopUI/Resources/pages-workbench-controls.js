@@ -3,22 +3,7 @@
 
   var S = global.CodexBridgeDesktopPageSupport;
   var drafts = new Map(), currentKey = null;
-  var controls = null, status = null, refreshButton = null;
-
-  function moveRefreshButtonToFooter() {
-    if (!refreshButton) refreshButton = document.querySelector(".refresh-button");
-    if (!refreshButton || !status) return;
-    refreshButton.classList.add("workbench-refresh-button");
-    status.appendChild(refreshButton);
-  }
-
-  function restoreRefreshButton() {
-    if (!refreshButton) refreshButton = document.querySelector(".refresh-button");
-    var toolbar = document.querySelector(".toolbar");
-    if (!refreshButton || !toolbar) return;
-    refreshButton.classList.remove("workbench-refresh-button");
-    toolbar.appendChild(refreshButton);
-  }
+  var controls = null, status = null;
 
   function render(page, emit) {
     var footer = document.getElementById("workbench-inspector-footer");
@@ -42,18 +27,13 @@
     }
     S.clear(status);
     status.appendChild(S.node("span", "footer-status-text", page ? page.engineStatus || "等待引擎状态" : "等待本机 Service"));
-    var count = modelCount(page);
-    var refreshing = !!(page && page.isRefreshingModels);
-    var title = refreshing ? "获取中…" : count > 0 ? "刷新模型" : "获取模型";
-    var disabled = !page || refreshing || page.canRefreshModels === false;
-    var refresh = S.button(title, "refreshModels", {}, emit, "footer-refresh-btn link-button", disabled);
+    var refresh = S.button("刷新", null, {}, emit, "small link-button", false);
+    refresh.title = "刷新状态与当前会话";
+    refresh.addEventListener("click", function () {
+      emit("refresh", {});
+      if (page && page.selectedTaskID) emit("refreshConversation", { taskID: page.selectedTaskID });
+    });
     status.appendChild(refresh);
-    moveRefreshButtonToFooter();
-  }
-
-  function modelCount(page) {
-    if (!page) return 0;
-    return typeof page.modelCount === "number" ? Math.max(0, page.modelCount) : S.safeArray(page.models).length;
   }
 
   function draftFor(taskID) {
@@ -73,7 +53,7 @@
 
   function steerForm(detail, modes, emit) {
     var draft = draftFor(detail.taskID), form = S.node("div", "steer-form");
-    var grid = S.node("div", "form-grid");
+    var grid = S.node("div", "form-grid workbench-steer-grid");
     var input = inputField(detail, "补充指令", "当前轮完成后继续");
     grid.appendChild(input.wrapper);
     var options = modes.length ? modes : [{ id: "queued", title: "当前轮结束后继续" }];
@@ -82,10 +62,14 @@
     mode.control.id = "workbench-steer-mode";
     mode.control.dataset.taskID = detail.taskID;
     mode.wrapper.querySelector("label").htmlFor = mode.control.id;
-    if (options.length > 1) grid.appendChild(mode.wrapper);
+    if (options.length > 1) {
+      grid.classList.add("has-mode");
+      grid.appendChild(mode.wrapper);
+    }
     var send = S.button("发送指令", null, {}, emit, "small primary", false);
-    var actions = S.node("div", "form-actions");
+    var actions = S.node("div", "form-actions workbench-steer-actions");
     actions.appendChild(send);
+    grid.appendChild(actions);
     var hint = S.node("p", "hint");
     hint.id = "workbench-input-hint";
     input.control.setAttribute("aria-describedby", hint.id);
@@ -110,7 +94,7 @@
       if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); submit(); }
     });
     send.addEventListener("click", submit);
-    form.appendChild(grid); form.appendChild(hint); form.appendChild(actions);
+    form.appendChild(grid); form.appendChild(hint);
     validate();
     return form;
   }
@@ -162,5 +146,5 @@
     if (typeof focused.start === "number") element.setSelectionRange(focused.start, focused.end, focused.direction);
   }
 
-  global.CodexBridgeDesktopWorkbenchControls = { render: render, restoreRefreshButton: restoreRefreshButton };
+  global.CodexBridgeDesktopWorkbenchControls = { render: render };
 }(window));
