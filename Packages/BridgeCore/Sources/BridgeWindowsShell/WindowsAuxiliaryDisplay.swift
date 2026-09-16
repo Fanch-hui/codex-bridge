@@ -138,6 +138,13 @@
 
   final class AuxiliaryDisplayBox<Value: Equatable & Sendable>: @unchecked Sendable {
     private let lock = NSLock()
+    private var version: UInt64 = 0
+
+    var revision: UInt64 {
+      lock.lock()
+      defer { lock.unlock() }
+      return version
+    }
     private var value: Value
 
     init(value: Value) { self.value = value }
@@ -150,8 +157,10 @@
 
     func store(_ value: Value) {
       lock.lock()
+      defer { lock.unlock() }
+      guard self.value != value else { return }
       self.value = value
-      lock.unlock()
+      version &+= 1
     }
   }
 #endif

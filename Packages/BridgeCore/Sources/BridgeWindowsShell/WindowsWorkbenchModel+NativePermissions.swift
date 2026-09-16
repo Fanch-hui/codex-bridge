@@ -16,10 +16,9 @@
       messageKey: String
     ) async {
       guard connectionState == .connected,
-        let task = tasks.first(where: {
-          $0.taskID == taskID && $0.providerID == "antigravity"
-            && $0.failureCode == "antigravity_permission_denied"
-        }),
+        let task = workbenchDisplaySnapshot.taskByID[taskID],
+        task.providerID == "antigravity",
+        task.failureCode == "antigravity_permission_denied",
         selectedTaskID == nil || selectedTaskID == task.taskID,
         conversation?.entries.contains(where: {
           $0.key == messageKey && $0.kind == "tool_call" && $0.toolStatus == "declined"

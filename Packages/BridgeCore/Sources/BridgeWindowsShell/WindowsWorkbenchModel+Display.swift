@@ -7,44 +7,54 @@
   extension WindowsWorkbenchModel {
     static let permissionModes = ["read-only", "workspace-write"]
 
+    var workbenchDisplaySnapshot: WindowsWorkbenchPresentationSnapshot {
+      workbenchDisplayCache.snapshot(
+        tasks: tasks,
+        projects: projects,
+        providers: agentProviders,
+        installations: agentInstallations,
+        approvals: approvals,
+        directApprovals: directApprovals,
+        selectedProjectID: selectedProjectID
+      )
+    }
+
     var visibleTasks: [MCPServiceTaskSnapshot] {
-      tasks.filter { selectedProjectID == nil || $0.projectID == selectedProjectID }
+      workbenchDisplaySnapshot.visibleTasks
     }
 
     var visibleSessions: [WorkbenchSessionItem] {
-      WorkbenchSessionCatalog.sessions(tasks: visibleTasks)
-        .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
+      workbenchDisplaySnapshot.visibleSessions
     }
 
     var allSessions: [WorkbenchSessionItem] {
-      WorkbenchSessionCatalog.sessions(tasks: tasks)
-        .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
+      workbenchDisplaySnapshot.allSessions
     }
 
     func publishDisplay() {
-      let runningCount = tasks.filter { $0.isRunning }.count
-      let task = selectedTask
-      let pendingUserInputTaskIDs = Set(
-        approvals.filter { $0.kind == "user_input" }.map(\.taskID)
-      )
-      let selectedSession = task.flatMap { selectedTask in
-        visibleSessions.first { session in
-          session.tasks.contains(where: { $0.taskID == selectedTask.taskID })
-        }
-      }
+      let cached = workbenchDisplaySnapshot
+      let task = selectedTaskID.flatMap { cached.taskByID[$0] }
+      let selectedSession = task.flatMap { cached.sessionByTaskID[$0.taskID] }
       let selectedSessionIndex = selectedSession.flatMap { selected in
-        visibleSessions.firstIndex(where: {
-          $0.id == selected.id && $0.providerID == selected.providerID
-        })
+        cached.visibleSessions.firstIndex { $0.id == selected.id }
       }
-      let workbenchRows = visibleSessions.map(Self.sessionRowText)
+      let workbenchRows = cached.visibleSessions.map(Self.sessionRowText)
       let selectedIndex = selectedSessionIndex
-      let conversationText = TaskInspectorPresentation.conversationText(
-        entries: conversation?.entries ?? [],
+      var conversationEntries: [BridgeDesktopConversationEntry]?
+      if let task {
+        conversationEntries = windowsConversationPresentationCache.update(
+          taskID: task.taskID,
+          providerID: task.providerIdentifier,
+          entries: conversation?.entries ?? []
+        )
+      } else {
+        windowsConversationPresentationCache.reset()
+      }
+      let conversationText = windowsConversationPresentationCache.text(
         isStreaming: conversation?.isStreaming == true || task?.isRunning == true,
         errorMessage: conversation?.errorMessage
       )
-      let approvalItems = approvalPresentationItems()
+      let approvalItems = cached.approvalItems
       let selectedApprovalIndex = selectedApprovalID.flatMap { selectedID in
         approvalItems.firstIndex(where: { $0.id == selectedID })
       }
@@ -55,59 +65,66 @@
         && selectedApproval != nil
         && !approvalResolving
         && !approvalRefreshInProgress
-      let taskItems = visibleSessions.map { session in
+      let taskItems = cached.visibleSessions.map { session in
         let latest = session.latestTask
         return Self.sessionItem(
           session,
-          projectName: projectName(for: latest.projectID),
+          projectName: cached.projectName(for: latest.projectID),
           selectedTaskID: selectedTaskID,
           canSteer: TaskInspectorPresentation.canSteer(
             latest,
-            providerSupportsSteer: providerSupportsSteer(for: latest)
+            providerSupportsSteer: cached.providerSupportsSteer(for: latest)
           ),
           canResume: TaskInspectorPresentation.canResume(
             latest,
-            providerSupportsSessionContinuation: providerSupportsSessionContinuation(for: latest)
+            providerSupportsSessionContinuation: cached.providerSupportsSessionContinuation(
+              for: latest
+            )
           ),
-          pendingUserInput: session.tasks.contains { pendingUserInputTaskIDs.contains($0.taskID) }
+          pendingUserInput: session.tasks.contains {
+            cached.pendingUserInputTaskIDs.contains($0.taskID)
+          }
         )
       }
       let selectedTaskDetail = task.map {
         Self.taskDetail(
           $0,
           session: selectedSession,
-          projectName: projectName(for: $0.projectID),
+          projectName: cached.projectName(for: $0.projectID),
           conversation: conversation,
           permissionRemediation: desktopPermissionRemediation(for: $0),
+          conversationEntries: conversationEntries,
           canResume: TaskInspectorPresentation.canResume(
             $0,
-            providerSupportsSessionContinuation: providerSupportsSessionContinuation(for: $0)
+            providerSupportsSessionContinuation: cached.providerSupportsSessionContinuation(
+              for: $0
+            )
           ),
           canSteer: TaskInspectorPresentation.canSteer(
-            $0, providerSupportsSteer: providerSupportsSteer(for: $0)
+            $0, providerSupportsSteer: cached.providerSupportsSteer(for: $0)
           ),
-          pendingUserInput: pendingUserInputTaskIDs.contains($0.taskID)
+          pendingUserInput: cached.pendingUserInputTaskIDs.contains($0.taskID)
         )
       }
-      let typedApprovals = approvalPresentationItems().enumerated().compactMap {
+      let typedApprovals = approvalItems.enumerated().compactMap {
         Self.approvalItem(
           $0.element,
-          approvals: approvals,
-          directApprovals: directApprovals,
-          tasks: tasks,
-          projects: projects,
+          approvalsByID: cached.approvalByID,
+          directApprovalsByID: cached.directApprovalByID,
+          tasksByID: cached.taskByID,
+          projectsByID: cached.projectByID,
           resolvingApprovalIDs: resolvingApprovalIDs,
           connected: connectionState == .connected && !approvalRefreshInProgress
         )
       }
-      let recentSessions = allSessions.prefix(12)
+      let recentSessions = cached.allSessions.prefix(12)
       displayBox.store(
         WindowsWorkbenchDisplay(
           connectionState: connectionState,
           mcpAddress: serviceStatus?.localMCPURL ?? "—",
           mcpState: serviceStatus?.status.mcpState ?? "未知",
-          taskCount: tasks.count,
-          runningTaskCount: runningCount,
+          taskCount: cached.taskCount,
+          runningTaskCount: cached.runningTaskCount,
           pendingApprovalCount: approvalItems.count,
           projectRows: projects.map(\.name),
           selectedProjectIndex: selectedProjectID.flatMap { selectedID in
@@ -120,11 +137,14 @@
           taskRows: workbenchRows,
           recentTaskRows: recentSessions.map(Self.sessionRowText),
           recentTasks: recentSessions.map {
-            Self.recentTaskPresentation($0, projectName: projectName(for: $0.projectID))
+            Self.recentTaskPresentation($0, projectName: cached.projectName(for: $0.projectID))
           },
           selectedTaskID: selectedTaskID,
           selectedTaskIndex: selectedIndex,
-          taskMetadata: metadata(for: task),
+          taskMetadata: metadata(
+            for: task,
+            projectName: task.map { cached.projectName(for: $0.projectID) }
+          ),
           conversationText: conversationText,
           interruptEnabled: connectionState == .connected
             && TaskInspectorPresentation.canInterrupt(task),
@@ -134,7 +154,9 @@
           steerEnabled: connectionState == .connected
             && TaskInspectorPresentation.canSteer(
               task,
-              providerSupportsSteer: providerSupportsSteer(for: task)
+              providerSupportsSteer: task.map {
+                cached.providerSupportsSteer(for: $0)
+              } ?? false
             ),
           actionText: actionText,
           approvalRows: approvalItems.map(\.rowText),
@@ -152,7 +174,7 @@
           approvalItems: typedApprovals,
           browserEnabled: isChatBrowserEnabled,
           supportsImmediateSteer: task?.installationID.flatMap { installationID in
-            agentInstallations.first(where: { $0.installationID == installationID })
+            cached.installationByID[installationID]
           }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true,
           canLoadEarlierConversation: conversation?.canLoadEarlier == true,
           defaultModel: modelPreferences?.executionModel ?? models.first?.displayName
@@ -170,32 +192,45 @@
 
     func providerSupportsSteer(for task: MCPServiceTaskSnapshot?) -> Bool {
       guard let task else { return false }
-      if task.isCodexTask { return true }
-      let providerID = task.providerIdentifier
-      return agentProviders.contains {
-        AgentProviderPresentation.identifier($0.providerID) == providerID && $0.supportsSteer
-      }
+      return workbenchDisplaySnapshot.providerSupportsSteer(for: task)
     }
 
     func providerSupportsSessionContinuation(for task: MCPServiceTaskSnapshot?) -> Bool {
       guard let task else { return false }
-      return TaskInspectorPresentation.supportsSessionContinuation(
-        for: task, providers: agentProviders, installations: agentInstallations
-      )
+      return workbenchDisplaySnapshot.providerSupportsSessionContinuation(for: task)
     }
 
-    private func metadata(for task: MCPServiceTaskSnapshot?) -> String {
+    private func metadata(for task: MCPServiceTaskSnapshot?, projectName: String?) -> String {
       if let task {
         return TaskInspectorPresentation.metadata(
           for: task,
-          projectName: projectName(for: task.projectID)
+          projectName: projectName
         )
       }
       return "未选择任务或会话"
     }
 
-    private func projectName(for projectID: String) -> String {
-      projects.first(where: { $0.projectID == projectID })?.name ?? projectID
+    func requestConversationDisplayUpdate(for taskID: String) {
+      guard conversation?.taskID == taskID else { return }
+      let isTerminal = workbenchDisplaySnapshot.taskByID[taskID]?.isTerminal == true
+      let conversationFinished = conversation?.isStreaming == false
+      guard !isTerminal, !conversationFinished else {
+        conversationDisplayTask?.cancel()
+        conversationDisplayTask = nil
+        publishDisplay()
+        return
+      }
+      guard conversationDisplayTask == nil else { return }
+      conversationDisplayTask = Task { [weak self] in
+        do {
+          try await Task.sleep(for: .milliseconds(33))
+        } catch {
+          return
+        }
+        guard let self, self.conversation?.taskID == taskID else { return }
+        self.conversationDisplayTask = nil
+        self.publishDisplay()
+      }
     }
 
     private static func sessionRowText(_ session: WorkbenchSessionItem) -> String {

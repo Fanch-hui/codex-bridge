@@ -22,6 +22,7 @@
       currentURL: WindowsChatWebView.storedResumeURL()
     )
     private var worker: WindowsWebViewThread?
+    private var lowMemoryUsage = false
 
     var state: State {
       lock.withLock { snapshot.state }
@@ -65,6 +66,7 @@
         lock.withLock({
           guard worker == nil else { return false }
           worker = next
+          next.setLowMemoryUsage(lowMemoryUsage)
           return true
         })
       else { return }
@@ -77,6 +79,14 @@
 
     func setVisible(_ visible: Bool) {
       lock.withLock { worker }?.setVisible(visible)
+    }
+
+    func setLowMemoryUsage(_ low: Bool) {
+      let active = lock.withLock { () -> WindowsWebViewThread? in
+        lowMemoryUsage = low
+        return worker
+      }
+      active?.setLowMemoryUsage(low)
     }
 
     func applyLayout(to bounds: RECT, visible: Bool) {

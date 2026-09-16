@@ -18,9 +18,16 @@
         guard let model, !model.isShuttingDown,
           let management, let auxiliary
         else { return }
-        await management.refresh()
+        await management.refreshProjects()
         guard !model.isShuttingDown else { return }
-        await auxiliary.refreshAll()
+        Task(priority: .utility) {
+          await management.refreshAgents()
+          guard !model.isShuttingDown else { return }
+          await auxiliary.agentDefaults.refresh()
+        }
+        if selectedPage != .overview {
+          refresh(page: selectedPage, model: model, management: management, auxiliary: auxiliary)
+        }
       }
       let ui = WindowsUIThread.shared
       guard
@@ -36,8 +43,15 @@
       }
 
       while ui.isRunning() {
-        for command in WindowsMainWindow.takePendingCommands() {
+        let commands = WindowsMainWindow.takePendingCommands()
+        for command in commands {
           run(command, model: model, management: management, auxiliary: auxiliary)
+        }
+        if commands.contains(where: {
+          if case .windowVisibilityChanged = $0 { return false }
+          return true
+        }) {
+          model.userDidInteract()
         }
         applyDisplay(
           model: model,
@@ -48,6 +62,7 @@
         )
         try? await Task.sleep(nanoseconds: 10_000_000)
       }
+      stopActivityScheduling()
       await model.shutdown()
     }
 
@@ -61,6 +76,8 @@
         return
       }
       switch command {
+      case .windowVisibilityChanged(let visible):
+        updateWindowVisibility(visible, model: model)
       case .selectPage(let index):
         guard let page = WindowsMainPage(rawValue: index) else { return }
         selectedPage = page
@@ -221,7 +238,7 @@
         Task { await model.refreshSelectedTask() }
       case .projects:
         Task { await management.refreshProjects() }
-        auxiliary.run(.refreshWorkspace)
+        Task { await auxiliary.workspace.refresh() }
       case .logs:
         auxiliary.run(.refreshLogs)
       case .connections:

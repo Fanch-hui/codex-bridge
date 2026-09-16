@@ -188,8 +188,31 @@
     });
   }
 
+  function prepareContentCard(content, page) {
+    var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
+    var detail = page.selectedTask;
+    var keepConversation = incremental && incremental.isWindows() && detail
+      && ((detail.conversation && detail.conversation.length) || detail.conversationState);
+    var stableCard = keepConversation && content.__windowsDetailCard;
+    if (stableCard) {
+      Array.from(content.children).forEach(function (child) {
+        if (child !== stableCard) child.remove();
+      });
+      var block = content.__windowsConversationBlock;
+      var retained = block ? [block.heading, block.error, block.list, block.actions] : [];
+      Array.from(stableCard.children).forEach(function (child) {
+        if (retained.indexOf(child) < 0) child.remove();
+      });
+    } else {
+      S.clear(content);
+      content.__windowsDetailCard = null;
+      if (!page.selectedTask) content.__windowsConversationBlock = null;
+    }
+    return { card: stableCard, keep: keepConversation };
+  }
+
   function renderContentBody(content, page, emit) {
-    S.clear(content);
+    var retained = prepareContentCard(content, page);
     if (!page.selectedTask) {
       var empty = S.node("div", "workbench-empty-state");
       empty.appendChild(S.icon("sparkles", "empty-sparkle-icon"));
@@ -214,7 +237,8 @@
     }
     var remediationCard = N && N.remediationCard(detail, emit);
     if (remediationCard) content.appendChild(remediationCard);
-    var card = S.node("div", "page-card task-detail-card");
+    var card = retained.card || S.node("div", "page-card task-detail-card");
+    if (retained.keep) content.__windowsDetailCard = card;
     card.appendChild(S.node("h3", "detail-title", detail.title));
     card.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));
     var grid = S.node("dl", "detail-grid");
@@ -238,9 +262,13 @@
 
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(card, "变更文件", detail.changedFiles);
     if ((detail.conversation && detail.conversation.length) || detail.conversationState) {
-      global.CodexBridgeDesktopWorkbenchConversation.render(card, detail.conversation || [], page, emit);
+      global.CodexBridgeDesktopWorkbenchConversation.render(
+        card, detail.conversation || [], page, emit, { owner: content });
     }
-    content.appendChild(card);
+    if (card.parentNode !== content) content.appendChild(card);
+    else Array.from(content.children).forEach(function (child) {
+      if (child !== card) content.insertBefore(child, card);
+    });
   }
 
   function decisionLabel(approval, decision) {

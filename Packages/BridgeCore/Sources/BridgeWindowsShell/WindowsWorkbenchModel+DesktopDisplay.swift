@@ -47,13 +47,16 @@
       projectName: String,
       conversation: TaskConversationModel?,
       permissionRemediation: BridgeDesktopPermissionRemediationState?,
+      conversationEntries: [BridgeDesktopConversationEntry]? = nil,
       canResume: Bool,
       canSteer: Bool,
       pendingUserInput: Bool = false
     ) -> BridgeDesktopTaskDetail {
-      let entries = (conversation?.entries ?? []).map {
-        conversationEntry($0, providerID: task.providerIdentifier)
-      }
+      let entries =
+        conversationEntries
+        ?? (conversation?.entries ?? []).map {
+          conversationEntry($0, providerID: task.providerIdentifier)
+        }
       let activity = task.recentActivity.map {
         BridgeDesktopActivityRow(
           id: "activity:\(task.taskID):\($0.sequence)",
@@ -120,12 +123,42 @@
       resolvingApprovalIDs: Set<ApprovalPresentation.Identifier>,
       connected: Bool
     ) -> BridgeDesktopApprovalRow? {
+      var approvalsByID: [String: IPCApprovalSummary] = [:]
+      approvalsByID.reserveCapacity(approvals.count)
+      for approval in approvals { approvalsByID[approval.approvalID] = approval }
+      var directApprovalsByID: [String: IPCPendingDirectApproval] = [:]
+      directApprovalsByID.reserveCapacity(directApprovals.count)
+      for approval in directApprovals { directApprovalsByID[approval.approvalID] = approval }
+      var tasksByID: [String: MCPServiceTaskSnapshot] = [:]
+      tasksByID.reserveCapacity(tasks.count)
+      for task in tasks { tasksByID[task.taskID] = task }
+      var projectsByID: [String: MCPProjectSummary] = [:]
+      projectsByID.reserveCapacity(projects.count)
+      for project in projects { projectsByID[project.projectID] = project }
+      return approvalItem(
+        item,
+        approvalsByID: approvalsByID,
+        directApprovalsByID: directApprovalsByID,
+        tasksByID: tasksByID,
+        projectsByID: projectsByID,
+        resolvingApprovalIDs: resolvingApprovalIDs,
+        connected: connected
+      )
+    }
+
+    static func approvalItem(
+      _ item: ApprovalPresentation.Item,
+      approvalsByID: [String: IPCApprovalSummary],
+      directApprovalsByID: [String: IPCPendingDirectApproval],
+      tasksByID: [String: MCPServiceTaskSnapshot],
+      projectsByID: [String: MCPProjectSummary],
+      resolvingApprovalIDs: Set<ApprovalPresentation.Identifier>,
+      connected: Bool
+    ) -> BridgeDesktopApprovalRow? {
       switch item.id {
       case .task(let approvalID):
-        guard let approval = approvals.first(where: { $0.approvalID == approvalID }) else {
-          return nil
-        }
-        let projectID = tasks.first(where: { $0.taskID == approval.taskID })?.projectID
+        guard let approval = approvalsByID[approvalID] else { return nil }
+        let projectID = tasksByID[approval.taskID]?.projectID
         let resolving = resolvingApprovalIDs.contains(.task(approvalID))
         return BridgeDesktopApprovalRow(
           approvalID: approvalID,
@@ -156,9 +189,7 @@
           } ?? []
         )
       case .direct(let approvalID):
-        guard let approval = directApprovals.first(where: { $0.approvalID == approvalID }) else {
-          return nil
-        }
+        guard let approval = directApprovalsByID[approvalID] else { return nil }
         let resolving = resolvingApprovalIDs.contains(.direct(approvalID))
         return BridgeDesktopApprovalRow(
           approvalID: approvalID,
@@ -167,9 +198,7 @@
           kind: approval.kind,
           title: "Direct 审批",
           summary: approval.summary,
-          reason: projects.first(where: { $0.projectID == approval.projectID }).map {
-            "项目：\($0.name)"
-          },
+          reason: projectsByID[approval.projectID].map { "项目：\($0.name)" },
           decisionOptions: ["allow"],
           canAllow: connected && !resolving,
           canDeny: connected && !resolving,
@@ -182,58 +211,7 @@
       _ entry: TaskConversationModel.Entry,
       providerID: String
     ) -> BridgeDesktopConversationEntry {
-      let role =
-        entry.role == "user"
-        ? "用户" : AgentProviderPresentation.displayName(providerID)
-      if entry.kind == "reasoning" {
-        return BridgeDesktopConversationEntry(
-          id: entry.key,
-          role: role,
-          text: entry.content,
-          kind: entry.kind,
-          displayTitle: CodexTranscriptPresentation.reasoningTitle(
-            providerID: providerID,
-            streaming: !entry.isFinal
-          ),
-          displayStatus: entry.isFinal ? "" : "进行中",
-          symbol: "brain.head.profile",
-          isFinal: entry.isFinal,
-          status: entry.isFinal ? "final" : "streaming"
-        )
-      }
-      if entry.kind == "tool_call" {
-        let toolStatus = CodexTranscriptPresentation.resolvedToolStatus(
-          providerID: providerID, name: entry.toolName, status: entry.toolStatus,
-          output: entry.content
-        )
-        let presentation = CodexTranscriptPresentation.tool(
-          providerID: providerID,
-          name: entry.toolName,
-          status: entry.toolStatus
-        )
-        return BridgeDesktopConversationEntry(
-          id: entry.key,
-          role: role,
-          text: entry.content,
-          kind: entry.kind,
-          toolName: entry.toolName,
-          toolStatus: toolStatus,
-          toolArguments: entry.toolArguments,
-          displayTitle: presentation.title,
-          displayStatus: CodexTranscriptPresentation.statusLabel(toolStatus),
-          symbol: presentation.systemImage,
-          isFinal: entry.isFinal,
-          status: entry.isFinal ? "final" : "streaming"
-        )
-      }
-      return BridgeDesktopConversationEntry(
-        id: entry.key,
-        role: role,
-        text: entry.content,
-        kind: entry.kind,
-        isFinal: entry.isFinal,
-        status: entry.isFinal ? "final" : "streaming"
-      )
+      WindowsConversationEntryPresenter.make(entry, providerID: providerID)
     }
 
     private static func taskModelLabel(_ task: MCPServiceTaskSnapshot) -> String? {

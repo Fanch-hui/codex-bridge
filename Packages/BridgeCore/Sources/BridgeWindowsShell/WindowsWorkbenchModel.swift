@@ -88,6 +88,13 @@
   /// non-isolated Win32 render loop (single reader, same-thread comparisons).
   public final class WorkbenchDisplayBox: @unchecked Sendable {
     private let lock = NSLock()
+    private var version: UInt64 = 0
+
+    var revision: UInt64 {
+      lock.lock()
+      defer { lock.unlock() }
+      return version
+    }
     private var value = WindowsWorkbenchDisplay(
       connectionState: .idle,
       mcpAddress: "—",
@@ -132,8 +139,10 @@
 
     func store(_ newValue: WindowsWorkbenchDisplay) {
       lock.lock()
+      defer { lock.unlock() }
+      guard self.value != newValue else { return }
       value = newValue
-      lock.unlock()
+      version &+= 1
     }
   }
 
@@ -143,19 +152,30 @@
   /// so the shell subscribes via the box instead of Combine.)
   @MainActor
   public final class WindowsWorkbenchModel {
-    public private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
-    public private(set) var errorMessage: String?
+    public internal(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
+    public internal(set) var errorMessage: String?
     public let displayBox = WorkbenchDisplayBox()
 
     let client: any BridgeServiceClientProtocol
     let feedback: WindowsDesktopFeedbackStore
+    var workbenchDisplayCache = WindowsWorkbenchPresentationCache()
     var serviceStatus: IPCServiceStatusResponse?
-    var projects: [MCPProjectSummary] = []
-    var agentProviders: [IPCAgentProviderSummary] = []
-    var agentInstallations: [IPCAgentInstallationSummary] = []
-    var tasks: [MCPServiceTaskSnapshot] = []
+    var projects: [MCPProjectSummary] = [] {
+      didSet { workbenchDisplayCache.projectsDidChange() }
+    }
+    var agentProviders: [IPCAgentProviderSummary] = [] {
+      didSet { workbenchDisplayCache.providersDidChange() }
+    }
+    var agentInstallations: [IPCAgentInstallationSummary] = [] {
+      didSet { workbenchDisplayCache.installationsDidChange() }
+    }
+    var tasks: [MCPServiceTaskSnapshot] = [] {
+      didSet { workbenchDisplayCache.tasksDidChange() }
+    }
     var threads: [MCPThreadSummary] = []
-    var selectedProjectID: String?
+    var selectedProjectID: String? {
+      didSet { workbenchDisplayCache.selectedProjectDidChange() }
+    }
     var selectedThreadID: String?
     var selectedThreadPage: MCPThreadReadPage?
     var workbenchPermissionMode = "workspace-write"
@@ -163,10 +183,15 @@
     var selectedTaskID: String?
     var conversation: TaskConversationModel?
     var conversationPresentationCache = TaskConversationPresentationCache()
+    var windowsConversationPresentationCache = WindowsConversationPresentationCache()
     var conversationWasTerminal = false
     var actionText: String?
-    var approvals: [IPCApprovalSummary] = []
-    var directApprovals: [IPCPendingDirectApproval] = []
+    var approvals: [IPCApprovalSummary] = [] {
+      didSet { if approvals != oldValue { workbenchDisplayCache.approvalsDidChange() } }
+    }
+    var directApprovals: [IPCPendingDirectApproval] = [] {
+      didSet { if directApprovals != oldValue { workbenchDisplayCache.approvalsDidChange() } }
+    }
     var selectedApprovalID: ApprovalPresentation.Identifier?
     var approvalSelectionGeneration: UInt64 = 0
     var resolvingApprovalIDs: Set<ApprovalPresentation.Identifier> = []
@@ -183,7 +208,14 @@
     var connectionRefreshInProgress = false
     var onConnected: (@MainActor () async -> Void)?
     var isShuttingDown = false
-    private var taskPollingTask: Task<Void, Never>?
+    var taskPollingTask: Task<Void, Never>?
+    var deferredCatalogTask: Task<Void, Never>?
+    var conversationDisplayTask: Task<Void, Never>?
+    var interactionRefreshTask: Task<Void, Never>?
+    var taskLoadInProgress = false
+    var taskRefreshInProgress = false
+    var isWindowVisible = true
+    var connectionGeneration: UInt64 = 0
 
     public convenience init() {
       self.init(feedback: WindowsDesktopFeedbackStore())
@@ -202,222 +234,5 @@
       publishDisplay()
     }
 
-    /// Launches the service if needed, then verifies connectivity via
-    /// `status()` and pulls the task list.
-    public func startServiceAndConnect() async {
-      let wasConnected = connectionState == .connected
-      connectionState = .connecting
-      publishDisplay()
-      let launched = await Task.detached(priority: .utility) {
-        WindowsServiceLauncher.ensureServiceRunning()
-      }.value
-      guard launched else {
-        fail("未能连接后台服务：codex-bridge-service.exe 启动失败或管道未就绪。")
-        startTaskPolling()
-        return
-      }
-      await connectAndRefresh(notifyOnConnect: !wasConnected)
-    }
-
-    /// Verifies the pipe transport with a `status()` round trip, then loads tasks.
-    public func connectAndRefresh() async {
-      await connectAndRefresh(notifyOnConnect: connectionState != .connected)
-    }
-
-    private func connectAndRefresh(notifyOnConnect: Bool) async {
-      guard !connectionRefreshInProgress else { return }
-      connectionRefreshInProgress = true
-      defer { connectionRefreshInProgress = false }
-      connectionState = .connecting
-      publishDisplay()
-      do {
-        let status = try await client.status()
-        serviceStatus = status
-        projects = (try? await client.projects()) ?? projects
-        if let catalog = try? await client.agentCatalog() {
-          agentProviders = catalog.providers
-          agentInstallations = catalog.installations
-        } else {
-          agentProviders = []
-          agentInstallations = []
-        }
-        do {
-          let catalog = try await client.modelCatalog()
-          models = catalog.models
-          modelPreferences = catalog.preferences
-          modelError = nil
-        } catch {
-          models = []
-          modelPreferences = nil
-          modelError = "模型目录读取失败：\(BridgeServiceErrorMessage.message(error))"
-        }
-        selectedProjectID =
-          projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID
-          ?? selectedProjectID
-          ?? projects.first?.projectID
-        try await synchronizeWorkbenchProject()
-        workbenchPermissionMode =
-          Self.permissionModes.contains(status.workbenchPermissionMode ?? "")
-          ? status.workbenchPermissionMode!
-          : workbenchPermissionMode
-        errorMessage = nil
-        await refreshTasks()
-        guard connectionState == .connected else {
-          startTaskPolling()
-          return
-        }
-        startTaskPolling()
-        if notifyOnConnect, !isShuttingDown {
-          await onConnected?()
-        }
-      } catch {
-        fail(BridgeServiceErrorMessage.message(error))
-      }
-      startTaskPolling()
-    }
-
-    public func refreshTasks() async {
-      await loadTasks()
-      guard connectionState == .connected else { return }
-      await refreshApprovals()
-    }
-
-    public func shutdown() async {
-      isShuttingDown = true
-      onConnected = nil
-      taskPollingTask?.cancel()
-      taskPollingTask = nil
-      closeConversation()
-      await client.close()
-    }
-
-    private func startTaskPolling() {
-      guard taskPollingTask == nil else { return }
-      taskPollingTask = Task { [weak self] in
-        while !Task.isCancelled {
-          do {
-            try await Task.sleep(for: .seconds(2))
-          } catch {
-            return
-          }
-          guard let self, !Task.isCancelled else { return }
-          if self.connectionState == .connected {
-            await self.refreshServiceStatus()
-            guard self.connectionState == .connected else { continue }
-            await self.refreshTasks()
-          } else {
-            await self.startServiceAndConnect()
-          }
-        }
-      }
-    }
-
-    private func refreshServiceStatus() async {
-      do {
-        let status = try await client.status()
-        guard !isShuttingDown, connectionState == .connected else { return }
-        var changed = serviceStatus != status
-        serviceStatus = status
-        if let mode = status.workbenchPermissionMode,
-          Self.permissionModes.contains(mode), workbenchPermissionMode != mode
-        {
-          workbenchPermissionMode = mode
-          changed = true
-        }
-        if errorMessage != nil {
-          errorMessage = nil
-          changed = true
-        }
-        if changed { publishDisplay() }
-      } catch {
-        fail(BridgeServiceErrorMessage.message(error))
-      }
-    }
-
-    func refreshDisplaySnapshot() {
-      publishDisplay()
-    }
-
-    private func fail(_ message: String) {
-      errorMessage = message
-      connectionState = .unavailable
-      publishDisplay()
-    }
-
-    func loadTasks() async {
-      do {
-        tasks = try await client.tasks(IPCTaskListRequest())
-        errorMessage = nil
-        connectionState = .connected
-        reconcileSelectedTask()
-        selectDefaultTaskIfNeeded()
-        publishDisplay()
-      } catch {
-        fail(BridgeServiceErrorMessage.message(error))
-      }
-    }
-
-    func reconcileSelectedTask() {
-      guard let selectedTaskID else { return }
-      guard
-        let task = tasks.first(where: {
-          $0.taskID == selectedTaskID
-            && (selectedProjectID == nil || $0.projectID == selectedProjectID)
-        })
-      else {
-        self.selectedTaskID = nil
-        closeConversation()
-        conversationWasTerminal = false
-        actionText = nil
-        return
-      }
-      if conversation?.taskID != task.taskID || conversationWasTerminal != task.isTerminal {
-        openConversation(for: task)
-      }
-      conversationWasTerminal = task.isTerminal
-    }
-
-    func openConversation(for task: MCPServiceTaskSnapshot) {
-      closeConversation()
-      let sessionTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: tasks)
-      let priorTaskIDs =
-        sessionTasks
-        .filter { $0.taskID != task.taskID && $0.updatedAt <= task.updatedAt }
-        .map(\.taskID)
-      let next = TaskConversationModel(
-        taskID: task.taskID,
-        priorTaskIDs: priorTaskIDs,
-        client: client,
-        isTerminal: task.isTerminal,
-        updateHandler: { [weak self] in
-          guard let self, self.conversation?.taskID == task.taskID else { return }
-          self.publishDisplay()
-        }
-      )
-      next.restorePresentation(
-        conversationPresentationCache.snapshot(for: task.taskID, priorTaskIDs: priorTaskIDs))
-      conversation = next
-      conversationWasTerminal = task.isTerminal
-      Task { [weak self, weak next] in
-        await next?.start()
-        guard let self, self.conversation === next else { return }
-        self.publishDisplay()
-      }
-    }
-
-    func closeConversation() {
-      guard let current = conversation else { return }
-      conversationPresentationCache.store(
-        current.presentationSnapshot(),
-        for: current.taskID
-      )
-      current.cancel()
-      conversation = nil
-    }
-
-    var selectedTask: MCPServiceTaskSnapshot? {
-      guard let selectedTaskID else { return nil }
-      return tasks.first(where: { $0.taskID == selectedTaskID })
-    }
   }
 #endif

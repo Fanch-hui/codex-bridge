@@ -5,6 +5,8 @@
   /// Projects the live Windows shell snapshots into the shared desktop UI
   /// contract consumed by the macOS and Windows hosts.
   enum WindowsDesktopUIStateBuilder {
+    private static let pageCache = WindowsDesktopUIStatePageCache()
+
     static func build(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
@@ -26,47 +28,97 @@
       let canRefreshModels = settings?.busy != true
       return BridgeDesktopUIState(
         hostContext: BridgeDesktopHostContext(platform: .windows),
-        navigation: navigation(
-          workbench: workbench,
-          management: management
-        ),
+        navigation: pageCache.navigation(
+          key: WindowsDesktopNavigationCacheKey(
+            runningTaskCount: workbench.runningTaskCount,
+            pendingApprovalCount: workbench.pendingApprovalCount,
+            projectCount: management.project.rows.count
+          )
+        ) {
+          navigation(workbench: workbench, management: management)
+        },
         selectedNavigation: selectedNavigation,
         connectionLabel: connectionLabel(for: workbench.connectionState),
         connectionTone: connectionTone(for: workbench.connectionState),
         isRefreshing: isRefreshing || modelRefreshInProgress,
         feedback: feedback,
-        overview: overview(
-          workbench: workbench,
-          management: management,
-          tunnel: connections?.tunnel
-        ),
-        workbench: workbenchPage(
-          workbench,
-          management: management,
-          browserAvailable: browserAvailable,
-          browserURL: browserURL,
-          browserStatus: browserStatus,
-          browserCanGoBack: browserCanGoBack,
-          browserCanGoForward: browserCanGoForward,
-          modelRefreshInProgress: modelRefreshInProgress,
-          canRefreshModels: canRefreshModels
-        ),
-        projects: projectsPage(
-          workbench: workbench,
-          management: management,
-          workspace: workspace
-        ),
-        logs: logsPage(logs),
-        connections: connectionsPage(
-          workbench: workbench,
-          management: management,
-          connections: connections,
-          settings: settings
-        ),
-        settings: settingsPage(
-          settings: settings,
-          agentDefaults: agentDefaults
-        )
+        overview: pageCache.overview(
+          key: WindowsDesktopOverviewCacheKey(
+            connectionState: workbench.connectionState,
+            mcpState: workbench.mcpState,
+            detailText: workbench.detailText,
+            runningTaskCount: workbench.runningTaskCount,
+            pendingApprovalCount: workbench.pendingApprovalCount,
+            taskCount: workbench.taskCount,
+            projectCount: management.project.rows.count,
+            installationCount: management.agent.installationRows.count,
+            availableAgentCount: management.availableAgentCount,
+            recentTasks: workbench.recentTasks,
+            tunnel: connections?.tunnel
+          )
+        ) {
+          overview(workbench: workbench, management: management, tunnel: connections?.tunnel)
+        },
+        workbench: pageCache.workbench(
+          key: WindowsDesktopWorkbenchCacheKey(
+            workbench: workbench,
+            management: management,
+            browserAvailable: browserAvailable,
+            browserURL: browserURL,
+            browserStatus: browserStatus,
+            browserCanGoBack: browserCanGoBack,
+            browserCanGoForward: browserCanGoForward,
+            modelRefreshInProgress: modelRefreshInProgress,
+            canRefreshModels: canRefreshModels
+          )
+        ) {
+          workbenchPage(
+            workbench,
+            management: management,
+            browserAvailable: browserAvailable,
+            browserURL: browserURL,
+            browserStatus: browserStatus,
+            browserCanGoBack: browserCanGoBack,
+            browserCanGoForward: browserCanGoForward,
+            modelRefreshInProgress: modelRefreshInProgress,
+            canRefreshModels: canRefreshModels
+          )
+        },
+        projects: pageCache.projects(
+          key: WindowsDesktopProjectsCacheKey(
+            workbench: workbench,
+            management: management,
+            workspace: workspace
+          )
+        ) {
+          projectsPage(workbench: workbench, management: management, workspace: workspace)
+        },
+        logs: pageCache.logs(key: WindowsDesktopLogsCacheKey(logs)) {
+          logsPage(logs)
+        },
+        connections: pageCache.connections(
+          key: WindowsDesktopConnectionsCacheKey(
+            workbench: workbench,
+            management: management,
+            connections: connections,
+            settings: settings
+          )
+        ) {
+          connectionsPage(
+            workbench: workbench,
+            management: management,
+            connections: connections,
+            settings: settings
+          )
+        },
+        settings: pageCache.settings(
+          key: WindowsDesktopSettingsCacheKey(
+            settings: settings,
+            agentDefaults: agentDefaults
+          )
+        ) {
+          settingsPage(settings: settings, agentDefaults: agentDefaults)
+        }
       )
     }
 

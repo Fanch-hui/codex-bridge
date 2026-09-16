@@ -178,7 +178,7 @@
       if mode == .interruptCurrentThenContinue {
         let supportsImmediate =
           task.installationID.flatMap { installationID in
-            agentInstallations.first(where: { $0.installationID == installationID })
+            workbenchDisplaySnapshot.installationByID[installationID]
           }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
         guard supportsImmediate else {
           reportFailure("当前 Agent 不支持立即 Steer。", taskID: taskID)
@@ -257,7 +257,7 @@
         reportFailure("会话不存在或已经移除。", taskID: taskID)
         return
       }
-      let relatedTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: tasks)
+      let relatedTasks = workbenchDisplaySnapshot.sessionByTaskID[task.taskID]?.tasks ?? [task]
       guard !relatedTasks.isEmpty, relatedTasks.allSatisfy({ $0.isTerminal }) else {
         reportFailure("运行中的会话不能删除。", taskID: taskID)
         return
@@ -342,7 +342,7 @@
     }
 
     private func task(id: String) -> MCPServiceTaskSnapshot? {
-      tasks.first(where: { $0.taskID == id })
+      workbenchDisplaySnapshot.taskByID[id]
     }
 
     private func clearSelectedTask() {

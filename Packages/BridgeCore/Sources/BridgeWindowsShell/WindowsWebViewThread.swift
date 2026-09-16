@@ -5,12 +5,13 @@
   final class WindowsWebViewThread: @unchecked Sendable {
     typealias StateUpdate = @Sendable (WindowsChatWebView.State, String?) -> Void
 
-    private enum Message {
+    enum Message {
       static let synchronize = UINT(WM_APP + 1)
       static let goBack = UINT(WM_APP + 2)
       static let goForward = UINT(WM_APP + 3)
       static let reload = UINT(WM_APP + 4)
       static let postWebMessage = UINT(WM_APP + 5)
+      static let setMemoryUsageTarget = UINT(WM_APP + 6)
     }
 
     typealias NavigationUpdate = @Sendable (Bool, Bool, String?) -> Void
@@ -47,6 +48,7 @@
     var navigationCompletedToken = WebView2EventRegistrationToken()
     var hasNavigationCompletedToken = false
     private var pendingWebMessage: String?
+    var pendingMemoryUsageLow = false
 
     convenience init(
       parentWindow: HWND,
@@ -277,6 +279,7 @@
         return
       }
       self.webView = webView
+      applyMemoryUsageTarget()
 
       if configuration.hasCustomSettings {
         var settingsPointer: UnsafeMutableRawPointer?
@@ -418,6 +421,7 @@
       case Message.goForward: runAction(WebView2Slot.webViewGoForward)
       case Message.reload: runAction(WebView2Slot.webViewReload)
       case Message.postWebMessage: postPendingWebMessage()
+      case Message.setMemoryUsageTarget: applyMemoryUsageTarget()
       default: break
       }
     }

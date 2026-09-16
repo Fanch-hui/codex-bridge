@@ -71,12 +71,12 @@
       settings: WindowsSettingsDisplay?
     ) -> BridgeDesktopCodexConnectionState {
       let service = statusLabel(workbench.connectionState)
-      guard let settings else {
+      guard let settings, settings.connectionState != .idle || settings.busy else {
         return BridgeDesktopCodexConnectionState(
           connectionState: service.label,
           modelCount: workbench.availableModelCount,
           modelError: workbench.modelError,
-          canRefresh: false,
+          canRefresh: workbench.connectionState == .connected,
           isConnected: workbench.connectionState == .connected && workbench.availableModelCount > 0
             && workbench.modelError == nil
         )

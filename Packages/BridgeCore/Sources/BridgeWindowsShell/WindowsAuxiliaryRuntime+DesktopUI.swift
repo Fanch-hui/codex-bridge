@@ -9,11 +9,6 @@
 
   extension WindowsAuxiliaryRuntime {
     func desktopDisplaySnapshot() -> WindowsAuxiliaryDisplaySnapshot {
-      workspace.refreshDisplaySnapshot()
-      agentDefaults.refreshDisplaySnapshot()
-      logs.refreshDisplaySnapshot()
-      settings.refreshDisplaySnapshot()
-      connections.refreshDisplaySnapshot()
       return WindowsAuxiliaryDisplaySnapshot(
         workspace: workspace.displayBox.current(),
         agentDefaults: agentDefaults.displayBox.current(),

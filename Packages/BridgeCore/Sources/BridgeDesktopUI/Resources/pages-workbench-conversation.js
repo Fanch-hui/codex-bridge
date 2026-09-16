@@ -21,7 +21,9 @@
     };
   }
 
-  function addConversationBlock(container, values, page, emit) {
+  function addConversationBlock(container, values, page, emit, options) {
+    var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
+    if (incremental && incremental.isWindows()) return incremental.render(container, values, page, emit, options);
     container.appendChild(S.node("h4", "subsection-title", "对话"));
     var state = page.selectedTask && page.selectedTask.conversationState;
     if (state && state.errorMessage) container.appendChild(conversationError(state.errorMessage));
@@ -62,22 +64,36 @@
   }
 
   function conversationMessage(entry) {
-    var isUser = entry.role === "用户";
-    var item = S.node("article", "conversation-entry entry-message " + (isUser ? "entry-user" : "entry-agent") + (entry.isFinal ? "" : " entry-streaming"));
-    item.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
+    var item = S.node("article", "conversation-entry entry-message");
+    updateMessage(item, entry);
     return item;
   }
 
+  function updateMessage(item, entry) {
+    var isUser = entry.role === "用户";
+    item.className = "conversation-entry entry-message " + (isUser ? "entry-user" : "entry-agent") + (entry.isFinal ? "" : " entry-streaming");
+    S.clear(item);
+    item.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
+  }
+
   function conversationDisclosure(entry, context) {
-    var item = S.node("details", "conversation-entry entry-disclosure entry-" + entry.kind);
-    var key = JSON.stringify([context, entry.id]);
-    var expanded = disclosures.has(key) ? disclosures.get(key) : false;
-    item.open = expanded;
+    var item = S.node("details", "conversation-entry entry-disclosure");
+    item.__disclosureKey = null;
     item.addEventListener("toggle", function () {
-      if (item.open === expanded) return;
-      expanded = item.open;
-      disclosures.set(key, expanded);
+      if (item.__disclosureKey !== null) disclosures.set(item.__disclosureKey, !!item.open);
     });
+    updateDisclosure(item, entry, context);
+    return item;
+  }
+
+  function updateDisclosure(item, entry, context) {
+    var key = JSON.stringify([context, entry.id]);
+    var isNewContext = item.__disclosureKey !== key;
+    if (disclosures.has(key)) item.open = disclosures.get(key);
+    else if (isNewContext) item.open = false;
+    item.__disclosureKey = key;
+    item.className = "conversation-entry entry-disclosure entry-" + entry.kind;
+    S.clear(item);
     var summary = S.node("summary", "entry-heading disclosure-summary");
     summary.appendChild(S.icon("chevron.right", "entry-disclosure-chevron"));
     summary.appendChild(statusIcon(entry));
@@ -101,7 +117,6 @@
       body.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
     }
     item.appendChild(body);
-    return item;
   }
 
   function statusIcon(entry) {
@@ -158,7 +173,8 @@
     var item = S.node("div", "conversation-state conversation-state-error");
     item.setAttribute("role", "alert");
     item.appendChild(S.icon("xmark.circle.fill", "conversation-state-icon"));
-    item.appendChild(S.node("span", null, message));
+    item.__message = S.node("span", null, message);
+    item.appendChild(item.__message);
     return item;
   }
 
@@ -167,7 +183,8 @@
     item.setAttribute("role", "status");
     item.setAttribute("aria-live", "polite");
     item.appendChild(S.node("span", "conversation-state-spinner", ""));
-    item.appendChild(S.node("span", null, statusText || "正在读取对话…"));
+    item.__statusText = S.node("span", null, statusText || "正在读取对话…");
+    item.appendChild(item.__statusText);
     return item;
   }
 
@@ -185,12 +202,31 @@
     item.setAttribute("role", "status");
     item.setAttribute("aria-live", "polite");
     item.appendChild(S.node("span", "conversation-state-spinner", ""));
-    var copy = S.node("div", "conversation-state-copy");
-    copy.appendChild(S.node("div", "conversation-state-title", state.statusText || "正在处理任务…"));
-    if (state.detailText) copy.appendChild(S.node("div", "conversation-state-detail", state.detailText));
-    item.appendChild(copy);
+    item.__activityCopy = S.node("div", "conversation-state-copy");
+    item.appendChild(item.__activityCopy);
+    updateActivityNode(item, state);
     return item;
   }
 
-  global.CodexBridgeDesktopWorkbenchConversation = { render: addConversationBlock, captureViewport: captureViewport };
+  function updateActivityNode(item, state) {
+    S.clear(item.__activityCopy);
+    item.__activityCopy.appendChild(S.node("div", "conversation-state-title", state.statusText || "正在处理任务…"));
+    if (state.detailText) item.__activityCopy.appendChild(S.node("div", "conversation-state-detail", state.detailText));
+    return item;
+  }
+
+  global.CodexBridgeDesktopWorkbenchConversation = {
+    render: addConversationBlock,
+    captureViewport: captureViewport,
+    contextKey: contextKey,
+    createMessage: conversationMessage,
+    updateMessage: updateMessage,
+    createDisclosure: conversationDisclosure,
+    updateDisclosure: updateDisclosure,
+    createError: conversationError,
+    createLoading: conversationLoading,
+    createEarlierLoading: earlierLoading,
+    createActivity: conversationActivity,
+    updateActivity: updateActivityNode
+  };
 }(window));

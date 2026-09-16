@@ -16,6 +16,7 @@
 
   enum MainWindowCommand: Equatable {
     case selectPage(index: Int)
+    case windowVisibilityChanged(Bool)
     case refreshAll
     case refreshModels
     case openTask(id: String)

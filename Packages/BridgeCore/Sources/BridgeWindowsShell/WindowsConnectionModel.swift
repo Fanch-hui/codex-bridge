@@ -29,6 +29,16 @@
       displayBox = AuxiliaryDisplayBox(value: Self.emptyDisplay)
     }
 
+    func applyServiceStatus(
+      _ status: IPCServiceStatusResponse?,
+      connectionState: WindowsWorkbenchDisplay.ConnectionState
+    ) {
+      guard serviceStatus != status || self.connectionState != connectionState else { return }
+      serviceStatus = status
+      self.connectionState = connectionState
+      publishDisplay()
+    }
+
     func refresh() async {
       guard !busy else { return }
       busy = true

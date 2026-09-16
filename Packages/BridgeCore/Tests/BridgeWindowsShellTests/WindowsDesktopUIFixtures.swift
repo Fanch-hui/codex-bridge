@@ -125,11 +125,12 @@
   }
 
   func makeSettings(
+    connectionState: WindowsWorkbenchDisplay.ConnectionState = .connected,
     keepServiceRunningAfterExit: Bool = true,
     serviceRegistered: Bool = false
   ) -> WindowsSettingsDisplay {
     WindowsSettingsDisplay(
-      connectionState: .connected,
+      connectionState: connectionState,
       modelRows: [],
       modelIDs: [],
       selectedExecutionModelIndex: nil,

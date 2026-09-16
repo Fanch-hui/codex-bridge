@@ -51,6 +51,13 @@
 
   final class ManagementDisplayBox: @unchecked Sendable {
     private let lock = NSLock()
+    private var version: UInt64 = 0
+
+    var revision: UInt64 {
+      lock.lock()
+      defer { lock.unlock() }
+      return version
+    }
     private var value: WindowsManagementDisplay
 
     init(value: WindowsManagementDisplay) {
@@ -65,8 +72,10 @@
 
     func store(_ value: WindowsManagementDisplay) {
       lock.lock()
+      defer { lock.unlock() }
+      guard self.value != value else { return }
       self.value = value
-      lock.unlock()
+      version &+= 1
     }
   }
 #endif

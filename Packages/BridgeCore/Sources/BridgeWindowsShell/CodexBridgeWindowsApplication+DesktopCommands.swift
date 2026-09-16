@@ -14,6 +14,7 @@
       switch command {
       case .setBrowserEnabled(let enabled):
         model.setChatBrowserEnabled(enabled)
+        updateBrowserMemoryPolicy(model: model)
         return true
       case .refreshModels:
         Task { @MainActor in await auxiliary.refreshModels(model: model) }

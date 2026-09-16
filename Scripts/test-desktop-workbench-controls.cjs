@@ -8,7 +8,8 @@ function runtime() {
     "pages-form-draft.js",
     "pages-settings-models.js",
     "pages-workbench-controls.js",
-    "pages-workbench-conversation.js"
+    "pages-workbench-conversation.js",
+    "pages-workbench-conversation-incremental.js"
   ], ["workbench-inspector-footer"]);
   const footer = ui.roots[0], commands = [];
   return {
@@ -198,6 +199,42 @@ test("conversation refresh preserves reading position and follows the bottom onl
   assert.equal(content.scrollTop, 1400);
 });
 
+test("Windows conversation rendering reuses keyed entries across snapshots", () => {
+  const ui = runtime();
+  ui.document.documentElement = { dataset: { platform: "windows" } };
+  const owner = ui.document.createElement("section");
+  const state = page("task-a");
+  const firstEntry = { id: "entry-1", role: "用户", text: "第一条", isFinal: true };
+  const secondEntry = { id: "entry-2", role: "助手", text: "第二条", isFinal: true };
+  const firstCard = ui.document.createElement("div");
+  ui.conversation.render(firstCard, [firstEntry], state, () => {}, { owner });
+  const firstNode = firstCard.querySelector(".conversation-entry");
+  const firstText = firstNode.querySelector(".entry-text");
+
+  const secondCard = ui.document.createElement("div");
+  ui.conversation.render(secondCard, [firstEntry, secondEntry], state, () => {}, { owner });
+  const entries = secondCard.querySelectorAll(".conversation-entry");
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0], firstNode);
+  assert.equal(entries[0].querySelector(".entry-text"), firstText);
+
+  const thirdCard = ui.document.createElement("div");
+  ui.conversation.render(thirdCard, [{ ...firstEntry, text: "更新后的第一条" }, secondEntry], state, () => {}, { owner });
+  assert.equal(thirdCard.querySelector(".conversation-entry"), firstNode);
+  assert.equal(firstNode.querySelector(".entry-text").textContent, "更新后的第一条");
+
+  const tool = { id: "tool-1", kind: "tool_call", toolName: "读取文件", text: "输出", isFinal: false };
+  const toolCard = ui.document.createElement("div");
+  ui.conversation.render(toolCard, [tool], state, () => {}, { owner });
+  const toolNode = toolCard.querySelector(".conversation-entry");
+  toolNode.open = true;
+  toolNode.dispatch("toggle");
+  const updatedToolCard = ui.document.createElement("div");
+  ui.conversation.render(updatedToolCard, [{ ...tool, toolStatus: "completed", isFinal: true }], state, () => {}, { owner });
+  assert.equal(updatedToolCard.querySelector(".conversation-entry"), toolNode);
+  assert.equal(toolNode.open, true);
+});
+
 test("manual disclosure choices survive streaming and stay scoped to their session", () => {
   const ui = runtime(), entry = { id: "reasoning-1", kind: "reasoning", isFinal: false, text: "" };
   function disclosure(state, value) {
@@ -206,11 +243,44 @@ test("manual disclosure choices survive streaming and stay scoped to their sessi
     return content.querySelector("details");
   }
   const original = disclosure(page("a"), entry);
-  assert.equal(original.open, true);
+  assert.equal(original.open, false);
   original.open = false; original.dispatch("toggle");
   assert.equal(disclosure(page("a"), entry).open, false);
-  assert.equal(disclosure(page("b"), entry).open, true);
+  assert.equal(disclosure(page("b"), entry).open, false);
   const completed = disclosure(page("a"), { ...entry, isFinal: true });
   completed.open = true; completed.dispatch("toggle");
   assert.equal(disclosure(page("a"), { ...entry, isFinal: true }).open, true);
+});
+
+test("Windows streaming keeps the conversation card attached to its parent", () => {
+  const ui = createHarness([
+    "pages-common.js", "pages-workbench-conversation.js",
+    "pages-workbench-conversation-incremental.js"
+  ], ["workbench-inspector-content", "workbench-inspector-approvals"]);
+  ui.document.documentElement = { dataset: { platform: "windows" } };
+  ui.window.addEventListener = () => {};
+  ui.window.CodexBridgeDesktopWorkbenchHeader = { render() {} };
+  ui.window.CodexBridgeDesktopWorkbenchControls = { render() {} };
+  ui.load("pages-workbench.js");
+  const content = ui.roots[0];
+  const state = page("task-a", {
+    title: "Task", projectName: "Project", provider: "Codex", status: "运行中",
+    conversation: [{ id: "entry-1", role: "助手", text: "First", isFinal: false }]
+  });
+  const render = () => ui.window.CodexBridgeDesktopWorkbenchPage.render(state, () => {});
+  render();
+  const card = content.querySelector(".task-detail-card");
+  const entry = card.querySelector(".conversation-entry");
+  let cardRemovals = 0;
+  const removeChild = content.removeChild.bind(content);
+  content.removeChild = child => {
+    if (child === card) cardRemovals++;
+    return removeChild(child);
+  };
+  state.selectedTask.conversation = [{ ...state.selectedTask.conversation[0], text: "First and second" }];
+  render();
+  assert.equal(content.querySelector(".task-detail-card"), card);
+  assert.equal(card.querySelector(".conversation-entry"), entry);
+  assert.equal(cardRemovals, 0);
+  assert.equal(entry.querySelector(".entry-text").textContent, "First and second");
 });

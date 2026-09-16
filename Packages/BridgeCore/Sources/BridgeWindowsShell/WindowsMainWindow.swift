@@ -94,6 +94,9 @@
       case UINT(WM_COMMAND):
         if WindowsMainWindowChrome.handleCommand(wParam, window: window) { return 0 }
         return 0
+      case UINT(WM_SHOWWINDOW):
+        enqueue(.windowVisibilityChanged(wParam != 0))
+        return DefWindowProcW(window, message, wParam, lParam)
       case UINT(WM_SIZE):
         if wParam == WPARAM(SIZE_MINIMIZED) {
           _ = ShowWindow(window, SW_HIDE)

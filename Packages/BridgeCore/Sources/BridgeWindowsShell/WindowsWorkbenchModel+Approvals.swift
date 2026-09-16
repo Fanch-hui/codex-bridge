@@ -15,12 +15,14 @@
 
       var errors: [String] = []
       do {
-        approvals = try await client.approvals(taskID: nil)
+        let refreshed = try await client.approvals(taskID: nil)
+        if approvals != refreshed { approvals = refreshed }
       } catch {
         errors.append("安全审批读取失败：\(BridgeServiceErrorMessage.message(error))")
       }
       do {
-        directApprovals = try await client.pendingDirectApprovals()
+        let refreshed = try await client.pendingDirectApprovals()
+        if directApprovals != refreshed { directApprovals = refreshed }
       } catch {
         errors.append("Direct 审批读取失败：\(BridgeServiceErrorMessage.message(error))")
       }
@@ -84,10 +86,9 @@
       if oneTimeToolAutoApproval {
         guard case .task(let rawID) = approvalID,
           decision == "allow",
-          approvals.contains(where: {
-            $0.approvalID == rawID && $0.kind == "task_start"
-              && $0.oneTimeToolAutoApprovalAvailable == true
-          })
+          let approval = workbenchDisplaySnapshot.approvalByID[rawID],
+          approval.kind == "task_start",
+          approval.oneTimeToolAutoApprovalAvailable == true
         else {
           setApprovalStatus("当前审批不支持本次 AGY 工具自动批准。", for: approvalID)
           return
@@ -137,11 +138,11 @@
       decision: String
     ) -> String? {
       guard decision != "deny", case .task(let rawID) = approvalID else { return nil }
-      return approvals.first(where: { $0.approvalID == rawID })?.taskID
+      return workbenchDisplaySnapshot.approvalByID[rawID]?.taskID
     }
 
     private func revealApprovedTask(taskID: String) {
-      guard let task = tasks.first(where: { $0.taskID == taskID }) else { return }
+      guard let task = workbenchDisplaySnapshot.taskByID[taskID] else { return }
       if selectedTaskID == task.taskID {
         openConversation(for: task)
         publishDisplay()
@@ -158,7 +159,7 @@
     ) async throws {
       switch approvalID {
       case .task(let rawID):
-        guard let approval = approvals.first(where: { $0.approvalID == rawID }) else {
+        guard let approval = workbenchDisplaySnapshot.approvalByID[rawID] else {
           throw WindowsApprovalError.noLongerAvailable
         }
         try await client.resolveApproval(
@@ -185,26 +186,7 @@
     }
 
     func approvalPresentationItems() -> [ApprovalPresentation.Item] {
-      let taskItems = approvals.map { approval in
-        ApprovalPresentation.task(
-          approval,
-          projectName: projectName(forTaskID: approval.taskID)
-        )
-      }
-      let directItems = directApprovals.map { approval in
-        ApprovalPresentation.direct(
-          approval,
-          projectName: projects.first(where: { $0.projectID == approval.projectID })?.name
-        )
-      }
-      return taskItems + directItems
-    }
-
-    private func projectName(forTaskID taskID: String) -> String? {
-      guard let projectID = tasks.first(where: { $0.taskID == taskID })?.projectID else {
-        return nil
-      }
-      return projects.first(where: { $0.projectID == projectID })?.name
+      workbenchDisplaySnapshot.approvalItems
     }
 
     private func reloadTasksAndApprovals() async {

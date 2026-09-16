@@ -4,8 +4,8 @@
 
   // IID values from WebView2.h (cross-checked against WebView2 SDK derived
   // bindings: go-webview2, Rust webview2-com, arsd webview.d).
-  // IID_IUnknown must stay exact; only these three are ever matched by our
-  // QueryInterface. Re-verify against WebView2.h when upgrading the SDK.
+  // IID_IUnknown must stay exact; every interface ID used by QueryInterface is
+  // kept here and should be re-verified against WebView2.h when upgrading the SDK.
   private let iidIUnknown = makeGUID(
     0x0000_0000, 0x0000, 0x0000,
     (0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46)
@@ -21,6 +21,10 @@
   let iidController2 = makeGUID(
     0xC979_903E, 0xD4CA, 0x4228,
     (0x92, 0xEB, 0x47, 0xEE, 0x3F, 0xA9, 0x6E, 0xAB)
+  )
+  let iidCoreWebView2Version19 = makeGUID(
+    0x6921_F954, 0x79B0, 0x437F,
+    (0xA9, 0x97, 0xC8, 0x58, 0x11, 0x89, 0x7C, 0x68)
   )
 
   struct COREWEBVIEW2_COLOR {
@@ -88,6 +92,10 @@
     static let webViewRemoveWebMessageReceived = 35
     static let webViewGetCanGoBack = 38
     static let webViewGetCanGoForward = 39
+    // ICoreWebView2_19 extends ICoreWebView2_18 with these two methods.
+    // The slots are verified against WebView2.h 1.0.4191.47.
+    static let webView19GetMemoryUsageTargetLevel = 122
+    static let webView19PutMemoryUsageTargetLevel = 123
     static let settingsPutIsStatusBarEnabled = 10
     static let settingsPutAreDevToolsEnabled = 12
     static let settingsPutAreDefaultContextMenusEnabled = 14
@@ -172,6 +180,18 @@
     @convention(c) (
       UnsafeMutableRawPointer?,
       Double
+    ) -> HRESULT
+
+  typealias WebView2GetMemoryUsageTargetLevelFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UInt32>?
+    ) -> HRESULT
+
+  typealias WebView2PutMemoryUsageTargetLevelFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UInt32
     ) -> HRESULT
 
   typealias WebView2GetCoreWebView2Fn =
