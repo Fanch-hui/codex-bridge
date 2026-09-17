@@ -13,7 +13,7 @@ function runtime() {
   ], ["workbench-inspector-footer"]);
   const footer = ui.roots[0], commands = [];
   return {
-    document: ui.document, footer, commands, conversation: ui.window.CodexBridgeDesktopWorkbenchConversation,
+    window: ui.window, document: ui.document, footer, commands, conversation: ui.window.CodexBridgeDesktopWorkbenchConversation,
     settingsModels: ui.window.CodexBridgeDesktopSettingsModels,
     render: page => ui.window.CodexBridgeDesktopWorkbenchControls.render(page, (command, payload) => {
       commands.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
@@ -203,6 +203,29 @@ test("conversation refresh preserves reading position and follows the bottom onl
   restore = ui.conversation.captureViewport(content, page("a"));
   content.scrollHeight = 1400; restore();
   assert.equal(content.scrollTop, 1400);
+});
+
+test("conversation follows delayed content growth until the reader scrolls up", () => {
+  const ui = runtime();
+  let resized;
+  ui.window.ResizeObserver = class {
+    constructor(callback) { resized = callback; }
+    observe() {}
+    disconnect() {}
+  };
+  const content = ui.document.createElement("section");
+  content.scrollTop = 0; content.scrollHeight = 900; content.clientHeight = 300;
+  content.appendChild(ui.document.createElement("article"));
+  ui.conversation.captureViewport(content, page("a"))();
+  content.scrollTop = 600; content.dispatch("scroll");
+  content.scrollHeight = 1200; resized();
+  assert.equal(content.scrollTop, 1200);
+  content.scrollTop = 200; content.dispatch("scroll");
+  content.scrollHeight = 1500; resized();
+  assert.equal(content.scrollTop, 200);
+  content.scrollTop = 1200; content.dispatch("scroll");
+  content.scrollHeight = 1800; resized();
+  assert.equal(content.scrollTop, 1800);
 });
 
 test("Windows conversation rendering reuses keyed entries across snapshots", () => {
