@@ -49,12 +49,15 @@ final class AgentConnectionPresentationTests: XCTestCase {
       IPCAgentProviderSummary(
         providerID: "deepseek-harness", displayName: "DeepSeek Harness", adapterRevision: 1,
         discoveryState: "discovered", discoveredExecutablePath: "/fixture/dsh.js",
-        discoveredConfigurationPath: "/fixture/cordis.yml", requiresConfiguration: true
+        discoveredConfigurationPath: "/fixture/cordis.yml",
+        configuredBaseURL: "https://dsh.example",
+        requiresConfiguration: true
       )
     ]
     let page = BridgeDesktopUIStateBuilder.build(from: model).connections
     XCTAssertEqual(page?.providers.first?.discoveryState, "discovered")
     XCTAssertEqual(page?.providers.first?.discoveredConfigurationPath, "/fixture/cordis.yml")
+    XCTAssertEqual(page?.providers.first?.configuredBaseURL, "https://dsh.example")
     XCTAssertEqual(page?.installations.count, 0)
     XCTAssertEqual(page?.canRegisterAgent, true)
   }

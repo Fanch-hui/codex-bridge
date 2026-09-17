@@ -220,7 +220,7 @@ final class ConversationStreamingHostTests: XCTestCase {
         permissionMode: .workspaceWrite
       )
     )
-    let content = String(repeating: "x", count: TaskConversationBuffer.maximumMessageBytes)
+    let content = String(repeating: "x", count: 256 * 1_024)
     for index in 0..<40 {
       try await fixture.composition.tasks.upsertTaskMessage(
         taskID: task.task.id,

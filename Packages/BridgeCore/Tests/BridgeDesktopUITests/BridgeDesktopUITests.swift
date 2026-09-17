@@ -88,6 +88,7 @@ final class BridgeDesktopUITests: XCTestCase {
     let agentConnectorRow = try BridgeDesktopUIResources.read(.pagesAgentConnectorRowJS)
     XCTAssertTrue(agentConnectorRow.contains("connectAgent"))
     XCTAssertTrue(agentConnectorRow.contains("apiKey.control.value = \"\""))
+    XCTAssertTrue(agentConnectorRow.contains("nextProvider.configuredBaseURL"))
     XCTAssertTrue(agentConnectorRow.contains("enabled === true"))
     XCTAssertFalse(agentConnectorRow.contains("global.confirm"))
     let headlessConsent = try BridgeDesktopUIResources.read(.pagesAgentHeadlessConsentJS)

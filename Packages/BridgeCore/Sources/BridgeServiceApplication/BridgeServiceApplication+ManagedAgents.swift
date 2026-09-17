@@ -11,6 +11,13 @@ extension BridgeServiceApplication {
     return try await requiredAgentRegistry().providerDescriptors()
   }
 
+  public func serviceDeepSeekHarnessBaseURL(
+    deadline: ContinuousClock.Instant
+  ) async throws -> String? {
+    try Self.checkDeadline(deadline)
+    return try await settings.string(for: .deepSeekHarnessBaseURL)
+  }
+
   public func serviceManagedAgentInstallations(
     deadline: ContinuousClock.Instant
   ) async throws -> [ServiceAgentInstallationRecord] {

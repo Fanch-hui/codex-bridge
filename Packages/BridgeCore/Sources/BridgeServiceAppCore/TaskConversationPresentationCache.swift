@@ -33,7 +33,10 @@ public struct TaskConversationPresentationCache {
         priorTaskIDs.contains(where: { entry.key.hasPrefix("\($0):") })
           ? entry : entry.prefixed(for: priorID)
       }
-      return TaskConversationPresentationSnapshot(entries: entries, canLoadEarlier: false)
+      return TaskConversationPresentationSnapshot(
+        entries: entries,
+        canLoadEarlier: prior.canLoadEarlier
+      )
     }
     return nil
   }

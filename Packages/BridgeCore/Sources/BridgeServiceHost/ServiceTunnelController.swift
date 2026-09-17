@@ -502,32 +502,40 @@ public actor ServiceTunnelController {
   }
 
   private func loadStoredConfiguration() async {
+    let rawID: String?
     do {
-      let rawID = try await settings.string(for: .tunnelID)
-      let rawEnabled = try await settings.string(for: .tunnelEnabled)
-      enabled = rawEnabled == "1"
-      guard let rawID else {
-        tunnelID = nil
-        snapshot = .unconfigured(helperAvailable: factory.helperAvailable())
+      rawID = try await settings.string(for: .tunnelID)
+    } catch {
+      // Keep a previously loaded identity visible when a transient settings
+      // read fails during a service restart.
+      guard tunnelID == nil else {
+        await publish(snapshot, degradation: "The stored Tunnel configuration is unavailable.")
         return
       }
-      tunnelID = try TunnelID(validating: rawID)
-      let configured = hasRuntimeKey()
+      tunnelID = nil
+      enabled = false
       snapshot = ServiceTunnelSnapshot(
-        configured: configured,
-        enabled: enabled,
+        configured: false,
+        enabled: false,
         helperAvailable: factory.helperAvailable(),
-        tunnelID: rawID,
-        lifecycle: configured ? .stopped : .failed,
+        tunnelID: nil,
+        lifecycle: .failed,
         acceptsRemoteSubmissions: false,
-        actionRequired: !configured
+        actionRequired: true
       )
-      if !configured {
-        await publish(
-          snapshot,
-          degradation: "The stored Tunnel Runtime Key is unavailable."
-        )
-      }
+      await publish(snapshot, degradation: "The stored Tunnel configuration is invalid.")
+      return
+    }
+
+    enabled = (try? await settings.string(for: .tunnelEnabled)) == "1"
+    guard let rawID else {
+      tunnelID = nil
+      snapshot = .unconfigured(helperAvailable: factory.helperAvailable())
+      return
+    }
+
+    do {
+      tunnelID = try TunnelID(validating: rawID)
     } catch {
       tunnelID = nil
       enabled = false
@@ -541,6 +549,24 @@ public actor ServiceTunnelController {
         actionRequired: true
       )
       await publish(snapshot, degradation: "The stored Tunnel configuration is invalid.")
+      return
+    }
+
+    let configured = hasRuntimeKey()
+    snapshot = ServiceTunnelSnapshot(
+      configured: configured,
+      enabled: enabled,
+      helperAvailable: factory.helperAvailable(),
+      tunnelID: rawID,
+      lifecycle: configured ? .stopped : .failed,
+      acceptsRemoteSubmissions: false,
+      actionRequired: !configured
+    )
+    if !configured {
+      await publish(
+        snapshot,
+        degradation: "The stored Tunnel Runtime Key is unavailable."
+      )
     }
   }
 

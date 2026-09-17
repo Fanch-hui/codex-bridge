@@ -64,7 +64,7 @@ test("stream snapshots preserve input identity, focus and selection", () => {
   assert.equal(input.selectionEnd, 5);
 });
 
-test("workbench footer refreshes state and conversation with one action", () => {
+test("workbench footer refreshes only the current conversation", () => {
   const ui = runtime();
   const state = { ...page("task-a"), modelCount: 4, canRefreshModels: true };
   ui.render(state);
@@ -74,9 +74,15 @@ test("workbench footer refreshes state and conversation with one action", () => 
   assert.equal(ui.footer.querySelector(".footer-status-text").textContent, "运行中");
   ui.button("刷新").dispatch("click");
   assert.deepEqual(ui.commands, [
-    { command: "refresh", payload: {} },
     { command: "refreshConversation", payload: { taskID: "task-a" } }
   ]);
+  assert.equal(ui.commands.some(command => command.command === "refreshModels"), false);
+});
+
+test("workbench footer disables refresh without a selected task", () => {
+  const ui = runtime();
+  ui.render(null);
+  assert.equal(ui.button("刷新").disabled, true);
 });
 
 test("settings model card refreshes the shared catalog", () => {

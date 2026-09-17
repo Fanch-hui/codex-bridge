@@ -17,10 +17,10 @@ enum ServiceValidation {
   static func text(
     _ value: String,
     field: String,
-    maximumBytes: Int,
+    maximumBytes: Int? = nil,
     allowEmpty: Bool = false
   ) throws {
-    guard value.utf8.count <= maximumBytes,
+    guard maximumBytes.map({ value.utf8.count <= $0 }) ?? true,
       !value.contains("\0"),
       !value.unicodeScalars.contains(where: isUnsafeTextScalar),
       allowEmpty || !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -32,7 +32,7 @@ enum ServiceValidation {
   static func optionalText(
     _ value: String?,
     field: String,
-    maximumBytes: Int
+    maximumBytes: Int? = nil
   ) throws {
     guard let value else { return }
     try text(value, field: field, maximumBytes: maximumBytes)

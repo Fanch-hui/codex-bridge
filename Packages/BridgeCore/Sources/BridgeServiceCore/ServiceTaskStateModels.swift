@@ -156,8 +156,7 @@ public struct ServiceTaskState: Codable, Equatable, Sendable {
     try ServiceValidation.uniqueRelativePaths(changedFiles, field: "task.changedFiles")
     try ServiceValidation.optionalText(
       resultSummary,
-      field: "task.resultSummary",
-      maximumBytes: 32 * 1_024
+      field: "task.resultSummary"
     )
     try ServiceValidation.optionalText(
       supervisorSummary,

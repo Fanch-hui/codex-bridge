@@ -36,6 +36,64 @@ final class TaskConversationBufferTests: XCTestCase {
     collect.cancel()
   }
 
+  func testAuthoritativeContentBeyondLegacyLimitIsKeptAndPersisted() async throws {
+    let fixture = try await makeExecutionFixture(self)
+    let task = try await submitStartedExecutionTask(
+      fixture: fixture,
+      taskID: "tsk-buffer-large-content"
+    )
+    let buffer = TaskConversationBuffer(tasks: fixture.tasks)
+    let content = String(repeating: "内容", count: 140_000)
+
+    await buffer.upsertAuthoritativeEntry(
+      taskID: task.id,
+      key: "agent:large",
+      kind: .agent,
+      content: content,
+      isFinal: true
+    )
+
+    let entries = await buffer.entries(taskID: task.id)
+    XCTAssertEqual(entries.first?.content, content)
+
+    let closed = await buffer.close(taskID: task.id)
+    XCTAssertTrue(closed)
+    let persisted = try await fixture.store.taskMessages(taskID: task.id)
+    XCTAssertEqual(persisted.first?.content, content)
+  }
+
+  func testAppendingBeyondLegacyEntryLimitKeepsPersistingMessages() async throws {
+    let fixture = try await makeExecutionFixture(self)
+    let task = try await submitStartedExecutionTask(
+      fixture: fixture,
+      taskID: "tsk-buffer-many-messages"
+    )
+    let buffer = TaskConversationBuffer(tasks: fixture.tasks)
+
+    for index in 0..<520 {
+      await buffer.appendAgentMessage(
+        taskID: task.id,
+        content: "message " + String(index)
+      )
+    }
+
+    let entries = await buffer.entries(taskID: task.id)
+    XCTAssertEqual(entries.count, TaskConversationBuffer.maximumRetainedMessagesPerTask)
+    XCTAssertEqual(entries.last?.content, "message 519")
+
+    let recent = try await fixture.store.taskMessages(taskID: task.id, limit: 500)
+    let beforeID = try XCTUnwrap(recent.first?.id)
+    let older = try await fixture.store.taskMessages(
+      taskID: task.id,
+      beforeMessageID: beforeID,
+      limit: 500
+    )
+    XCTAssertEqual(recent.count + older.count, 520)
+    XCTAssertEqual(recent.last?.content, "message 519")
+    let closed = await buffer.close(taskID: task.id)
+    XCTAssertTrue(closed)
+  }
+
   func testDeltaLifecycleAccumulatesThenFinalizeReplacesWithAuthoritativeContent() async throws {
     let fixture = try await makeExecutionFixture(self)
     let task = try await submitStartedExecutionTask(fixture: fixture, taskID: "tsk-buffer-delta")

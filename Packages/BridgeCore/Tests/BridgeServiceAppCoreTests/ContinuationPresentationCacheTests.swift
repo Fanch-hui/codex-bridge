@@ -14,11 +14,12 @@ final class ContinuationPresentationCacheTests: XCTestCase {
             isFinal: true),
           .init(
             key: "message", role: "agent", kind: "agent", content: "Second reply", isFinal: true),
-        ], canLoadEarlier: false), for: "turn-2"
+        ], canLoadEarlier: true), for: "turn-2"
     )
     let snapshot = cache.snapshot(for: "turn-3", priorTaskIDs: ["turn-1", "turn-2"])
     XCTAssertEqual(snapshot?.entries.map(\.key), ["turn-1:message", "turn-2:message"])
     XCTAssertEqual(snapshot?.entries.map(\.content), ["First reply", "Second reply"])
+    XCTAssertTrue(snapshot?.canLoadEarlier == true)
     XCTAssertNil(cache.snapshot(for: "other-task", priorTaskIDs: []))
   }
 }

@@ -80,6 +80,11 @@ extension BridgeServiceAppModel {
     openConversation(taskID: task.taskID, priorTaskIDs: priorTaskIDs)
   }
 
+  public func refreshConversation(taskID: String) {
+    guard tasks.contains(where: { $0.taskID == taskID }) else { return }
+    openTask(taskID)
+  }
+
   public func openConversation(taskID: String, priorTaskIDs: [String] = []) {
     guard let client, connectionState == .connected else {
       errorMessage = "后台 Service 未连接，无法查看对话。"

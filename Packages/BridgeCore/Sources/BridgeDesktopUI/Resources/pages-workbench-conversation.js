@@ -22,6 +22,8 @@
   }
 
   function addConversationBlock(container, values, page, emit, options) {
+    var process = global.CodexBridgeDesktopWorkbenchProcess;
+    if (process) values = process.entries(values, page);
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
     if (incremental && incremental.isWindows()) return incremental.render(container, values, page, emit, options);
     container.appendChild(S.node("h4", "subsection-title", "对话"));
@@ -36,7 +38,9 @@
       list.appendChild(S.node("p", "muted", "暂无对话记录。"));
     }
     values.forEach(function (entry) {
-      if (entry.kind === "reasoning" || entry.kind === "tool_call") {
+      if (entry.kind === "process") {
+        list.appendChild(process.create(entry, contextKey(page)));
+      } else if (entry.kind === "reasoning" || entry.kind === "tool_call") {
         list.appendChild(conversationDisclosure(entry, contextKey(page)));
       } else {
         list.appendChild(conversationMessage(entry));

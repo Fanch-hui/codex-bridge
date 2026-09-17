@@ -70,7 +70,7 @@ public struct ServiceTaskMessageDraft: Codable, Equatable, Sendable {
     updatedAt: Date? = nil
   ) throws {
     try ServiceValidation.identifier(key, field: "taskMessage.key", maximumBytes: 256)
-    try ServiceValidation.text(content, field: "taskMessage.content", maximumBytes: 256 * 1_024)
+    try ServiceValidation.text(content, field: "taskMessage.content")
     try ServiceValidation.optionalText(toolName, field: "taskMessage.toolName", maximumBytes: 256)
     try ServiceValidation.optionalText(
       toolArguments,
@@ -125,7 +125,7 @@ public struct ServiceTaskMessageRecord: Codable, Equatable, Sendable {
     try ServiceValidation.identifier(
       taskID.rawValue, field: "taskMessage.taskID", maximumBytes: 128)
     try ServiceValidation.identifier(key, field: "taskMessage.key", maximumBytes: 256)
-    try ServiceValidation.text(content, field: "taskMessage.content", maximumBytes: 256 * 1_024)
+    try ServiceValidation.text(content, field: "taskMessage.content")
     try ServiceValidation.optionalText(toolName, field: "taskMessage.toolName", maximumBytes: 256)
     try ServiceValidation.optionalText(
       toolArguments,

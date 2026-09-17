@@ -173,6 +173,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
   public let discoveryMessage: String?
   public let discoveredExecutablePath: String?
   public let discoveredConfigurationPath: String?
+  public let configuredBaseURL: String?
   public let requiresConfiguration: Bool
   public let requiresHeadlessAlwaysProceed: Bool?
   public let supportsModelSelection: Bool
@@ -189,6 +190,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     discoveryMessage: String? = nil,
     discoveredExecutablePath: String? = nil,
     discoveredConfigurationPath: String? = nil,
+    configuredBaseURL: String? = nil,
     requiresConfiguration: Bool = false,
     requiresHeadlessAlwaysProceed: Bool? = nil,
     supportsModelSelection: Bool = true,
@@ -204,6 +206,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     self.discoveryMessage = discoveryMessage
     self.discoveredExecutablePath = discoveredExecutablePath
     self.discoveredConfigurationPath = discoveredConfigurationPath
+    self.configuredBaseURL = configuredBaseURL
     self.requiresConfiguration = requiresConfiguration
     self.requiresHeadlessAlwaysProceed = requiresHeadlessAlwaysProceed
     self.supportsModelSelection = supportsModelSelection

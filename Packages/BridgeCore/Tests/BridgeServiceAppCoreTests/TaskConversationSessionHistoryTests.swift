@@ -35,6 +35,67 @@ private actor SessionHistoryClient: BridgeTaskConversationClient {
 
 @MainActor
 final class TaskConversationSessionHistoryTests: XCTestCase {
+  func testPriorHistoryLoadsEarlierPagesSoTheFirstPromptRemainsVisible() async {
+    let priorMessages = (1...254).map(makePagedPriorMessage)
+    let currentMessage = IPCTaskConversationMessage(
+      messageID: 255,
+      key: "agent:current",
+      role: "agent",
+      content: "当前轮结果"
+    )
+    let client = PagedSessionHistoryClient(
+      priorMessages: priorMessages,
+      currentMessage: currentMessage
+    )
+    let model = TaskConversationModel(
+      taskID: "task-current",
+      priorTaskIDs: ["task-prior"],
+      client: client,
+      isTerminal: true
+    )
+
+    await model.start()
+
+    XCTAssertEqual(model.entries.first?.key, "task-prior:user:first")
+    XCTAssertEqual(model.entries.first?.content, "第一条指令")
+    XCTAssertEqual(model.entries.count, 255)
+    XCTAssertEqual(model.entries.last?.key, "agent:current")
+  }
+
+  func testLoadEarlierPagesAcrossPriorTasksPreservesCompleteHistory() async {
+    let oldPriorMessages = makePagedMessages(count: 350)
+    let latestPriorMessages = makePagedMessages(count: 250)
+    let client = MultiPagedSessionHistoryClient(
+      messages: [
+        "task-old": oldPriorMessages,
+        "task-prior": latestPriorMessages,
+      ],
+      currentMessage: IPCTaskConversationMessage(
+        messageID: 1,
+        key: "agent:current",
+        role: "agent",
+        content: "当前轮结果"
+      )
+    )
+    let model = TaskConversationModel(
+      taskID: "task-current",
+      priorTaskIDs: ["task-old", "task-prior"],
+      client: client,
+      isTerminal: true
+    )
+
+    await model.start()
+    XCTAssertTrue(model.canLoadEarlier)
+    XCTAssertFalse(model.entries.contains { $0.key == "task-old:user:first" })
+
+    await model.loadEarlier()
+    await model.loadEarlier()
+
+    XCTAssertEqual(model.entries.first?.key, "task-old:user:first")
+    XCTAssertEqual(model.entries.count, 601)
+    XCTAssertFalse(model.canLoadEarlier)
+  }
+
   func testTerminalConversationPrependsPriorTurnsWithStableKeys() async {
     let prior = IPCTaskConversationPage(
       taskID: "task-prior",
@@ -142,4 +203,105 @@ final class TaskConversationSessionHistoryTests: XCTestCase {
     XCTAssertEqual(model.entries.map(\.key), ["task-prior:user:1", "agent:1"])
     XCTAssertEqual(model.entries.count, 2)
   }
+}
+
+private func makePagedPriorMessage(_ messageID: Int) -> IPCTaskConversationMessage {
+  IPCTaskConversationMessage(
+    messageID: Int64(messageID),
+    key: messageID == 1 ? "user:first" : "agent:" + String(messageID),
+    role: messageID == 1 ? "user" : "agent",
+    content: messageID == 1 ? "第一条指令" : "过程 " + String(messageID)
+  )
+}
+
+private func makePagedMessages(count: Int) -> [IPCTaskConversationMessage] {
+  (1...count).map(makePagedPriorMessage)
+}
+
+private actor PagedSessionHistoryClient: BridgeTaskConversationClient {
+  let priorMessages: [IPCTaskConversationMessage]
+  let currentMessage: IPCTaskConversationMessage
+
+  init(
+    priorMessages: [IPCTaskConversationMessage],
+    currentMessage: IPCTaskConversationMessage
+  ) {
+    self.priorMessages = priorMessages
+    self.currentMessage = currentMessage
+  }
+
+  func taskConversation(_ request: IPCTaskConversationRequest) async throws
+    -> IPCTaskConversationPage
+  {
+    if request.taskID == "task-current" {
+      return IPCTaskConversationPage(taskID: request.taskID, messages: [currentMessage])
+    }
+
+    let end = request.beforeMessageID.map { Int($0) - 1 } ?? priorMessages.count
+    let start = max(1, end - request.limit + 1)
+    let messages = priorMessages[(start - 1)..<end]
+    return IPCTaskConversationPage(taskID: request.taskID, messages: Array(messages))
+  }
+
+  func subscribeTaskConversation(
+    taskID: String,
+    limit _: Int
+  ) async throws -> (IPCTaskConversationSubscription, AsyncStream<IPCTaskConversationPush>) {
+    let page = IPCTaskConversationPage(taskID: taskID, messages: [currentMessage])
+    let updates = AsyncStream<IPCTaskConversationPush> { continuation in
+      continuation.finish()
+    }
+    return (
+      IPCTaskConversationSubscription(subscriptionID: 1, page: page),
+      updates
+    )
+  }
+
+  func unsubscribeTaskConversation(taskID _: String, subscriptionID _: Int) async throws {}
+}
+
+private actor MultiPagedSessionHistoryClient: BridgeTaskConversationClient {
+  let messages: [String: [IPCTaskConversationMessage]]
+  let currentMessage: IPCTaskConversationMessage
+
+  init(
+    messages: [String: [IPCTaskConversationMessage]],
+    currentMessage: IPCTaskConversationMessage
+  ) {
+    self.messages = messages
+    self.currentMessage = currentMessage
+  }
+
+  func taskConversation(_ request: IPCTaskConversationRequest) async throws
+    -> IPCTaskConversationPage
+  {
+    if request.taskID == "task-current" {
+      return IPCTaskConversationPage(taskID: request.taskID, messages: [currentMessage])
+    }
+    guard let allMessages = messages[request.taskID] else {
+      return IPCTaskConversationPage(taskID: request.taskID, messages: [])
+    }
+    let end = request.beforeMessageID.map { Int($0) - 1 } ?? allMessages.count
+    let start = max(1, end - request.limit + 1)
+    return IPCTaskConversationPage(
+      taskID: request.taskID,
+      messages: Array(allMessages[(start - 1)..<end])
+    )
+  }
+
+  func subscribeTaskConversation(
+    taskID: String,
+    limit _: Int
+  ) async throws -> (IPCTaskConversationSubscription, AsyncStream<IPCTaskConversationPush>) {
+    let page = IPCTaskConversationPage(taskID: taskID, messages: [currentMessage])
+    let updates = AsyncStream<IPCTaskConversationPush> { continuation in
+      continuation.finish()
+    }
+    return (
+      IPCTaskConversationSubscription(subscriptionID: 1, page: page),
+      updates
+    )
+  }
+
+  func unsubscribeTaskConversation(taskID _: String, subscriptionID _: Int) async throws {}
 }

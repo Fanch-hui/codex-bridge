@@ -95,7 +95,9 @@
         item.remove(); item = null;
       }
       if (!item) {
-        item = type === "disclosure"
+        item = type === "process"
+          ? global.CodexBridgeDesktopWorkbenchProcess.create(entry, C.contextKey(page))
+          : type === "disclosure"
           ? C.createDisclosure(entry, C.contextKey(page))
           : C.createMessage(entry);
         item.__entryType = type;
@@ -103,7 +105,8 @@
         nodes.set(key, item);
       }
       if (!sameEntry(item.__entry, entry)) {
-        if (type === "disclosure") C.updateDisclosure(item, entry, C.contextKey(page));
+        if (type === "process") global.CodexBridgeDesktopWorkbenchProcess.update(item, entry);
+        else if (type === "disclosure") C.updateDisclosure(item, entry, C.contextKey(page));
         else C.updateMessage(item, entry);
         item.__entry = entry;
       }
@@ -150,10 +153,14 @@
   }
 
   function entryType(entry) {
+    if (entry.kind === "process") return "process";
     return entry.kind === "reasoning" || entry.kind === "tool_call" ? "disclosure" : "message";
   }
 
   function sameEntry(previous, entry) {
+    if (entry.kind === "process") return !!previous && !!previous.processEntries
+      && previous.processEntries.length === entry.processEntries.length
+      && entry.processEntries.every(function (value, index) { return sameEntry(previous.processEntries[index], value); });
     return !!previous && previous.role === entry.role && previous.text === entry.text
       && previous.kind === entry.kind && previous.toolName === entry.toolName
       && previous.toolStatus === entry.toolStatus && previous.toolArguments === entry.toolArguments

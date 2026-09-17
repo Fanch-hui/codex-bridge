@@ -187,7 +187,10 @@
         row.insertBefore(configPanel, actionBar);
       }
       updateDetails(nextProvider, currentInstallations, primary);
-      draft.update({ baseURL: baseURL.control.value, apiKey: "" });
+      draft.update({
+        baseURL: nextProvider.configuredBaseURL || "",
+        apiKey: ""
+      });
       refreshAction();
     }
 

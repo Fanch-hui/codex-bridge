@@ -27,10 +27,11 @@
     }
     S.clear(status);
     status.appendChild(S.node("span", "footer-status-text", page ? page.engineStatus || "等待引擎状态" : "等待本机 Service"));
-    var refresh = S.button("刷新", null, {}, emit, "small link-button", false);
-    refresh.title = "刷新状态与当前会话";
+    var refresh = S.button(
+      "刷新", null, {}, emit, "small link-button", !page || !page.selectedTaskID
+    );
+    refresh.title = "刷新当前对话";
     refresh.addEventListener("click", function () {
-      emit("refresh", {});
       if (page && page.selectedTaskID) emit("refreshConversation", { taskID: page.selectedTaskID });
     });
     status.appendChild(refresh);

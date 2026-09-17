@@ -257,7 +257,9 @@
       });
       actions.appendChild(rm);
     }
-    actions.appendChild(S.button("刷新任务", "refreshTasks", {}, emit, "small", false));
+    actions.appendChild(S.button(
+      "刷新当前对话", "refreshConversation", { taskID: detail.taskID }, emit, "small", false
+    ));
     card.appendChild(actions);
 
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(card, "变更文件", detail.changedFiles);

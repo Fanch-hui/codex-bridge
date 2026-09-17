@@ -60,7 +60,7 @@ final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
       return (version, rows, projectSQL, installationSQL, artifactSQL, message, artifactPath)
     }
 
-    XCTAssertEqual(migrated.0, 15)
+    XCTAssertEqual(migrated.0, 16)
     XCTAssertEqual(migrated.1, [1, 1, 1, 1, 1, 1])
     XCTAssertTrue(migrated.2?.contains("GLOB '[A-Za-z]'") ?? false)
     XCTAssertTrue(migrated.3?.contains("GLOB '[A-Za-z]'") ?? false)

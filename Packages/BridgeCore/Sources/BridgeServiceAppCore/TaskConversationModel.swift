@@ -8,27 +8,27 @@ import Foundation
 @MainActor
 public final class TaskConversationModel: Identifiable {
   #if canImport(Combine)
-    @Published public private(set) var entries: [Entry] = []
-    @Published public private(set) var isStreaming = false
-    @Published public private(set) var isLoading = true
-    @Published public private(set) var activity: Activity = .idle
-    @Published public private(set) var errorMessage: String?
-    @Published public private(set) var isLoadingEarlier = false
-    @Published public private(set) var canLoadEarlier = false
+    @Published public internal(set) var entries: [Entry] = []
+    @Published public internal(set) var isStreaming = false
+    @Published public internal(set) var isLoading = true
+    @Published public internal(set) var activity: Activity = .idle
+    @Published public internal(set) var errorMessage: String?
+    @Published public internal(set) var isLoadingEarlier = false
+    @Published public internal(set) var canLoadEarlier = false
     @Published public var autoScroll = true
-    @Published public private(set) var scrollAnchor: String?
-    @Published public private(set) var scrollRevision: UInt64 = 0
+    @Published public internal(set) var scrollAnchor: String?
+    @Published public internal(set) var scrollRevision: UInt64 = 0
   #else
-    public private(set) var entries: [Entry] = []
-    public private(set) var isStreaming = false
-    public private(set) var isLoading = true
-    public private(set) var activity: Activity = .idle
-    public private(set) var errorMessage: String?
-    public private(set) var isLoadingEarlier = false
-    public private(set) var canLoadEarlier = false
+    public internal(set) var entries: [Entry] = []
+    public internal(set) var isStreaming = false
+    public internal(set) var isLoading = true
+    public internal(set) var activity: Activity = .idle
+    public internal(set) var errorMessage: String?
+    public internal(set) var isLoadingEarlier = false
+    public internal(set) var canLoadEarlier = false
     public var autoScroll = true
-    public private(set) var scrollAnchor: String?
-    public private(set) var scrollRevision: UInt64 = 0
+    public internal(set) var scrollAnchor: String?
+    public internal(set) var scrollRevision: UInt64 = 0
   #endif
 
   public let id = UUID()
@@ -38,25 +38,28 @@ public final class TaskConversationModel: Identifiable {
 
   private static let pushBatchDelay: Duration = .milliseconds(16)
 
-  private let client: any BridgeTaskConversationClient
-  private let isTerminal: Bool
+  let client: any BridgeTaskConversationClient
+  let isTerminal: Bool
   private let updateHandler: (@MainActor @Sendable () -> Void)?
-  private var priorEntries: [Entry] = []
-  private var index: [String: Int] = [:]
+  var priorEntries: [Entry] = []
+  var priorTaskHistories: [String: PriorTaskHistory] = [:]
+  var canLoadEarlierCurrentTask = false
+  var index: [String: Int] = [:]
   private var hasAppliedPage = false
   private var streamingTask: Task<Void, Never>?
   private var pushFlushTask: Task<Void, Never>?
   private var resyncTask: Task<Void, Never>?
   private var pendingPushes: [IPCTaskConversationPush] = []
   private var pendingResyncPushes: [IPCTaskConversationPush] = []
-  private var lifecycleGeneration: UInt64 = 0
-  private var loadGeneration: UInt64 = 0
+  var lifecycleGeneration: UInt64 = 0
+  var loadGeneration: UInt64 = 0
   private var hasLoadedTerminalSnapshot = false
   private var hasRestoredPresentation = false
 
   private static let maximumPendingPushes = 256
-  private static let maximumPriorTaskCount = 20
-  private static let maximumPriorEntries = 1_000
+  static let initialPriorPageCount = 2
+  static let conversationPageSize = 200
+  static let earlierPageSize = 100
   private static let resyncRetryDelays: [Duration] = [
     .milliseconds(100),
     .milliseconds(250),
@@ -76,7 +79,7 @@ public final class TaskConversationModel: Identifiable {
     updateHandler: (@MainActor @Sendable () -> Void)? = nil
   ) {
     self.taskID = taskID
-    self.priorTaskIDs = Array(priorTaskIDs.suffix(Self.maximumPriorTaskCount))
+    self.priorTaskIDs = priorTaskIDs
     self.client = client
     self.isTerminal = isTerminal
     self.updateHandler = updateHandler
@@ -146,6 +149,9 @@ public final class TaskConversationModel: Identifiable {
     invalidateLiveSubscription()
     hasAppliedPage = false
     hasLoadedTerminalSnapshot = false
+    canLoadEarlierCurrentTask = false
+    priorEntries.removeAll(keepingCapacity: false)
+    priorTaskHistories.removeAll(keepingCapacity: false)
     pushFlushTask?.cancel()
     pushFlushTask = nil
     pendingPushes.removeAll(keepingCapacity: false)
@@ -175,38 +181,6 @@ public final class TaskConversationModel: Identifiable {
     rebuildIndex()
     refreshStreamingState()
     requestAutoScroll()
-  }
-
-  public func loadEarlier() async {
-    flushPendingPushes()
-    guard canLoadEarlier, !isLoadingEarlier else { return }
-    let anchor = entries.dropFirst(priorEntries.count).first(where: { $0.messageID != nil })?
-      .messageID
-    guard let anchor else { return }
-    let lifecycle = lifecycleGeneration
-    let load = loadGeneration
-    isLoadingEarlier = true
-    defer { isLoadingEarlier = false }
-    do {
-      let page = try await client.taskConversation(
-        IPCTaskConversationRequest(taskID: taskID, beforeMessageID: anchor, limit: 100)
-      )
-      guard isRequestValid(lifecycle: lifecycle, load: load) else { return }
-      guard page.taskID == taskID else { return }
-      canLoadEarlier = page.messages.count >= 100
-      guard !page.messages.isEmpty else { return }
-      let older = page.messages
-        .filter { index[$0.key] == nil }
-        .map { Entry($0, isFinal: true) }
-      guard !older.isEmpty else { return }
-      let currentEntries = entries.dropFirst(priorEntries.count)
-      entries = priorEntries + older + Array(currentEntries)
-      rebuildIndex()
-      scrollAnchor = entries.last?.key
-    } catch {
-      guard isRequestValid(lifecycle: lifecycle, load: load) else { return }
-      errorMessage = BridgeServiceErrorMessage.message(error)
-    }
   }
 
   func reloadAuthoritativeSnapshot() async {
@@ -272,49 +246,20 @@ public final class TaskConversationModel: Identifiable {
     return true
   }
 
-  private func loadPriorTasks() async {
-    guard !priorTaskIDs.isEmpty else { return }
-    let restoredEntries = entries
-    let currentEntries = restoredEntries.filter { entry in
-      !priorTaskIDs.contains(where: { entry.key.hasPrefix("\($0):") })
-    }
-    var loaded: [Entry] = []
-    for priorID in priorTaskIDs {
-      let cached = restoredEntries.filter { $0.key.hasPrefix("\(priorID):") }
-      let taskEntries: [Entry]
-      do {
-        let page = try await client.taskConversation(
-          IPCTaskConversationRequest(taskID: priorID, limit: 200)
-        )
-        taskEntries = page.messages.map {
-          Entry($0, isFinal: true, keyPrefix: priorID)
-        }
-      } catch {
-        taskEntries = cached
-      }
-      let remaining = Self.maximumPriorEntries - loaded.count
-      guard remaining > 0 else { break }
-      loaded.append(contentsOf: taskEntries.prefix(remaining))
-    }
-    priorEntries = loaded
-    entries = priorEntries + currentEntries
-    rebuildIndex()
-    requestAutoScroll()
-  }
-
   private func applyPage(_ page: IPCTaskConversationPage) {
     pushFlushTask?.cancel()
     pushFlushTask = nil
     pendingPushes.removeAll(keepingCapacity: false)
     pendingResyncPushes.removeAll(keepingCapacity: false)
     entries = priorEntries + page.messages.map { Entry($0, isFinal: $0.final) }
-    canLoadEarlier = page.messages.count >= 200
+    canLoadEarlierCurrentTask = page.messages.count >= Self.conversationPageSize
+    updateEarlierAvailability()
     rebuildIndex()
     refreshStreamingState()
     requestAutoScroll()
   }
 
-  private func isRequestValid(lifecycle: UInt64, load: UInt64) -> Bool {
+  func isRequestValid(lifecycle: UInt64, load: UInt64) -> Bool {
     lifecycleGeneration == lifecycle && self.loadGeneration == load
   }
 
@@ -353,7 +298,7 @@ public final class TaskConversationModel: Identifiable {
     }
   }
 
-  private func flushPendingPushes() {
+  func flushPendingPushes() {
     pushFlushTask?.cancel()
     pushFlushTask = nil
     guard !pendingPushes.isEmpty else { return }
@@ -510,14 +455,14 @@ public final class TaskConversationModel: Identifiable {
     requestAutoScroll()
   }
 
-  private func rebuildIndex() {
+  func rebuildIndex() {
     index.removeAll(keepingCapacity: true)
     for (position, entry) in entries.enumerated() {
       index[entry.key] = position
     }
   }
 
-  private func requestAutoScroll() {
+  func requestAutoScroll() {
     if autoScroll, let key = entries.last?.key {
       scrollAnchor = key
       scrollRevision &+= 1
@@ -525,7 +470,7 @@ public final class TaskConversationModel: Identifiable {
     updateHandler?()
   }
 
-  private func refreshStreamingState() {
+  fileprivate func refreshStreamingState() {
     guard let entry = entries.last(where: { $0.role == "agent" && !$0.isFinal }) else {
       activity = .idle
       isStreaming = false
