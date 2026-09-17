@@ -18,7 +18,38 @@
     var position = viewports.get(viewportKey);
     return function () {
       container.scrollTop = !position || position.following ? container.scrollHeight : position.top;
+      followContentSize(container, !position || position.following);
     };
+  }
+
+  function followContentSize(container, following) {
+    if (!container.addEventListener) return;
+    var tracker = container.__conversationFollow;
+    if (!tracker) {
+      tracker = container.__conversationFollow = { following: following, frame: null };
+      var align = function () {
+        tracker.frame = null;
+        if (tracker.following) container.scrollTop = container.scrollHeight;
+      };
+      tracker.schedule = function () {
+        if (tracker.frame !== null) return;
+        if (global.requestAnimationFrame) tracker.frame = global.requestAnimationFrame(align);
+        else align();
+      };
+      container.addEventListener("scroll", function () {
+        tracker.following = container.scrollHeight - container.clientHeight - container.scrollTop <= 40;
+      }, { passive: true });
+      container.addEventListener("wheel", function (event) {
+        if (event.deltaY < 0) tracker.following = false;
+      }, { passive: true });
+      if (global.ResizeObserver) tracker.observer = new global.ResizeObserver(tracker.schedule);
+    }
+    tracker.following = following;
+    if (tracker.observer) {
+      tracker.observer.disconnect();
+      Array.from(container.children).forEach(function (child) { tracker.observer.observe(child); });
+    }
+    tracker.schedule();
   }
 
   function addConversationBlock(container, values, page, emit, options) {
