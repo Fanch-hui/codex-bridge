@@ -2,6 +2,8 @@
 
 This guide describes the DeepSeek Harness (DSH) setup supported by Bridge. The [Chinese guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) contains the most detailed troubleshooting and task examples.
 
+The shortest path is: build DSH from the official repository, open `Connections → Local Agent Engine Connections → DeepSeek Harness`, enter the Base URL and API key, connect it, then refresh the model list in Settings. macOS and Windows use the same flow. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
+
 The provider ID is:
 
 ```text
@@ -10,11 +12,11 @@ deepseek-harness
 
 Omitting `provider_id` selects Codex, not DSH.
 
-## 1. Compatibility boundary and reference revision
+## 1. Compatibility boundary
 
 Bridge does not use exact DSH, agent, pnpm, or ACP SDK package versions as an allowlist. It validates the entry layout and package identity, the source manifest and dependency-lock artifact identities, the real Node interpreter identity, the ACP handshake and wire protocol, and the external profile structure. Re-run Probe after an upgrade or replacement. Bridge does not read Git metadata or treat a tag as proof of compatibility.
 
-This guide was checked against the official `dsh-v0.1.5-rc.2` revision. That tag is a reference point for this review, not a required checkout or a Bridge version allowlist. Other official revisions can continue to work when artifact validation, the Node minimum, ACP protocol 1, and Probe pass.
+Use the current source or an official revision from the [DeepSeek Harness repository](https://github.com/deepseek-ai/deepseek-harness). Bridge does not require a fixed tag. A revision is usable when its entry point, artifacts, Node runtime, ACP protocol 1, and Probe satisfy the checks below.
 
 | Component | Compatibility boundary |
 | --- | --- |
@@ -27,59 +29,74 @@ Node 22.18.x and Node 23 are not supported. Node 22.19.0+ within 22.x and Node 2
 
 The modern entry supports grouped model choices, selected-model reasoning options, reasoning text, and context usage updates. Standard ACP completion checks the stop reason, final answer, and tool states; the older execution-evidence extension is still validated when present.
 
-Modern DSH sessions support cross-process continuation and the MCP servers configured in the App. Native real-time steer and transcript replay remain unavailable in upstream ACP; displayed history comes from Bridge task records.
+Modern DSH supports cross-process continuation when ACP initialization advertises `resume` and Bridge persistence is available. It also receives the MCP servers configured in the App. Native real-time steer and transcript replay remain unavailable in upstream ACP; displayed history comes from Bridge task records.
 
-## 2. Clone and build the correct entry point
+## 2. Clone the official source
 
-Use the official [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) repository. You may use the current official branch or another official revision. To reproduce this guide's reference point, optionally checkout `dsh-v0.1.5-rc.2`; Bridge does not require that tag:
+Use the official [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) repository and its current official branch, or another official revision:
 
 ```bash
 git clone https://github.com/deepseek-ai/deepseek-harness.git deepseek-harness
 cd deepseek-harness
-
-# Optional: reproduce this guide's reference revision
-git fetch --tags origin
-git checkout --detach dsh-v0.1.5-rc.2
 ```
 
 Do not use a third-party repackaged script, a global `dsh` command, or source TypeScript as Bridge's ACP entry.
 
-## 3. Prepare Node and pnpm
+## 3. Prepare Node, pnpm, and the ACP entry
 
-Check the versions available to the service environment:
+Check the versions available to your terminal and Bridge Service:
 
 ```bash
 node --version
 pnpm --version
 ```
 
-Use a Node runtime in the supported range above. Use the package-manager version declared by the checked-out DSH source or a compatible version; the reference source declares `pnpm@11.7.0`, but Bridge does not enforce that exact value. An interactive-shell alias is not a reliable service runtime.
+Use a Node runtime in the supported range above. Use the package-manager version declared by the checked-out DSH source or a compatible version. Install Node from the [official Node.js download page](https://nodejs.org/en/download/) and pnpm from the [official pnpm installation guide](https://pnpm.io/installation). An interactive-shell alias is not a reliable service runtime; reopen the terminal and check both versions after installation.
 
-The current official source builds the ACP entry with the root commands below. Register this absolute path in Bridge:
+The current official source builds the modern ACP entry with the root commands below. Register this absolute path in Bridge:
 
 ```bash
 pnpm install
 pnpm run build
+```
+
+macOS, Linux, or Git Bash:
+
+```bash
 test -f apps/cli/lib/bin.js
+```
+
+Windows PowerShell:
+
+```powershell
+Test-Path .\apps\cli\lib\bin.js
 ```
 
 ```text
 <dsh-source>/apps/cli/lib/bin.js
 ```
 
-The older ACP Demo entry remains compatible for existing registrations:
-
-```text
-<dsh-source>/packages/examples/acp-demo/lib/bin.js
-```
-
-The modern entry runs as `--profile acp --patch <Bridge private runtime configuration>`. The legacy ACP Demo entry continues to use `--config <Bridge private runtime copy>/cordis.yml`; Bridge selects the launch form from the entry layout.
+Bridge runs this entry as `--profile acp --patch <Bridge private runtime configuration>`. It creates a private patch for each run and leaves your original profile unchanged.
 
 Bridge executes the built entry directly with Node and does not require a running terminal or browser UI. Keep the complete source tree. Moving `bin.js` by itself removes the manifest, dependency lock, modules, and source-root identity that Bridge validates.
 
 The entry point commonly uses `#!/usr/bin/env node`. Bridge resolves the real Node executable rather than treating `/usr/bin/env` as Node. A Node installation that exists only after interactive `nvm`/`asdf` shell initialization may be unavailable to the macOS LaunchAgent; the app's Probe result is authoritative.
 
-## 4. Create an external profile
+## Recommended path: connect in the app
+
+Most users do not need an external profile or `.env` file. After building DSH, configure the main model connection in the app:
+
+1. Sign in to [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys), create a new API key, and copy it when it is shown.
+2. Open `Connections → Local Agent Engine Connections` and find DeepSeek Harness.
+3. Enter the main model Base URL (default `https://api.deepseek.com`) and the API key in the connection row.
+4. Click `Connect` and wait for discovery, configuration, and Probe. A successful Probe enables the installation.
+5. Open Settings, refresh the model catalog, and select a model returned for your account.
+
+Bridge stores the key in macOS Keychain or Windows Credential Manager, clears the field after submission, and injects it only when starting the DSH child process. Read the advanced sections below only for manual registration, an independent Web Search endpoint, or a fixed local profile.
+
+## 4. Advanced optional: external profile
+
+This section is only for manual registration, a fixed profile, or a separate search endpoint. Users following the recommended one-click flow can skip this section and the next one.
 
 Runtime validation requires the profile to be outside the DSH source tree. For credential isolation and to prevent accidental Agent/Git access, also keep it outside task projects and the Bridge repository:
 
@@ -115,23 +132,17 @@ cp /Applications/CodexBridge.app/Contents/Resources/BridgeCore_BridgeDeepSeekHar
 
 Do not rebuild or trim the template from an upstream generic example. It contains the Bridge profile structure used for model and effort configuration. Model and effort values are the expected configurable parts; compatible trailing composition can also pass normalized structure validation. Re-Probe every change because incompatible edits cause `templateMismatch` or `needs_review`.
 
-For the modern `apps/cli/lib/bin.js` entry, Bridge reads and validates the existing external `cordis.yml`, then writes a private per-run `acp.patch.yml` and launches with `--profile acp --patch`. The user's original `cordis.yml` is not rewritten. The legacy ACP Demo entry continues to use a private `cordis.yml` with `--config`.
+For `apps/cli/lib/bin.js`, Bridge reads and validates the external `cordis.yml`, then writes a private per-run `acp.patch.yml` and launches with `--profile acp --patch`. The user's original `cordis.yml` is not rewritten.
 
 Keep the packaged `dsh-user-approval` plugin at `policy: ask`. Bridge uses it to surface DSH `session/request_permission` calls in Workbench. Removing the approval plugin or changing the sandbox to `danger-full-access` is not a supported user configuration.
 
-## 5. Configure `.env`
+## 5. Advanced optional: `.env` and independent endpoints
 
-Create a DeepSeek API key at [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys). Store the real key only in the external profile's `.env`; never paste it into Bridge, ChatGPT, source control, screenshots, or issue reports.
+This section is only for the manual profile in Section 4 or an independent Web Search endpoint. The recommended one-click flow stores the API key directly from the App connection row and does not require a hand-created `.env` file.
 
-From the Bridge repository:
+Create a DeepSeek API key at [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys). Sign in, open API Keys, create a new key, and copy it when it is shown; button names can change with the platform. This is a DeepSeek API credential, separate from a ChatGPT login, OpenAI Tunnel Runtime Key, or OpenAI API key. Store the real key only in Bridge's password field or the external profile's `.env`; never paste it into a project `.env`, ChatGPT, source control, screenshots, or issue reports.
 
-```bash
-cp Examples/DeepSeekHarnessProfile/.env.example \
-  /path/to/dsh-profile/.env
-chmod 600 /path/to/dsh-profile/.env
-```
-
-The current variables are:
+The current variables are; fill the key only on your machine:
 
 ```dotenv
 DEEPSEEK_API_KEY=<fill locally>
@@ -145,18 +156,19 @@ DEEPSEEK_SEARCH_BASE_URL=https://api.deepseek.com/anthropic/v1
 
 The packaged profile currently uses `DEEPSEEK_API_KEY` for both paths. If a custom gateway needs separate credentials, verify its support before changing the validated profile; Bridge will not read or translate credentials.
 
-Bridge launches DSH with the profile directory as its working directory, so Harness loads the adjacent `.env` itself. Bridge does not open, persist, summarize, log, or return its contents.
+The modern DSH process runs from a private temporary runtime directory created for that run, not from the profile directory. Bridge starts Node with a preload script that reads `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_SEARCH_BASE_URL` from the `.env` beside the registered `cordis.yml` only when the system credential store or existing process environment does not already provide the same value. Bridge does not use the profile directory as DSH's working directory, and does not persist, summarize, log, or return `.env` contents.
 
-## 6. Connect in the app
+With manual registration, keep the key in the external profile's `.env`; the App field can remain empty.
 
-1. Open `Connections → Local Agent Engine Connections`.
-2. Enter the Base URL and API key under DeepSeek Harness.
-3. Click the one-click connection button and wait for discovery, configuration, and Probe.
-4. Check availability; a successful Probe enables the agent.
+## 6. Connection status and manual registration
 
-macOS and Windows share this flow. The API key is stored in the system credential store and passed to Harness through its process environment. The external profile and `.env` instructions above apply to advanced manual registration, which accepts the ACP entry point and `cordis.yml` paths.
+The recommended path above completes one-click connection in the App. The connection row shows the installation status; use `Retry` after correcting an error.
 
-Probe validates the local installation, protocol, and basic ACP session. API authentication and model execution are verified when running a task.
+If DSH is not discovered, expand `Advanced: Register an existing installation`, choose `<dsh-source>/apps/cli/lib/bin.js`, and then choose the external `<dsh-profile>/cordis.yml`. Probe it and enable the installation from its details. This does not move or delete the DSH source tree.
+
+macOS and Windows share this flow. The external profile and `.env` instructions above apply to advanced manual registration and to an independent search endpoint.
+
+Probe validates the local installation, protocol, and basic ACP session. Model refresh also reads `/models` from the main Base URL; API quota, model execution, and Web Search are verified when running a task.
 
 ## 7. Refresh models and defaults
 
@@ -164,7 +176,17 @@ Probe validates the local installation, protocol, and basic ACP session. API aut
 2. Open the DeepSeek Harness execution defaults in Settings.
 3. Select the installation if more than one exists.
 4. Refresh the model list.
-5. Select exact model IDs returned by ACP `session/new.configOptions`. Effort values come from the validated DSH Profile rather than per-model ACP advertising; the bundled thinking-enabled Profile supports `off`, `low`, `high`, and `max` with default `max`.
+5. Select an exact model ID returned by the current provider. Effort values come from the selected model's current ACP session `thought_level`/`reasoning_effort` options; the bundled profile's `off`, `low`, `high`, and `max` values are only initial examples, and the current ACP session is authoritative.
+
+For the modern entry, Bridge obtains the catalog in two stages:
+
+```text
+GET <DEEPSEEK_BASE_URL>/models
+        ↓
+ACP session/new → configOptions
+```
+
+The main endpoint therefore needs a Bearer-authenticated OpenAI-compatible `/models` response and Chat Completions support. A typical response contains `{"data":[{"id":"..."}]}`. Bridge uses provider-returned IDs and does not treat the bundled `deepseek-v4-pro` example as proof that your account can use that model.
 
 Do not copy model IDs or effort values from Codex, OpenCode, or Antigravity. Without an explicit user override, Bridge preserves the provider/profile current value or a saved default that remains valid.
 
@@ -199,6 +221,8 @@ For Web Search:
 2. Set the project network intent consistently and send `network_access=true`.
 3. Approve the start and any runtime Web-tool permission.
 
+The search endpoint defaults to the main Base URL and key. If it is different, set `DEEPSEEK_SEARCH_BASE_URL` in the external profile's `.env`; the App Base URL field configures the main model endpoint only. Do not include `/messages`; DSH appends it. The endpoint must accept Anthropic Messages-compatible requests and the native `web_search_20250305` server tool.
+
 The project network selector is not a packet-level firewall for external providers. The current DSH launcher does not rewrite its profile from `network_access`; actual model and Web access remain governed by DSH's profile, endpoints, and native tools.
 
 ## 9. Submit a task
@@ -225,7 +249,7 @@ Web Search, URL fetch, and external APIs require explicit network intent:
 }
 ```
 
-Only when the user explicitly requests overrides should the client add `model_override`, exact model/Profile-supported effort values, or `permission_mode_override`. Omit Codex Supervisor fields. For continuation, pass the `provider_session_id` of a completed task as `thread_id` when `lifecycle.session_continue` is available. The project and installation must match, and persistent session data must still exist. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
+Only when the user explicitly requests overrides should the client add `model_override`, the exact effort returned by the selected model's current ACP session, or `permission_mode_override`. For continuation, pass the `provider_session_id` of a completed task as `thread_id` when `lifecycle.session_continue` is available. The project and installation must match, and persistent session data must still exist. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
 
 Remote submissions normally enter `awaiting_local_approval`. Review project, provider, access mode, network intent, and prompt in Workbench before approving the start. Automatic remote-start approval is disabled by default and never approves later DSH permission requests or Direct operations.
 
@@ -235,11 +259,17 @@ Follow `get_task.wait_policy` and read terminal results from the same `get_task`
 
 Queued steer sends a second prompt after the current prompt finishes. DSH also supports interrupt-current-then-continue for the active session. Neither is Codex in-flight steer.
 
-## 10. Availability and troubleshooting
+## 10. MCP configuration and continuation
+
+Use the DSH MCP section on Connections to manage stdio and Streamable HTTP servers. Stdio commands require absolute paths; enter arguments one per line. HTTP servers are attached only to tasks with network access enabled. Environment and header values use the system credential store and are never returned to the editor. Leave a saved value blank to retain it, or remove its row to delete it. Changes apply to the next task or continuation.
+
+Choose Continue conversation on an ended task to retain its context after a Service restart. Resume requires the same project and installation, an ACP `resume` capability, and persistent session data. Sessions cleared by older temporary-runtime versions cannot be recovered.
+
+## 11. Availability and troubleshooting
 
 | Symptom | Check first |
 | --- | --- |
-| Invalid artifact | Use the official built `apps/cli/lib/bin.js`, or the compatible `packages/examples/acp-demo/lib/bin.js`; retain the full source tree |
+| Invalid artifact | Use the official built `apps/cli/lib/bin.js`; retain the full source tree |
 | Unsupported Node | Use Node 22.19.0+ within 22.x, or Node 24+; do not use Node 23 |
 | Node not found by the app | Ensure the LaunchAgent can resolve the real interpreter, not only an interactive shell alias |
 | Manifest/lock missing | Do not copy `bin.js` away from its source tree |
@@ -262,11 +292,8 @@ Do not paste `.env` or raw authentication responses into support reports. Probe 
 - [DeepSeek Harness official repository](https://github.com/deepseek-ai/deepseek-harness)
 - [DeepSeek API documentation](https://api-docs.deepseek.com/)
 - [DeepSeek API Keys](https://platform.deepseek.com/api_keys)
+- [Node.js official download page](https://nodejs.org/en/download/)
+- [pnpm installation guide](https://pnpm.io/installation)
 - [Detailed Chinese DSH guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
 - [Detailed user guide](./USER_GUIDE.md)
-
-## MCP configuration and continuation
-
-Use the DSH MCP section on Connections to manage stdio and Streamable HTTP servers. Stdio commands require absolute paths; enter arguments one per line. HTTP servers are attached only to tasks with network access enabled. Environment and header values use the system credential store and are never returned to the editor. Leave a saved value blank to retain it, or remove its row to delete it. Changes apply to the next task or continuation.
-
-Choose Continue conversation on an ended task to retain its context after a Service restart. Sessions cleared by older temporary-runtime versions cannot be recovered.
+- [ChatGPT Developer Mode and Secure Tunnel guide](./CHATGPT_DEVELOPER_MODE.md)

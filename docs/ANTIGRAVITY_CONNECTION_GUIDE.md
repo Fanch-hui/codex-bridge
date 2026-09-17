@@ -19,7 +19,7 @@ Bridge 项目和任务模式
         ↓
 Bridge 远程任务启动批准
         ↓
-agy CLI 原生 Sandbox + Permissions
+AGY CLI 原生 Sandbox + Global Permissions
 ```
 
 最常见的误区是只在 Bridge 中选择 `Write`，却没有配置 AGY CLI 自己的权限。Bridge 不能在 headless `stream-json` 中回答 AGY 的交互式确认；需要询问但没有提前放行的工具会被 AGY 拒绝或软拒绝。
@@ -29,12 +29,14 @@ agy CLI 原生 Sandbox + Permissions
 | `项目 → 访问与执行权限` | 项目可读、是否允许进入写模式，以及用户期望的网络边界 |
 | `工作台 → GPT/Qwen 新任务` | ChatGPT/Qwen 默认使用 `Read Only` 还是 `Write` |
 | “批准启动” | 是否启动这一次远程 Provider 任务 |
-| AGY `/settings` | Tool Permission 等 CLI 全局行为 |
+| AGY `/settings` 或 `/config` | Tool Permission 等 CLI 全局行为 |
 | AGY `/permissions` | 哪些命令、URL 和 MCP 工具可以在 headless 中直接执行 |
 
 “自动批准远程 Agent 启动请求”只跳过启动批准，不批准 AGY 工具。Antigravity Desktop 的自动执行设置也不等于 CLI 的权限设置。
 
-> **正常使用前必须确认**：在交互式 `agy` 中打开 `/settings`（或 `/config`），将 **Tool Permission** 设为 `proceed-in-sandbox`，也就是允许沙箱内终端命令自动执行。Bridge 启动 AGY 时已经强制传入 `--sandbox`；如果设置页显示 Sandbox Mode 被命令行覆盖为开启，这是预期行为。
+> **连接 AGY 前必须确认**：Bridge 的 AGY 连接流程会在页面中明确请求将当前用户的 AGY Global **Tool Permission** 设为 `always-proceed`（Always Proceed，总是通过）。这是 headless 任务无法回答交互式工具确认的前置条件。用户取消时不修改设置，也不会连接；用户同意后，Service 才会 Probe 并写入当前用户的 Global 配置。该设置会影响使用同一用户配置的其他 AGY CLI 任务。
+
+Bridge 每次启动 AGY 仍会传入 `--sandbox`，项目读写策略和任务模式继续生效。`proceed-in-sandbox` 适合交互式 AGY 或不使用 Bridge 的场景；如果在 Bridge 连接后手动改回该模式，未通过 `/permissions` 提前放行的 headless 工具可能被拒绝。
 
 ## 2. 兼容要求
 
@@ -59,7 +61,7 @@ Bridge 根据安装的 CLI 实际接口判断兼容性。Probe 读取 `agy --ver
 
 ### 3.1 安装
 
-如果尚未安装，请先阅读 [Antigravity CLI Installation & Auth](https://antigravity.google/docs/cli/install/)。当前官方 macOS/Linux 安装命令为：
+如果尚未安装，请先阅读 [Antigravity CLI Installation & Auth](https://antigravity.google/docs/cli/install/)。官方安装方式会随平台和版本变化，常用命令如下：
 
 ```bash
 curl -fsSL https://antigravity.google/cli/install.sh | bash
@@ -71,6 +73,16 @@ curl -fsSL https://antigravity.google/cli/install.sh | bash
 ~/.local/bin/agy
 ```
 
+Windows PowerShell：
+
+```powershell
+irm https://antigravity.google/cli/install.ps1 | iex
+agy --version
+agy --help
+```
+
+Windows 安装器通常把 CLI 放在当前用户的 `%LOCALAPPDATA%\agy\bin\agy.exe`；以 `Get-Command agy` 的实际结果为准。Windows 的 CMD 安装命令和其他平台选项见官方安装页。
+
 安装脚本和版本可能更新；以官方安装页为准。企业账号、代理或 Keychain 认证也应按该页配置，不要把认证材料交给 Bridge。
 
 ### 3.2 找到二进制
@@ -79,6 +91,14 @@ curl -fsSL https://antigravity.google/cli/install.sh | bash
 
 ```bash
 command -v agy
+agy --version
+agy --help
+```
+
+Windows PowerShell 使用：
+
+```powershell
+Get-Command agy
 agy --version
 agy --help
 ```
@@ -96,11 +116,11 @@ agy --help
 - 一个只包含快捷方式但目标已失效的路径；
 - 从其他账号目录复制来的 AGY。
 
-如果路径位于 `.local` 等隐藏目录，在 Bridge 文件选择器中按 `⌘⇧G`，粘贴 `command -v agy` 的完整输出，再选择该文件。
+如果路径位于 `.local` 等隐藏目录，在 macOS Bridge 文件选择器中按 `⌘⇧G`，粘贴 `command -v agy` 的完整输出，再选择该文件。Windows 选择 `Get-Command agy` 返回的真实 `.exe`、`.cmd` 或 `.bat` 路径。
 
-## 4. 先用同一 macOS 用户完成 CLI 登录
+## 4. 先用同一系统用户完成 CLI 登录
 
-Bridge 启动 AGY 时继承当前用户的 `HOME` 和登录状态。先在准备使用的项目根目录运行一次交互式 CLI：
+Bridge 启动 AGY 时继承当前系统用户的 `HOME` 和登录状态。macOS/Linux 使用该用户的 shell，Windows 使用该用户的 PowerShell；先在准备使用的项目根目录运行一次交互式 CLI：
 
 ```bash
 cd /path/to/your/project
@@ -109,11 +129,11 @@ agy
 
 按 AGY 自己的流程完成登录，确认能够进入交互界面并看到可用模型。然后退出即可。
 
-不要用临时或隔离的 `HOME` 测试 `agy` 登录；没有现有登录状态时，AGY 可能重新打开浏览器 OAuth。不要把浏览器返回的授权码、Token、Cookie 或账号信息粘贴到 Bridge、聊天、日志或 Issue。
+没有现有登录状态时，AGY 会按官方流程打开浏览器或请求 API key，并把认证状态保存在系统凭据存储。完成一次登录后，headless `stream-json` 才能复用该用户的缓存凭据。不要把 API key、浏览器授权码、Token、Cookie 或账号信息粘贴到 Bridge、聊天、日志或 Issue；也不要用临时或隔离的 `HOME` 代替正式用户目录测试登录。
 
 ## 5. 正确配置 AGY 原生权限
 
-### 5.1 正常使用前确认 Tool Permission
+### 5.1 连接 Bridge 所需的 Tool Permission
 
 在目标项目根目录启动交互式 `agy`，输入：
 
@@ -127,22 +147,22 @@ agy
 /config
 ```
 
-找到 **Tool Permission**，将其设为：
+找到 **Tool Permission**。如果你准备从 Bridge 连接 AGY，不需要手动先改设置：点击 Bridge 中的“连接”时，Bridge 会展示明确的 Always Proceed 授权提示；同意后 Service 会将当前用户的 Global 配置写为：
 
 ```text
-proceed-in-sandbox
+always-proceed
 ```
 
-这就是“沙箱内终端命令自动执行”。Bridge 每次启动 AGY 都会传入 `--sandbox`，所以不需要再依赖 Desktop 的 Sandbox 设置；AGY 设置页可能显示 Sandbox Mode 被命令行参数覆盖为开启。不能进入 Sandbox 的命令仍会按权限规则处理。
+这是 Bridge headless 任务可以自动完成工具调用的条件。连接确认只在用户明确同意后发生；取消不会改变现有配置。连接成功后，如果在 AGY 里再次打开 `/settings` 或 `/config`，应能看到 `always-proceed`。Bridge 每次启动 AGY 都会传入 `--sandbox`，所以不需要依赖 Desktop 的 Sandbox 设置。
 
 其他模式的含义：
 
 | 模式 | 行为 | Bridge 使用建议 |
 | --- | --- | --- |
-| `request-review` | 写入、命令和网络操作通常要求交互确认 | 交互式 AGY 安全，但未预先放行的工具在 Bridge headless 中会被拒绝 |
-| `proceed-in-sandbox` | Sandbox 内命令可自动运行 | 推荐起点 |
-| `strict` | 更多非读取操作要求确认 | 适合纯交互审查，不适合作为未配置规则的 Bridge 默认 |
-| `always-proceed` | 所有工具尽量自动运行 | 风险高，不建议作为长期全局设置 |
+| `request-review` | 写入、命令和网络操作通常要求交互确认 | 适合交互式 AGY；Bridge headless 无法回答未预先放行的确认 |
+| `proceed-in-sandbox` | Sandbox 内命令可自动运行 | 适合交互式 AGY；在 Bridge 中需配合窄 allow 规则 |
+| `strict` | 更多非读取操作要求确认 | 适合交互式审查；不适合作为未配置规则的 Bridge 默认 |
+| `always-proceed` | 工具调用自动继续 | Bridge 连接所需的 Global 模式；风险高，并影响同一用户的其他 AGY CLI |
 
 AGY 将持久设置保存在：
 
@@ -150,7 +170,13 @@ AGY 将持久设置保存在：
 ~/.gemini/antigravity-cli/settings.json
 ```
 
-优先通过 `/settings` 和 `/permissions` 修改，避免手工写错 JSON。Antigravity Desktop 的设置不会可靠替代这里的 CLI 配置。
+Windows 对应路径为：
+
+```text
+%USERPROFILE%\.gemini\antigravity-cli\settings.json
+```
+
+优先通过 `/settings` 和 `/permissions` 修改，避免手工写错 JSON。Antigravity Desktop 的设置不会可靠替代这里的 CLI 配置。Bridge 连接后若手动改回其他模式，未配置 allow 规则的工具可能被 AGY soft-deny；需要再次连接时，Bridge 会重新请求 Always Proceed 授权。
 
 ### 5.2 用 `/permissions` 添加窄规则
 
@@ -215,28 +241,33 @@ AGY 的 Accept Edits 会自动批准活动工作区内的标准文件创建和�
 
 Plan 用于分析和规划，不应依赖它修改项目文件。
 
-## 6. 在 Bridge 中登记
+## 6. 在 Bridge 中连接和启用
 
 1. 打开 `连接 → 本机 Agent 引擎连接`。
-2. 点击“登记 Agent”。
-3. 选择“Antigravity”。
-4. 选择第 3 节 `command -v agy` 返回的真实文件。
-5. 点击“登记并 Probe”。
-6. 检查版本、能力和状态。
-7. 状态为“可用”后打开“启用”。
+2. 共享桌面页面会自动查找 `agy`/`antigravity`。在 AGY 卡片中点击“连接”；如果没有自动发现，选择“按路径登记已有安装”。按路径登记时选择第 3 节命令返回的真实文件。
+3. AGY 连接前，页面会显示以下授权提示：
 
-登记成功不会自动启用。AGY 更新或二进制身份变化后，Bridge 会显示 `needs_review`；核对新版本仍在兼容范围内，再点击“接受替换并 Probe”。
+   ```text
+   AGY 无头任务需要自动通过工具执行。是否允许将本机 AGY 全局工具策略设为 Always Proceed（总是通过）并连接？这会影响使用同一配置的其他 AGY CLI 任务。
+   ```
+
+   只有点击同意后，Service 才会连接候选、执行 Probe，并把当前用户的 AGY Global `toolPermission` 设为 `always-proceed`；取消不会修改设置。
+4. 检查版本、能力和状态。连接流程 Probe 成功时会自动启用可用安装；手动“登记 Agent”则需在状态为“可用”后打开“启用”。
+
+AGY 更新或二进制身份变化后，Bridge 会显示“需确认更新”/`needs_review`。核对新文件来源后，点击“接受替换并 Probe”；Probe 只根据当前 CLI 的实际帮助能力判断，不使用固定版本范围。移除登记只删除 Bridge 的连接记录，不删除 AGY CLI、登录状态或 Global 配置。
 
 ## 7. 刷新模型和默认值
 
 1. 先在 `工作台` 选择真实任务项目。
-2. 打开 `设置 → Antigravity 执行默认偏好`。
+2. 打开 `设置 → 外部 Agent 默认偏好`，找到 `Antigravity` 执行默认偏好。
 3. 有多个安装时选择目标 AGY。
-4. 刷新模型列表。
-5. 选择 AGY 当前返回的精确 model 和 effort。
+4. 点击“刷新模型列表”。Bridge 读取当前 AGY 安装实际返回的模型目录，不会补入静态或过期模型。
+5. 选择当前返回的精确 model 和 effort；推理强度只显示所选模型声明支持的值。
 6. 选择 Provider 默认访问权限：只读或工作区可写。
 
 对 ChatGPT/Qwen 新任务，`工作台 → GPT/Qwen 新任务 → Read Only / Write` 优先于这里的 Provider 默认。远程客户端通常应省略 `permission_mode`，让 Workbench 决定；只有用户明确要求单任务覆盖时才同时发送 `permission_mode_override=true`。
+
+连接完成后，连接详情会显示 AGY Global Tool Permission。使用 Bridge headless 任务期间应保持 `always-proceed`；需要收窄行为时优先在 AGY `/permissions` 为具体命令、域名或 MCP 工具添加 Project 规则。
 
 ## 8. Bridge 实际如何启动 AGY
 
@@ -331,7 +362,7 @@ Bridge 使用 `--mode accept-edits`，同一项目的写任务进入独占 works
 1. `设置 → Codex 执行默认偏好 → 访问权限` 选择“完全访问权限（full-access）”；
 2. 当前任务明确发送 `network_access=true`。
 
-此时启动参数仍包含：
+这是单次任务的高风险访问组合，和连接 AGY 时写入的 Global `always-proceed` 是两层不同设置。此时启动参数仍包含：
 
 ```text
 --sandbox
@@ -345,7 +376,7 @@ Bridge 使用 `--mode accept-edits`，同一项目的写任务进入独占 works
 --mode accept-edits
 ```
 
-它不会移除 AGY Sandbox，也不会把只读任务改成写任务；但它会跳过该次 AGY 的所有工具确认，包括命令、文件和 MCP。这个 access mode 是 Service 共用设置，可能同时影响 Codex 等任务，不要作为长期默认。优先使用 Project 作用域的窄 `/permissions` 规则；只有完全信任 prompt、项目和工具时才临时使用，任务结束后改回“请求批准”。
+它不会移除 AGY Sandbox，也不会把只读任务改成写任务；但它会为该次 AGY 任务追加 `--dangerously-skip-permissions`，跳过命令、文件和 MCP 的工具确认。远程任务启动仍可能需要本机点击“批准启动”；AGY 当前 Provider 策略不提供单次工具自动批准按钮。这个 access mode 是 Service 共用设置，可能同时影响 Codex 等任务，不要作为长期默认。优先使用 Project 作用域的窄 `/permissions` 规则；只有完全信任 prompt、项目和工具时才临时使用，任务结束后改回较窄的访问权限。
 
 `auto-review`、自动批准远程任务启动、Direct 自动批准都不会产生同样效果。
 
@@ -384,8 +415,9 @@ awaiting_local_approval
 | 误选 Desktop App | 重新登记真实 `agy` CLI；Bridge 不运行 Antigravity Desktop |
 | Probe 提示缺少协议能力 | 检查当前 `agy --help` 是否包含 stream-json、plan、sandbox 和工具权限参数 |
 | 显示 `needs_review` | 二进制已变化；核对来源和版本后“接受替换并 Probe” |
-| Bridge 中提示未登录 | 用同一 macOS 用户在普通 `HOME` 下交互运行 `agy` 完成登录 |
-| `permission_mode=request-review` 后工具被拒绝 | 在交互式 AGY 用 `/settings` 选择 `proceed-in-sandbox`，并用 `/permissions` 添加窄 allow 规则 |
+| Bridge 中提示未登录 | 用同一系统用户在普通 `HOME` 下交互运行 `agy` 完成登录；Windows 使用同一用户的 `USERPROFILE` |
+| 连接时提示 Always Proceed | 这是 AGY headless 连接的明确授权步骤；同意后 Bridge 才会 Probe 并连接，取消不会改配置 |
+| 手动改为 `request-review` / `proceed-in-sandbox` 后工具被拒绝 | Bridge headless 无法回答交互确认；保持连接所需的 `always-proceed`，或在 AGY `/permissions` 为具体工具添加 Project allow 规则 |
 | 已添加 allow 仍被询问 | 检查 ask/deny 是否匹配同一操作；AGY 优先级为 `deny > ask > allow`，并确认规则作用域是当前 Project |
 | Shell 仍被拒绝 | 放行精确 `command(...)`；若命令必须逃离 Sandbox，应先评估风险，不要默认扩大到全部命令 |
 | Web/URL 被拒绝 | 任务发送 `network_access=true`，并为具体域名添加 `read_url(domain)` / `execute_url(domain)` |
@@ -393,7 +425,7 @@ awaiting_local_approval
 | Desktop 已设自动执行仍无效 | Desktop 与 CLI 设置来源不同；检查 AGY `/settings` 和 `/permissions` |
 | 只读搜索能用，URL/辅助脚本失败 | 后者可能需要 URL、命令、MCP 或缓存写入权限；按实际失败工具补窄规则 |
 | 写任务没有修改文件 | Workbench 是否为 `Write`、项目写入是否允许、任务是否实际使用 `--mode accept-edits` |
-| 打开 `full-access` 仍没有 skip 参数 | 该次任务还必须明确 `network_access=true`；此组合只用于完全可信任务 |
+| 打开 `full-access` 仍没有 skip 参数 | 该次任务还必须明确 `network_access=true`；此组合只用于完全可信任务，且不改变连接时的 Global Always Proceed 授权 |
 
 ## 13. 安全与验收
 

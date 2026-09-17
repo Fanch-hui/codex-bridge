@@ -14,11 +14,18 @@ macOS 与 Windows 共用 Swift 核心和桌面界面。项目权限、任务记�
 | --- | --- | --- |
 | macOS 14+，Apple Silicon | `CodexBridge-0.5.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
 | Windows x64 | `CodexBridge-Windows-x64-0.5.0-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows x64，便携运行 | `CodexBridge-Windows-x64-0.5.0.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
+| Windows x64，便携运行 | `codex-bridge-windows-x64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
 升级时沿用现有应用数据和内置浏览器登录态。Windows 关闭主窗口后保留托盘，使用托盘菜单退出。
+
+## 使用指南
+
+- [详细使用指南](./docs/USER_GUIDE.md)：安装、项目权限、Qwen、任务与故障排查
+- [ChatGPT / Tunnel / OpenAI API Key 配置](./docs/CHATGPT_DEVELOPER_MODE.md)
+- [DeepSeek Harness 安装与 API 配置](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
+- [OpenCode 连接](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity 连接与权限](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
 
 ## 首次配置
 

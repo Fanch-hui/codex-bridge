@@ -14,11 +14,18 @@ Get the latest version from [GitHub Releases](https://github.com/yeyuancc0-glitc
 | --- | --- | --- |
 | macOS 14+, Apple Silicon | `CodexBridge-0.5.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
 | Windows x64 | `CodexBridge-Windows-x64-0.5.0-Setup.exe` | Run the installer and choose an installation folder |
-| Windows x64, portable | `CodexBridge-Windows-x64-0.5.0.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
+| Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
 
 Upgrades preserve application data and the embedded browser profile. Closing the Windows main window keeps the tray icon; use the tray menu to exit.
+
+## User guides
+
+- [Complete user guide (Chinese)](./docs/USER_GUIDE.md)
+- [ChatGPT / Tunnel / OpenAI Runtime API Key (Chinese)](./docs/CHATGPT_DEVELOPER_MODE.md)
+- [DeepSeek Harness installation and API configuration](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md)
+- [OpenCode (Chinese)](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
 
 ## First setup
 

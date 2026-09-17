@@ -1,8 +1,8 @@
 # DeepSeek Harness 接入指南
 
-本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建 ACP 入口、一键连接并从 ChatGPT/Qwen 提交任务。
+本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、一键连接并从 ChatGPT/Qwen 提交任务。
 
-安装并构建 DSH 后，在 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key，点击“一键连接”。Mac 与 Windows 共用自动发现、配置、验证和启用流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。下文的外部 Profile 与 `.env` 步骤用于高级手动登记。
+最短路径是：从官方仓库构建 DSH → 在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key → 点击“连接” → 在设置中刷新模型。Mac 与 Windows 共用这套流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
 DSH 的 Provider ID 固定为：
 
@@ -12,11 +12,11 @@ deepseek-harness
 
 省略 `provider_id` 时 Bridge 使用 Codex，不会自动改用 DSH。
 
-## 1. 兼容边界与本次核对版本
+## 1. 兼容边界
 
 Bridge 不把 DSH、agent、pnpm 或 ACP SDK 的具体包版本作为白名单。它校验入口布局和包身份、源码清单与依赖锁文件的工件身份、真实 Node 解释器身份、ACP 握手与 wire protocol，以及外部 Profile 结构；升级或替换后需要重新 Probe。Bridge 不读取 Git 元数据，也不把 tag 当作兼容性证明。
 
-本次文档按官方 `dsh-v0.1.5-rc.2` 核对。这个 tag 只是本次核对的参考点，不是 Bridge 必须 checkout 的版本；其他官方修订版只要通过工件校验、Node 最低范围、ACP protocol 1 和 Probe，也可以继续使用。
+请使用 [DeepSeek Harness 官方仓库](https://github.com/deepseek-ai/deepseek-harness) 的当前官方源码或官方修订版。Bridge 不要求某个固定 tag；具体修订版能否使用，以入口、工件、Node、ACP protocol 1 和 Probe 结果为准。
 
 | 组件 | 兼容边界 |
 | --- | --- |
@@ -33,39 +33,33 @@ Node 版本解释：
 
 现代入口已接入分组模型目录、所选模型的推理强度、推理文本与上下文用量通知。标准 ACP 完成响应依据结束原因、最终正文和工具状态处理；旧版执行证据扩展仍会校验。
 
-现代 DSH 会话支持跨进程续聊，并接收 App 中配置的 MCP 服务。上游 ACP 暂无原生实时 Steer 和历史消息重放；界面历史消息来自 Bridge 保存的任务记录。
+现代 DSH 在 ACP 初始化声明 `resume` 且 Bridge 持久化目录可用时支持跨进程续聊，并接收 App 中配置的 MCP 服务。上游 ACP 暂无原生实时 Steer 和历史消息重放；界面历史消息来自 Bridge 保存的任务记录。
 
 ## 2. 获取官方源码
 
-只从 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 获取源码。可直接使用当前官方分支或其他官方修订版；如需复现本次核对点，可 checkout `dsh-v0.1.5-rc.2`，但这不是 Bridge 的版本白名单：
+只从 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) 获取源码。直接使用仓库当前官方分支，或按上游发布说明选择一个官方修订版：
 
 ```bash
 git clone https://github.com/deepseek-ai/deepseek-harness.git deepseek-harness
 cd deepseek-harness
-
-# 可选：复现本次文档核对点
-git fetch --tags origin
-git checkout --detach dsh-v0.1.5-rc.2
 ```
 
 不要把第三方重新打包的同名脚本、全局 `dsh` 命令或源码 TypeScript 文件当作 Bridge 的 ACP 入口。
 
 ## 3. 准备 Node 和 pnpm
 
-先确认当前终端使用的版本：
+先确认当前终端和 Bridge Service 能使用的版本：
 
 ```bash
 node --version
 pnpm --version
 ```
 
-Node 使用上面的最低范围。pnpm 使用当前 DSH 源码 `package.json` 声明的 package manager 或兼容版本；本次核对的源码声明为 `pnpm@11.7.0`，但 Bridge 不把它作为精确门槛。请按 Node/pnpm 官方方式安装兼容版本；不要仅在交互式 shell alias 中伪装版本。
+Node 使用上面的最低范围。pnpm 使用当前 DSH 源码 `package.json` 声明的 package manager 或兼容版本。请按照 [Node.js 官方下载页](https://nodejs.org/en/download/) 和 [pnpm 官方安装说明](https://pnpm.io/installation) 安装；不要仅在交互式 shell alias 中伪装版本。安装完成后，重新打开终端并再次检查两个版本。
 
 DSH 的 ACP entrypoint 通常使用 `#!/usr/bin/env node`。Bridge 不会把 `/usr/bin/env` 误当成 Node，而会继续解析真实 Node 可执行文件并冻结其身份。macOS LaunchAgent 的 PATH 比终端小；如果 Node 只在 `nvm`、`asdf` 等交互式 shell 初始化后可见，Probe 可能找不到它。应确保已构建 entrypoint 的 shebang 能在 Service 环境解析到受支持的真实 Node 安装，然后以 App Probe 结果为准。
 
-不要读取或复制 Node 安装目录中的无关认证文件来解决 PATH 问题。
-
-## 4. 安装依赖并构建 ACP 入口
+## 4. 安装依赖并构建现代 ACP 入口
 
 在 DSH 源码根目录运行。新版官方 README 与根目录 `package.json` 使用以下命令：
 
@@ -74,10 +68,18 @@ pnpm install
 pnpm run build
 ```
 
-确认现代 ACP 产物存在：
+确认现代 ACP 产物存在。
+
+macOS、Linux 或 Git Bash：
 
 ```bash
 test -f apps/cli/lib/bin.js
+```
+
+Windows PowerShell：
+
+```powershell
+Test-Path .\apps\cli\lib\bin.js
 ```
 
 现代 DSH 要登记的构建产物绝对路径是：
@@ -86,13 +88,7 @@ test -f apps/cli/lib/bin.js
 <dsh-source>/apps/cli/lib/bin.js
 ```
 
-旧版 ACP Demo 入口仍保持兼容。已经登记或仍在使用旧入口时，可以继续使用：
-
-```text
-<dsh-source>/packages/examples/acp-demo/lib/bin.js
-```
-
-现代入口启动时使用 `--profile acp --patch <Bridge 私有运行配置>`；旧 ACP Demo 入口继续使用 `--config <Bridge 私有运行副本>/cordis.yml`。Bridge 会按入口类型选择对应启动方式。
+Bridge 使用现代入口启动：`--profile acp --patch <Bridge 私有运行配置>`。Bridge 会为每次运行生成私有 patch，不修改你的原始 Profile。
 
 ### 不要选择这些对象
 
@@ -100,8 +96,6 @@ test -f apps/cli/lib/bin.js
 dsh
 pnpm dsh web
 apps/cli/src/bin.ts
-packages/examples/acp-demo/src/
-packages/examples/acp-demo/src/bin.ts
 DSH Web UI
 整个 deepseek-harness 文件夹
 ```
@@ -114,16 +108,11 @@ Bridge 实际执行语义是：
   --patch <Bridge 私有运行配置>
 ```
 
-不需要先启动 `pnpm dsh web`，也不需要保持终端或浏览器中的 DSH UI 打开。旧版入口的实际调用仍是：
-
-```text
-<真实 Node> <dsh-source>/packages/examples/acp-demo/lib/bin.js \
-  --config <Bridge 私有运行副本>/cordis.yml
-```
+不需要先启动 `pnpm dsh web`，也不需要保持终端或浏览器中的 DSH UI 打开。
 
 ## 5. 为什么 Bridge 需要完整源码树
 
-虽然文件选择器只选择 `lib/bin.js`，Bridge 还会从它向上定位唯一 DSH 源根，并检查：
+虽然文件选择器只选择 `apps/cli/lib/bin.js`，Bridge 还会从它向上定位唯一 DSH 源根，并检查：
 
 - `package.json` 与依赖锁文件是否属于同一完整源码树；现代入口还检查包身份与入口布局；
 - entrypoint、源码清单、依赖锁文件和 Node 解释器的路径、文件身份与 SHA；
@@ -133,7 +122,21 @@ Bridge 实际执行语义是：
 
 因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。DSH 更新后，即使路径相同，Bridge 也会因工件身份变化要求重新 Probe，而不是静默信任替换后的文件。
 
-## 6. 准备外部 Profile
+## 推荐路径：在 App 中一键连接
+
+大多数用户不需要创建外部 Profile 或 `.env`。完成 DSH 构建后，直接在 App 中配置主模型连接：
+
+1. 登录 [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys)，创建一个新的 API key，并在页面显示时立即复制。
+2. 进入 `连接 → 本机 Agent 引擎连接`，找到 DeepSeek Harness。
+3. 在连接行填写主模型 Base URL（默认 `https://api.deepseek.com`）和 API key。
+4. 点击“连接”，等待自动发现、配置和 Probe；Probe 成功后安装会启用。
+5. 进入设置刷新模型目录并选择当前账号实际返回的模型。
+
+Bridge 会把 API key 保存到 macOS 钥匙串或 Windows 凭据管理器，提交后清空输入框，并仅在启动 DSH 子进程时注入。只有需要手动登记已有安装、单独的 Web Search 端点或固定本机 Profile 时，才继续阅读下面的高级章节。
+
+## 6. 高级可选：外部 Profile
+
+本节只用于手动登记、固定 Profile 或需要单独搜索端点的场景。一键连接用户可以跳过本节和下一节。
 
 运行时强制 `cordis.yml` 位于 DSH 源码树之外。出于凭据隔离和防止 Agent/Git 误读，建议 Profile 另外位于任务项目和 Codex Bridge 仓库之外：
 
@@ -150,7 +153,7 @@ Bridge 实际执行语义是：
 └── .env
 ```
 
-`cordis.yml` 与 `.env` 必须在同一目录。外部 `cordis.yml` 继续作为 Bridge 的模型和 effort 配置来源；现代 DSH 启动时，Bridge 从它读取并校验这些值，再为本次运行生成私有 ACP patch，原文件不会被改写。旧版 ACP Demo 入口仍使用私有运行副本的 `cordis.yml`。Bridge 以该目录作为 Harness 工作目录，因此 DSH 可以自己加载旁边的 `.env`。Bridge 不打开、保存、摘要、日志记录或回传 `.env` 内容。
+`cordis.yml` 与 `.env`（如果使用）放在同一个外部配置目录。外部 `cordis.yml` 作为 Bridge 的模型和 effort 配置来源。现代 DSH 的工作目录是 Bridge 为本次运行创建的独立临时 runtime 目录，不是 Profile 目录；Bridge 启动 Node 时通过预加载脚本，让 Node 从配置目录中 `.env` 读取 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL` 和 `DEEPSEEK_SEARCH_BASE_URL`，仅在系统凭据或已有进程环境没有同名值时补入。原始文件不会被改写，Bridge 也不会保存、摘要、日志记录或回传 `.env` 内容。
 
 ### 6.1 从 Bridge 随包模板复制 `cordis.yml`
 
@@ -192,24 +195,19 @@ cp /Applications/CodexBridge.app/Contents/Resources/BridgeCore_BridgeDeepSeekHar
 - ACP 工具与 execution evidence；
 - 私有状态和快照目录。
 
-现代入口不会直接把这份旧式 `cordis.yml` 传给 DSH，而是读取其中受支持的模型和 effort 配置，生成本次运行的私有 `acp.patch.yml`，通过 `--profile acp --patch` 启动；用户原来的 `cordis.yml` 保持不变。旧版 ACP Demo 入口继续使用私有 `cordis.yml` 和 `--config`。
+现代入口不会把原始 `cordis.yml` 直接改写或当作运行目录中的临时文件，而是读取其中受支持的模型和 effort 配置，生成本次运行的私有 `acp.patch.yml`，通过 `--profile acp --patch` 启动；用户原来的 `cordis.yml` 保持不变。
 
 普通用户不应删除插件、改写 sandbox 结构或把模板改成另一种通用 DSH 配置。模型目录、默认模型、thinking/reasoning effort 是预期的可配置内容；兼容的尾部扩展也可能通过归一化结构校验，但任何改动都应重新 Probe，结构不兼容时会触发 `templateMismatch` 或 `needs_review`。
 
 模板中的 `dsh-user-approval` 必须保持 `policy: ask`。Bridge 依靠它把 DSH 的 `session/request_permission` 带回本机工作台；删除 approval 插件、改成自动放行或把 sandbox 改成 `danger-full-access` 都不是受支持的用户配置。
 
-## 7. 创建 `.env` 并配置 DeepSeek API Key
+## 7. 高级可选：创建 `.env` 并配置独立端点
 
-DeepSeek API Key 可从 [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys) 创建。只把真实 Key 粘贴到本机 Profile 的 `.env`，不要放进 Bridge UI、项目 `.env`、聊天、截图、Issue 或 Git。
+本节仅用于第 6 节的手动 Profile，或需要独立的 Web Search 端点。推荐的一键连接流程在上面的 App 连接行中直接保存 API key，不需要手动创建 `.env`。
 
-Codex Bridge 仓库提供示例：
+DeepSeek API Key 可从 [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys) 创建。登录 DeepSeek Platform 后，打开 API Keys 页面，创建新 Key，并在页面显示时立即复制保存；具体按钮名称以当前页面为准。这个 Key 是 DeepSeek API 凭据，不是 ChatGPT 登录凭据、OpenAI Tunnel Runtime Key 或 OpenAI API Key。只把真实 Key 粘贴到 Bridge 的密码字段或本机 Profile 的 `.env`，不要放进项目 `.env`、聊天、截图、Issue 或 Git。
 
-```bash
-cp Examples/DeepSeekHarnessProfile/.env.example \
-  /path/to/dsh-profile/.env
-```
-
-也可以在外部 Profile 中按以下变量名创建：
+也可以在外部 Profile 中按以下变量名创建。等号右侧的 API key 只在本机填写：
 
 ```dotenv
 DEEPSEEK_API_KEY=<在本机填写真实 Key>
@@ -225,11 +223,21 @@ chmod 600 /path/to/dsh-profile/.env
 
 不要把 `/path/to/dsh-profile` 原样当作目录；请换成你实际创建的外部 Profile 绝对路径。
 
+若使用手动 Profile，API key 留在配置目录的 `.env`，App 中可不重复填写。
+
 ## 8. 正确理解两个 Base URL
 
 ### 8.1 主模型：`DEEPSEEK_BASE_URL`
 
 该值是 DeepSeek-compatible Chat Completions 的**基础 URL**，不要带 `/chat/completions`。DSH 会自己追加请求路径。
+
+现代入口刷新模型时，Bridge 会用 Bearer API key 请求：
+
+```text
+GET <DEEPSEEK_BASE_URL>/models
+```
+
+因此自定义网关必须同时提供可用的 OpenAI-compatible `/models` 响应和 Chat Completions 接口。返回应包含类似 `{"data":[{"id":"..."}]}` 的模型列表；Bridge 只使用返回的模型 ID，不把本地静态示例当作真实套餐目录。
 
 ```text
 完整接口：https://gateway.example/v1/chat/completions
@@ -259,18 +267,13 @@ Search endpoint 必须同时满足：
 
 “主模型能回答”“网关支持 `/messages`”或“认证成功”都不能单独证明 Web Search 可用。自定义网关若用不同的搜索凭据，而当前模板只配置 `DEEPSEEK_API_KEY`，需要先确认该 Key 对两个端点都有效；不要让 Bridge 读取或转换凭据来弥补网关配置差异。
 
-## 9. 在 Codex Bridge 连接 DSH
+## 9. 检查连接结果与手动登记
 
-搜索默认复用聊天 Base URL 和 API key，所填地址需支持搜索工具使用的 Anthropic Messages 接口。外部 Profile 中显式设置的 `DEEPSEEK_SEARCH_BASE_URL` 仍优先生效。
+上面的推荐路径会在 App 中完成一键连接。连接行显示安装状态；失败时先查看行内错误，再使用“重试”。
 
-1. 进入 `连接 → 本机 Agent 引擎连接`。
-2. 在 DeepSeek Harness 中输入 Base URL 与 API key。
-3. 点击“一键连接”，等待自动发现、配置和 Probe。
-4. 检查安装状态；Probe 成功后自动启用。
+如果没有自动发现 DSH，展开“高级：按路径登记已有安装”，选择 `<dsh-source>/apps/cli/lib/bin.js`，再选择外部 `<dsh-profile>/cordis.yml`。登记并 Probe 成功后，在安装详情中启用它；该方式不会删除或移动 DSH 源码。
 
-高级手动登记可指定现代 `<dsh-source>/apps/cli/lib/bin.js`，或兼容的 `<dsh-source>/packages/examples/acp-demo/lib/bin.js`，并关联外部 `<dsh-profile>/cordis.yml`；在 Probe 成功后启用。
-
-Probe 验证本地安装、协议和基础 ACP Session；API 服务认证及实际模型请求在执行任务时验证。
+Probe 验证本地安装、协议和基础 ACP Session。模型刷新还会访问主 Base URL 的 `/models`；API 额度、模型调用和 Web Search 必须在任务执行时验证。
 
 ## 10. 刷新模型和设置默认值
 
@@ -279,18 +282,20 @@ Probe 验证本地安装、协议和基础 ACP Session；API 服务认证及实�
 3. 有多个 DSH 安装时，选择目标安装实例。
 4. 点击“刷新模型列表”。
 5. 选择 DSH 当前 ACP Session 返回的精确模型 ID。
-6. 选择当前 DSH Profile 支持的 effort。模型 ID 来自 ACP 动态目录；effort 不是按模型由 ACP 单独广告。
+6. 选择当前所选模型的 ACP Session 返回的 `thought_level`/`reasoning_effort` effort 能力。模型 ID 和 effort 都必须使用当前 ACP Session 返回的精确值。
 7. 保存默认访问模式。它是 DSH 的 Provider 默认；ChatGPT/Qwen 新任务仍优先使用工作台的 `Read Only / Write`。
 
-模型目录来自：
+现代 DSH 的模型目录按以下顺序获得：
 
 ```text
-session/new → configOptions
+GET <DEEPSEEK_BASE_URL>/models
+        ↓
+ACP session/new → configOptions
 ```
 
-不是 OpenCode 模型目录，也不是 Bridge 根据 Provider 名称猜出的别名。effort 列表来自经过验证的 DSH Profile：当前随包 Profile 在 thinking 启用时支持 `off/low/high/max`，默认 `max`；thinking 关闭时只支持 `off`。没有显式模型覆盖时，Bridge 保留 DSH/Profile 的 current value 或已保存且仍有效的默认值；不应随便选目录第一项。
+不是 OpenCode 模型目录，也不是 Bridge 根据 Provider 名称猜出的别名。ACP Session 返回当前模型和推理选项，Bridge 会把所选模型的 wire value 与可显示的模型 ID 对齐。effort 列表来自当前所选模型 ACP 返回的 `thought_level`/`reasoning_effort` 选项；随包 Profile 的 `off/low/high/max` 只是初始示例，实际下拉值和默认值以当前 ACP Session 返回为准。没有显式模型覆盖时，Bridge 保留 DSH 的 current value 或已保存且仍有效的默认值。
 
-当前静态模型回退为 `deepseek-v4-pro`。真实模型优先使用当前 ACP 动态目录，effort 则继续使用已验证 Profile 的支持集合。
+随包 Profile 的初始模型示例为 `deepseek-v4-pro`。配置 API 和 ACP 返回的真实模型优先于该示例；刷新失败时，界面会显示错误，不应把示例 ID 当作账号可用性证明。
 
 ## 11. 权限、网络与工作区
 
@@ -435,7 +440,7 @@ list_agents
   "prompt": "完成指定任务。",
   "model_override": true,
   "execution_model": "<当前 DSH 模型目录中的精确 ID>",
-  "execution_effort": "<当前 DSH Profile 支持的 effort>",
+  "execution_effort": "<当前所选模型 ACP Session 返回的精确 effort>",
   "permission_mode": "workspace-write",
   "permission_mode_override": true,
   "network_access": false
@@ -446,7 +451,6 @@ list_agents
 
 - `installation_id` 通常可以省略，由 Bridge 选择已启用且可用的安装。
 - 新建会话省略 `thread_id`；续聊时传同项目、同安装实例已结束任务的 `provider_session_id`，并确认 `list_agents` 包含 `lifecycle.session_continue`。
-- 不要传 Codex Supervisor 字段。
 - `skill_name` 只在用户明确选择已发现的 Bridge Skill 时使用。
 - 模型 ID 和 effort 不能从 Codex/OpenCode/Antigravity 复制。
 
@@ -532,7 +536,7 @@ waiting_for_codex_approval
 
 处理：
 
-1. 核对路径是当前官方构建出的 `apps/cli/lib/bin.js`，或仍在使用的兼容入口 `packages/examples/acp-demo/lib/bin.js`。
+1. 核对路径是当前官方源码构建出的 `apps/cli/lib/bin.js`。
 2. 核对 Node 满足最低范围，并确认源码根目录仍包含清单、依赖锁文件和运行模块。
 3. 保留现有 `cordis.yml` 与 `.env`；只有配置结构确实需要迁移时，才基于当前 Bridge 模板合并变更。
 4. 确认替换来源可信后点击“接受替换并 Probe”。
@@ -546,7 +550,7 @@ waiting_for_codex_approval
 
 | 现象 | 优先检查 |
 | --- | --- |
-| 选择文件后提示 artifact 无效 | 是否选择官方构建后的 `apps/cli/lib/bin.js`，或兼容的 `packages/examples/acp-demo/lib/bin.js`；是否保留完整源码树 |
+| 选择文件后提示 artifact 无效 | 是否选择官方构建后的 `apps/cli/lib/bin.js`；是否保留完整源码树 |
 | Node 不支持 | 使用 Node 22.19.0+ 的 22.x 或 Node 24+；不要使用 Node 23 |
 | App 找不到 Node | Node 是否只存在于交互式 shell PATH；Service 能否解析 shebang 指向的真实 Node |
 | 找不到 manifest/lock | 是否把 `bin.js` 单独复制走；源根是否仍有 `package.json` 和 `pnpm-lock.yaml` |
@@ -557,7 +561,7 @@ waiting_for_codex_approval
 | 主模型可用但 Web Search 认证失败 | 检查独立 `DEEPSEEK_SEARCH_BASE_URL` 与该 endpoint 对当前 Key 的接受情况 |
 | 有 `/messages` 但没有搜索结果 | endpoint 是否明确支持 `web_search_20250305`，不能只看“Anthropic compatible”标签 |
 | 模型列表为空 | 选择正确 Workbench 项目和 DSH 安装后刷新；检查 ACP `configOptions` |
-| 模型/effort 不可用 | 模型使用当前 ACP Session 返回的精确值；effort 使用当前 Profile 支持集合，不要使用其他 Provider 的别名 |
+| 模型/effort 不可用 | 使用当前所选模型 ACP Session 返回的精确值，不要使用其他 Provider 的别名 |
 | 写入被拒绝 | Workbench/任务是否只读；项目硬策略是否禁止写入；同项目是否已有写任务 |
 | 网络工具被拒绝 | 任务是否明确 `network_access=true`；`.env`、搜索 endpoint 和当前 DSH 工具审批是否有效；项目网络选择器不是外部 Provider 硬防火墙 |
 | 已批准启动但任务仍等待 | 查看工作台“等待本机审批”，展开当前 DSH 命令/权限/路径后选择“仅本次允许”或拒绝 |
@@ -579,5 +583,7 @@ waiting_for_codex_approval
 - [DeepSeek Harness 官方仓库](https://github.com/deepseek-ai/deepseek-harness)
 - [DeepSeek API 文档](https://api-docs.deepseek.com/)
 - [DeepSeek API Keys](https://platform.deepseek.com/api_keys)
+- [Node.js 官方下载页](https://nodejs.org/en/download/)
+- [pnpm 官方安装说明](https://pnpm.io/installation)
 - [Codex Bridge 详细使用指南](./USER_GUIDE.md)
 - [ChatGPT Developer Mode 接入指南](./CHATGPT_DEVELOPER_MODE.md)
