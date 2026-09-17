@@ -183,6 +183,7 @@ try {
         "BridgeServiceHostWindowsTests",
         "BridgeTunnelWindowsTests",
         "BridgeCodexServiceWindowsTests",
+        "BridgeConversationWindowsTests",
         "BridgeServiceApplicationWindowsTests",
         "BridgeServiceCoreWindowsTests",
         "BridgeDirectCommandWindowsTests",
