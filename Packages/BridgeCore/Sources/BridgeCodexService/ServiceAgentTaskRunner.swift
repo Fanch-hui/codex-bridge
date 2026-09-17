@@ -16,10 +16,11 @@ public struct AgentTaskBrief: Sendable {
   public let permissionMode: ServicePermissionMode
   public let profileID: AgentProfileID?
   public let networkAllowed: Bool
+  // Retained for source compatibility; external providers own their tool approval policy.
   public let accessMode: ServiceAccessMode
 
   public var toolApprovalPolicy: AgentToolApprovalPolicy {
-    accessMode == .fullAccess && networkAllowed ? .autoApprove : .providerManaged
+    .providerManaged
   }
 
   public init(

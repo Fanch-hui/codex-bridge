@@ -72,6 +72,14 @@ Windows 关闭主窗口会隐藏到托盘；需要退出时使用托盘菜单。
 
 远程客户端要指定项目时，应先调用 `list_projects`，使用返回的 ID，不能把显示名称当成 ID。
 
+### Agent 权限独立
+
+Codex 的访问模式只用于 Codex。OpenCode、DSH 和 Antigravity 分别使用自己的执行模式与原生工具权限，不从 Codex 的 `full-access` 或 `auto-review` 推导自动批准。项目策略、工作台本次任务的 Read Only / Write 和远程启动批准是共同的任务约束。
+
+AGY 的 Always Proceed 由 AGY 连接流程单独征得同意后设置；它属于 AGY 当前系统用户的全局配置，会影响复用该配置的 AGY 实例。
+
+本节权限隔离修复适用于包含该修复的后续构建；已发布 v0.5.0 安装包仍对应原始发布提交。
+
 ## 5. 连接 Agent
 
 ### Codex
@@ -91,6 +99,8 @@ Windows 可发现商店版及受支持的 CLI 安装位置；外部 Agent 应连
 
 - [OpenCode](./OPENCODE_CONNECTION_GUIDE.md)：先安装 CLI 并完成模型服务登录，再在 Bridge 连接。
 - [Antigravity](./ANTIGRAVITY_CONNECTION_GUIDE.md)：先安装并登录 CLI，在 Bridge 连接时阅读并确认无头执行权限说明。
+
+Bridge 调用的是协议执行入口：Codex app-server、OpenCode ACP、DSH 的 Node ACP 入口和 AGY headless CLI。使用这些入口可以复用同一 Agent 的原生用户配置，不代表必须另建一套账号配置。OpenCode Desktop/CLI 的标准配置与认证通常共享；Antigravity 2.0/CLI 的核心偏好、权限和安全设置共享，具体边界见对应指南。
 
 Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片的“可用”表示连接探测通过；第一项真实任务还会验证所用账号、模型和项目是否可执行。
 

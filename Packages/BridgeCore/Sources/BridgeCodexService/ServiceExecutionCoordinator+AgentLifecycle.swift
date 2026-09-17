@@ -49,8 +49,7 @@ extension ServiceExecutionCoordinator {
       effort: task.executionEffort == serviceDefaultProviderExecutionEffort
         ? nil : task.executionEffort,
       permissionMode: task.permissionMode,
-      networkAllowed: task.networkAllowed,
-      accessMode: task.accessMode
+      networkAllowed: task.networkAllowed
     )
     let handle: AgentTaskRunHandle
     do {
