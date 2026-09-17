@@ -1,5 +1,6 @@
 # Antigravity / AGY 连接与权限指南
 
+权限隔离说明适用于包含修复的后续构建；v0.5.0 安装包仍对应原始发布提交。
 本指南说明如何让 Antigravity CLI 在 Codex Bridge 中正常完成只读分析、联网检索和项目写入。Bridge 使用的是 `agy` CLI 的 headless `stream-json` 模式，不是 Antigravity Desktop App。
 
 Provider ID 固定为：
@@ -9,6 +10,30 @@ antigravity
 ```
 
 省略 `provider_id` 时，Bridge 会使用 Codex，不会自动选择 AGY。
+
+## Antigravity 2.0 与 AGY CLI 的关系
+
+Antigravity 2.0 与 AGY CLI 是两个界面，但官方说明它们使用同一套 Agent harness，并同步核心偏好、权限和安全设置。CLI 中的 `/settings`（`/config`）和 `/permissions` 修改，原则上也会影响 Antigravity 2.0；反向修改同样适用。对话默认不会自动在两个界面之间出现，需要使用官方的对话导入功能。
+
+Bridge 不启动或嵌入 Antigravity 2.0，而是启动已登记的 `agy` CLI，以 headless `stream-json` 协议执行任务。
+
+```text
+Bridge Desktop → Bridge Service → agy --input-format stream-json → AGY CLI
+```
+
+Bridge 启动 `agy` 时继承当前系统用户的 `HOME`、登录状态和 CLI 配置，并使用该 CLI 的原生 Sandbox、Tool Permission 与 `/permissions` 规则。CLI 的持久设置位于 `~/.gemini/antigravity-cli/settings.json`（Windows 为 `%USERPROFILE%\.gemini\antigravity-cli\settings.json`）。官方资料明确保证 Desktop 与 CLI 的核心设置同步，但没有把每一种登录会话或凭据文件都承诺为可互换；CLI 会从当前用户的系统钥匙串、Secret Service 或 Windows Credential Manager 读取 token profile。若 CLI 不能读取 Desktop 建立的登录状态，应在同一系统用户下运行 `agy` 完成一次官方登录。使用 Gemini API key 时，CLI 需要 `modelProvider=gemini` 和 `GEMINI_API_KEY`；Bridge 只在其 Service 启动环境中已有该变量时转发它，不在 Bridge 中保存 AGY API key。完成配置后，应先在 `agy` CLI 中确认登录、模型和需要的权限，再从 Bridge 连接。
+
+Bridge 桌面 App 中的设置边界如下：
+
+| 设置 | 作用范围 |
+| --- | --- |
+| `设置 → Antigravity 默认偏好` | 只保存 AGY 的模型、effort 和只读/写入默认模式 |
+| `设置 → OpenCode 默认偏好` | 只保存 OpenCode 的模型、effort 和 Plan/Build 默认模式 |
+| `设置 → Codex 执行默认偏好` | 只保存 Codex 的模型、effort、访问模式和快速模式 |
+| 项目访问策略、工作台 Read Only/Write、远程启动批准 | Bridge 任务级约束；会按目标 Provider 映射为对应的原生执行模式 |
+| AGY `/settings`、`/config`、`/permissions` | 控制 AGY 的原生工具权限和规则；核心设置按官方行为与 Antigravity 2.0 同步 |
+
+因此，Antigravity 2.0 与 AGY CLI 会共享 AGY 自己的核心设置、权限和安全配置；OpenCode 与 AGY 不会共享彼此的 Provider 配置。Bridge 的桌面 App 只提供统一的项目、任务、模型和审批控制面，Codex 的访问模式也不会作为 AGY 的工具放行开关。
 
 ## 1. 先理解权限链
 
@@ -32,7 +57,7 @@ AGY CLI 原生 Sandbox + Global Permissions
 | AGY `/settings` 或 `/config` | Tool Permission 等 CLI 全局行为 |
 | AGY `/permissions` | 哪些命令、URL 和 MCP 工具可以在 headless 中直接执行 |
 
-“自动批准远程 Agent 启动请求”只跳过启动批准，不批准 AGY 工具。Antigravity Desktop 的自动执行设置也不等于 CLI 的权限设置。
+“自动批准远程 Agent 启动请求”只跳过启动批准，不批准 AGY 工具。Antigravity 2.0 的核心权限设置会按官方行为与 CLI 同步，但 Bridge 这次任务仍由 `agy` CLI 的命令行参数和配置执行。
 
 > **连接 AGY 前必须确认**：Bridge 的 AGY 连接流程会在页面中明确请求将当前用户的 AGY Global **Tool Permission** 设为 `always-proceed`（Always Proceed，总是通过）。这是 headless 任务无法回答交互式工具确认的前置条件。用户取消时不修改设置，也不会连接；用户同意后，Service 才会 Probe 并写入当前用户的 Global 配置。该设置会影响使用同一用户配置的其他 AGY CLI 任务。
 
@@ -56,6 +81,7 @@ Bridge 根据安装的 CLI 实际接口判断兼容性。Probe 读取 `agy --ver
 - `--effort`
 
 必需接口齐全时，CLI 升级后继续通过同一 Probe；缺少必需接口时，Probe 会报告协议能力不兼容。
+其中 `--dangerously-skip-permissions` 只是当前适配器用来确认 CLI 接口完整性的能力项；Bridge 不从 Codex 的访问模式推导它，也不会把 Codex 的 `full-access` 作为 AGY 工具放行设置。
 
 ## 3. 安装并找到正确的 AGY 二进制
 
@@ -153,7 +179,7 @@ agy
 always-proceed
 ```
 
-这是 Bridge headless 任务可以自动完成工具调用的条件。连接确认只在用户明确同意后发生；取消不会改变现有配置。连接成功后，如果在 AGY 里再次打开 `/settings` 或 `/config`，应能看到 `always-proceed`。Bridge 每次启动 AGY 都会传入 `--sandbox`，所以不需要依赖 Desktop 的 Sandbox 设置。
+这是 Bridge headless 任务可以自动完成工具调用的条件。连接确认只在用户明确同意后发生；取消不会改变现有配置。连接成功后，如果在 AGY 里再次打开 `/settings` 或 `/config`，应能看到 `always-proceed`。由于 AGY Desktop 与 CLI 共享核心设置，该配置也可能影响 Antigravity 2.0 中的后续任务，以及使用同一用户配置的其他 AGY CLI 任务；不会改变 Codex 或 OpenCode 的权限。Bridge 每次启动 AGY 都会显式传入 `--sandbox`，所以这次任务不依赖 Desktop 界面的 Sandbox 开关。
 
 其他模式的含义：
 
@@ -176,7 +202,7 @@ Windows 对应路径为：
 %USERPROFILE%\.gemini\antigravity-cli\settings.json
 ```
 
-优先通过 `/settings` 和 `/permissions` 修改，避免手工写错 JSON。Antigravity Desktop 的设置不会可靠替代这里的 CLI 配置。Bridge 连接后若手动改回其他模式，未配置 allow 规则的工具可能被 AGY soft-deny；需要再次连接时，Bridge 会重新请求 Always Proceed 授权。
+优先通过 `/settings` 和 `/permissions` 修改，避免手工写错 JSON。由于 Desktop 与 CLI 的核心设置会同步，在任一界面修改 Tool Permission 都可能改变另一界面的默认行为；但 Bridge 这次执行仍以 `agy` CLI 的命令行覆盖和当前配置为准。Bridge 连接后若手动改回其他模式，未配置 allow 规则的工具可能被 AGY soft-deny；需要再次连接时，Bridge 会重新请求 Always Proceed 授权。
 
 ### 5.2 用 `/permissions` 添加窄规则
 
@@ -248,7 +274,7 @@ Plan 用于分析和规划，不应依赖它修改项目文件。
 3. AGY 连接前，页面会显示以下授权提示：
 
    ```text
-   AGY 无头任务需要自动通过工具执行。是否允许将本机 AGY 全局工具策略设为 Always Proceed（总是通过）并连接？这会影响使用同一配置的其他 AGY CLI 任务。
+   AGY 无头任务需要自动通过工具执行。是否允许将本机 AGY 全局工具策略设为 Always Proceed（总是通过）并连接？这会影响使用同一配置的 Antigravity 2.0 和其他 AGY CLI 任务。
    ```
 
    只有点击同意后，Service 才会连接候选、执行 Probe，并把当前用户的 AGY Global `toolPermission` 设为 `always-proceed`；取消不会修改设置。
@@ -265,7 +291,7 @@ AGY 更新或二进制身份变化后，Bridge 会显示“需确认更新”/`n
 5. 选择当前返回的精确 model 和 effort；推理强度只显示所选模型声明支持的值。
 6. 选择 Provider 默认访问权限：只读或工作区可写。
 
-对 ChatGPT/Qwen 新任务，`工作台 → GPT/Qwen 新任务 → Read Only / Write` 优先于这里的 Provider 默认。远程客户端通常应省略 `permission_mode`，让 Workbench 决定；只有用户明确要求单任务覆盖时才同时发送 `permission_mode_override=true`。
+对 ChatGPT/Qwen 新任务，`工作台 → GPT/Qwen 新任务 → Read Only / Write` 是 Bridge 的任务级选择，会映射为 AGY 的 `plan` 或 `accept-edits`；它不修改 AGY 的 Global Tool Permission。远程客户端通常应省略 `permission_mode`，让 Workbench 决定；只有用户明确要求单任务覆盖时才同时发送 `permission_mode_override=true`。
 
 连接完成后，连接详情会显示 AGY Global Tool Permission。使用 Bridge headless 任务期间应保持 `always-proceed`；需要收窄行为时优先在 AGY `/permissions` 为具体命令、域名或 MCP 工具添加 Project 规则。
 
@@ -355,32 +381,7 @@ Bridge：
 
 Bridge 使用 `--mode accept-edits`，同一项目的写任务进入独占 workspace gate。项目写入为“需要本机批准”不会给 AGY 增加逐文件审批；希望硬性禁止写入时应选择“拒绝”。
 
-## 10. 高风险兜底：`full-access + network_access=true`
-
-只有同时满足以下两项，Bridge 才会为 AGY 增加 `--dangerously-skip-permissions`：
-
-1. `设置 → Codex 执行默认偏好 → 访问权限` 选择“完全访问权限（full-access）”；
-2. 当前任务明确发送 `network_access=true`。
-
-这是单次任务的高风险访问组合，和连接 AGY 时写入的 Global `always-proceed` 是两层不同设置。此时启动参数仍包含：
-
-```text
---sandbox
---mode plan
-```
-
-或：
-
-```text
---sandbox
---mode accept-edits
-```
-
-它不会移除 AGY Sandbox，也不会把只读任务改成写任务；但它会为该次 AGY 任务追加 `--dangerously-skip-permissions`，跳过命令、文件和 MCP 的工具确认。远程任务启动仍可能需要本机点击“批准启动”；AGY 当前 Provider 策略不提供单次工具自动批准按钮。这个 access mode 是 Service 共用设置，可能同时影响 Codex 等任务，不要作为长期默认。优先使用 Project 作用域的窄 `/permissions` 规则；只有完全信任 prompt、项目和工具时才临时使用，任务结束后改回较窄的访问权限。
-
-`auto-review`、自动批准远程任务启动、Direct 自动批准都不会产生同样效果。
-
-## 11. 从 ChatGPT/Qwen 提交
+## 10. 从 ChatGPT/Qwen 提交
 
 先让客户端调用：
 
@@ -407,7 +408,7 @@ awaiting_local_approval
 
 在 Bridge 工作台核对项目、Provider、Read Only/Write、网络意图和 prompt 后点击“批准启动”。AGY 后续工具不会进入可交互的 App 审批卡片；权限不足时应回到 AGY `/permissions` 修正规则后重试。
 
-## 12. 常见故障
+## 11. 常见故障
 
 | 现象 | 正确处理 |
 | --- | --- |
@@ -422,21 +423,21 @@ awaiting_local_approval
 | Shell 仍被拒绝 | 放行精确 `command(...)`；若命令必须逃离 Sandbox，应先评估风险，不要默认扩大到全部命令 |
 | Web/URL 被拒绝 | 任务发送 `network_access=true`，并为具体域名添加 `read_url(domain)` / `execute_url(domain)` |
 | MCP 工具被拒绝 | 在 AGY `/permissions` 添加精确 `mcp(server/tool)`，不是修改 Bridge MCP 客户端权限 |
-| Desktop 已设自动执行仍无效 | Desktop 与 CLI 设置来源不同；检查 AGY `/settings` 和 `/permissions` |
+| Desktop 已设自动执行仍无效 | Desktop 与 CLI 的核心设置按官方行为同步；检查 CLI 是否使用同一系统用户/钥匙串、是否有命令行覆盖，以及 AGY `/settings` 和 `/permissions` |
 | 只读搜索能用，URL/辅助脚本失败 | 后者可能需要 URL、命令、MCP 或缓存写入权限；按实际失败工具补窄规则 |
 | 写任务没有修改文件 | Workbench 是否为 `Write`、项目写入是否允许、任务是否实际使用 `--mode accept-edits` |
-| 打开 `full-access` 仍没有 skip 参数 | 该次任务还必须明确 `network_access=true`；此组合只用于完全可信任务，且不改变连接时的 Global Always Proceed 授权 |
-
-## 13. 安全与验收
+## 12. 安全与验收
 
 - 不读取、复制或提交 AGY 的认证文件、Token、Cookie 或浏览器授权响应。
 - 优先使用 Project 作用域和精确规则，不使用全局通配符代替必要配置。
 - Probe 成功只证明二进制、版本、帮助能力和基础 Provider 行为可用，不证明账号额度、Web、Shell、MCP 或写入已验收。
 - 最终使用自己的账号，在可回滚的测试项目中分别验证只读、联网、写入、命令和会话继续。
 
-## 14. 参考
+## 13. 参考
 
 - [Antigravity CLI Installation & Auth](https://antigravity.google/docs/cli/install/)
+- [Antigravity CLI Overview](https://antigravity.google/docs/cli/overview/)
+- [Antigravity CLI 与 Antigravity 2.0（官方说明）](https://www.antigravity.google/blog/introducing-google-antigravity-cli)
 - [Antigravity CLI Settings](https://antigravity.google/docs/cli/settings/)
 - [Antigravity CLI Permissions](https://antigravity.google/docs/cli/permissions/)
 - [Permissions Command](https://antigravity.google/docs/cli/commands/permissions/)

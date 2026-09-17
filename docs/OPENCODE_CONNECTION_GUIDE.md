@@ -1,5 +1,6 @@
 # OpenCode 连接指南
 
+权限隔离说明适用于包含修复的后续构建；v0.5.0 安装包仍对应原始发布提交。
 本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并让 ChatGPT、Qwen Studio 或 Bridge 工作台通过 MCP 提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
 
 ## 先说明连接方向
@@ -17,6 +18,30 @@ opencode acp --cwd <已登记的项目根目录>
 ```
 
 OpenCode 不随 Bridge 打包，Bridge 也不会读取、复制或导出 OpenCode 的登录凭据。
+
+## OpenCode Desktop 与 CLI 的关系
+
+OpenCode Desktop 和 OpenCode CLI 是两个界面，但 Desktop 的本地后端运行 `opencode-cli` sidecar。OpenCode 官方文档把它们的标准配置和运行数据放在同一组用户目录中：全局配置在 `~/.config/opencode/`，认证和其他运行数据在 `~/.local/share/opencode/`（Windows 对应 `%USERPROFILE%\.config\opencode` 和 `%USERPROFILE%\.local\share\opencode`）。因此通过 Desktop 完成的标准 Provider 配置和登录通常可以被 CLI 复用，反过来也一样；Desktop 自己的窗口、服务器选择和最近项目等 UI 状态仍保存在单独的应用数据目录。
+
+Bridge 不启动或嵌入 OpenCode Desktop，而是启动已登记的 OpenCode CLI：
+
+```text
+Bridge Desktop → Bridge Service → opencode acp --cwd <项目根目录> → OpenCode ACP
+```
+
+Bridge 会把当前系统用户的 `HOME`、`PATH`、`XDG_CONFIG_HOME` 和 `XDG_DATA_HOME` 传给 OpenCode ACP，因此会读取上述标准配置和 `auth.json`。同时，Bridge 将缓存、临时目录、运行状态以及 ACP 使用的数据库放到自己的运行目录；这部分会话数据不会与 OpenCode Desktop 的本地 UI 状态混用。若你依赖 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR` 或其他自定义环境变量，应把配置写入标准全局/项目文件并在 CLI 中确认，因为 Bridge 的 ACP 启动环境不承诺转发这些自定义覆盖项。配置或登录后，应在 `opencode` CLI 中先确认能正常连接 Provider 和读取模型。
+
+Bridge 桌面 App 中的设置边界如下：
+
+| 设置 | 作用范围 |
+| --- | --- |
+| `设置 → OpenCode 默认偏好` | 只保存 OpenCode 的模型、effort 和 Plan/Build 默认模式 |
+| `设置 → Antigravity 默认偏好` | 只保存 Antigravity 的模型、effort 和只读/写入默认模式 |
+| `设置 → Codex 执行默认偏好` | 只保存 Codex 的模型、effort、访问模式和快速模式 |
+| 项目访问策略、工作台 Read Only/Write、远程启动批准 | Bridge 任务级约束；会按目标 Provider 映射为对应的原生执行模式 |
+| OpenCode/Antigravity 原生权限 | 由各自 CLI 或 ACP 处理，不因其他 Agent 的访问设置改变 |
+
+因此，OpenCode Desktop 与 CLI 会共享 OpenCode 自己的标准配置和认证数据；OpenCode 与 AGY 不会共享彼此的 Provider 配置。Bridge 的桌面 App 只提供统一的项目、任务、模型和审批控制面。
 
 ## 1. 安装并登录 OpenCode
 
@@ -72,7 +97,7 @@ Bridge 的自动发现只读取必要的安装元数据，不会执行未连接�
 2. 点击“刷新模型列表”。模型目录来自当前项目根启动的 ACP `session/new.configOptions`，不是 `opencode models` CLI 的输出。
 3. 选择 ACP 返回的精确模型 ID。不要手动在 `opencode/...` 与其他 Provider 的名称之间改名或使用别名。
 4. 仅当当前模型通过 ACP 声明了 effort 选项时，才选择对应 effort；没有可用选项时使用 Provider 默认值。
-5. 保存 OpenCode 的默认模型、effort 和访问权限。ChatGPT/Qwen 新任务的统一权限默认值在“工作台 → GPT/Qwen 新任务”中选择：
+5. 保存 OpenCode 的默认模型、effort 和访问权限。这些值只属于 OpenCode。ChatGPT/Qwen 新任务的工作台模式是 Bridge 的任务级选择，进入 OpenCode 后映射为：
    - **Write** 映射 OpenCode Build；
    - **Read Only** 映射 OpenCode Plan。
 
@@ -172,6 +197,8 @@ Bridge 会在同一个 ACP Session 中把 steer 内容排队为后续 prompt；�
 - OpenCode 继承用户 `HOME` 和 `PATH`，使原生配置与本机工具可用；Bridge 仅隔离每次运行的 cache、state、runtime，并将会话数据库保存在 Service 私有 AgentState。
 - Bridge 不读取或回传 OpenCode auth 文件、Token、Cookie 或 Runtime Key。
 - OpenCode ACP 的权限请求由本机 Bridge 工作台处理；远程 ChatGPT/Qwen 客户端不能代替本机用户批准。
+- OpenCode 的 Provider 默认值与 AGY、Codex 的默认值分开保存；修改其他 Agent 的访问设置不会改变 OpenCode 的 ACP 模式或原生权限。
+- Bridge 桌面 App 与 OpenCode Desktop 是两个应用。Bridge 只调用 OpenCode CLI 的 ACP 入口；标准 OpenCode 配置和认证数据可由 Desktop 与 CLI 共同使用，但 Desktop 独有的 UI 状态不会成为 Bridge 的会话数据。
 
 ## 8. 常见问题
 
@@ -193,5 +220,8 @@ Bridge 会在同一个 ACP Session 中把 steer 内容排队为后续 prompt；�
 ## 9. 官方参考
 
 - [OpenCode 官方文档](https://opencode.ai/docs/)
+- [OpenCode CLI](https://opencode.ai/docs/cli/)
+- [OpenCode 配置](https://opencode.ai/docs/config/)
+- [OpenCode 故障排查（含 Desktop 本地数据说明）](https://github.com/anomalyco/opencode/blob/dev/packages/web/src/content/docs/troubleshooting.mdx)
 - [OpenCode ACP](https://opencode.ai/docs/acp/)
 - [Codex Bridge 详细使用指南](./USER_GUIDE.md)
