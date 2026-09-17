@@ -15,6 +15,9 @@
   function icon(symbol, className) {
     var element = node("span", "icon" + (className ? " " + className : ""));
     element.dataset.symbol = symbol || "circle.dashed";
+    var icons = global.CodexBridgeDesktopIcons;
+    if (icons) element.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+      + (icons[element.dataset.symbol] || icons["circle.dashed"]) + "</svg>";
     return element;
   }
 

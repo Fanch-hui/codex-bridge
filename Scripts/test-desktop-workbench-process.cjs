@@ -5,7 +5,7 @@ const { createHarness } = require("./desktop-ui-test-support.cjs");
 for (const platform of ["macos", "windows"]) {
   test(`${platform} terminal process mounts only after expanding`, () => {
     const ui = createHarness([
-      "pages-common.js", "pages-workbench-conversation.js", "pages-workbench-process.js",
+      "icons.js", "pages-common.js", "pages-workbench-conversation.js", "pages-workbench-process.js",
       "pages-workbench-conversation-incremental.js"
     ], ["conversation"]);
     ui.document.documentElement = { dataset: { platform } };
@@ -34,6 +34,8 @@ for (const platform of ["macos", "windows"]) {
       container.querySelector(".entry-agent").querySelector(".entry-text").textContent, "Done");
     process.open = true; process.dispatch("toggle");
     assert.ok(process.querySelector(".entry-tool_call"));
+    assert.match(process.querySelector(".entry-symbol").innerHTML, /<svg /);
+    assert.match(process.querySelector(".entry-disclosure-chevron").innerHTML, /<svg /);
     ui.window.CodexBridgeDesktopPageSupport.clear(container);
     render();
     process = container.querySelector(".conversation-process");
