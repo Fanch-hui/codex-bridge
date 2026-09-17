@@ -70,5 +70,7 @@ extension ServiceAgentInstallationRecord {
     return lastProbeError == "The Provider adapter changed and requires a new Probe."
       || lastProbeError == "The registered executable changed and requires local review."
       || lastProbeError == "A registered installation artifact changed and requires local review."
+      || lastProbeError
+        == "A registered installation artifact is unavailable and requires local review."
   }
 }

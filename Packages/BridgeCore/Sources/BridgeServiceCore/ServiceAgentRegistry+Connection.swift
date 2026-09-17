@@ -84,7 +84,7 @@ extension ServiceAgentRegistry {
       if existing.availability == .available {
         throw ServiceAgentRegistryError.connectionProbeFailed(existing.id)
       }
-      let unavailable = try candidate.replacingEnabled(false, updatedAt: now())
+      let unavailable = try candidate.replacingEnabled(existing.isEnabled, updatedAt: now())
       try await store.updateAgentInstallation(unavailable)
       return unavailable
     }

@@ -22,7 +22,7 @@ extension BridgeServiceApplication {
     records.reserveCapacity(persistedRecords.count)
     for record in persistedRecords {
       try Self.checkDeadline(deadline)
-      guard record.isSelectable else {
+      guard record.isEnabled else {
         records.append(record)
         continue
       }
