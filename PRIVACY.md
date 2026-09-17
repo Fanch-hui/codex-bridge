@@ -1,28 +1,28 @@
 # Privacy
 
-Codex Bridge is a local-first macOS application. The project does not operate a developer cloud service, telemetry collector, analytics endpoint, account database or billing system.
+Codex Bridge is a local-first application for macOS and Windows. The project does not operate a developer cloud relay, telemetry collector, analytics endpoint, account database, or billing system.
 
-## Data stored on the Mac
+## Local data
 
-The app stores task events, project registrations, non-secret connection profiles, bounded Git/verification/report evidence and lifecycle preferences in `~/Library/Application Support/CodexBridge`. Database files are created with `0600` permissions inside a `0700` directory. Connection credentials and Tunnel Runtime Keys are stored in the user's Keychain, not in the databases or logs.
+The background service stores project registrations, configuration, task history, conversation messages, and execution evidence in the current operating-system user's application data directory. Registered projects remain in their existing locations.
 
-Registered project source remains in its existing location. Codex Bridge does not copy whole projects into its data directory.
+Connection credentials and Tunnel Runtime Keys use macOS Keychain or Windows Credential Manager. The embedded browser maintains a persistent profile for the current system user. Installation packages do not contain user databases, browser cookies, or user credentials.
 
-## Data sent outside the Mac
+## External services
 
-- Codex execution and any enabled Supervisor use the user's own Codex ChatGPT session through the local `codex app-server`. Prompts and evidence required for those operations are therefore processed by the user's configured Codex service.
-- ChatGPT receives only structured MCP results for tools the user has enabled and invoked. Project roots, arbitrary absolute paths, raw credentials and unrestricted file contents are not exposed by the MCP contract.
-- Secure Tunnel mode sends transport traffic through the pinned OpenAI tunnel helper. The restricted Runtime Key is used only by that helper and is not sent to Codex or included in task evidence.
-- Manual HTTPS mode contacts only the endpoint explicitly configured by the user.
+- ChatGPT, Codex, and other configured agents may send prompts, project content, and execution results to the services selected by the user.
+- Connected MCP clients receive the results of authorized tool calls. Depending on project permissions and the requested tool, these results can include file content and task output.
+- Secure MCP Tunnel carries MCP transport traffic through the packaged OpenAI tunnel helper.
+- Configured model, search, and MCP servers receive the requests required for their enabled functions.
 
 Codex Bridge does not add an independent analytics or crash-reporting transmission path.
 
-## Logs and support bundles
+## Logs and sharing
 
-Runtime logs are bounded and redact recognized credentials and absolute local paths. Support bundles are generated only after an explicit local action. They contain typed diagnostic facts rather than raw project files, process output, credentials, endpoint URLs or authentication material. Users should still review a support bundle before sharing it.
+Logs and diagnostic output apply credential and path redaction. Review logs, task output, screenshots, and diagnostic files before sharing them, since user-provided content may contain private information.
 
-## Permissions and control
+## User control
 
-Project access is limited to directories registered by the user. Network and write capabilities default to denied or require a local decision. Codex approval remains deny-only when the upstream protocol cannot provide authoritative, atomically enforceable operation evidence.
+Project permissions, task modes, agent capabilities, and local approvals determine the access granted to a request. Users can disconnect clients, disable agents, change project permissions, and remove registered projects in the app.
 
-Users can remove the app and delete `~/Library/Application Support/CodexBridge` to remove its local databases and evidence. Keychain items named for Codex Bridge must be removed separately in Keychain Access. Deleting app data does not delete registered projects or Codex account data.
+Application data, browser profiles, and operating-system credentials are separate from the installed program. Windows uninstall preserves these data. Deleting Bridge data does not delete registered project directories or the user's external agent accounts.
