@@ -27,7 +27,6 @@
         provider: task.providerDisplayName,
         providerID: task.providerIdentifier,
         status: desktopStatusLabel(task, pendingUserInput: pendingUserInput),
-        isTerminal: task.isTerminal,
         updatedAt: task.updatedAt,
         turnCount: session.turnCount,
         selected: session.tasks.contains(where: { $0.taskID == selectedTaskID }),
