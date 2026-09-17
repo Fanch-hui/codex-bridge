@@ -1662,7 +1662,7 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     XCTAssertEqual(provider.shutdownCount, 1)
   }
 
-  func testAntigravitySubmissionUsesWorkspaceWriteAndProviderNativeNetwork() async throws {
+  func testAntigravitySubmissionKeepsNativePermissionsWithCodexFullAccess() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     let provider = try ScriptedAgentProvider(
       providerID: .antigravity,
@@ -1714,7 +1714,7 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     XCTAssertEqual(pending.installationID, "ainst-route-antigravity")
     XCTAssertEqual(pending.permissionMode, .workspaceWrite)
     XCTAssertTrue(pending.networkAllowed)
-    XCTAssertEqual(pending.accessMode, .fullAccess)
+    XCTAssertEqual(pending.accessMode, .requestApproval)
     XCTAssertEqual(pending.selectionMode, .explicit)
 
     try await application.resolveTaskStartApproval(
@@ -1731,7 +1731,7 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     XCTAssertEqual(request.mutationIntent, .workspaceWrite)
     XCTAssertEqual(request.workspaceStrategy, .exclusiveProject)
     XCTAssertTrue(request.networkAccessRequested)
-    XCTAssertEqual(request.toolApprovalPolicy, .autoApprove)
+    XCTAssertEqual(request.toolApprovalPolicy, .providerManaged)
     XCTAssertTrue(request.requiredCapabilities.contains(.workspaceWriteInPlace))
     XCTAssertEqual(request.profileID, AgentProfileID(rawValue: "desktop-shared"))
 

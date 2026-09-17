@@ -191,7 +191,6 @@ extension BridgeServiceApplication {
       project: project,
       deadline: deadline
     )
-    let accessMode = try await settings.accessMode()
     let executionModel =
       supportsModelSelection
       ? selectedDescriptor?.id ?? resolvedModel ?? serviceDefaultProviderExecutionModel
@@ -212,7 +211,7 @@ extension BridgeServiceApplication {
         executionEffort: executionEffort,
         permissionMode: permission,
         networkAllowed: submission.networkAccess,
-        accessMode: accessMode
+        accessMode: .requestApproval
       )
     )
   }
