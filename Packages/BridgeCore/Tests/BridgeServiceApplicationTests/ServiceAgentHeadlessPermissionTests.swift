@@ -61,6 +61,23 @@ final class ServiceAgentHeadlessPermissionTests: XCTestCase {
     let updateCount = await permissions.updateCount()
     XCTAssertEqual(permission, "always-proceed")
     XCTAssertEqual(updateCount, 1)
+
+    await permissions.setSnapshotFailure(true)
+    do {
+      _ = try await application.serviceConnectManagedAgent(
+        providerID: .antigravity,
+        baseURL: nil,
+        apiKey: nil,
+        candidates: [request],
+        alwaysProceedConfirmed: true,
+        deadline: .now.advanced(by: .seconds(3))
+      )
+      XCTFail("A failed permission read must report its error.")
+    } catch let error as AgentNativePermissionPolicyError {
+      XCTAssertEqual(error, .settingsUnsafe)
+    }
+    let retained = try await registry.installation(id: connected.id)
+    XCTAssertTrue(try XCTUnwrap(retained).isSelectable)
   }
 
   func testPermissionSetupFailureLeavesConnectionDisabled() async throws {
@@ -113,6 +130,7 @@ private actor HeadlessPermissionFixtureManager: AgentNativePermissionPolicyManag
   private var updates = 0
   private var revision = "revision-1"
   private var shouldFailUpdate = false
+  private var shouldFailSnapshot = false
   private let modes: [AgentNativePermissionModeDescriptor]
 
   init() throws {
@@ -129,7 +147,8 @@ private actor HeadlessPermissionFixtureManager: AgentNativePermissionPolicyManag
   func snapshot(installation: AgentInstallation) async throws
     -> AgentNativePermissionPolicySnapshot
   {
-    try makeSnapshot(installation: installation)
+    if shouldFailSnapshot { throw AgentNativePermissionPolicyError.settingsUnsafe }
+    return try makeSnapshot(installation: installation)
   }
 
   func update(
@@ -163,6 +182,8 @@ private actor HeadlessPermissionFixtureManager: AgentNativePermissionPolicyManag
   func updateCount() -> Int { updates }
 
   func setUpdateFailure(_ value: Bool) { shouldFailUpdate = value }
+
+  func setSnapshotFailure(_ value: Bool) { shouldFailSnapshot = value }
 
   private func makeSnapshot(installation: AgentInstallation) throws
     -> AgentNativePermissionPolicySnapshot

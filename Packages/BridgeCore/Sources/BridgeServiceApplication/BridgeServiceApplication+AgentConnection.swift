@@ -38,6 +38,10 @@ extension BridgeServiceApplication {
     }
     try validateConnectionCandidates(matchingCandidates, providerID: providerID)
 
+    let previouslyEnabled = Set(
+      try await registry.installations(providerID: providerID)
+        .filter { $0.isEnabled }.map(\.id)
+    )
     var lastRecord: ServiceAgentInstallationRecord?
     var lastError: (any Error)?
     for candidate in matchingCandidates {
@@ -54,7 +58,9 @@ extension BridgeServiceApplication {
               deadline: deadline
             )
           } catch {
-            _ = try? await registry.setEnabled(false, installationID: record.id)
+            if !previouslyEnabled.contains(record.id) {
+              _ = try? await registry.setEnabled(false, installationID: record.id)
+            }
             throw error
           }
           return record

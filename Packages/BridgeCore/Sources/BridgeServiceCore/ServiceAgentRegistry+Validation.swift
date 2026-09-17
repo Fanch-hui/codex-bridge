@@ -106,11 +106,17 @@ extension ServiceAgentRegistry {
         reason: "A registered installation artifact is unavailable and requires local review."
       )
     }
+    if record.availability == .unavailable,
+      !record.isEnabled || now().timeIntervalSince(record.updatedAt) < 30
+    {
+      return record
+    }
     let metadataChanged =
       current != record.executableIdentity
       || !artifactsHaveSameIdentity(currentArtifacts, record.artifacts)
     if provider.descriptor.adapterRevision != record.adapterRevision
       || metadataChanged || record.hasRecoverableIdentityReview
+      || (record.isEnabled && record.availability == .unavailable)
     {
       return try await refreshProbe(
         record, provider: provider, identity: current, artifacts: currentArtifacts)
@@ -137,7 +143,10 @@ extension ServiceAgentRegistry {
       probedAt: record.lastProbedAt,
       updatedAt: now()
     )
-    try await store.updateAgentInstallation(updated)
-    return updated
+    try await store.updateAgentInstallation(updated, expectedRecord: record)
+    guard let current = try await store.agentInstallation(id: record.id) else {
+      throw ServiceStoreError.unknownAgentInstallation(record.id)
+    }
+    return current
   }
 }
