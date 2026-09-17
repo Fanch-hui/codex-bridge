@@ -18,6 +18,8 @@ extension BridgeServiceRequestController {
     let installations = try await composition.application.serviceManagedAgentInstallations(
       deadline: deadline
     )
+    let configuredDeepSeekBaseURL = try? await composition.application
+      .serviceDeepSeekHarnessBaseURL(deadline: deadline)
     let discovery = await composition.agentDiscoveryCatalog.summaries(
       providerIDs: providers.map(\.providerID),
       existingInstallations: installations,
@@ -27,7 +29,12 @@ extension BridgeServiceRequestController {
       requestID: request.requestID,
       payload: IPCAgentCatalogResponse(
         providers: providers.map { provider in
-          Self.agentProviderSummary(provider, discovery: discovery[provider.providerID])
+          Self.agentProviderSummary(
+            provider,
+            discovery: discovery[provider.providerID],
+            configuredBaseURL: provider.providerID == .deepSeekHarness
+              ? configuredDeepSeekBaseURL : nil
+          )
         },
         installations: installations.map(Self.agentInstallationSummary)
       )
@@ -166,7 +173,8 @@ extension BridgeServiceRequestController {
 
   private static func agentProviderSummary(
     _ descriptor: AgentProviderDescriptor,
-    discovery: ServiceAgentDiscoverySummary?
+    discovery: ServiceAgentDiscoverySummary?,
+    configuredBaseURL: String?
   ) -> IPCAgentProviderSummary {
     let policy = ServiceAgentProviderPolicyRegistry.policy(for: descriptor.providerID)
     return IPCAgentProviderSummary(
@@ -177,6 +185,7 @@ extension BridgeServiceRequestController {
       discoveryMessage: discovery?.message,
       discoveredExecutablePath: discovery?.executablePath,
       discoveredConfigurationPath: discovery?.configurationPath,
+      configuredBaseURL: configuredBaseURL,
       requiresConfiguration: policy?.requiresConfiguration ?? false,
       requiresHeadlessAlwaysProceed: policy?.requiresHeadlessAlwaysProceed ?? false,
       registrationTrustProfile: policy?.registrationTrustProfile.rawValue ?? "managed",

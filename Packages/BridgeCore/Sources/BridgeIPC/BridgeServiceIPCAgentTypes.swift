@@ -8,6 +8,7 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
   public let discoveryMessage: String?
   public let discoveredExecutablePath: String?
   public let discoveredConfigurationPath: String?
+  public let configuredBaseURL: String?
   public let requiresConfiguration: Bool
   public let requiresHeadlessAlwaysProceed: Bool
   public let registrationTrustProfile: String
@@ -30,6 +31,7 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     discoveryMessage: String? = nil,
     discoveredExecutablePath: String? = nil,
     discoveredConfigurationPath: String? = nil,
+    configuredBaseURL: String? = nil,
     requiresConfiguration: Bool = false,
     requiresHeadlessAlwaysProceed: Bool = false,
     registrationTrustProfile: String = "managed",
@@ -51,6 +53,7 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     self.discoveryMessage = discoveryMessage
     self.discoveredExecutablePath = discoveredExecutablePath
     self.discoveredConfigurationPath = discoveredConfigurationPath
+    self.configuredBaseURL = configuredBaseURL
     self.requiresConfiguration = requiresConfiguration
     self.requiresHeadlessAlwaysProceed = requiresHeadlessAlwaysProceed
     self.registrationTrustProfile = registrationTrustProfile
@@ -74,6 +77,7 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     case discoveryMessage = "discovery_message"
     case discoveredExecutablePath = "discovered_executable_path"
     case discoveredConfigurationPath = "discovered_configuration_path"
+    case configuredBaseURL = "configured_base_url"
     case requiresConfiguration = "requires_configuration"
     case requiresHeadlessAlwaysProceed = "requires_headless_always_proceed"
     case registrationTrustProfile = "registration_trust_profile"
@@ -104,6 +108,10 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
       discoveredConfigurationPath: try container.decodeIfPresent(
         String.self,
         forKey: .discoveredConfigurationPath
+      ),
+      configuredBaseURL: try container.decodeIfPresent(
+        String.self,
+        forKey: .configuredBaseURL
       ),
       requiresConfiguration: try container.decodeIfPresent(
         Bool.self,

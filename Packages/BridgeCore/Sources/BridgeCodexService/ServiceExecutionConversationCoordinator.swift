@@ -25,7 +25,7 @@ actor ServiceExecutionConversationCoordinator {
     let persistedLimit =
       task.state.status.isTerminal
       ? limit
-      : (inMemory.count >= limit ? 0 : max(1, limit - inMemory.count))
+      : limit
     let persisted = try await tasks.messages(taskID: taskID, limit: persistedLimit)
     let persistedPage = persisted.map {
       TaskConversationBuffer.Entry(

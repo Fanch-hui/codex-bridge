@@ -111,13 +111,15 @@ struct BridgeServiceWorkbenchInspectorFooter: View {
       }
       Spacer()
       Button {
-        model.refresh()
+        if let task = context.currentTask {
+          model.refreshConversation(taskID: task.taskID)
+        }
       } label: {
         Label("刷新", systemImage: "arrow.clockwise")
           .font(.caption2)
       }
       .buttonStyle(.borderless)
-      .disabled(model.isRefreshing)
+      .disabled(context.currentTask == nil)
     }
   }
 

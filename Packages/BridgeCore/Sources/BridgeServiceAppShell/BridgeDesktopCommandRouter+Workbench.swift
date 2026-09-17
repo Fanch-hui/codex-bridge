@@ -130,7 +130,7 @@ extension BridgeDesktopCommandRouter {
       let conversation = model.conversation,
       conversation.taskID == taskID
     else { return }
-    model.openTask(taskID)
+    model.refreshConversation(taskID: taskID)
   }
 
   private static func steer(

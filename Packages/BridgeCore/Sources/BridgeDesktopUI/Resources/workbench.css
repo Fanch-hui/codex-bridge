@@ -74,7 +74,12 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .workbench-page .current-step-card { padding: 7px 9px; }
 .workbench-page .step-text { margin-top: 2px; font-size: 11px; line-height: 1.35; }
 .workbench-page .conversation-list { gap: 4px; }
-.workbench-page .conversation-entry.entry-disclosure { padding: 5px 8px; border-radius: 6px; }
+.workbench-page .conversation-entry.entry-disclosure {
+  padding: 5px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
 .workbench-page .entry-disclosure .entry-heading { gap: 5px; min-height: 18px; }
 .workbench-page .entry-disclosure .entry-title { font-size: 11px; }
 .workbench-page .entry-disclosure .entry-symbol { width: 14px; height: 14px; }
@@ -108,3 +113,8 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .workbench-layout.browser-collapsed .browser-pane,
 .workbench-layout.browser-collapsed .workbench-divider { display: none; }
 .inspector-browser-controls { display: flex; justify-content: flex-end; }
+.workbench-page .conversation-process { border: 0; padding: 5px 0; }
+.workbench-page .conversation-process > summary { cursor: pointer; color: var(--text-secondary); }
+.workbench-page .conversation-process > summary::before { content: "›"; display: inline-block; width: 12px; text-align: center; }
+.workbench-page .conversation-process[open] > summary::before { transform: rotate(90deg); }
+.workbench-page .conversation-process-body { margin-top: 8px; }

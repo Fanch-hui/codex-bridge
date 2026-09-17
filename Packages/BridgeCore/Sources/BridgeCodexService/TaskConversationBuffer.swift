@@ -99,8 +99,6 @@ public actor TaskConversationBuffer {
     }
   }
 
-  public static let maximumMessageBytes = 256 * 1_024
-  public static let maximumMessagesPerTask = 512
   public static let maximumRetainedMessagesPerTask = 64
   public static let maximumSubscribersPerTask = 8
 

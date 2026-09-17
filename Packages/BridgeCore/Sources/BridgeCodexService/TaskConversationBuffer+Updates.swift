@@ -7,7 +7,6 @@ extension TaskConversationBuffer {
   public func appendUserMessage(taskID: TaskID, content: String) async {
     guard !content.isEmpty else { return }
     let state = state(taskID: taskID)
-    guard state.entries.count < Self.maximumMessagesPerTask else { return }
     let key = "user:" + UUID().uuidString.lowercased()
     append(Entry(key: key, role: .user, kind: .user, content: content, isFinal: true), in: state)
     markDirty(taskID: taskID, key: key, in: state)
@@ -30,7 +29,6 @@ extension TaskConversationBuffer {
   public func appendAgentMessage(taskID: TaskID, content: String) async {
     guard !content.isEmpty else { return }
     let state = state(taskID: taskID)
-    guard state.entries.count < Self.maximumMessagesPerTask else { return }
     let key = "agent:bridge:" + UUID().uuidString.lowercased()
     append(Entry(key: key, role: .agent, kind: .agent, content: content, isFinal: true), in: state)
     markDirty(taskID: taskID, key: key, in: state)
@@ -89,10 +87,9 @@ extension TaskConversationBuffer {
     let content: String
     if let output, !output.isEmpty {
       let input = Self.toolCallContent(arguments, toolName: call.tool)
-      content = Self.capped(input + "\n" + output)
+      content = input + "\n" + output
     } else {
-      content =
-        existing?.content ?? Self.capped(Self.toolCallContent(arguments, toolName: call.tool))
+      content = existing?.content ?? Self.toolCallContent(arguments, toolName: call.tool)
     }
     let entry = Entry(
       key: key,
@@ -158,7 +155,7 @@ extension TaskConversationBuffer {
     if let existing, !existing.content.isEmpty {
       content = existing.content
     } else {
-      content = Self.capped(fallbackContent)
+      content = fallbackContent
     }
     let entry = Entry(
       key: key,
@@ -174,7 +171,6 @@ extension TaskConversationBuffer {
     if let index = state.index[key], state.entries.indices.contains(index) {
       state.entries[index] = entry
     } else {
-      guard state.entries.count < Self.maximumMessagesPerTask else { return }
       append(entry, in: state)
     }
     markDirty(taskID: taskID, key: key, in: state)
@@ -226,14 +222,13 @@ extension TaskConversationBuffer {
     isFinal: Bool
   ) async {
     guard kind == .agent || kind == .reasoning || kind == .toolCall else { return }
-    let cappedContent = Self.capped(content)
-    guard !cappedContent.isEmpty else { return }
+    guard !content.isEmpty else { return }
     let state = state(taskID: taskID)
     let entry = Entry(
       key: key,
       role: .agent,
       kind: kind,
-      content: cappedContent,
+      content: content,
       toolName: toolName.map(Self.cappedToolName),
       toolStatus: toolStatus,
       toolArguments: toolArguments,
@@ -249,7 +244,7 @@ extension TaskConversationBuffer {
         kind: kind,
         delta: nil,
         baseContentLength: 0,
-        fullContent: cappedContent,
+        fullContent: content,
         final: isFinal,
         toolName: entry.toolName,
         toolStatus: toolStatus,
@@ -271,10 +266,8 @@ extension TaskConversationBuffer {
   ) -> ConversationChange? {
     if let index = state.index[key], state.entries.indices.contains(index) {
       let entry = state.entries[index]
-      guard !entry.isFinal, entry.content.utf8.count < Self.maximumMessageBytes else {
-        return nil
-      }
-      let content = Self.cappedAppend(entry.content, delta)
+      guard !entry.isFinal else { return nil }
+      let content = entry.content + delta
       guard content != entry.content else { return nil }
       state.entries[index] = Entry(
         key: entry.key,
@@ -297,8 +290,7 @@ extension TaskConversationBuffer {
       )
     }
 
-    guard state.entries.count < Self.maximumMessagesPerTask else { return nil }
-    let content = Self.capped(delta)
+    let content = delta
     append(
       Entry(key: key, role: .agent, kind: kind, content: content, isFinal: false),
       in: state
@@ -323,11 +315,9 @@ extension TaskConversationBuffer {
   ) -> ConversationChange? {
     guard let index = state.index[key], state.entries.indices.contains(index) else { return nil }
     let existing = state.entries[index]
-    guard !existing.isFinal, existing.content.utf8.count < Self.maximumMessageBytes else {
-      return nil
-    }
+    guard !existing.isFinal else { return nil }
     let line = existing.content.isEmpty ? progress : "\n" + progress
-    let content = Self.cappedAppend(existing.content, line)
+    let content = existing.content + line
     guard content != existing.content else { return nil }
     state.entries[index] = Entry(
       key: key,
@@ -379,7 +369,6 @@ extension TaskConversationBuffer {
       )
       return true
     }
-    guard state.entries.count < Self.maximumMessagesPerTask else { return false }
     append(entry, in: state)
     return true
   }
@@ -393,9 +382,9 @@ extension TaskConversationBuffer {
     guard kind == .agent || kind == .reasoning || kind == .toolCall else { return false }
     let key = message.key
     guard key.hasPrefix(Self.keyPrefix(for: kind)) else { return false }
-    var content = Self.capped(message.content)
+    var content = message.content
     if kind == .toolCall {
-      content = Self.capped(Self.toolCallContent(content, toolName: message.toolName))
+      content = Self.toolCallContent(content, toolName: message.toolName)
     }
     guard !content.isEmpty else { return false }
     let entry = Entry(
@@ -448,20 +437,9 @@ extension TaskConversationBuffer {
     return "工具调用"
   }
 
-  private static func capped(_ content: String) -> String {
-    guard content.utf8.count > maximumMessageBytes else { return content }
-    return String(decoding: content.utf8.prefix(maximumMessageBytes), as: UTF8.self)
-  }
-
   private static func cappedToolName(_ name: String) -> String {
     guard name.utf8.count > 256 else { return name }
     return String(decoding: name.utf8.prefix(256), as: UTF8.self)
   }
 
-  private static func cappedAppend(_ content: String, _ delta: String) -> String {
-    guard content.utf8.count + delta.utf8.count <= maximumMessageBytes else {
-      return content
-    }
-    return content + delta
-  }
 }
