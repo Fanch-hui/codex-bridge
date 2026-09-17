@@ -283,9 +283,23 @@ var windowsApplicationLinkerFlags = [
       path: "Tests/BridgeServiceApplicationWindowsTests"
     ),
     .testTarget(
+      name: "BridgeConversationWindowsTests",
+      dependencies: [
+        "BridgeCodexRPC", "BridgeCodexService", "BridgeDomain", "BridgeProjects",
+        "BridgeServiceCore",
+      ],
+      path: "Tests/BridgeCodexServiceTests",
+      sources: [
+        "TaskConversationBufferTests.swift", "ExecutionTestSupport.swift",
+        "ConversationChangeCollector.swift",
+      ]
+    ),
+    .testTarget(
       name: "BridgeServiceCoreWindowsTests",
       dependencies: [
         "BridgeAgentCore",
+        "BridgeDomain",
+        "BridgeProjects",
         "BridgeSkills",
         "BridgeServiceCore",
         .product(name: "GRDB", package: "GRDB.swift"),
@@ -294,6 +308,8 @@ var windowsApplicationLinkerFlags = [
       sources: [
         "ServiceAgentRegistryStabilityTests.swift",
         "ServiceAgentRegistryRecoveryTests.swift",
+        "ServiceTaskCompletionSummaryTests.swift",
+        "TestSupport.swift",
         "ServiceStoreSchemaV15MigrationTests.swift",
         "SkillActionInterpreterWindowsTests.swift",
       ]
