@@ -70,10 +70,13 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .step-caption { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent); }
 .step-text { margin-top: 4px; font-size: 12px; color: var(--text); }
 
-.workbench-page .inspector-content { padding: 10px; }
+.workbench-page .inspector-content { padding: 16px clamp(18px, 2.4vw, 40px); }
 .workbench-page .current-step-card { padding: 7px 9px; }
 .workbench-page .step-text { margin-top: 2px; font-size: 11px; line-height: 1.35; }
-.workbench-page .conversation-list { gap: 4px; }
+.workbench-page .conversation-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.workbench-page .entry-message .entry-text { line-height: 1.75; }
+.workbench-page .entry-message .markdown-body p:not(:last-child) { margin-bottom: 12px; }
+.workbench-page .entry-message .markdown-body li + li { margin-top: 6px; }
 .workbench-page .conversation-entry.entry-disclosure {
   padding: 5px 0;
   border: 0;
@@ -85,7 +88,7 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .workbench-page .entry-disclosure .entry-symbol { width: 14px; height: 14px; }
 .workbench-page .entry-disclosure .status-badge { padding: 1px 5px; font-size: 10px; line-height: 16px; }
 .workbench-page .entry-disclosure .disclosure-body { padding: 5px 0 0 19px; }
-.workbench-page .entry-disclosure .entry-text { font-size: 11px; line-height: 1.4; }
+.workbench-page .entry-disclosure .entry-text { font-size: 11px; line-height: 1.6; }
 .workbench-page .entry-disclosure .entry-arguments { margin-top: 5px; padding: 7px; font-size: 10px; line-height: 1.4; }
 .workbench-page .conversation-state-activity { gap: 6px; padding: 6px 8px; font-size: 11px; line-height: 1.35; }
 .workbench-page .conversation-state-activity .conversation-state-spinner { width: 12px; height: 12px; flex-basis: 12px; }
@@ -113,7 +116,7 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .workbench-layout.browser-collapsed .browser-pane,
 .workbench-layout.browser-collapsed .workbench-divider { display: none; }
 .inspector-browser-controls { display: flex; justify-content: flex-end; }
-.workbench-page .conversation-process { border: 0; padding: 5px 0; }
+.workbench-page .conversation-process { min-width: 0; border: 0; padding: 5px 0; }
 .workbench-page .conversation-process > summary { cursor: pointer; color: var(--text-secondary); }
 .workbench-page .conversation-process > summary::before { content: "›"; display: inline-block; width: 12px; text-align: center; }
 .workbench-page .conversation-process[open] > summary::before { transform: rotate(90deg); }
