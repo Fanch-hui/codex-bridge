@@ -1,226 +1,95 @@
 # Codex Bridge
 
-<p align="center">
-  <a href="./README.md">简体中文</a> | <b>English</b>
-</p>
+[简体中文](./README.md) · [English](./README_en.md)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Platform-macOS%2014.0%2B-blue?style=flat-square&logo=apple" alt="Platform">
-  <img src="https://img.shields.io/badge/Swift-6.0%20Strict-orange?style=flat-square&logo=swift" alt="Swift 6">
-  <img src="https://img.shields.io/badge/Protocol-MCP%20Gateway-green?style=flat-square" alt="MCP">
-  <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License">
-</p>
+Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, and Antigravity.
 
-**Codex Bridge** is a self-hosted native macOS app and background service. It connects ChatGPT on the web, Qwen Studio, and a local Workbench to explicitly registered projects, then runs Codex, OpenCode, DeepSeek Harness, or Antigravity through one task, approval, conversation, and persistence system.
+macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-Bridge does not depend on a developer-operated relay, account service, or remote database. Requests still leave the Mac when you choose ChatGPT, a model API, or another provider; local-first does not mean that every task remains offline.
+## Download and install
 
-## Current capabilities
+Get the latest version from [GitHub Releases](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest).
 
-| Layer | Current implementation |
-| --- | --- |
-| ChatGPT web | OpenAI Secure MCP Tunnel; the packaged helper is managed by the background service |
-| Qwen Studio | Loopback Streamable HTTP `/mcp`; the app copies an authenticated JSON profile |
-| Codex | Default provider; `codex app-server --stdio`, Thread/Turn, live steer, interrupt, approvals, and Supervisor |
-| OpenCode | ACP stdio, Plan/Build, runtime model and effort options, permissions, and queued follow-up prompts |
-| DeepSeek Harness | Version-pinned ACP adapter, external `cordis.yml`, models/effort, Web/tools/subagents, execution evidence, and one-shot local approvals |
-| Antigravity | `agy` stream-json CLI, Plan/Accept Edits, native sandbox, CLI permission rules, conversation resume, and queued steer |
-| Direct Workspace | Controlled reads/writes, revision-aware patches, structured commands, process sessions, and local Git commits |
-| Skills | Safe `SKILL.md` discovery; only explicitly declared actions can run |
+| Platform | v0.5.0 package | Installation |
+| --- | --- | --- |
+| macOS 14+, Apple Silicon | `CodexBridge-0.5.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-0.5.0-Setup.exe` | Run the installer and choose an installation folder |
+| Windows x64, portable | `CodexBridge-Windows-x64-0.5.0.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
-External agents must be explicitly registered, probed, enabled, and selected. A `submit_task` request without `provider_id` always uses Codex.
+The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
+
+Upgrades preserve application data and the embedded browser profile. Closing the Windows main window keeps the tray icon; use the tray menu to exit.
+
+## First setup
+
+1. Open the app and confirm that the background service is connected. Approve the macOS background item if prompted.
+2. Register a local project and set its read, write, and network permissions.
+3. Connect an installed agent from the Connections page. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
+4. Select a project and `Read Only` or `Write` in the workbench.
+5. Connect ChatGPT through OpenAI Secure MCP Tunnel, or Qwen Studio through loopback HTTP MCP. The Connections page provides configuration controls.
+6. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
+
+Credentials are managed through the operating system credential store. Remove credentials before sharing configuration, logs, or screenshots.
+
+## Capabilities
+
+- **Codex:** Thread/Turn, streaming output, approvals, structured questions, steer, and interrupt.
+- **OpenCode:** ACP, model and reasoning options, permissions, and conversation continuation.
+- **DeepSeek Harness:** ACP capability probing, live model catalogs, search configuration, MCP servers, and persistent sessions.
+- **Antigravity:** CLI integration, native permission policies, execution progress, and conversation continuation.
+- **Workbench:** project sessions grouped by agent, history paging, tool cards, task controls, and approvals.
+- **Direct Workspace:** controlled file access, patches, command execution, and Git operations.
+- **Skills:** local discovery, read-only inspection, and explicit actions.
+
+Effective capabilities depend on the agent, its connection probe, and project permissions. Requests without `project_id` use the workbench default project; requests without `provider_id` use Codex.
 
 ## Architecture
 
 ```text
-ChatGPT Web                         Qwen Studio
-    │ OpenAI Secure MCP Tunnel          │ localhost /mcp
-    └──────────────────┬────────────────┘
-                       ▼
-              CodexBridgeService
-              ├─ MCP / XPC application services
-              ├─ one service.sqlite database
-              ├─ project policy and local approvals
-              ├─ provider task coordination
-              ├─ Direct Workspace
-              └─ Tunnel / Skill lifecycle
-                       │
-        ┌──────────────┼───────────────┬────────────────┐
-        ▼              ▼               ▼                ▼
- Codex app-server  OpenCode ACP  DeepSeek Harness ACP  agy CLI
-        │
-        └─ Supervisor (Codex only)
-
-CodexBridge.app ── XPC ──► CodexBridgeService
-  Projects / Workbench / Connections / Settings / Approvals
+ChatGPT Web ── Secure MCP Tunnel ─┐
+Qwen Studio ── localhost MCP ────┼─► Codex Bridge Service
+Desktop App ── local IPC ────────┘   ├─ Project policy and approvals
+                                    ├─ Tasks, conversations, SQLite
+                                    ├─ Codex / OpenCode / DSH / AGY
+                                    └─ Direct Workspace / Skills
 ```
 
-The production service stores projects, settings, tasks, messages, and presentation events in one SQLite database. The app configures and observes the service and collects local approvals; it does not own provider, MCP, Tunnel, or Supervisor process lifecycles.
+macOS uses WKWebView and XPC; Windows uses WebView2 and named pipes. Both use `BridgeDesktopUI` and `BridgeServiceAppCore`. Windows uses state revisions, page caches, and incremental message rendering while active conversations retain their independent streaming subscriptions.
 
-## Quick start
+## Build from source
 
-The [detailed Chinese user guide](./docs/USER_GUIDE.md) covers first-time setup, every provider, ChatGPT/Qwen, task control, permissions, and troubleshooting.
-
-### 1. Install and start
-
-- Requires macOS 14.0 or later.
-- Release artifacts are split into `arm64` and `x86_64`; install the architecture matching the Mac.
-- On first launch, approve the Codex Bridge background item when macOS asks, then return to the Overview page and refresh status.
-- Closing the window does not stop the service. “Keep background service running after quitting the app” controls ⌘Q behavior and is enabled by default.
-
-Build from source:
+The default development branch is `win`.
 
 ```bash
-git clone https://github.com/yeyuancc0-glitch/codex-bridge.git
+git clone --branch win https://github.com/yeyuancc0-glitch/codex-bridge.git
 cd codex-bridge
-
-Scripts/with-xcode.sh xcodebuild \
-  -project CodexBridge.xcodeproj \
-  -scheme CodexBridge \
-  -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' \
-  -derivedDataPath .build/Xcode \
-  build CODE_SIGNING_ALLOWED=NO
 ```
 
-A normal Debug build may omit OpenAI's `tunnel-client`. Local MCP can still work, but ChatGPT Secure Tunnel requires a build whose Connections page reports that the helper is available.
+### macOS Apple Silicon
 
-### 2. Register a project and set hard policy
-
-1. Open `Projects → Add` and select the project root.
-2. Configure read, write, and network policy under Access and Execution Permissions.
-3. Configure Direct command policy only if remote clients should run explicit local commands.
-
-Project policy outranks Workbench defaults and task overrides. A project that denies writes cannot be upgraded by any provider request.
-
-### 3. Select the remote-task default
-
-In Workbench:
-
-1. Select the project ChatGPT/Qwen should use.
-2. Select `Read Only` or `Write` under the new-task control.
-
-When a remote request omits `project_id`, the selected Workbench project is authoritative. An explicit ID must come from MCP `list_projects`, not from a display name. Remote clients should normally omit permission overrides and use the Workbench default.
-
-### 4. Connect local agents
-
-Open `Connections → Local Agent Engine Connections` and click the agent's one-click connection button. macOS and Windows share discovery, validation, and activation.
-
-- **Codex** uses its existing automatic discovery and current authentication/provider configuration.
-- **OpenCode** discovers the local CLI and uses its existing configuration. See the [OpenCode guide](./docs/OPENCODE_CONNECTION_GUIDE.md).
-- **DeepSeek Harness**: install and build the supported DSH version, enter the Base URL and API key, then connect. Bridge prepares the runtime profile and stores the key in the system credential store. See the [DeepSeek Harness guide](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md).
-- **Antigravity** discovers the `agy` CLI and uses its existing sign-in and permission settings. See the [Antigravity / AGY guide (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md).
-
-A successful connection enables the agent. Select provider-native models and effort values in Settings. Authentication, API availability, and execution permissions are managed by the corresponding provider.
-
-### External-provider permission essentials
-
-- Workbench `Read Only / Write` controls new ChatGPT/Qwen tasks; the provider Settings value is only a fallback default.
-- DSH keeps `approval.policy: ask`. Resolve each runtime `session/request_permission` in Workbench with one-shot allow or deny; `full-access` and automatic task-start approval do not bypass it.
-- Before normal AGY use, confirm **Tool Permission = `proceed-in-sandbox`** in interactive `agy /settings`, then add narrow Project-scoped allow rules through `/permissions`. Bridge already forces `--sandbox`.
-- The project network selector is not a packet-level firewall for external providers. Network tasks require explicit `network_access=true`, while actual access remains governed by AGY/DSH native configuration and tool policy.
-
-### 5. Connect clients
-
-#### ChatGPT web
-
-1. Create or obtain a Tunnel in [OpenAI Platform Tunnels](https://platform.openai.com/settings/organization/tunnels).
-2. Create a Restricted Runtime API Key in [OpenAI Platform API Keys](https://platform.openai.com/settings/organization/api-keys), granting only Tunnels `Read` and `Use`.
-3. Enter the Tunnel ID and Runtime API Key in Bridge under `Connections → Remote AI Clients (OpenAI Secure Tunnel)`, then start the connection.
-4. Follow the current OpenAI page to create an MCP app in ChatGPT Apps/Developer Mode. The common flow is to select **Tunnel**, select or paste the same Tunnel ID, scan tools, and create the app; the exact entry depends on the current account and Workspace UI.
-
-The Runtime API Key is entered only in Bridge. Do not enter it, a localhost URL, `/mcp`, or the local Header Secret generated specifically for the ChatGPT profile in ChatGPT. See the [current Chinese ChatGPT guide](./docs/CHATGPT_DEVELOPER_MODE.md) and [OpenAI's Secure Tunnel guide](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels).
-
-#### Qwen Studio
-
-1. Open `Connections → Local MCP Client Channels`.
-2. Enable Qwen Studio and select read-only or full tools.
-3. Click “Copy Qwen JSON Configuration” and use Qwen's JSON import flow.
-
-The JSON contains a local authentication header. Do not commit or publish it. Regenerating the credential invalidates every previous copy.
-
-## Task, approval, and result semantics
-
-```text
-submit_task
-    ↓
-awaiting_local_approval (default)
-    ↓ local Approve Start
-starting → running ↔ waiting_for_codex_approval
-               ↓
-    completed / failed / interrupted
-
-unknown: non-terminal state after losing the original run binding; requires local review
-```
-
-- Automatic approval for remote agent starts is disabled by default. Enabling it does not approve provider tool permissions or Direct operations.
-- A project permits at most one active `workspace-write` task; read-only tasks can run concurrently.
-- Terminal `get_task` state is authoritative. Follow its `wait_policy`; quiet output and an unchanged timestamp do not prove failure.
-- Read `result_summary`, `failure_code`, `changed_files`, and provider bindings from the terminal `get_task` snapshot. The current MCP catalog does not expose `get_final_report`; `wait_policy.next_action=read_final_report` is a hint string, not a callable tool.
-- OpenCode and Antigravity can resume a strictly matched historical session. DeepSeek Harness currently creates a fresh session for each task; historical-session resume is not supported. External-provider steer is generally a queued next prompt, not Codex in-flight steer.
-
-## Security boundaries
-
-| Boundary | Behavior |
-| --- | --- |
-| Registered projects | MCP accepts opaque project IDs; paths must stay inside a registered root and pass identity checks |
-| Sensitive files | `.env*`, private keys, authentication files, browser data, and other sensitive paths are denied |
-| Concurrent writes | Provider and Direct paths share one per-project write gate |
-| Approval layers | Remote start approval, provider runtime permission, and Direct approval are separate |
-| Credentials | Tunnel Runtime Key and per-client-profile local MCP secrets use Keychain; Bridge does not read provider credentials or the DSH `.env` |
-| Network | Codex/Direct enforce project policy; external providers record explicit task intent and use native policy, while the project selector is not a packet-level firewall |
-| Git | `direct_git_commit` creates controlled local commits only; push, amend, reset, and history rewrites are disallowed |
-
-## Repository layout
-
-```text
-App/                                  macOS application entry point
-Packages/BridgeCore/Sources/
-  BridgeServiceCore/                  SQLite, projects, settings, tasks, messages
-  BridgeServiceApplication/           MCP/XPC application facade and policy
-  BridgeCodexRPC/                      codex app-server adapter
-  BridgeCodexService/                  Codex execution, Supervisor, conversation
-  BridgeAgentCore/                     provider, installation, capability contracts
-  BridgeACP/                           shared ACP transport and request broker
-  BridgeOpenCodeACP/                   OpenCode adapter
-  BridgeDeepSeekHarnessACP/            DSH adapter and packaged profile
-  BridgeAntigravityCLI/                Antigravity CLI adapter
-  BridgeMCP/                           single MCP control plane
-  BridgeDirectCommand/                 Direct commands, Git, processes, approvals
-  BridgeSkills/                        skill discovery and explicit actions
-  BridgeTunnel/                        Secure MCP Tunnel lifecycle and health
-  BridgeIPC/                           versioned XPC DTOs and client
-  BridgeServiceHost/                   background-service composition root
-  BridgeServiceAppShell/               Workbench, project, connection, settings UI
-Scripts/                              build, validation, packaging, release scripts
-docs/                                 user and developer documentation
-```
-
-## Development and validation
+Install Xcode and a compatible Swift toolchain.
 
 ```bash
-Scripts/with-xcode.sh swift build --package-path Packages/BridgeCore
-Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore
-Scripts/with-xcode.sh xcrun swift-format lint --strict --recursive \
-  Packages/BridgeCore/Sources Packages/BridgeCore/Tests App
-Scripts/verify-mcp-inspector.sh
-Scripts/test-tunnel-helper-config.sh
+Scripts/with-xcode.sh xcodebuild \
+  -project CodexBridge.xcodeproj -scheme CodexBridge \
+  -configuration Debug -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath .build/Xcode build CODE_SIGNING_ALLOWED=NO
 ```
 
-Packaging, installation, and signing only prove artifact state. Real ChatGPT, Qwen, provider login, network, tool, and approval behavior still requires manual acceptance with the corresponding accounts.
+A standard source build supports local MCP. ChatGPT Secure Tunnel also requires a verified `tunnel-client`; release packages include it.
 
-## Documentation
+### Windows x64
 
-- [Detailed user guide (Chinese)](./docs/USER_GUIDE.md)
-- [ChatGPT Developer Mode guide (Chinese)](./docs/CHATGPT_DEVELOPER_MODE.md)
-- [OpenCode connection guide (Chinese)](./docs/OPENCODE_CONNECTION_GUIDE.md)
-- [DeepSeek Harness connection guide](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md)
-- [Antigravity / AGY connection and permissions guide (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
-- [Compatibility matrix](./docs/COMPATIBILITY.md)
-- [Secure Tunnel integration notes](./docs/TUNNEL_CLIENT_INTEGRATION.md)
-- [Build, signing, and release](./docs/RELEASE.md)
-- [Dependencies and licenses](./docs/DEPENDENCIES.md)
+Install Swift 6.3.3, Visual Studio C++ tools, Windows SDK, SQLite through vcpkg, and Inno Setup 7.1.0 for installer generation.
 
-## License and security reports
+```powershell
+pwsh -File Scripts/build-windows.ps1 `
+  -VcpkgRoot 'D:\Dev\Tools\vcpkg' `
+  -Installer -ISCCPath 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe'
+```
 
-Licensed under [Apache License 2.0](./LICENSE); third-party notices are in [NOTICE](./NOTICE). See [PRIVACY.md](./PRIVACY.md) and [SECURITY.md](./SECURITY.md) for privacy and vulnerability reporting. Never publish API keys, tokens, cookies, `.env` files, or sensitive project source in issues, logs, or screenshots.
+The script uses `swiftbuild` and writes the portable ZIP and EXE installer under `.build`.
+
+## License and privacy
+
+[Apache-2.0](./LICENSE) · [Third-party notices](./NOTICE) · [Dependencies](./docs/DEPENDENCIES.md) · [Privacy](./PRIVACY.md) · [Security](./SECURITY.md)

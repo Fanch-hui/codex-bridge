@@ -4,11 +4,11 @@ umask 077
 
 readonly script_directory="${0:A:h}"
 readonly repository_root="${script_directory:h}"
-readonly product_version="0.4.0"
+readonly product_version="0.5.0"
 
 if (( $# < 3 || $# > 4 )); then
   print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64|x86_64|all]"
-  print -u2 "Builds architecture-specific unsigned local release candidates."
+  print -u2 "Builds architecture-specific ad-hoc-signed release packages."
   exit 64
 fi
 
@@ -152,11 +152,12 @@ readonly created_at="$(/bin/date -u -r "${commit_epoch}" '+%Y-%m-%dT%H:%M:%SZ')"
   "${candidate_directory}/DEPENDENCIES.md"
 
 {
-  print -r -- "UNSIGNED LOCAL RELEASE CANDIDATE — NOT FOR PUBLIC DISTRIBUTION"
+  print -r -- "Codex Bridge ${product_version}"
   print -r -- ""
-  print -r -- "This candidate verifies architecture-specific compilation, helper staging, bundle structure, SBOM generation and packaging. It is not Developer ID signed, notarized or stapled."
-} > "${candidate_directory}/RELEASE-CANDIDATE.txt"
-/bin/chmod 0644 "${candidate_directory}/RELEASE-CANDIDATE.txt"
+  print -r -- "macOS signature: ad hoc"
+  print -r -- "Apple notarization: unavailable"
+} > "${candidate_directory}/RELEASE-INFO.txt"
+/bin/chmod 0644 "${candidate_directory}/RELEASE-INFO.txt"
 
 (
   cd "${candidate_directory}"
@@ -167,4 +168,4 @@ readonly created_at="$(/bin/date -u -r "${commit_epoch}" '+%Y-%m-%dT%H:%M:%SZ')"
 /bin/chmod 0644 "${candidate_directory}/SHA256SUMS"
 
 /bin/mv "${candidate_directory}" "${output_directory}"
-print "Built unsigned architecture-specific release candidate at ${output_directory}"
+print "Built architecture-specific release package at ${output_directory}"
