@@ -5,6 +5,8 @@ public enum ServiceAgentRegistryError: Error, Equatable, LocalizedError, Sendabl
   case providerUnavailable(AgentProviderID)
   case installationUnavailable(AgentInstallationID)
   case installationNeedsReview(AgentInstallationID)
+  case connectionProbeFailed(AgentInstallationID)
+  case replacementProbeFailed(AgentInstallationID, reason: String)
   case registrationInProgress(AgentProviderID)
 
   public var errorDescription: String? {
@@ -15,6 +17,10 @@ public enum ServiceAgentRegistryError: Error, Equatable, LocalizedError, Sendabl
       "The Agent installation is unavailable."
     case .installationNeedsReview:
       "The Agent installation changed and requires local review."
+    case .connectionProbeFailed:
+      "The Agent installation did not pass the connection Probe."
+    case .replacementProbeFailed(_, let reason):
+      reason
     case .registrationInProgress:
       "The Agent executable is already being registered."
     }
@@ -37,6 +43,7 @@ public actor ServiceAgentRegistry {
   let captureIdentity: IdentityCapture
   let captureArtifactIdentity: ArtifactIdentityCapture
   let now: @Sendable () -> Date
+  var refreshProbes: [AgentInstallationID: Task<ServiceAgentInstallationRecord, Error>] = [:]
   var activeRegistrations: Set<RegistrationKey> = []
 
   public init(

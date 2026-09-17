@@ -37,7 +37,7 @@ extension MCPServiceToolDispatcher {
       guard event.sequence > prior,
         !event.kind.isEmpty,
         event.summary.utf8.count <= 1_024,
-        OutboundContentSecurity.isSafe(event.summary)
+        Self.isSafeTaskEventSummary(event)
       else {
         throw MCPToolAdapterError.invalidQueryOutput
       }
@@ -65,6 +65,13 @@ extension MCPServiceToolDispatcher {
       }
       priorActivity = activity.sequence
     }
+  }
+
+  private static func isSafeTaskEventSummary(_ event: MCPServiceTaskEvent) -> Bool {
+    if event.kind == "execution.command_completed" {
+      return OutboundContentSecurity.isSafeSecrets(event.summary)
+    }
+    return OutboundContentSecurity.isSafe(event.summary)
   }
 
 }

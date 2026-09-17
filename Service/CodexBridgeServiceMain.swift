@@ -9,7 +9,8 @@ enum CodexBridgeBundledServiceMain {
       try await ServiceProcessRunner.run()
     } catch {
       FileHandle.standardError.write(
-        Data("Codex Bridge service failed to start.\n".utf8)
+        Data(
+          "Codex Bridge service failed to start (\(String(reflecting: type(of: error)))).\n".utf8)
       )
       exit(EXIT_FAILURE)
     }

@@ -1,40 +1,60 @@
 #if os(Windows)
+  import BridgeDesktopUI
+  import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
 
   extension WindowsWorkbenchModel {
     static let permissionModes = ["read-only", "workspace-write"]
 
-    var visibleTasks: [MCPServiceTaskSnapshot] {
-      tasks.filter { selectedProjectID == nil || $0.projectID == selectedProjectID }
+    var workbenchDisplaySnapshot: WindowsWorkbenchPresentationSnapshot {
+      workbenchDisplayCache.snapshot(
+        tasks: tasks,
+        projects: projects,
+        providers: agentProviders,
+        installations: agentInstallations,
+        approvals: approvals,
+        directApprovals: directApprovals,
+        selectedProjectID: selectedProjectID
+      )
     }
 
-    var orphanThreads: [MCPThreadSummary] {
-      let taskThreadIDs = Set(visibleTasks.compactMap { $0.isCodexTask ? $0.threadID : nil })
-      return threads.filter { !taskThreadIDs.contains($0.threadID) }
+    var visibleTasks: [MCPServiceTaskSnapshot] {
+      workbenchDisplaySnapshot.visibleTasks
+    }
+
+    var visibleSessions: [WorkbenchSessionItem] {
+      workbenchDisplaySnapshot.visibleSessions
+    }
+
+    var allSessions: [WorkbenchSessionItem] {
+      workbenchDisplaySnapshot.allSessions
     }
 
     func publishDisplay() {
-      let runningCount = tasks.filter { $0.isRunning }.count
-      let task = selectedTask
-      let selectedTaskIndex = selectedTaskID.flatMap { selectedID in
-        visibleTasks.firstIndex(where: { $0.taskID == selectedID })
+      let cached = workbenchDisplaySnapshot
+      let task = selectedTaskID.flatMap { cached.taskByID[$0] }
+      let selectedSession = task.flatMap { cached.sessionByTaskID[$0.taskID] }
+      let selectedSessionIndex = selectedSession.flatMap { selected in
+        cached.visibleSessions.firstIndex { $0.id == selected.id }
       }
-      let selectedThreadIndex = selectedThreadID.flatMap { selectedID in
-        orphanThreads.firstIndex(where: { $0.threadID == selectedID })
-      }
-      let workbenchRows = visibleTasks.map(Self.rowText) + orphanThreads.map(Self.threadRowText)
-      let selectedIndex =
-        selectedTaskIndex
-        ?? selectedThreadIndex.map { visibleTasks.count + $0 }
-      let conversationText =
-        selectedThreadPage.map(Self.threadConversationText)
-        ?? TaskInspectorPresentation.conversationText(
-          entries: conversation?.entries ?? [],
-          isStreaming: conversation?.isStreaming == true || task?.isRunning == true,
-          errorMessage: conversation?.errorMessage
+      let workbenchRows = cached.visibleSessions.map(Self.sessionRowText)
+      let selectedIndex = selectedSessionIndex
+      var conversationEntries: [BridgeDesktopConversationEntry]?
+      if let task {
+        conversationEntries = windowsConversationPresentationCache.update(
+          taskID: task.taskID,
+          providerID: task.providerIdentifier,
+          entries: conversation?.entries ?? []
         )
-      let approvalItems = approvalPresentationItems()
+      } else {
+        windowsConversationPresentationCache.reset()
+      }
+      let conversationText = windowsConversationPresentationCache.text(
+        isStreaming: conversation?.isStreaming == true || task?.isRunning == true,
+        errorMessage: conversation?.errorMessage
+      )
+      let approvalItems = cached.approvalItems
       let selectedApprovalIndex = selectedApprovalID.flatMap { selectedID in
         approvalItems.firstIndex(where: { $0.id == selectedID })
       }
@@ -45,34 +65,98 @@
         && selectedApproval != nil
         && !approvalResolving
         && !approvalRefreshInProgress
+      let taskItems = cached.visibleSessions.map { session in
+        let latest = session.latestTask
+        return Self.sessionItem(
+          session,
+          projectName: cached.projectName(for: latest.projectID),
+          selectedTaskID: selectedTaskID,
+          canSteer: TaskInspectorPresentation.canSteer(
+            latest,
+            providerSupportsSteer: cached.providerSupportsSteer(for: latest)
+          ),
+          canResume: TaskInspectorPresentation.canResume(
+            latest,
+            providerSupportsSessionContinuation: cached.providerSupportsSessionContinuation(
+              for: latest
+            )
+          ),
+          pendingUserInput: session.tasks.contains {
+            cached.pendingUserInputTaskIDs.contains($0.taskID)
+          }
+        )
+      }
+      let selectedTaskDetail = task.map {
+        Self.taskDetail(
+          $0,
+          session: selectedSession,
+          projectName: cached.projectName(for: $0.projectID),
+          conversation: conversation,
+          permissionRemediation: desktopPermissionRemediation(for: $0),
+          conversationEntries: conversationEntries,
+          canResume: TaskInspectorPresentation.canResume(
+            $0,
+            providerSupportsSessionContinuation: cached.providerSupportsSessionContinuation(
+              for: $0
+            )
+          ),
+          canSteer: TaskInspectorPresentation.canSteer(
+            $0, providerSupportsSteer: cached.providerSupportsSteer(for: $0)
+          ),
+          pendingUserInput: cached.pendingUserInputTaskIDs.contains($0.taskID)
+        )
+      }
+      let typedApprovals = approvalItems.enumerated().compactMap {
+        Self.approvalItem(
+          $0.element,
+          approvalsByID: cached.approvalByID,
+          directApprovalsByID: cached.directApprovalByID,
+          tasksByID: cached.taskByID,
+          projectsByID: cached.projectByID,
+          resolvingApprovalIDs: resolvingApprovalIDs,
+          connected: connectionState == .connected && !approvalRefreshInProgress
+        )
+      }
+      let recentSessions = cached.allSessions.prefix(12)
       displayBox.store(
         WindowsWorkbenchDisplay(
           connectionState: connectionState,
           mcpAddress: serviceStatus?.localMCPURL ?? "—",
-          taskCount: tasks.count,
-          runningTaskCount: runningCount,
+          mcpState: serviceStatus?.status.mcpState ?? "未知",
+          taskCount: cached.taskCount,
+          runningTaskCount: cached.runningTaskCount,
           pendingApprovalCount: approvalItems.count,
           projectRows: projects.map(\.name),
           selectedProjectIndex: selectedProjectID.flatMap { selectedID in
             projects.firstIndex(where: { $0.projectID == selectedID })
           },
+          selectedProjectID: selectedProjectID,
           permissionRows: ["只读", "可写"],
-          selectedPermissionIndex: Self.permissionModes.firstIndex(
-            of: workbenchPermissionMode),
+          selectedPermissionIndex: Self.permissionModes.firstIndex(of: workbenchPermissionMode),
+          permissionMode: workbenchPermissionMode,
           taskRows: workbenchRows,
-          recentTaskRows: tasks.map(Self.rowText),
+          recentTaskRows: recentSessions.map(Self.sessionRowText),
+          recentTasks: recentSessions.map {
+            Self.recentTaskPresentation($0, projectName: cached.projectName(for: $0.projectID))
+          },
           selectedTaskID: selectedTaskID,
           selectedTaskIndex: selectedIndex,
-          taskMetadata: metadata(for: task),
+          taskMetadata: metadata(
+            for: task,
+            projectName: task.map { cached.projectName(for: $0.projectID) }
+          ),
           conversationText: conversationText,
           interruptEnabled: connectionState == .connected
             && TaskInspectorPresentation.canInterrupt(task),
           stopEnabled: connectionState == .connected && task?.isActive == true,
-          deleteEnabled: connectionState == .connected && task?.isTerminal == true,
+          deleteEnabled: connectionState == .connected
+            && selectedSession?.tasks.allSatisfy({ $0.isTerminal }) == true,
           steerEnabled: connectionState == .connected
             && TaskInspectorPresentation.canSteer(
               task,
-              providerSupportsSteer: providerSupportsSteer(for: task)
+              providerSupportsSteer: task.map {
+                cached.providerSupportsSteer(for: $0)
+              } ?? false
             ),
           actionText: actionText,
           approvalRows: approvalItems.map(\.rowText),
@@ -83,52 +167,100 @@
             && !(selectedApproval?.allowDecisions.isEmpty ?? true),
           approvalDenyEnabled: approvalActionsEnabled,
           approvalStatusText: approvalStatusText,
-          detailText: errorMessage
+          detailText: errorMessage,
+          taskItems: taskItems,
+          selectedTaskDetail: selectedTaskDetail,
+          history: BridgeDesktopThreadHistoryState(),
+          approvalItems: typedApprovals,
+          browserEnabled: isChatBrowserEnabled,
+          supportsImmediateSteer: task?.installationID.flatMap { installationID in
+            cached.installationByID[installationID]
+          }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true,
+          canLoadEarlierConversation: conversation?.canLoadEarlier == true,
+          defaultModel: modelPreferences?.executionModel ?? models.first?.displayName
+            ?? models.first?.modelID,
+          availableModelCount: models.count,
+          modelError: modelError
         )
       )
     }
 
-    func providerSupportsSteer(for task: MCPServiceTaskSnapshot?) -> Bool {
-      guard let task, !agentProviders.isEmpty else { return false }
-      let providerID = task.providerIdentifier
-      return agentProviders.contains {
-        AgentProviderPresentation.identifier($0.providerID) == providerID && $0.supportsSteer
-      }
+    func setChatBrowserEnabled(_ enabled: Bool) {
+      isChatBrowserEnabled = enabled
+      publishDisplay()
     }
 
-    private func metadata(for task: MCPServiceTaskSnapshot?) -> String {
+    func providerSupportsSteer(for task: MCPServiceTaskSnapshot?) -> Bool {
+      guard let task else { return false }
+      return workbenchDisplaySnapshot.providerSupportsSteer(for: task)
+    }
+
+    func providerSupportsSessionContinuation(for task: MCPServiceTaskSnapshot?) -> Bool {
+      guard let task else { return false }
+      return workbenchDisplaySnapshot.providerSupportsSessionContinuation(for: task)
+    }
+
+    private func metadata(for task: MCPServiceTaskSnapshot?, projectName: String?) -> String {
       if let task {
         return TaskInspectorPresentation.metadata(
           for: task,
-          projectName: projectName(for: task.projectID)
+          projectName: projectName
         )
-      }
-      if let thread = selectedThreadPage?.thread {
-        return
-          "Codex 历史会话\r\n\(thread.title ?? thread.preview ?? thread.threadID)\r\n状态：\(thread.status)"
       }
       return "未选择任务或会话"
     }
 
-    private func projectName(for projectID: String) -> String {
-      projects.first(where: { $0.projectID == projectID })?.name ?? projectID
+    func requestConversationDisplayUpdate(for taskID: String) {
+      guard conversation?.taskID == taskID else { return }
+      let isTerminal = workbenchDisplaySnapshot.taskByID[taskID]?.isTerminal == true
+      let conversationFinished = conversation?.isStreaming == false
+      guard !isTerminal, !conversationFinished else {
+        conversationDisplayTask?.cancel()
+        conversationDisplayTask = nil
+        publishDisplay()
+        return
+      }
+      guard conversationDisplayTask == nil else { return }
+      conversationDisplayTask = Task { [weak self] in
+        do {
+          try await Task.sleep(for: .milliseconds(33))
+        } catch {
+          return
+        }
+        guard let self, self.conversation?.taskID == taskID else { return }
+        self.conversationDisplayTask = nil
+        self.publishDisplay()
+      }
     }
 
-    private static func rowText(_ task: MCPServiceTaskSnapshot) -> String {
+    private static func sessionRowText(_ session: WorkbenchSessionItem) -> String {
+      let task = session.latestTask
       let state = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
-      return "\(task.providerDisplayName) · \(task.workbenchTitle) — \(state)"
+      let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
+        title: session.title,
+        turnCount: session.turnCount
+      )
+      return "\(session.providerDisplayName) · \(title) — \(state)"
     }
 
-    private static func threadRowText(_ thread: MCPThreadSummary) -> String {
-      "Codex · \(thread.title ?? thread.preview ?? thread.threadID) — \(thread.status)"
+    private static func recentTaskPresentation(
+      _ session: WorkbenchSessionItem,
+      projectName: String
+    ) -> WindowsRecentTaskPresentation {
+      let task = session.latestTask
+      let status = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
+      return WindowsRecentTaskPresentation(
+        taskID: task.taskID,
+        title: WorkbenchTaskTextPresentation.sessionMenuTitle(
+          title: session.title,
+          turnCount: session.turnCount
+        ),
+        projectName: projectName,
+        source: task.sourceDisplayName,
+        status: status,
+        updatedAt: task.updatedAt
+      )
     }
 
-    private static func threadConversationText(_ page: MCPThreadReadPage) -> String {
-      guard !page.entries.isEmpty else { return "此 Codex 会话暂无可显示记录。" }
-      return page.entries.map { entry in
-        let role = entry.role == "user" ? "用户" : (entry.role == "assistant" ? "Codex" : entry.role)
-        return "\(role)：\(entry.text)"
-      }.joined(separator: "\r\n\r\n")
-    }
   }
 #endif

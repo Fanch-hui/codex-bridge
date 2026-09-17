@@ -57,7 +57,7 @@ extension ExecutionSession {
           turnID: correlation.item.turnID
         ),
         isKnownBinding(approvalBinding),
-        let itemEvidence = knownItems[correlation.item],
+        decoded.requiresItemEvidence == false || knownItems[correlation.item] != nil,
         !usedApprovalRequests.contains(requestKey),
         usedApprovalRequests.count < configuration.maximumKnownItems,
         pendingApprovals.count < configuration.maximumPendingApprovals
@@ -70,7 +70,7 @@ extension ExecutionSession {
         taskID: taskID,
         binding: approvalBinding,
         request: decoded,
-        itemEvidence: itemEvidence,
+        itemEvidence: knownItems[correlation.item],
         rawParameters: rpcRequest.params,
         projectRoot: projectRoot,
         limits: approvalLimits
@@ -91,6 +91,7 @@ extension ExecutionSession {
     "item/commandExecution/requestApproval",
     "item/fileChange/requestApproval",
     "item/permissions/requestApproval",
+    "item/tool/requestUserInput",
   ]
 
   private static let legacyApprovalMethods: Set<String> = [

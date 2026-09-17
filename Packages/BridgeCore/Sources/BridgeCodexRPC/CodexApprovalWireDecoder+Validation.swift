@@ -113,6 +113,17 @@ extension CodexApprovalWireDecoder {
     return boolean
   }
 
+  static func requiredBool(
+    _ object: [String: JSONValue],
+    key: String
+  ) throws -> Bool {
+    guard let value = object[key] else { throw CodexApprovalWireError.missingField(key) }
+    guard case .bool(let boolean) = value else {
+      throw CodexApprovalWireError.invalidField(key)
+    }
+    return boolean
+  }
+
   static func optionalStringArray(
     _ value: JSONValue?,
     field: String

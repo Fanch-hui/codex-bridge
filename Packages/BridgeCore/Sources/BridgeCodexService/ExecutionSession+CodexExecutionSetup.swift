@@ -27,16 +27,26 @@ extension ExecutionSession {
     effort: String,
     fastMode: Bool
   ) async throws -> String? {
+    if model == serviceDefaultProviderExecutionModel,
+      effort == serviceDefaultProviderExecutionEffort,
+      !fastMode
+    {
+      return nil
+    }
     var cursor: String?
+    var sawCatalogEntry = false
     for _ in 0..<8 {
       let page: ModelListResponse
       do {
         page = try await client.listModels(
           ModelListParams(cursor: cursor, limit: 100, includeHidden: false)
         )
+      } catch is CancellationError {
+        throw CancellationError()
       } catch {
-        throw ExecutionServiceError.processUnavailable
+        return nil
       }
+      sawCatalogEntry = sawCatalogEntry || !page.data.isEmpty
       if let available = page.data.first(where: { $0.id == model }) {
         guard
           available.supportedReasoningEfforts.contains(where: {
@@ -53,6 +63,7 @@ extension ExecutionSession {
       guard let next = page.nextCursor, !next.isEmpty, next != cursor else { break }
       cursor = next
     }
+    guard sawCatalogEntry else { return nil }
     throw ExecutionServiceError.modelUnavailable(model)
   }
 
@@ -79,7 +90,7 @@ extension ExecutionSession {
           approvalsReviewer: posture.approvalsReviewer,
           serviceTier: posture.serviceTier,
           ephemeral: false,
-          model: request.task.executionModel,
+          model: posture.model,
           projectId: projectID
         )
       )
@@ -110,7 +121,7 @@ extension ExecutionSession {
     } catch {
       throw ExecutionServiceError.threadUnavailable(threadID)
     }
-    guard read.thread.id == threadID, read.thread.cwd == projectRoot else {
+    guard read.thread.id == threadID, Self.pathsMatch(read.thread.cwd, projectRoot) else {
       throw ExecutionServiceError.threadMismatch(threadID)
     }
     if let projectID, read.thread.projectId != projectID {
@@ -119,7 +130,7 @@ extension ExecutionSession {
           ThreadMetadataUpdateParams(threadId: threadID, projectId: projectID)
         )
         guard updated.thread.id == threadID,
-          updated.thread.cwd == projectRoot,
+          Self.pathsMatch(updated.thread.cwd, projectRoot),
           updated.thread.projectId == projectID
         else {
           throw ExecutionServiceError.threadMismatch(threadID)
@@ -140,7 +151,7 @@ extension ExecutionSession {
           approvalPolicy: posture.approvalPolicy,
           approvalsReviewer: posture.approvalsReviewer,
           serviceTier: posture.serviceTier,
-          model: request.task.executionModel
+          model: posture.model
         )
       )
     } catch {
@@ -164,10 +175,10 @@ extension ExecutionSession {
     guard Self.isSafeWireIdentifier(response.thread.id),
       expectedThreadID == nil || response.thread.id == expectedThreadID,
       expectedProjectID == nil || response.thread.projectId == expectedProjectID,
-      response.thread.cwd == projectRoot,
-      response.cwd == projectRoot,
+      Self.pathsMatch(response.thread.cwd, projectRoot),
+      Self.pathsMatch(response.cwd, projectRoot),
       response.thread.ephemeral == false,
-      response.model == posture.model,
+      posture.model == nil || response.model == posture.model,
       response.approvalPolicy == posture.approvalPolicy,
       response.approvalsReviewer == posture.approvalsReviewer,
       response.sandbox.type == posture.sandboxPolicy.type
@@ -188,7 +199,7 @@ extension ExecutionSession {
   }
 
   struct ExecutionPosture: Equatable, Sendable {
-    let model: String
+    let model: String?
     let threadSandbox: ThreadSandboxMode
     let sandboxPolicy: CodexSandboxPolicy
     let approvalPolicy: CodexApprovalPolicy
@@ -229,7 +240,7 @@ extension ExecutionSession {
       approvalPolicy = .onRequest
     }
     return ExecutionPosture(
-      model: task.executionModel,
+      model: wireModel(task.executionModel),
       threadSandbox: fullAccess
         ? .dangerFullAccess : (task.permissionMode == .readOnly ? .readOnly : .workspaceWrite),
       sandboxPolicy: sandboxPolicy,
@@ -237,6 +248,14 @@ extension ExecutionSession {
       approvalsReviewer: task.accessMode == .autoReview ? "auto_review" : "user",
       serviceTier: fastServiceTierID
     )
+  }
+
+  static func wireModel(_ model: String) -> String? {
+    model == serviceDefaultProviderExecutionModel ? nil : model
+  }
+
+  static func wireEffort(_ effort: String) -> String? {
+    effort == serviceDefaultProviderExecutionEffort ? nil : effort
   }
 
   static func isSafeWireIdentifier(_ value: String) -> Bool {

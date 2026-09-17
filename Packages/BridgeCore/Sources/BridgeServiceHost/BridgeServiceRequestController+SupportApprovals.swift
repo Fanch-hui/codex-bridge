@@ -20,7 +20,18 @@ extension BridgeServiceRequestController {
       displayCommand: approval.displayCommand,
       relativePaths: approval.relativePaths,
       reason: approval.reason,
-      decisionOptions: approval.availableDecisions.map(\.rawValue)
+      decisionOptions: approval.availableDecisions.map(\.rawValue),
+      questions: approval.questions.isEmpty
+        ? nil
+        : approval.questions.map { question in
+          IPCUserInputQuestion(
+            id: question.id, header: question.header, question: question.question,
+            isOther: question.isOther, isSecret: question.isSecret,
+            options: question.options.map {
+              IPCUserInputOption(label: $0.label, description: $0.description)
+            }
+          )
+        }
     )
   }
 
@@ -55,7 +66,8 @@ extension BridgeServiceRequestController {
       title: "\(clientLabel)请求调用 \(approval.providerDisplayName)",
       summary: prompt,
       reason: "项目：\(approval.projectID) · 权限：\(permission) · 网络：\(network)",
-      decisionOptions: ["allow", "deny"]
+      decisionOptions: ["allow", "deny"],
+      oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable
     )
   }
 
@@ -73,8 +85,9 @@ extension BridgeServiceRequestController {
     }
     if providerID == "antigravity" {
       switch permissionMode {
-      case "read-only": return "Antigravity + macOS 项目只读边界"
-      default: return "Antigravity 不支持：\(permissionMode)"
+      case "workspace-write": return "Antigravity 原生 Accept Edits（工作区可写）"
+      case "read-only": return "Antigravity 原生 Plan（项目只读）"
+      default: return "Antigravity：\(permissionMode)"
       }
     }
     return permissionMode
@@ -88,7 +101,9 @@ extension BridgeServiceRequestController {
       return "OpenCode 原生 permissions（network_access 不覆盖）"
     }
     if providerID == "antigravity" {
-      return "Antigravity 原生工具权限（network_access 不覆盖）"
+      return networkAccess == true
+        ? "已请求（仍受 AGY Global 或本机单次授权）"
+        : "未请求"
     }
     guard let networkAccess else { return "未记录" }
     return networkAccess ? "已请求" : "未请求"

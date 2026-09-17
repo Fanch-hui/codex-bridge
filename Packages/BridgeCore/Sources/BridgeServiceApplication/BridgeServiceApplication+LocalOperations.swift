@@ -79,7 +79,8 @@ extension BridgeServiceApplication {
       rootURL: rootURL,
       accessPolicy: accessPolicy
     )
-    return Self.projectDetail(project)
+    return Self.projectDetail(
+      project, gitState: await ProjectGitStatus.read(project, deadline: deadline))
   }
 
   public func serviceUpdateManagedProjectPolicy(
@@ -92,7 +93,8 @@ extension BridgeServiceApplication {
       policy,
       projectID: ProjectID(rawValue: projectID)
     )
-    return Self.projectDetail(project)
+    return Self.projectDetail(
+      project, gitState: await ProjectGitStatus.read(project, deadline: deadline))
   }
 
   public func serviceUpdateManagedProjectCommands(
@@ -107,7 +109,9 @@ extension BridgeServiceApplication {
       commandBlacklist: blacklist,
       projectID: ProjectID(rawValue: projectID)
     )
-    return Self.projectDetail(try await managedProject(projectID))
+    let project = try await managedProject(projectID)
+    return Self.projectDetail(
+      project, gitState: await ProjectGitStatus.read(project, deadline: deadline))
   }
 
   public func serviceSetManagedProjectCommandMode(
@@ -120,7 +124,9 @@ extension BridgeServiceApplication {
       mode,
       projectID: ProjectID(rawValue: projectID)
     )
-    return Self.projectDetail(try await managedProject(projectID))
+    let project = try await managedProject(projectID)
+    return Self.projectDetail(
+      project, gitState: await ProjectGitStatus.read(project, deadline: deadline))
   }
 
   public func serviceRemoveManagedProject(
@@ -239,10 +245,6 @@ extension BridgeServiceApplication {
   }
 
   public func serviceSupervisorEnabled() async throws -> Bool {
-    #if os(Windows)
-      return false
-    #else
-      try await settings.isSupervisorEnabled()
-    #endif
+    false
   }
 }

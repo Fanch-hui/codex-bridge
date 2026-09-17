@@ -46,7 +46,9 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     installation: AgentInstallation,
     projectRoot: String,
     runDirectory: String,
+    persistentStateDirectory: String? = nil,
     modelID: String? = nil,
+    catalogModelIDs: [String]? = nil,
     reasoningEffort: String? = nil,
     mutationIntent: AgentMutationIntent = .readOnly,
     networkAllowed _: Bool,
@@ -65,17 +67,11 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
       nodeInterpreter: validated.nodeInterpreterPath,
       projectRoot: project,
       runDirectory: runtime,
+      persistentStateDirectory: persistentStateDirectory,
       mutationIntent: mutationIntent,
       sourceEnvironment: sourceEnvironment
     )
-    let runtimeConfiguration = try prepareRuntimeProfile(
-      sourceRoot: validated.sourceRoot,
-      runDirectory: runtime,
-      configurationData: validated.configurationData,
-      modelID: modelID,
-      reasoningEffort: reasoningEffort,
-      mutationIntent: mutationIntent
-    )
+    let modern = DeepSeekHarnessACPModernLaunch.isModernEntry(validated.executablePath)
     guard
       let configurationDirectory = DeepSeekHarnessACPPathSupport.existingParentDirectory(
         of: validated.configurationPath
@@ -83,16 +79,48 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     else {
       throw AgentRuntimeError.processUnavailable
     }
-    let argv = [
-      validated.nodeInterpreterPath,
-      validated.executablePath,
-      "--config",
-      runtimeConfiguration,
-    ]
+    let argv: [String]
+    if modern {
+      let patch = try DeepSeekHarnessACPModernLaunch.preparePatch(
+        configurationData: validated.configurationData,
+        template: profile.configurationTemplate,
+        runDirectory: runtime,
+        modelID: modelID,
+        catalogModelIDs: catalogModelIDs,
+        reasoningEffort: reasoningEffort,
+        mutationIntent: mutationIntent
+      )
+      let bootstrap = try DeepSeekHarnessACPProfileBootstrap.prepare(
+        configurationDirectory: configurationDirectory, runDirectory: runtime)
+      argv = [
+        validated.nodeInterpreterPath,
+        "--import", bootstrap,
+        validated.executablePath,
+        "--profile",
+        "acp",
+        "--patch",
+        patch,
+      ]
+    } else {
+      let configuration = try prepareRuntimeProfile(
+        sourceRoot: validated.sourceRoot,
+        runDirectory: runtime,
+        configurationData: validated.configurationData,
+        modelID: modelID,
+        reasoningEffort: reasoningEffort,
+        mutationIntent: mutationIntent
+      )
+      argv = [
+        validated.nodeInterpreterPath,
+        validated.executablePath,
+        "--config",
+        configuration,
+      ]
+    }
     return DeepSeekHarnessACPLaunchConfiguration(
       process: ACPProcessTransportConfiguration(
         argv: argv,
-        workingDirectory: configurationDirectory,
+        workingDirectory: modern ? runtime : configurationDirectory,
         environment: environment,
         maximumFrameBytes: maximumFrameBytes,
         maximumStandardErrorBytes: maximumStandardErrorBytes,
@@ -156,9 +184,9 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
           throw AgentRuntimeError.processUnavailable
         }
       #endif
-      try FileManager.default.createSymbolicLink(
+      try DeepSeekHarnessACPDirectoryLink.createDirectoryLink(
         atPath: try DeepSeekHarnessACPPathSupport.append("node_modules", to: runtimeProfile),
-        withDestinationPath: moduleDirectory
+        destinationPath: moduleDirectory
       )
       return configuration
     } catch let error as AgentRuntimeError {
@@ -173,6 +201,12 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
       let canonical = AgentPathSemantics.canonicalPath(path),
       AgentPathSemantics.directoryPath(of: canonical) != nil
     else { return }
+    if let linkPath = try? DeepSeekHarnessACPPathSupport.append(
+      "node_modules",
+      to: DeepSeekHarnessACPPathSupport.append("profile", to: canonical, isDirectory: true)
+    ) {
+      DeepSeekHarnessACPDirectoryLink.removeDirectoryLink(atPath: linkPath)
+    }
     try? FileManager.default.removeItem(atPath: canonical)
   }
 
@@ -180,6 +214,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     nodeInterpreter: String,
     projectRoot: String,
     runDirectory: String,
+    persistentStateDirectory: String?,
     mutationIntent: AgentMutationIntent,
     sourceEnvironment: [String: String]
   ) throws -> [String: String] {
@@ -190,7 +225,15 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     let xdgState = try DeepSeekHarnessACPPathSupport.append("xdg-state", to: runDirectory)
     let temporary = try DeepSeekHarnessACPPathSupport.append("tmp", to: runDirectory)
     let dshHome = try DeepSeekHarnessACPPathSupport.append("dsh-home", to: runDirectory)
-    let snapshots = try DeepSeekHarnessACPPathSupport.append("snapshots", to: runDirectory)
+    let snapshots: String
+    if let persistentStateDirectory {
+      snapshots = try DeepSeekHarnessACPPathSupport.preparePrivateDirectory(
+        persistentStateDirectory,
+        field: "persistentStateDirectory"
+      )
+    } else {
+      snapshots = try DeepSeekHarnessACPPathSupport.append("snapshots", to: runDirectory)
+    }
     for path in [xdgConfig, xdgCache, xdgData, xdgState, temporary, dshHome, snapshots] {
       try DeepSeekHarnessACPPathSupport.createPrivateDirectory(path)
     }
@@ -220,23 +263,19 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
         environment[key] = value
       }
     }
+    for key in ["DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "DEEPSEEK_SEARCH_BASE_URL"] {
+      if let value = sourceEnvironment[key], !value.isEmpty, !value.contains("\0"),
+        value.rangeOfCharacter(from: .controlCharacters) == nil
+      {
+        environment[key] = value
+      }
+    }
     #if os(Windows)
       environment["USERPROFILE"] = home
       environment["TEMP"] = temporary
       environment["TMP"] = temporary
-      for key in [
-        "SystemRoot", "SystemDrive", "ComSpec", "PATHEXT", "LOCALAPPDATA", "APPDATA",
-      ] {
-        if let value = sourceEnvironment.first(where: {
-          $0.key.caseInsensitiveCompare(key) == .orderedSame
-        })?.value,
-          !value.isEmpty,
-          !value.contains("\0"),
-          value.rangeOfCharacter(from: .controlCharacters) == nil
-        {
-          environment[key] = value
-        }
-      }
+      AgentProviderEnvironment.applyWindowsSystemEnvironment(
+        to: &environment, from: sourceEnvironment)
     #endif
     return environment
   }

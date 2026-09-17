@@ -1,3 +1,4 @@
+import BridgeACP
 import BridgeAgentCore
 import Foundation
 
@@ -23,13 +24,18 @@ extension DeepSeekHarnessACPProvider {
       return unavailableProbe(request.installation, reason: "Probe runtime is unavailable.")
     }
     var client: DeepSeekHarnessACPClient?
+    var resolvingCredentials = true
     do {
+      let sourceEnvironment = try await configuration.runtimeEnvironment(
+        for: request.installation
+      )
+      resolvingCredentials = false
       let launch = try configuration.launchBuilder.make(
         installation: request.installation,
         projectRoot: probeRoot.path,
         runDirectory: runDirectory,
         networkAllowed: false,
-        sourceEnvironment: configuration.sourceEnvironment
+        sourceEnvironment: sourceEnvironment
       )
       let connected = makeClient(transport: try configuration.transportFactory(launch))
       client = connected
@@ -42,21 +48,40 @@ extension DeepSeekHarnessACPProvider {
         id: request.installation.id,
         providerID: .deepSeekHarness,
         executablePath: launch.resolvedExecutablePath,
-        version: DeepSeekHarnessACPConstants.releaseVersion,
+        version: try request.installation.artifacts.first(where: { $0.role == .runtimeManifest })
+          .flatMap {
+            try DeepSeekHarnessACPArtifactRuntime.runtimeVersion(
+              executablePath: launch.resolvedExecutablePath, manifestPath: $0.canonicalPath
+            )
+          }
+          ?? initialization.agentVersion,
         protocolRevision: String(DeepSeekHarnessACPConstants.acpProtocolVersion),
         artifacts: request.installation.artifacts
       )
       return AgentProbeResult(
         installation: installation,
         available: true,
-        capabilities: Self.capabilitySnapshot
+        capabilities: Self.capabilities(
+          executablePath: launch.resolvedExecutablePath,
+          initialization: initialization,
+          persistenceAvailable: configuration.persistentStateBaseDirectory != nil
+        )
       )
     } catch {
       await client?.shutdown()
+      let stderr: String
+      if let transport = await client?.transport as? ACPProcessTransport {
+        stderr = DeepSeekHarnessACPDiagnostic.startupSummary(
+          transport.standardErrorSnapshot().tail)
+      } else {
+        stderr = ""
+      }
       cleanup(runDirectory: runDirectory, probeRoot: probeRoot)
       return unavailableProbe(
         request.installation,
-        reason: Self.probeReason(error),
+        reason: resolvingCredentials
+          ? "无法读取 DSH 连接凭据，请检查系统钥匙串访问权限。"
+          : Self.probeReason(error) + (stderr.isEmpty ? "" : " \(stderr)"),
         reviewRequired: Self.requiresReview(error)
       )
     }

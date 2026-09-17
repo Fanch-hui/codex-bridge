@@ -3,13 +3,21 @@ import BridgeAgentCore
 import Foundation
 
 public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
+  public typealias EnvironmentProvider =
+    @Sendable (AgentInstallation) async throws -> [String: String]
+
+  public typealias MCPServersProvider = @Sendable () async throws -> [AgentMCPServerConfiguration]
+
+  public let mcpServersProvider: MCPServersProvider
   public let clientInfo: DeepSeekHarnessACPClientInfo
   public let launchBuilder: DeepSeekHarnessACPLaunchBuilder
   public let requestTimeout: Duration
   public let inactivityTimeout: Duration
   public let eventBufferLimit: Int
   public let runtimeBaseDirectory: String
+  public let persistentStateBaseDirectory: String?
   public let sourceEnvironment: [String: String]
+  public let environmentProvider: EnvironmentProvider
   public let transportFactory: DeepSeekHarnessACPTransportFactory
 
   public init(
@@ -24,19 +32,37 @@ public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
     eventBufferLimit: Int = DeepSeekHarnessACPConstants.maximumEventBuffer,
     runtimeBaseDirectory: String = FileManager.default.temporaryDirectory
       .appendingPathComponent("CodexBridge/DeepSeekHarnessACP", isDirectory: true).path,
+    persistentStateBaseDirectory: String? = nil,
     sourceEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+    environmentProvider: EnvironmentProvider? = nil,
+    mcpServersProvider: @escaping MCPServersProvider = { [] },
     transportFactory: @escaping DeepSeekHarnessACPTransportFactory = { launch in
       try ACPProcessTransport.launch(configuration: launch.process)
     }
   ) throws {
+    self.mcpServersProvider = mcpServersProvider
     self.clientInfo = clientInfo
     self.launchBuilder = try launchBuilder ?? DeepSeekHarnessACPLaunchBuilder()
     self.requestTimeout = requestTimeout
     self.inactivityTimeout = inactivityTimeout
     self.eventBufferLimit = max(1, eventBufferLimit)
     self.runtimeBaseDirectory = runtimeBaseDirectory
+    self.persistentStateBaseDirectory = persistentStateBaseDirectory
     self.sourceEnvironment = sourceEnvironment
+    self.environmentProvider =
+      environmentProvider ?? { _ in
+        var environment = sourceEnvironment
+        for key in Array(environment.keys)
+        where key.caseInsensitiveCompare("DEEPSEEK_API_KEY") == .orderedSame {
+          environment.removeValue(forKey: key)
+        }
+        return environment
+      }
     self.transportFactory = transportFactory
+  }
+
+  func runtimeEnvironment(for installation: AgentInstallation) async throws -> [String: String] {
+    try await environmentProvider(installation)
   }
 }
 
@@ -50,7 +76,7 @@ public struct DeepSeekHarnessACPProvider: AgentProvider, Sendable {
     descriptor = try AgentProviderDescriptor(
       providerID: .deepSeekHarness,
       displayName: "DeepSeek Harness",
-      adapterRevision: 6
+      adapterRevision: 8
     )
   }
 
@@ -68,8 +94,7 @@ public struct DeepSeekHarnessACPProvider: AgentProvider, Sendable {
       throw AgentRuntimeError.unsupportedProtocol(String(initialization.protocolVersion))
     }
     guard initialization.agentName != nil || initialization.agentVersion != nil else { return }
-    guard initialization.agentName == DeepSeekHarnessACPConstants.agentName,
-      initialization.agentVersion == DeepSeekHarnessACPConstants.agentVersion
+    guard initialization.agentName == DeepSeekHarnessACPConstants.agentName
     else {
       throw AgentRuntimeError.unsupportedProtocol("unexpected_deepseek_harness_identity")
     }

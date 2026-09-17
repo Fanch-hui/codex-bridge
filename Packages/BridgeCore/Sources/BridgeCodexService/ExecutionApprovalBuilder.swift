@@ -4,67 +4,6 @@ import BridgeProjects
 import BridgeServiceCore
 import Foundation
 
-package enum ExecutionApprovalResponse: Sendable {
-  case command(execPolicyAmendment: [String]?)
-  case fileChange
-  case permissions(JSONValue)
-
-  var availableDecisions: [LocalApprovalDecision] {
-    switch self {
-    case .command(let amendment):
-      var decisions: [LocalApprovalDecision] = [.allow, .allowForSession]
-      if amendment?.isEmpty == false { decisions.append(.allowSimilarCommands) }
-      decisions.append(.deny)
-      return decisions
-    case .fileChange, .permissions:
-      return [.allow, .allowForSession, .deny]
-    }
-  }
-
-  func value(for decision: LocalApprovalDecision) throws -> JSONValue {
-    guard availableDecisions.contains(decision) else {
-      throw ExecutionServiceError.invalidRequest("approval.decision")
-    }
-    switch (self, decision) {
-    case (_, .deny):
-      if case .permissions = self {
-        return .object([
-          "permissions": .object([:]),
-          "scope": .string("turn"),
-          "strictAutoReview": .bool(false),
-        ])
-      }
-      return .object(["decision": .string("decline")])
-    case (.command, .allow):
-      return .object(["decision": .string("accept")])
-    case (.command, .allowForSession), (.fileChange, .allowForSession):
-      return .object(["decision": .string("acceptForSession")])
-    case (.command(let amendment), .allowSimilarCommands):
-      guard let amendment, !amendment.isEmpty else {
-        throw ExecutionServiceError.invalidRequest("approval.decision")
-      }
-      return .object([
-        "decision": .object([
-          "acceptWithExecpolicyAmendment": .object([
-            "execpolicy_amendment": .array(amendment.map(JSONValue.string))
-          ])
-        ])
-      ])
-    case (.fileChange, .allow):
-      return .object(["decision": .string("accept")])
-    case (.permissions(let permissions), .allow),
-      (.permissions(let permissions), .allowForSession):
-      return .object([
-        "permissions": permissions,
-        "scope": .string(decision == .allow ? "turn" : "session"),
-        "strictAutoReview": .bool(false),
-      ])
-    case (.fileChange, .allowSimilarCommands), (.permissions, .allowSimilarCommands):
-      throw ExecutionServiceError.invalidRequest("approval.decision")
-    }
-  }
-}
-
 package struct PreparedExecutionApproval: Sendable {
   let request: ExecutionApprovalRequest
   let response: ExecutionApprovalResponse
@@ -88,7 +27,7 @@ package enum ExecutionApprovalBuilder {
     taskID: TaskID,
     binding: ExecutionBinding,
     request: CodexApprovalRequest,
-    itemEvidence: CodexApprovalItemEvidence,
+    itemEvidence: CodexApprovalItemEvidence?,
     rawParameters: JSONValue?,
     projectRoot: String,
     limits: ExecutionApprovalLimits
@@ -96,14 +35,14 @@ package enum ExecutionApprovalBuilder {
     let correlation = request.correlation.item
     guard correlation.threadID == binding.threadID,
       correlation.turnID == binding.turnID,
-      itemEvidence.item == correlation
+      !request.requiresItemEvidence || itemEvidence?.item == correlation
     else {
       throw ExecutionServiceError.bindingMismatch
     }
 
     switch request {
     case .command(let command):
-      guard case .commandExecution(let evidence) = itemEvidence else {
+      guard let itemEvidence, case .commandExecution(let evidence) = itemEvidence else {
         throw ExecutionServiceError.protocolViolation("command approval item")
       }
       if command.networkContext != nil
@@ -112,7 +51,7 @@ package enum ExecutionApprovalBuilder {
         try requireNetworkPermission(limits)
       }
       let displayCommand =
-        ExecutionValidation.redacted(
+        ExecutionValidation.commandDisplay(
           command.displayCommand ?? evidence.displayCommand,
           maximumBytes: 8 * 1_024
         ) ?? "Command details unavailable"
@@ -135,7 +74,7 @@ package enum ExecutionApprovalBuilder {
       return PreparedExecutionApproval(request: approval, response: response)
 
     case .fileChange(let fileChange):
-      guard case .fileChange(let evidence) = itemEvidence else {
+      guard let itemEvidence, case .fileChange(let evidence) = itemEvidence else {
         throw ExecutionServiceError.protocolViolation("file approval item")
       }
       try requireWritePermission(limits)
@@ -166,7 +105,7 @@ package enum ExecutionApprovalBuilder {
       return PreparedExecutionApproval(request: approval, response: response)
 
     case .permissions(let permissions):
-      guard case .commandExecution = itemEvidence else {
+      guard let itemEvidence, case .commandExecution = itemEvidence else {
         throw ExecutionServiceError.protocolViolation("permissions approval item")
       }
       let reason = ExecutionValidation.redacted(permissions.reason, maximumBytes: 4 * 1_024)
@@ -194,6 +133,36 @@ package enum ExecutionApprovalBuilder {
         request: approval,
         response: response
       )
+
+    case .userInput(let input):
+      let questions = input.questions.map { question in
+        ExecutionUserInputQuestion(
+          id: question.id,
+          header: question.header,
+          question: question.question,
+          isOther: question.isOther,
+          isSecret: question.isSecret,
+          options: question.options.map {
+            ExecutionUserInputOption(label: $0.label, description: $0.description)
+          }
+        )
+      }
+      let response = ExecutionApprovalResponse.userInput(
+        questionIDs: Set(questions.map(\.id))
+      )
+      let approval = try ExecutionApprovalRequest(
+        id: approvalID,
+        taskID: taskID,
+        binding: binding,
+        itemID: correlation.itemID,
+        kind: .userInput,
+        title: "Codex asks for input",
+        summary: "Codex needs answers before it can continue.",
+        availableDecisions: response.availableDecisions,
+        questions: questions,
+        isBlocking: input.isBlocking
+      )
+      return PreparedExecutionApproval(request: approval, response: response)
     }
   }
 

@@ -48,13 +48,19 @@ extension BridgeServiceApplication {
   public func serviceReprobeManagedAgent(
     installationID: AgentInstallationID,
     acceptReplacement: Bool,
+    replacementRequest: ServiceAgentRegistrationRequest? = nil,
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
     try Self.checkDeadline(deadline)
-    let record = try await requiredAgentRegistry().reprobe(
-      installationID: installationID,
-      acceptReplacement: acceptReplacement
-    )
+    let registry = try requiredAgentRegistry()
+    let record: ServiceAgentInstallationRecord
+    if acceptReplacement, let replacementRequest {
+      record = try await registry.replaceAndProbe(
+        installationID: installationID, request: replacementRequest)
+    } else {
+      record = try await registry.reprobe(
+        installationID: installationID, acceptReplacement: acceptReplacement)
+    }
     try Self.checkDeadline(deadline)
     return record
   }
@@ -88,9 +94,8 @@ extension BridgeServiceApplication {
 }
 
 extension BridgeServiceApplication {
-  /// Local App submission path for agent providers. Mirrors the MCP
-  /// `submit_task` semantics: persists as awaiting_local_approval and never
-  /// auto-starts.
+  /// Local App submission path for agent providers. The desktop app is the
+  /// local user surface, so its task starts immediately without MCP approval.
   public func serviceSubmitAgentTask(
     projectID: String,
     providerID: String,
@@ -125,9 +130,8 @@ extension BridgeServiceApplication {
       acceptanceCriteria: acceptanceCriteria,
       clientRequestID: clientRequestID ?? "app-\(UUID().uuidString.lowercased())"
     )
-    let receipt = try await serviceSubmitTask(
+    let receipt = try await serviceSubmitTaskFromLocalApp(
       submission,
-      invocationContext: MCPInvocationContext(clientID: MCPClientID(rawValue: "macos.app")),
       deadline: deadline
     )
     return (receipt.taskID, receipt.status)

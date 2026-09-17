@@ -1,131 +1,155 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import Foundation
   import WinSDK
+
+  private struct WindowsDesktopRenderSnapshot: Equatable, Sendable {
+    let state: BridgeDesktopUIState
+    let chatSlotEnabled: Bool
+    let runningTaskCount: Int
+    let pendingApprovalCount: Int
+    let desktopState: WindowsChatWebView.State
+    let desktopErrorDetail: String?
+    let desktopReady: Bool
+    let desktopLoadStalled: Bool
+  }
+
+  @MainActor
+  private var lastWindowsDesktopRenderSnapshot: WindowsDesktopRenderSnapshot? = nil
+
+  private struct WindowsDesktopRenderInputs: Equatable {
+    let revisions: [UInt64]
+    let page: WindowsMainPage
+    let feedback: BridgeDesktopFeedback?
+    let chatState: WindowsChatWebView.State
+    let chatURL: String?
+    let chatError: String?
+    let canGoBack: Bool
+    let canGoForward: Bool
+    let desktopState: WindowsChatWebView.State
+    let desktopError: String?
+    let desktopReady: Bool
+    let desktopLoadStalled: Bool
+  }
+
+  @MainActor
+  private var lastWindowsDesktopRenderInputs: WindowsDesktopRenderInputs?
+
+  @MainActor
+  private var lastWorkbenchServiceRevision: UInt64?
 
   extension CodexBridgeWindowsApplication {
     static func applyDisplay(
       model: WindowsWorkbenchModel,
       management: WindowsManagementModel,
-      chat: WindowsChatWebView
+      auxiliary: WindowsAuxiliaryRuntime,
+      chat: WindowsChatWebView,
+      desktopUI: WindowsDesktopUIWebView
     ) {
-      model.refreshDisplaySnapshot()
-      management.refreshDisplaySnapshot()
+      let workbenchRevision = model.displayBox.revision
+      if workbenchRevision != lastWorkbenchServiceRevision {
+        lastWorkbenchServiceRevision = workbenchRevision
+        auxiliary.connections.applyServiceStatus(
+          model.serviceStatus, connectionState: model.connectionState)
+      }
+      let inputs = WindowsDesktopRenderInputs(
+        revisions: [
+          model.displayBox.revision, management.displayBox.revision,
+          auxiliary.workspace.displayBox.revision, auxiliary.agentDefaults.displayBox.revision,
+          auxiliary.logs.displayBox.revision, auxiliary.settings.displayBox.revision,
+          auxiliary.connections.displayBox.revision,
+        ],
+        page: selectedPage,
+        feedback: model.feedback.current,
+        chatState: chat.state, chatURL: chat.currentURL, chatError: chat.errorDetail,
+        canGoBack: chat.canGoBack, canGoForward: chat.canGoForward,
+        desktopState: desktopUI.state, desktopError: desktopUI.errorDetail,
+        desktopReady: desktopUI.isReady, desktopLoadStalled: desktopUI.loadStalled
+      )
+      guard inputs != lastWindowsDesktopRenderInputs else { return }
+      lastWindowsDesktopRenderInputs = inputs
+      let auxiliarySnapshot = auxiliary.desktopDisplaySnapshot()
       let display = model.displayBox.current()
       let managementDisplay = management.displayBox.current()
+      let chatSlotEnabled = chat.state == .active && display.browserEnabled
+      let state = WindowsDesktopUIStateBuilder.build(
+        workbench: display,
+        management: managementDisplay,
+        workspace: auxiliarySnapshot.workspace,
+        logs: auxiliarySnapshot.logs,
+        connections: auxiliarySnapshot.connections,
+        settings: auxiliarySnapshot.settings,
+        agentDefaults: auxiliarySnapshot.agentDefaults,
+        selectedNavigation: selectedPage.desktopNavigation,
+        browserAvailable: chat.state == .active,
+        browserURL: chat.currentURL,
+        browserStatus: browserStatus(for: chat),
+        browserCanGoBack: chat.canGoBack,
+        browserCanGoForward: chat.canGoForward,
+        feedback: model.feedback.current
+      )
+      let snapshot = WindowsDesktopRenderSnapshot(
+        state: state,
+        chatSlotEnabled: chatSlotEnabled,
+        runningTaskCount: display.runningTaskCount,
+        pendingApprovalCount: display.pendingApprovalCount,
+        desktopState: desktopUI.state,
+        desktopErrorDetail: desktopUI.errorDetail,
+        desktopReady: desktopUI.isReady,
+        desktopLoadStalled: desktopUI.loadStalled
+      )
+      guard snapshot != lastWindowsDesktopRenderSnapshot else { return }
+      lastWindowsDesktopRenderSnapshot = snapshot
       WindowsUIThread.shared.enqueue {
-        applyOnUI(workbench: display, management: managementDisplay, chat: chat)
+        applyOnUI(
+          snapshot: snapshot,
+          desktopUI: desktopUI
+        )
       }
     }
 
     private nonisolated static func applyOnUI(
-      workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay,
-      chat: WindowsChatWebView
+      snapshot: WindowsDesktopRenderSnapshot,
+      desktopUI: WindowsDesktopUIWebView
     ) {
-      WindowsMainWindow.updateNavigation(workbench: workbench, management: management)
-      WindowsMainWindow.updateOverview(workbench: workbench, management: management)
-      applyWorkbench(workbench)
-      applyManagement(management)
-      applyBrowser(chat)
+      desktopUI.setState(snapshot.state)
+      WindowsMainWindow.setChatSlotEnabled(snapshot.chatSlotEnabled)
+      WindowsMainWindowChrome.updateStatus(
+        connectionLabel: snapshot.state.connectionLabel,
+        runningTasks: snapshot.runningTaskCount,
+        pendingApprovals: snapshot.pendingApprovalCount
+      )
+      WindowsMainWindow.refreshSurfaces()
     }
 
-    private nonisolated static func applyWorkbench(_ display: WindowsWorkbenchDisplay) {
-      guard display != lastAppliedDisplay else { return }
-      var lines = [
-        "服务连接: \(statusName(display.connectionState))",
-        "任务: \(display.taskCount)（运行中 \(display.runningTaskCount)）",
-        "审批: \(display.pendingApprovalCount)",
-        "MCP 地址: \(display.mcpAddress)",
-      ]
-      if let detail = display.detailText { lines.append("详情: \(detail)") }
-      WindowsMainWindow.setStatusText(lines.joined(separator: "\r\n"))
-      let previous = lastAppliedDisplay
-      if display.taskRows != previous?.taskRows
-        || display.selectedTaskIndex != previous?.selectedTaskIndex
-      {
-        WindowsMainWindow.setTaskRows(display.taskRows, selectedIndex: display.selectedTaskIndex)
-      }
-      if display.taskMetadata != previous?.taskMetadata {
-        WindowsTaskInspector.setTaskMetadata(display.taskMetadata)
-      }
-      if display.conversationText != previous?.conversationText {
-        WindowsTaskInspector.setConversationText(display.conversationText)
-      }
-      if display.actionText != previous?.actionText {
-        WindowsTaskInspector.setActionStatus(display.actionText)
-      }
-      if contextChanged(display, from: previous) {
-        WindowsTaskInspector.applyContext(display)
-      }
-      if display.interruptEnabled != previous?.interruptEnabled
-        || display.steerEnabled != previous?.steerEnabled
-      {
-        WindowsTaskInspector.setControls(
-          interruptEnabled: display.interruptEnabled,
-          steerEnabled: display.steerEnabled
-        )
-      }
-      WindowsApprovalWindow.apply(display)
-      lastAppliedDisplay = display
-    }
-
-    private nonisolated static func contextChanged(
-      _ display: WindowsWorkbenchDisplay,
-      from previous: WindowsWorkbenchDisplay?
-    ) -> Bool {
-      display.projectRows != previous?.projectRows
-        || display.selectedProjectIndex != previous?.selectedProjectIndex
-        || display.permissionRows != previous?.permissionRows
-        || display.selectedPermissionIndex != previous?.selectedPermissionIndex
-        || display.pendingApprovalCount != previous?.pendingApprovalCount
-        || display.stopEnabled != previous?.stopEnabled
-        || display.deleteEnabled != previous?.deleteEnabled
-    }
-
-    private nonisolated static func applyManagement(_ display: WindowsManagementDisplay) {
-      guard display != lastAppliedManagementDisplay else { return }
-      WindowsProjectManagementWindow.apply(display.project)
-      WindowsAgentManagementWindow.apply(display.agent)
-      lastAppliedManagementDisplay = display
-    }
-
-    private nonisolated static func applyBrowser(_ chat: WindowsChatWebView) {
-      let placeholder: String?
+    private nonisolated static func browserStatus(for chat: WindowsChatWebView) -> String? {
       switch chat.state {
-      case .unsupported:
-        placeholder = "内置浏览器不可用：\(chat.errorDetail ?? "未知原因")\r\n可使用上方“在外部浏览器打开”，任务管理功能仍然可用。"
-      case .loading:
-        placeholder = "正在加载聊天页…"
-      case .failed:
-        placeholder = "聊天页加载失败：\(chat.errorDetail ?? "未知原因")\r\n可使用上方“在外部浏览器打开”，任务管理功能仍然可用。"
       case .active:
-        placeholder = nil
+        return chat.currentURL
+      case .loading:
+        return "正在加载聊天页…"
+      case .failed:
+        return hostBrowserFailure("聊天页加载失败", chat)
+      case .unsupported:
+        return hostBrowserFailure("内置浏览器不可用", chat)
       }
-      WindowsBrowserToolbar.setBrowserActionsEnabled(chat.state == .active)
-      chat.setVisible(chat.state == .active && WindowsMainWindow.currentPage() == .workbench)
-      if placeholder != lastPlaceholderText {
-        WindowsMainWindow.setChatPlaceholder(placeholder)
-        lastPlaceholderText = placeholder
-      }
+    }
+
+    private nonisolated static func hostBrowserFailure(
+      _ reason: String,
+      _ chat: WindowsChatWebView
+    ) -> String {
+      let detail = chat.errorDetail ?? "未知原因"
+      return "\(reason)：\(detail)。可使用“在外部浏览器打开”，任务管理功能仍然可用。"
     }
 
     nonisolated static func openChatExternally() {
+      let chatURL = WindowsUIThread.shared.chatWebView()?.currentURL ?? WindowsChatWebView.chatURL
       "open".withCString(encodedAs: UTF16.self) { operation in
-        WindowsChatWebView.chatURL.withCString(encodedAs: UTF16.self) { url in
+        chatURL.withCString(encodedAs: UTF16.self) { url in
           _ = ShellExecuteW(
             WindowsMainWindow.currentWindow(), operation, url, nil, nil, SW_SHOWNORMAL)
         }
-      }
-    }
-
-    private nonisolated static func statusName(
-      _ state: WindowsWorkbenchDisplay.ConnectionState
-    ) -> String {
-      switch state {
-      case .idle: "未连接"
-      case .connecting: "连接中…"
-      case .connected: "已连接"
-      case .unavailable: "不可用"
       }
     }
   }

@@ -18,11 +18,13 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
   public let supportsSessionContinuation: Bool
   public let supportsSteer: Bool
   public let supportsInteractiveApproval: Bool
+  public let supportsOneTimeToolAutoApproval: Bool
   public let supportsModelSelection: Bool
   public let supportsEffortSelection: Bool
   public let supportsSkillSelection: Bool
   public let supportsSupervisor: Bool
   public let allowsNetworkAccess: Bool
+  public let requiresHeadlessAlwaysProceed: Bool
   public let workspaceEnforcement: String
   public let approvalEnforcement: String
   public let networkEnforcement: String
@@ -44,11 +46,13 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
     supportsSessionContinuation: Bool = false,
     supportsSteer: Bool = false,
     supportsInteractiveApproval: Bool = false,
+    supportsOneTimeToolAutoApproval: Bool = false,
     supportsModelSelection: Bool = false,
     supportsEffortSelection: Bool = false,
     supportsSkillSelection: Bool = false,
     supportsSupervisor: Bool = false,
     allowsNetworkAccess: Bool = false,
+    requiresHeadlessAlwaysProceed: Bool = false,
     workspaceEnforcement: String = "unavailable",
     approvalEnforcement: String = "unavailable",
     networkEnforcement: String = "unavailable",
@@ -69,11 +73,13 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
     self.supportsSessionContinuation = supportsSessionContinuation
     self.supportsSteer = supportsSteer
     self.supportsInteractiveApproval = supportsInteractiveApproval
+    self.supportsOneTimeToolAutoApproval = supportsOneTimeToolAutoApproval
     self.supportsModelSelection = supportsModelSelection
     self.supportsEffortSelection = supportsEffortSelection
     self.supportsSkillSelection = supportsSkillSelection
     self.supportsSupervisor = supportsSupervisor
     self.allowsNetworkAccess = allowsNetworkAccess
+    self.requiresHeadlessAlwaysProceed = requiresHeadlessAlwaysProceed
     self.workspaceEnforcement = workspaceEnforcement
     self.approvalEnforcement = approvalEnforcement
     self.networkEnforcement = networkEnforcement
@@ -191,7 +197,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     displayName: "DeepSeek Harness",
     requiresConfiguration: true,
     supportsWorkspaceWrite: true,
-    supportsSessionContinuation: false,
+    supportsSessionContinuation: true,
     supportsSteer: true,
     supportsInteractiveApproval: true,
     supportsModelSelection: true,
@@ -203,18 +209,19 @@ public enum ServiceAgentProviderPolicyRegistry {
     approvalEnforcement: "local_app",
     networkEnforcement: "provider_native",
     allowedCapabilities: [
-      .sessionCreate, .interrupt, .steer, .steerInterruptAndContinue, .textDelta,
+      .sessionCreate, .sessionContinue, .interrupt, .steer, .steerInterruptAndContinue, .textDelta,
+      .reasoningDelta, .usage, .mcpClient,
       .toolLifecycle, .workspaceRead,
       .workspaceWriteInPlace, .oneShotApproval, .structuredApprovalPayload, .modelSelection,
       .effortSelection, .shell, .webSearch, .webFetch, .codeExecution, .subagents, .workflow,
       .skills,
     ],
     requiredArtifactRoles: Set(AgentInstallationArtifactRole.allCases),
-    requiredVersion: "0.1.1-rc.2",
     requiredProtocolRevision: "1",
     registrationTrustProfile: .userTrusted,
     registrationSecurityProfileID: controlledReadOnlyProfileID,
-    requiresExactRegistrationProfile: true
+    requiresExactRegistrationProfile: true,
+    selectionsRequireObservedCapabilities: true
   )
 
   public static let antigravity = ServiceAgentProviderPolicy(
@@ -225,10 +232,12 @@ public enum ServiceAgentProviderPolicyRegistry {
     supportsSessionContinuation: true,
     supportsSteer: true,
     supportsInteractiveApproval: false,
+    supportsOneTimeToolAutoApproval: false,
     supportsModelSelection: true,
     supportsEffortSelection: true,
     supportsSkillSelection: true,
     allowsNetworkAccess: true,
+    requiresHeadlessAlwaysProceed: true,
     workspaceEnforcement: "provider_native",
     approvalEnforcement: "provider_soft_deny",
     networkEnforcement: "provider_native",

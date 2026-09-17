@@ -11,6 +11,8 @@ extension CodexApprovalWireDecoder {
       return .fileChange(try decodeFileChange(requestID: request.id, params: params))
     case "item/permissions/requestApproval":
       return .permissions(try decodePermissions(requestID: request.id, params: params))
+    case "item/tool/requestUserInput":
+      return .userInput(try decodeUserInput(requestID: request.id, params: params))
     default:
       throw CodexApprovalWireError.unsupportedRequestMethod(request.method)
     }
@@ -62,6 +64,65 @@ extension CodexApprovalWireDecoder {
       permissions: try permissionProfile(params["permissions"]),
       reason: try optionalString(params, key: "reason"),
       environmentID: try optionalString(params, key: "environmentId")
+    )
+  }
+
+  static func decodeUserInput(
+    requestID: RequestID,
+    params: [String: JSONValue]
+  ) throws -> CodexUserInputApprovalRequest {
+    try validate(requestID: requestID)
+    let correlation = CodexApprovalCorrelation(
+      requestID: requestID,
+      item: CodexApprovalItemKey(
+        threadID: try identifier(params, key: "threadId"),
+        turnID: try identifier(params, key: "turnId"),
+        itemID: try identifier(params, key: "itemId")
+      ),
+      callbackID: nil,
+      startedAtMilliseconds: 0
+    )
+    let isBlocking = try optionalBool(params, key: "isBlocking") ?? true
+    let values = try array(params["questions"], field: "questions")
+    try validateArray(values, field: "questions")
+    let questions = try values.enumerated().map { index, value in
+      try decodeUserInputQuestion(value, field: "questions[\(index)]")
+    }
+    return CodexUserInputApprovalRequest(
+      correlation: correlation,
+      isBlocking: isBlocking,
+      questions: questions
+    )
+  }
+
+  private static func decodeUserInputQuestion(
+    _ value: JSONValue,
+    field: String
+  ) throws -> CodexUserInputQuestion {
+    let object = try object(value, field: field)
+    let optionsValue = object["options"]
+    let options: [CodexUserInputOption]
+    if optionsValue == nil || optionsValue == .null {
+      options = []
+    } else {
+      let values = try array(optionsValue, field: "\(field).options")
+      try validateArray(values, field: "\(field).options")
+      options = try values.enumerated().map { index, value in
+        let optionField = "\(field).options[\(index)]"
+        let option = try Self.object(value, field: optionField)
+        return CodexUserInputOption(
+          label: try requiredString(option, key: "label"),
+          description: try requiredString(option, key: "description")
+        )
+      }
+    }
+    return CodexUserInputQuestion(
+      id: try identifier(object, key: "id"),
+      header: try requiredString(object, key: "header"),
+      question: try requiredString(object, key: "question"),
+      isOther: try optionalBool(object, key: "isOther") ?? false,
+      isSecret: try optionalBool(object, key: "isSecret") ?? false,
+      options: options
     )
   }
 

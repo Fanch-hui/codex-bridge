@@ -10,40 +10,46 @@
     let settings: WindowsSettingsModel
     let connections: WindowsConnectionModel
 
-    private var lastWorkspaceDisplay: WindowsWorkspaceDisplay?
-    private var lastAgentDefaultsDisplay: WindowsAgentDefaultsDisplay?
-    private var lastLogDisplay: WindowsLogDisplay?
-    private var lastSettingsDisplay: WindowsSettingsDisplay?
-    private var lastConnectionDisplay: WindowsConnectionDisplay?
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
+      workspace = WindowsWorkspaceModel(client: client, feedback: feedback)
+      agentDefaults = WindowsAgentDefaultsModel(client: client, feedback: feedback)
+      logs = WindowsLogModel(client: client, feedback: feedback)
+      settings = WindowsSettingsModel(client: client, feedback: feedback)
+      connections = WindowsConnectionModel(client: client, feedback: feedback)
+    }
 
-    init(client: any BridgeServiceClientProtocol) {
-      workspace = WindowsWorkspaceModel(client: client)
-      agentDefaults = WindowsAgentDefaultsModel(client: client)
-      logs = WindowsLogModel(client: client)
-      settings = WindowsSettingsModel(client: client)
-      connections = WindowsConnectionModel(client: client)
+    func refreshAll() async {
+      await workspace.refresh()
+      await logs.refresh()
+      await connections.refresh()
+      await settings.refresh()
+      await agentDefaults.refresh()
     }
 
     func run(_ command: MainWindowCommand) {
       switch command {
-      case .showWorkspace, .selectWorkspaceProject, .selectWorkspaceCommand,
+      case .selectWorkspaceProject, .selectWorkspaceCommand,
         .selectWorkspaceSkill, .selectWorkspaceThread, .refreshWorkspace, .setWorkspaceMode,
         .selectWorkspaceBlacklist, .saveWorkspaceCommand, .removeSelectedWorkspaceCommand,
         .saveWorkspaceBlacklist, .removeSelectedWorkspaceBlacklist:
         runWorkspace(command)
-      case .showAgentDefaults, .selectDefaultProvider, .selectDefaultInstallation,
+      case .selectDefaultProvider, .selectDefaultInstallation,
         .refreshAgentDefaults, .refreshAgentModels, .saveAgentDefaults:
         runAgentDefaults(command)
-      case .showLogs, .refreshLogs, .selectLog, .setLogSearch, .setLogProjectFilter,
+      case .refreshLogs, .selectLog, .setLogSearch, .setLogProjectFilter,
         .setLogKindFilter, .copyLogs:
         runLogs(command)
-      case .showSettings, .refreshSettings, .saveSettingsPreferences,
+      case .refreshSettings, .saveSettingsPreferences, .saveDirectConfiguration,
         .saveSettingsInstructions, .setSettingsDirectApprovalMode,
-        .setSettingsTaskStartApprovalMode:
+        .setSettingsTaskStartApprovalMode,
+        .registerService, .unregisterService, .setKeepServiceRunning:
         runSettings(command)
       case .selectMCPClient, .refreshMCPConnections, .toggleSelectedMCPClient,
         .setSelectedMCPExposure, .copySelectedMCPConfiguration,
-        .rotateSelectedMCPCredential, .rotateLocalMCPEndpoint:
+        .copyLocalMCPEndpoint, .rotateSelectedMCPCredential, .rotateLocalMCPEndpoint:
         runConnections(command)
       default:
         break
@@ -57,17 +63,27 @@
       case .refreshMCPConnections:
         Task { await connections.refresh() }
       case .toggleSelectedMCPClient:
-        Task { await connections.toggleSelectedClient() }
+        guard let clientID = connections.selectedClientID else { return }
+        Task { await connections.toggleSelectedClient(clientID: clientID) }
       case .setSelectedMCPExposure(let index):
-        Task { await connections.setSelectedExposure(at: index) }
+        guard let clientID = connections.selectedClientID else { return }
+        Task { await connections.setSelectedExposure(at: index, clientID: clientID) }
       case .copySelectedMCPConfiguration:
+        guard let clientID = connections.selectedClientID else { return }
         Task {
-          guard let configuration = await connections.exportSelectedConfiguration() else { return }
+          guard
+            let configuration = await connections.exportSelectedConfiguration(clientID: clientID)
+          else { return }
           connections.didCopyConfiguration(
             WindowsClipboard.write(configuration, owner: WindowsMainWindow.currentWindow()))
         }
+      case .copyLocalMCPEndpoint:
+        guard let endpoint = connections.localMCPEndpoint else { return }
+        connections.didCopyEndpoint(
+          WindowsClipboard.write(endpoint, owner: WindowsMainWindow.currentWindow()))
       case .rotateSelectedMCPCredential:
-        Task { await connections.rotateSelectedCredential() }
+        guard let clientID = connections.selectedClientID else { return }
+        Task { await connections.rotateSelectedCredential(clientID: clientID) }
       case .rotateLocalMCPEndpoint:
         Task { await connections.rotateEndpoint() }
       default:
@@ -77,11 +93,6 @@
 
     private func runWorkspace(_ command: MainWindowCommand) {
       switch command {
-      case .showWorkspace:
-        onUI { WindowsWorkspaceWindow.show(owner: WindowsMainWindow.currentWindow()) }
-        workspace.refreshDisplaySnapshot()
-        applyWorkspace()
-        Task { await workspace.refresh() }
       case .selectWorkspaceProject(let index):
         workspace.selectProject(at: index)
       case .selectWorkspaceCommand(let index):
@@ -95,7 +106,8 @@
       case .refreshWorkspace:
         Task { await workspace.refreshSelected() }
       case .setWorkspaceMode(let mode):
-        Task { await workspace.setMode(mode) }
+        guard let projectID = workspace.selectedProjectID else { return }
+        Task { await workspace.setMode(mode, projectID: projectID) }
       case .saveWorkspaceCommand(
         let name,
         let executable,
@@ -112,13 +124,19 @@
           requiresNetwork: requiresNetwork,
           risk: risk
         )
-        Task { await workspace.saveCommand(draft) }
+        guard let context = workspace.editContext else { return }
+        Task { await workspace.saveCommand(draft, context: context) }
       case .removeSelectedWorkspaceCommand:
-        Task { await workspace.removeSelectedCommand() }
+        guard let context = workspace.editContext else { return }
+        Task { await workspace.removeSelectedCommand(context: context) }
       case .saveWorkspaceBlacklist(let executable, let pattern):
-        Task { await workspace.saveBlacklist(executable: executable, pattern: pattern) }
+        guard let context = workspace.editContext else { return }
+        Task {
+          await workspace.saveBlacklist(executable: executable, pattern: pattern, context: context)
+        }
       case .removeSelectedWorkspaceBlacklist:
-        Task { await workspace.removeSelectedBlacklist() }
+        guard let context = workspace.editContext else { return }
+        Task { await workspace.removeSelectedBlacklist(context: context) }
       default:
         break
       }
@@ -126,11 +144,6 @@
 
     private func runAgentDefaults(_ command: MainWindowCommand) {
       switch command {
-      case .showAgentDefaults:
-        onUI { WindowsAgentDefaultsWindow.show(owner: WindowsMainWindow.currentWindow()) }
-        agentDefaults.refreshDisplaySnapshot()
-        applyAgentDefaults()
-        Task { await agentDefaults.refresh() }
       case .selectDefaultProvider(let index):
         agentDefaults.selectProvider(at: index)
         Task { await agentDefaults.refreshModels() }
@@ -153,11 +166,6 @@
 
     private func runLogs(_ command: MainWindowCommand) {
       switch command {
-      case .showLogs:
-        onUI { WindowsLogWindow.show(owner: WindowsMainWindow.currentWindow()) }
-        logs.refreshDisplaySnapshot()
-        applyLogs()
-        Task { await logs.refresh() }
       case .refreshLogs:
         Task { await logs.refresh() }
       case .selectLog(let index):
@@ -179,13 +187,10 @@
 
     private func runSettings(_ command: MainWindowCommand) {
       switch command {
-      case .showSettings:
-        onUI { WindowsSettingsWindow.show(owner: WindowsMainWindow.currentWindow()) }
-        settings.refreshDisplaySnapshot()
-        applySettings()
-        Task { await settings.refresh() }
       case .refreshSettings:
         Task { await settings.refresh() }
+      case .saveDirectConfiguration(let json):
+        Task { await settings.saveDirectConfiguration(json) }
       case .saveSettingsPreferences(let preferences):
         Task { await settings.savePreferences(preferences) }
       case .saveSettingsInstructions(let text):
@@ -194,61 +199,15 @@
         Task { await settings.setDirectApprovalMode(mode) }
       case .setSettingsTaskStartApprovalMode(let mode):
         Task { await settings.setTaskStartApprovalMode(mode) }
+      case .registerService:
+        Task { await settings.registerService() }
+      case .unregisterService:
+        Task { await settings.unregisterService() }
+      case .setKeepServiceRunning(let keep):
+        settings.setKeepServiceRunningAfterExit(keep)
       default:
         break
       }
-    }
-
-    func applyDisplay() {
-      workspace.refreshDisplaySnapshot()
-      agentDefaults.refreshDisplaySnapshot()
-      logs.refreshDisplaySnapshot()
-      settings.refreshDisplaySnapshot()
-      connections.refreshDisplaySnapshot()
-      applyWorkspace()
-      applyAgentDefaults()
-      applyLogs()
-      applySettings()
-      applyConnections()
-    }
-
-    private func applyWorkspace() {
-      let value = workspace.displayBox.current()
-      guard value != lastWorkspaceDisplay else { return }
-      lastWorkspaceDisplay = value
-      onUI { WindowsWorkspaceWindow.apply(value) }
-    }
-
-    private func applyAgentDefaults() {
-      let value = agentDefaults.displayBox.current()
-      guard value != lastAgentDefaultsDisplay else { return }
-      lastAgentDefaultsDisplay = value
-      onUI { WindowsAgentDefaultsWindow.apply(value) }
-    }
-
-    private func applyLogs() {
-      let value = logs.displayBox.current()
-      guard value != lastLogDisplay else { return }
-      lastLogDisplay = value
-      onUI { WindowsLogWindow.apply(value) }
-    }
-
-    private func applySettings() {
-      let value = settings.displayBox.current()
-      guard value != lastSettingsDisplay else { return }
-      lastSettingsDisplay = value
-      onUI { WindowsSettingsWindow.apply(value) }
-    }
-
-    private func applyConnections() {
-      let value = connections.displayBox.current()
-      guard value != lastConnectionDisplay else { return }
-      lastConnectionDisplay = value
-      onUI { WindowsConnectionWindow.apply(value) }
-    }
-
-    private func onUI(_ action: @escaping @Sendable () -> Void) {
-      WindowsUIThread.shared.enqueue(action)
     }
   }
 #endif

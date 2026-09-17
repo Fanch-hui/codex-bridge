@@ -13,6 +13,10 @@ public protocol BridgeTaskConversationClient: Sendable {
 }
 
 public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Sendable {
+  func directConfiguration() async throws -> IPCDirectConfiguration
+  func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
+    -> IPCDirectConfiguration
+
   func status() async throws -> IPCServiceStatusResponse
   func projects() async throws -> [MCPProjectSummary]
   func registerProject(_ request: IPCProjectRegistrationRequest) async throws -> MCPProjectDetail
@@ -28,8 +32,20 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setWorkbenchProject(projectID: String?) async throws
   func setWorkbenchPermissionMode(_ mode: String) async throws
   func agentCatalog() async throws -> IPCAgentCatalogResponse
+  func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse
   func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
+  ) async throws -> IPCAgentInstallationSummary
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?
+  ) async throws -> IPCAgentInstallationSummary
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed: Bool
   ) async throws -> IPCAgentInstallationSummary
   func reprobeAgentInstallation(
     installationID: String,
@@ -71,14 +87,26 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     permissionMode: String?,
     effort: String?
   ) async throws -> IPCAgentModelDefaultResponse
+  func agentNativePermissionPolicy(
+    installationID: String
+  ) async throws -> IPCAgentNativePermissionPolicyResponse
+  func updateAgentNativePermissionPolicy(
+    _ request: IPCAgentNativePermissionMutationRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse
+  func agentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationRequest
+  ) async throws -> IPCAgentPermissionRemediationResponse
+  func applyAgentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationApplyRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse
   func customInstructions() async throws -> String
   func setCustomInstructions(_ instructions: String) async throws
   func removeProject(projectID: String) async throws
   func models() async throws -> MCPModelList
   func modelCatalog() async throws -> IPCModelCatalogResponse
+  func modelCatalog(forceRefresh: Bool) async throws -> IPCModelCatalogResponse
   func modelPreferences() async throws -> IPCModelPreferences
   func setModelPreferences(_ preferences: IPCModelPreferences) async throws
-  func setSupervisorEnabled(_ enabled: Bool) async throws
   func threads(_ request: IPCThreadListRequest) async throws -> MCPThreadPage
   func skills(projectID: String) async throws -> MCPServiceSkillList
   func readThread(_ request: IPCThreadReadRequest) async throws -> MCPThreadReadPage
@@ -107,6 +135,11 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setTaskStartApprovalMode(_ mode: String) async throws
   func setExposureMode(_ mode: MCPServiceExposureMode) async throws
   func mcpClients() async throws -> [IPCMCPClientStatus]
+  func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse
+  func saveDeepSeekHarnessMCPServer(
+    _ request: IPCDeepSeekHarnessMCPServerInput
+  ) async throws -> IPCDeepSeekHarnessMCPServerSummary
+  func deleteDeepSeekHarnessMCPServer(id: String) async throws
   func setMCPClientEnabled(clientID: String, enabled: Bool) async throws
   func setMCPClientExposureMode(clientID: String, mode: MCPServiceExposureMode) async throws
   func exportMCPClientConfiguration(clientID: String) async throws -> String
@@ -126,6 +159,45 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func directConfiguration() async throws -> IPCDirectConfiguration {
+    throw BridgeServiceClientError.unavailable
+  }
+  public func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
+    -> IPCDirectConfiguration
+  { throw BridgeServiceClientError.unavailable }
+
+  public func modelCatalog(forceRefresh _: Bool) async throws -> IPCModelCatalogResponse {
+    try await modelCatalog()
+  }
+
+  public func agentNativePermissionPolicy(
+    installationID _: String
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func updateAgentNativePermissionPolicy(
+    _: IPCAgentNativePermissionMutationRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func agentPermissionRemediation(
+    _: IPCAgentPermissionRemediationRequest
+  ) async throws -> IPCAgentPermissionRemediationResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func applyAgentPermissionRemediation(
+    _: IPCAgentPermissionRemediationApplyRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse {
+    try await agentCatalog()
+  }
+
   public func agentCatalog() async throws -> IPCAgentCatalogResponse {
     throw BridgeServiceClientError.unavailable
   }
@@ -134,6 +206,27 @@ extension BridgeServiceClientProtocol {
     _ request: IPCAgentRegistrationRequest
   ) async throws -> IPCAgentInstallationSummary {
     throw BridgeServiceClientError.unavailable
+  }
+
+  public func connectAgentInstallation(
+    providerID _: String,
+    baseURL _: String?,
+    apiKey _: String?
+  ) async throws -> IPCAgentInstallationSummary {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed _: Bool
+  ) async throws -> IPCAgentInstallationSummary {
+    try await connectAgentInstallation(
+      providerID: providerID,
+      baseURL: baseURL,
+      apiKey: apiKey
+    )
   }
 
   public func reprobeAgentInstallation(
@@ -257,6 +350,20 @@ extension BridgeServiceClientProtocol {
   }
 
   public func mcpClients() async throws -> [IPCMCPClientStatus] {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func saveDeepSeekHarnessMCPServer(
+    _: IPCDeepSeekHarnessMCPServerInput
+  ) async throws -> IPCDeepSeekHarnessMCPServerSummary {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func deleteDeepSeekHarnessMCPServer(id _: String) async throws {
     throw BridgeServiceClientError.unavailable
   }
 

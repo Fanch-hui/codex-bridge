@@ -7,7 +7,7 @@ extension DeepSeekHarnessACPExecution {
     observedFailedToolCalls: Int
   ) async throws -> String? {
     let stopReason = result.stopReason
-    if requiresExecutionEvidence {
+    if requiresExecutionEvidence || result.executionEvidence != nil {
       guard let evidence = result.executionEvidence else {
         await failExecution(
           code: "deepseek_harness_execution_evidence_missing",
@@ -60,7 +60,12 @@ extension DeepSeekHarnessACPExecution {
     if let immediate = try await resumeAfterImmediateSteer() {
       return immediate
     }
-    guard !finalizedContent.isEmpty else {
+    guard
+      finalizedContent.contains(where: {
+        if case .content(let update) = $0.event { return update.kind == .message }
+        return false
+      })
+    else {
       await failExecution(
         code: "deepseek_harness_empty_response",
         summary: "DeepSeek Harness ACP completed without a committed assistant message."

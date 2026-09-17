@@ -4,11 +4,11 @@ umask 077
 
 readonly script_directory="${0:A:h}"
 readonly repository_root="${script_directory:h}"
-readonly product_version="0.3.0"
+readonly product_version="0.5.0"
 
 if (( $# < 3 || $# > 4 )); then
   print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64|x86_64|all]"
-  print -u2 "Builds architecture-specific unsigned local release candidates."
+  print -u2 "Builds architecture-specific ad-hoc-signed release packages."
   exit 64
 fi
 
@@ -109,12 +109,23 @@ for architecture in "${architectures[@]}"; do
     print -u2 "Bundled helper digest does not match its signed resource."
     exit 65
   }
+  for binary in "${service_binary}" "${bundled_helper}" \
+    "${archived_app}"/Contents/Frameworks/*.dylib(N); do
+    /usr/bin/codesign --force --sign - "${binary}"
+    /usr/bin/codesign --verify --strict "${binary}"
+  done
+  actual_bundled_sha256="$(/usr/bin/shasum -a 256 "${bundled_helper}")"
+  print -r -- "${actual_bundled_sha256%% *}" > "${bundled_digest}"
+  /usr/bin/codesign --force --sign - \
+    --entitlements "${repository_root}/App/CodexBridge.entitlements" "${archived_app}"
+  /usr/bin/codesign --verify --deep --strict --verbose=2 "${archived_app}"
 
   /bin/mkdir -m 0700 "${disk_image_directory}"
   /usr/bin/ditto -c -k --sequesterRsrc --keepParent \
     "${archived_app}" \
     "${candidate_directory}/${artifact_base}.zip"
   /usr/bin/ditto "${archived_app}" "${disk_image_directory}/CodexBridge.app"
+  /usr/bin/codesign --verify --deep --strict "${disk_image_directory}/CodexBridge.app"
   /bin/ln -s /Applications "${disk_image_directory}/Applications"
   /usr/bin/hdiutil create \
     -quiet \
@@ -141,11 +152,12 @@ readonly created_at="$(/bin/date -u -r "${commit_epoch}" '+%Y-%m-%dT%H:%M:%SZ')"
   "${candidate_directory}/DEPENDENCIES.md"
 
 {
-  print -r -- "UNSIGNED LOCAL RELEASE CANDIDATE — NOT FOR PUBLIC DISTRIBUTION"
+  print -r -- "Codex Bridge ${product_version}"
   print -r -- ""
-  print -r -- "This candidate verifies architecture-specific compilation, helper staging, bundle structure, SBOM generation and packaging. It is not Developer ID signed, notarized or stapled."
-} > "${candidate_directory}/RELEASE-CANDIDATE.txt"
-/bin/chmod 0644 "${candidate_directory}/RELEASE-CANDIDATE.txt"
+  print -r -- "macOS signature: ad hoc"
+  print -r -- "Apple notarization: unavailable"
+} > "${candidate_directory}/RELEASE-INFO.txt"
+/bin/chmod 0644 "${candidate_directory}/RELEASE-INFO.txt"
 
 (
   cd "${candidate_directory}"
@@ -156,4 +168,4 @@ readonly created_at="$(/bin/date -u -r "${commit_epoch}" '+%Y-%m-%dT%H:%M:%SZ')"
 /bin/chmod 0644 "${candidate_directory}/SHA256SUMS"
 
 /bin/mv "${candidate_directory}" "${output_directory}"
-print "Built unsigned architecture-specific release candidate at ${output_directory}"
+print "Built architecture-specific release package at ${output_directory}"

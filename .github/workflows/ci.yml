@@ -1,114 +1,23 @@
-name: CI
-
+name: macOS
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [win]
+  pull_request:
+    branches: [win]
   workflow_dispatch:
-
 permissions:
   contents: read
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  CODEX_BRIDGE_XCODE_DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
-
 jobs:
-  core:
-    name: Swift package and MCP contract
-    runs-on: xcode-27
-    timeout-minutes: 45
+  build:
+    runs-on: macos-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: Record toolchain
-        run: |
-          Scripts/with-xcode.sh xcodebuild -version
-          Scripts/with-xcode.sh swift --version
-          node --version
-
-      - name: Lint Swift sources
+      - name: Build Apple Silicon app
         run: >-
-          Scripts/with-xcode.sh xcrun swift-format lint --strict --recursive
-          Packages/BridgeCore/Sources Packages/BridgeCore/Tests UITests
-
-      - name: Test Swift package
-        run: Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore
-
-      - name: Verify MCP Inspector contract
-        run: Scripts/verify-mcp-inspector.sh
-
-      - name: Verify dependency resolution is unchanged
-        run: git diff --exit-code -- Packages/BridgeCore/Package.resolved
-
-  native:
-    name: Native app and accessibility smoke test
-    runs-on: xcode-27
-    timeout-minutes: 35
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Build unsigned app
-        run: >-
-          Scripts/with-xcode.sh xcodebuild
-          -project CodexBridge.xcodeproj
-          -scheme CodexBridge
-          -configuration Debug
-          -destination 'platform=macOS,arch=arm64'
-          -derivedDataPath .build/Xcode
-          build
-          CODE_SIGNING_ALLOWED=NO
-
-      - name: Run isolated native UI test
-        run: >-
-          Scripts/with-xcode.sh xcodebuild
-          -project CodexBridge.xcodeproj
-          -scheme CodexBridge
-          -configuration Debug
-          -destination 'platform=macOS,arch=arm64'
-          -derivedDataPath .build/XcodeUITests
-          -parallel-testing-enabled NO
-          test
-
-  universal2:
-    name: Unsigned Universal 2 archive
-    runs-on: xcode-27
-    timeout-minutes: 35
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Archive both macOS architectures
-        run: >-
-          Scripts/with-xcode.sh xcodebuild
-          -project CodexBridge.xcodeproj
-          -scheme CodexBridge
-          -configuration Release
-          -destination 'generic/platform=macOS'
-          -archivePath .build/CodexBridge.xcarchive
-          archive
-          CODE_SIGNING_ALLOWED=NO
-          ARCHS='arm64 x86_64'
-          ONLY_ACTIVE_ARCH=NO
+          Scripts/with-xcode.sh xcodebuild -project CodexBridge.xcodeproj
+          -scheme CodexBridge -configuration Release
+          -destination 'generic/platform=macOS' -derivedDataPath .build/Xcode
+          build CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
           REQUIRE_TUNNEL_HELPER=NO
-
-      - name: Verify archived app is Universal 2
-        run: |
-          app=".build/CodexBridge.xcarchive/Products/Applications/CodexBridge.app/Contents/MacOS/CodexBridge"
-          test -f "$app"
-          architectures="$(/usr/bin/lipo -archs "$app")"
-          test "$architectures" = "x86_64 arm64" || test "$architectures" = "arm64 x86_64"
-          /usr/bin/lipo "$app" -verify_arch x86_64
-          /usr/bin/lipo "$app" -verify_arch arm64

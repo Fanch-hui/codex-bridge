@@ -37,7 +37,10 @@ extension MCPServiceToolCatalog {
   static let listProjects = Tool(
     name: MCPServiceToolName.listProjects.rawValue,
     title: "List projects",
-    description: "List user-approved projects visible to the authenticated MCP client.",
+    description:
+      "List user-approved projects visible to the authenticated MCP client, including default_project_id "
+      + "for the current Workbench selection. Omit project_id when submitting work unless the user "
+      + "explicitly selected a different project; Bridge resolves the current default at submission time.",
     inputSchema: objectSchema(
       properties: [
         "cursor": nullableStringSchema(maximum: 2_048),
@@ -49,6 +52,7 @@ extension MCPServiceToolCatalog {
       properties: [
         "projects": arraySchema(projectSummarySchema),
         "next_cursor": stringSchema,
+        "default_project_id": opaqueProjectIDSchema,
       ],
       required: ["projects"]
     )

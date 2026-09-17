@@ -99,7 +99,7 @@ extension ExecutionSession {
       }
     }
     let displayCommand =
-      ExecutionValidation.redacted(command.displayCommand, maximumBytes: 8 * 1_024)
+      ExecutionValidation.commandDisplay(command.displayCommand, maximumBytes: 8 * 1_024)
       ?? "命令内容不可用"
     lines.append("命令：\(displayCommand)")
     return lines.joined(separator: "\n")

@@ -7,8 +7,12 @@ extension AppServerConfiguration {
         if let discovered = CodexExecutableResolver().resolve(explicitPath: executableURL.path) {
           return AppServerConfiguration(
             executableURL: URL(fileURLWithPath: discovered),
-            arguments: ["app-server", "--stdio"]
+            arguments: ["app-server", "--stdio"],
+            environment: CodexWindowsPath.childEnvironment()
           )
+        }
+        if let cmdScript = resolveCommandScript(executableURL.path) {
+          return cmdScriptLaunchConfiguration(scriptPath: cmdScript)
         }
         return unavailableWindowsCodexConfiguration(
           reason:
@@ -18,13 +22,14 @@ extension AppServerConfiguration {
       if let discovered = CodexExecutableResolver().resolve() {
         return AppServerConfiguration(
           executableURL: URL(fileURLWithPath: discovered),
-          arguments: ["app-server", "--stdio"]
+          arguments: ["app-server", "--stdio"],
+          environment: CodexWindowsPath.childEnvironment()
         )
       }
-      return unavailableWindowsCodexConfiguration(
-        reason:
-          "Codex app-server executable was not found in PATH or standard Windows installation locations."
-      )
+      if let cmdScript = defaultWindowsCodexCommandPath() {
+        return cmdScriptLaunchConfiguration(scriptPath: cmdScript)
+      }
+      return defaultWindowsCodexFallbackConfiguration()
     #else
       if let executableURL {
         return AppServerConfiguration(
@@ -46,6 +51,59 @@ extension AppServerConfiguration {
   }
 
   #if os(Windows)
+    private static func resolveCommandScript(_ path: String) -> String? {
+      let normalized = CodexWindowsPath.normalize(path) ?? path
+      let lower = normalized.lowercased()
+      guard lower.hasSuffix(".cmd") || lower.hasSuffix(".bat") else { return nil }
+      guard FileManager.default.fileExists(atPath: normalized) else { return nil }
+      return normalized
+    }
+
+    private static func defaultWindowsCodexCommandPath() -> String? {
+      let env = ProcessInfo.processInfo.environment
+      var candidates: [String] = []
+      if let appData = CodexWindowsPath.environmentValue("APPDATA", in: env) {
+        candidates.append(CodexWindowsPath.join(appData, "npm", "codex.cmd"))
+        candidates.append(CodexWindowsPath.join(appData, "npm", "codex.bat"))
+      }
+      if let localAppData = CodexWindowsPath.environmentValue("LOCALAPPDATA", in: env) {
+        candidates.append(CodexWindowsPath.join(localAppData, "pnpm", "codex.cmd"))
+        candidates.append(CodexWindowsPath.join(localAppData, "pnpm", "codex.bat"))
+      }
+      if let userProfile = CodexWindowsPath.environmentValue("USERPROFILE", in: env) {
+        candidates.append(CodexWindowsPath.join(userProfile, ".bun", "bin", "codex.cmd"))
+        candidates.append(CodexWindowsPath.join(userProfile, ".bun", "bin", "codex.bat"))
+        candidates.append(CodexWindowsPath.join(userProfile, ".cargo", "bin", "codex.cmd"))
+      }
+      if let path = CodexWindowsPath.environmentValue("PATH", in: env) {
+        for dir in CodexWindowsPath.splitSearchPath(path) {
+          candidates.append(CodexWindowsPath.join(dir, "codex.cmd"))
+          candidates.append(CodexWindowsPath.join(dir, "codex.bat"))
+        }
+      }
+      return candidates.first(where: { FileManager.default.fileExists(atPath: $0) })
+    }
+
+    private static func cmdScriptLaunchConfiguration(scriptPath: String) -> AppServerConfiguration {
+      let comSpec =
+        ProcessInfo.processInfo.environment["ComSpec"] ?? "C:\\Windows\\System32\\cmd.exe"
+      return AppServerConfiguration(
+        executableURL: URL(fileURLWithPath: comSpec),
+        arguments: ["/d", "/s", "/c", scriptPath, "app-server", "--stdio"],
+        environment: CodexWindowsPath.childEnvironment()
+      )
+    }
+
+    private static func defaultWindowsCodexFallbackConfiguration() -> AppServerConfiguration {
+      let comSpec =
+        ProcessInfo.processInfo.environment["ComSpec"] ?? "C:\\Windows\\System32\\cmd.exe"
+      return AppServerConfiguration(
+        executableURL: URL(fileURLWithPath: comSpec),
+        arguments: ["/d", "/s", "/c", "codex", "app-server", "--stdio"],
+        environment: CodexWindowsPath.childEnvironment()
+      )
+    }
+
     private static func unavailableWindowsCodexConfiguration(reason: String)
       -> AppServerConfiguration
     {
@@ -63,8 +121,13 @@ extension AppServerConfiguration {
 
   public static func defaultCodexExecutableURL() -> URL? {
     #if os(Windows)
-      guard let path = CodexExecutableResolver().resolve() else { return nil }
-      return URL(fileURLWithPath: path)
+      if let path = CodexExecutableResolver().resolve() {
+        return URL(fileURLWithPath: path)
+      }
+      if let cmd = defaultWindowsCodexCommandPath() {
+        return URL(fileURLWithPath: cmd)
+      }
+      return nil
     #else
       let home = FileManager.default.homeDirectoryForCurrentUser
       let candidates: [URL] = [

@@ -7,10 +7,15 @@ extension BridgeServiceAppModel {
   func refreshCollections(
     client: any BridgeServiceClientProtocol,
     includeCatalog: Bool,
-    includeThreads: Bool
+    includeProjectResources: Bool,
+    forceCatalogRefresh: Bool = false
   ) async {
+    async let directConfigurationResult = optional { try await client.directConfiguration() }
     async let projectResult = optional { try await client.projects() }
-    async let agentCatalogResult = optional { try await client.agentCatalog() }
+    let scanAgents = agentProviders.isEmpty || forceCatalogRefresh
+    async let agentCatalogResult = optional {
+      try await client.agentCatalog(forceRefresh: scanAgents)
+    }
     async let taskResult = optional {
       try await client.tasks(IPCTaskListRequest(limit: 200))
     }
@@ -21,7 +26,11 @@ extension BridgeServiceAppModel {
       try await client.taskStartApprovalMode()
     }
     async let mcpClientResult = optional { try await client.mcpClients() }
+    async let deepSeekHarnessMCPResult = optional {
+      try await client.deepSeekHarnessMCPServers()
+    }
 
+    if let value = await directConfigurationResult { directConfiguration = value }
     if let value = await projectResult {
       applyProjectSnapshot(value)
     }
@@ -37,15 +46,15 @@ extension BridgeServiceAppModel {
       projectDetails[projectID] = detail
     }
 
-    var shouldRefreshThreads = includeThreads || threadCatalogRefreshDue()
+    var shouldRefreshProjectResources = includeProjectResources || threadCatalogRefreshDue()
     if let value = await taskResult {
-      shouldRefreshThreads =
-        shouldRefreshThreads || Self.taskCatalogChanged(from: tasks, to: value)
+      shouldRefreshProjectResources =
+        shouldRefreshProjectResources || Self.taskCatalogChanged(from: tasks, to: value)
       applyTaskSnapshot(value)
     }
 
-    if shouldRefreshThreads, let projectID = selectedProjectID {
-      await refreshThreadCollections(client: client, projectID: projectID)
+    if shouldRefreshProjectResources, let projectID = selectedProjectID {
+      await refreshProjectResources(client: client, projectID: projectID)
     }
 
     if let value = await approvalResult {
@@ -63,9 +72,20 @@ extension BridgeServiceAppModel {
     if let value = await mcpClientResult, mcpClients != value {
       mcpClients = value
     }
-    if includeCatalog {
-      await refreshModelCatalog(client: client)
+    if let value = await deepSeekHarnessMCPResult,
+      deepSeekHarnessMCPServers != value.servers
+    {
+      deepSeekHarnessMCPServers = value.servers
     }
+    if includeCatalog {
+      await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)
+      for installation in agentInstallations
+      where installation.isEnabled && installation.availability == "available" {
+        refreshAgentModelCatalog(
+          installationID: installation.installationID, providerID: installation.providerID)
+      }
+    }
+    scheduleServiceUpgradeIfNeeded()
   }
 
   private func applyProjectSnapshot(_ value: [MCPProjectSummary]) {
@@ -98,8 +118,7 @@ extension BridgeServiceAppModel {
       let conversation,
       conversation.taskID == selectedTaskBeforeRefresh.taskID
     {
-      closeConversation()
-      openConversation(taskID: selectedTaskBeforeRefresh.taskID)
+      openTask(selectedTaskBeforeRefresh.taskID)
     }
     guard selectedTaskID == nil, selectedThreadID == nil, conversation == nil else { return }
     guard let selectedProjectID else { return }
@@ -125,27 +144,23 @@ extension BridgeServiceAppModel {
     }
   }
 
-  private func refreshThreadCollections(
+  private func refreshProjectResources(
     client: any BridgeServiceClientProtocol,
     projectID: String
   ) async {
     lastThreadCatalogRefreshAt = Date()
-    async let skillResult = optional { try await client.skills(projectID: projectID) }
-    let threadPage = await optional {
-      try await client.threads(IPCThreadListRequest(projectID: projectID, limit: 100))
-    }
-    if selectedProjectID == projectID, let value = await skillResult {
+    let skillResult = await optional { try await client.skills(projectID: projectID) }
+    if selectedProjectID == projectID, let value = skillResult {
       skills = value.skills
-    }
-    if selectedProjectID == projectID, let threadPage {
-      threads = threadPage.threads
-      reconcileThreadSelection()
     }
   }
 
-  private func refreshModelCatalog(client: any BridgeServiceClientProtocol) async {
+  private func refreshModelCatalog(
+    client: any BridgeServiceClientProtocol,
+    forceRefresh: Bool
+  ) async {
     do {
-      let catalog = try await client.modelCatalog()
+      let catalog = try await client.modelCatalog(forceRefresh: forceRefresh)
       models = catalog.models
       modelPreferences = catalog.preferences
       modelCatalogError = nil

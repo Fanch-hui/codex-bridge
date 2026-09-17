@@ -143,4 +143,38 @@ public enum AgentProviderEnvironment {
       && !value.contains("\0")
       && value.rangeOfCharacter(from: .controlCharacters) == nil
   }
+
+  public static let windowsSystemEnvironmentKeys: [String] = [
+    "SystemRoot",
+    "SystemDrive",
+    "ComSpec",
+    "PATHEXT",
+    "LOCALAPPDATA",
+    "APPDATA",
+    "USERPROFILE",
+    "ProgramFiles",
+    "ProgramFiles(x86)",
+    "ProgramW6432",
+    "ProgramData",
+    "CommonProgramFiles",
+    "CommonProgramFiles(x86)",
+    "CommonProgramW6432",
+    "PUBLIC",
+    "ALLUSERSPROFILE",
+  ]
+
+  public static func applyWindowsSystemEnvironment(
+    to environment: inout [String: String],
+    from source: [String: String]
+  ) {
+    for key in windowsSystemEnvironmentKeys {
+      if let value = environmentValue(key, source: source),
+        !value.isEmpty,
+        !value.contains("\0"),
+        value.rangeOfCharacter(from: .controlCharacters) == nil
+      {
+        environment[key] = value
+      }
+    }
+  }
 }

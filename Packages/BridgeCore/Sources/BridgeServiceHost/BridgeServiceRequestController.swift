@@ -84,6 +84,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
 
   func handleOperation(_ request: BridgeServiceIPCRequest) async throws -> Data {
     switch request.operation {
+    case .getDirectConfiguration, .updateDirectConfiguration:
+      return try await handleDirectConfiguration(request)
     case .status:
       return try await handleStatus(request)
     case .listProjects:
@@ -106,6 +108,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleSetWorkbenchPermissionMode(request)
     case .getAgentCatalog:
       return try await handleGetAgentCatalog(request)
+    case .connectAgentInstallation:
+      return try await handleConnectAgentInstallation(request)
     case .registerAgentInstallation:
       return try await handleRegisterAgentInstallation(request)
     case .reprobeAgentInstallation:
@@ -178,6 +182,20 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleGetAgentModelDefault(request)
     case .setAgentModelDefault:
       return try await handleSetAgentModelDefault(request)
+    case .getAgentNativePermissionPolicy:
+      return try await handleGetAgentNativePermissionPolicy(request)
+    case .updateAgentNativePermissionPolicy:
+      return try await handleUpdateAgentNativePermissionPolicy(request)
+    case .getAgentPermissionRemediation:
+      return try await handleGetAgentPermissionRemediation(request)
+    case .applyAgentPermissionRemediation:
+      return try await handleApplyAgentPermissionRemediation(request)
+    case .listDeepSeekHarnessMCPServers:
+      return try await handleListDeepSeekHarnessMCPServers(request)
+    case .saveDeepSeekHarnessMCPServer:
+      return try await handleSaveDeepSeekHarnessMCPServer(request)
+    case .deleteDeepSeekHarnessMCPServer:
+      return try await handleDeleteDeepSeekHarnessMCPServer(request)
     case .setExposureMode:
       return try await handleSetExposureMode(request)
     case .listMCPClients:

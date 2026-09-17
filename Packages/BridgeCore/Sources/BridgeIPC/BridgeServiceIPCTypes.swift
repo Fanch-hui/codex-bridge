@@ -3,6 +3,8 @@ import Foundation
 
 public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case status
+  case getDirectConfiguration = "get_direct_configuration"
+  case updateDirectConfiguration = "update_direct_configuration"
   case listProjects = "list_projects"
   case registerProject = "register_project"
   case updateProjectPolicy = "update_project_policy"
@@ -13,6 +15,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setWorkbenchProject = "set_workbench_project"
   case setWorkbenchPermissionMode = "set_workbench_permission_mode"
   case getAgentCatalog = "get_agent_catalog"
+  case connectAgentInstallation = "connect_agent_installation"
   case registerAgentInstallation = "register_agent_installation"
   case reprobeAgentInstallation = "reprobe_agent_installation"
   case setAgentInstallationEnabled = "set_agent_installation_enabled"
@@ -50,6 +53,13 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case listAgentModels = "list_agent_models"
   case getAgentModelDefault = "get_agent_model_default"
   case setAgentModelDefault = "set_agent_model_default"
+  case getAgentNativePermissionPolicy = "get_agent_native_permission_policy"
+  case updateAgentNativePermissionPolicy = "update_agent_native_permission_policy"
+  case getAgentPermissionRemediation = "get_agent_permission_remediation"
+  case applyAgentPermissionRemediation = "apply_agent_permission_remediation"
+  case listDeepSeekHarnessMCPServers = "list_deepseek_harness_mcp_servers"
+  case saveDeepSeekHarnessMCPServer = "save_deepseek_harness_mcp_server"
+  case deleteDeepSeekHarnessMCPServer = "delete_deepseek_harness_mcp_server"
   case listMCPClients = "list_mcp_clients"
   case setMCPClientEnabled = "set_mcp_client_enabled"
   case setMCPClientExposureMode = "set_mcp_client_exposure_mode"

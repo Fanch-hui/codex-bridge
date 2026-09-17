@@ -21,8 +21,12 @@ extension TaskConversationModel {
 
     public var id: String { key }
 
-    public init(_ message: IPCTaskConversationMessage, isFinal: Bool) {
-      key = message.key
+    public init(
+      _ message: IPCTaskConversationMessage,
+      isFinal: Bool,
+      keyPrefix: String? = nil
+    ) {
+      key = keyPrefix.map { "\($0):\(message.key)" } ?? message.key
       role = message.role
       kind = message.kind
       messageID = message.messageID
@@ -31,6 +35,15 @@ extension TaskConversationModel {
       toolStatus = message.toolStatus
       toolArguments = message.toolArguments
       self.isFinal = isFinal
+    }
+
+    public func prefixed(for taskID: String) -> Self {
+      Self(
+        IPCTaskConversationMessage(
+          messageID: messageID, key: key, role: role, kind: kind, content: content,
+          toolName: toolName, toolStatus: toolStatus, toolArguments: toolArguments
+        ), isFinal: true, keyPrefix: taskID
+      )
     }
 
     public init(key: String, role: String, kind: String, content: String, isFinal: Bool) {

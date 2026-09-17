@@ -1,4 +1,5 @@
 import AppKit
+import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
 import BridgeServiceAppCore
@@ -103,10 +104,26 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var agentModelDefaults: [String: IPCAgentModelDefaultResponse] =
     [:]
   @Published public internal(set) var agentModelHydratingProviders: Set<String> = []
+  @Published public internal(set) var agentNativePermissionPolicies:
+    [String: IPCAgentNativePermissionPolicyResponse] = [:]
+  @Published public internal(set) var agentNativePermissionLoadingInstallations: Set<String> = []
+  @Published public internal(set) var agentNativePermissionSavingInstallations: Set<String> = []
+  @Published public internal(set) var agentNativePermissionErrors: [String: String] = [:]
+  @Published public internal(set) var focusedAgentNativePermissionInstallationID: String?
+  @Published public internal(set) var agentPermissionRemediations:
+    [String: IPCAgentPermissionRemediationResponse] = [:]
+  @Published public internal(set) var agentPermissionRemediationLoadingTaskIDs: Set<String> = []
+  @Published public internal(set) var agentPermissionRemediationApplyingTaskIDs: Set<String> = []
+  @Published public internal(set) var agentPermissionRemediationAppliedTaskIDs: Set<String> = []
+  @Published public internal(set) var agentPermissionRemediationErrors: [String: String] = [:]
   @Published public internal(set) var openCodeDefaultModel: String?
   @Published public internal(set) var openCodeDefaultPermissionMode = "build"
   @Published public internal(set) var openCodeDefaultEffort: String?
   @Published public internal(set) var isManagingAgents = false
+  @Published var directConfiguration: IPCDirectConfiguration?
+  @Published var isSavingDirectConfiguration = false
+  @Published var agentOperationRevision = 0
+  var didAttemptServiceUpgrade = false
   @Published public internal(set) var isRefreshingAgentModels = false
   @Published public internal(set) var agentModelRefreshError: String?
   @Published public internal(set) var tasks: [MCPServiceTaskSnapshot] = []
@@ -116,6 +133,8 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var directApprovalMode = "require"
   @Published public internal(set) var taskStartApprovalMode = "require"
   @Published public internal(set) var mcpClients: [IPCMCPClientStatus] = []
+  @Published public internal(set) var deepSeekHarnessMCPServers:
+    [IPCDeepSeekHarnessMCPServerSummary] = []
   @Published public internal(set) var models: [MCPModelSummary] = []
   @Published public internal(set) var modelPreferences: IPCModelPreferences?
   @Published public internal(set) var customInstructions: String?
@@ -128,6 +147,11 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var selectedTaskID: String?
   @Published public internal(set) var selectedProjectID: String?
   @Published public internal(set) var workbenchPermissionMode = "workspace-write"
+  @Published var desktopLogSearchText = ""
+  @Published var desktopLogProjectID: String?
+  @Published var desktopLogKind = "all"
+  @Published var desktopSelectedLogID: String?
+  @Published var chatBrowserViewport: BridgeDesktopBrowserViewport?
   @Published public var chatWebView: WKWebView? {
     didSet {
       if chatWebView != nil {
@@ -177,6 +201,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var pendingRefresh = false
   var pendingVisibleRefresh = false
   var pendingCatalogRefresh = false
+  var pendingForceCatalogRefresh = false
   var chatWebViewSleepTask: Task<Void, Never>?
   var toastDismissTask: Task<Void, Never>?
   var workbenchProjectSyncTask: Task<Void, Never>?
@@ -191,6 +216,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var agentModelDefaultLoadGenerations: [String: UInt64] = [:]
   var agentModelDefaultRevisions: [String: UInt64] = [:]
   var agentModelDefaultMutationTasks: [String: Task<Void, Never>] = [:]
+  var agentNativePermissionGenerations: [String: UInt64] = [:]
   var resolvedTaskApprovalKeys: Set<String> = []
   var resolvedDirectApprovalKeys: Set<String> = []
   var chatBrowserResumeURL = URL(string: "https://chatgpt.com")!
@@ -336,6 +362,16 @@ public final class BridgeServiceAppModel: ObservableObject {
   public func refresh() {
     Task { [weak self] in
       await self?.refresh(silent: false, includeCatalog: true)
+    }
+  }
+
+  public func refreshModels() {
+    Task { [weak self] in
+      await self?.refresh(
+        silent: false,
+        includeCatalog: true,
+        forceCatalogRefresh: true
+      )
     }
   }
 

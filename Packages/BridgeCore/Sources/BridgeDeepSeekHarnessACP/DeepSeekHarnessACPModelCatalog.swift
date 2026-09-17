@@ -106,6 +106,19 @@ enum DeepSeekHarnessACPModelCatalog {
     return parsed
   }
 
+  static func additionalEntries(configuration: Data, template: Data) throws -> String {
+    guard let value = String(data: configuration, encoding: .utf8),
+      let templateValue = String(data: template, encoding: .utf8)
+    else { throw DeepSeekHarnessACPError.templateMismatch }
+    let normalizedProfile = try normalized(value)
+    let normalizedTemplate = try normalized(templateValue)
+    guard normalizedProfile.hasPrefix(normalizedTemplate) else {
+      throw DeepSeekHarnessACPError.templateMismatch
+    }
+    return String(normalizedProfile.dropFirst(normalizedTemplate.count))
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
   private static func parsedProfile(from value: String) throws -> Profile {
     let modelIDs = try modelIDs(from: value)
     let selectedModel = try scalarValue(prefix: selectedModelPrefix, in: value)

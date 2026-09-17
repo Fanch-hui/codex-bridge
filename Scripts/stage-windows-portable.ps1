@@ -13,7 +13,8 @@ param(
   [string]$VcpkgTriplet,
   [string]$TargetTriple = "",
   [string]$VcpkgRoot = "",
-  [string]$VCRedistRoot = ""
+  [string]$VCRedistRoot = "",
+  [string]$TunnelClientDir = ""
 )
 
 Set-StrictMode -Version Latest
@@ -135,6 +136,35 @@ try {
   Stage-File (Join-Path $repoRoot "LICENSE") "LICENSE.txt"
   Stage-File (Join-Path $repoRoot "NOTICE") "NOTICE.txt"
 
+  $tunnelClientSHA256 = $null
+  if (-not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
+    $tunnelClientFull = Get-FullPath $TunnelClientDir
+    Assert-Directory $tunnelClientFull | Out-Null
+    $tunnelExecutablePath = Join-Path $tunnelClientFull "tunnel-client.exe"
+    Assert-RegularFile $tunnelExecutablePath | Out-Null
+    if ((Get-PEMachine $tunnelExecutablePath) -ne $expectedMachine) {
+      throw "tunnel-client.exe has the wrong architecture: $tunnelExecutablePath"
+    }
+    $tunnelDigestPath = Join-Path $tunnelClientFull "tunnel-client.sha256"
+    Assert-RegularFile $tunnelDigestPath | Out-Null
+    $tunnelDigest = (Get-Content -LiteralPath $tunnelDigestPath | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_) }) -join ""
+    if ($tunnelDigest -notmatch "^[0-9a-f]{64}$") {
+      throw "tunnel-client.sha256 must contain a single 64-character lowercase hex digest."
+    }
+    if ((Get-Sha256 $tunnelExecutablePath) -ne $tunnelDigest) {
+      throw "tunnel-client.exe does not match its staged digest."
+    }
+    Stage-File $tunnelExecutablePath "tunnel-client.exe"
+    Stage-File $tunnelDigestPath "tunnel-client.sha256"
+    $tunnelManifestPath = Join-Path $tunnelClientFull "tunnel-client.manifest.json"
+    if (Test-Path -LiteralPath $tunnelManifestPath) {
+      Assert-RegularFile $tunnelManifestPath | Out-Null
+      Stage-File $tunnelManifestPath "tunnel-client.manifest.json"
+    }
+    $tunnelClientSHA256 = $tunnelDigest
+  }
+
   $swiftRuntimeModule = Resolve-SwiftRuntimeMergeModule $Architecture
   $swiftRuntimeDirectory = Join-Path $temporaryRoot "swift-runtime"
   Expand-SwiftRuntimeMergeModule $swiftRuntimeModule $swiftRuntimeDirectory
@@ -203,6 +233,57 @@ try {
   Assert-Directory $resourceCandidates[0].FullName | Out-Null
   Copy-Item -LiteralPath $resourceCandidates[0].FullName -Destination (Join-Path $outFull $resourceCandidates[0].Name) -Recurse -Force
 
+  $desktopUIResourceCandidates = @(Get-ChildItem -LiteralPath $binFull -Directory -Recurse |
+      Where-Object { $_.Name -in @("BridgeCore_BridgeDesktopUI.bundle", "BridgeCore_BridgeDesktopUI.resources") })
+  if ($desktopUIResourceCandidates.Count -ne 1) {
+    throw "Expected exactly one production BridgeDesktopUI resource directory."
+  }
+  $desktopUIResourceDirectory = $desktopUIResourceCandidates[0].FullName
+  Assert-Directory $desktopUIResourceDirectory | Out-Null
+  $desktopUIReparseItems = @(Get-ChildItem -LiteralPath $desktopUIResourceDirectory -Force -Recurse |
+      Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 })
+  if ($desktopUIReparseItems.Count -ne 0) {
+    throw "BridgeDesktopUI resources cannot contain reparse points."
+  }
+  $requiredDesktopUIResources = @(
+    "index.html",
+    "host-context.js",
+    "styles.css",
+    "pages.css",
+    "windows-theme.css",
+    "windows-components.css",
+    "feedback.js",
+    "pages-common.js",
+    "pages-workbench-controls.js",
+    "pages-workbench-conversation.js",
+    "pages-workbench.js",
+    "pages-form-draft.js",
+    "pages-project-editors.js",
+    "pages-project-collections.js",
+    "pages-projects.js",
+    "pages-logs.js",
+    "pages-connections-editor.js",
+    "pages-connections.js",
+    "pages-settings-models.js",
+    "pages-settings-agents.js",
+    "pages-settings-instructions.js",
+    "pages-settings.js",
+    "pages.js",
+    "app.js"
+  )
+  foreach ($resourceName in $requiredDesktopUIResources) {
+    Assert-RegularFile (Join-Path $desktopUIResourceDirectory $resourceName) | Out-Null
+  }
+  $stagedDesktopUIResourceDirectory = Join-Path $outFull $desktopUIResourceCandidates[0].Name
+  Copy-Item -LiteralPath $desktopUIResourceDirectory -Destination $stagedDesktopUIResourceDirectory -Recurse -Force
+  Assert-Directory $stagedDesktopUIResourceDirectory | Out-Null
+  foreach ($resourceName in $requiredDesktopUIResources) {
+    Assert-RegularFile (Join-Path $stagedDesktopUIResourceDirectory $resourceName) | Out-Null
+  }
+  $iconSource = Join-Path $desktopUIResourceDirectory "AppIcon.ico"
+  Assert-RegularFile $iconSource | Out-Null
+  Stage-File $iconSource "AppIcon.ico"
+
   $packagePath = Join-Path $temporaryRoot "webview2-package.zip"
   $packageUri = "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$webView2Version/microsoft.web.webview2.$webView2Version.nupkg"
   Invoke-WebRequest -UseBasicParsing -Uri $packageUri -OutFile $packagePath
@@ -232,6 +313,7 @@ try {
     webView2PackageSHA256 = $webView2Hash
     vcRedistVersion = (Split-Path -Leaf $vcRedistRootFull)
     vcRuntimeDirectory = $vcRuntimeDirectory.Name
+    tunnelClientSHA256 = $tunnelClientSHA256
   }
   $buildInfoPath = Join-Path $outFull "BUILD-INFO.json"
   $utf8NoBom = [Text.UTF8Encoding]::new($false)

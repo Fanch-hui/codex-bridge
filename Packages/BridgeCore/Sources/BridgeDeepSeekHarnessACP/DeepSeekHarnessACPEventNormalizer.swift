@@ -8,13 +8,14 @@ public actor DeepSeekHarnessACPEventNormalizer {
     var title: String?
     var kind: String?
     var status: AgentToolStatus = .pending
-    var arguments: String?
+    var rawInput: ACPJSONValue?
   }
 
   private let taskID: TaskID
   private let binding: AgentBinding
   private let projectRoot: String?
   private var content = ""
+  private var reasoning = DeepSeekHarnessACPReasoningBuffer()
   private var lastFinalizedContent = ""
   private var assistantMessageIndex: UInt64 = 0
   private var nextProviderSequence: Int64 = 0
@@ -53,6 +54,22 @@ public actor DeepSeekHarnessACPEventNormalizer {
         authoritative: false
       )
       return try envelope(.content(update))
+    case .reasoningDelta(let sessionID, let text):
+      try validateSession(sessionID)
+      guard let update = try reasoning.append(text) else { return nil }
+      return try envelope(.content(update))
+    case .usageUpdated(let sessionID, let usedTokens, let contextSize):
+      try validateSession(sessionID)
+      let usage = try AgentUsageUpdate(
+        usedTokens: usedTokens,
+        contextSize: contextSize,
+        costAmount: nil,
+        currency: nil
+      )
+      return try envelope(.usage(usage))
+    case .configurationUpdated(let sessionID):
+      try validateSession(sessionID)
+      return nil
     case .toolUpdated(let update):
       try validateSession(update.sessionID)
       return try tool(update)
@@ -75,8 +92,10 @@ public actor DeepSeekHarnessACPEventNormalizer {
   }
 
   public func finalizeContent() throws -> [AgentEventEnvelope] {
-    guard let event = try finalizeCurrentContent() else { return [] }
-    return [event]
+    var events: [AgentEventEnvelope] = []
+    if let event = try finalizeReasoning() { events.append(event) }
+    if let event = try finalizeCurrentContent() { events.append(event) }
+    return events
   }
 
   func finalizeCurrentContent() throws -> AgentEventEnvelope? {
@@ -135,6 +154,11 @@ public actor DeepSeekHarnessACPEventNormalizer {
       : "message:assistant:\(assistantMessageIndex)"
   }
 
+  func finalizeReasoning() throws -> AgentEventEnvelope? {
+    guard let update = try reasoning.finish() else { return nil }
+    return try envelope(.content(update))
+  }
+
   private func validateSession(_ sessionID: String) throws {
     guard sessionID == binding.providerSessionID else {
       throw DeepSeekHarnessACPError.sessionMismatch
@@ -152,19 +176,24 @@ public actor DeepSeekHarnessACPEventNormalizer {
   private func approval(
     _ request: DeepSeekHarnessACPPermissionRequest
   ) throws -> AgentEventEnvelope {
+    let tool = tools[request.toolCallID]
+    let input = request.rawInput ?? tool?.rawInput
+    let title =
+      request.title == "DeepSeek Harness permission request"
+      ? tool?.title ?? request.title : request.title
     let approval = try AgentApprovalRequest(
       approvalID: request.approvalID,
       taskID: taskID,
       binding: binding,
       providerItemID: request.toolCallID,
-      kind: Self.approvalKind(request.kind),
-      title: Self.safeText(request.title) ?? "DeepSeek Harness permission request",
-      relativePaths: Self.relativePaths(from: request.rawInput, projectRoot: projectRoot),
-      normalizedCommand: Self.safeCommand(Self.stringValue(request.rawInput, key: "command")),
+      kind: Self.approvalKind(request.kind ?? tool?.kind),
+      title: Self.safeText(title) ?? "DeepSeek Harness permission request",
+      relativePaths: Self.relativePaths(from: input, projectRoot: projectRoot),
+      normalizedCommand: Self.safeCommand(Self.stringValue(input, key: "command")),
       networkTarget: Self.safeNetworkTarget(
-        Self.stringValue(request.rawInput, key: "url")
-          ?? Self.stringValue(request.rawInput, key: "uri")
-          ?? Self.stringValue(request.rawInput, key: "target")
+        Self.stringValue(input, key: "url")
+          ?? Self.stringValue(input, key: "uri")
+          ?? Self.stringValue(input, key: "target")
       ),
       options: request.options
     )
@@ -181,7 +210,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
     var state = tools[update.toolCallID] ?? ToolState()
     if let title = update.title, !title.isEmpty { state.title = title }
     if let kind = update.kind { state.kind = kind }
-    if let rawInput = update.rawInput { state.arguments = rawInput.encodedString() }
+    if let rawInput = update.rawInput { state.rawInput = rawInput }
     state.status = update.status
     let payload = try AgentToolUpdate(
       key: "tool:\(update.toolCallID)",
@@ -189,7 +218,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
       title: state.title,
       kind: state.kind,
       status: state.status,
-      arguments: state.arguments
+      arguments: state.rawInput?.encodedString()
     )
     tools[update.toolCallID] = state
     return try envelope(.tool(payload))

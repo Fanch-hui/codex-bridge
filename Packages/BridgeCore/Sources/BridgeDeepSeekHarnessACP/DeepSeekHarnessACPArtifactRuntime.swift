@@ -4,9 +4,7 @@ import Foundation
 
 enum DeepSeekHarnessACPArtifactRuntime {
   struct PackageManifest: Sendable {
-    let version: String
-    let nodeRequirement: String
-    let packageManager: String
+    let version: String?
   }
 
   struct SemanticVersion: Comparable, Equatable, Sendable {
@@ -77,9 +75,9 @@ enum DeepSeekHarnessACPArtifactRuntime {
         throw DeepSeekHarnessACPError.artifactInvalid("source_root")
       }
       let package = try DeepSeekHarnessACPPathSupport.append("package.json", to: candidatePath)
-      let lock = try DeepSeekHarnessACPPathSupport.append("pnpm-lock.yaml", to: candidatePath)
+      let lock = try? dependencyLockPath(in: candidatePath)
       if FileManager.default.fileExists(atPath: package),
-        FileManager.default.fileExists(atPath: lock)
+        lock != nil
       {
         matches.append(candidatePath)
       }
@@ -167,6 +165,27 @@ enum DeepSeekHarnessACPArtifactRuntime {
     return candidates
   }
 
+  static func dependencyLockPath(in sourceRoot: String) throws -> String {
+    for name in ["pnpm-lock.yaml", "package-lock.json", "npm-shrinkwrap.json"] {
+      let path = try DeepSeekHarnessACPPathSupport.append(name, to: sourceRoot)
+      if FileManager.default.fileExists(atPath: path) { return path }
+    }
+    throw DeepSeekHarnessACPError.artifactInvalid("dependency_lock")
+  }
+
+  static func runtimeVersion(executablePath: String, manifestPath: String) throws -> String? {
+    if let version = try parseManifest(at: manifestPath).version { return version }
+    let entryManifest = URL(fileURLWithPath: executablePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .appendingPathComponent("package.json").path
+    if FileManager.default.fileExists(atPath: entryManifest),
+      let version = try parseManifest(at: entryManifest).version
+    {
+      return version
+    }
+    return nil
+  }
+
   static func commonSourceRoot(_ manifest: String, _ lock: String) throws -> String {
     guard let manifestRoot = AgentPathSemantics.directoryPath(of: manifest),
       let lockRoot = AgentPathSemantics.directoryPath(of: lock),
@@ -184,46 +203,11 @@ enum DeepSeekHarnessACPArtifactRuntime {
       field: "runtime_manifest.size"
     )
     guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-      let version = json["version"] as? String,
-      let engines = json["engines"] as? [String: Any],
-      let nodeRequirement = engines["node"] as? String,
-      let packageManager = json["packageManager"] as? String
+      json["version"] == nil || json["version"] is String
     else {
       throw DeepSeekHarnessACPError.artifactInvalid("runtime_manifest.json")
     }
-    return PackageManifest(
-      version: version,
-      nodeRequirement: nodeRequirement,
-      packageManager: packageManager
-    )
-  }
-
-  static func validateDependencyLock(at path: String) throws {
-    let data = try boundedData(
-      at: path,
-      maximumBytes: 128 * 1_024 * 1_024,
-      field: "dependency_lock.size"
-    )
-    guard let value = String(data: data, encoding: .utf8),
-      dependencyLockContainsExactACPVersion(value)
-    else {
-      throw DeepSeekHarnessACPError.artifactInvalid("dependency_lock.acp_sdk")
-    }
-  }
-
-  private static func dependencyLockContainsExactACPVersion(_ value: String) -> Bool {
-    let package = "@agentclientprotocol/sdk@\(DeepSeekHarnessACPConstants.acpSDKVersion)"
-    return value.split(whereSeparator: \.isNewline).contains { line in
-      var key = line.trimmingCharacters(in: .whitespaces)
-      if key.hasPrefix("'") || key.hasPrefix("\"") { key.removeFirst() }
-      if key.hasPrefix("/") { key.removeFirst() }
-      guard key.hasPrefix(package) else { return false }
-      let suffix = key.dropFirst(package.count)
-      return suffix.hasPrefix(":")
-        || suffix.hasPrefix("':")
-        || suffix.hasPrefix("\":")
-        || suffix.hasPrefix("(")
-    }
+    return PackageManifest(version: json["version"] as? String)
   }
 
   static func boundedData(at path: String, maximumBytes: Int, field: String) throws -> Data {

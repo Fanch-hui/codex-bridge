@@ -2,6 +2,11 @@
 const
   InvalidFileAttributes = $FFFFFFFF;
   FileAttributeReparsePoint = $00000400;
+  PreviousInstallUninstallKey =
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F51B5A4-4C25-4E72-A8E5-93447D72D031}_is1';
+
+var
+  PreviousInstallDirectory: String;
 
 function WindowsGetFileAttributes(FileName: String): DWORD;
   external 'GetFileAttributesW@kernel32.dll stdcall';
@@ -41,23 +46,23 @@ begin
     end;
 end;
 
-function HasReparseDirectory(const FilePath: String): Boolean;
+function HasReparseDirectoryAt(const FilePath: String; const AppDirectory: String): Boolean;
 var
-  AppDirectory: String;
   Attributes: DWORD;
   Directory: String;
   Parent: String;
+  RootDirectory: String;
 begin
   Result := True;
-  AppDirectory := RemoveBackslashUnlessRoot(ExpandConstant('{app}'));
+  RootDirectory := RemoveBackslashUnlessRoot(AppDirectory);
   Directory := ExtractFileDir(FilePath);
-  while Length(Directory) >= Length(AppDirectory) do
+  while Length(Directory) >= Length(RootDirectory) do
   begin
     Attributes := WindowsGetFileAttributes(Directory);
     if (Attributes = InvalidFileAttributes) or
        ((Attributes and FileAttributeReparsePoint) <> 0) then
       Exit;
-    if CompareText(Directory, AppDirectory) = 0 then
+    if CompareText(Directory, RootDirectory) = 0 then
     begin
       Result := False;
       Exit;
@@ -69,15 +74,20 @@ begin
   end;
 end;
 
-procedure RemoveEmptyParents(const FilePath: String);
-var
-  AppDirectory: String;
-  Directory: String;
+function HasReparseDirectory(const FilePath: String): Boolean;
 begin
-  AppDirectory := RemoveBackslashUnlessRoot(ExpandConstant('{app}'));
+  Result := HasReparseDirectoryAt(FilePath, ExpandConstant('{app}'));
+end;
+
+procedure RemoveEmptyParentsAt(const FilePath: String; const AppDirectory: String);
+var
+  Directory: String;
+  RootDirectory: String;
+begin
+  RootDirectory := RemoveBackslashUnlessRoot(AppDirectory);
   Directory := ExtractFileDir(FilePath);
-  while (Length(Directory) > Length(AppDirectory)) and
-        (CompareText(Directory, AppDirectory) <> 0) do
+  while (Length(Directory) > Length(RootDirectory)) and
+        (CompareText(Directory, RootDirectory) <> 0) do
   begin
     if not RemoveDir(Directory) then
       Exit;
@@ -85,7 +95,30 @@ begin
   end;
 end;
 
+procedure RemoveEmptyParents(const FilePath: String);
+begin
+  RemoveEmptyParentsAt(FilePath, ExpandConstant('{app}'));
+end;
+
+function ServiceRunCommand(const AppDirectory: String): String;
+begin
+  Result := '"' + AddBackslash(AppDirectory) + 'codex-bridge-service.exe"';
+end;
+
+function GuiRunCommand(const AppDirectory: String): String;
+begin
+  Result := '"' + AddBackslash(AppDirectory) +
+    'codex-bridge-windows-app.exe" --ensure-service';
+end;
+
+function SameRunCommand(const ConfiguredCommand: String;
+  const ExpectedCommand: String): Boolean;
+begin
+  Result := CompareText(Trim(ConfiguredCommand), ExpectedCommand) = 0;
+end;
+
 #include "CodexBridgeLegacyMigration.iss"
+#include "CodexBridgePreviousInstallMigration.iss"
 
 function RemoveStalePayloadFiles: String;
 var
@@ -135,17 +168,17 @@ begin
   end;
 end;
 
-function StopInstalledService(var ErrorMessage: String): Boolean;
+function StopInstalledServiceAt(const AppDirectory: String; var ErrorMessage: String): Boolean;
 var
   ExitCode: Integer;
   ServicePath: String;
 begin
   Result := True;
   ErrorMessage := '';
-  ServicePath := ExpandConstant('{app}\codex-bridge-service.exe');
+  ServicePath := AddBackslash(AppDirectory) + 'codex-bridge-service.exe';
   if not FileExists(ServicePath) then
     Exit;
-  if not Exec(ServicePath, '--shutdown', ExpandConstant('{app}'), SW_HIDE,
+  if not Exec(ServicePath, '--shutdown', AppDirectory, SW_HIDE,
               ewWaitUntilTerminated, ExitCode) or (ExitCode <> 0) then
   begin
     ErrorMessage := 'Codex Bridge could not stop its background service. Close the app and try again.';
@@ -153,17 +186,17 @@ begin
   end;
 end;
 
-function StopInstalledApplication(var ErrorMessage: String): Boolean;
+function StopInstalledApplicationAt(const AppDirectory: String; var ErrorMessage: String): Boolean;
 var
   AppPath: String;
   ExitCode: Integer;
 begin
   Result := True;
   ErrorMessage := '';
-  AppPath := ExpandConstant('{app}\codex-bridge-windows-app.exe');
+  AppPath := AddBackslash(AppDirectory) + 'codex-bridge-windows-app.exe';
   if not FileExists(AppPath) then
     Exit;
-  if not Exec(AppPath, '--shutdown', ExpandConstant('{app}'), SW_HIDE,
+  if not Exec(AppPath, '--shutdown', AppDirectory, SW_HIDE,
               ewWaitUntilTerminated, ExitCode) or (ExitCode <> 0) then
   begin
     ErrorMessage := 'Codex Bridge could not stop its desktop application. Close the app and try again.';
@@ -171,43 +204,56 @@ begin
   end;
 end;
 
-function StopInstalledProcesses(var ErrorMessage: String): Boolean;
+function StopInstalledProcessesAt(const AppDirectory: String; var ErrorMessage: String): Boolean;
 begin
   ErrorMessage := '';
-  if not FileExists(ExpandConstant('{app}\CodexBridgeControl.v1')) then
+  if not FileExists(AddBackslash(AppDirectory) + 'CodexBridgeControl.v1') then
   begin
     Result := True;
     Exit;
   end;
-  Result := StopInstalledApplication(ErrorMessage);
+  Result := StopInstalledApplicationAt(AppDirectory, ErrorMessage);
   if Result then
-    Result := StopInstalledService(ErrorMessage);
+    Result := StopInstalledServiceAt(AppDirectory, ErrorMessage);
 end;
 
-procedure RemoveMatchingLegacyRunEntry;
+function StopInstalledProcesses(var ErrorMessage: String): Boolean;
+begin
+  Result := StopInstalledProcessesAt(ExpandConstant('{app}'), ErrorMessage);
+end;
+
+procedure RemoveRunEntryForPath(const AppDirectory: String);
 var
   ConfiguredCommand: String;
-  InstalledCommand: String;
 begin
-  InstalledCommand := '"' + ExpandConstant('{app}\codex-bridge-service.exe') + '"';
   if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run',
        'CodexBridgeService', ConfiguredCommand) and
-     (CompareText(ConfiguredCommand, InstalledCommand) = 0) then
+     (SameRunCommand(ConfiguredCommand, ServiceRunCommand(AppDirectory)) or
+      SameRunCommand(ConfiguredCommand, GuiRunCommand(AppDirectory))) then
     RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run',
       'CodexBridgeService');
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  ExpectedDirectory: String;
+  CurrentDirectory: String;
 begin
   Result := '';
-  ExpectedDirectory := ExpandConstant('{localappdata}\Programs\CodexBridge');
-  if CompareText(RemoveBackslashUnlessRoot(ExpandConstant('{app}')),
-       RemoveBackslashUnlessRoot(ExpectedDirectory)) <> 0 then
+  CurrentDirectory := NormalizeInstallPath(ExpandConstant('{app}'));
+  PreviousInstallDirectory := FindPreviousInstallDirectory;
+  if (PreviousInstallDirectory <> '') and
+     (CompareText(PreviousInstallDirectory, CurrentDirectory) <> 0) then
   begin
-    Result := 'Codex Bridge must be installed in its fixed per-user application directory.';
-    Exit;
+    if DirExists(PreviousInstallDirectory) and
+       HasReparseDirectoryAt(
+         AddBackslash(PreviousInstallDirectory) + 'payload-check',
+         PreviousInstallDirectory) then
+    begin
+      Result := 'Codex Bridge found an unsafe previous application directory.';
+      Exit;
+    end;
+    if not StopInstalledProcessesAt(PreviousInstallDirectory, Result) then
+      Exit;
   end;
   if DirExists(ExpandConstant('{app}')) and
      HasReparseDirectory(ExpandConstant('{app}\payload-check')) then
@@ -230,7 +276,25 @@ begin
       RaiseException(ErrorMessage);
   end;
   if CurStep = ssPostInstall then
-    RemoveMatchingLegacyRunEntry;
+  begin
+    if not MigrateServiceRunEntry(PreviousInstallDirectory, ErrorMessage) then
+      RaiseException(ErrorMessage);
+    if (PreviousInstallDirectory <> '') and
+       (CompareText(
+         NormalizeInstallPath(PreviousInstallDirectory),
+         NormalizeInstallPath(ExpandConstant('{app}'))) <> 0) then
+    begin
+      ErrorMessage := RemovePreviousInstallPayload(PreviousInstallDirectory);
+      if ErrorMessage <> '' then
+        RaiseException(ErrorMessage);
+    end;
+  end;
+end;
+
+procedure RegisterPreviousData(PreviousDataKey: Integer);
+begin
+  SetPreviousData(PreviousDataKey, 'InstallPath',
+    NormalizeInstallPath(ExpandConstant('{app}')));
 end;
 
 function InitializeUninstall: Boolean;
@@ -245,5 +309,5 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
-    RemoveMatchingLegacyRunEntry;
+    RemoveRunEntryForPath(ExpandConstant('{app}'));
 end;

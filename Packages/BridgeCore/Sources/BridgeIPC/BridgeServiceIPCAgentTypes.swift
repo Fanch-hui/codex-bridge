@@ -4,7 +4,12 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
   public let providerID: String
   public let displayName: String
   public let adapterRevision: Int
+  public let discoveryState: String?
+  public let discoveryMessage: String?
+  public let discoveredExecutablePath: String?
+  public let discoveredConfigurationPath: String?
   public let requiresConfiguration: Bool
+  public let requiresHeadlessAlwaysProceed: Bool
   public let registrationTrustProfile: String
   public let supportsModelSelection: Bool
   public let supportsEffortSelection: Bool
@@ -21,7 +26,12 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     providerID: String,
     displayName: String,
     adapterRevision: Int,
+    discoveryState: String? = nil,
+    discoveryMessage: String? = nil,
+    discoveredExecutablePath: String? = nil,
+    discoveredConfigurationPath: String? = nil,
     requiresConfiguration: Bool = false,
+    requiresHeadlessAlwaysProceed: Bool = false,
     registrationTrustProfile: String = "managed",
     supportsModelSelection: Bool = true,
     supportsEffortSelection: Bool = true,
@@ -37,7 +47,12 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     self.providerID = providerID
     self.displayName = displayName
     self.adapterRevision = adapterRevision
+    self.discoveryState = discoveryState
+    self.discoveryMessage = discoveryMessage
+    self.discoveredExecutablePath = discoveredExecutablePath
+    self.discoveredConfigurationPath = discoveredConfigurationPath
     self.requiresConfiguration = requiresConfiguration
+    self.requiresHeadlessAlwaysProceed = requiresHeadlessAlwaysProceed
     self.registrationTrustProfile = registrationTrustProfile
     self.supportsModelSelection = supportsModelSelection
     self.supportsEffortSelection = supportsEffortSelection
@@ -55,7 +70,12 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     case providerID = "provider_id"
     case displayName = "display_name"
     case adapterRevision = "adapter_revision"
+    case discoveryState = "discovery_state"
+    case discoveryMessage = "discovery_message"
+    case discoveredExecutablePath = "discovered_executable_path"
+    case discoveredConfigurationPath = "discovered_configuration_path"
     case requiresConfiguration = "requires_configuration"
+    case requiresHeadlessAlwaysProceed = "requires_headless_always_proceed"
     case registrationTrustProfile = "registration_trust_profile"
     case supportsModelSelection = "supports_model_selection"
     case supportsEffortSelection = "supports_effort_selection"
@@ -75,9 +95,23 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
       providerID: try container.decode(String.self, forKey: .providerID),
       displayName: try container.decode(String.self, forKey: .displayName),
       adapterRevision: try container.decode(Int.self, forKey: .adapterRevision),
+      discoveryState: try container.decodeIfPresent(String.self, forKey: .discoveryState),
+      discoveryMessage: try container.decodeIfPresent(String.self, forKey: .discoveryMessage),
+      discoveredExecutablePath: try container.decodeIfPresent(
+        String.self,
+        forKey: .discoveredExecutablePath
+      ),
+      discoveredConfigurationPath: try container.decodeIfPresent(
+        String.self,
+        forKey: .discoveredConfigurationPath
+      ),
       requiresConfiguration: try container.decodeIfPresent(
         Bool.self,
         forKey: .requiresConfiguration
+      ) ?? false,
+      requiresHeadlessAlwaysProceed: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .requiresHeadlessAlwaysProceed
       ) ?? false,
       registrationTrustProfile: try container.decodeIfPresent(
         String.self,
@@ -210,6 +244,18 @@ public struct IPCAgentCatalogResponse: Codable, Equatable, Sendable {
   }
 }
 
+public struct IPCAgentCatalogRequest: Codable, Equatable, Sendable {
+  public let forceRefresh: Bool
+
+  public init(forceRefresh: Bool = false) {
+    self.forceRefresh = forceRefresh
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case forceRefresh = "force_refresh"
+  }
+}
+
 public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
   public let providerID: String
   public let displayName: String
@@ -233,6 +279,45 @@ public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
     case displayName = "display_name"
     case executablePath = "executable_path"
     case configurationPath = "configuration_path"
+  }
+}
+
+public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
+  public let providerID: String
+  public let baseURL: String?
+  public let apiKey: String?
+  public let alwaysProceedConfirmed: Bool
+
+  public init(
+    providerID: String,
+    baseURL: String? = nil,
+    apiKey: String? = nil,
+    alwaysProceedConfirmed: Bool = false
+  ) {
+    self.providerID = providerID
+    self.baseURL = baseURL
+    self.apiKey = apiKey
+    self.alwaysProceedConfirmed = alwaysProceedConfirmed
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case providerID = "provider_id"
+    case baseURL = "base_url"
+    case apiKey = "api_key"
+    case alwaysProceedConfirmed = "always_proceed_confirmed"
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      providerID: try container.decode(String.self, forKey: .providerID),
+      baseURL: try container.decodeIfPresent(String.self, forKey: .baseURL),
+      apiKey: try container.decodeIfPresent(String.self, forKey: .apiKey),
+      alwaysProceedConfirmed: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .alwaysProceedConfirmed
+      ) ?? false
+    )
   }
 }
 

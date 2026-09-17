@@ -33,21 +33,29 @@ public actor ServiceMCPClientRegistry {
   private let settings: ServiceSettings
   private let secrets: ServiceMCPSecretProvider
 
+  /// Builds the registry without touching the system credential store.
+  ///
+  /// The empty authenticator rejects every request until
+  /// `prepareForLocalMCP()` installs stored credentials before a listener is
+  /// opened.
+  public static func makeDeferred(
+    settings: ServiceSettings,
+    secrets: ServiceMCPSecretProvider
+  ) throws -> ServiceMCPClientRegistry {
+    return try ServiceMCPClientRegistry(
+      settings: settings,
+      secrets: secrets,
+      authenticator: MCPClientCredentialAuthenticator(),
+      admission: MCPClientAdmissionGate(initiallyEnabled: [])
+    )
+  }
+
   public static func make(
     settings: ServiceSettings,
     secrets: ServiceMCPSecretProvider
   ) async throws -> ServiceMCPClientRegistry {
-    let chatGPTSecret = try await secrets.secret(for: .chatGPT)
-    let credentials = [
-      try MCPClientCredential(clientID: .chatGPT, value: chatGPTSecret)
-    ]
-    let registry = try ServiceMCPClientRegistry(
-      settings: settings,
-      secrets: secrets,
-      authenticator: MCPClientCredentialAuthenticator(credentials: credentials),
-      admission: MCPClientAdmissionGate()
-    )
-    try await registry.refreshCredentials()
+    let registry = try makeDeferred(settings: settings, secrets: secrets)
+    try await registry.prepareForLocalMCP()
     return registry
   }
 
@@ -161,9 +169,10 @@ public actor ServiceMCPClientRegistry {
     try await secrets.secret(for: .chatGPT)
   }
 
-  private func refreshCredentials() async throws {
+  public func prepareForLocalMCP() async throws {
     let qwenEnabled = try await settings.qwenStudioEnabled()
     try await installCredentials(qwenEnabled: qwenEnabled)
+    admission.allow(.chatGPT)
     if qwenEnabled {
       admission.allow(.qwenStudio)
     } else {

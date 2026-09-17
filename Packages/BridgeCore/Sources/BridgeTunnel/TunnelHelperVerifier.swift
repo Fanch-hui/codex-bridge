@@ -7,7 +7,7 @@ import Foundation
 #endif
 
 public struct TunnelCodeIdentity: Equatable, Sendable {
-  fileprivate let codeDirectoryHash: Data
+  package let codeDirectoryHash: Data
 
   public init(codeDirectoryHash: Data) {
     self.codeDirectoryHash = codeDirectoryHash
@@ -170,16 +170,15 @@ public struct TunnelHelperVerifier: Sendable {
   private static func defaultVerifier() -> any TunnelCodeSignatureVerifier {
     #if canImport(Security)
       return MacOSTunnelCodeSignatureVerifier()
+    #elseif os(Windows)
+      return WindowsTunnelCodeSignatureVerifier()
     #else
       return UnsupportedTunnelCodeSignatureVerifier()
     #endif
   }
 
   package func verify(executable: URL, expectedSHA256: String) throws -> TunnelVerifiedHelper {
-    #if !canImport(Darwin)
-      // No pinned helper build exists for this platform.
-      throw TunnelHelperError.unavailable
-    #else
+    #if canImport(Darwin)
       let descriptor = open(executable.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
       guard descriptor >= 0 else { throw TunnelHelperError.unavailable }
       defer { Darwin.close(descriptor) }
@@ -191,6 +190,14 @@ public struct TunnelHelperVerifier: Sendable {
       guard digest == expectedSHA256 else { throw TunnelHelperError.digestMismatch }
       let identity = try codeSignatureVerifier.verifyStatic(executableDescriptor: descriptor)
       return TunnelVerifiedHelper(executable: executable, codeIdentity: identity)
+    #elseif os(Windows)
+      return try WindowsTunnelHelperVerifier.verify(
+        executable: executable,
+        expectedSHA256: expectedSHA256
+      )
+    #else
+      // No pinned helper build exists for this platform.
+      throw TunnelHelperError.unavailable
     #endif
   }
 

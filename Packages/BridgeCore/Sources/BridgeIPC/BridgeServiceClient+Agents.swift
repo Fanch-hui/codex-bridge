@@ -1,8 +1,12 @@
 extension BridgeServiceClient {
   public func agentCatalog() async throws -> IPCAgentCatalogResponse {
+    try await agentCatalog(forceRefresh: false)
+  }
+
+  public func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse {
     try await call(
       operation: .getAgentCatalog,
-      payload: Optional<IPCMutationResponse>.none
+      payload: forceRefresh ? IPCAgentCatalogRequest(forceRefresh: true) : nil
     )
   }
 
@@ -10,6 +14,36 @@ extension BridgeServiceClient {
     _ request: IPCAgentRegistrationRequest
   ) async throws -> IPCAgentInstallationSummary {
     try await call(operation: .registerAgentInstallation, payload: request)
+  }
+
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String? = nil,
+    apiKey: String? = nil
+  ) async throws -> IPCAgentInstallationSummary {
+    try await connectAgentInstallation(
+      providerID: providerID,
+      baseURL: baseURL,
+      apiKey: apiKey,
+      alwaysProceedConfirmed: false
+    )
+  }
+
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String? = nil,
+    apiKey: String? = nil,
+    alwaysProceedConfirmed: Bool
+  ) async throws -> IPCAgentInstallationSummary {
+    try await call(
+      operation: .connectAgentInstallation,
+      payload: IPCAgentConnectRequest(
+        providerID: providerID,
+        baseURL: baseURL,
+        apiKey: apiKey,
+        alwaysProceedConfirmed: alwaysProceedConfirmed
+      )
+    )
   }
 
   public func reprobeAgentInstallation(
@@ -143,5 +177,32 @@ extension BridgeServiceClient {
         effort: effort ?? ""
       )
     )
+  }
+
+  public func agentNativePermissionPolicy(
+    installationID: String
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    try await call(
+      operation: .getAgentNativePermissionPolicy,
+      payload: IPCAgentNativePermissionPolicyRequest(installationID: installationID)
+    )
+  }
+
+  public func updateAgentNativePermissionPolicy(
+    _ request: IPCAgentNativePermissionMutationRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    try await call(operation: .updateAgentNativePermissionPolicy, payload: request)
+  }
+
+  public func agentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationRequest
+  ) async throws -> IPCAgentPermissionRemediationResponse {
+    try await call(operation: .getAgentPermissionRemediation, payload: request)
+  }
+
+  public func applyAgentPermissionRemediation(
+    _ request: IPCAgentPermissionRemediationApplyRequest
+  ) async throws -> IPCAgentNativePermissionPolicyResponse {
+    try await call(operation: .applyAgentPermissionRemediation, payload: request)
   }
 }

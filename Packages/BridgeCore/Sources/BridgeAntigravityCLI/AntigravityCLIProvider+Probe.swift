@@ -30,9 +30,6 @@ extension AntigravityCLIProvider {
       guard let version = AntigravityCLISemanticVersion(output) else {
         throw AntigravityCLIError.unsupportedVersion("unrecognized")
       }
-      guard configuration.compatibility.accepts(version) else {
-        throw AntigravityCLIError.unsupportedVersion(version.stringValue)
-      }
       let help = try await configuration.commandRunner.run(
         argv: [resolved, "--help"],
         workingDirectory: request.projectRoot,

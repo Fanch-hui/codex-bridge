@@ -125,6 +125,7 @@ extension BridgeServiceAppModel {
       resolvedTaskApprovalKeys = []
       resolvedDirectApprovalKeys = []
       mcpClients = []
+      deepSeekHarnessMCPServers = []
       models = []
       modelPreferences = nil
       customInstructions = nil
@@ -144,13 +145,15 @@ extension BridgeServiceAppModel {
 
   func refresh(
     silent: Bool,
-    includeCatalog: Bool
+    includeCatalog: Bool,
+    forceCatalogRefresh: Bool = false
   ) async {
     guard !stopped else { return }
     if refreshInProgress {
       pendingRefresh = true
       pendingVisibleRefresh = pendingVisibleRefresh || !silent
       pendingCatalogRefresh = pendingCatalogRefresh || includeCatalog
+      pendingForceCatalogRefresh = pendingForceCatalogRefresh || forceCatalogRefresh
       return
     }
     registrationStatus = registration.status
@@ -162,7 +165,10 @@ extension BridgeServiceAppModel {
       return
     }
     guard let client else {
-      await connect(includeCatalog: includeCatalog)
+      await connect(
+        includeCatalog: includeCatalog,
+        forceCatalogRefresh: forceCatalogRefresh
+      )
       return
     }
 
@@ -178,7 +184,8 @@ extension BridgeServiceAppModel {
       await refreshCollections(
         client: client,
         includeCatalog: includeCatalog,
-        includeThreads: !silent
+        includeProjectResources: !silent,
+        forceCatalogRefresh: forceCatalogRefresh
       )
     } catch {
       await closeClient()
@@ -194,66 +201,16 @@ extension BridgeServiceAppModel {
     guard pendingRefresh, !stopped else { return }
     let visible = pendingVisibleRefresh
     let includeCatalog = pendingCatalogRefresh
+    let forceCatalogRefresh = pendingForceCatalogRefresh
     pendingRefresh = false
     pendingVisibleRefresh = false
     pendingCatalogRefresh = false
-    await refresh(silent: !visible, includeCatalog: includeCatalog)
-  }
-
-  func connect(includeCatalog: Bool) async {
-    pollingTask?.cancel()
-    pollingTask = nil
-    await closeClient()
-    registrationStatus = registration.status
-    guard registrationStatus == .enabled else {
-      connectionState =
-        registrationStatus == .requiresApproval
-        ? .requiresApproval
-        : .unavailable
-      return
-    }
-
-    connectionState = .connecting
-    var lastError: (any Error)?
-    for attempt in 0..<maximumConnectionAttempts {
-      guard !stopped, registration.status == .enabled else { return }
-      let candidate = clientFactory()
-      do {
-        let status = try await candidate.status()
-        serviceStatus = status
-        applyWorkbenchPermissionMode(status.workbenchPermissionMode)
-        client = candidate
-        connectionState = .connected
-        registrationStatus = .enabled
-        lastRefreshAt = Date()
-        errorMessage = nil
-        await refreshCollections(
-          client: candidate,
-          includeCatalog: includeCatalog,
-          includeThreads: true
-        )
-        startPolling()
-        return
-      } catch {
-        lastError = error
-        await candidate.close()
-        guard attempt + 1 < maximumConnectionAttempts else { break }
-        do {
-          try await Task.sleep(for: connectionRetryDelay)
-        } catch {
-          return
-        }
-      }
-    }
-
-    registrationStatus = registration.status
-    connectionState =
-      registrationStatus == .requiresApproval
-      ? .requiresApproval
-      : .unavailable
-    if let lastError {
-      errorMessage = Self.message(lastError)
-    }
+    pendingForceCatalogRefresh = false
+    await refresh(
+      silent: !visible,
+      includeCatalog: includeCatalog,
+      forceCatalogRefresh: forceCatalogRefresh
+    )
   }
 
   func reconcileThreadSelection() {
@@ -301,6 +258,9 @@ extension BridgeServiceAppModel {
   }
 
   func updateChatBrowserVisibility() {
+    if selection != .workbench, chatBrowserViewport != nil {
+      chatBrowserViewport = nil
+    }
     cancelChatBrowserSleep()
     guard isChatBrowserEnabled, selection != .workbench, chatWebView != nil else { return }
     let delay = chatBrowserSleepDelay
@@ -417,13 +377,13 @@ extension BridgeServiceAppModel {
     BridgeServiceErrorMessage.message(error)
   }
 
-  private func closeClient() async {
+  func closeClient() async {
     let current = client
     client = nil
     await current?.close()
   }
 
-  private func startPolling() {
+  func startPolling() {
     guard let pollInterval, pollingTask == nil else { return }
     pollingTask = Task { [weak self] in
       while !Task.isCancelled {
@@ -442,8 +402,10 @@ extension BridgeServiceAppModel {
 
   func nextPollingDelay(base: Duration) -> Duration {
     let needsLiveUpdates =
-      tasks.contains(where: \.isActive) || !approvals.isEmpty || !directApprovals.isEmpty
+      connectionState != .connected || tasks.contains(where: \.isActive) || !approvals.isEmpty
+      || !directApprovals.isEmpty
       || !resolvingApprovalKeys.isEmpty
+      || (serviceStatus?.tunnel.enabled == true && serviceStatus?.tunnel.lifecycle != "ready")
     return needsLiveUpdates ? base : max(base, idlePollInterval)
   }
 

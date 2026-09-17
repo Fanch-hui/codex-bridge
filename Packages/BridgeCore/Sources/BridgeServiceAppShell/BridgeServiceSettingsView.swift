@@ -10,7 +10,7 @@ struct BridgeServiceSettingsView: View {
       VStack(alignment: .leading, spacing: 24) {
         SectionHeader(
           "偏好与策略设置",
-          subtitle: "配置 AI 模型的默认推理强度、Supervisor 监督、全局安全审批策略与后台常驻服务。",
+          subtitle: "配置 AI 模型的默认推理强度、全局安全审批策略与后台常驻服务。",
           icon: "gearshape"
         )
 
@@ -21,8 +21,6 @@ struct BridgeServiceSettingsView: View {
 
           BridgeServiceSettingsCodexDefaultsCard(model: model)
 
-          BridgeServiceSettingsSupervisorDefaultsCard(model: model)
-
           ForEach(
             ["opencode", "deepseek-harness", "antigravity"],
             id: \.self
@@ -32,6 +30,7 @@ struct BridgeServiceSettingsView: View {
               providerID: providerID
             )
           }
+
         }
 
         VStack(alignment: .leading, spacing: 12) {

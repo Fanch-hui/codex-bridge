@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -35,6 +36,19 @@
     let saveBlacklistEnabled: Bool
     let removeBlacklistEnabled: Bool
     let statusText: String
+    var selectedProjectID: String? = nil
+    var selectedCommandID: String? = nil
+    var selectedSkillID: String? = nil
+    var selectedThreadID: String? = nil
+    var fileWritePermission: String = "denied"
+    var commands: [BridgeDesktopWorkspaceCommand] = []
+    var blacklist: [BridgeDesktopBlacklistRule] = []
+    var skills: [BridgeDesktopSkillRow] = []
+    var threads: [BridgeDesktopThreadRow] = []
+    var verificationCommands: [String] = []
+    var threadCount: Int? = nil
+    var selectedThreadTitle: String? = nil
+    var selectedThreadConversation: [BridgeDesktopConversationEntry] = []
   }
 
   struct WindowsAgentDefaultsDisplay: Equatable, Sendable {
@@ -54,6 +68,17 @@
     let refreshModelsEnabled: Bool
     let saveEnabled: Bool
     let statusText: String
+    var providerItems: [BridgeDesktopAgentProviderRow] = []
+    var installationItems: [BridgeDesktopAgentInstallationRow] = []
+    var selectedProviderID: String? = nil
+    var selectedInstallationID: String? = nil
+    var selectedModelID: String? = nil
+    var selectedEffort: String = ""
+    var selectedPermissionMode: String = ""
+    var defaultErrorMessage: String? = nil
+    var modelOptions: [BridgeDesktopModelOption] = []
+    var defaultItems: [BridgeDesktopAgentDefaultState] = []
+    var nativePermissionPolicy: BridgeDesktopNativePermissionState? = nil
   }
 
   struct WindowsLogDisplay: Equatable, Sendable {
@@ -70,6 +95,11 @@
     let copyEnabled: Bool
     let copyText: String
     let statusText: String
+    var rowsTyped: [BridgeDesktopLogRow] = []
+    var projectOptions: [BridgeDesktopChoice] = []
+    var selectedProjectID: String? = nil
+    var selectedKind: String = "all"
+    var selectedRowID: String? = nil
   }
 
   struct WindowsSettingsDisplay: Equatable, Sendable {
@@ -77,13 +107,10 @@
     let modelRows: [String]
     let modelIDs: [String]
     let selectedExecutionModelIndex: Int?
-    let selectedSupervisorModelIndex: Int?
     let effortValues: [String]
     let selectedExecutionEffortIndex: Int?
-    let selectedSupervisorEffortIndex: Int?
     let accessValues: [String]
     let selectedAccessIndex: Int?
-    let supervisorEnabled: Bool
     let fastModeEnabled: Bool
     let directApprovalValues: [String]
     let selectedDirectApprovalIndex: Int?
@@ -95,10 +122,29 @@
     let saveDirectApprovalEnabled: Bool
     let saveTaskStartApprovalEnabled: Bool
     let statusText: String
+    var busy: Bool = false
+    var isRefreshingModels: Bool = false
+    var modelError: String? = nil
+    var executionModel: String = ""
+    var executionEffort: String = ""
+    var accessMode: String = "request-approval"
+    var directApprovalMode: String = "require"
+    var taskStartApprovalMode: String = "require"
+    var modelOptions: [BridgeDesktopModelOption] = []
+    var keepServiceRunningAfterExit: Bool = true
+    var serviceRegistered: Bool = false
+    var direct: BridgeDesktopDirectState? = nil
   }
 
   final class AuxiliaryDisplayBox<Value: Equatable & Sendable>: @unchecked Sendable {
     private let lock = NSLock()
+    private var version: UInt64 = 0
+
+    var revision: UInt64 {
+      lock.lock()
+      defer { lock.unlock() }
+      return version
+    }
     private var value: Value
 
     init(value: Value) { self.value = value }
@@ -111,8 +157,10 @@
 
     func store(_ value: Value) {
       lock.lock()
+      defer { lock.unlock() }
+      guard self.value != value else { return }
       self.value = value
-      lock.unlock()
+      version &+= 1
     }
   }
 #endif

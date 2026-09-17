@@ -365,7 +365,10 @@ public struct BoundedProcessRunner: Sendable {
               nil,
               nil,
               true,
-              DWORD(CREATE_UNICODE_ENVIRONMENT),
+              // The desktop shell is a Windows GUI subsystem process. Without
+              // CREATE_NO_WINDOW, console tools such as Git receive a newly
+              // allocated console window for each status refresh.
+              DWORD(CREATE_UNICODE_ENVIRONMENT) | DWORD(CREATE_NO_WINDOW),
               UnsafeMutableRawPointer(mutating: environmentWide),
               workingWide,
               &startup,

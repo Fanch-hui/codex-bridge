@@ -5,15 +5,18 @@ public struct AntigravityCLILaunchBuilder: Sendable {
   public let maximumFrameBytes: Int
   public let maximumStandardErrorBytes: Int
   public let maximumLifetime: Duration
+  public let printTimeout: String
 
   public init(
     maximumFrameBytes: Int = 1_048_576,
     maximumStandardErrorBytes: Int = 256 * 1_024,
-    maximumLifetime: Duration = .seconds(24 * 60 * 60)
+    maximumLifetime: Duration = .seconds(24 * 60 * 60),
+    printTimeout: String = "24h"
   ) {
     self.maximumFrameBytes = max(1, maximumFrameBytes)
     self.maximumStandardErrorBytes = max(1, maximumStandardErrorBytes)
     self.maximumLifetime = maximumLifetime
+    self.printTimeout = printTimeout
   }
 
   public func make(
@@ -55,6 +58,9 @@ public struct AntigravityCLILaunchBuilder: Sendable {
         "--output-format",
         "stream-json",
       ])
+    if !printTimeout.isEmpty {
+      providerArgv.append(contentsOf: ["--print-timeout", printTimeout])
+    }
     let readOnly = request.mutationIntent == .readOnly
     providerArgv.append(contentsOf: ["--mode", readOnly ? "plan" : "accept-edits"])
     if let sessionID = request.requestedSessionID {

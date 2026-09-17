@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import Foundation
 
 public actor SkillScanner {
@@ -15,13 +16,24 @@ public actor SkillScanner {
     self.fileManager = fileManager
   }
 
-  public static func defaultGlobalRoots() -> [URL] {
-    let home = FileManager.default.homeDirectoryForCurrentUser
-    return [
-      home.appendingPathComponent(".codex/skills"),
-      home.appendingPathComponent(".agents/skills"),
-      home.appendingPathComponent(".gemini/config/skills"),
-    ]
+  public static func defaultGlobalRoots(
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+  ) -> [URL] {
+    let homePath = userHomePath(environment: environment) ?? homeDirectory.path
+    let home = URL(fileURLWithPath: homePath, isDirectory: true)
+    var roots: [URL] = []
+    if let codexHome = environmentValue("CODEX_HOME", in: environment),
+      let codexHomeURL = absoluteURL(codexHome)
+    {
+      roots.append(codexHomeURL.appendingPathComponent("skills", isDirectory: true))
+    }
+    roots.append(contentsOf: [
+      home.appendingPathComponent(".codex/skills", isDirectory: true),
+      home.appendingPathComponent(".agents/skills", isDirectory: true),
+      home.appendingPathComponent(".gemini/config/skills", isDirectory: true),
+    ])
+    return uniqueRoots(roots)
   }
 
   public func scanSkills(for projectRoot: URL?) throws -> [SkillManifest] {
@@ -59,5 +71,57 @@ public actor SkillScanner {
     public let argvPrefix: [String]
     public var interpreter: String { argvPrefix.first ?? "" }
     public var resolvedScriptPath: String { argvPrefix.count > 1 ? argvPrefix[1] : "" }
+  }
+
+  private static func userHomePath(environment: [String: String]) -> String? {
+    #if os(Windows)
+      if let profile = environmentValue("USERPROFILE", in: environment) {
+        return profile
+      }
+      if let drive = environmentValue("HOMEDRIVE", in: environment),
+        let path = environmentValue("HOMEPATH", in: environment)
+      {
+        let combined = drive + path
+        if !combined.isEmpty { return combined }
+      }
+    #endif
+    return environmentValue("HOME", in: environment)
+  }
+
+  private static func environmentValue(
+    _ name: String,
+    in environment: [String: String]
+  ) -> String? {
+    guard
+      let key = environment.keys.first(where: {
+        $0.caseInsensitiveCompare(name) == .orderedSame
+      })
+    else {
+      return nil
+    }
+    let value = environment[key] ?? ""
+    return value.isEmpty ? nil : value
+  }
+
+  private static func absoluteURL(_ path: String) -> URL? {
+    #if os(Windows)
+      guard AgentPathSemantics.isAbsolute(path, style: .windows) else { return nil }
+    #else
+      guard AgentPathSemantics.isAbsolute(path, style: .posix) else { return nil }
+    #endif
+    return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+  }
+
+  private static func uniqueRoots(_ roots: [URL]) -> [URL] {
+    var seen = Set<String>()
+    return roots.filter { root in
+      let path = root.standardizedFileURL.path
+      #if os(Windows)
+        let key = path.lowercased()
+      #else
+        let key = path
+      #endif
+      return seen.insert(key).inserted
+    }
   }
 }

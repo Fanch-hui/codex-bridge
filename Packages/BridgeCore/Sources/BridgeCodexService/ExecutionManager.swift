@@ -79,10 +79,15 @@ public actor ExecutionManager {
   public func respondToApproval(
     taskID: TaskID,
     approvalID: String,
-    decision: LocalApprovalDecision
+    decision: LocalApprovalDecision,
+    answers: [String: [String]]? = nil
   ) async throws {
     let session = try requiredSession(taskID)
-    try await session.respondToApproval(id: approvalID, decision: decision)
+    try await session.respondToApproval(
+      id: approvalID,
+      decision: decision,
+      answers: answers
+    )
   }
 
   public func finalizeApproval(

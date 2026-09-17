@@ -25,11 +25,13 @@ public struct ServiceCommandBlacklistRule: Codable, Equatable, Sendable {
   public let id: String
   public let executable: String?
   public let pattern: String?
+  public let arguments: [String]?
 
   public init(
     id: String,
     executable: String? = nil,
-    pattern: String? = nil
+    pattern: String? = nil,
+    arguments: [String]? = nil
   ) throws {
     try ServiceValidation.identifier(id, field: "blacklistRule.id", maximumBytes: 128)
     if let executable {
@@ -44,6 +46,7 @@ public struct ServiceCommandBlacklistRule: Codable, Equatable, Sendable {
     self.id = id
     self.executable = executable
     self.pattern = pattern
+    self.arguments = arguments
   }
 }
 

@@ -231,14 +231,20 @@ public struct MCPProjectPage: Codable, Equatable, Sendable {
   public let projects: [MCPProjectSummary]
   public let nextCursor: String?
 
-  public init(projects: [MCPProjectSummary], nextCursor: String? = nil) {
+  public let defaultProjectID: String?
+
+  public init(
+    projects: [MCPProjectSummary], nextCursor: String? = nil, defaultProjectID: String? = nil
+  ) {
     self.projects = projects
     self.nextCursor = nextCursor
+    self.defaultProjectID = defaultProjectID
   }
 
   private enum CodingKeys: String, CodingKey {
     case projects
     case nextCursor = "next_cursor"
+    case defaultProjectID = "default_project_id"
   }
 }
 

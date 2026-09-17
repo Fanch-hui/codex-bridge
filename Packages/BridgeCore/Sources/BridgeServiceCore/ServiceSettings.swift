@@ -21,6 +21,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case mcpLocalPort = "mcp.local_port"
   case qwenStudioEnabled = "mcp.client.qwen-studio.enabled"
   case qwenStudioExposureMode = "mcp.client.qwen-studio.exposure_mode"
+  case directConfiguration = "direct.configuration"
   case directApprovalMode = "direct.approval_mode"
   case taskStartApprovalMode = "tasks.start_approval_mode"
   case defaultExecutionModel = "models.execution.default"
@@ -38,6 +39,9 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessDefaultModel = "agent.deepseek-harness.default_model"
   case deepSeekHarnessDefaultPermissionMode = "agent.deepseek-harness.default_permission_mode"
   case deepSeekHarnessDefaultEffort = "agent.deepseek-harness.default_effort"
+  case deepSeekHarnessBaseURL = "agent.deepseek-harness.base_url"
+  case deepSeekHarnessManagedConfigurationPath = "agent.deepseek-harness.managed_configuration_path"
+  case deepSeekHarnessMCPServers = "agent.deepseek-harness.mcp.servers"
   case antigravityDefaultModel = "agent.antigravity.default_model"
   case antigravityDefaultPermissionMode = "agent.antigravity.default_permission_mode"
   case antigravityDefaultEffort = "agent.antigravity.default_effort"
@@ -86,7 +90,7 @@ public actor ServiceSettings {
   public func exposureMode() async throws -> ServiceMCPExposureMode {
     guard let setting = try await store.setting(key: ServiceSettingKey.mcpExposureMode.rawValue)
     else {
-      return .readOnly
+      return .full
     }
     guard let mode = ServiceMCPExposureMode(rawValue: setting.value) else {
       throw ServiceStoreError.corruptRecord
@@ -106,6 +110,30 @@ public actor ServiceSettings {
       allowEmpty: true
     )
     try await set(instructions, for: .customInstructions)
+  }
+
+  public func deepSeekHarnessMCPServers() async throws
+    -> [ServiceDeepSeekHarnessMCPServerRecord]
+  {
+    guard let value = try await string(for: .deepSeekHarnessMCPServers) else { return [] }
+    guard let data = value.data(using: .utf8) else { throw ServiceStoreError.corruptRecord }
+    do {
+      return try JSONDecoder().decode([ServiceDeepSeekHarnessMCPServerRecord].self, from: data)
+    } catch {
+      throw ServiceStoreError.corruptRecord
+    }
+  }
+
+  public func setDeepSeekHarnessMCPServers(
+    _ servers: [ServiceDeepSeekHarnessMCPServerRecord]
+  ) async throws {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    guard let data = try? encoder.encode(servers), let value = String(data: data, encoding: .utf8)
+    else {
+      throw ServiceStoreError.invalidArgument("dsh.mcp.servers")
+    }
+    try await set(value, for: .deepSeekHarnessMCPServers)
   }
 
   public func setExposureMode(_ mode: ServiceMCPExposureMode) async throws {
@@ -142,7 +170,7 @@ public actor ServiceSettings {
   }
 
   public func qwenStudioExposureMode() async throws -> ServiceMCPExposureMode {
-    guard let value = try await string(for: .qwenStudioExposureMode) else { return .readOnly }
+    guard let value = try await string(for: .qwenStudioExposureMode) else { return .full }
     guard let mode = ServiceMCPExposureMode(rawValue: value) else {
       throw ServiceStoreError.corruptRecord
     }
@@ -263,18 +291,11 @@ public actor ServiceSettings {
   }
 
   public func isSupervisorEnabled() async throws -> Bool {
-    guard let setting = try await store.setting(key: ServiceSettingKey.supervisorEnabled.rawValue)
-    else {
-      return true
-    }
-    guard let enabled = Bool(setting.value) else {
-      throw ServiceStoreError.corruptRecord
-    }
-    return enabled
+    false
   }
 
-  public func setSupervisorEnabled(_ enabled: Bool) async throws {
-    try await set(String(enabled), for: .supervisorEnabled)
+  public func setSupervisorEnabled(_ _: Bool) async throws {
+    try await set("false", for: .supervisorEnabled)
   }
 
   public func openCodeDefaultPermissionMode() async throws -> String {

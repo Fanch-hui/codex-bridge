@@ -16,6 +16,15 @@ extension DeepSeekHarnessACPProvider {
     case DeepSeekHarnessACPError.processExited(let code):
       return
         "DeepSeek Harness ACP exited during probe (code: \(code.map(String.init) ?? "unknown"))."
+    case DeepSeekHarnessACPError.remote(let code, let message):
+      let detail = DeepSeekHarnessACPDiagnostic.sanitizeProviderMessage(message)
+      return "DeepSeek Harness ACP rejected the probe (\(code)): \(detail)"
+    case DeepSeekHarnessACPError.requestTimedOut:
+      return "DeepSeek Harness ACP did not respond before the probe timeout."
+    case DeepSeekHarnessACPError.transportClosed:
+      return "DeepSeek Harness ACP closed its connection during the probe."
+    case DeepSeekHarnessACPError.processUnavailable:
+      return "DeepSeek Harness ACP could not start."
     case DeepSeekHarnessACPError.artifactInvalid:
       return "DeepSeek Harness installation artifacts are unavailable or changed."
     default:

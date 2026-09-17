@@ -25,6 +25,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let tasks: ServiceTaskManager
   let settings: ServiceSettings
   let agentRegistry: ServiceAgentRegistry?
+  let agentCredentials: ServiceAgentCredentialEnvironment?
   let coordinator: ServiceExecutionCoordinator
   let catalog: ServiceCodexCatalog
   let files: RestrictedProjectFileService
@@ -46,6 +47,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     catalog: ServiceCodexCatalog,
     runtimeStatus: ServiceRuntimeStatus,
     agentRegistry: ServiceAgentRegistry? = nil,
+    agentCredentials: ServiceAgentCredentialEnvironment? = nil,
     files: RestrictedProjectFileService? = nil,
     mutations: RestrictedProjectMutationService? = nil,
     workspaceGate: ServiceWorkspaceMutationGate? = nil,
@@ -60,6 +62,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     self.tasks = tasks
     self.settings = settings
     self.agentRegistry = agentRegistry
+    self.agentCredentials = agentCredentials
     self.coordinator = coordinator
     self.catalog = catalog
     self.runtimeStatus = runtimeStatus

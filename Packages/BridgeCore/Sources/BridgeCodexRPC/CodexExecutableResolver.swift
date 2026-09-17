@@ -32,7 +32,7 @@
       case .amd64:
         machine == 0x8664
       case .arm64:
-        machine == 0xAA64 || machine == 0xA641
+        machine == 0xAA64 || machine == 0xA641 || machine == 0x8664
       }
     }
   }
@@ -45,8 +45,11 @@
     private let architecture: CodexWindowsArchitecture
     private let validator: Validator
     private let regularFileCheck: RegularFileCheck
+    private let packagedInstallations: @Sendable () -> [String]
 
     init(
+      packagedInstallations: @escaping @Sendable () -> [String] =
+        CodexWindowsPackageDiscovery.installationDirectories,
       environment: [String: String] = ProcessInfo.processInfo.environment,
       architecture: CodexWindowsArchitecture = .current,
       validator: @escaping Validator = CodexWindowsNativeExecutable.isValid,
@@ -56,6 +59,7 @@
       self.architecture = architecture
       self.validator = validator
       self.regularFileCheck = regularFileCheck
+      self.packagedInstallations = packagedInstallations
     }
 
     func resolve(explicitPath: String? = nil) -> String? {
@@ -81,12 +85,16 @@
     }
 
     private func candidatePaths() -> [String] {
-      let appData = CodexWindowsPath.environmentValue("APPDATA", in: environment)
-      let localAppData = CodexWindowsPath.environmentValue("LOCALAPPDATA", in: environment)
+      let userProfile = CodexWindowsPath.userProfile(in: environment)
+      let appData =
+        CodexWindowsPath.environmentValue("APPDATA", in: environment)
+        ?? userProfile.map { CodexWindowsPath.join($0, "AppData", "Roaming") }
+      let localAppData =
+        CodexWindowsPath.environmentValue("LOCALAPPDATA", in: environment)
+        ?? userProfile.map { CodexWindowsPath.join($0, "AppData", "Local") }
       let programFiles = CodexWindowsPath.environmentValue("ProgramFiles", in: environment)
       let programFilesX86 = CodexWindowsPath.environmentValue("ProgramFiles(x86)", in: environment)
       let programW6432 = CodexWindowsPath.environmentValue("ProgramW6432", in: environment)
-      let userProfile = CodexWindowsPath.environmentValue("USERPROFILE", in: environment)
       var result: [String] = []
 
       if let configured = CodexWindowsPath.environmentValue(
@@ -94,6 +102,10 @@
       ) {
         result.append(contentsOf: expandedExplicitPaths(configured))
       }
+      result.append(
+        contentsOf: packagedInstallations().map {
+          CodexWindowsPath.join($0, "app", "resources", "codex.exe")
+        })
       appendOfficialInstallations(
         localAppData: localAppData,
         programFiles: programFiles,
@@ -132,7 +144,22 @@
         ])
       }
       if let userProfile {
-        result.append(
+        result.append(contentsOf: [
+          CodexWindowsPath.join(
+            userProfile,
+            ".codex",
+            "plugins",
+            ".plugin-appserver",
+            "codex.exe"
+          ),
+          CodexWindowsPath.join(
+            userProfile,
+            ".codex",
+            ".sandbox-bin",
+            "codex.exe"
+          ),
+          CodexWindowsPath.join(userProfile, ".codex", "bin", "codex.exe"),
+          CodexWindowsPath.join(userProfile, ".codex", "codex.exe"),
           CodexWindowsPath.join(
             userProfile,
             ".codex",
@@ -141,8 +168,19 @@
             "current",
             "bin",
             "codex.exe"
-          ))
+          ),
+          CodexWindowsPath.join(userProfile, ".cargo", "bin", "codex.exe"),
+          CodexWindowsPath.join(userProfile, ".local", "bin", "codex.exe"),
+          CodexWindowsPath.join(userProfile, "scoop", "shims", "codex.exe"),
+          CodexWindowsPath.join(userProfile, "scoop", "apps", "codex", "current", "codex.exe"),
+        ])
       }
+      if let localAppData {
+        result.append(
+          CodexWindowsPath.join(localAppData, "Microsoft", "WinGet", "Links", "codex.exe")
+        )
+      }
+      result.append("C:\\ProgramData\\chocolatey\\bin\\codex.exe")
       for root in [programW6432, programFiles, programFilesX86].compactMap({ $0 }) {
         result.append(contentsOf: [
           CodexWindowsPath.join(root, "OpenAI", "Codex", "bin", "codex.exe"),
@@ -221,22 +259,30 @@
     }
 
     private func nativeCodexPaths(packageRoot: String) -> [String] {
-      let nativeRoot = CodexWindowsPath.join(
-        packageRoot,
-        "node_modules",
-        "@openai",
-        architecture.nativePackageName
-      )
-      let siblingRoot = CodexWindowsPath.parent(packageRoot).map {
-        CodexWindowsPath.join($0, architecture.nativePackageName)
+      let architectures: [CodexWindowsArchitecture] = {
+        switch architecture {
+        case .amd64: [.amd64]
+        case .arm64: [.arm64, .amd64]
+        }
+      }()
+      return architectures.flatMap { arch in
+        let nativeRoot = CodexWindowsPath.join(
+          packageRoot,
+          "node_modules",
+          "@openai",
+          arch.nativePackageName
+        )
+        let siblingRoot = CodexWindowsPath.parent(packageRoot).map {
+          CodexWindowsPath.join($0, arch.nativePackageName)
+        }
+        return [
+          CodexWindowsPath.join(nativeRoot, "vendor", arch.vendorTriple, "bin", "codex.exe"),
+          siblingRoot.map {
+            CodexWindowsPath.join($0, "vendor", arch.vendorTriple, "bin", "codex.exe")
+          },
+          CodexWindowsPath.join(packageRoot, "vendor", arch.vendorTriple, "bin", "codex.exe"),
+        ].compactMap { $0 }
       }
-      return [
-        CodexWindowsPath.join(nativeRoot, "vendor", architecture.vendorTriple, "bin", "codex.exe"),
-        siblingRoot.map {
-          CodexWindowsPath.join($0, "vendor", architecture.vendorTriple, "bin", "codex.exe")
-        },
-        CodexWindowsPath.join(packageRoot, "vendor", architecture.vendorTriple, "bin", "codex.exe"),
-      ].compactMap { $0 }
     }
   }
 #endif

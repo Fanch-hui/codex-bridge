@@ -2,10 +2,11 @@ import BridgeMCP
 import BridgeServiceAppCore
 import SwiftUI
 
+package typealias WorkbenchAgentTaskPickerContent = WorkbenchSessionCatalog
+
 struct WorkbenchAgentTaskPicker: View {
   @ObservedObject var model: BridgeServiceAppModel
   let tasks: [MCPServiceTaskSnapshot]
-  let threads: [MCPThreadSummary]
 
   var body: some View {
     HStack(spacing: 6) {
@@ -14,118 +15,68 @@ struct WorkbenchAgentTaskPicker: View {
         .foregroundStyle(.secondary)
 
       if itemCount == 0 {
-        Text("暂无 Agent 任务")
+        Text("暂无 Agent 会话")
           .font(.caption)
           .foregroundStyle(.secondary)
       } else {
         Menu {
-          if !tasks.isEmpty {
-            Section("Agent 任务") {
-              ForEach(tasks, id: \.taskID) { task in
-                taskButton(task)
-              }
-            }
-          }
-
-          if !orphanThreads.isEmpty {
-            Section("Codex 历史会话") {
-              ForEach(orphanThreads, id: \.threadID) { thread in
+          ForEach(WorkbenchSessionCatalog.groupedSessions(tasks: tasks)) { group in
+            Section {
+              ForEach(group.sessions) { session in
                 Button {
-                  model.openThread(thread.threadID)
+                  model.openSession(session)
                 } label: {
                   Label(
-                    threadTitle(thread),
-                    systemImage: thread.threadID == model.selectedThreadID
-                      ? "checkmark" : AgentProviderPresentation.systemImage("codex")
+                    WorkbenchTaskTextPresentation.sessionMenuTitle(
+                      title: session.title,
+                      turnCount: session.turnCount
+                    ),
+                    systemImage: isSessionSelected(session)
+                      ? "checkmark" : session.providerSystemImage
                   )
                 }
               }
+            } header: {
+              Label(group.providerDisplayName + " 会话", systemImage: group.providerSystemImage)
             }
           }
+
         } label: {
           Text(selectedItemLabel)
             .font(.caption.weight(.medium))
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(maxWidth: 250, alignment: .leading)
+            .frame(maxWidth: 240, alignment: .leading)
         }
         .menuStyle(.borderlessButton)
-        .frame(maxWidth: 250, alignment: .leading)
+        .frame(maxWidth: 240, alignment: .leading)
         .help(selectedItemLabel)
-        .accessibilityLabel("当前 Agent 任务：\(selectedItemLabel)")
+        .accessibilityLabel("当前 Agent 会话：\(selectedItemLabel)")
       }
     }
   }
 
-  @ViewBuilder
-  private func taskButton(_ task: MCPServiceTaskSnapshot) -> some View {
-    Button {
-      model.openTask(task.taskID)
-    } label: {
-      Label(
-        WorkbenchTaskTextPresentation.menuTitle(for: task),
-        systemImage: task.taskID == model.selectedTaskID ? "checkmark" : task.providerSystemImage
-      )
-    }
+  private func isSessionSelected(_ session: WorkbenchSessionItem) -> Bool {
+    session.tasks.contains(where: { $0.taskID == model.selectedTaskID })
   }
 
   private var selectedItemLabel: String {
-    if let task = WorkbenchAgentTaskPickerContent.selectedTask(
+    if let session = WorkbenchSessionCatalog.selectedSession(
       tasks: tasks,
       selectedTaskID: model.selectedTaskID
     ) {
-      return WorkbenchTaskTextPresentation.menuTitle(for: task)
+      let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
+        title: session.title,
+        turnCount: session.turnCount,
+        maximumCharacters: 30
+      )
+      return "\(session.providerDisplayName) · \(title)"
     }
-    if let thread = threads.first(where: { $0.threadID == model.selectedThreadID }) {
-      return "Codex · \(threadTitle(thread))"
-    }
-    if let task = tasks.first(where: { $0.taskID == model.selectedTaskID }) {
-      return WorkbenchTaskTextPresentation.menuTitle(for: task)
-    }
-    return "选择 Agent 任务（\(itemCount)）"
+    return "选择 Agent 会话（\(itemCount)）"
   }
 
   private var itemCount: Int {
-    WorkbenchAgentTaskPickerContent.itemCount(tasks: tasks, threads: threads)
-  }
-
-  private var orphanThreads: [MCPThreadSummary] {
-    WorkbenchAgentTaskPickerContent.orphanThreads(tasks: tasks, threads: threads)
-  }
-
-  private func threadTitle(_ thread: MCPThreadSummary) -> String {
-    WorkbenchThreadTitlePresentation.compact(
-      thread.title ?? thread.preview ?? thread.threadID,
-      maximumCharacters: 48
-    )
-  }
-}
-
-package enum WorkbenchAgentTaskPickerContent {
-  package static func selectedTask(
-    tasks: [MCPServiceTaskSnapshot],
-    selectedTaskID: String?
-  ) -> MCPServiceTaskSnapshot? {
-    guard let selectedTaskID else { return nil }
-    return tasks.first(where: { $0.taskID == selectedTaskID })
-  }
-
-  package static func orphanThreads(
-    tasks: [MCPServiceTaskSnapshot],
-    threads: [MCPThreadSummary]
-  ) -> [MCPThreadSummary] {
-    let taskThreadIDs = Set(
-      tasks.compactMap { task in
-        task.isCodexTask ? task.threadID : nil
-      })
-    return threads.filter { !taskThreadIDs.contains($0.threadID) }
-  }
-
-  package static func itemCount(
-    tasks: [MCPServiceTaskSnapshot],
-    threads: [MCPThreadSummary]
-  ) -> Int {
-    tasks.count + orphanThreads(tasks: tasks, threads: threads).count
+    WorkbenchSessionCatalog.sessions(tasks: tasks).count
   }
 }
 
@@ -165,13 +116,6 @@ struct WorkbenchExternalTaskCard: View {
           .font(.caption2)
           .foregroundStyle(.secondary)
 
-        if task.providerIdentifier == "deepseek-harness" {
-          Text("每个任务使用独立会话")
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-            .help("DeepSeek Harness 当前不支持续接历史会话。")
-        }
-
         if let failureDescription = task.failureDescription {
           Label {
             Text(failureDescription)
@@ -203,24 +147,5 @@ struct WorkbenchConversationErrorCard: View {
       .font(.caption)
       .foregroundStyle(.red)
     }
-  }
-}
-
-package enum WorkbenchTaskTextPresentation {
-  package static func menuTitle(for task: MCPServiceTaskSnapshot) -> String {
-    let title = compact(task.workbenchTitle, maximumCharacters: 160) ?? "未命名任务"
-    return "\(task.providerDisplayName) · \(title)"
-  }
-
-  package static func cardTitle(for task: MCPServiceTaskSnapshot) -> String? {
-    compact(task.currentStep ?? task.resultSummary, maximumCharacters: 240)
-  }
-
-  private static func compact(_ value: String?, maximumCharacters: Int) -> String? {
-    guard let value else { return nil }
-    let normalized = value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    guard !normalized.isEmpty else { return nil }
-    guard normalized.count > maximumCharacters else { return normalized }
-    return String(normalized.prefix(maximumCharacters - 1)) + "…"
   }
 }

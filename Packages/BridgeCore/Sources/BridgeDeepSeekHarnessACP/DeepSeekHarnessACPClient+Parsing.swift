@@ -3,6 +3,40 @@ import BridgeAgentCore
 import Foundation
 
 extension DeepSeekHarnessACPClient {
+  static func parseInitialization(_ value: ACPJSONValue) throws
+    -> DeepSeekHarnessACPInitialization
+  {
+    guard let object = value.objectValue,
+      let protocolVersion = object["protocolVersion"]?.intValue
+    else {
+      throw DeepSeekHarnessACPError.malformedResponse
+    }
+    let agentInfo: [String: ACPJSONValue]?
+    if let value = object["agentInfo"] {
+      guard let decoded = value.objectValue,
+        decoded["name"]?.stringValue != nil,
+        decoded["version"]?.stringValue != nil
+      else {
+        throw DeepSeekHarnessACPError.malformedResponse
+      }
+      agentInfo = decoded
+    } else {
+      agentInfo = nil
+    }
+    let capabilities = object["agentCapabilities"]?.objectValue ?? [:]
+    let sessionCapabilities = capabilities["sessionCapabilities"]?.objectValue ?? [:]
+    let mcpCapabilities = capabilities["mcpCapabilities"]?.objectValue ?? [:]
+    return DeepSeekHarnessACPInitialization(
+      protocolVersion: protocolVersion,
+      agentName: agentInfo?["name"]?.stringValue,
+      agentTitle: agentInfo?["title"]?.stringValue,
+      agentVersion: agentInfo?["version"]?.stringValue,
+      supportsResumeSession: sessionCapabilities["resume"]?.objectValue != nil,
+      supportsCloseSession: sessionCapabilities["close"]?.objectValue != nil,
+      supportsMCPHTTP: mcpCapabilities["http"]?.boolValue == true
+    )
+  }
+
   static func parseConfigOptions(_ value: ACPJSONValue?) throws
     -> [DeepSeekHarnessACPConfigOption]
   {
@@ -22,23 +56,16 @@ extension DeepSeekHarnessACPClient {
       let category = object["category"]?.stringValue
       if let category { try validateConfigText(category, maximumBytes: 64) }
       let currentValue = object["currentValue"]?.stringValue
-      if let currentValue { try validateConfigText(currentValue, maximumBytes: 256) }
+      if let currentValue { try validateConfigValue(currentValue, maximumBytes: 256) }
       guard let rawValues = object["options"]?.arrayValue, rawValues.count <= 512 else {
         throw DeepSeekHarnessACPError.malformedResponse
       }
       var seenValues = Set<String>()
-      let values = try rawValues.map { rawValue -> DeepSeekHarnessACPConfigValue in
-        guard let entry = rawValue.objectValue,
-          let value = entry["value"]?.stringValue,
-          let name = entry["name"]?.stringValue,
-          seenValues.insert(value).inserted
-        else {
-          throw DeepSeekHarnessACPError.malformedResponse
-        }
-        try validateConfigText(value, maximumBytes: 256)
-        try validateConfigText(name, maximumBytes: 512)
-        return DeepSeekHarnessACPConfigValue(value: value, name: name)
-      }
+      let values = try parseConfigValues(
+        rawValues,
+        seenValues: &seenValues,
+        depth: 0
+      )
       return DeepSeekHarnessACPConfigOption(
         id: id,
         category: category,
@@ -53,6 +80,52 @@ extension DeepSeekHarnessACPClient {
       value.rangeOfCharacter(from: .controlCharacters) == nil
     else {
       throw DeepSeekHarnessACPError.malformedResponse
+    }
+  }
+
+  private static func validateConfigValue(_ value: String, maximumBytes: Int) throws {
+    guard value.utf8.count <= maximumBytes, !value.contains("\0"),
+      value.rangeOfCharacter(from: .controlCharacters) == nil
+    else {
+      throw DeepSeekHarnessACPError.malformedResponse
+    }
+  }
+
+  private static func parseConfigValues(
+    _ rawValues: [ACPJSONValue],
+    seenValues: inout Set<String>,
+    depth: Int
+  ) throws -> [DeepSeekHarnessACPConfigValue] {
+    guard depth <= 2 else { throw DeepSeekHarnessACPError.malformedResponse }
+    return try rawValues.flatMap { rawValue in
+      guard let entry = rawValue.objectValue else {
+        throw DeepSeekHarnessACPError.malformedResponse
+      }
+      if let value = entry["value"]?.stringValue {
+        guard let name = entry["name"]?.stringValue,
+          seenValues.count < 512,
+          seenValues.insert(value).inserted
+        else {
+          throw DeepSeekHarnessACPError.malformedResponse
+        }
+        try validateConfigValue(value, maximumBytes: 256)
+        try validateConfigText(name, maximumBytes: 512)
+        return [DeepSeekHarnessACPConfigValue(value: value, name: name)]
+      }
+
+      guard let nested = entry["options"]?.arrayValue, nested.count <= 512 else {
+        throw DeepSeekHarnessACPError.malformedResponse
+      }
+      if let group = entry["group"]?.stringValue {
+        try validateConfigText(group, maximumBytes: 256)
+      }
+      if let name = entry["name"]?.stringValue {
+        try validateConfigText(name, maximumBytes: 512)
+      }
+      guard entry["value"] == nil else {
+        throw DeepSeekHarnessACPError.malformedResponse
+      }
+      return try parseConfigValues(nested, seenValues: &seenValues, depth: depth + 1)
     }
   }
 

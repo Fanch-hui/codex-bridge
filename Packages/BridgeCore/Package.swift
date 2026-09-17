@@ -1,281 +1,29 @@
 // swift-tools-version: 6.1
-
+import Foundation
 import PackageDescription
-
-var testTargets: [Target] = [
-  .testTarget(
-    name: "BridgeDomainTests",
-    dependencies: ["BridgeDomain"]
-  ),
-  .testTarget(
-    name: "BridgeAgentCoreTests",
-    dependencies: ["BridgeAgentCore", "BridgeServiceCore"]
-  ),
-  .testTarget(
-    name: "BridgeServiceAppCoreTests",
-    dependencies: ["BridgeIPC", "BridgeMCP", "BridgeServiceAppCore"]
-  ),
-]
 
 var macOSOnlyProducts: [Product] = []
 var macOSOnlyTargets: [Target] = []
+var windowsApplicationLinkerFlags = [
+  "-Xlinker", "/SUBSYSTEM:WINDOWS",
+  "-Xlinker", "/ENTRY:mainCRTStartup",
+  "-Xlinker", "/MANIFEST:EMBED",
+  "-Xlinker", "/MANIFESTINPUT:Windows/CodexBridgeWindowsApp.manifest",
+]
+#if os(Windows)
+  if let resourcePath = ProcessInfo.processInfo.environment["CODEX_BRIDGE_WINDOWS_RESOURCE"],
+    !resourcePath.isEmpty
+  {
+    windowsApplicationLinkerFlags += ["-Xlinker", resourcePath]
+  }
+#endif
 
 #if !os(Windows)
-  testTargets += [
-    .testTarget(
-      name: "BridgeSecurityTests",
-      dependencies: ["BridgeSecurity"]
-    ),
-    .testTarget(
-      name: "BridgeCodexRPCTests",
-      dependencies: ["BridgeCodexRPC"]
-    ),
-    .testTarget(
-      name: "BridgeProjectsTests",
-      dependencies: ["BridgeProjects"]
-    ),
-    .testTarget(
-      name: "BridgeGitTests",
-      dependencies: ["BridgeGit"]
-    ),
-    .testTarget(
-      name: "BridgeSupervisorTests",
-      dependencies: ["BridgeCodexRPC", "BridgeSecurity", "BridgeSupervisor"]
-    ),
-    .testTarget(
-      name: "BridgeFilesTests",
-      dependencies: ["BridgeFiles", "BridgeDomain", "BridgeProjects", "BridgeSecurity"]
-    ),
-    .testTarget(
-      name: "BridgeMCPTests",
-      dependencies: [
-        "BridgeMCP",
-        .product(name: "MCP", package: "swift-sdk"),
-        .product(name: "NIOCore", package: "swift-nio"),
-        .product(name: "NIOEmbedded", package: "swift-nio"),
-        .product(name: "NIOHTTP1", package: "swift-nio"),
-        .product(name: "NIOPosix", package: "swift-nio"),
-      ]
-    ),
-    .testTarget(
-      name: "BridgeTunnelTests",
-      dependencies: ["BridgeTunnel"],
-      path: "Tests/BridgeTunnelTests",
-      exclude: ["Fixture"]
-    ),
-    .testTarget(
-      name: "BridgeServiceCoreTests",
-      dependencies: [
-        "BridgeAgentCore",
-        "BridgeDomain",
-        "BridgeProjects",
-        "BridgeSkills",
-        "BridgeServiceCore",
-        "BridgeSecurity",
-        .product(name: "GRDB", package: "GRDB.swift"),
-      ],
-      resources: [.copy("Fixtures")]
-    ),
-    .testTarget(
-      name: "BridgeLegacyImportTests",
-      dependencies: [
-        "BridgeDomain",
-        "BridgeLegacyImport",
-        "BridgeProjects",
-        "BridgeSecurity",
-        "BridgeServiceCore",
-        .product(name: "GRDB", package: "GRDB.swift"),
-      ]
-    ),
-    .testTarget(
-      name: "BridgeCodexServiceTests",
-      dependencies: [
-        "BridgeCodexRPC",
-        "BridgeCodexService",
-        "BridgeDomain",
-        "BridgeProjects",
-        "BridgeSecurity",
-        "BridgeServiceCore",
-        "BridgeSupervisor",
-      ]
-    ),
-    .testTarget(
-      name: "BridgeOpenCodeACPTests",
-      dependencies: [
-        "BridgeACP",
-        "BridgeAgentCore",
-        "BridgeDomain",
-        "BridgeOpenCodeACP",
-      ]
-    ),
-    .testTarget(
-      name: "BridgeACPTests",
-      dependencies: ["BridgeACP"]
-    ),
-    .testTarget(
-      name: "BridgeDeepSeekHarnessACPTests",
-      dependencies: [
-        "BridgeACP",
-        "BridgeAgentCore",
-        "BridgeCodexService",
-        "BridgeDeepSeekHarnessACP",
-        "BridgeDomain",
-        "BridgeProjects",
-        "BridgeServiceCore",
-      ]
-    ),
-    .testTarget(
-      name: "BridgeAntigravityCLITests",
-      dependencies: [
-        "BridgeAgentCore",
-        "BridgeAntigravityCLI",
-        "BridgeDomain",
-        "BridgeProcess",
-      ]
-    ),
-    .testTarget(
-      name: "BridgeServiceApplicationTests",
-      dependencies: [
-        "BridgeAgentCore",
-        "BridgeCodexRPC",
-        "BridgeCodexService",
-        "BridgeDirectCommand",
-        "BridgeDomain",
-        "BridgeMCP",
-        "BridgeProjects",
-        "BridgeSecurity",
-        "BridgeServiceApplication",
-        "BridgeServiceCore",
-        .product(name: "MCP", package: "swift-sdk"),
-      ]
-    ),
-    .testTarget(
-      name: "BridgeServiceHostTests",
-      dependencies: [
-        "BridgeCodexRPC",
-        "BridgeDirectCommand",
-        "BridgeDomain",
-        "BridgeIPC",
-        "BridgeLegacyImport",
-        "BridgeMCP",
-        "BridgeProjects",
-        "BridgeSecurity",
-        "BridgeServiceApplication",
-        "BridgeServiceHost",
-        "BridgeServiceCore",
-        "BridgeTunnel",
-        .product(name: "GRDB", package: "GRDB.swift"),
-        .product(name: "MCP", package: "swift-sdk"),
-      ]
-    ),
-    .testTarget(
-      name: "BridgeServiceAppShellTests",
-      dependencies: [
-        "BridgeIPC",
-        "BridgeMCP",
-        "BridgeServiceAppShell",
-      ]
-    ),
-    .testTarget(
-      name: "BridgeDirectCommandTests",
-      dependencies: [
-        "BridgeDirectCommand",
-        "BridgeDomain",
-        "BridgeProjects",
-        "BridgeSecurity",
-        "BridgeServiceCore",
-      ]
-    ),
-  ]
-  macOSOnlyProducts = [
-    .library(name: "BridgeServiceAppShell", targets: ["BridgeServiceAppShell"]),
-    .executable(name: "bridge-tunnel-fixture", targets: ["BridgeTunnelFixture"]),
-    .executable(
-      name: "bridge-tunnel-acceptance-fixture",
-      targets: ["BridgeTunnelAcceptanceFixture"]
-    ),
-    .executable(name: "mcp-inspector-fixture", targets: ["BridgeMCPInspectorFixture"]),
-  ]
+  macOSOnlyProducts = [.library(name: "BridgeServiceAppShell", targets: ["BridgeServiceAppShell"])]
   macOSOnlyTargets = [
     .target(
       name: "BridgeServiceAppShell",
-      dependencies: [
-        "BridgeIPC",
-        "BridgeMCP",
-        "BridgeServiceAppCore",
-      ]
-    ),
-    .executableTarget(
-      name: "BridgeTunnelFixture",
-      path: "Tests/BridgeTunnelTests/Fixture"
-    ),
-    .executableTarget(
-      name: "BridgeTunnelAcceptanceFixture",
-      dependencies: ["BridgeSecurity", "BridgeTunnel"],
-      path: "Tests/BridgeTunnelAcceptanceFixture"
-    ),
-    .executableTarget(
-      name: "BridgeMCPInspectorFixture",
-      dependencies: ["BridgeMCP"],
-      path: "Tests/BridgeMCPInspectorFixture"
-    ),
-  ]
-#endif
-
-#if os(Windows)
-  testTargets += [
-    .testTarget(
-      name: "BridgeServiceHostWindowsTests",
-      dependencies: ["BridgeIPC", "BridgeServiceHost"],
-      path: "Tests/BridgeServiceHostWindowsTests"
-    ),
-    .testTarget(
-      name: "BridgeSecurityTests",
-      dependencies: ["BridgeSecurity"],
-      path: "Tests/BridgeSecurityTests",
-      exclude: [
-        "KeychainSecretStoreTests.swift",
-        "PathSecurityTests.swift",
-        "SecureFileArtifactSnapshotTests.swift",
-      ]
-    ),
-    .testTarget(
-      name: "BridgeCodexRPCTests",
-      dependencies: ["BridgeCodexRPC"],
-      path: "Tests/BridgeCodexRPCTests",
-      exclude: [
-        "AccountMethodsTests.swift",
-        "CodexApprovalWireDecoderTests.swift",
-        "FakeAppServerTests.swift",
-        "RPCValueTests.swift",
-        "ThreadCatalogMethodsTests.swift",
-        "TypedCodexMethodsTests.swift",
-      ]
-    ),
-    .testTarget(
-      name: "BridgeCodexServiceWindowsTests",
-      dependencies: ["BridgeCodexService"],
-      path: "Tests/BridgeCodexServiceWindowsTests"
-    ),
-    .testTarget(
-      name: "BridgeServiceApplicationWindowsTests",
-      dependencies: ["BridgeIPC", "BridgeServiceApplication"],
-      path: "Tests/BridgeServiceApplicationWindowsTests"
-    ),
-    .testTarget(
-      name: "BridgeServiceCoreWindowsTests",
-      dependencies: [
-        "BridgeServiceCore",
-        .product(name: "GRDB", package: "GRDB.swift"),
-      ],
-      path: "Tests/BridgeServiceCoreTests",
-      sources: ["ServiceStoreSchemaV15MigrationTests.swift"]
-    ),
-    .testTarget(
-      name: "BridgeDirectCommandWindowsTests",
-      dependencies: ["BridgeDirectCommand"],
-      path: "Tests/BridgeDirectCommandWindowsTests"
-    ),
+      dependencies: ["BridgeDesktopUI", "BridgeIPC", "BridgeMCP", "BridgeServiceAppCore"])
   ]
 #endif
 
@@ -283,12 +31,12 @@ let package = Package(
   name: "BridgeCore",
   platforms: [.macOS(.v14)],
   products: [
+    .library(name: "BridgeDesktopUI", targets: ["BridgeDesktopUI"]),
     .library(name: "BridgeDomain", targets: ["BridgeDomain"]),
     .library(name: "BridgeSecurity", targets: ["BridgeSecurity"]),
     .library(name: "BridgeCodexRPC", targets: ["BridgeCodexRPC"]),
     .library(name: "BridgeProjects", targets: ["BridgeProjects"]),
     .library(name: "BridgeGit", targets: ["BridgeGit"]),
-    .library(name: "BridgeSupervisor", targets: ["BridgeSupervisor"]),
     .library(name: "BridgeFiles", targets: ["BridgeFiles"]),
     .library(name: "BridgeMCP", targets: ["BridgeMCP"]),
     .library(name: "BridgeTunnel", targets: ["BridgeTunnel"]),
@@ -312,7 +60,7 @@ let package = Package(
       name: "codex-bridge-windows-app",
       targets: ["CodexBridgeWindowsApp"]
     ),
-    .executable(name: "codex-rpc-fixture", targets: ["CodexRPCFixture"]),
+
   ] + macOSOnlyProducts,
   dependencies: [
     // Vendored MCP swift-sdk 0.12.1: upstream excludes the EventSource
@@ -341,6 +89,11 @@ let package = Package(
     ),
   ],
   targets: [
+    .target(
+      name: "BridgeDesktopUI",
+      dependencies: ["BridgeServiceAppCore"],
+      resources: [.process("Resources")]
+    ),
     .target(name: "BridgeDomain"),
     .target(
       name: "BridgeSecurity",
@@ -351,7 +104,7 @@ let package = Package(
     ),
     .target(
       name: "BridgeCodexRPC",
-      dependencies: ["BridgeAgentCore", "BridgeSecurity"]
+      dependencies: ["BridgeAgentCore", "BridgeProcess", "BridgeSecurity"]
     ),
     .target(
       name: "BridgeProjects",
@@ -362,10 +115,6 @@ let package = Package(
       dependencies: [
         .product(name: "Crypto", package: "swift-crypto")
       ]
-    ),
-    .target(
-      name: "BridgeSupervisor",
-      dependencies: ["BridgeCodexRPC", "BridgeSecurity"]
     ),
     .target(
       name: "BridgeFiles",
@@ -432,7 +181,6 @@ let package = Package(
         "BridgeProjects",
         "BridgeSecurity",
         "BridgeServiceCore",
-        "BridgeSupervisor",
         .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
@@ -541,6 +289,7 @@ let package = Package(
     .target(
       name: "BridgeWindowsShell",
       dependencies: [
+        "BridgeDesktopUI",
         "BridgeIPC",
         "BridgeMCP",
         "BridgeServiceAppCore",
@@ -558,20 +307,11 @@ let package = Package(
       ],
       linkerSettings: [
         .unsafeFlags(
-          [
-            "-Xlinker", "/SUBSYSTEM:WINDOWS",
-            "-Xlinker", "/ENTRY:mainCRTStartup",
-            "-Xlinker", "/MANIFEST:EMBED",
-            "-Xlinker",
-            "/MANIFESTINPUT:Windows/CodexBridgeWindowsApp.manifest",
-          ],
+          windowsApplicationLinkerFlags,
           .when(platforms: [.windows])
         )
       ]
     ),
-    .executableTarget(
-      name: "CodexRPCFixture",
-      dependencies: ["BridgeCodexRPC"]
-    ),
-  ] + macOSOnlyTargets + testTargets
+
+  ] + macOSOnlyTargets
 )

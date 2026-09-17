@@ -70,7 +70,7 @@ extension ServiceAgentRegistry {
       return unavailable
     }
 
-    if currentIdentity != existing.executableIdentity, !acceptReplacement {
+    if !currentIdentity.hasSameContent(as: existing.executableIdentity), !acceptReplacement {
       let review = try unavailableRecord(
         existing,
         availability: .needsReview,
@@ -99,7 +99,7 @@ extension ServiceAgentRegistry {
       try await store.updateAgentInstallation(review)
       return review
     }
-    let artifactsChanged = !artifactsHaveSameIdentity(currentArtifacts, existing.artifacts)
+    let artifactsChanged = !artifactsHaveSameContent(currentArtifacts, existing.artifacts)
     if artifactsChanged, !acceptReplacement {
       let review = try unavailableRecord(
         existing,
@@ -113,7 +113,6 @@ extension ServiceAgentRegistry {
       try await store.updateAgentInstallation(review)
       return review
     }
-    let artifactsForProbe = artifactsChanged ? currentArtifacts : existing.artifacts
 
     let record = try await probeRecord(
       id: existing.id,
@@ -125,7 +124,7 @@ extension ServiceAgentRegistry {
       securityProfileID: existing.securityProfileID,
       isEnabled: existing.isEnabled,
       projectRoot: projectRoot,
-      artifacts: artifactsForProbe,
+      artifacts: currentArtifacts,
       createdAt: existing.createdAt
     )
     try await store.updateAgentInstallation(record)
@@ -139,71 +138,16 @@ extension ServiceAgentRegistry {
     guard let existing = try await store.agentInstallation(id: installationID) else {
       throw ServiceStoreError.unknownAgentInstallation(installationID)
     }
+    let validated = enabled ? try await refreshedRecord(existing) : existing
     if enabled {
-      let provider = try provider(for: existing.providerID)
-      guard provider.descriptor.adapterRevision == existing.adapterRevision else {
-        let review = try unavailableRecord(
-          existing,
-          availability: .needsReview,
-          identity: existing.executableIdentity,
-          reason: "The Provider adapter changed and requires a new Probe.",
-          probedAt: existing.lastProbedAt,
-          updatedAt: now()
-        )
-        try await store.updateAgentInstallation(review)
-        throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-      }
-      let current = try captureIdentity(existing.executablePath)
-      guard current == existing.executableIdentity else {
-        let review = try unavailableRecord(
-          existing,
-          availability: .needsReview,
-          identity: existing.executableIdentity,
-          reason: "The registered executable changed and requires local review.",
-          probedAt: existing.lastProbedAt,
-          updatedAt: now()
-        )
-        try await store.updateAgentInstallation(review)
-        throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-      }
-      do {
-        let currentArtifacts = try captureArtifacts(existing.artifacts, at: now())
-        guard artifactsHaveSameIdentity(currentArtifacts, existing.artifacts) else {
-          let review = try unavailableRecord(
-            existing,
-            availability: .needsReview,
-            identity: existing.executableIdentity,
-            artifacts: existing.artifacts,
-            reason: "A registered installation artifact changed and requires local review.",
-            probedAt: existing.lastProbedAt,
-            updatedAt: now()
-          )
-          try await store.updateAgentInstallation(review)
-          throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-        }
-      } catch let error as ServiceAgentRegistryError {
-        throw error
-      } catch {
-        let review = try unavailableRecord(
-          existing,
-          availability: .needsReview,
-          identity: existing.executableIdentity,
-          artifacts: existing.artifacts,
-          reason: "A registered installation artifact is unavailable and requires local review.",
-          probedAt: existing.lastProbedAt,
-          updatedAt: now()
-        )
-        try await store.updateAgentInstallation(review)
-        throw ServiceAgentRegistryError.installationNeedsReview(installationID)
-      }
-      guard existing.availability == .available else {
-        if existing.availability == .needsReview {
+      guard validated.availability == .available else {
+        if validated.availability == .needsReview {
           throw ServiceAgentRegistryError.installationNeedsReview(installationID)
         }
         throw ServiceAgentRegistryError.installationUnavailable(installationID)
       }
     }
-    let updated = try existing.replacingEnabled(enabled, updatedAt: now())
+    let updated = try validated.replacingEnabled(enabled, updatedAt: now())
     try await store.updateAgentInstallation(updated)
     return updated
   }

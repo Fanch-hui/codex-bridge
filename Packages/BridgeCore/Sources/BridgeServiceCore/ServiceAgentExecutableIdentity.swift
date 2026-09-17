@@ -78,11 +78,23 @@ public struct ServiceAgentExecutableIdentity: Codable, Equatable, Sendable {
         throw ServiceStoreError.invalidArgument("agentInstallation.executablePath")
       }
     #endif
-    let canonicalPath = URL(fileURLWithPath: executablePath)
-      .resolvingSymlinksInPath()
-      .standardizedFileURL
-      .path
     #if os(Windows)
+      let canonicalPath: String = {
+        let raw = URL(fileURLWithPath: executablePath)
+          .resolvingSymlinksInPath()
+          .standardizedFileURL
+          .path
+        var normalized = raw.replacingOccurrences(of: "/", with: "\\")
+        if normalized.count >= 3,
+          normalized.hasPrefix("\\"),
+          let char = normalized.dropFirst().first,
+          char.isASCII && char.isLetter,
+          normalized.dropFirst(2).hasPrefix(":")
+        {
+          normalized.removeFirst()
+        }
+        return normalized
+      }()
       let handle = ServiceAgentArtifactInspection.open(canonicalPath)
       guard handle != INVALID_HANDLE_VALUE else {
         throw ServiceStoreError.invalidArgument("agentInstallation.executablePath")
@@ -115,6 +127,10 @@ public struct ServiceAgentExecutableIdentity: Codable, Equatable, Sendable {
         sha256: digest
       )
     #elseif canImport(Darwin)
+      let canonicalPath = URL(fileURLWithPath: executablePath)
+        .resolvingSymlinksInPath()
+        .standardizedFileURL
+        .path
       let descriptor = Darwin.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
       guard descriptor >= 0 else {
         throw ServiceStoreError.invalidArgument("agentInstallation.executablePath")
@@ -214,7 +230,6 @@ public struct ServiceAgentExecutableIdentity: Codable, Equatable, Sendable {
     static func validateExecutable(_ snapshot: Snapshot, errorField: String) throws {
       let isRegularFile =
         snapshot.attributes & DWORD(FILE_ATTRIBUTE_DIRECTORY) == 0
-        && snapshot.attributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) == 0
       // Windows uses ACLs; the executable bit check applies to POSIX only.
       guard isRegularFile,
         snapshot.inode > 0,

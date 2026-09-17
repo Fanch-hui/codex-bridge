@@ -47,23 +47,6 @@ public struct AntigravityCLISemanticVersion: Comparable, Equatable, Sendable {
   public var stringValue: String { "\(major).\(minor).\(patch)" }
 }
 
-public struct AntigravityCLICompatibility: Equatable, Sendable {
-  public let minimumVersion: AntigravityCLISemanticVersion
-  public let maximumExclusiveVersion: AntigravityCLISemanticVersion
-
-  public init(
-    minimumVersion: AntigravityCLISemanticVersion = .init(major: 1, minor: 1, patch: 21),
-    maximumExclusiveVersion: AntigravityCLISemanticVersion = .init(major: 1, minor: 2, patch: 0)
-  ) {
-    self.minimumVersion = minimumVersion
-    self.maximumExclusiveVersion = maximumExclusiveVersion
-  }
-
-  public func accepts(_ version: AntigravityCLISemanticVersion) -> Bool {
-    version >= minimumVersion && version < maximumExclusiveVersion
-  }
-}
-
 struct AntigravityCLIHelpFacts: Equatable, Sendable {
   let supportsStreamJSON: Bool
   let supportsPlanMode: Bool

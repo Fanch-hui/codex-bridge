@@ -97,6 +97,9 @@ extension OpenCodeACPProvider {
   private static func probeReason(_ error: any Error) -> String {
     let base: String
     switch error {
+    case AgentRuntimeError.unsupportedProtocol("windows_gui_executable"):
+      base =
+        "所选文件为 Windows GUI 桌面程序，不支持命令行 ACP 通信。请指定 OpenCode 命令行工具（如 opencode / opencode.cmd）。"
     case OpenCodeACPError.unsupportedProtocol(let version):
       base = "OpenCode uses unsupported ACP protocol version \(version)."
     case AgentRuntimeError.unsupportedProtocol(let value):

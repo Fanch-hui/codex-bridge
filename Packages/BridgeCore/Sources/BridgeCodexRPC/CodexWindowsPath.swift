@@ -15,6 +15,56 @@
       return value.isEmpty ? nil : value
     }
 
+    static func userProfile(in environment: [String: String]) -> String? {
+      if let profile = environmentValue("USERPROFILE", in: environment) {
+        return profile
+      }
+      if let drive = environmentValue("HOMEDRIVE", in: environment),
+        let path = environmentValue("HOMEPATH", in: environment)
+      {
+        let combined = drive + path
+        if !combined.isEmpty { return combined }
+      }
+      if let home = environmentValue("HOME", in: environment) {
+        return home
+      }
+      let home = FileManager.default.homeDirectoryForCurrentUser.path
+      return home.isEmpty ? nil : home
+    }
+
+    static func childEnvironment(
+      configured: [String: String]? = nil,
+      source: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [String: String] {
+      var result = configured ?? source
+      let profile = userProfile(in: result) ?? userProfile(in: source)
+      if let profile {
+        setIfMissing("USERPROFILE", profile, in: &result)
+        setIfMissing("HOME", profile, in: &result)
+        setIfMissing("APPDATA", join(profile, "AppData", "Roaming"), in: &result)
+        setIfMissing("LOCALAPPDATA", join(profile, "AppData", "Local"), in: &result)
+      }
+      let systemRoot =
+        environmentValue("SystemRoot", in: result)
+        ?? environmentValue("WINDIR", in: source)
+      if let systemRoot {
+        setIfMissing("SystemRoot", systemRoot, in: &result)
+        if let drive = drivePrefix(of: systemRoot) {
+          setIfMissing("SystemDrive", drive, in: &result)
+        }
+        setIfMissing("ComSpec", join(systemRoot, "System32", "cmd.exe"), in: &result)
+      }
+      let temporary =
+        environmentValue("TEMP", in: result)
+        ?? environmentValue("TMP", in: result)
+        ?? FileManager.default.temporaryDirectory.path
+      if !temporary.isEmpty {
+        setIfMissing("TEMP", temporary, in: &result)
+        setIfMissing("TMP", temporary, in: &result)
+      }
+      return result
+    }
+
     static func normalize(_ path: String) -> String? {
       let value = path.replacingOccurrences(of: "/", with: "\\")
       guard !value.contains("\0"), value.rangeOfCharacter(from: .controlCharacters) == nil,
@@ -94,6 +144,21 @@
       let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty, let normalized = normalize(trimmed) else { return }
       result.append(normalized)
+    }
+
+    private static func setIfMissing(
+      _ name: String,
+      _ value: String,
+      in environment: inout [String: String]
+    ) {
+      guard environmentValue(name, in: environment) == nil else { return }
+      environment[name] = value
+    }
+
+    private static func drivePrefix(of path: String) -> String? {
+      let characters = Array(path)
+      guard characters.count >= 2, characters[1] == ":" else { return nil }
+      return String(characters.prefix(2))
     }
   }
 #endif

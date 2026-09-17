@@ -1,5 +1,9 @@
 @preconcurrency import Foundation
 
+#if os(Windows)
+  import WinSDK
+#endif
+
 private final class SendableFileHandle: @unchecked Sendable {
   let value: FileHandle
 
@@ -43,6 +47,34 @@ private final class TransportChunkGate: @unchecked Sendable {
   }
 }
 
+#if os(Windows)
+  private func startWindowsPipeReader(
+    output: SendableFileHandle,
+    continuation: AsyncStream<Data>.Continuation,
+    gate: TransportChunkGate
+  ) {
+    Thread.detachNewThread {
+      defer { continuation.finish() }
+      let handle = output.value._handle
+      guard handle != INVALID_HANDLE_VALUE else { return }
+      var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+      while true {
+        var count: DWORD = 0
+        let succeeded = buffer.withUnsafeMutableBytes { bytes in
+          ReadFile(handle, bytes.baseAddress, DWORD(bytes.count), &count, nil)
+        }
+        guard succeeded, count > 0, gate.acquire() else { return }
+        let data = Data(buffer.prefix(Int(count)))
+        if case .terminated = continuation.yield(data) {
+          gate.release()
+          gate.close()
+          return
+        }
+      }
+    }
+  }
+#endif
+
 public actor JSONLineTransport {
   private static let maximumBufferedChunks = 16
 
@@ -79,18 +111,22 @@ public actor JSONLineTransport {
       bufferingPolicy: .unbounded
     )
     readContinuation = pair.continuation
-    output.value.readabilityHandler = { handle in
-      let data = handle.availableData
-      if data.isEmpty {
-        pair.continuation.finish()
-      } else {
-        guard chunkGate.acquire() else { return }
-        if case .terminated = pair.continuation.yield(data) {
-          chunkGate.release()
-          chunkGate.close()
+    #if os(Windows)
+      startWindowsPipeReader(output: output, continuation: pair.continuation, gate: chunkGate)
+    #else
+      output.value.readabilityHandler = { handle in
+        let data = handle.availableData
+        if data.isEmpty {
+          pair.continuation.finish()
+        } else {
+          guard chunkGate.acquire() else { return }
+          if case .terminated = pair.continuation.yield(data) {
+            chunkGate.release()
+            chunkGate.close()
+          }
         }
       }
-    }
+    #endif
     readerTask = Task.detached(priority: .userInitiated) {
       defer { chunkGate.close() }
       var parser = JSONLineParser(maximumLineBytes: maximumLineBytes)

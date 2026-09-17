@@ -34,42 +34,44 @@ package enum CodexTranscriptPresentation {
     status: String?
   ) -> CodexTranscriptToolPresentation {
     let category = category(providerID: providerID, name: name)
-    let active = isActive(status)
+    let normalized = normalizedToolStatus(status)
+    let active = isActive(normalized)
+    let completed = normalized == "completed"
     let title: String
     switch category {
     case .fileRead:
-      title = active ? "正在读取文件" : "已读取文件"
+      title = active ? "正在读取文件" : completed ? "已读取文件" : "读取文件"
     case .fileSearch:
-      title = active ? "正在搜索文件" : "已搜索文件"
+      title = active ? "正在搜索文件" : completed ? "已搜索文件" : "搜索文件"
     case .fileList:
-      title = active ? "正在列出文件" : "已列出文件"
+      title = active ? "正在列出文件" : completed ? "已列出文件" : "列出文件"
     case .fileWrite:
-      title = active ? "正在编辑文件" : "已编辑文件"
+      title = active ? "正在编辑文件" : completed ? "已编辑文件" : "编辑文件"
     case .command:
-      title = active ? "正在运行命令" : "已运行命令"
+      title = active ? "正在运行命令" : completed ? "已运行命令" : "运行命令"
     case .webSearch:
-      title = active ? "正在搜索网页" : "已搜索网页"
+      title = active ? "正在搜索网页" : completed ? "已搜索网页" : "搜索网页"
     case .webFetch:
-      title = active ? "正在读取网页" : "已读取网页"
+      title = active ? "正在读取网页" : completed ? "已读取网页" : "读取网页"
     case .subagent:
-      title = active ? "正在调用子代理" : "子代理已完成"
+      title = active ? "正在调用子代理" : completed ? "子代理已完成" : "调用子代理"
     case .reasoning:
-      title = active ? "正在分析" : "分析完成"
+      title = active ? "正在分析" : completed ? "分析完成" : "分析过程"
     case .mcp:
-      title = active ? "正在调用 MCP 工具" : "MCP 工具已完成"
+      title = active ? "正在调用 MCP 工具" : completed ? "MCP 工具已完成" : "调用 MCP 工具"
     case .workflow:
-      title = active ? "正在执行工作流" : "工作流已完成"
+      title = active ? "正在执行工作流" : completed ? "工作流已完成" : "执行工作流"
     case .jobOutput:
-      title = active ? "正在读取后台任务输出" : "已读取后台任务输出"
+      title = active ? "正在读取后台任务输出" : completed ? "已读取后台任务输出" : "读取后台任务输出"
     case .skill:
-      title = active ? "正在执行技能" : "技能已完成"
+      title = active ? "正在执行技能" : completed ? "技能已完成" : "执行技能"
     case .other:
       let provider = AgentProviderPresentation.displayName(providerID)
       let rawName = safeRawName(name)
       title =
         active
         ? "正在使用 \(provider) 工具：\(rawName)"
-        : "已使用 \(provider) 工具：\(rawName)"
+        : completed ? "已使用 \(provider) 工具：\(rawName)" : "使用 \(provider) 工具：\(rawName)"
     }
     return CodexTranscriptToolPresentation(title: title, systemImage: systemImage(for: category))
   }
@@ -84,17 +86,6 @@ package enum CodexTranscriptPresentation {
   package static func reasoningTitle(providerID: String?, streaming: Bool) -> String {
     let provider = AgentProviderPresentation.displayName(providerID)
     return streaming ? "\(provider) 正在分析" : "\(provider) 分析过程"
-  }
-
-  package static func statusLabel(_ status: String?) -> String {
-    switch status?.lowercased() {
-    case "completed": ""
-    case "failed": "失败"
-    case "declined": "已拒绝"
-    case "cancelled": "已取消"
-    case "pending": "等待执行"
-    default: "进行中"
-    }
   }
 
 }

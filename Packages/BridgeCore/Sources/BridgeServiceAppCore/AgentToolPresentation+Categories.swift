@@ -222,9 +222,9 @@ extension CodexTranscriptPresentation {
   }
 
   package static func isActive(_ status: String?) -> Bool {
-    switch status?.lowercased() {
-    case "completed", "failed", "declined", "cancelled": false
-    default: true
+    switch normalizedToolStatus(status) {
+    case "inProgress", "pending": true
+    default: false
     }
   }
 

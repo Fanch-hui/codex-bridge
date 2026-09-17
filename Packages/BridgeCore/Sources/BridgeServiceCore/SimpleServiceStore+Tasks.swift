@@ -1,4 +1,5 @@
 import BridgeDomain
+import BridgeProjects
 import GRDB
 
 extension SimpleServiceStore {
@@ -79,6 +80,72 @@ extension SimpleServiceStore {
         try Self.validateTransition(from: existing.state.status, to: task.state.status)
         try updateTaskRow(task, in: db)
         try Self.insert(event, taskID: task.id, in: db)
+      }
+    } catch let error as ServiceStoreError {
+      throw error
+    } catch {
+      throw ServiceStoreError.storageFailure
+    }
+  }
+
+  public func approveTask(
+    id: TaskID,
+    authorization: ServiceTaskExecutionAuthorization,
+    supervisorStatus: ServiceSupervisorStatus,
+    event: ServiceTaskEventDraft
+  ) throws -> ServiceTaskRecord {
+    guard event.kind == .taskApproved else {
+      throw ServiceStoreError.invalidArgument("task.approvalEvent")
+    }
+    do {
+      return try database.write { db in
+        guard let row = try Self.taskRow(id: id, in: db) else {
+          throw ServiceStoreError.unknownTask(id)
+        }
+        let existing = try Self.decodeTask(row)
+        guard existing.state.status == .awaitingLocalApproval else {
+          throw ServiceStoreError.invalidTaskTransition(
+            from: existing.state.status,
+            to: .starting
+          )
+        }
+        try Self.validateTransition(from: existing.state.status, to: .starting)
+        guard let projectRow = try Self.projectRow(id: existing.projectID, in: db) else {
+          throw ServiceStoreError.unknownProject(existing.projectID)
+        }
+        let project = try Self.decodeProject(projectRow)
+        guard project.accessPolicy.network != .denied,
+          existing.permissionMode != .workspaceWrite || project.accessPolicy.write != .denied
+        else {
+          throw ServiceStoreError.invalidArgument("task.executionAuthorization")
+        }
+        try db.execute(
+          sql: """
+            UPDATE bridge_service_tasks
+            SET status = ?, supervisor_status = ?, network_allowed = ?, access_mode = ?,
+                updated_at = ?
+            WHERE task_id = ? AND status = ?
+            """,
+          arguments: [
+            ServiceTaskStatus.starting.rawValue,
+            supervisorStatus.rawValue,
+            authorization.networkAllowed ? 1 : 0,
+            authorization.accessMode.rawValue,
+            event.createdAt.timeIntervalSince1970,
+            id.rawValue,
+            ServiceTaskStatus.awaitingLocalApproval.rawValue,
+          ]
+        )
+        guard db.changesCount == 1,
+          let updatedRow = try Self.taskRow(id: id, in: db)
+        else {
+          throw ServiceStoreError.invalidTaskTransition(
+            from: existing.state.status,
+            to: .starting
+          )
+        }
+        try Self.insert(event, taskID: id, in: db)
+        return try Self.decodeTask(updatedRow)
       }
     } catch let error as ServiceStoreError {
       throw error

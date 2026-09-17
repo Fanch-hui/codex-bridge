@@ -1,4 +1,5 @@
 import BridgeAgentCore
+import Crypto
 import Foundation
 
 extension DeepSeekHarnessACPProvider {
@@ -28,6 +29,29 @@ extension DeepSeekHarnessACPProvider {
     }
     let path = try makeRunDirectory(prefix: "probe-project")
     return ProbeRoot(path: path, owned: true)
+  }
+
+  func makePersistentStateDirectory(
+    installation: AgentInstallation,
+    request: AgentExecutionRequest
+  ) throws -> String? {
+    guard let configuredBase = configuration.persistentStateBaseDirectory else { return nil }
+    let base = try DeepSeekHarnessACPPathSupport.preparePrivateDirectory(
+      configuredBase,
+      field: "persistentStateBaseDirectory"
+    )
+    let identity = [
+      installation.providerID.rawValue,
+      installation.id.rawValue,
+      request.projectID.rawValue,
+      request.projectRoot,
+    ].joined(separator: "\u{0}")
+    let digest = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }
+      .joined()
+    return try DeepSeekHarnessACPPathSupport.preparePrivateDirectory(
+      try DeepSeekHarnessACPPathSupport.append(digest, to: base, isDirectory: true),
+      field: "persistentStateDirectory"
+    )
   }
 
   func cleanup(runDirectory: String?, probeRoot: ProbeRoot) {

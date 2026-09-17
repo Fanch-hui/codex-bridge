@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import Foundation
 
   struct WindowsProjectPolicy: Equatable, Sendable {
@@ -16,6 +17,7 @@
     let removeEnabled: Bool
     let savePolicyEnabled: Bool
     let statusText: String
+    var projectItems: [BridgeDesktopProjectRow] = []
   }
 
   struct WindowsAgentManagementDisplay: Equatable, Sendable {
@@ -34,6 +36,10 @@
     let acceptReplacementEnabled: Bool
     let removeEnabled: Bool
     let statusText: String
+    var providerItems: [BridgeDesktopAgentProviderRow] = []
+    var installationItems: [BridgeDesktopAgentInstallationRow] = []
+    var isManagingAgents = false
+    var agentOperationRevision = 0
   }
 
   struct WindowsManagementDisplay: Equatable, Sendable {
@@ -45,6 +51,13 @@
 
   final class ManagementDisplayBox: @unchecked Sendable {
     private let lock = NSLock()
+    private var version: UInt64 = 0
+
+    var revision: UInt64 {
+      lock.lock()
+      defer { lock.unlock() }
+      return version
+    }
     private var value: WindowsManagementDisplay
 
     init(value: WindowsManagementDisplay) {
@@ -59,8 +72,10 @@
 
     func store(_ value: WindowsManagementDisplay) {
       lock.lock()
+      defer { lock.unlock() }
+      guard self.value != value else { return }
       self.value = value
-      lock.unlock()
+      version &+= 1
     }
   }
 #endif

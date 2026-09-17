@@ -15,6 +15,7 @@ extension ExecutionSession {
       guard isKnownBinding(completedBinding) else {
         throw ExecutionServiceError.bindingMismatch
       }
+      await expireNonblockingQuestions(binding: completedBinding)
       if collaborationBindings.remove(completedBinding) != nil {
         guard Self.isTerminalTurnStatus(completed.turn.status) else {
           throw ExecutionServiceError.protocolViolation("collaboration turn status")
@@ -48,6 +49,7 @@ extension ExecutionSession {
       await fail(code: "turn_binding_mismatch", summary: "Codex Turn completion did not match.")
       return
     }
+    await expireNonblockingQuestions(binding: binding)
     guard approvalBarriers.isEmpty, pendingApprovals.isEmpty else {
       guard deferredCompletion == nil else {
         await fail(
@@ -79,6 +81,19 @@ extension ExecutionSession {
       )
     default:
       await fail(code: "invalid_turn_status", summary: "Codex reported an invalid terminal status.")
+    }
+  }
+
+  private func expireNonblockingQuestions(binding: ExecutionBinding) async {
+    let expired = pendingApprovals.filter {
+      $0.value.request.binding == binding && !$0.value.request.isBlocking
+    }
+    for (id, pending) in expired {
+      pendingApprovals.removeValue(forKey: id)
+      try? await client.respond(
+        to: pending.rpcRequestID, errorCode: -32000,
+        message: "The question's turn has completed."
+      )
     }
   }
 
@@ -197,7 +212,7 @@ extension ExecutionSession {
         throw ExecutionServiceError.protocolViolation("command completion status")
       }
       return .commandCompleted(
-        displayCommand: OutboundContentSecurity.redacted(
+        displayCommand: OutboundContentSecurity.redactedCommand(
           command.displayCommand,
           maximumUTF8Bytes: 8 * 1_024
         ),

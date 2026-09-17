@@ -1,7 +1,6 @@
 import BridgeAgentCore
 import BridgeDomain
 import BridgeServiceCore
-import BridgeSupervisor
 import Foundation
 
 public actor ServiceExecutionCoordinator {
@@ -27,7 +26,6 @@ public actor ServiceExecutionCoordinator {
   let tasks: ServiceTaskManager
   let projects: ServiceProjectService
   let execution: ExecutionManager
-  let supervision: ServiceSupervisorCoordinator
   let conversation: TaskConversationBuffer
   let conversationCoordinator: ServiceExecutionConversationCoordinator
   let agentEventProcessor: ServiceExecutionAgentEventProcessor
@@ -45,7 +43,6 @@ public actor ServiceExecutionCoordinator {
     tasks: ServiceTaskManager,
     projects: ServiceProjectService,
     execution: ExecutionManager,
-    supervisor: SupervisorManager? = nil,
     conversation: TaskConversationBuffer? = nil,
     agentRunner: (any AgentTaskRunning)? = nil,
     providerDisplayNameResolver: @escaping @Sendable (AgentProviderID) -> String = {
@@ -60,12 +57,6 @@ public actor ServiceExecutionCoordinator {
     self.tasks = tasks
     self.projects = projects
     self.execution = execution
-    self.supervision = ServiceSupervisorCoordinator(
-      tasks: tasks,
-      execution: execution,
-      supervisor: supervisor,
-      conversation: conversation
-    )
     self.conversation = conversation
     self.conversationCoordinator = ServiceExecutionConversationCoordinator(
       tasks: tasks,
@@ -103,7 +94,6 @@ public actor ServiceExecutionCoordinator {
     }
     try ensureStartIsActive(taskID)
 
-    await supervision.launch(task: task)
     let handle: ExecutionHandle
     do {
       handle = try await execution.start(try ExecutionRequest(task: task, project: project))
@@ -116,7 +106,6 @@ public actor ServiceExecutionCoordinator {
       await conversation.appendUserMessage(taskID: taskID, content: task.prompt)
     } catch {
       await execution.stop(taskID: taskID)
-      await supervision.stop(taskID: taskID)
       let conversationPersisted = await conversation.close(taskID: taskID)
       _ = try? await tasks.fail(
         taskID: taskID,
@@ -225,7 +214,6 @@ public actor ServiceExecutionCoordinator {
     collectors.removeValue(forKey: taskID)?.cancel()
     await stopAgentRun(taskID: taskID)
     await execution.stop(taskID: taskID)
-    await supervision.stop(taskID: taskID)
     if await conversation.close(taskID: taskID) {
       _ = try? await tasks.interrupt(taskID: taskID, summary: summary)
     } else {
@@ -246,14 +234,12 @@ public actor ServiceExecutionCoordinator {
     collectors.removeAll(keepingCapacity: false)
     pendingAgentApprovals.removeAll(keepingCapacity: false)
     for task in executionTasks { task.cancel() }
-    await supervision.beginShutdown()
     let shutdowns = activeAgentRuns.values.map(\.shutdown)
     activeAgentRuns.removeAll(keepingCapacity: false)
     for shutdown in shutdowns {
       await shutdown()
     }
     await execution.shutdown()
-    await supervision.shutdown()
     let failedConversationTasks = await conversation.closeAll()
     for taskID in failedConversationTasks {
       _ = try? await tasks.fail(

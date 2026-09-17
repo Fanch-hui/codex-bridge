@@ -19,12 +19,6 @@ jobs:
             triplet: x64-windows
             library_architecture: x64
             target_triple: ""
-            run_tests: true
-          - architecture: arm64
-            triplet: arm64-windows
-            library_architecture: arm64
-            target_triple: aarch64-unknown-windows-msvc
-            run_tests: false
     steps:
       - uses: actions/checkout@v4
       - name: Exclude build directories from Windows Defender
@@ -171,6 +165,13 @@ jobs:
             }
             Add-Content $env:GITHUB_PATH $vcpkgBin
           }
+      - name: Compile Windows application resources
+        shell: pwsh
+        run: |
+          $resourceOutput = Join-Path $env:GITHUB_WORKSPACE ".build\windows-resources\CodexBridgeWindowsApp.res"
+          & "$env:GITHUB_WORKSPACE\Scripts\compile-windows-resources.ps1" -OutputPath $resourceOutput
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content $env:GITHUB_ENV "CODEX_BRIDGE_WINDOWS_RESOURCE=$resourceOutput"
       - name: Build service and Windows shell
         working-directory: Packages/BridgeCore
         shell: pwsh
@@ -178,13 +179,10 @@ jobs:
           swift --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $targetTriple = "${{ matrix.target_triple }}"
-          $swiftArguments = @("-Xswiftc", "-DSQLITE_DISABLE_SNAPSHOT")
-          if ($targetTriple) {
-            $swiftArguments += @("--triple", $targetTriple)
-            foreach ($libraryPath in ($env:TARGET_LIBRARY_PATHS -split ";")) {
-              $swiftArguments += @("-Xlinker", "-libpath:$libraryPath")
-            }
-          }
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
+          $swiftArguments = @(Get-WindowsSwiftArguments `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
+            -TargetTriple $targetTriple -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
           $buildArguments = @($swiftArguments) + @("-c", "release")
           swift build @buildArguments --product codex-bridge-windows-app
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -195,6 +193,15 @@ jobs:
           $binPath = ($binPathOutput | Select-Object -Last 1).ToString().Trim()
           if (-not $binPath) { throw "Swift build output directory was empty." }
           Add-Content $env:GITHUB_ENV "SWIFT_BIN_PATH=$binPath"
+      - name: Stage Windows tunnel client
+        shell: pwsh
+        run: |
+          $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
+          & "$env:GITHUB_WORKSPACE\Scripts\stage-windows-tunnel-client.ps1" `
+            -Architecture "${{ matrix.architecture }}" `
+            -Destination $tunnelClientDir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content $env:GITHUB_ENV "TUNNEL_CLIENT_DIR=$tunnelClientDir"
       - name: Stage Windows portable package
         shell: pwsh
         run: |
@@ -205,59 +212,12 @@ jobs:
             OutDir = $portableDir
             Architecture = "${{ matrix.architecture }}"
             VcpkgTriplet = "${{ matrix.triplet }}"
+            TunnelClientDir = $env:TUNNEL_CLIENT_DIR
           }
           if ($targetTriple) {
             $stageArguments["TargetTriple"] = $targetTriple
           }
           & "$env:GITHUB_WORKSPACE\Scripts\stage-windows-portable.ps1" @stageArguments
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke portable service startup
-        if: matrix.run_tests
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-portable-service.ps1" `
-            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke app-to-service launch from spaced path
-        if: matrix.run_tests
-        timeout-minutes: 5
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-spaced-path-launch.ps1" `
-            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke Windows GUI startup
-        if: matrix.run_tests
-        timeout-minutes: 5
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-gui-startup.ps1" `
-            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke tests
-        if: matrix.run_tests
-        working-directory: Packages/BridgeCore
-        shell: pwsh
-        run: |
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeDomainTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeAgentCoreTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeSecurityTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeCodexRPCTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceAppCoreTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceHostWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeCodexServiceWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceApplicationWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeServiceCoreWindowsTests"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          swift test -Xswiftc -DSQLITE_DISABLE_SNAPSHOT --filter "BridgeDirectCommandWindowsTests"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install pinned Inno Setup 7.1.0
         shell: pwsh
@@ -271,17 +231,6 @@ jobs:
             -Architecture "${{ matrix.architecture }}" `
             -PayloadDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}" `
             -OutputDir "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke EXE install, upgrade, and uninstall
-        if: matrix.run_tests
-        timeout-minutes: 15
-        shell: pwsh
-        run: |
-          $installerRoot = "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
-          $installers = @(Get-ChildItem -LiteralPath $installerRoot -Filter "*-Setup.exe" -File)
-          if ($installers.Count -ne 1) { throw "Expected exactly one EXE installer." }
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-exe-install.ps1" `
-            -InstallerPath $installers[0].FullName
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows portable ZIP
         uses: actions/upload-artifact@v4

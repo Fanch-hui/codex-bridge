@@ -71,7 +71,7 @@ public enum ProjectAgentPresentation {
   }
 
   public static func project(_ project: MCPProjectSummary) -> ProjectItem {
-    let git = project.gitState?.nilIfBlank ?? "未知"
+    let git = gitStateLabel(project.gitState) ?? ""
     let detail = [
       "项目：\(project.name)",
       "ID：\(project.projectID)",
@@ -142,6 +142,16 @@ public enum ProjectAgentPresentation {
     )
   }
 
+  public static func gitStateLabel(_ state: String?) -> String? {
+    switch state {
+    case "clean": "Git 干净"
+    case "dirty": "有未提交改动"
+    case "not_git": "非 Git 项目"
+    case "check_failed": "检查失败"
+    default: nil
+    }
+  }
+
   public static func permissionLabel(_ value: String) -> String {
     switch value {
     case "allowed": "允许"
@@ -168,7 +178,6 @@ public enum ProjectAgentPresentation {
     if provider.supportsSteer { values.append("Steer") }
     if provider.supportsWorkspaceWrite { values.append("工作区写入") }
     if provider.supportsSkillSelection { values.append("技能") }
-    if provider.supportsSupervisor { values.append("Supervisor") }
     return values
   }
 }

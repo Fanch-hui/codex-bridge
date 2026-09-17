@@ -54,8 +54,33 @@ public enum TaskInspectorPresentation {
     _ task: MCPServiceTaskSnapshot?,
     providerSupportsSteer: Bool
   ) -> Bool {
-    guard let task else { return false }
-    return providerSupportsSteer && task.isExternalAgentTask && task.expectedControlID != nil
+    guard let task, task.expectedControlID != nil else { return false }
+    return task.isCodexTask || providerSupportsSteer
+  }
+
+  public static func supportsSessionContinuation(
+    for task: MCPServiceTaskSnapshot,
+    providers: [IPCAgentProviderSummary],
+    installations: [IPCAgentInstallationSummary]
+  ) -> Bool {
+    if task.isCodexTask { return true }
+    guard
+      providers.contains(where: {
+        $0.providerID == task.providerIdentifier && $0.supportsSessionContinuation
+      })
+    else { return false }
+    return installations.contains {
+      $0.installationID == task.installationID && $0.providerID == task.providerIdentifier
+        && $0.isEnabled && $0.effectiveCapabilities.contains("lifecycle.session_continue")
+    }
+  }
+
+  public static func canResume(
+    _ task: MCPServiceTaskSnapshot?,
+    providerSupportsSessionContinuation: Bool
+  ) -> Bool {
+    guard let task, task.canResumeSession else { return false }
+    return task.isCodexTask || providerSupportsSessionContinuation
   }
 
   public static func steerValidationMessage(_ input: String) -> String? {

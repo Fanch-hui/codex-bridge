@@ -16,6 +16,7 @@
     private var started = false
     private var creationSucceeded = false
     private var chat: WindowsChatWebView?
+    private var desktopUI: WindowsDesktopUIWebView?
 
     private init() {}
 
@@ -53,17 +54,31 @@
       lock.withLock { chat }
     }
 
+    func desktopUIWebView() -> WindowsDesktopUIWebView? {
+      lock.withLock { desktopUI }
+    }
+
     private func run() {
       let activeChat = WindowsChatWebView()
+      let activeDesktopUI = WindowsDesktopUIWebView { envelope in
+        guard let command = WindowsDesktopUICommandRouter.command(for: envelope) else { return }
+        WindowsMainWindow.enqueue(command)
+      }
+      WindowsMainWindow.desktopUI = activeDesktopUI
       guard let window = WindowsMainWindow.create() else {
         ready.signal()
         return
       }
       WindowsMainWindow.chat = activeChat
+      activeDesktopUI.attach(to: window)
       activeChat.attach(to: window)
       activeChat.setVisible(false)
+      // The pre-attach layout was a no-op for both surfaces, so push the real client
+      // rect now instead of waiting for the first user interaction.
+      WindowsMainWindow.layout()
       lock.withLock {
         chat = activeChat
+        desktopUI = activeDesktopUI
         running = true
         creationSucceeded = true
       }
@@ -76,18 +91,13 @@
         drainActions()
       }
       drainActions()
+      activeDesktopUI.shutdown()
       activeChat.shutdown()
-      WindowsApprovalWindow.shutdown()
-      WindowsProjectManagementWindow.shutdown()
-      WindowsAgentManagementWindow.shutdown()
-      WindowsWorkspaceWindow.shutdown()
-      WindowsAgentDefaultsWindow.shutdown()
-      WindowsLogWindow.shutdown()
-      WindowsSettingsWindow.shutdown()
-      WindowsConnectionWindow.shutdown()
+      WindowsShellFailure.shutdown()
       lock.withLock {
         actions.removeAll(keepingCapacity: false)
         chat = nil
+        desktopUI = nil
         running = false
       }
     }

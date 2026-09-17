@@ -35,7 +35,8 @@
         statusText = "Codex Thread 已加载。"
       } catch {
         guard selectedProjectID == projectID, selectedThreadID == threadID else { return }
-        statusText = "Thread 读取失败：\(BridgeServiceErrorMessage.message(error))"
+        reportFailure("Thread 读取失败：\(BridgeServiceErrorMessage.message(error))")
+        return
       }
       publishDisplay()
     }

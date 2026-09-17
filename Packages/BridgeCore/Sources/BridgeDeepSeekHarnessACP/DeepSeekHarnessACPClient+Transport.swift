@@ -61,6 +61,12 @@ extension DeepSeekHarnessACPClient {
     switch updateType {
     case "agent_message_chunk":
       try handleTextUpdate(sessionID: sessionID, update: update)
+    case "agent_thought_chunk":
+      try handleTextUpdate(sessionID: sessionID, update: update, reasoning: true)
+    case "usage_update":
+      try handleUsageUpdate(sessionID: sessionID, update: update)
+    case "config_option_update":
+      yield(.configurationUpdated(sessionID: sessionID))
     case "tool_call", "tool_call_update":
       try handleToolUpdate(sessionID: sessionID, update: update)
     default:
@@ -70,7 +76,8 @@ extension DeepSeekHarnessACPClient {
 
   private func handleTextUpdate(
     sessionID: String,
-    update: [String: ACPJSONValue]
+    update: [String: ACPJSONValue],
+    reasoning: Bool = false
   ) throws {
     guard
       let content = update["content"]?.objectValue,
@@ -85,7 +92,31 @@ extension DeepSeekHarnessACPClient {
       throw DeepSeekHarnessACPError.oversizedFrame
     }
     guard !text.isEmpty else { return }
-    yield(.textDelta(sessionID: sessionID, text: text))
+    if reasoning {
+      yield(.reasoningDelta(sessionID: sessionID, text: text))
+    } else {
+      yield(.textDelta(sessionID: sessionID, text: text))
+    }
+  }
+
+  private func handleUsageUpdate(
+    sessionID: String,
+    update: [String: ACPJSONValue]
+  ) throws {
+    guard let usedTokens = update["used"]?.intValue,
+      let contextSize = update["size"]?.intValue,
+      usedTokens >= 0,
+      contextSize >= 0
+    else {
+      throw DeepSeekHarnessACPError.invalidMessage
+    }
+    yield(
+      .usageUpdated(
+        sessionID: sessionID,
+        usedTokens: usedTokens,
+        contextSize: contextSize
+      )
+    )
   }
 
   private func handleToolUpdate(

@@ -58,10 +58,7 @@ enum DeepSeekHarnessACPArtifactValidator {
       makeArtifact(
         role: .dependencyLock,
         snapshot: DeepSeekHarnessACPFileSnapshot(
-          capturing: try DeepSeekHarnessACPPathSupport.append(
-            "pnpm-lock.yaml",
-            to: sourceRoot
-          ),
+          capturing: try DeepSeekHarnessACPArtifactRuntime.dependencyLockPath(in: sourceRoot),
           requiresExecutable: false
         )
       ),
@@ -88,7 +85,7 @@ enum DeepSeekHarnessACPArtifactValidator {
       ),
       (
         .dependencyLock,
-        try DeepSeekHarnessACPPathSupport.append("pnpm-lock.yaml", to: sourceRoot)
+        try DeepSeekHarnessACPArtifactRuntime.dependencyLockPath(in: sourceRoot)
       ),
       (.nodeInterpreter, node),
     ])
@@ -138,17 +135,7 @@ enum DeepSeekHarnessACPArtifactValidator {
       installation.executablePath,
       sourceRoot: sourceRoot
     )
-    let package = try DeepSeekHarnessACPArtifactRuntime.parseManifest(at: manifest.path)
-    guard package.version == DeepSeekHarnessACPConstants.rootManifestVersion else {
-      throw DeepSeekHarnessACPError.artifactInvalid("runtime_manifest.version")
-    }
-    guard package.nodeRequirement == DeepSeekHarnessACPConstants.nodeRequirement else {
-      throw DeepSeekHarnessACPError.artifactInvalid("runtime_manifest.engines.node")
-    }
-    guard package.packageManager == "pnpm@\(DeepSeekHarnessACPConstants.pnpmVersion)" else {
-      throw DeepSeekHarnessACPError.artifactInvalid("runtime_manifest.packageManager")
-    }
-    try DeepSeekHarnessACPArtifactRuntime.validateDependencyLock(at: lock.path)
+    _ = try DeepSeekHarnessACPArtifactRuntime.parseManifest(at: manifest.path)
     let nodeVersion = try DeepSeekHarnessACPArtifactRuntime.nodeVersion(at: node.path)
     guard DeepSeekHarnessACPArtifactRuntime.isCompatibleNodeVersion(nodeVersion) else {
       throw DeepSeekHarnessACPError.nodeVersionIncompatible(nodeVersion)

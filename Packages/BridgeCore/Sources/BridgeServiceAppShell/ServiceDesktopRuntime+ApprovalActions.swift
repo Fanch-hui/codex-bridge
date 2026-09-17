@@ -2,7 +2,12 @@ import BridgeIPC
 import BridgeServiceAppCore
 
 extension BridgeServiceAppModel {
-  public func resolveApproval(_ approval: IPCApprovalSummary, decision: String) {
+  public func resolveApproval(
+    _ approval: IPCApprovalSummary,
+    decision: String,
+    oneTimeToolAutoApproval: Bool = false,
+    answers: [String: [String]]? = nil
+  ) {
     let resolutionKey = WorkbenchApprovalResolutionKey.task(approval.approvalID)
     guard resolvingApprovalKeys.insert(resolutionKey).inserted else { return }
     errorMessage = nil
@@ -17,7 +22,9 @@ extension BridgeServiceAppModel {
           IPCApprovalResolutionRequest(
             taskID: approval.taskID,
             approvalID: approval.approvalID,
-            decision: decision
+            decision: decision,
+            oneTimeToolAutoApproval: oneTimeToolAutoApproval ? true : nil,
+            answers: answers
           )
         )
         self.completeTaskApprovalResolution(
@@ -93,8 +100,14 @@ extension BridgeServiceAppModel {
     resolvingApprovalKeys.remove(resolutionKey)
     resolvedTaskApprovalKeys.insert(resolutionKey)
     approvals.removeAll { $0.approvalID == approval.approvalID }
+    if decision != "deny" {
+      selection = .workbench
+      openTask(approval.taskID)
+    }
     postToast(
-      decision == "deny" ? "已拒绝 \(providerName) 操作" : "已批准 \(providerName) 操作",
+      approval.kind == "user_input"
+        ? "已提交回答"
+        : (decision == "deny" ? "已拒绝 \(providerName) 操作" : "已批准 \(providerName) 操作"),
       symbol: decision == "deny" ? "xmark.shield.fill" : "checkmark.shield.fill",
       tone: decision == "deny" ? .warning : .success
     )

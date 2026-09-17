@@ -284,8 +284,8 @@ struct ToolCallBubbleView: View {
 
   @ViewBuilder
   private var statusIcon: some View {
-    switch entry.toolStatus {
-    case "completed":
+    switch resolvedToolStatus {
+    case "completed", "not_git":
       Image(systemName: presentation.systemImage)
         .foregroundStyle(.secondary)
     case "failed":
@@ -302,8 +302,14 @@ struct ToolCallBubbleView: View {
     }
   }
 
+  private var resolvedToolStatus: String? {
+    CodexTranscriptPresentation.resolvedToolStatus(
+      providerID: providerID, name: entry.toolName, status: entry.toolStatus, output: entry.content
+    )
+  }
+
   private var statusLabel: String {
-    CodexTranscriptPresentation.statusLabel(entry.toolStatus)
+    CodexTranscriptPresentation.statusLabel(resolvedToolStatus)
   }
 
   private var presentation: CodexTranscriptToolPresentation {

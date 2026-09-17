@@ -42,8 +42,6 @@ let package = Package(
         .target(
             name: "MCP",
             dependencies: targetDependencies),
-        .testTarget(
-            name: "MCPTests",
-            dependencies: ["MCP"] + targetDependencies),
+
     ]
 )

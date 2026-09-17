@@ -122,9 +122,6 @@ extension BridgeServiceAppModel {
     guard let projectID else { return }
     loadProjectDetail(projectID: projectID)
     loadSkills(projectID: projectID)
-    Task { [weak self] in
-      await self?.loadThreads(projectID: projectID)
-    }
   }
 
   func persistWorkbenchProjectSelection(_ projectID: String?) {

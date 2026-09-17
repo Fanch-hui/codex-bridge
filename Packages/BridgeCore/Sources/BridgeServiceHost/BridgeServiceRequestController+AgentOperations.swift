@@ -7,6 +7,10 @@ import Foundation
 
 extension BridgeServiceRequestController {
   func handleGetAgentCatalog(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let catalogRequest = try BridgeServiceIPCCodec.optionalPayload(
+      IPCAgentCatalogRequest.self,
+      from: request
+    )
     let deadline = Self.deadline()
     let providers = try await composition.application.serviceManagedAgentProviderDescriptors(
       deadline: deadline
@@ -14,10 +18,17 @@ extension BridgeServiceRequestController {
     let installations = try await composition.application.serviceManagedAgentInstallations(
       deadline: deadline
     )
+    let discovery = await composition.agentDiscoveryCatalog.summaries(
+      providerIDs: providers.map(\.providerID),
+      existingInstallations: installations,
+      forceRefresh: catalogRequest?.forceRefresh ?? false
+    )
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
       payload: IPCAgentCatalogResponse(
-        providers: providers.map(Self.agentProviderSummary),
+        providers: providers.map { provider in
+          Self.agentProviderSummary(provider, discovery: discovery[provider.providerID])
+        },
         installations: installations.map(Self.agentInstallationSummary)
       )
     )
@@ -54,6 +65,35 @@ extension BridgeServiceRequestController {
     )
   }
 
+  func handleConnectAgentInstallation(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let payload = try BridgeServiceIPCCodec.payload(
+      IPCAgentConnectRequest.self,
+      from: request
+    )
+    let providerID = AgentProviderID(rawValue: payload.providerID)
+    let existingInstallations = try await composition.agentRegistry.installations(
+      providerID: providerID
+    )
+    let candidates = try ServiceAgentAutoDiscovery.registrationRequests(
+      providerID: providerID,
+      dataPaths: composition.paths,
+      existingInstallations: existingInstallations,
+      credentialsProvided: payload.baseURL != nil || payload.apiKey != nil
+    )
+    let record = try await composition.application.serviceConnectManagedAgent(
+      providerID: providerID,
+      baseURL: payload.baseURL,
+      apiKey: payload.apiKey,
+      candidates: candidates,
+      alwaysProceedConfirmed: payload.alwaysProceedConfirmed,
+      deadline: Self.deadline()
+    )
+    return try BridgeServiceIPCCodec.success(
+      requestID: request.requestID,
+      payload: Self.agentInstallationSummary(record)
+    )
+  }
+
   private static func registrationArtifacts(
     providerID: AgentProviderID,
     executablePath: String,
@@ -78,9 +118,14 @@ extension BridgeServiceRequestController {
       IPCAgentReprobeRequest.self,
       from: request
     )
+    let replacement = try await deepSeekReplacementRequest(
+      installationID: AgentInstallationID(rawValue: payload.installationID),
+      acceptReplacement: payload.acceptReplacement
+    )
     let record = try await composition.application.serviceReprobeManagedAgent(
       installationID: AgentInstallationID(rawValue: payload.installationID),
       acceptReplacement: payload.acceptReplacement,
+      replacementRequest: replacement,
       deadline: Self.deadline()
     )
     return try BridgeServiceIPCCodec.success(
@@ -120,14 +165,20 @@ extension BridgeServiceRequestController {
   }
 
   private static func agentProviderSummary(
-    _ descriptor: AgentProviderDescriptor
+    _ descriptor: AgentProviderDescriptor,
+    discovery: ServiceAgentDiscoverySummary?
   ) -> IPCAgentProviderSummary {
     let policy = ServiceAgentProviderPolicyRegistry.policy(for: descriptor.providerID)
     return IPCAgentProviderSummary(
       providerID: descriptor.providerID.rawValue,
       displayName: descriptor.displayName,
       adapterRevision: descriptor.adapterRevision,
+      discoveryState: discovery?.state,
+      discoveryMessage: discovery?.message,
+      discoveredExecutablePath: discovery?.executablePath,
+      discoveredConfigurationPath: discovery?.configurationPath,
       requiresConfiguration: policy?.requiresConfiguration ?? false,
+      requiresHeadlessAlwaysProceed: policy?.requiresHeadlessAlwaysProceed ?? false,
       registrationTrustProfile: policy?.registrationTrustProfile.rawValue ?? "managed",
       supportsModelSelection: policy?.supportsModelSelection ?? true,
       supportsEffortSelection: policy?.supportsEffortSelection ?? true,

@@ -1,7 +1,9 @@
+import BridgeAgentCore
 import BridgeCodexService
 import BridgeDeepSeekHarnessACP
 import BridgeIPC
 import BridgeMCP
+import BridgeServiceApplication
 import BridgeServiceCore
 import BridgeTunnel
 import Foundation
@@ -19,6 +21,30 @@ extension BridgeServiceRequestController {
     }
     if let error = error as? ServiceAgentRegistryError {
       return mapAgentRegistryError(error)
+    }
+    if let error = error as? ServiceAgentConnectionError {
+      switch error {
+      case .installationNotFound:
+        return .init(code: "agent_installation_not_found", message: error.localizedDescription)
+      case .headlessPermissionConfirmationRequired:
+        return .init(
+          code: "agent_headless_permission_confirmation_required",
+          message: error.localizedDescription
+        )
+      }
+    }
+    if let error = error as? ServiceAgentCredentialError {
+      return mapAgentCredentialError(error)
+    }
+    if let error = error as? ServiceDeepSeekHarnessMCPError {
+      return mapDeepSeekHarnessMCPError(error)
+    }
+    if let error = error as? AgentNativePermissionPolicyError {
+      return mapAgentNativePermissionPolicyError(error)
+    }
+    if let error = error as? DeepSeekHarnessModelCatalogError {
+      return .init(
+        code: "agent_model_catalog_failed", message: error.localizedDescription, retryable: true)
     }
     if let error = error as? DeepSeekHarnessACPError {
       return mapDeepSeekHarnessError(error)
@@ -98,12 +124,100 @@ extension BridgeServiceRequestController {
         code: "agent_installation_needs_review",
         message: "The Agent executable changed and requires explicit local review."
       )
+    case .connectionProbeFailed:
+      return .init(
+        code: "agent_connection_probe_failed",
+        message: "The Agent installation did not pass the connection Probe."
+      )
+    case .replacementProbeFailed(_, let reason):
+      return .init(code: "agent_connection_probe_failed", message: reason)
     case .registrationInProgress:
       return .init(
         code: "agent_registration_in_progress",
         message: "This Agent executable is already being registered.",
         retryable: true
       )
+    }
+  }
+
+  private static func mapAgentCredentialError(
+    _ error: ServiceAgentCredentialError
+  ) -> BridgeServiceIPCError {
+    switch error {
+    case .unsupportedProvider:
+      return .init(
+        code: "agent_credentials_unsupported",
+        message: "The Agent Provider does not accept connection credentials."
+      )
+    case .invalidBaseURL:
+      return .init(
+        code: "agent_base_url_invalid",
+        message: "The Agent Base URL is invalid."
+      )
+    case .invalidAPIKey:
+      return .init(
+        code: "agent_api_key_invalid",
+        message: "The Agent API key is invalid."
+      )
+    case .invalidConfigurationPath:
+      return .init(
+        code: "agent_configuration_invalid",
+        message: "The Agent configuration path is invalid."
+      )
+    case .invalidStoredAPIKey:
+      return .init(
+        code: "agent_credentials_unavailable",
+        message: "The stored Agent credentials are unavailable."
+      )
+    }
+  }
+
+  private static func mapAgentNativePermissionPolicyError(
+    _ error: AgentNativePermissionPolicyError
+  ) -> BridgeServiceIPCError {
+    switch error {
+    case .unavailable:
+      return .init(
+        code: "agent_native_permissions_unavailable",
+        message: "Native permission settings are unavailable for this Agent installation."
+      )
+    case .revisionConflict:
+      return .init(
+        code: "agent_permission_revision_conflict",
+        message: "The native permission settings changed. Reload them before saving.",
+        retryable: true
+      )
+    case .settingsInvalid:
+      return .init(
+        code: "agent_permission_settings_invalid",
+        message: "The native permission settings file is invalid."
+      )
+    case .settingsUnsafe:
+      return .init(
+        code: "agent_permission_settings_unsafe",
+        message: "The native permission settings file cannot be modified safely."
+      )
+    case .ruleInvalid:
+      return .init(
+        code: "agent_permission_rule_invalid",
+        message: "The native permission rule is invalid."
+      )
+    case .remediationUnavailable:
+      return .init(
+        code: "agent_permission_remediation_unavailable",
+        message: "A safe native permission rule could not be derived for this tool call."
+      )
+    }
+  }
+
+  private static func mapDeepSeekHarnessMCPError(
+    _ error: ServiceDeepSeekHarnessMCPError
+  ) -> BridgeServiceIPCError {
+    switch error {
+    case .serverNotFound:
+      return .init(code: "dsh_mcp_server_not_found", message: error.localizedDescription)
+    case .secretStoreUnavailable, .invalidStoredSecret:
+      return .init(code: "dsh_mcp_credentials_unavailable", message: error.localizedDescription)
     }
   }
 
@@ -115,7 +229,7 @@ extension BridgeServiceRequestController {
       return .init(
         code: "agent_artifact_invalid",
         message:
-          "The selected DeepSeek Harness build is incomplete or incompatible (\(field)). Use the pinned dsh-v0.1.1-rc.2 build and select packages/examples/acp-demo/lib/bin.js."
+          "The selected DeepSeek Harness build is incomplete or incompatible (\(field)). Select the built apps/cli/lib/bin.js entry, or packages/examples/acp-demo/lib/bin.js for an ACP demo build."
       )
     case .templateMismatch:
       return .init(

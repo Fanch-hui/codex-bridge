@@ -19,9 +19,10 @@ public actor ServiceComposition {
   public let projects: ServiceProjectService
   public let tasks: ServiceTaskManager
   public let settings: ServiceSettings
+  public let deepSeekHarnessMCP: ServiceDeepSeekHarnessMCPConfiguration
   public let agentRegistry: ServiceAgentRegistry
+  let agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog
   public let execution: ExecutionManager
-  public let supervisor: SupervisorManager
   public let coordinator: ServiceExecutionCoordinator
   public let catalog: ServiceCodexCatalog
   public let runtimeStatus: ServiceRuntimeStatus
@@ -65,6 +66,19 @@ public actor ServiceComposition {
     let projects = ServiceProjectService(store: store)
     let tasks = ServiceTaskManager(store: store)
     let settings = ServiceSettings(store: store)
+    try await settings.setExposureMode(.full)
+    try await settings.setQwenStudioExposureMode(.full)
+    let deepSeekHarnessMCP = ServiceDeepSeekHarnessMCPConfiguration(
+      settings: settings, secretStore: secretStore)
+    let deepSeekBaseURL = try await settings.string(for: .deepSeekHarnessBaseURL)
+    let deepSeekConfigurationPath = try await settings.string(
+      for: .deepSeekHarnessManagedConfigurationPath
+    )
+    let agentCredentials = ServiceAgentCredentialEnvironment(
+      secretStore: secretStore,
+      deepSeekBaseURL: deepSeekBaseURL,
+      managedDeepSeekConfigurationPath: deepSeekConfigurationPath
+    )
     let agentProviders: [any AgentProvider] = [
       try AntigravityCLIProvider(),
       try OpenCodeACPProvider(
@@ -75,7 +89,15 @@ public actor ServiceComposition {
       try DeepSeekHarnessACPProvider(
         configuration: DeepSeekHarnessACPProviderConfiguration(
           runtimeBaseDirectory: paths.agentStateURL
-            .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path
+            .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path,
+          persistentStateBaseDirectory: paths.agentStateURL
+            .appendingPathComponent("DeepSeekHarnessSessions", isDirectory: true).path,
+          environmentProvider: { [agentCredentials] installation in
+            try await agentCredentials.runtimeEnvironment(for: installation)
+          },
+          mcpServersProvider: { [deepSeekHarnessMCP] in
+            try await deepSeekHarnessMCP.enabledRuntimeConfigurations()
+          }
         )
       ),
     ]
@@ -84,6 +106,11 @@ public actor ServiceComposition {
       providers: agentProviders
     )
     _ = try await agentRegistry.refreshInstallationStates()
+    let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog()
+    _ = await agentDiscoveryCatalog.summaries(
+      providerIDs: agentProviders.map(\.descriptor.providerID),
+      existingInstallations: try await agentRegistry.installations()
+    )
     let agentRunner = ServiceAgentTaskRunner(
       registry: agentRegistry,
       providers: Dictionary(
@@ -97,18 +124,10 @@ public actor ServiceComposition {
         synchronizeCodexProjects: configuration.synchronizeCodexProjects
       )
     )
-    let supervisor = SupervisorManager(
-      configuration: SupervisorManagerConfiguration(
-        appServer: configuration.supervisorAppServer,
-        clientInfo: configuration.clientInfo,
-        scratchRootURL: paths.supervisorScratchURL
-      )
-    )
     let coordinator = ServiceExecutionCoordinator(
       tasks: tasks,
       projects: projects,
       execution: execution,
-      supervisor: supervisor,
       agentRunner: agentRunner,
       providerDisplayNameResolver: {
         ServiceAgentProviderPolicyRegistry.displayName(for: $0)
@@ -136,6 +155,7 @@ public actor ServiceComposition {
       catalog: catalog,
       runtimeStatus: runtimeStatus,
       agentRegistry: agentRegistry,
+      agentCredentials: agentCredentials,
       directCommands: DirectCommandSessionManager(
         orphanPIDFileURL: paths.supervisorScratchURL.appending(path: "direct-command-pids.txt")
       )
@@ -157,7 +177,7 @@ public actor ServiceComposition {
       store: secretStore,
       randomBytes: randomBytes
     )
-    let mcpClients = try await ServiceMCPClientRegistry.make(
+    let mcpClients = try ServiceMCPClientRegistry.makeDeferred(
       settings: settings,
       secrets: secretProvider
     )
@@ -168,9 +188,10 @@ public actor ServiceComposition {
       projects: projects,
       tasks: tasks,
       settings: settings,
+      deepSeekHarnessMCP: deepSeekHarnessMCP,
       agentRegistry: agentRegistry,
+      agentDiscoveryCatalog: agentDiscoveryCatalog,
       execution: execution,
-      supervisor: supervisor,
       coordinator: coordinator,
       catalog: catalog,
       runtimeStatus: runtimeStatus,
@@ -188,9 +209,10 @@ public actor ServiceComposition {
     projects: ServiceProjectService,
     tasks: ServiceTaskManager,
     settings: ServiceSettings,
+    deepSeekHarnessMCP: ServiceDeepSeekHarnessMCPConfiguration,
     agentRegistry: ServiceAgentRegistry,
+    agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog,
     execution: ExecutionManager,
-    supervisor: SupervisorManager,
     coordinator: ServiceExecutionCoordinator,
     catalog: ServiceCodexCatalog,
     runtimeStatus: ServiceRuntimeStatus,
@@ -205,9 +227,10 @@ public actor ServiceComposition {
     self.projects = projects
     self.tasks = tasks
     self.settings = settings
+    self.deepSeekHarnessMCP = deepSeekHarnessMCP
     self.agentRegistry = agentRegistry
+    self.agentDiscoveryCatalog = agentDiscoveryCatalog
     self.execution = execution
-    self.supervisor = supervisor
     self.coordinator = coordinator
     self.catalog = catalog
     self.runtimeStatus = runtimeStatus
@@ -223,31 +246,37 @@ public actor ServiceComposition {
     if let mcpEndpoint { return mcpEndpoint }
     await tunnel.pauseForMCPRestart()
     await stopMCP()
-    let persistedPort = configuration.mcpPort == 0 ? try await settings.localMCPPort() : nil
-    let requestedPort = configuration.mcpPort == 0 ? persistedPort ?? 0 : configuration.mcpPort
-    let chatGPTSecret = try await mcpClients.chatGPTCredential()
-    let server = MCPBridgeServer(
-      appVersion: configuration.appVersion,
-      service: application,
-      exposureMode: { [mcpClients] clientID in
-        await mcpClients.exposureMode(for: clientID)
-      },
-      httpConfiguration: try MCPHTTPConfiguration(
-        clientAuthenticator: mcpClients.authenticator,
-        port: requestedPort
-      ),
-      clientAdmission: mcpClients.admission
-    )
+    var requestedPort = configuration.mcpPort
+    var server: MCPBridgeServer?
+    var attemptedServerStart = false
     do {
-      let endpoint = try await server.start()
+      let persistedPort = configuration.mcpPort == 0 ? try await settings.localMCPPort() : nil
+      requestedPort = configuration.mcpPort == 0 ? persistedPort ?? 0 : configuration.mcpPort
+      try await mcpClients.prepareForLocalMCP()
+      let chatGPTSecret = try await mcpClients.chatGPTCredential()
+      let activeServer = MCPBridgeServer(
+        appVersion: configuration.appVersion,
+        service: application,
+        exposureMode: { [mcpClients] clientID in
+          await mcpClients.exposureMode(for: clientID)
+        },
+        httpConfiguration: try MCPHTTPConfiguration(
+          clientAuthenticator: mcpClients.authenticator,
+          port: requestedPort
+        ),
+        clientAdmission: mcpClients.admission
+      )
+      server = activeServer
+      attemptedServerStart = true
+      let endpoint = try await activeServer.start()
       guard !isShutdown else {
-        await server.stop()
+        await activeServer.stop()
         throw CancellationError()
       }
       if configuration.mcpPort == 0, persistedPort == nil {
         try await settings.setLocalMCPPort(endpoint.port)
       }
-      mcpServer = server
+      mcpServer = activeServer
       mcpEndpoint = endpoint
       await runtimeStatus.updateMCP(state: "ready")
       if tunnelBootstrapped {
@@ -264,17 +293,20 @@ public actor ServiceComposition {
       }
       return endpoint
     } catch {
-      if mcpServer !== server {
+      if let server, mcpServer !== server {
         await server.stop()
       }
-      let state = requestedPort == 0 ? "failed" : "local_port_unavailable"
+      let portUnavailable = attemptedServerStart && requestedPort != 0
+      let state = portUnavailable ? "local_port_unavailable" : "failed"
       await runtimeStatus.updateMCP(
         state: state,
-        degradation: requestedPort == 0
-          ? "Local MCP could not start."
-          : "Local MCP port \(requestedPort) is unavailable."
+        degradation: Self.mcpDegradation(
+          error: error,
+          portUnavailable: portUnavailable,
+          requestedPort: requestedPort
+        )
       )
-      if requestedPort != 0 {
+      if portUnavailable {
         throw ServiceLocalMCPError.localPortUnavailable(requestedPort)
       }
       throw error
@@ -470,6 +502,25 @@ public actor ServiceComposition {
     case .readOnly: .readOnly
     case .full: .full
     }
+  }
+
+  private static func mcpDegradation(
+    error: any Error,
+    portUnavailable: Bool,
+    requestedPort: Int
+  ) -> String {
+    if let storeError = error as? SecretStoreError {
+      switch storeError {
+      case .accessDenied, .keychainFailure:
+        return
+          "MCP credentials are unavailable because the system credential store cannot be accessed."
+      default:
+        break
+      }
+    }
+    return portUnavailable
+      ? "Local MCP port \(requestedPort) is unavailable."
+      : "Local MCP could not start."
   }
 }
 

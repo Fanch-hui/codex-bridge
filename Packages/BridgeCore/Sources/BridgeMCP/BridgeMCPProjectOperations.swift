@@ -4,17 +4,22 @@ public struct MCPCommandBlacklistRule: Codable, Equatable, Sendable {
   public let ruleID: String
   public let executable: String?
   public let pattern: String?
+  public let arguments: [String]?
 
-  public init(ruleID: String, executable: String? = nil, pattern: String? = nil) {
+  public init(
+    ruleID: String, executable: String? = nil, pattern: String? = nil, arguments: [String]? = nil
+  ) {
     self.ruleID = ruleID
     self.executable = executable
     self.pattern = pattern
+    self.arguments = arguments
   }
 
   private enum CodingKeys: String, CodingKey {
     case ruleID = "rule_id"
     case executable
     case pattern
+    case arguments
   }
 }
 

@@ -13,12 +13,15 @@ extension BridgeServiceApplication {
     guard (1...100).contains(limit) else { throw BridgeMCPQueryError.contractRejected }
     let all = try await projects.projects()
     let visible = Self.sortedProjects(all.filter { $0.accessPolicy.read == .allowed })
+    let defaultID = try await defaultSubmissionProjectID(in: all)
+    let visibleDefault = visible.first { $0.id.rawValue == defaultID }?.id.rawValue
     let offset = try Self.decodeOffset(cursor, maximum: visible.count)
     let end = min(offset + limit, visible.count)
-    let page = visible[offset..<end].map(Self.projectSummary)
+    let page = await Self.checkedProjectSummaries(Array(visible[offset..<end]), deadline: deadline)
     return MCPProjectPage(
       projects: Array(page),
-      nextCursor: end < visible.count ? "v1.\(end)" : nil
+      nextCursor: end < visible.count ? "v1.\(end)" : nil,
+      defaultProjectID: visibleDefault
     )
   }
 
@@ -26,7 +29,9 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> [MCPProjectSummary] {
     try Self.checkDeadline(deadline)
-    return Self.sortedProjects(try await projects.projects()).map(Self.projectSummary)
+    return await Self.checkedProjectSummaries(
+      Self.sortedProjects(try await projects.projects()), deadline: deadline
+    )
   }
 
   public func serviceProject(
@@ -34,8 +39,9 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectDetail {
     try Self.checkDeadline(deadline)
-    let project = try await readableProject(projectID)
-    return Self.projectDetail(project)
+    let project = try await applyingDirectConfiguration(to: readableProject(projectID))
+    return Self.projectDetail(
+      project, gitState: await ProjectGitStatus.read(project, deadline: deadline))
   }
 
   public func serviceManagedProject(
@@ -43,7 +49,9 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectDetail {
     try Self.checkDeadline(deadline)
-    return Self.projectDetail(try await managedProject(projectID))
+    let project = try await applyingDirectConfiguration(to: managedProject(projectID))
+    return Self.projectDetail(
+      project, gitState: await ProjectGitStatus.read(project, deadline: deadline))
   }
 
   public func serviceProjectCommands(
@@ -51,7 +59,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectCommands {
     try Self.checkDeadline(deadline)
-    let project = try await readableProject(projectID)
+    let project = try await applyingDirectConfiguration(to: readableProject(projectID))
     let commands = project.workspaceCommands.map(Self.projectCommand)
     var recommendedUsage: [String: MCPRecommendedCommandUsage] = [:]
     for rule in commandPolicy.effectiveSafeCommandRules {
@@ -127,7 +135,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectChanges {
     try Self.checkDeadline(deadline)
-    let project = try await readableProject(projectID)
+    let project = try await applyingDirectConfiguration(to: readableProject(projectID))
     let changes = try await mutations.changes(projectID: project.id)
     return MCPProjectChanges(
       changedFiles: changes.changedFiles,

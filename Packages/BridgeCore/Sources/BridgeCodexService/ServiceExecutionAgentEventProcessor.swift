@@ -1,5 +1,6 @@
 import BridgeAgentCore
 import BridgeDomain
+import BridgeSecurity
 import BridgeServiceCore
 import Foundation
 
@@ -52,19 +53,15 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
         call: try ExecutionToolCall(
           itemID: itemID,
           tool: update.name.isEmpty ? "tool" : update.name,
-          arguments: update.arguments,
+          arguments: update.arguments.map {
+            OutboundContentSecurity.redactedToolArguments($0, maximumUTF8Bytes: 64 * 1_024)
+          },
           status: Self.toolStatus(update.status)
-        )
+        ),
+        output: update.output.map {
+          OutboundContentSecurity.redactedCommandOutput($0, maximumUTF8Bytes: 256 * 1_024)
+        }
       )
-      if update.status != .pending, update.status != .inProgress,
-        let output = update.output, !output.isEmpty
-      {
-        await conversation.appendToolCallProgress(
-          taskID: taskID,
-          itemID: itemID,
-          progress: output
-        )
-      }
       if update.status == .completed, Self.isEditTool(update) {
         let paths = try await agentChangedPaths(update.locations, taskID: taskID)
         if !paths.isEmpty {
@@ -91,13 +88,10 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
       return
 
     case .approvalAutomaticallyDenied(let itemID):
-      await conversation.upsertAuthoritativeEntry(
+      await conversation.declineToolCall(
         taskID: taskID,
-        key: "tool:" + itemID,
-        kind: .toolCall,
-        content: "The requested operation was denied by local policy.",
-        toolStatus: ExecutionToolCallStatus.declined.rawValue,
-        isFinal: false
+        itemID: itemID,
+        fallbackContent: "The requested operation was denied by local policy."
       )
       return
 

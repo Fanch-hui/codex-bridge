@@ -7,6 +7,7 @@ extension BridgeServiceApplication {
   func prepareTaskSubmission(
     _ submission: MCPServiceTaskSubmission,
     sourceClientID: String,
+    source: ServiceTaskSource,
     deadline: ContinuousClock.Instant
   ) async throws -> PreparedTaskSubmission {
     let projectID = try await submissionProjectID(explicit: submission.projectID)
@@ -14,17 +15,26 @@ extension BridgeServiceApplication {
     let workbenchPermissionMode = try await workbenchDefaultPermissionMode(
       sourceClientID: sourceClientID
     )
-    if let providerRaw = submission.providerID {
+    if let providerRaw = submission.providerID, providerRaw != serviceCodexProviderID {
       return try await prepareAgentSubmission(
         submission,
         providerRaw: providerRaw,
         project: project,
         sourceClientID: sourceClientID,
+        source: source,
         workbenchPermissionMode: workbenchPermissionMode,
         deadline: deadline
       )
     }
-    let models = try await catalog.listModels(deadline: deadline).models
+    let models: [MCPModelSummary]?
+    do {
+      models = try await catalog.listModels(deadline: deadline).models
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch {
+      try Self.checkDeadline(deadline)
+      models = nil
+    }
     let selections = try await modelSelections(submission: submission, models: models)
     let requestedPermissionMode = try Self.permissionModeRequest(
       submission.permissionMode,
@@ -39,7 +49,7 @@ extension BridgeServiceApplication {
     let accessMode = try await settings.accessMode()
     let fastMode =
       try await settings.isFastModeEnabled()
-      && models.first(where: { $0.modelID == selections.execution.model })?
+      && models?.first(where: { $0.modelID == selections.execution.model })?
         .supportsFastMode == true
     guard !submission.networkAccess || project.accessPolicy.network != .denied else {
       throw BridgeMCPQueryError.contractRejected
@@ -49,8 +59,8 @@ extension BridgeServiceApplication {
       projectID: project.id,
       request: ServiceTaskRequest(
         projectID: project.id,
-        source: .mcpClient,
-        sourceClientID: sourceClientID,
+        source: source,
+        sourceClientID: source == .mcpClient ? sourceClientID : "",
         clientRequestID: submission.clientRequestID,
         prompt: taskPrompt,
         requestedThreadID: submission.threadID,
@@ -80,16 +90,10 @@ extension BridgeServiceApplication {
 
   private func submissionProjectID(explicit: String?) async throws -> String {
     if let explicit { return explicit }
-    if let selected = try await settings.string(for: .workbenchProjectID), !selected.isEmpty,
-      selected.utf8.count <= 128, !selected.contains("\0"),
-      try await projects.project(id: ProjectID(rawValue: selected)) != nil
-    {
-      return selected
-    }
-    guard let fallback = Self.sortedProjects(try await projects.projects()).first else {
+    guard let projectID = try await defaultSubmissionProjectID(in: projects.projects()) else {
       throw BridgeMCPQueryError.projectNotFound
     }
-    return fallback.id.rawValue
+    return projectID
   }
 
   func taskPrompt(

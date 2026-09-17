@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeServiceAppCore
 
   extension WindowsWorkspaceModel {
@@ -26,6 +27,46 @@
         blacklists.firstIndex { $0.id == id }
       }
       let selectedBlacklist = blacklistIndex.flatMap { blacklists[$0] }
+      let desktopCommands = commands.map { command in
+        BridgeDesktopWorkspaceCommand(
+          commandID: command.id,
+          name: command.name,
+          executable: command.executable,
+          arguments: command.arguments.split(separator: "\n").map(String.init),
+          workingDirectory: command.workingDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+            ? nil : command.workingDirectory,
+          requiresNetwork: command.requiresNetwork,
+          risk: command.risk
+        )
+      }
+      let desktopBlacklist = blacklists.map { rule in
+        BridgeDesktopBlacklistRule(
+          ruleID: rule.id,
+          executable: rule.executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil : rule.executable,
+          pattern: rule.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil : rule.pattern
+        )
+      }
+      let desktopSkills = skills.map { skill in
+        BridgeDesktopSkillRow(
+          skillID: skill.id,
+          name: skill.name,
+          scope: skill.scope.rawValue,
+          description: skill.description,
+          actionCount: skill.actions.count
+        )
+      }
+      let desktopThreads = threads.map { thread in
+        BridgeDesktopThreadRow(
+          threadID: thread.threadID,
+          title: thread.title ?? thread.preview ?? thread.threadID,
+          status: thread.status,
+          updatedAt: thread.updatedAt,
+          preview: thread.preview
+        )
+      }
       let value = WindowsWorkspaceDisplay(
         connectionState: connectionState,
         projectRows: projects.map { "\($0.name) · \($0.projectID)" },
@@ -62,7 +103,22 @@
         saveModeEnabled: connectionState == .connected && !busy && hasWorkspace,
         saveBlacklistEnabled: connectionState == .connected && !busy && hasWorkspace,
         removeBlacklistEnabled: connectionState == .connected && !busy && selectedBlacklist != nil,
-        statusText: statusText
+        statusText: statusText,
+        selectedProjectID: selectedProjectID,
+        selectedCommandID: selectedCommandID,
+        selectedSkillID: selectedSkillID,
+        selectedThreadID: selectedThreadID,
+        fileWritePermission: detail?.directWorkspace?.fileWritePermission ?? "denied",
+        commands: desktopCommands,
+        blacklist: desktopBlacklist,
+        skills: desktopSkills,
+        threads: desktopThreads,
+        verificationCommands: detail?.verificationCommands ?? [],
+        threadCount: detail?.threadCount,
+        selectedThreadTitle: selectedThreadPage.map { ThreadHistoryPresentation.title($0.thread) },
+        selectedThreadConversation: ThreadHistoryPresentation.entries(selectedThreadPage).map {
+          BridgeDesktopConversationEntry(id: $0.id, role: $0.role, text: $0.text)
+        }
       )
       displayBox.store(value)
     }

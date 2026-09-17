@@ -1,53 +1,50 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import Foundation
   import WinSDK
 
   enum WindowLayout {
-    static let navigationWidth = 220
-    static let inspectorIdealWidth = 400
-    static let inspectorMinimumWidth = 280
     static let windowWidth = 1180
     static let windowHeight = 760
   }
 
+  /// Win32 host surface: owns the frame, the command queue and the two WebView2
+  /// children. All product pages live in `BridgeDesktopUI`.
   enum WindowsMainWindow {
     private static let windowClassName = WindowsApplicationIdentity.mainWindowClassName
     private static let windowTitle = "Codex Bridge"
     private static let defaultPosition = Int32(bitPattern: 0x8000_0000)
-    private static let standardResourceID = 32_512
-    private static let timerID: UINT_PTR = 1
-    private static let timerIntervalMs: UINT = 250
-    private static let webViewStoppedMessage = UINT(WM_APP + 40)
+    private static let standardCursorID = 32_512
 
     private static let commandLock = NSLock()
+    private static let browserViewportLock = NSLock()
     nonisolated(unsafe) private static var pendingCommands: [MainWindowCommand] = []
-    nonisolated(unsafe) private static var selectedPage = WindowsMainPage.overview
-    nonisolated(unsafe) private static var chatBounds = RECT()
-    nonisolated(unsafe) private static var waitingForWebViewShutdown = false
+    nonisolated(unsafe) private static var browserViewport: BridgeDesktopBrowserViewport?
+    nonisolated(unsafe) static var chatSlotEnabled = false
+
+    /// Mirror of the page the shared UI last rendered; the command loop owns the
+    /// request, this value only reports what reached the surface.
+    nonisolated(unsafe) static var renderedPage = WindowsMainPage.overview
+    nonisolated(unsafe) static var chatBounds = RECT()
     nonisolated(unsafe) static var chat: WindowsChatWebView?
+    nonisolated(unsafe) static var desktopUI: WindowsDesktopUIWebView?
     nonisolated(unsafe) static var window: HWND?
+    nonisolated(unsafe) private static var hasRevealedWindow = false
 
     static func create() -> HWND? {
+      hasRevealedWindow = false
       WindowsUIFoundation.initialize()
       let instance = GetModuleHandleW(nil)!
       registerWindowClass(instance)
-      let created = createWindow(instance: instance)
-      guard let window = created else {
+      guard let window = createWindow(instance: instance) else {
         showCreationFailure(GetLastError())
         return nil
       }
       self.window = window
-      WindowsNavigationSidebar.create(in: window, instance: instance)
-      WindowsPageHeader.create(in: window, instance: instance)
-      WindowsOverviewPane.create(in: window, instance: instance)
-      WindowsTaskInspector.create(in: window, instance: instance)
-      WindowsBrowserToolbar.create(in: window, instance: instance)
-      WindowsEmbeddedPages.prepare(in: window)
+      applyDwmAttributes(to: window)
+      setWindowIcons(window)
       WindowsMainWindowChrome.install(on: window)
-      _ = SetTimer(window, timerID, timerIntervalMs, nil)
-      selectPage(.overview)
       layout()
-      _ = ShowWindow(window, SW_SHOW)
       return window
     }
 
@@ -59,9 +56,7 @@
 
     static func currentWindow() -> HWND? { window }
 
-    static func currentPage() -> WindowsMainPage { selectedPage }
-
-    static func workbenchChatBounds() -> RECT { chatBounds }
+    static func currentPage() -> WindowsMainPage { renderedPage }
 
     static func takePendingCommands() -> [MainWindowCommand] {
       commandLock.lock()
@@ -72,67 +67,24 @@
     }
 
     static func selectPage(_ page: WindowsMainPage) {
-      selectedPage = page
-      WindowsNavigationSidebar.select(page)
-      WindowsPageHeader.apply(page: page)
-      WindowsOverviewPane.setVisible(page == .overview)
-      WindowsTaskInspector.setVisible(page == .workbench)
-      WindowsTaskInspector.setChatPlaceholderPageVisible(page == .workbench)
-      WindowsBrowserToolbar.setVisible(page == .workbench)
-      WindowsEmbeddedPages.select(page)
-      chat?.setVisible(page == .workbench)
+      guard renderedPage != page else { return }
+      renderedPage = page
       layout()
     }
 
-    static func updateNavigation(
-      workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay
-    ) {
-      WindowsNavigationSidebar.update(
-        state: workbench.connectionState,
-        taskCount: workbench.taskCount,
-        approvalCount: workbench.pendingApprovalCount,
-        projectCount: management.project.rows.count
-      )
-      if selectedPage == .connections {
-        WindowsPageHeader.apply(
-          page: .connections,
-          statusDetail:
-            "本地 MCP：\(workbench.mcpAddress) · \(management.availableAgentCount) 个可用 Agent"
-        )
-      }
+    static func setChatSlotEnabled(_ enabled: Bool) {
+      guard chatSlotEnabled != enabled else { return }
+      chatSlotEnabled = enabled
+      layout()
     }
 
-    static func updateOverview(
-      workbench: WindowsWorkbenchDisplay,
-      management: WindowsManagementDisplay
-    ) {
-      WindowsOverviewPane.apply(
-        WindowsOverviewDisplay(
-          connectionState: workbench.connectionState,
-          runningTaskCount: workbench.runningTaskCount,
-          pendingApprovalCount: workbench.pendingApprovalCount,
-          projectCount: management.project.rows.count,
-          agentCount: management.availableAgentCount,
-          taskCount: workbench.taskCount,
-          mcpAddress: workbench.mcpAddress,
-          recentTaskRows: Array(workbench.recentTaskRows.prefix(4)),
-          detailText: workbench.detailText
-        )
-      )
+    static func applyBrowserViewport(_ viewport: BridgeDesktopBrowserViewport) {
+      browserViewportLock.withLock { browserViewport = viewport }
+      WindowsUIThread.shared.enqueue { layout() }
     }
 
-    static func setStatusText(_ text: String) {
-      WindowsTaskInspector.setStatusText(text)
-    }
-
-    static func setTaskRows(_ rows: [String], selectedIndex: Int?) {
-      WindowsTaskInspector.setTaskRows(rows, selectedIndex: selectedIndex)
-    }
-
-    static func setChatPlaceholder(_ text: String?) {
-      WindowsTaskInspector.setChatPlaceholder(text)
-      WindowsTaskInspector.setChatPlaceholderPageVisible(selectedPage == .workbench)
+    static func browserViewportSnapshot() -> BridgeDesktopBrowserViewport? {
+      browserViewportLock.withLock { browserViewport }
     }
 
     static func handleMessage(
@@ -140,20 +92,11 @@
     ) -> LRESULT {
       switch message {
       case UINT(WM_COMMAND):
-        if WindowsMainWindowChrome.isExitCommand(wParam) {
-          requestClose(window)
-          return 0
-        }
-        let command =
-          WindowsNavigationSidebar.command(for: wParam)
-          ?? WindowsPageHeader.command(for: wParam)
-          ?? WindowsOverviewPane.command(for: wParam)
-          ?? WindowsBrowserToolbar.command(for: wParam)
-          ?? WindowsTaskInspector.command(for: wParam)
-          ?? WindowsEmbeddedPageTabs.command(for: wParam)
-          ?? WindowsMainWindowChrome.command(for: wParam)
-        if let command { enqueue(command) }
+        if WindowsMainWindowChrome.handleCommand(wParam, window: window) { return 0 }
         return 0
+      case UINT(WM_SHOWWINDOW):
+        enqueue(.windowVisibilityChanged(wParam != 0))
+        return DefWindowProcW(window, message, wParam, lParam)
       case UINT(WM_SIZE):
         if wParam == WPARAM(SIZE_MINIMIZED) {
           _ = ShowWindow(window, SW_HIDE)
@@ -161,20 +104,54 @@
           layout()
         }
         return 0
+      case UINT(WM_DPICHANGED):
+        if let suggestedRect = UnsafePointer<RECT>(bitPattern: Int(lParam))?.pointee {
+          _ = SetWindowPos(
+            window,
+            nil,
+            suggestedRect.left,
+            suggestedRect.top,
+            suggestedRect.right - suggestedRect.left,
+            suggestedRect.bottom - suggestedRect.top,
+            UINT(SWP_NOZORDER | SWP_NOACTIVATE)
+          )
+        }
+        layout()
+        return 0
+      case UINT(WM_GETMINMAXINFO):
+        if let minMaxInfo = UnsafeMutablePointer<MINMAXINFO>(bitPattern: Int(lParam)) {
+          let dpi = GetDpiForWindow(window)
+          let scale = Double(dpi > 0 ? dpi : 96) / 96.0
+          minMaxInfo.pointee.ptMinTrackSize.x = Int32(Double(800) * scale)
+          minMaxInfo.pointee.ptMinTrackSize.y = Int32(Double(500) * scale)
+        }
+        return 0
       case WindowsMainWindowChrome.trayCallbackMessage:
-        _ = WindowsMainWindowChrome.handleTrayMessage(lParam, window: window)
+        if WindowsMainWindowChrome.handleTrayMessage(lParam, window: window) {
+          resynchronizeAfterRestore()
+        }
         return 0
       case UINT(WM_CLOSE):
-        requestClose(window)
+        if wParam == WindowsApplicationIdentity.explicitCloseRequest {
+          WindowsMainWindowLifecycle.requestExit(window)
+        } else {
+          _ = ShowWindow(window, SW_HIDE)
+        }
         return 0
-      case webViewStoppedMessage:
+      case WindowsMainWindowLifecycle.chatStoppedMessage:
         chat?.shutdown()
-        _ = DestroyWindow(window)
+        WindowsMainWindowLifecycle.finishWebViewShutdown(window)
+        return 0
+      case WindowsMainWindowLifecycle.desktopStoppedMessage:
+        desktopUI?.shutdown()
+        WindowsMainWindowLifecycle.finishWebViewShutdown(window)
         return 0
       case UINT(WM_DESTROY):
         WindowsMainWindowChrome.removeTrayIcon()
         WindowsUIFoundation.shutdown()
-        waitingForWebViewShutdown = false
+        WindowsMainWindowLifecycle.reset()
+        hasRevealedWindow = false
+        desktopUI = nil
         Self.window = nil
         PostQuitMessage(0)
         return 0
@@ -183,60 +160,51 @@
       }
     }
 
-    private static func requestClose(_ window: HWND?) {
-      guard !waitingForWebViewShutdown else { return }
-      if let window, chat?.beginShutdown(notifying: window, message: webViewStoppedMessage) == true
-      {
-        waitingForWebViewShutdown = true
-        _ = EnableWindow(window, false)
-        return
-      }
-      _ = DestroyWindow(window)
-    }
-
-    private static func layout() {
+    /// Surfaces the desktop UI once it is live and reports a clear reason when the
+    /// host cannot load it, so a broken install never degrades to a silent blank frame.
+    static func refreshSurfaces() {
+      guard let window else { return }
+      revealWhenReady(window)
+      let visible = desktopUI?.isReady == true
       var area = RECT()
-      guard GetClientRect(window, &area) else { return }
-      let navigationWidth = Int32(WindowLayout.navigationWidth)
-      WindowsNavigationSidebar.layout(height: area.bottom, width: navigationWidth)
-      let detailBounds = RECT(
-        left: navigationWidth,
-        top: area.top,
-        right: area.right,
-        bottom: area.bottom
-      )
-      let contentBounds = WindowsPageHeader.layout(in: detailBounds)
-      WindowsOverviewPane.layout(in: contentBounds)
-      if selectedPage == .workbench {
-        layoutWorkbench(in: contentBounds)
+      if GetClientRect(window, &area) {
+        desktopUI?.applyLayout(to: area, visible: visible)
       } else {
-        WindowsEmbeddedPages.layout(page: selectedPage, in: contentBounds)
+        desktopUI?.setVisible(visible)
+      }
+      WindowsShellFailure.present(desktopFailureText(), in: window)
+    }
+
+    private static func revealWhenReady(_ window: HWND) {
+      guard let desktopUI else { return }
+      let failed = desktopUI.state == .failed || desktopUI.state == .unsupported
+      guard desktopUI.isReady || failed || desktopUI.loadStalled else { return }
+      guard !hasRevealedWindow else { return }
+      hasRevealedWindow = true
+      _ = ShowWindow(window, SW_SHOW)
+    }
+
+    /// Re-applies surface bounds after a tray restore, where Win32 does not reliably
+    /// raise WM_SIZE for a window that was hidden rather than minimized.
+    static func resynchronizeAfterRestore() {
+      layout()
+      refreshSurfaces()
+    }
+
+    static func desktopFailureText() -> String? {
+      guard let desktopUI else { return nil }
+      guard !desktopUI.isReady else { return nil }
+      switch desktopUI.state {
+      case .failed, .unsupported:
+        return
+          "界面无法加载：\(desktopUI.errorDetail ?? "WebView2 运行时不可用")\r\n请安装 Microsoft Edge WebView2 Evergreen 运行时后重试，任务与本地 MCP 服务仍在后台运行。"
+      default:
+        return desktopUI.loadStalled ? desktopStallText : nil
       }
     }
 
-    private static func layoutWorkbench(in bounds: RECT) {
-      let width = bounds.right - bounds.left
-      let inspectorWidth = min(
-        Int32(WindowLayout.inspectorIdealWidth),
-        max(Int32(WindowLayout.inspectorMinimumWidth), width / 3)
-      )
-      let inspector = RECT(
-        left: bounds.right - inspectorWidth,
-        top: bounds.top,
-        right: bounds.right,
-        bottom: bounds.bottom
-      )
-      let browser = RECT(
-        left: bounds.left,
-        top: bounds.top,
-        right: inspector.left - 1,
-        bottom: bounds.bottom
-      )
-      chatBounds = WindowsBrowserToolbar.layout(in: browser)
-      WindowsTaskInspector.layoutChatPlaceholder(in: chatBounds)
-      WindowsTaskInspector.layoutInspector(in: inspector)
-      chat?.resize(to: chatBounds)
-    }
+    private static let desktopStallText =
+      "界面未能完成加载：WebView2 已启动，但页面没有响应。\r\n请重新启动 Codex Bridge；如果仍然如此，请修复安装或更新 Microsoft Edge WebView2 Evergreen 运行时。任务与本地 MCP 服务仍在后台运行。"
 
     private static func createWindow(instance: HINSTANCE?) -> HWND? {
       windowTitle.withCString(encodedAs: UTF16.self) { title in
@@ -266,11 +234,37 @@
           WindowsMainWindow.handleMessage(window, message, wParam, lParam)
         }
         windowClass.hInstance = instance
-        windowClass.hIcon = LoadIconW(nil, resourcePointer(standardResourceID))
-        windowClass.hCursor = LoadCursorW(nil, resourcePointer(standardResourceID))
-        windowClass.hbrBackground = GetSysColorBrush(COLOR_WINDOW)
+        windowClass.hIcon = WindowsApplicationIcon.load()
+        windowClass.hCursor = LoadCursorW(nil, resourcePointer(standardCursorID))
+        windowClass.hbrBackground = CreateSolidBrush(WindowsSystemAppearance.canvasColorRef)
         windowClass.lpszClassName = className
         _ = RegisterClassW(&windowClass)
+      }
+    }
+
+    private static func applyDwmAttributes(to window: HWND) {
+      var useDarkMode: Int32 = WindowsSystemAppearance.isDark ? 1 : 0
+      _ = DwmSetWindowAttribute(
+        window,
+        DWORD(20),
+        &useDarkMode,
+        DWORD(MemoryLayout<Int32>.size)
+      )
+      var cornerPreference: DWORD = 2
+      _ = DwmSetWindowAttribute(
+        window,
+        DWORD(33),
+        &cornerPreference,
+        DWORD(MemoryLayout<DWORD>.size)
+      )
+    }
+
+    private static func setWindowIcons(_ window: HWND) {
+      if let iconBig = WindowsApplicationIcon.load(width: 32, height: 32) {
+        _ = SendMessageW(window, UINT(WM_SETICON), WPARAM(1), LPARAM(Int(bitPattern: iconBig)))
+      }
+      if let iconSmall = WindowsApplicationIcon.load(width: 16, height: 16) {
+        _ = SendMessageW(window, UINT(WM_SETICON), WPARAM(0), LPARAM(Int(bitPattern: iconSmall)))
       }
     }
 

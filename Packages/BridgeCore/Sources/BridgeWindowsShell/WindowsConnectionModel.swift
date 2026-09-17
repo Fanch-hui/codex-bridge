@@ -1,4 +1,6 @@
 #if os(Windows)
+  import Foundation
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -9,16 +11,32 @@
 
     let client: any BridgeServiceClientProtocol
     let displayBox: AuxiliaryDisplayBox<WindowsConnectionDisplay>
+    let feedback: WindowsDesktopFeedbackStore
     var connectionState = WindowsWorkbenchDisplay.ConnectionState.idle
     var serviceStatus: IPCServiceStatusResponse?
     var clients: [IPCMCPClientStatus] = []
+    var deepSeekHarnessMCPServers: [IPCDeepSeekHarnessMCPServerSummary] = []
     var selectedClientID: String?
     var busy = false
     var statusText = "尚未读取 MCP 客户端状态。"
 
-    init(client: any BridgeServiceClientProtocol) {
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
       self.client = client
+      self.feedback = feedback
       displayBox = AuxiliaryDisplayBox(value: Self.emptyDisplay)
+    }
+
+    func applyServiceStatus(
+      _ status: IPCServiceStatusResponse?,
+      connectionState: WindowsWorkbenchDisplay.ConnectionState
+    ) {
+      guard serviceStatus != status || self.connectionState != connectionState else { return }
+      serviceStatus = status
+      self.connectionState = connectionState
+      publishDisplay()
     }
 
     func refresh() async {
@@ -33,8 +51,12 @@
       do {
         async let statusRequest = client.status()
         async let clientsRequest = client.mcpClients()
+        async let deepSeekHarnessMCPRequest = client.deepSeekHarnessMCPServers()
         serviceStatus = try await statusRequest
         clients = try await clientsRequest
+        if let deepSeekHarnessMCPResponse = try? await deepSeekHarnessMCPRequest {
+          deepSeekHarnessMCPServers = deepSeekHarnessMCPResponse.servers
+        }
         connectionState = .connected
         reconcileSelection()
         statusText = "MCP 客户端状态已刷新。"
@@ -50,22 +72,32 @@
       publishDisplay()
     }
 
-    func toggleSelectedClient() async {
-      guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue else {
+    func toggleSelectedClient(clientID: String? = nil) async {
+      guard let profile = profile(clientID: clientID),
+        profile.clientID == MCPClientID.qwenStudio.rawValue
+      else {
         return
       }
-      await mutate("正在更新 Qwen Studio 状态…") {
+      let enabled = !profile.enabled
+      await mutate(
+        "正在更新 Qwen Studio 状态…",
+        success: enabled ? "Qwen Studio 已启用。" : "Qwen Studio 已停用。"
+      ) {
         try await self.client.setMCPClientEnabled(
           clientID: profile.clientID,
-          enabled: !profile.enabled
+          enabled: enabled
         )
       }
     }
 
-    func setSelectedExposure(at index: Int) async {
-      guard Self.exposureModes.indices.contains(index), let profile = selectedClient else { return }
+    func setSelectedExposure(at index: Int, clientID: String? = nil) async {
+      guard Self.exposureModes.indices.contains(index), let profile = profile(clientID: clientID)
+      else { return }
       let mode = Self.exposureModes[index]
-      await mutate("正在保存工具权限…") {
+      await mutate(
+        "正在保存工具权限…",
+        success: "工具权限已设置为：\(mode == .full ? "完整" : "只读")。"
+      ) {
         if profile.clientID == MCPClientID.chatGPT.rawValue {
           try await self.client.setExposureMode(mode)
         } else {
@@ -74,8 +106,9 @@
       }
     }
 
-    func exportSelectedConfiguration() async -> String? {
-      guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue,
+    func exportSelectedConfiguration(clientID: String? = nil) async -> String? {
+      guard let profile = profile(clientID: clientID),
+        profile.clientID == MCPClientID.qwenStudio.rawValue,
         profile.enabled
       else { return nil }
       do {
@@ -85,34 +118,97 @@
         return value
       } catch {
         statusText = "生成 Qwen 配置失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText, title: "配置生成失败")
         publishDisplay()
         return nil
       }
     }
 
-    func rotateSelectedCredential() async {
-      guard let profile = selectedClient, profile.clientID == MCPClientID.qwenStudio.rawValue,
+    func rotateSelectedCredential(clientID: String? = nil) async {
+      guard let profile = profile(clientID: clientID),
+        profile.clientID == MCPClientID.qwenStudio.rawValue,
         profile.enabled
       else { return }
-      await mutate("正在重新生成 Qwen 凭证…") {
+      await mutate("正在重新生成 Qwen 凭证…", success: "Qwen 凭证已重新生成。") {
         try await self.client.rotateMCPClientCredential(clientID: profile.clientID)
       }
     }
 
     func rotateEndpoint() async {
-      await mutate("正在重新生成本地 MCP Endpoint…") {
+      await mutate("正在重新生成本地 MCP Endpoint…", success: "本地 MCP Endpoint 已重新生成。") {
         _ = try await self.client.rotateLocalMCPEndpoint()
       }
     }
 
+    func saveDeepSeekHarnessMCPServer(
+      _ request: IPCDeepSeekHarnessMCPServerInput
+    ) async {
+      await mutate("正在保存 DSH MCP…", success: "DSH MCP 已保存。") {
+        _ = try await self.client.saveDeepSeekHarnessMCPServer(request)
+      }
+    }
+
+    func deleteDeepSeekHarnessMCPServer(id: String) async {
+      await mutate("正在删除 DSH MCP…", success: "DSH MCP 已删除。") {
+        try await self.client.deleteDeepSeekHarnessMCPServer(id: id)
+      }
+    }
+
+    func setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool) async {
+      guard let server = deepSeekHarnessMCPServers.first(where: { $0.id == id }) else { return }
+      let request = IPCDeepSeekHarnessMCPServerInput(
+        id: server.id,
+        name: server.name,
+        enabled: enabled,
+        transport: server.transport,
+        command: server.command,
+        args: server.args,
+        url: server.url,
+        environment: server.environment.map { IPCDeepSeekHarnessMCPSecretInput(name: $0.name) },
+        headers: server.headers.map { IPCDeepSeekHarnessMCPSecretInput(name: $0.name) }
+      )
+      await saveDeepSeekHarnessMCPServer(request)
+    }
+
     func didCopyConfiguration(_ success: Bool) {
       statusText = success ? "已复制 Qwen Studio JSON 配置。" : "复制 Qwen 配置失败。"
+      if success {
+        feedback.postToast(statusText)
+      } else {
+        feedback.postAlert(statusText, title: "复制失败")
+      }
+      publishDisplay()
+    }
+
+    var localMCPEndpoint: String? {
+      Self.safeLocalMCPDescription(from: serviceStatus?.localMCPURL)
+    }
+
+    nonisolated static func safeLocalMCPDescription(from raw: String?) -> String? {
+      guard let raw, let components = URLComponents(string: raw), let host = components.host else {
+        return nil
+      }
+      let port = components.port.map { ":\($0)" } ?? ""
+      return "\(components.scheme ?? "http")://\(host)\(port)/mcp"
+    }
+
+    func didCopyEndpoint(_ success: Bool) {
+      statusText = success ? "已复制本地 MCP Endpoint。" : "复制本地 MCP Endpoint 失败。"
+      if success {
+        feedback.postToast(statusText)
+      } else {
+        feedback.postAlert(statusText, title: "复制失败")
+      }
       publishDisplay()
     }
 
     func refreshDisplaySnapshot() { publishDisplay() }
 
-    private func mutate(_ progress: String, action: () async throws -> Void) async {
+    func mutate(
+      _ progress: String,
+      success: String,
+      action: () async throws -> Void
+    ) async {
       guard connectionState == .connected, !busy else { return }
       busy = true
       statusText = progress
@@ -121,16 +217,22 @@
         try await action()
         busy = false
         await refresh()
+        statusText = success
+        feedback.postToast(success)
+        publishDisplay()
       } catch {
         busy = false
         statusText = "操作失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText, title: "连接操作失败")
         publishDisplay()
       }
     }
 
-    private var selectedClient: IPCMCPClientStatus? {
-      guard let selectedClientID else { return nil }
-      return clients.first { $0.clientID == selectedClientID }
+    private var selectedClient: IPCMCPClientStatus? { profile(clientID: nil) }
+
+    private func profile(clientID: String?) -> IPCMCPClientStatus? {
+      guard let id = clientID ?? selectedClientID else { return nil }
+      return clients.first { $0.clientID == id }
     }
 
     private func reconcileSelection() {
@@ -147,6 +249,24 @@
       }
       let isQwen = profile?.clientID == MCPClientID.qwenStudio.rawValue
       let enabled = profile?.enabled == true
+      let desktopClients = clients.map { client in
+        BridgeDesktopMCPClientRow(
+          clientID: client.clientID,
+          displayName: client.displayName,
+          enabled: client.enabled,
+          exposureMode: client.exposureMode.rawValue,
+          exposureOptions: Self.exposureModes.map { mode in
+            BridgeDesktopChoice(id: mode.rawValue, title: mode == .full ? "完整" : "只读")
+          },
+          activeSessionCount: client.activeSessionCount,
+          lastConnectedAt: client.lastConnectedAt,
+          canToggle: client.clientID == MCPClientID.qwenStudio.rawValue && !busy,
+          canCopyConfiguration: client.clientID == MCPClientID.qwenStudio.rawValue
+            && client.enabled && !busy,
+          canRotateCredential: client.clientID == MCPClientID.qwenStudio.rawValue
+            && client.enabled && !busy
+        )
+      }
       displayBox.store(
         WindowsConnectionDisplay(
           connectionState: connectionState,
@@ -155,7 +275,7 @@
           },
           selectedClientIndex: selectedIndex,
           clientDetailText: detailText(profile),
-          endpointText: serviceStatus?.localMCPURL ?? "本地 MCP Endpoint 暂不可用",
+          endpointText: localMCPEndpoint ?? "本地 MCP Endpoint 暂不可用",
           exposureRows: ["只读", "完整"],
           selectedExposureIndex: profile.flatMap {
             Self.exposureModes.firstIndex(of: $0.exposureMode)
@@ -168,7 +288,32 @@
           copyConfigurationEnabled: isQwen && enabled && !busy,
           rotateCredentialEnabled: isQwen && enabled && !busy,
           rotateEndpointEnabled: connectionState == .connected && !busy,
-          statusText: statusText
+          statusText: ServiceStatusPresentation.connectionMessage(
+            status: serviceStatus?.status,
+            currentMessage: statusText
+          ) ?? statusText,
+          clientItems: desktopClients,
+          deepSeekHarnessMCPItems: deepSeekHarnessMCPServers.map { server in
+            BridgeDesktopDeepSeekHarnessMCPRow(
+              id: server.id,
+              name: server.name,
+              enabled: server.enabled,
+              transport: server.transport,
+              command: server.command,
+              arguments: server.args,
+              url: server.url,
+              environment: server.environment.map {
+                BridgeDesktopSecretSummary(name: $0.name, hasValue: $0.hasValue)
+              },
+              headers: server.headers.map {
+                BridgeDesktopSecretSummary(name: $0.name, hasValue: $0.hasValue)
+              },
+              canToggle: !busy,
+              canEdit: !busy,
+              canDelete: !busy
+            )
+          },
+          tunnel: projectedTunnel
         )
       )
     }
@@ -186,8 +331,6 @@
         profile.exposureMode == .full
           ? "暴露任务与 Direct 工具；项目权限、workspace gate 与本机审批仍然生效。"
           : "仅暴露项目、文件、任务、Thread、模型与 Skill 查询工具。",
-        "",
-        "Secure Tunnel 在 Windows 版不可用；本地 MCP 与 Qwen Studio 不受影响。",
       ].joined(separator: "\r\n")
     }
 

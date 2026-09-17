@@ -201,17 +201,20 @@ public struct ListProjectsOutput: Codable, Equatable, Sendable {
   public let schemaVersion: Int
   public let projects: [MCPProjectSummary]
   public let nextCursor: String?
+  public let defaultProjectID: String?
 
   public init(page: MCPProjectPage) {
     schemaVersion = 1
     projects = page.projects
     nextCursor = page.nextCursor
+    defaultProjectID = page.defaultProjectID
   }
 
   private enum CodingKeys: String, CodingKey {
     case schemaVersion = "schema_version"
     case projects
     case nextCursor = "next_cursor"
+    case defaultProjectID = "default_project_id"
   }
 }
 

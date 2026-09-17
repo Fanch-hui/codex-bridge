@@ -58,8 +58,13 @@ extension BridgeServiceRequestController {
   }
 
   func handleGetModelCatalog(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let options = try BridgeServiceIPCCodec.optionalPayload(
+      IPCModelCatalogRequest.self,
+      from: request
+    )
     let catalog = try await composition.application.serviceModelCatalog(
-      deadline: Self.deadline()
+      deadline: Self.deadline(),
+      forceRefresh: options?.forceRefresh == true
     )
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,

@@ -1,7 +1,6 @@
 import BridgeAgentCore
 import BridgeDomain
 import BridgeServiceCore
-import BridgeSupervisor
 import Foundation
 
 extension ServiceExecutionCoordinator {
@@ -24,36 +23,39 @@ extension ServiceExecutionCoordinator {
   public func resolveApproval(
     taskID: TaskID,
     approvalID: String,
-    decision: LocalApprovalDecision
+    decision: LocalApprovalDecision,
+    answers: [String: [String]]? = nil
   ) async throws {
     if let pending = pendingAgentApprovals[approvalID] {
       guard pending.request.taskID == taskID else {
         throw ExecutionServiceError.bindingMismatch
       }
+      guard answers == nil else {
+        throw ExecutionServiceError.invalidRequest("approval.answers")
+      }
       try await resolveAgentApproval(pending, taskID: taskID, decision: decision)
       return
     }
+    let pending = await execution.pendingApprovals(taskID: taskID).first { $0.id == approvalID }
     try await execution.respondToApproval(
       taskID: taskID,
       approvalID: approvalID,
-      decision: decision
+      decision: decision,
+      answers: answers
     )
     do {
-      let updated = try await tasks.resumeAfterCodexApproval(
-        taskID: taskID,
-        approved: decision.isApproval
-      )
+      if pending?.isBlocking == false {
+        guard try await tasks.task(id: taskID) != nil else {
+          throw ExecutionServiceError.approvalUnavailable(approvalID)
+        }
+      } else {
+        _ = try await tasks.resumeAfterCodexApproval(
+          taskID: taskID, approved: decision.isApproval)
+      }
       await execution.finalizeApproval(
         taskID: taskID,
         approvalID: approvalID,
         committed: true
-      )
-      await supervision.observe(
-        task: updated,
-        kind: .progress,
-        summary: decision == .allow
-          ? "The local user approved a Codex operation."
-          : "The local user denied a Codex operation; Codex may choose a safer path."
       )
     } catch {
       await execution.finalizeApproval(
@@ -101,16 +103,9 @@ extension ServiceExecutionCoordinator {
 
     pendingAgentApprovals.removeValue(forKey: approval.approvalID)
     do {
-      let updated = try await tasks.resumeAfterCodexApproval(
+      _ = try await tasks.resumeAfterCodexApproval(
         taskID: taskID,
         approved: decision.isApproval
-      )
-      await supervision.observe(
-        task: updated,
-        kind: .progress,
-        summary: decision.isApproval
-          ? "The local user approved an agent operation."
-          : "The local user denied an agent operation."
       )
     } catch {
       await failAgentApproval(

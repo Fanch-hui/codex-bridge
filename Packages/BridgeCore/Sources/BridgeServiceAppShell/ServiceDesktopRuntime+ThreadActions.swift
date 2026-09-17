@@ -25,11 +25,12 @@ extension BridgeServiceAppModel {
     if let relatedTask {
       selectedTaskID = relatedTask.taskID
       selectedThread = nil
-      openConversation(taskID: relatedTask.taskID)
+      openTask(relatedTask.taskID)
       return
     }
 
     selectedTaskID = nil
+    selectedThread = nil
     closeConversation()
 
     runMutation { [weak self] client in
@@ -42,9 +43,23 @@ extension BridgeServiceAppModel {
           limit: 100
         )
       )
-      guard self.selectedThreadID == threadID, self.selectedTaskID == nil else { return }
+      guard self.selectedProjectID == targetProjectID, self.selectedThreadID == threadID,
+        self.selectedTaskID == nil
+      else { return }
       self.selectedThread = page
     }
+  }
+
+  package func openSession(_ session: WorkbenchSessionItem) {
+    let latest = session.latestTask
+    let priorTaskIDs = session.tasks.dropLast().map(\.taskID)
+    if selectedProjectID != latest.projectID {
+      selectProject(latest.projectID)
+    }
+    selectedTaskID = latest.taskID
+    selectedThread = nil
+    selectedThreadID = latest.isCodexTask ? latest.threadID : nil
+    openConversation(taskID: latest.taskID, priorTaskIDs: priorTaskIDs)
   }
 
   public func openTask(_ taskID: String) {
@@ -57,10 +72,15 @@ extension BridgeServiceAppModel {
     selectedThread = nil
     selectedThreadID = task.isCodexTask ? task.threadID : nil
 
-    openConversation(taskID: task.taskID)
+    let sessionTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: tasks)
+    let priorTaskIDs =
+      sessionTasks
+      .filter { $0.taskID != task.taskID && $0.updatedAt <= task.updatedAt }
+      .map(\.taskID)
+    openConversation(taskID: task.taskID, priorTaskIDs: priorTaskIDs)
   }
 
-  public func openConversation(taskID: String) {
+  public func openConversation(taskID: String, priorTaskIDs: [String] = []) {
     guard let client, connectionState == .connected else {
       errorMessage = "后台 Service 未连接，无法查看对话。"
       return
@@ -76,10 +96,12 @@ extension BridgeServiceAppModel {
     closeConversation()
     let conversation = TaskConversationModel(
       taskID: taskID,
+      priorTaskIDs: priorTaskIDs,
       client: client,
       isTerminal: task?.isTerminal == true
     )
-    conversation.restorePresentation(conversationPresentationCache.snapshot(for: taskID))
+    conversation.restorePresentation(
+      conversationPresentationCache.snapshot(for: taskID, priorTaskIDs: priorTaskIDs))
     self.conversation = conversation
     Task {
       await conversation.start()

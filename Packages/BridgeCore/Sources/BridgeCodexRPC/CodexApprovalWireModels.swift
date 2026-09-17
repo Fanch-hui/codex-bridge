@@ -137,16 +137,76 @@ public struct CodexPermissionsApprovalRequest: Equatable, Sendable {
   public let environmentID: String?
 }
 
+public struct CodexUserInputOption: Equatable, Sendable {
+  public let label: String
+  public let description: String
+
+  public init(label: String, description: String) {
+    self.label = label
+    self.description = description
+  }
+}
+
+public struct CodexUserInputQuestion: Equatable, Sendable {
+  public let id: String
+  public let header: String
+  public let question: String
+  public let isOther: Bool
+  public let isSecret: Bool
+  public let options: [CodexUserInputOption]
+
+  public init(
+    id: String,
+    header: String,
+    question: String,
+    isOther: Bool = false,
+    isSecret: Bool = false,
+    options: [CodexUserInputOption] = []
+  ) {
+    self.id = id
+    self.header = header
+    self.question = question
+    self.isOther = isOther
+    self.isSecret = isSecret
+    self.options = options
+  }
+}
+
+public struct CodexUserInputApprovalRequest: Equatable, Sendable {
+  public let correlation: CodexApprovalCorrelation
+  public let isBlocking: Bool
+  public let questions: [CodexUserInputQuestion]
+
+  public init(
+    correlation: CodexApprovalCorrelation,
+    isBlocking: Bool,
+    questions: [CodexUserInputQuestion]
+  ) {
+    self.correlation = correlation
+    self.isBlocking = isBlocking
+    self.questions = questions
+  }
+}
+
 public enum CodexApprovalRequest: Equatable, Sendable {
   case command(CodexCommandApprovalRequest)
   case fileChange(CodexFileChangeApprovalRequest)
   case permissions(CodexPermissionsApprovalRequest)
+  case userInput(CodexUserInputApprovalRequest)
 
   public var correlation: CodexApprovalCorrelation {
     switch self {
     case .command(let request): request.correlation
     case .fileChange(let request): request.correlation
     case .permissions(let request): request.correlation
+    case .userInput(let request): request.correlation
+    }
+  }
+
+  public var requiresItemEvidence: Bool {
+    switch self {
+    case .userInput: false
+    case .command, .fileChange, .permissions: true
     }
   }
 }

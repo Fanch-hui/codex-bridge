@@ -29,10 +29,31 @@ public enum DirectProcessError: Error, Equatable, Sendable {
 
 public final class DirectProcessLifetime: @unchecked Sendable {
   public let pid: Int32
-  private let process: ManagedStdioProcess
+  #if os(Windows)
+    private enum Backend {
+      case managed(ManagedStdioProcess)
+      case container(WindowsAppContainerProcess)
+    }
+    private let backend: Backend
+  #else
+    private let process: ManagedStdioProcess
+  #endif
 
   public var identity: DirectProcessIdentity? {
-    process.identity.map(Self.directIdentity)
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc):
+        return proc.identity.map(Self.directIdentity)
+      case .container(let proc):
+        return DirectProcessIdentity(
+          pid: proc.pid,
+          startTimeMicros: 0,
+          processGroupID: proc.pid
+        )
+      }
+    #else
+      process.identity.map(Self.directIdentity)
+    #endif
   }
 
   public init(
@@ -46,83 +67,194 @@ public final class DirectProcessLifetime: @unchecked Sendable {
     guard let executable = argv.first, !executable.isEmpty, argv.count <= 128, !usePTY else {
       throw DirectProcessError.invalidArgument
     }
-    let launchArgv: [String]
+    let environment = Self.defaultEnvironment(overrides: environment)
     #if os(Windows)
-      guard !denyNetwork else { throw DirectProcessError.sandboxUnavailable }
-      launchArgv = argv
+      if denyNetwork {
+        do {
+          let container = try WindowsAppContainerProcess(
+            argv: argv,
+            workingDirectory: workingDirectory,
+            environment: environment,
+            onOutput: { output.append($0) }
+          )
+          self.backend = .container(container)
+          self.pid = container.pid
+        } catch let error as DirectProcessError {
+          throw error
+        } catch {
+          throw DirectProcessError.sandboxUnavailable
+        }
+      } else {
+        do {
+          let managed = try ManagedStdioProcess(
+            argv: argv,
+            workingDirectory: workingDirectory,
+            environment: environment,
+            mergeStandardError: true,
+            onStandardOutput: { output.append($0) }
+          )
+          self.backend = .managed(managed)
+          self.pid = managed.pid
+        } catch let error as ManagedProcessError {
+          throw Self.directError(error)
+        }
+      }
     #else
+      let launchArgv: [String]
       if denyNetwork {
         guard Self.sandboxExecAvailable else { throw DirectProcessError.sandboxUnavailable }
         launchArgv = [Self.sandboxExecPath, "-p", Self.denyNetworkProfile, "--"] + argv
       } else {
         launchArgv = argv
       }
+      do {
+        process = try ManagedStdioProcess(
+          argv: launchArgv,
+          workingDirectory: workingDirectory,
+          environment: environment,
+          mergeStandardError: true,
+          onStandardOutput: { output.append($0) }
+        )
+      } catch let error as ManagedProcessError {
+        throw Self.directError(error)
+      }
+      pid = process.pid
     #endif
-    let environment = Self.defaultEnvironment(overrides: environment)
-    do {
-      process = try ManagedStdioProcess(
-        argv: launchArgv,
-        workingDirectory: workingDirectory,
-        environment: environment,
-        mergeStandardError: true,
-        onStandardOutput: { output.append($0) }
-      )
-    } catch let error as ManagedProcessError {
-      throw Self.directError(error)
-    }
-    pid = process.pid
   }
 
   public func writeStdin(_ data: Data) throws {
-    do {
-      try process.writeStdin(data)
-    } catch {
-      throw DirectProcessError.stdinUnavailable
-    }
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc):
+        do {
+          try proc.writeStdin(data)
+        } catch {
+          throw DirectProcessError.stdinUnavailable
+        }
+      case .container(let proc):
+        try proc.writeStdin(data)
+      }
+    #else
+      do {
+        try process.writeStdin(data)
+      } catch {
+        throw DirectProcessError.stdinUnavailable
+      }
+    #endif
   }
 
   public func closeStdin() {
-    process.closeStdin()
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc): proc.closeStdin()
+      case .container(let proc): proc.closeStdin()
+      }
+    #else
+      process.closeStdin()
+    #endif
   }
 
   public func terminateGroup() {
-    process.terminateGroup()
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc): proc.terminateGroup()
+      case .container(let proc): proc.terminateGroup()
+      }
+    #else
+      process.terminateGroup()
+    #endif
   }
 
   public func killGroup() {
-    process.killGroup()
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc): proc.killGroup()
+      case .container(let proc): proc.killGroup()
+      }
+    #else
+      process.killGroup()
+    #endif
   }
 
   public var isRunning: Bool {
-    process.isRunning
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc): return proc.isRunning
+      case .container(let proc): return proc.isRunning
+      }
+    #else
+      return process.isRunning
+    #endif
   }
 
   public func reapIfExited(gracePeriod: Duration = .milliseconds(200))
     -> DirectProcessTermination?
   {
-    process.reapIfExited(gracePeriod: gracePeriod).map(Self.directTermination)
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc):
+        return proc.reapIfExited(gracePeriod: gracePeriod).map(Self.directTermination)
+      case .container(let proc):
+        return proc.reapIfExited(gracePeriod: gracePeriod)
+      }
+    #else
+      process.reapIfExited(gracePeriod: gracePeriod).map(Self.directTermination)
+    #endif
   }
 
   public func waitForExit(timeout: Duration) -> DirectProcessTermination? {
-    process.waitForExit(timeout: timeout).map(Self.directTermination)
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc):
+        return proc.waitForExit(timeout: timeout).map(Self.directTermination)
+      case .container(let proc):
+        return proc.waitForExit(timeout: timeout)
+      }
+    #else
+      process.waitForExit(timeout: timeout).map(Self.directTermination)
+    #endif
   }
 
   public func terminateAndWait(
     gracePeriod: Duration = .seconds(1),
     killWait: Duration = .seconds(5)
   ) -> DirectProcessTermination? {
-    process.terminateAndWait(gracePeriod: gracePeriod, killWait: killWait)
-      .map(Self.directTermination)
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc):
+        return proc.terminateAndWait(gracePeriod: gracePeriod, killWait: killWait)
+          .map(Self.directTermination)
+      case .container(let proc):
+        return proc.terminateAndWait(gracePeriod: gracePeriod, killWait: killWait)
+      }
+    #else
+      process.terminateAndWait(gracePeriod: gracePeriod, killWait: killWait)
+        .map(Self.directTermination)
+    #endif
   }
 
   public func pollOutput() {}
 
   public func drainRemainingOutput() {
-    process.drainRemainingOutput()
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc): proc.drainRemainingOutput()
+      case .container(let proc): proc.drainRemainingOutput()
+      }
+    #else
+      process.drainRemainingOutput()
+    #endif
   }
 
   public func close() {
-    process.close()
+    #if os(Windows)
+      switch backend {
+      case .managed(let proc): proc.close()
+      case .container(let proc): proc.close()
+      }
+    #else
+      process.close()
+    #endif
   }
 
   public static func identity(of processID: Int32) -> DirectProcessIdentity? {
@@ -254,9 +386,11 @@ public final class DirectProcessLifetime: @unchecked Sendable {
       environment["PATH"] = path.joined(separator: ";")
       if let overrides {
         for (key, value) in overrides {
-          environment.keys
-            .first(where: { $0.caseInsensitiveCompare(key) == .orderedSame })
-            .map { environment.removeValue(forKey: $0) }
+          if let existingKey = environment.keys.first(where: {
+            $0.caseInsensitiveCompare(key) == .orderedSame
+          }) {
+            environment.removeValue(forKey: existingKey)
+          }
           environment[key] = value
         }
       }

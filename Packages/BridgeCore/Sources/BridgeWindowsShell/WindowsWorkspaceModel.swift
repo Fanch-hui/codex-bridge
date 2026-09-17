@@ -7,6 +7,7 @@
   final class WindowsWorkspaceModel {
     let client: any BridgeServiceClientProtocol
     let displayBox: AuxiliaryDisplayBox<WindowsWorkspaceDisplay>
+    let feedback: WindowsDesktopFeedbackStore
 
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var projects: [MCPProjectSummary] = []
@@ -24,8 +25,12 @@
     var busy = false
     var statusText = "尚未加载项目工作区。"
 
-    init(client: any BridgeServiceClientProtocol) {
+    init(
+      client: any BridgeServiceClientProtocol,
+      feedback: WindowsDesktopFeedbackStore
+    ) {
       self.client = client
+      self.feedback = feedback
       displayBox = AuxiliaryDisplayBox(
         value: WindowsWorkspaceDisplay(
           connectionState: .idle,
@@ -119,114 +124,7 @@
       publishDisplay()
     }
 
-    func refreshSelected() async {
-      guard connectionState == .connected, !busy else {
-        statusText = "后台 Service 未连接。"
-        publishDisplay()
-        return
-      }
-      await loadSelectedWorkspace()
-    }
-
-    func setMode(_ mode: String) async {
-      guard let projectID = selectedProjectID, Self.modeValues.contains(mode) else {
-        statusText = "请先选择项目和有效的命令模式。"
-        publishDisplay()
-        return
-      }
-      guard connectionState == .connected, !busy else { return }
-      busy = true
-      statusText = "正在保存命令模式…"
-      publishDisplay()
-      defer { busy = false }
-      do {
-        detail = try await client.setProjectCommandMode(
-          projectID: projectID,
-          commandMode: mode
-        )
-        syncWorkspace()
-        statusText = "命令模式已保存。"
-      } catch {
-        statusText = "命令模式保存失败：\(BridgeServiceErrorMessage.message(error))"
-      }
-      publishDisplay()
-    }
-
-    func saveCommand(_ draft: BridgeWorkspaceCommandDraft) async {
-      guard let projectID = selectedProjectID, let workspace = detail?.directWorkspace else {
-        statusText = "当前项目没有可编辑的 Direct 工作区。"
-        publishDisplay()
-        return
-      }
-      guard !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-        !draft.executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      else {
-        statusText = "命令名称和可执行文件不能为空。"
-        publishDisplay()
-        return
-      }
-      guard connectionState == .connected, !busy else { return }
-      busy = true
-      statusText = "正在保存 Direct 命令…"
-      publishDisplay()
-      defer { busy = false }
-      var next = commands
-      if let index = next.firstIndex(where: { $0.id == selectedCommandID }) {
-        next[index] = draft
-      } else {
-        next.append(draft)
-      }
-      do {
-        detail = try await client.updateProjectCommands(
-          projectID: projectID,
-          commands: next.map { $0.toIPCCommand() },
-          commandBlacklist: workspace.commandBlacklist.map {
-            BridgeBlacklistDraft(rule: $0).toIPCRule()
-          }
-        )
-        selectedCommandID = draft.id
-        syncWorkspace()
-        statusText = "Direct 命令已保存。"
-      } catch {
-        statusText = "Direct 命令保存失败：\(BridgeServiceErrorMessage.message(error))"
-      }
-      publishDisplay()
-    }
-
-    func removeSelectedCommand() async {
-      guard let selectedCommandID, let projectID = selectedProjectID,
-        let workspace = detail?.directWorkspace
-      else {
-        statusText = "请先选择要移除的命令。"
-        publishDisplay()
-        return
-      }
-      guard connectionState == .connected, !busy else { return }
-      busy = true
-      statusText = "正在移除 Direct 命令…"
-      publishDisplay()
-      defer { busy = false }
-      let next = commands.filter { $0.id != selectedCommandID }
-      do {
-        detail = try await client.updateProjectCommands(
-          projectID: projectID,
-          commands: next.map { $0.toIPCCommand() },
-          commandBlacklist: workspace.commandBlacklist.map {
-            BridgeBlacklistDraft(rule: $0).toIPCRule()
-          }
-        )
-        self.selectedCommandID = nil
-        syncWorkspace()
-        statusText = "Direct 命令已移除。"
-      } catch {
-        statusText = "Direct 命令移除失败：\(BridgeServiceErrorMessage.message(error))"
-      }
-      publishDisplay()
-    }
-
-    func refreshDisplaySnapshot() { publishDisplay() }
-
-    private func loadSelectedWorkspace() async {
+    func loadSelectedWorkspace() async {
       guard let projectID = selectedProjectID else {
         detail = nil
         commands = []
@@ -245,18 +143,15 @@
         } catch {
           loadedSkills = []
         }
-        let loadedThreads =
-          (try? await client.threads(
-            IPCThreadListRequest(projectID: projectID)
-          ).threads) ?? []
         guard selectedProjectID == projectID else { return }
         detail = loadedDetail
         skills = loadedSkills
-        threads = loadedThreads
+        threads = []
+        selectedThreadID = nil
+        selectedThreadPage = nil
         syncWorkspace()
         reconcileSkillSelection()
-        reconcileThreadSelection()
-        statusText = "已加载 Direct、\(loadedSkills.count) 个 Skills 和 \(loadedThreads.count) 个 Threads。"
+        statusText = "已加载 Direct 和 \(loadedSkills.count) 个 Skills。"
       } catch {
         guard selectedProjectID == projectID else { return }
         statusText = "命令读取失败：\(BridgeServiceErrorMessage.message(error))"

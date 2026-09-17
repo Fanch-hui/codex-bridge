@@ -1,0 +1,297 @@
+:root[data-platform="windows"] :is(.page-card, .list-panel, .detail-panel, .summary-card) {
+  border-color: var(--separator);
+  box-shadow: var(--shadow-surface);
+}
+
+:root[data-platform="windows"] .log-row {
+  border-color: var(--separator);
+  border-radius: var(--control-radius);
+  box-shadow: none;
+}
+
+:root[data-platform="windows"] :is(.list-row, .project-row, .agent-row, .log-row):hover {
+  background: var(--surface-hover);
+}
+
+:root[data-platform="windows"] :is(.list-row, .project-row, .log-row).selected {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--separator));
+  background: var(--selection);
+}
+
+:root[data-platform="windows"] .button {
+  border-color: var(--separator-strong);
+  border-radius: var(--control-radius);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-control);
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease,
+    box-shadow 120ms ease, transform 80ms ease;
+}
+
+:root[data-platform="windows"] .button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--separator-strong));
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-control-hover);
+}
+
+:root[data-platform="windows"] .button:active:not(:disabled):not(.primary) {
+  background: var(--surface-pressed);
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+:root[data-platform="windows"] .button.primary {
+  border-color: var(--accent);
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: 0 1px 2px rgba(15, 108, 189, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+:root[data-platform="windows"] .button.primary:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
+  background: var(--accent-hover);
+}
+
+:root[data-platform="windows"] .button.danger {
+  color: var(--error-strong);
+  border-color: color-mix(in srgb, var(--error) 30%, var(--separator-strong));
+  background: var(--error-soft);
+}
+
+:root[data-platform="windows"] .button:disabled {
+  color: var(--text-tertiary);
+  background: var(--surface-muted);
+  box-shadow: none;
+  opacity: 0.62;
+}
+
+:root[data-platform="windows"] :is(.field input, .field select, .field textarea, .filter-bar input, .filter-bar select) {
+  border-color: var(--separator);
+  border-radius: var(--control-radius);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-inset);
+}
+
+:root[data-platform="windows"] :is(.field input, .field select, .field textarea, .filter-bar input, .filter-bar select):hover {
+  border-color: var(--separator-strong);
+  background: var(--surface-hover);
+}
+
+:root[data-platform="windows"] :is(.field input, .field select, .field textarea, .filter-bar input, .filter-bar select):focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--focus-ring-soft);
+  outline-offset: 1px;
+  box-shadow: var(--shadow-inset);
+}
+
+:root[data-platform="windows"] :is(.field input, .field select, .field textarea, .filter-bar input, .filter-bar select):disabled {
+  color: var(--text-tertiary);
+  background: var(--surface-muted);
+  box-shadow: none;
+}
+
+:root[data-platform="windows"] .check-field input {
+  accent-color: var(--accent);
+}
+
+:root[data-platform="windows"] .segmented-control {
+  background: var(--surface-muted);
+  box-shadow: inset 0 0 0 1px var(--separator);
+}
+
+:root[data-platform="windows"] .segmented-btn:hover:not(.is-active) {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+:root[data-platform="windows"] .segmented-btn.is-active {
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-control);
+}
+
+:root[data-platform="windows"] .browser-url-pill {
+  background: var(--surface-muted);
+  box-shadow: inset 0 0 0 1px var(--separator);
+}
+
+:root[data-platform="windows"] .switch-toggle {
+  border-color: var(--separator-strong);
+  background: var(--surface-pressed);
+  box-shadow: var(--shadow-inset);
+}
+
+:root[data-platform="windows"] .switch-toggle.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: none;
+}
+
+:root[data-platform="windows"] .switch-thumb {
+  background: var(--surface);
+  box-shadow: var(--shadow-control);
+}
+
+:root[data-platform="windows"] .status-badge.success {
+  color: var(--success-strong);
+  border-color: color-mix(in srgb, var(--success) 30%, var(--separator));
+  background: var(--success-soft);
+}
+
+:root[data-platform="windows"] .status-badge.running {
+  color: var(--running-strong);
+  border-color: color-mix(in srgb, var(--running) 30%, var(--separator));
+  background: var(--running-soft);
+}
+
+:root[data-platform="windows"] .status-badge.warning {
+  color: var(--warning-strong);
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--separator));
+  background: var(--warning-soft);
+}
+
+:root[data-platform="windows"] .status-badge.error {
+  color: var(--error-strong);
+  border-color: color-mix(in srgb, var(--error) 30%, var(--separator));
+  background: var(--error-soft);
+}
+
+:root[data-platform="windows"] .notice.warning {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--separator));
+  background: var(--warning-soft);
+}
+
+:root[data-platform="windows"] .notice.error {
+  border-color: color-mix(in srgb, var(--error) 28%, var(--separator));
+  background: var(--error-soft);
+}
+
+:root[data-platform="windows"] :is(.path-row, .activity-row, .conversation-entry.entry-user, .markdown-code, .entry-arguments, .approval-card pre) {
+  background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+
+:root[data-platform="windows"] .conversation-entry.entry-disclosure {
+  border-color: var(--separator);
+  background: var(--surface);
+}
+
+:root[data-platform="windows"] .feedback-layer {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  pointer-events: none;
+}
+
+:root[data-platform="windows"] .feedback-layer.is-toast {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 20px 24px;
+}
+
+:root[data-platform="windows"] .feedback-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(420px, calc(100vw - 48px));
+  padding: 12px 14px;
+  border: 1px solid var(--separator);
+  border-radius: var(--control-radius);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  pointer-events: auto;
+  animation: windows-feedback-enter 160ms ease-out;
+}
+
+:root[data-platform="windows"] .feedback-toast > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+:root[data-platform="windows"] .feedback-toast span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-platform="windows"] .feedback-dismiss {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--control-radius);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+:root[data-platform="windows"] .feedback-dismiss:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+:root[data-platform="windows"] .feedback-layer.is-alert {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+
+:root[data-platform="windows"] .feedback-dialog {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 22px;
+  width: min(520px, calc(100vw - 48px));
+  padding: 22px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  animation: windows-feedback-enter 160ms ease-out;
+}
+
+:root[data-platform="windows"] .feedback-dialog h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+:root[data-platform="windows"] .feedback-dialog p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@keyframes windows-feedback-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (forced-colors: active) {
+  :root[data-platform="windows"] :is(.button, .field input, .field select, .field textarea, .filter-bar input, .filter-bar select) {
+    border: 1px solid ButtonBorder;
+    box-shadow: none;
+    forced-color-adjust: auto;
+  }
+
+  :root[data-platform="windows"] :is(.button.primary, .nav-item.is-selected, .list-row.selected, .project-row.selected, .log-row.selected) {
+    color: var(--on-accent);
+    border-color: Highlight;
+    background: Highlight;
+  }
+
+  :root[data-platform="windows"] :is(.activity-row, .conversation-entry.entry-user, .markdown-code, .entry-arguments, .approval-card pre) {
+    background: Canvas;
+  }
+}

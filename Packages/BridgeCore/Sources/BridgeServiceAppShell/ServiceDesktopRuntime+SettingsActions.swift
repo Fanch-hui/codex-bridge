@@ -68,30 +68,6 @@ extension BridgeServiceAppModel {
     }
   }
 
-  func setSupervisorEnabled(_ enabled: Bool) {
-    guard let current = modelPreferences else { return }
-    let previous = modelPreferences
-    modelPreferences = IPCModelPreferences(
-      executionModel: current.executionModel,
-      executionEffort: current.executionEffort,
-      supervisorModel: current.supervisorModel,
-      supervisorEffort: current.supervisorEffort,
-      supervisorEnabled: enabled,
-      accessMode: current.accessMode,
-      fastModeEnabled: current.fastModeEnabled
-    )
-    runMutation { [weak self] client in
-      guard let self else { return }
-      do {
-        try await client.setSupervisorEnabled(enabled)
-        await self.refresh(silent: true, includeCatalog: true)
-      } catch {
-        modelPreferences = previous
-        throw error
-      }
-    }
-  }
-
   func setExecutionModel(_ modelID: String) {
     guard let current = modelPreferences,
       let model = models.first(where: { $0.modelID == modelID })
@@ -163,44 +139,4 @@ extension BridgeServiceAppModel {
     )
   }
 
-  func setSupervisorModel(_ modelID: String) {
-    guard let current = modelPreferences,
-      let model = models.first(where: { $0.modelID == modelID })
-    else { return }
-
-    let effort =
-      model.reasoningEfforts.contains(current.supervisorEffort)
-      ? current.supervisorEffort
-      : model.defaultReasoningEffort ?? model.reasoningEfforts[0]
-
-    setModelPreferences(
-      IPCModelPreferences(
-        executionModel: current.executionModel,
-        executionEffort: current.executionEffort,
-        supervisorModel: modelID,
-        supervisorEffort: effort,
-        supervisorEnabled: current.supervisorEnabled,
-        accessMode: current.accessMode,
-        fastModeEnabled: current.fastModeEnabled
-      )
-    )
-  }
-
-  func setSupervisorEffort(_ effort: String) {
-    guard let current = modelPreferences,
-      let model = models.first(where: { $0.modelID == current.supervisorModel }),
-      model.reasoningEfforts.contains(effort)
-    else { return }
-    setModelPreferences(
-      IPCModelPreferences(
-        executionModel: current.executionModel,
-        executionEffort: current.executionEffort,
-        supervisorModel: current.supervisorModel,
-        supervisorEffort: effort,
-        supervisorEnabled: current.supervisorEnabled,
-        accessMode: current.accessMode,
-        fastModeEnabled: current.fastModeEnabled
-      )
-    )
-  }
 }

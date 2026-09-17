@@ -2,7 +2,6 @@ import BridgeAgentCore
 import Foundation
 
 public struct AntigravityCLIProviderConfiguration: Sendable {
-  public let compatibility: AntigravityCLICompatibility
   public let launchBuilder: AntigravityCLILaunchBuilder
   public let commandRunner: any AntigravityCLICommandRunning
   public let requestTimeout: Duration
@@ -13,7 +12,6 @@ public struct AntigravityCLIProviderConfiguration: Sendable {
   public let transportFactory: AntigravityCLITransportFactory
 
   public init(
-    compatibility: AntigravityCLICompatibility = .init(),
     launchBuilder: AntigravityCLILaunchBuilder = .init(),
     commandRunner: any AntigravityCLICommandRunning = AntigravityCLICommandRunner(),
     requestTimeout: Duration = .seconds(30),
@@ -26,7 +24,6 @@ public struct AntigravityCLIProviderConfiguration: Sendable {
       try AntigravityCLIProcessTransport.launch(configuration: launch.process)
     }
   ) {
-    self.compatibility = compatibility
     self.launchBuilder = launchBuilder
     self.commandRunner = commandRunner
     self.requestTimeout = requestTimeout
@@ -40,11 +37,15 @@ public struct AntigravityCLIProviderConfiguration: Sendable {
 
 public struct AntigravityCLIProvider: AgentProvider, Sendable {
   public let descriptor: AgentProviderDescriptor
+  public let nativePermissionPolicyManager: (any AgentNativePermissionPolicyManaging)?
 
   let configuration: AntigravityCLIProviderConfiguration
 
   public init(configuration: AntigravityCLIProviderConfiguration = .init()) throws {
     self.configuration = configuration
+    nativePermissionPolicyManager = AntigravityCLISettingsStore(
+      sourceEnvironment: configuration.sourceEnvironment
+    )
     descriptor = try AgentProviderDescriptor(
       providerID: .antigravity,
       displayName: "Antigravity CLI",

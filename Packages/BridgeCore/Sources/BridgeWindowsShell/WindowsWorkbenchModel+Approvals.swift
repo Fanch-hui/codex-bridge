@@ -15,12 +15,14 @@
 
       var errors: [String] = []
       do {
-        approvals = try await client.approvals(taskID: nil)
+        let refreshed = try await client.approvals(taskID: nil)
+        if approvals != refreshed { approvals = refreshed }
       } catch {
         errors.append("安全审批读取失败：\(BridgeServiceErrorMessage.message(error))")
       }
       do {
-        directApprovals = try await client.pendingDirectApprovals()
+        let refreshed = try await client.pendingDirectApprovals()
+        if directApprovals != refreshed { directApprovals = refreshed }
       } catch {
         errors.append("Direct 审批读取失败：\(BridgeServiceErrorMessage.message(error))")
       }
@@ -45,13 +47,34 @@
       publishDisplay()
     }
 
-    public func resolveSelectedApproval(decision: String) async {
+    public func resolveSelectedApproval(
+      decision: String,
+      oneTimeToolAutoApproval: Bool = false,
+      answers: [String: [String]]? = nil
+    ) async {
+      guard let approvalID = selectedApprovalID else {
+        setApprovalStatus("请先选择要处理的审批。")
+        return
+      }
+      await resolveApproval(
+        approvalID,
+        decision: decision,
+        oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+        answers: answers
+      )
+    }
+
+    func resolveApproval(
+      _ approvalID: ApprovalPresentation.Identifier,
+      decision: String,
+      oneTimeToolAutoApproval: Bool = false,
+      answers: [String: [String]]? = nil
+    ) async {
       guard connectionState == .connected else {
         setApprovalStatus("后台 Service 未连接，无法处理审批。")
         return
       }
-      guard let approvalID = selectedApprovalID,
-        let item = approvalPresentationItems().first(where: { $0.id == approvalID })
+      guard let item = approvalPresentationItems().first(where: { $0.id == approvalID })
       else {
         setApprovalStatus("请先选择要处理的审批。")
         return
@@ -60,19 +83,40 @@
         setApprovalStatus("当前审批不支持该决策。", for: approvalID)
         return
       }
+      if oneTimeToolAutoApproval {
+        guard case .task(let rawID) = approvalID,
+          decision == "allow",
+          let approval = workbenchDisplaySnapshot.approvalByID[rawID],
+          approval.kind == "task_start",
+          approval.oneTimeToolAutoApprovalAvailable == true
+        else {
+          setApprovalStatus("当前审批不支持本次 AGY 工具自动批准。", for: approvalID)
+          return
+        }
+      }
       guard resolvingApprovalIDs.insert(approvalID).inserted else { return }
-      let selectionGeneration = approvalSelectionGeneration
-      approvalStatusText = "正在处理审批…"
+      let selectionGeneration = selectedApprovalID == approvalID ? approvalSelectionGeneration : nil
+      let taskIDToReveal = approvedTaskID(for: approvalID, decision: decision)
+      if selectedApprovalID == approvalID { approvalStatusText = "正在处理审批…" }
       publishDisplay()
 
       do {
-        try await sendApprovalDecision(approvalID, decision: decision)
+        try await sendApprovalDecision(
+          approvalID,
+          decision: decision,
+          oneTimeToolAutoApproval: oneTimeToolAutoApproval,
+          answers: answers
+        )
         removeApproval(approvalID)
         await reloadTasksAndApprovals()
+        if let taskIDToReveal {
+          revealApprovedTask(taskID: taskIDToReveal)
+        }
         finishApprovalResolution(
           approvalID,
           selectionGeneration: selectionGeneration,
-          message: "已提交：\(ApprovalPresentation.decisionLabel(decision))。"
+          message: "已提交：\(ApprovalPresentation.decisionLabel(decision))。",
+          succeeded: true
         )
       } catch {
         let message =
@@ -83,28 +127,54 @@
         finishApprovalResolution(
           approvalID,
           selectionGeneration: selectionGeneration,
-          message: message
+          message: message,
+          succeeded: false
         )
+      }
+    }
+
+    private func approvedTaskID(
+      for approvalID: ApprovalPresentation.Identifier,
+      decision: String
+    ) -> String? {
+      guard decision != "deny", case .task(let rawID) = approvalID else { return nil }
+      return workbenchDisplaySnapshot.approvalByID[rawID]?.taskID
+    }
+
+    private func revealApprovedTask(taskID: String) {
+      guard let task = workbenchDisplaySnapshot.taskByID[taskID] else { return }
+      if selectedTaskID == task.taskID {
+        openConversation(for: task)
+        publishDisplay()
+      } else {
+        selectTask(id: task.taskID)
       }
     }
 
     private func sendApprovalDecision(
       _ approvalID: ApprovalPresentation.Identifier,
-      decision: String
+      decision: String,
+      oneTimeToolAutoApproval: Bool,
+      answers: [String: [String]]?
     ) async throws {
       switch approvalID {
       case .task(let rawID):
-        guard let approval = approvals.first(where: { $0.approvalID == rawID }) else {
+        guard let approval = workbenchDisplaySnapshot.approvalByID[rawID] else {
           throw WindowsApprovalError.noLongerAvailable
         }
         try await client.resolveApproval(
           IPCApprovalResolutionRequest(
             taskID: approval.taskID,
             approvalID: approval.approvalID,
-            decision: decision
+            decision: decision,
+            oneTimeToolAutoApproval: oneTimeToolAutoApproval ? true : nil,
+            answers: answers
           )
         )
       case .direct(let rawID):
+        guard !oneTimeToolAutoApproval else {
+          throw WindowsApprovalError.noLongerAvailable
+        }
         let accepted: Bool
         if decision == "allow" {
           accepted = try await client.approveDirectApproval(approvalID: rawID)
@@ -116,26 +186,7 @@
     }
 
     func approvalPresentationItems() -> [ApprovalPresentation.Item] {
-      let taskItems = approvals.map { approval in
-        ApprovalPresentation.task(
-          approval,
-          projectName: projectName(forTaskID: approval.taskID)
-        )
-      }
-      let directItems = directApprovals.map { approval in
-        ApprovalPresentation.direct(
-          approval,
-          projectName: projects.first(where: { $0.projectID == approval.projectID })?.name
-        )
-      }
-      return taskItems + directItems
-    }
-
-    private func projectName(forTaskID taskID: String) -> String? {
-      guard let projectID = tasks.first(where: { $0.taskID == taskID })?.projectID else {
-        return nil
-      }
-      return projects.first(where: { $0.projectID == projectID })?.name
+      workbenchDisplaySnapshot.approvalItems
     }
 
     private func reloadTasksAndApprovals() async {
@@ -155,11 +206,17 @@
 
     private func finishApprovalResolution(
       _ approvalID: ApprovalPresentation.Identifier,
-      selectionGeneration: UInt64,
-      message: String
+      selectionGeneration: UInt64?,
+      message: String,
+      succeeded: Bool
     ) {
       resolvingApprovalIDs.remove(approvalID)
-      guard approvalSelectionGeneration == selectionGeneration else {
+      if succeeded {
+        feedback.postToast(message)
+      } else {
+        feedback.postAlert(message, title: "审批处理失败")
+      }
+      guard let selectionGeneration, approvalSelectionGeneration == selectionGeneration else {
         publishDisplay()
         return
       }
@@ -182,6 +239,7 @@
     ) {
       guard approvalID == nil || selectedApprovalID == approvalID else { return }
       approvalStatusText = text
+      feedback.postAlert(text, title: "审批处理失败")
       publishDisplay()
     }
   }

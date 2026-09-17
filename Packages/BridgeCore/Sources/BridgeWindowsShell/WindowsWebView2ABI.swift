@@ -4,8 +4,8 @@
 
   // IID values from WebView2.h (cross-checked against WebView2 SDK derived
   // bindings: go-webview2, Rust webview2-com, arsd webview.d).
-  // IID_IUnknown must stay exact; only these three are ever matched by our
-  // QueryInterface. Re-verify against WebView2.h when upgrading the SDK.
+  // IID_IUnknown must stay exact; every interface ID used by QueryInterface is
+  // kept here and should be re-verified against WebView2.h when upgrading the SDK.
   private let iidIUnknown = makeGUID(
     0x0000_0000, 0x0000, 0x0000,
     (0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46)
@@ -18,6 +18,25 @@
     0x6C48_19F3, 0xC9B7, 0x4260,
     (0x81, 0x27, 0xC9, 0xF5, 0xBD, 0xE7, 0xF6, 0x8C)
   )
+  let iidController2 = makeGUID(
+    0xC979_903E, 0xD4CA, 0x4228,
+    (0x92, 0xEB, 0x47, 0xEE, 0x3F, 0xA9, 0x6E, 0xAB)
+  )
+  let iidCoreWebView2Version19 = makeGUID(
+    0x6921_F954, 0x79B0, 0x437F,
+    (0xA9, 0x97, 0xC8, 0x58, 0x11, 0x89, 0x7C, 0x68)
+  )
+
+  struct COREWEBVIEW2_COLOR {
+    var a: UInt8
+    var r: UInt8
+    var g: UInt8
+    var b: UInt8
+
+    var rawValue: UInt32 {
+      UInt32(a) | (UInt32(r) << 8) | (UInt32(g) << 16) | (UInt32(b) << 24)
+    }
+  }
 
   private func makeGUID(
     _ data1: UInt32,
@@ -54,13 +73,80 @@
     static let environmentCreateController = 3
     static let controllerPutIsVisible = 4
     static let controllerPutBounds = 6
+    static let controllerPutZoomFactor = 8
     static let controllerClose = 24
     static let controllerGetCoreWebView2 = 25
+    static let controller2PutDefaultBackgroundColor = 27
+    static let webViewGetSettings = 3
+    static let webViewGetSource = 4
     static let webViewNavigate = 5
+    static let webViewAddHistoryChanged = 13
+    static let webViewRemoveHistoryChanged = 14
+    static let webViewAddNavigationCompleted = 15
+    static let webViewRemoveNavigationCompleted = 16
     static let webViewReload = 31
     static let webViewGoBack = 40
     static let webViewGoForward = 41
+    static let webViewPostWebMessageAsJSON = 32
+    static let webViewAddWebMessageReceived = 34
+    static let webViewRemoveWebMessageReceived = 35
+    static let webViewGetCanGoBack = 38
+    static let webViewGetCanGoForward = 39
+    // ICoreWebView2_19 extends ICoreWebView2_18 with these two methods.
+    // The slots are verified against WebView2.h 1.0.4191.47.
+    static let webView19GetMemoryUsageTargetLevel = 122
+    static let webView19PutMemoryUsageTargetLevel = 123
+    static let settingsPutIsStatusBarEnabled = 10
+    static let settingsPutAreDevToolsEnabled = 12
+    static let settingsPutAreDefaultContextMenusEnabled = 14
+    static let settingsPutIsZoomControlEnabled = 18
   }
+
+  typealias WebView2QueryInterfaceFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafePointer<GUID>?,
+      UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+    ) -> HRESULT
+
+  typealias WebView2GetSettingsFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+    ) -> HRESULT
+
+  typealias WebView2GetStringFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UnsafeMutablePointer<WCHAR>?>?
+    ) -> HRESULT
+
+  typealias WebView2PutColorFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UInt32
+    ) -> HRESULT
+
+  typealias WebView2GetBoolFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<Int32>?
+    ) -> HRESULT
+
+  typealias WebView2AddEventHandlerFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<WebView2EventRegistrationToken>?
+    ) -> HRESULT
+
+  typealias WebView2RemoveEventHandlerFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      WebView2EventRegistrationToken
+    ) -> HRESULT
+
+  typealias WebView2EventRegistrationToken = Int64
 
   /// `CreateCoreWebView2EnvironmentWithOptions` from WebView2Loader.dll.
   typealias WebView2CreateEnvironmentFn =
@@ -90,6 +176,24 @@
       Bool
     ) -> HRESULT
 
+  typealias WebView2PutDoubleFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      Double
+    ) -> HRESULT
+
+  typealias WebView2GetMemoryUsageTargetLevelFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UInt32>?
+    ) -> HRESULT
+
+  typealias WebView2PutMemoryUsageTargetLevelFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UInt32
+    ) -> HRESULT
+
   typealias WebView2GetCoreWebView2Fn =
     @convention(c) (
       UnsafeMutableRawPointer?,
@@ -105,6 +209,31 @@
   typealias WebView2ActionFn =
     @convention(c) (
       UnsafeMutableRawPointer?
+    ) -> HRESULT
+
+  typealias WebView2PostWebMessageAsJSONFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafePointer<WCHAR>?
+    ) -> HRESULT
+
+  typealias WebView2AddWebMessageReceivedFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<WebView2EventRegistrationToken>?
+    ) -> HRESULT
+
+  typealias WebView2RemoveWebMessageReceivedFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      WebView2EventRegistrationToken
+    ) -> HRESULT
+
+  typealias WebView2GetWebMessageAsJSONFn =
+    @convention(c) (
+      UnsafeMutableRawPointer?,
+      UnsafeMutablePointer<UnsafeMutableRawPointer?>?
     ) -> HRESULT
 
   /// Loads a member function pointer of a COM interface by vtable slot.

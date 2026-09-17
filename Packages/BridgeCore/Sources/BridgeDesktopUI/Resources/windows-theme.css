@@ -1,0 +1,212 @@
+:root[data-platform="windows"] {
+  color-scheme: light dark;
+  --canvas: #fafbfc;
+  --sidebar: #f4f5f7;
+  --surface: #ffffff;
+  --surface-muted: #f5f6f8;
+  --surface-hover: #eef1f4;
+  --surface-pressed: #e7eaee;
+  --text: #1f2328;
+  --text-secondary: #5f6368;
+  --text-tertiary: #7d838a;
+  --separator: rgba(31, 35, 40, 0.12);
+  --separator-strong: rgba(31, 35, 40, 0.18);
+  --accent: #0f6cbd;
+  --accent-hover: #0b5cab;
+  --accent-soft: #e8f2fc;
+  --on-accent: #ffffff;
+  --focus-ring: #0f6cbd;
+  --focus-ring-soft: rgba(15, 108, 189, 0.22);
+  --success: #107c10;
+  --success-strong: #0c6b0c;
+  --success-soft: #e8f5e8;
+  --warning: #9d5d00;
+  --warning-strong: #8a5000;
+  --warning-soft: #fff4ce;
+  --error: #c42b1c;
+  --error-strong: #b3261e;
+  --error-soft: #fde7e9;
+  --running: #0f6cbd;
+  --running-strong: #0b5cab;
+  --running-soft: #e8f2fc;
+  --neutral-soft: #eef0f2;
+  --selection: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "Microsoft YaHei UI", monospace;
+  --radius: 10px;
+  --control-radius: 8px;
+  --scrollbar-thumb: rgba(82, 88, 96, 0.38);
+  --scrollbar-thumb-hover: rgba(82, 88, 96, 0.58);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  --shadow-control: 0 1px 2px rgba(31, 35, 40, 0.08), var(--shadow-inset);
+  --shadow-control-hover: 0 2px 5px rgba(31, 35, 40, 0.12), var(--shadow-inset);
+  --shadow-surface: 0 1px 2px rgba(31, 35, 40, 0.05), 0 4px 16px rgba(31, 35, 40, 0.035);
+  --shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.24);
+  font-family: var(--font-ui);
+}
+
+:root[data-platform="windows"] body {
+  font-family: var(--font-ui);
+  font-synthesis: none;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-platform="windows"] button,
+:root[data-platform="windows"] input,
+:root[data-platform="windows"] select,
+:root[data-platform="windows"] textarea {
+  font-family: var(--font-ui);
+}
+
+:root[data-platform="windows"] .toolbar h1,
+:root[data-platform="windows"] .section-header h2,
+:root[data-platform="windows"] .page-header h2,
+:root[data-platform="windows"] .detail-title {
+  font-family: var(--font-display);
+}
+
+:root[data-platform="windows"] .mono,
+:root[data-platform="windows"] code,
+:root[data-platform="windows"] pre {
+  font-family: var(--font-mono);
+}
+
+:root[data-platform="windows"] * {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+
+:root[data-platform="windows"] *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:root[data-platform="windows"] *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:root[data-platform="windows"] *::-webkit-scrollbar-thumb {
+  min-height: 34px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+:root[data-platform="windows"] *::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+:root[data-platform="windows"] button:focus-visible,
+:root[data-platform="windows"] input:focus-visible,
+:root[data-platform="windows"] select:focus-visible,
+:root[data-platform="windows"] textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+:root[data-platform="windows"] .icon-button:hover,
+:root[data-platform="windows"] .nav-item:hover,
+:root[data-platform="windows"] .icon-btn-small:hover:not(:disabled),
+:root[data-platform="windows"] .browser-external-btn:hover {
+  background: var(--surface-hover);
+}
+
+:root[data-platform="windows"] .nav-item.is-selected {
+  color: var(--text);
+  background: var(--selection);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+:root[data-platform="windows"] .nav-item.is-selected .icon {
+  color: var(--accent);
+}
+
+:root[data-platform="windows"] .nav-badge {
+  background: var(--surface-pressed);
+}
+
+:root[data-platform="windows"] .metric-card,
+:root[data-platform="windows"] .surface-card {
+  box-shadow: var(--shadow-surface);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-platform="windows"] {
+    --canvas: #1c1c1c;
+    --sidebar: #202020;
+    --surface: #272727;
+    --surface-muted: #2e2e2e;
+    --surface-hover: #353535;
+    --surface-pressed: #3c3c3c;
+    --text: #f5f5f5;
+    --text-secondary: #c9c9c9;
+    --text-tertiary: #a1a1a1;
+    --separator: rgba(255, 255, 255, 0.13);
+    --separator-strong: rgba(255, 255, 255, 0.20);
+    --accent: #75b6f2;
+    --accent-hover: #8bc7ff;
+    --accent-soft: rgba(117, 182, 242, 0.16);
+    --on-accent: #0d2b44;
+    --focus-ring: #8bc7ff;
+    --focus-ring-soft: rgba(139, 199, 255, 0.26);
+    --success: #6ccb5f;
+    --success-strong: #7bd970;
+    --success-soft: rgba(108, 203, 95, 0.15);
+    --warning: #f8c471;
+    --warning-strong: #ffd28a;
+    --warning-soft: rgba(248, 196, 113, 0.15);
+    --error: #ff8b82;
+    --error-strong: #ffaaa3;
+    --error-soft: rgba(255, 139, 130, 0.15);
+    --running: #75b6f2;
+    --running-strong: #8bc7ff;
+    --running-soft: rgba(117, 182, 242, 0.15);
+    --neutral-soft: #383838;
+    --selection: color-mix(in srgb, var(--accent) 18%, var(--surface));
+    --scrollbar-thumb: rgba(210, 210, 210, 0.34);
+    --scrollbar-thumb-hover: rgba(230, 230, 230, 0.56);
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --shadow-control: 0 1px 2px rgba(0, 0, 0, 0.25), var(--shadow-inset);
+    --shadow-control-hover: 0 2px 5px rgba(0, 0, 0, 0.34), var(--shadow-inset);
+    --shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.46);
+  }
+}
+
+@media (forced-colors: active) {
+  :root[data-platform="windows"] {
+    --canvas: Canvas;
+    --sidebar: Canvas;
+    --surface: Canvas;
+    --surface-muted: Canvas;
+    --surface-hover: Highlight;
+    --surface-pressed: Highlight;
+    --text: CanvasText;
+    --text-secondary: CanvasText;
+    --text-tertiary: GrayText;
+    --separator: ButtonBorder;
+    --separator-strong: ButtonText;
+    --accent: Highlight;
+    --accent-hover: Highlight;
+    --accent-soft: Canvas;
+    --on-accent: HighlightText;
+    --selection: Highlight;
+    --focus-ring: Highlight;
+    --shadow-inset: none;
+    --shadow-control: none;
+    --shadow-control-hover: none;
+    --shadow-surface: none;
+    --shadow-overlay: none;
+  }
+
+  :root[data-platform="windows"] .connection-indicator,
+  :root[data-platform="windows"] .status-badge,
+  :root[data-platform="windows"] .notice {
+    forced-color-adjust: auto;
+  }
+}

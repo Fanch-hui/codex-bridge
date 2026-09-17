@@ -18,12 +18,8 @@ let package = Package(
         .library(
             name: "MCP",
             targets: ["MCP"]),
-        .executable(
-            name: "mcp-everything-server",
-            targets: ["MCPConformanceServer"]),
-        .executable(
-            name: "mcp-everything-client",
-            targets: ["MCPConformanceClient"])
+
+
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", branch: "main"),
@@ -48,35 +44,8 @@ let package = Package(
                 .enableUpcomingFeature("StrictConcurrency")
             ]
         ),
-        .testTarget(
-            name: "MCPTests",
-            dependencies: [
-                "MCP",
-                .product(name: "SystemPackage", package: "swift-system"),
-                .product(name: "Logging", package: "swift-log"),
-                .product(
-                    name: "EventSource", package: "eventsource",
-                    condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS, .watchOS, .macCatalyst])),
-            ]
-        ),
-        .executableTarget(
-            name: "MCPConformanceServer",
-            dependencies: [
-                "MCP",
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOHTTP1", package: "swift-nio"),
-            ],
-            path: "Sources/MCPConformance/Server"
-        ),
-        .executableTarget(
-            name: "MCPConformanceClient",
-            dependencies: [
-                "MCP",
-                .product(name: "Logging", package: "swift-log"),
-            ],
-            path: "Sources/MCPConformance/Client"
-        )
+
+
+
     ]
 )

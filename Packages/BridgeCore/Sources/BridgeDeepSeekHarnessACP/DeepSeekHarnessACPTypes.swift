@@ -69,17 +69,26 @@ public struct DeepSeekHarnessACPInitialization: Equatable, Sendable {
   public let agentName: String?
   public let agentTitle: String?
   public let agentVersion: String?
+  public let supportsResumeSession: Bool
+  public let supportsCloseSession: Bool
+  public let supportsMCPHTTP: Bool
 
   public init(
     protocolVersion: Int,
     agentName: String?,
     agentTitle: String?,
-    agentVersion: String?
+    agentVersion: String?,
+    supportsResumeSession: Bool = false,
+    supportsCloseSession: Bool = false,
+    supportsMCPHTTP: Bool = false
   ) {
     self.protocolVersion = protocolVersion
     self.agentName = agentName
     self.agentTitle = agentTitle
     self.agentVersion = agentVersion
+    self.supportsResumeSession = supportsResumeSession
+    self.supportsCloseSession = supportsCloseSession
+    self.supportsMCPHTTP = supportsMCPHTTP
   }
 }
 
@@ -224,6 +233,9 @@ public struct DeepSeekHarnessACPToolUpdate: Equatable, Sendable {
 
 public enum DeepSeekHarnessACPClientEvent: Equatable, Sendable {
   case textDelta(sessionID: String, text: String)
+  case reasoningDelta(sessionID: String, text: String)
+  case usageUpdated(sessionID: String, usedTokens: Int, contextSize: Int)
+  case configurationUpdated(sessionID: String)
   case toolUpdated(DeepSeekHarnessACPToolUpdate)
   case permissionRequested(DeepSeekHarnessACPPermissionRequest)
   case approvalAutomaticallyDenied(sessionID: String, toolCallID: String)

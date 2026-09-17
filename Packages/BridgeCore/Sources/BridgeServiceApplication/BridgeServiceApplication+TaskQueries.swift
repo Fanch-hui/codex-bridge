@@ -1,5 +1,6 @@
 import BridgeDomain
 import BridgeMCP
+import BridgeSecurity
 import BridgeServiceCore
 import Foundation
 
@@ -38,6 +39,7 @@ extension BridgeServiceApplication {
     return MCPServiceTaskSnapshot(
       taskID: task.id.rawValue,
       projectID: task.projectID.rawValue,
+      prompt: task.prompt,
       source: task.source.rawValue,
       sourceClientID: task.sourceClientID.isEmpty ? nil : task.sourceClientID,
       status: task.state.status.rawValue,
@@ -45,9 +47,10 @@ extension BridgeServiceApplication {
       installationID: task.installationID,
       executionModel: task.executionModel,
       executionEffort: task.executionEffort,
-      threadID: isCodexProvider ? task.state.codexThreadID : nil,
+      threadID: isCodexProvider ? task.state.codexThreadID ?? task.requestedThreadID : nil,
       turnID: isCodexProvider ? task.state.codexTurnID : nil,
-      providerSessionID: isCodexProvider ? nil : task.state.providerSessionID,
+      providerSessionID: isCodexProvider
+        ? nil : task.state.providerSessionID ?? task.requestedThreadID,
       providerRunID: isCodexProvider ? nil : task.state.providerRunID,
       permissionMode: task.permissionMode.rawValue,
       networkAccess: task.networkAllowed,
@@ -59,7 +62,7 @@ extension BridgeServiceApplication {
         MCPServiceTaskEvent(
           sequence: $0.id,
           kind: $0.kind.rawValue,
-          summary: Self.safe($0.summary, maximum: 1_024),
+          summary: Self.eventSummary($0),
           occurredAt: iso8601.string(from: $0.createdAt)
         )
       },
@@ -77,6 +80,13 @@ extension BridgeServiceApplication {
       failureCode: task.state.failureCode,
       updatedAt: iso8601.string(from: effectiveUpdatedAt)
     )
+  }
+
+  private static func eventSummary(_ event: ServiceTaskEventRecord) -> String {
+    if event.kind == .commandCompleted {
+      return OutboundContentSecurity.redactedCommand(event.summary, maximumUTF8Bytes: 1_024)
+    }
+    return safe(event.summary, maximum: 1_024)
   }
 
   private func taskActivity(

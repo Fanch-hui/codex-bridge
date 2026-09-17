@@ -24,7 +24,12 @@ enum SkillDocumentReader {
     let target = root.appendingPathComponent(relative.components.joined(separator: "/"))
     let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL.path
     let resolvedTarget = target.resolvingSymlinksInPath().standardizedFileURL.path
-    guard resolvedTarget == resolvedRoot || resolvedTarget.hasPrefix(resolvedRoot + "/") else {
+    guard
+      SkillPathRules.isContained(
+        URL(fileURLWithPath: resolvedTarget),
+        in: URL(fileURLWithPath: resolvedRoot)
+      )
+    else {
       throw SkillError.pathEscapeDetected
     }
     guard fileManager.fileExists(atPath: target.path) else { throw SkillError.documentNotFound }

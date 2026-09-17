@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -6,6 +7,31 @@
 
   /// Value snapshot the Win32 message-loop thread renders. Updated only by the
   /// model on the main actor; consumed through `WorkbenchDisplayBox`.
+  public struct WindowsRecentTaskPresentation: Equatable, Sendable {
+    public let taskID: String
+    public let title: String
+    public let projectName: String
+    public let source: String
+    public let status: String
+    public let updatedAt: String
+
+    public init(
+      taskID: String,
+      title: String,
+      projectName: String,
+      source: String,
+      status: String,
+      updatedAt: String
+    ) {
+      self.taskID = taskID
+      self.title = title
+      self.projectName = projectName
+      self.source = source
+      self.status = status
+      self.updatedAt = updatedAt
+    }
+  }
+
   public struct WindowsWorkbenchDisplay: Equatable, Sendable {
     public enum ConnectionState: Equatable, Sendable {
       case idle
@@ -16,15 +42,19 @@
 
     public var connectionState: ConnectionState
     public var mcpAddress: String
+    public var mcpState: String
     public var taskCount: Int
     public var runningTaskCount: Int
     public var pendingApprovalCount: Int
     public var projectRows: [String]
     public var selectedProjectIndex: Int?
+    public var selectedProjectID: String? = nil
     public var permissionRows: [String]
     public var selectedPermissionIndex: Int?
+    public var permissionMode: String = "workspace-write"
     public var taskRows: [String]
     public var recentTaskRows: [String]
+    public var recentTasks: [WindowsRecentTaskPresentation] = []
     public var selectedTaskID: String?
     public var selectedTaskIndex: Int?
     public var taskMetadata: String
@@ -42,15 +72,33 @@
     public var approvalDenyEnabled: Bool
     public var approvalStatusText: String?
     public var detailText: String?
+    public var taskItems: [BridgeDesktopTaskRow] = []
+    public var selectedTaskDetail: BridgeDesktopTaskDetail?
+    public var history: BridgeDesktopThreadHistoryState = .init()
+    public var approvalItems: [BridgeDesktopApprovalRow] = []
+    public var browserEnabled: Bool = true
+    public var supportsImmediateSteer: Bool = false
+    public var canLoadEarlierConversation: Bool = false
+    public var defaultModel: String? = nil
+    public var availableModelCount: Int = 0
+    public var modelError: String? = nil
   }
 
   /// Lock-guarded bridge between main-actor model updates and the
   /// non-isolated Win32 render loop (single reader, same-thread comparisons).
   public final class WorkbenchDisplayBox: @unchecked Sendable {
     private let lock = NSLock()
+    private var version: UInt64 = 0
+
+    var revision: UInt64 {
+      lock.lock()
+      defer { lock.unlock() }
+      return version
+    }
     private var value = WindowsWorkbenchDisplay(
       connectionState: .idle,
       mcpAddress: "—",
+      mcpState: "未知",
       taskCount: 0,
       runningTaskCount: 0,
       pendingApprovalCount: 0,
@@ -60,6 +108,7 @@
       selectedPermissionIndex: 1,
       taskRows: [],
       recentTaskRows: [],
+      recentTasks: [],
       selectedTaskID: nil,
       selectedTaskIndex: nil,
       taskMetadata: "未选择任务",
@@ -76,7 +125,10 @@
       approvalAllowEnabled: false,
       approvalDenyEnabled: false,
       approvalStatusText: nil,
-      detailText: nil
+      detailText: nil,
+      defaultModel: nil,
+      availableModelCount: 0,
+      modelError: nil
     )
 
     public func current() -> WindowsWorkbenchDisplay {
@@ -87,8 +139,10 @@
 
     func store(_ newValue: WindowsWorkbenchDisplay) {
       lock.lock()
+      defer { lock.unlock() }
+      guard self.value != newValue else { return }
       value = newValue
-      lock.unlock()
+      version &+= 1
     }
   }
 
@@ -98,151 +152,87 @@
   /// so the shell subscribes via the box instead of Combine.)
   @MainActor
   public final class WindowsWorkbenchModel {
-    public private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
-    public private(set) var errorMessage: String?
+    public internal(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
+    public internal(set) var errorMessage: String?
     public let displayBox = WorkbenchDisplayBox()
 
     let client: any BridgeServiceClientProtocol
+    let feedback: WindowsDesktopFeedbackStore
+    var workbenchDisplayCache = WindowsWorkbenchPresentationCache()
     var serviceStatus: IPCServiceStatusResponse?
-    var projects: [MCPProjectSummary] = []
-    var agentProviders: [IPCAgentProviderSummary] = []
-    var tasks: [MCPServiceTaskSnapshot] = []
+    var projects: [MCPProjectSummary] = [] {
+      didSet { workbenchDisplayCache.projectsDidChange() }
+    }
+    var agentProviders: [IPCAgentProviderSummary] = [] {
+      didSet { workbenchDisplayCache.providersDidChange() }
+    }
+    var agentInstallations: [IPCAgentInstallationSummary] = [] {
+      didSet { workbenchDisplayCache.installationsDidChange() }
+    }
+    var tasks: [MCPServiceTaskSnapshot] = [] {
+      didSet { workbenchDisplayCache.tasksDidChange() }
+    }
     var threads: [MCPThreadSummary] = []
-    var selectedProjectID: String?
+    var selectedProjectID: String? {
+      didSet { workbenchDisplayCache.selectedProjectDidChange() }
+    }
     var selectedThreadID: String?
     var selectedThreadPage: MCPThreadReadPage?
     var workbenchPermissionMode = "workspace-write"
+    var isChatBrowserEnabled = true
     var selectedTaskID: String?
     var conversation: TaskConversationModel?
+    var conversationPresentationCache = TaskConversationPresentationCache()
+    var windowsConversationPresentationCache = WindowsConversationPresentationCache()
     var conversationWasTerminal = false
     var actionText: String?
-    var approvals: [IPCApprovalSummary] = []
-    var directApprovals: [IPCPendingDirectApproval] = []
+    var approvals: [IPCApprovalSummary] = [] {
+      didSet { if approvals != oldValue { workbenchDisplayCache.approvalsDidChange() } }
+    }
+    var directApprovals: [IPCPendingDirectApproval] = [] {
+      didSet { if directApprovals != oldValue { workbenchDisplayCache.approvalsDidChange() } }
+    }
     var selectedApprovalID: ApprovalPresentation.Identifier?
     var approvalSelectionGeneration: UInt64 = 0
     var resolvingApprovalIDs: Set<ApprovalPresentation.Identifier> = []
     var approvalStatusText: String?
     var approvalRefreshInProgress = false
+    var permissionRemediations: [String: IPCAgentPermissionRemediationResponse] = [:]
+    var permissionRemediationLoadingTaskIDs: Set<String> = []
+    var permissionRemediationApplyingTaskIDs: Set<String> = []
+    var permissionRemediationAppliedTaskIDs: Set<String> = []
+    var permissionRemediationErrors: [String: String] = [:]
+    var models: [MCPModelSummary] = []
+    var modelPreferences: IPCModelPreferences?
+    var modelError: String?
+    var connectionRefreshInProgress = false
+    var onConnected: (@MainActor () async -> Void)?
+    var isShuttingDown = false
+    var taskPollingTask: Task<Void, Never>?
+    var deferredCatalogTask: Task<Void, Never>?
+    var conversationDisplayTask: Task<Void, Never>?
+    var interactionRefreshTask: Task<Void, Never>?
+    var taskLoadInProgress = false
+    var taskRefreshInProgress = false
+    var isWindowVisible = true
+    var connectionGeneration: UInt64 = 0
 
-    public init() {
-      client = BridgeServiceClient(transport: ServiceTransportFactory.defaultTransport())
-      publishDisplay()
+    public convenience init() {
+      self.init(feedback: WindowsDesktopFeedbackStore())
     }
 
-    /// Launches the service if needed, then verifies connectivity via
-    /// `status()` and pulls the task list.
-    public func startServiceAndConnect() async {
-      connectionState = .connecting
-      publishDisplay()
-      let launched = await Task.detached(priority: .utility) {
-        WindowsServiceLauncher.ensureServiceRunning()
-      }.value
-      guard launched else {
-        fail("未能连接后台服务：codex-bridge-service.exe 启动失败或管道未就绪。")
-        return
-      }
-      await connectAndRefresh()
-    }
-
-    /// Verifies the pipe transport with a `status()` round trip, then loads tasks.
-    public func connectAndRefresh() async {
-      connectionState = .connecting
-      publishDisplay()
-      do {
-        let status = try await client.status()
-        serviceStatus = status
-        projects = (try? await client.projects()) ?? projects
-        agentProviders = (try? await client.agentCatalog())?.providers ?? []
-        selectedProjectID =
-          projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID
-          ?? selectedProjectID
-          ?? projects.first?.projectID
-        workbenchPermissionMode =
-          Self.permissionModes.contains(status.workbenchPermissionMode ?? "")
-          ? status.workbenchPermissionMode!
-          : workbenchPermissionMode
-        errorMessage = nil
-        await refreshTasks()
-        await loadThreads()
-      } catch {
-        fail(BridgeServiceErrorMessage.message(error))
-      }
-    }
-
-    public func refreshTasks() async {
-      await loadTasks()
-      guard connectionState == .connected else { return }
-      await refreshApprovals()
-    }
-
-    public func shutdown() async {
-      conversation?.cancel()
-      await client.close()
-    }
-
-    func refreshDisplaySnapshot() {
-      publishDisplay()
-    }
-
-    private func fail(_ message: String) {
-      errorMessage = message
-      connectionState = .unavailable
-      publishDisplay()
-    }
-
-    func loadTasks() async {
-      do {
-        tasks = try await client.tasks(IPCTaskListRequest())
-        errorMessage = nil
-        connectionState = .connected
-        reconcileSelectedTask()
-        selectDefaultTaskIfNeeded()
-        publishDisplay()
-      } catch {
-        fail(BridgeServiceErrorMessage.message(error))
-      }
-    }
-
-    func reconcileSelectedTask() {
-      guard let selectedTaskID else { return }
-      guard
-        let task = tasks.first(where: {
-          $0.taskID == selectedTaskID
-            && (selectedProjectID == nil || $0.projectID == selectedProjectID)
-        })
-      else {
-        self.selectedTaskID = nil
-        conversation?.cancel()
-        conversation = nil
-        conversationWasTerminal = false
-        actionText = nil
-        return
-      }
-      if conversation?.taskID != task.taskID || conversationWasTerminal != task.isTerminal {
-        openConversation(for: task)
-      }
-      conversationWasTerminal = task.isTerminal
-    }
-
-    func openConversation(for task: MCPServiceTaskSnapshot) {
-      conversation?.cancel()
-      let next = TaskConversationModel(
-        taskID: task.taskID,
-        client: client,
-        isTerminal: task.isTerminal
+    convenience init(feedback: WindowsDesktopFeedbackStore) {
+      self.init(
+        client: BridgeServiceClient(transport: ServiceTransportFactory.defaultTransport()),
+        feedback: feedback
       )
-      conversation = next
-      conversationWasTerminal = task.isTerminal
-      Task { [weak self, weak next] in
-        await next?.start()
-        guard let self, self.conversation === next else { return }
-        self.publishDisplay()
-      }
     }
 
-    var selectedTask: MCPServiceTaskSnapshot? {
-      guard let selectedTaskID else { return nil }
-      return tasks.first(where: { $0.taskID == selectedTaskID })
+    init(client: any BridgeServiceClientProtocol, feedback: WindowsDesktopFeedbackStore) {
+      self.client = client
+      self.feedback = feedback
+      publishDisplay()
     }
+
   }
 #endif

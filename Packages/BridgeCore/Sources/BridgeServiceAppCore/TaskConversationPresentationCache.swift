@@ -1,6 +1,11 @@
 public struct TaskConversationPresentationSnapshot {
   public let entries: [TaskConversationModel.Entry]
   public let canLoadEarlier: Bool
+
+  public init(entries: [TaskConversationModel.Entry], canLoadEarlier: Bool) {
+    self.entries = entries
+    self.canLoadEarlier = canLoadEarlier
+  }
 }
 
 public struct TaskConversationPresentationCache {
@@ -16,6 +21,21 @@ public struct TaskConversationPresentationCache {
     guard let snapshot = snapshots[taskID] else { return nil }
     touch(taskID)
     return snapshot
+  }
+
+  public mutating func snapshot(
+    for taskID: String, priorTaskIDs: [String]
+  ) -> TaskConversationPresentationSnapshot? {
+    if let current = snapshot(for: taskID) { return current }
+    for priorID in priorTaskIDs.reversed() {
+      guard let prior = snapshot(for: priorID) else { continue }
+      let entries = prior.entries.map { entry in
+        priorTaskIDs.contains(where: { entry.key.hasPrefix("\($0):") })
+          ? entry : entry.prefixed(for: priorID)
+      }
+      return TaskConversationPresentationSnapshot(entries: entries, canLoadEarlier: false)
+    }
+    return nil
   }
 
   public mutating func store(

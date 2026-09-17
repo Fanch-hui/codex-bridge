@@ -95,7 +95,12 @@ public enum ApprovalPresentation {
     if !approval.relativePaths.isEmpty {
       lines.append("目标路径：\(approval.relativePaths.joined(separator: "、"))")
     }
-    lines.append("可用决策：\(allowDecisions(for: approval).map(decisionLabel).joined(separator: "、"))")
+    if approval.kind == "user_input" {
+      lines.append("需要回答：\(approval.questions?.count ?? 0) 个问题")
+    } else {
+      lines.append(
+        "可用决策：\(allowDecisions(for: approval).map(decisionLabel).joined(separator: "、"))")
+    }
     return lines.joined(separator: "\r\n")
   }
 

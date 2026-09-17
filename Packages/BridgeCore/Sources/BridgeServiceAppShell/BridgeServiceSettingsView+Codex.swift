@@ -30,6 +30,7 @@ struct BridgeServiceSettingsCodexDefaultsCard: View {
                 selectedID: model.modelPreferences?.executionModel
               )
             }
+            .frame(maxWidth: 280)
 
             Picker("推理强度", selection: executionEffortBinding) {
               BridgeServiceSettingsEffortOptions(
@@ -38,10 +39,12 @@ struct BridgeServiceSettingsCodexDefaultsCard: View {
                 selectedEffort: model.modelPreferences?.executionEffort
               )
             }
+            .frame(maxWidth: 280)
 
             Picker("访问权限", selection: accessModeBinding) {
               accessModeOptions(selected: model.modelPreferences?.accessMode)
             }
+            .frame(maxWidth: 280)
 
             Text(accessModeDescription)
               .font(.caption)

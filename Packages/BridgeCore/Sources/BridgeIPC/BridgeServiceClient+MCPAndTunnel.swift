@@ -25,10 +25,16 @@ extension BridgeServiceClient {
   }
 
   public func modelCatalog() async throws -> IPCModelCatalogResponse {
+    try await modelCatalog(forceRefresh: false)
+  }
+
+  public func modelCatalog(forceRefresh: Bool) async throws -> IPCModelCatalogResponse {
     do {
       return try await call(
         operation: .getModelCatalog,
-        payload: Optional<IPCMutationResponse>.none
+        payload: forceRefresh
+          ? IPCModelCatalogRequest(forceRefresh: true)
+          : Optional<IPCModelCatalogRequest>.none
       )
     } catch let error as BridgeServiceIPCCodecError {
       let shouldFallback: Bool

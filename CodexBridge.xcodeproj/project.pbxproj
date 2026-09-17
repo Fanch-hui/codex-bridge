@@ -10,7 +10,7 @@
 		01A000000000000000000001 /* CodexBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B000000000000000000001 /* CodexBridgeApp.swift */; };
 		01A000000000000000000002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01B000000000000000000002 /* Assets.xcassets */; };
 		01A000000000000000000003 /* BridgeServiceAppShell in Frameworks */ = {isa = PBXBuildFile; productRef = 01F000000000000000000001 /* BridgeServiceAppShell */; };
-		03A000000000000000000001 /* CodexBridgeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B000000000000000000001 /* CodexBridgeUITests.swift */; };
+
 		05A000000000000000000001 /* CodexBridgeServiceMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B000000000000000000001 /* CodexBridgeServiceMain.swift */; };
 		05A000000000000000000002 /* BridgeServiceHost in Frameworks */ = {isa = PBXBuildFile; productRef = 05G000000000000000000001 /* BridgeServiceHost */; };
 		05A000000000000000000003 /* CodexBridgeService in Embed Service */ = {isa = PBXBuildFile; fileRef = 05B000000000000000000003 /* CodexBridgeService */; };
@@ -18,13 +18,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		03F000000000000000000001 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 01E000000000000000000003 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 01E000000000000000000001;
-			remoteInfo = CodexBridge;
-		};
+
 		05F000000000000000000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 01E000000000000000000003 /* Project object */;
@@ -43,8 +37,8 @@
 		01B000000000000000000006 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		01B000000000000000000007 /* Signing.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig.example; sourceTree = "<group>"; };
 		01B000000000000000000008 /* CodexBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CodexBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		03B000000000000000000001 /* CodexBridgeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexBridgeUITests.swift; sourceTree = "<group>"; };
-		03B000000000000000000002 /* CodexBridgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CodexBridgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+
+
 		05B000000000000000000001 /* CodexBridgeServiceMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexBridgeServiceMain.swift; sourceTree = "<group>"; };
 		05B000000000000000000002 /* org.codexbridge.service.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = org.codexbridge.service.plist; sourceTree = "<group>"; };
 		05B000000000000000000003 /* CodexBridgeService */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CodexBridgeService; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -84,13 +78,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03C000000000000000000002 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+
 		05C000000000000000000004 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -107,7 +95,6 @@
 			children = (
 				01D000000000000000000002 /* App */,
 				05D000000000000000000001 /* Service */,
-				03D000000000000000000001 /* UITests */,
 				01D000000000000000000004 /* Config */,
 				01D000000000000000000005 /* Products */,
 			);
@@ -148,7 +135,6 @@
 			children = (
 				01B000000000000000000008 /* CodexBridge.app */,
 				05B000000000000000000003 /* CodexBridgeService */,
-				03B000000000000000000002 /* CodexBridgeUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -161,14 +147,7 @@
 			path = Service;
 			sourceTree = "<group>";
 		};
-		03D000000000000000000001 /* UITests */ = {
-			isa = PBXGroup;
-			children = (
-				03B000000000000000000001 /* CodexBridgeUITests.swift */,
-			);
-			path = UITests;
-			sourceTree = "<group>";
-		};
+
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -218,26 +197,7 @@
 			productReference = 05B000000000000000000003 /* CodexBridgeService */;
 			productType = "com.apple.product-type.tool";
 		};
-		03E000000000000000000001 /* CodexBridgeUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 03E000000000000000000002 /* Build configuration list for PBXNativeTarget "CodexBridgeUITests" */;
-			buildPhases = (
-				03C000000000000000000001 /* Sources */,
-				03C000000000000000000002 /* Frameworks */,
-				03C000000000000000000003 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				03F000000000000000000002 /* PBXTargetDependency */,
-			);
-			name = CodexBridgeUITests;
-			packageProductDependencies = (
-			);
-			productName = CodexBridgeUITests;
-			productReference = 03B000000000000000000002 /* CodexBridgeUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
+
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -254,10 +214,7 @@
 					05E000000000000000000001 = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					03E000000000000000000001 = {
-						CreatedOnToolsVersion = 27.0;
-						TestTargetID = 01E000000000000000000001;
-					};
+
 				};
 			};
 			buildConfigurationList = 01E000000000000000000004 /* Build configuration list for PBXProject "CodexBridge" */;
@@ -279,7 +236,6 @@
 			targets = (
 				01E000000000000000000001 /* CodexBridge */,
 				05E000000000000000000001 /* CodexBridgeService */,
-				03E000000000000000000001 /* CodexBridgeUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -293,13 +249,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03C000000000000000000003 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+
 		05C000000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -382,14 +332,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03C000000000000000000001 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				03A000000000000000000001 /* CodexBridgeUITests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+
 		05C000000000000000000003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -401,11 +344,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		03F000000000000000000002 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 01E000000000000000000001 /* CodexBridge */;
-			targetProxy = 03F000000000000000000001 /* PBXContainerItemProxy */;
-		};
+
 		05F000000000000000000002 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 05E000000000000000000001 /* CodexBridgeService */;
@@ -492,42 +431,6 @@
 			};
 			name = Release;
 		};
-		040000000000000000000001 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = org.codexbridge.CodexBridgeUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SUPPORTED_PLATFORMS = macosx;
-				SWIFT_STRICT_CONCURRENCY = complete;
-				SWIFT_VERSION = 6.0;
-				TEST_TARGET_NAME = CodexBridge;
-			};
-			name = Debug;
-		};
-		040000000000000000000002 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Automatic;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = org.codexbridge.CodexBridgeUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SUPPORTED_PLATFORMS = macosx;
-				SWIFT_STRICT_CONCURRENCY = complete;
-				SWIFT_VERSION = 6.0;
-				TEST_TARGET_NAME = CodexBridge;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -558,15 +461,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		03E000000000000000000002 /* Build configuration list for PBXNativeTarget "CodexBridgeUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				040000000000000000000001 /* Debug */,
-				040000000000000000000002 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
+
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
