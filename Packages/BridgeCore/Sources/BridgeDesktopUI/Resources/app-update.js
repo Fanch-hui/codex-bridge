@@ -154,6 +154,11 @@
         emit,
         busy
       ));
+      var dismiss = action("×", "deferAppUpdate", emit, false, lockActions);
+      dismiss.className = "icon-button app-update-dismiss";
+      dismiss.setAttribute("aria-label", "关闭更新提示");
+      dismiss.title = "关闭";
+      actions.appendChild(dismiss);
     } else if (mode === "settings" && !busy) {
       actions.appendChild(action(phase === "upToDate" ? "再次检查" : "检查更新", "checkAppUpdate", emit, false));
     }

@@ -129,6 +129,11 @@ public final class AppUpdateController {
 
   public func deferUpdate() {
     guard operation == nil, state.phase == "available" || state.phase == "failed" else { return }
+    if state.phase == "failed" {
+      release = nil
+      state = AppUpdateStatus(currentVersion: state.currentVersion)
+      return
+    }
     state.isDeferred = true
   }
 

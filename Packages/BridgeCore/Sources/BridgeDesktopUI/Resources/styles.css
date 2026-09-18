@@ -183,6 +183,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .app-update-version, .app-update-notes, .app-update-message { margin: 3px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .app-update-notes { white-space: pre-wrap; }
 .app-update-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
+.app-update-dismiss { width: 28px; height: 28px; border-radius: 6px; font-size: 20px; }
 .app-update-card .app-update-actions .button:not(.primary) { color: var(--text); }
 .app-update-progress-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--text-secondary); font-size: 11px; }
 .app-update-progress { width: min(280px, 100%); height: 6px; accent-color: var(--accent); }
