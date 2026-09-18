@@ -175,6 +175,7 @@ try {
         "BridgeDomainTests",
         "BridgeAgentCoreTests",
         "BridgeSecurityTests",
+        "BridgeFilesWindowsTests",
         "BridgeCodexRPCTests",
         "BridgeProcessWindowsTests",
         "BridgeOpenCodeACPTests",

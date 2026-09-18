@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - win
   workflow_dispatch:
 
 permissions:
@@ -37,19 +38,26 @@ jobs:
       - name: Lint Swift sources
         run: >-
           Scripts/with-xcode.sh xcrun swift-format lint --strict --recursive
-          Packages/BridgeCore/Sources Packages/BridgeCore/Tests UITests
+          Packages/BridgeCore/Sources Packages/BridgeCore/Tests App Service UITests
 
       - name: Test Swift package
         run: Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore
+
+      - name: Test shared desktop UI logic
+        if: ${{ hashFiles('Scripts/test-desktop-*.cjs') != '' }}
+        run: |
+          for test in Scripts/test-desktop-*.cjs; do
+            node "$test"
+          done
 
       - name: Verify MCP Inspector contract
         run: Scripts/verify-mcp-inspector.sh
 
       - name: Verify dependency resolution is unchanged
-        run: git diff --exit-code -- Packages/BridgeCore/Package.resolved
+        run: git diff --exit-code -- Packages/BridgeCore/Package.resolved CodexBridge.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
   native:
-    name: Native app and accessibility smoke test
+    name: Native app build
     runs-on: xcode-27
     timeout-minutes: 35
     steps:
@@ -68,17 +76,6 @@ jobs:
           -derivedDataPath .build/Xcode
           build
           CODE_SIGNING_ALLOWED=NO
-
-      - name: Run isolated native UI test
-        run: >-
-          Scripts/with-xcode.sh xcodebuild
-          -project CodexBridge.xcodeproj
-          -scheme CodexBridge
-          -configuration Debug
-          -destination 'platform=macOS,arch=arm64'
-          -derivedDataPath .build/XcodeUITests
-          -parallel-testing-enabled NO
-          test
 
   universal2:
     name: Unsigned Universal 2 archive

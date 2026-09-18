@@ -7,6 +7,13 @@ on:
     branches: [win]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: build (${{ matrix.architecture }})
@@ -27,6 +34,8 @@ jobs:
             run_tests: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Exclude build directories from Windows Defender
         shell: pwsh
         run: |
@@ -43,7 +52,7 @@ jobs:
           $proc = Start-Process -Wait -PassThru -FilePath .\swift-installer.exe `
             -ArgumentList "/quiet", "/norestart", "InstallPerMachine=1"
           Remove-Item .\swift-installer.exe
-          Write-Host "installer exit code: $($proc.ExitCode)"
+          if ($proc.ExitCode -notin @(0, 3010)) { throw "Swift installer failed: $($proc.ExitCode)" }
           $roots = @(
             "$env:ProgramFiles\Swift",
             "$env:LOCALAPPDATA\Programs\Swift",
@@ -66,6 +75,7 @@ jobs:
           }
           $swiftRoot = $toolchainVersionDirectory.Parent.Parent.FullName
           $sdkVersion = $toolchainVersionDirectory.Name -replace "\+.*$", ""
+          if ($sdkVersion -ne "6.3.3") { throw "Expected Swift 6.3.3, found $sdkVersion" }
           # The host runtime is separate from the toolchain and must be on PATH.
           $runtimeBin = Join-Path $swiftRoot "Runtimes\$sdkVersion\usr\bin"
           if (-not (Test-Path (Join-Path $runtimeBin "swiftCore.dll"))) {
@@ -267,7 +277,7 @@ jobs:
             "BridgeCodexRPCTests", "BridgeProcessWindowsTests", "BridgeOpenCodeACPTests", "BridgeDesktopUITests",
             "BridgeServiceAppCoreTests", "BridgeServiceHostWindowsTests", "BridgeTunnelWindowsTests",
             "BridgeCodexServiceWindowsTests", "BridgeConversationWindowsTests",
-            "BridgeServiceApplicationWindowsTests",
+            "BridgeServiceApplicationWindowsTests", "BridgeFilesWindowsTests",
             "BridgeServiceCoreWindowsTests", "BridgeDirectCommandWindowsTests",
             "BridgeDeepSeekHarnessACPWindowsTests", "BridgeWindowsShellTests"
           )

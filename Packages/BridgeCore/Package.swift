@@ -240,6 +240,11 @@ var windowsApplicationLinkerFlags = [
 #if os(Windows)
   testTargets += [
     .testTarget(
+      name: "BridgeFilesWindowsTests",
+      dependencies: ["BridgeDomain", "BridgeFiles", "BridgeProjects", "BridgeSecurity"],
+      path: "Tests/BridgeFilesWindowsTests"
+    ),
+    .testTarget(
       name: "BridgeServiceHostWindowsTests",
       dependencies: ["BridgeIPC", "BridgeServiceHost"],
       path: "Tests/BridgeServiceHostWindowsTests"
@@ -312,6 +317,7 @@ var windowsApplicationLinkerFlags = [
         "TestSupport.swift",
         "ServiceStoreSchemaV15MigrationTests.swift",
         "SkillActionInterpreterWindowsTests.swift",
+        "ServiceReviewRegressionTests.swift",
       ]
     ),
     .testTarget(

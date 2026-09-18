@@ -121,6 +121,18 @@ func run() throws {
     ]
   ]
   packages.append(contentsOf: try sortedPins.map(makePackage))
+  packages.append([
+    "SPDXID": "SPDXRef-Package-swift-sdk-vendored",
+    "name": "swift-sdk",
+    "versionInfo": "0.12.1",
+    "downloadLocation": "https://github.com/modelcontextprotocol/swift-sdk",
+    "filesAnalyzed": false,
+    "licenseConcluded": "NOASSERTION",
+    "licenseDeclared": "NOASSERTION",
+    "copyrightText": "NOASSERTION",
+    "sourceInfo":
+      "Vendor/swift-sdk: upstream 0.12.1 with Codex Bridge Windows transport adaptations",
+  ])
   var relationships: [[String: String]] = [
     [
       "spdxElementId": "SPDXRef-DOCUMENT",
@@ -136,6 +148,11 @@ func run() throws {
         "relatedSpdxElement": packageIdentifier(pin.identity),
       ]
     })
+  relationships.append([
+    "spdxElementId": "SPDXRef-Package-CodexBridge",
+    "relationshipType": "DEPENDS_ON",
+    "relatedSpdxElement": "SPDXRef-Package-swift-sdk-vendored",
+  ])
   let document: [String: Any] = [
     "spdxVersion": "SPDX-2.3",
     "dataLicense": "CC0-1.0",

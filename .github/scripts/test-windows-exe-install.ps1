@@ -221,7 +221,7 @@ try {
   foreach ($sentinel in @($dataSentinel, $webViewSentinel)) {
     Assert-RegularFile $sentinel | Out-Null
   }
-  if ((Get-LegacyRunValue) -ne ('"' + $servicePath + '"')) {
+  if ((Get-LegacyRunValue) -ne ('"' + $appPath + '" --ensure-service')) {
     throw "Startup registration did not move to the selected application directory."
   }
 
