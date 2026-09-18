@@ -1,5 +1,6 @@
 #if os(Windows)
   import Foundation
+  import WinSDK
   import XCTest
 
   @testable import BridgeDirectCommand
@@ -10,7 +11,7 @@
     override func setUp() {
       super.setUp()
       tempDirectory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ac-test-\(UUID().uuidString)")
+        .appendingPathComponent("ac-test-\(Foundation.UUID().uuidString)")
       try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
     }
 
@@ -56,6 +57,34 @@
       XCTAssertTrue(FileManager.default.fileExists(atPath: outFile.path))
       let content = try String(contentsOf: outFile, encoding: .utf8)
       XCTAssertTrue(content.contains("WORKSPACE_OK"))
+    }
+
+    func testAppContainerUsesOnlySuppliedEnvironment() throws {
+      let parentKey =
+        "BRIDGE_TEST_PARENT_" + Foundation.UUID().uuidString.replacingOccurrences(of: "-", with: "")
+      let inherited = parentKey.withCString(encodedAs: UTF16.self) { key in
+        "parent-only".withCString(encodedAs: UTF16.self) { SetEnvironmentVariableW(key, $0) }
+      }
+      XCTAssertTrue(inherited)
+      defer {
+        _ = parentKey.withCString(encodedAs: UTF16.self) { SetEnvironmentVariableW($0, nil) }
+      }
+      let output = DirectCommandOutputCollector(maximumBytes: 4096)
+      let lifetime = try DirectProcessLifetime(
+        argv: [
+          #"C:\Windows\System32\cmd.exe"#, "/d", "/c",
+          "if defined \(parentKey) (exit /b 11) else (echo %BRIDGE_TEST_CHILD%>environment.txt)",
+        ],
+        workingDirectory: tempDirectory.path,
+        environment: ["SystemRoot": #"C:\Windows"#, "BRIDGE_TEST_CHILD": "kept"],
+        usePTY: false,
+        output: output,
+        denyNetwork: true
+      )
+      XCTAssertEqual(lifetime.waitForExit(timeout: .seconds(10)), .exited(0))
+      let content = try String(
+        contentsOf: tempDirectory.appendingPathComponent("environment.txt"), encoding: .utf8)
+      XCTAssertEqual(content.trimmingCharacters(in: .whitespacesAndNewlines), "kept")
     }
 
     func testAppContainerJobObjectTreeTermination() throws {

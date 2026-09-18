@@ -62,6 +62,57 @@
       XCTAssertEqual(consoleHandle, "0")
     }
 
+    func testBatchShimForwardsPercentStarArgumentsVerbatim() throws {
+      let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("managed-stdio batch-\(UUID().uuidString)")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      defer { try? FileManager.default.removeItem(at: directory) }
+
+      let probe = directory.appendingPathComponent("probe.ps1")
+      let batch = directory.appendingPathComponent("forward.cmd")
+      let probeSource = """
+        $ErrorActionPreference = 'Stop'
+        [Console]::Out.WriteLine((@($args) | ConvertTo-Json -Compress))
+        """
+      let batchSource = """
+        @echo off
+        "\(powershellPath)" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0probe.ps1" %*
+        """
+      try Data(probeSource.utf8).write(to: probe)
+      try Data(batchSource.replacingOccurrences(of: "\n", with: "\r\n").utf8).write(to: batch)
+
+      let expected = [
+        "alpha beta",
+        "quote\"value",
+        "100%VAR%literal",
+        "a&b|c<d>e^f!g",
+        "quote\"&literal",
+      ]
+      let output = BoundedProcessOutputCollector(maximumBytes: 16 * 1_024)
+      var environment = childEnvironment
+      environment["VAR"] = "synthetic-expansion-must-not-appear"
+      let process = try ManagedStdioProcess(
+        argv: [batch.path] + expected,
+        workingDirectory: directory.path,
+        environment: environment,
+        mergeStandardError: false,
+        onStandardOutput: { output.append($0) }
+      )
+      defer {
+        if process.isRunning { _ = process.terminateAndWait() }
+        process.close()
+      }
+
+      XCTAssertEqual(process.waitForExit(timeout: .seconds(15)), .exited(0))
+      process.drainRemainingOutput()
+
+      let data = Data(output.snapshot().head.trimmingCharacters(in: .whitespacesAndNewlines).utf8)
+      let actual = try XCTUnwrap(
+        try JSONSerialization.jsonObject(with: data) as? [String]
+      )
+      XCTAssertEqual(actual, expected)
+    }
+
     private var systemRoot: String {
       ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows"
     }

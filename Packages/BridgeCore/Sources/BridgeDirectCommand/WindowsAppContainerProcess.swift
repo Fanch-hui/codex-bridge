@@ -1,16 +1,19 @@
 #if os(Windows)
   import BridgeAgentCore
+  import BridgeProcess
   import Foundation
   import WinSDK
 
   public final class WindowsAppContainerProcess: @unchecked Sendable {
     public let pid: Int32
+    public let startTimeMicros: Int64
     private var processHandle: HANDLE
     private var threadHandle: HANDLE
     private var jobHandle: HANDLE
     private var stdinWriteHandle: HANDLE
     private let containerName: String
     private let appContainerSid: PSID
+    private let accessGrantedPath: String?
     private let reader: OutputReader
     private let lock = NSLock()
     private var closed = false
@@ -34,11 +37,6 @@
         UnsafeMutableRawPointer?,
         DWORD,
         UnsafeMutablePointer<PSID?>?
-      ) -> HRESULT
-
-    private typealias DeleteAppContainerProfileFn =
-      @convention(c) (
-        UnsafePointer<WCHAR>?
       ) -> HRESULT
 
     private typealias DeriveAppContainerSidFn =
@@ -104,9 +102,17 @@
       self.containerName = uniqueName
       self.appContainerSid = sid
 
+      let accessGrantedPath: String?
       if let workingDirectory, !workingDirectory.isEmpty {
-        _ = Self.grantAccess(to: workingDirectory, for: sid)
+        guard Self.grantAccess(to: workingDirectory, for: sid) else {
+          Self.cleanupProfile(name: uniqueName, sid: sid)
+          throw DirectProcessError.sandboxUnavailable
+        }
+        accessGrantedPath = workingDirectory
+      } else {
+        accessGrantedPath = nil
       }
+      self.accessGrantedPath = accessGrantedPath
 
       var stdinRead: HANDLE?
       var stdinWrite: HANDLE?
@@ -119,7 +125,11 @@
       guard CreatePipe(&stdinRead, &stdinWrite, &sa, 0),
         let inRead = stdinRead, let inWrite = stdinWrite
       else {
-        Self.cleanupProfile(name: uniqueName)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
         throw DirectProcessError.sandboxUnavailable
       }
       _ = SetHandleInformation(inWrite, DWORD(HANDLE_FLAG_INHERIT), 0)
@@ -129,7 +139,11 @@
       else {
         _ = CloseHandle(inRead)
         _ = CloseHandle(inWrite)
-        Self.cleanupProfile(name: uniqueName)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
         throw DirectProcessError.sandboxUnavailable
       }
       _ = SetHandleInformation(outRead, DWORD(HANDLE_FLAG_INHERIT), 0)
@@ -142,17 +156,35 @@
         _ = CloseHandle(inWrite)
         _ = CloseHandle(outRead)
         _ = CloseHandle(outWrite)
-        Self.cleanupProfile(name: uniqueName)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
         throw DirectProcessError.sandboxUnavailable
       }
       var limitInfo = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
       limitInfo.BasicLimitInformation.LimitFlags = DWORD(JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE)
-      _ = SetInformationJobObject(
-        job,
-        JobObjectExtendedLimitInformation,
-        &limitInfo,
-        DWORD(MemoryLayout<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>.size)
-      )
+      guard
+        SetInformationJobObject(
+          job,
+          JobObjectExtendedLimitInformation,
+          &limitInfo,
+          DWORD(MemoryLayout<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>.size)
+        )
+      else {
+        _ = CloseHandle(job)
+        _ = CloseHandle(inRead)
+        _ = CloseHandle(inWrite)
+        _ = CloseHandle(outRead)
+        _ = CloseHandle(outWrite)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
+        throw DirectProcessError.sandboxUnavailable
+      }
       self.jobHandle = job
 
       var attrSize: SIZE_T = 0
@@ -172,7 +204,11 @@
         _ = CloseHandle(outRead)
         _ = CloseHandle(outWrite)
         _ = CloseHandle(job)
-        Self.cleanupProfile(name: uniqueName)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
         throw DirectProcessError.sandboxUnavailable
       }
 
@@ -213,7 +249,11 @@
         _ = CloseHandle(outRead)
         _ = CloseHandle(outWrite)
         _ = CloseHandle(job)
-        Self.cleanupProfile(name: uniqueName)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
         throw DirectProcessError.sandboxUnavailable
       }
 
@@ -241,6 +281,7 @@
                 nil,
                 true,
                 DWORD(EXTENDED_STARTUPINFO_PRESENT) | DWORD(CREATE_UNICODE_ENVIRONMENT)
+                  | DWORD(CREATE_SUSPENDED)
                   | DWORD(CREATE_NO_WINDOW),
                 UnsafeMutableRawPointer(mutating: envW),
                 workW,
@@ -256,6 +297,7 @@
               nil,
               true,
               DWORD(EXTENDED_STARTUPINFO_PRESENT) | DWORD(CREATE_UNICODE_ENVIRONMENT)
+                | DWORD(CREATE_SUSPENDED)
                 | DWORD(CREATE_NO_WINDOW),
               UnsafeMutableRawPointer(mutating: envW),
               nil,
@@ -273,14 +315,72 @@
         _ = CloseHandle(inWrite)
         _ = CloseHandle(outRead)
         _ = CloseHandle(job)
-        Self.cleanupProfile(name: uniqueName)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
         throw DirectProcessError.processLaunchFailed(Int32(GetLastError()))
       }
 
-      _ = AssignProcessToJobObject(job, proc)
+      guard AssignProcessToJobObject(job, proc) else {
+        let error = GetLastError()
+        _ = TerminateProcess(proc, 1)
+        _ = WaitForSingleObject(proc, 1_000)
+        _ = CloseHandle(proc)
+        _ = CloseHandle(thread)
+        _ = CloseHandle(inWrite)
+        _ = CloseHandle(outRead)
+        _ = CloseHandle(job)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
+        throw DirectProcessError.processLaunchFailed(Int32(error))
+      }
+
+      guard
+        let startTimeMicros = ManagedStdioProcess.identity(
+          of: Int32(bitPattern: processInfo.dwProcessId)
+        )?.startTimeMicros
+      else {
+        _ = TerminateProcess(proc, 1)
+        _ = WaitForSingleObject(proc, 1_000)
+        _ = CloseHandle(proc)
+        _ = CloseHandle(thread)
+        _ = CloseHandle(inWrite)
+        _ = CloseHandle(outRead)
+        _ = CloseHandle(job)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
+        throw DirectProcessError.processLaunchFailed(Int32(ERROR_ACCESS_DENIED))
+      }
+
+      guard ResumeThread(thread) != DWORD.max else {
+        let error = GetLastError()
+        _ = TerminateProcess(proc, 1)
+        _ = WaitForSingleObject(proc, 1_000)
+        _ = CloseHandle(proc)
+        _ = CloseHandle(thread)
+        _ = CloseHandle(inWrite)
+        _ = CloseHandle(outRead)
+        _ = CloseHandle(job)
+        Self.cleanupProfile(
+          name: uniqueName,
+          accessPath: accessGrantedPath,
+          sid: sid
+        )
+        throw DirectProcessError.processLaunchFailed(Int32(error))
+      }
+
       self.processHandle = proc
       self.threadHandle = thread
       self.pid = Int32(bitPattern: processInfo.dwProcessId)
+      self.startTimeMicros = startTimeMicros
 
       let pipeReader = OutputReader(handle: outRead, onOutput: onOutput)
       self.reader = pipeReader
@@ -457,65 +557,11 @@
       if thread != INVALID_HANDLE_VALUE { _ = CloseHandle(thread) }
       if job != INVALID_HANDLE_VALUE { _ = CloseHandle(job) }
       reader.waitUntilFinished()
-      Self.cleanupProfile(name: name)
-    }
-
-    private static func cleanupProfile(name: String) {
-      guard let userenv = "userenv.dll".withCString(encodedAs: UTF16.self, { LoadLibraryW($0) })
-      else { return }
-      defer { _ = FreeLibrary(userenv) }
-      guard
-        let deleteProfilePtr = "DeleteAppContainerProfile".withCString({
-          GetProcAddress(userenv, $0)
-        })
-      else { return }
-      let deleteProfile = unsafeBitCast(deleteProfilePtr, to: DeleteAppContainerProfileFn.self)
-      _ = name.withCString(encodedAs: UTF16.self) { deleteProfile($0) }
-    }
-
-    private static func grantAccess(to path: String, for sid: PSID) -> Bool {
-      var ea = EXPLICIT_ACCESS_W()
-      ea.grfAccessPermissions = DWORD(0x1000_0000)  // GENERIC_ALL
-      ea.grfAccessMode = GRANT_ACCESS
-      ea.grfInheritance = DWORD(1 | 2)  // OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE
-      ea.Trustee.TrusteeForm = TRUSTEE_IS_SID
-      ea.Trustee.TrusteeType = TRUSTEE_IS_UNKNOWN
-      ea.Trustee.ptstrName = UnsafeMutablePointer<WCHAR>(OpaquePointer(sid))
-
-      var oldDacl: PACL?
-      var pSD: PSECURITY_DESCRIPTOR?
-      let getRes = path.withCString(encodedAs: UTF16.self) { p in
-        GetNamedSecurityInfoW(
-          UnsafeMutablePointer(mutating: p),
-          SE_FILE_OBJECT,
-          DWORD(DACL_SECURITY_INFORMATION),
-          nil,
-          nil,
-          &oldDacl,
-          nil,
-          &pSD
-        )
-      }
-      guard getRes == ERROR_SUCCESS else { return false }
-      defer { if let pSD { _ = LocalFree(pSD) } }
-
-      var newDacl: PACL?
-      let setRes = SetEntriesInAclW(1, &ea, oldDacl, &newDacl)
-      guard setRes == ERROR_SUCCESS, let newDacl else { return false }
-      defer { _ = LocalFree(newDacl) }
-
-      let applyRes = path.withCString(encodedAs: UTF16.self) { p in
-        SetNamedSecurityInfoW(
-          UnsafeMutablePointer(mutating: p),
-          SE_FILE_OBJECT,
-          DWORD(DACL_SECURITY_INFORMATION),
-          nil,
-          nil,
-          newDacl,
-          nil
-        )
-      }
-      return applyRes == ERROR_SUCCESS
+      Self.cleanupProfile(
+        name: name,
+        accessPath: accessGrantedPath,
+        sid: appContainerSid
+      )
     }
 
     private static func windowsCommandLine(_ arguments: [String]) -> String {
@@ -546,33 +592,6 @@
       result += String(repeating: "\\", count: backslashes * 2)
       result.append("\"")
       return result
-    }
-
-    private static func windowsEnvironmentBlock(_ environment: [String: String]) -> String {
-      var entries = currentEnvironmentEntries()
-      for (name, value) in environment {
-        if let index = entries.firstIndex(where: { $0.hasPrefix(name + "=") }) {
-          entries[index] = name + "=" + value
-        } else {
-          entries.append(name + "=" + value)
-        }
-      }
-      return entries.joined(separator: "\0") + "\0\0"
-    }
-
-    private static func currentEnvironmentEntries() -> [String] {
-      guard let block = GetEnvironmentStringsW() else { return [] }
-      defer { _ = FreeEnvironmentStringsW(block) }
-      var entries: [String] = []
-      var cursor = block
-      while cursor.pointee != 0 {
-        var end = cursor
-        while end.pointee != 0 { end += 1 }
-        let units = Array(UnsafeBufferPointer(start: cursor, count: end - cursor))
-        entries.append(String(decoding: units, as: UTF16.self))
-        cursor = end + 1
-      }
-      return entries
     }
 
     private final class OutputReader: @unchecked Sendable {

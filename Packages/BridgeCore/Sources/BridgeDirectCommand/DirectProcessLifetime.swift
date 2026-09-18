@@ -47,7 +47,7 @@ public final class DirectProcessLifetime: @unchecked Sendable {
       case .container(let proc):
         return DirectProcessIdentity(
           pid: proc.pid,
-          startTimeMicros: 0,
+          startTimeMicros: proc.startTimeMicros,
           processGroupID: proc.pid
         )
       }
