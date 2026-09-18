@@ -10,8 +10,6 @@
       { id: "denied", title: "关闭命令执行" }, { id: "safe", title: "安全模式" }, { id: "full", title: "完整模式" }
     ], function (value) { save({ commandMode: value }); }, "");
     root.appendChild(mode.wrapper);
-    var legacy = S.node("p", "hint", "尚未保存全局规则，已有项目沿用原配置。首次添加或更改后，这里的规则统一用于所有项目。");
-    root.appendChild(legacy);
     var allowed = list("白名单", "allowedCommands", "例如：git status"), denied = list("黑名单", "deniedCommands", "例如：git push");
     root.appendChild(allowed.root); root.appendChild(denied.root);
     root.appendChild(S.node("p", "hint", "输入一条命令后点击添加，例如 git status 或 npm test。带空格的参数使用引号，不支持管道和重定向。"));
@@ -63,7 +61,6 @@
       root.hidden = !value;
       if (!value) return;
       mode.control.value = value.commandMode; mode.control.disabled = !value.canSave;
-      legacy.hidden = !value.usesProjectDefaults;
       allowed.update(value); denied.update(value);
     }};
   }

@@ -19,8 +19,6 @@
     container.appendChild(content);
     container.appendChild(unavailable);
 
-    var summary = S.node("div", "connection-summary");
-    content.appendChild(summary);
     var codex = global.CodexBridgeDesktopCodexConnection.create(emit);
     content.appendChild(codex.root);
     var localSection = S.section(content, "本地 MCP 客户端通道");
@@ -36,10 +34,8 @@
     tunnelCard.appendChild(tunnelTitle);
     var tunnelSubtitle = S.node("p", "card-subtitle");
     tunnelCard.appendChild(tunnelSubtitle);
-    var tunnelFacts = S.node("div", "detail-grid");
+    var tunnelFacts = S.node("div", "detail-grid form-grid three tunnel-facts");
     tunnelCard.appendChild(tunnelFacts);
-    var tunnelIDBlock = S.node("div");
-    tunnelCard.appendChild(tunnelIDBlock);
     var tunnelDiagnostics = S.node("div");
     tunnelCard.appendChild(tunnelDiagnostics);
     var tunnelEditor = E.createTunnelForm(emit);
@@ -51,9 +47,7 @@
     var clientsSection = S.section(content, "ChatGPT / Qwen 客户端工具权限");
     var clientsEditor = E.createClients(emit);
     clientsSection.appendChild(clientsEditor.root);
-    var dshMCPSection = S.section(content, "DeepSeek Harness MCP");
     var dshMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
-    dshMCPSection.appendChild(dshMCP.root);
     var agentsSection = S.section(content, "本机 Agent 引擎连接");
     var agentsCard = S.node("div", "page-card connection-card");
     agentsCard.appendChild(S.node("h3", null, "连接本机 Agent"));
@@ -89,14 +83,12 @@
           return;
         }
         S.pageHeader(header, page.header);
-        renderSummary(summary, page);
         codex.update(page.codex, nextEmit);
         renderLocalMCP(localCard, page, context);
         renderTunnel(
           tunnelBadge,
           tunnelSubtitle,
           tunnelFacts,
-          tunnelIDBlock,
           tunnelDiagnostics,
           tunnelEditor,
           tunnelActions,
@@ -104,25 +96,11 @@
           context
         );
         clientsEditor.update(S.safeArray(page.clients), nextEmit);
-        dshMCP.update(page, nextEmit);
-        renderAgents(agentConnectors, agentEditor, page, nextEmit);
+        renderAgents(agentConnectors, agentEditor, dshMCP, page, nextEmit);
         status.textContent = page.statusMessage || "";
         status.hidden = !page.statusMessage;
       }
     };
-  }
-
-  function renderSummary(container, page) {
-    S.clear(container);
-    S.safeArray(page.summaryRows).forEach(function (row) {
-      var card = S.node("div", "summary-card");
-      card.appendChild(S.node("div", "summary-title", row.title));
-      card.appendChild(S.node("div", "summary-value", row.value));
-      container.appendChild(card);
-    });
-    if (!page.summaryRows || page.summaryRows.length === 0) {
-      container.appendChild(S.node("div", "page-message", "暂无连接摘要。"));
-    }
   }
 
   function renderLocalMCP(card, page, context) {
@@ -157,7 +135,6 @@
     badge,
     subtitle,
     facts,
-    tunnelIDBlock,
     diagnostics,
     editor,
     actions,
@@ -173,7 +150,6 @@
     addFact(facts, "Helper", tunnel.helperAvailable ? "就绪" : "未打包");
     addFact(facts, "远程任务接收", tunnel.acceptsRemoteSubmissions ? "允许" : "关闭");
     addFact(facts, "配置状态", tunnel.configured ? "已配置" : "未配置");
-    renderTunnelID(tunnelIDBlock, tunnel, context);
     S.clear(diagnostics);
     if (!tunnel.helperAvailable) {
       diagnostics.appendChild(S.node("div", "page-message warning", "Helper 辅助工具缺失，本地 MCP 仍可用，但远程隧道不能启动。"));
@@ -205,13 +181,15 @@
     }
   }
 
-  function renderAgents(connectors, editor, page, emit) {
+  function renderAgents(connectors, editor, dshMCP, page, emit) {
     var providers = S.safeArray(page.providers).filter(function (provider) { return provider.providerID !== "codex"; });
     connectors.update(providers, page.installations, {
       canConnect: page.canRegisterAgent,
       busy: page.isManagingAgents === true,
       revision: page.agentOperationRevision,
-      acceptReplacement: true
+      acceptReplacement: true,
+      dshMCP: dshMCP,
+      dshMCPPage: page
     }, emit);
     editor.update(providers, page.canRegisterAgent, emit);
   }
@@ -221,22 +199,6 @@
     item.appendChild(S.node("dt", null, title));
     item.appendChild(S.node("dd", null, value));
     container.appendChild(item);
-  }
-
-  function renderTunnelID(container, tunnel, context) {
-    S.clear(container);
-    var tunnelID = typeof tunnel.tunnelID === "string" ? tunnel.tunnelID.trim() : "";
-    if (!tunnelID) return;
-
-    var block = S.node("div", "page-message");
-    var heading = S.node("div", "section-heading-row");
-    heading.appendChild(S.node("span", "muted", "已绑定的 Tunnel ID"));
-    var copy = S.button("复制", null, {}, null, "small", false);
-    copy.addEventListener("click", function () { context.emit("copyTunnelID", {}); });
-    heading.appendChild(copy);
-    block.appendChild(heading);
-    block.appendChild(S.node("div", "mono", tunnelID));
-    container.appendChild(block);
   }
 
   function tunnelTone(tunnel) {

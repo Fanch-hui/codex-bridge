@@ -86,18 +86,10 @@
     row1.appendChild(statusWrap);
     header.appendChild(row1);
 
-    // Row 2: Subtitle
-    var subText = "这里只控制 ChatGPT/Qwen 发给 Agent 的任务权限；客户端工具权限在连接页单独设置";
-    if (page.selectedTask && page.selectedTask.provider && page.selectedTask.permissionMode) {
-      subText = page.selectedTask.provider + " 原生 " + page.selectedTask.permissionMode
-        + "，这里是 Agent 任务权限；ChatGPT/Qwen 客户端工具权限在连接页单独设置";
-    }
-    header.appendChild(S.node("p", "inspector-subtitle", subText));
-
     // Row 3: Permission segmented control: [ Read Only | Write ]
     var row3 = S.node("div", "inspector-header-row row-permissions"), permLabel = S.node("div", "permission-row-label");
     permLabel.appendChild(S.icon("doc.text", "perm-icon"));
-    permLabel.appendChild(S.node("span", null, "Agent 任务权限"));
+    permLabel.appendChild(S.node("span", null, "Agent权限"));
     row3.appendChild(permLabel);
 
     var seg = S.node("div", "segmented-control"), isRO = page.permissionMode === "read-only";

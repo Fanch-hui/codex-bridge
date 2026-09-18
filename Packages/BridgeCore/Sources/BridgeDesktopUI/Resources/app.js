@@ -108,7 +108,6 @@
   function renderOverview(overview) {
     if (!overview) return;
     document.getElementById("overview-title").textContent = overview.title;
-    document.getElementById("overview-subtitle").textContent = overview.subtitle;
     var metrics = document.getElementById("metrics");
     metrics.innerHTML = "";
     (overview.metrics || []).forEach(function (metric) { metrics.appendChild(renderMetric(metric)); });
@@ -146,6 +145,14 @@
     setIcons(container);
   }
 
+  function recentTaskTone(status) {
+    if (status === "completed" || status === "已完成") return "success";
+    if (status === "failed" || status === "失败") return "error";
+    if (["running", "starting", "运行中", "正在启动"].includes(status)) return "running";
+    if (/approval|等待|审批/.test(status)) return "warning";
+    return "neutral";
+  }
+
   function renderRecentTasks(tasks) {
     var section = document.getElementById("recent-section");
     var container = document.getElementById("recent-tasks");
@@ -155,7 +162,7 @@
       var row = document.createElement("button");
       row.type = "button";
       row.className = "recent-task";
-      row.appendChild(elementWithText("span", "status-badge neutral recent-status", task.status));
+      row.appendChild(elementWithText("span", "status-badge " + recentTaskTone(task.status) + " recent-status", task.status));
       row.appendChild(elementWithText("span", "recent-source", task.source));
       var copy = document.createElement("span");
       copy.appendChild(elementWithText("span", "recent-title", task.title));

@@ -102,8 +102,10 @@
     var draft = draftFor(detail.taskID);
     var field = S.textField(label, draft.input, placeholder, "full");
     field.control.id = "workbench-task-input";
+    field.control.setAttribute("aria-label", label);
     field.control.dataset.taskID = detail.taskID;
     field.wrapper.querySelector("label").htmlFor = field.control.id;
+    field.wrapper.querySelector("label").hidden = label === "消息";
     field.control.addEventListener("input", function () { draft.input = field.control.value; });
     return field;
   }
@@ -170,7 +172,7 @@
     var actions = S.node("div", "form-actions");
     var resumeButton = null, restartButton = null;
     if (detail.canResume) {
-      var input = inputField(detail, "补充说明", "输入下一条指令，沿用当前会话上下文");
+      var input = inputField(detail, "消息", "输入下一条指令，沿用当前会话上下文");
       form.appendChild(input.wrapper);
       function resume() {
         if (resumeButton.disabled) return;
@@ -186,7 +188,7 @@
         validate();
         emit("resumeTask", { taskID: detail.taskID, input: value || null }, requestID);
       }
-      resumeButton = S.button("继续对话", null, {}, emit, "small primary", false);
+      resumeButton = S.button("发送", null, {}, emit, "small primary", false);
       resumeButton.addEventListener("click", resume);
       input.control.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); resume(); }

@@ -61,6 +61,8 @@ function page(extra = {}) {
     }],
     providers: [{ providerID: "opencode", displayName: "OpenCode", requiresConfiguration: false, detail: "" }],
     installations: [],
+    deepSeekHarnessMCPServers: [],
+    canManageDeepSeekHarnessMCP: false,
     canRegisterAgent: true,
     statusMessage: null,
     ...extra,
@@ -106,6 +108,23 @@ test("tunnel drafts retain identity, focus and IME text while capabilities chang
     payload: { tunnelID: "正在输入 Tunnel", runtimeKey: "runtime-key-test" }
   });
   assert.equal(runtimeKey.value, "");
+});
+
+test("connection page keeps tunnel facts inline and removes summary and bound ID panels", () => {
+  const ui = runtime();
+  ui.render(page({
+    summaryRows: [
+      { title: "Service", value: "ready" },
+      { title: "MCP", value: "ready" },
+      { title: "Tunnel", value: "stopped" },
+      { title: "Agent", value: "1" }
+    ]
+  }));
+  assert.equal(ui.root.querySelectorAll(".connection-summary").length, 0);
+  assert.equal(ui.root.querySelectorAll(".summary-card").length, 0);
+  assert.equal(ui.find(ui.root, node => node.textContent === "已绑定的 Tunnel ID"), null);
+  const inlineFacts = ui.find(ui.root, node => node.className.split(" ").includes("tunnel-facts"));
+  assert.equal(inlineFacts.children.length, 3);
 });
 
 test("agent registration and MCP client rows retain drafts while lists and permissions update", () => {
@@ -189,4 +208,50 @@ test("connection rows expose parity labels and hide ChatGPT toggle", () => {
   assert.equal(installation.querySelectorAll(".row-detail")[1].textContent.includes("ACP 1"), true);
   assert.equal(ui.button("重新检查", installation).disabled, false);
   assert.equal(ui.button("移除登记", agent).disabled, false);
+});
+
+test("DeepSeek MCP stays inside the DSH connection details across refreshes", () => {
+  const ui = runtime();
+  const provider = {
+    providerID: "deepseek-harness",
+    displayName: "DeepSeek Harness",
+    requiresConfiguration: false,
+    detail: "ACP"
+  };
+  const server = {
+    id: "mcp-filesystem",
+    name: "filesystem",
+    enabled: true,
+    transport: "stdio",
+    command: "/usr/local/bin/mcp-filesystem",
+    arguments: [],
+    environment: [],
+    headers: [],
+    canToggle: true,
+    canEdit: true,
+    canDelete: true
+  };
+  ui.render(page({
+    providers: [provider],
+    canManageDeepSeekHarnessMCP: true,
+    deepSeekHarnessMCPServers: [server]
+  }));
+  const agent = ui.find(ui.root, node => node.className.split(" ").includes("agent-connect-row"));
+  const detailsBody = ui.find(agent, node => node.className.split(" ").includes("agent-details-body"));
+  const mcp = ui.find(detailsBody, node => node.className.split(" ").includes("dsh-mcp-card"));
+  assert.ok(mcp);
+  assert.equal(mcp.parentNode, detailsBody);
+  const editor = ui.find(mcp, node => node.className.split(" ").includes("dsh-mcp-editor"));
+  ui.find(mcp, node => node.tagName === "button" && node.textContent === "添加 MCP").dispatch("click");
+  assert.equal(editor.hidden, false);
+
+  ui.render(page({
+    providers: [provider],
+    canManageDeepSeekHarnessMCP: true,
+    deepSeekHarnessMCPServers: [server, { ...server, id: "mcp-http", name: "http" }]
+  }));
+  assert.equal(ui.find(ui.root, node => node.className.split(" ").includes("dsh-mcp-card")), mcp);
+  assert.equal(ui.find(mcp, node => node.className.split(" ").includes("dsh-mcp-editor")), editor);
+  assert.equal(editor.hidden, false);
+  assert.equal(ui.findAll(ui.root, node => node.tagName === "section" && node.children.includes(mcp)).length, 0);
 });

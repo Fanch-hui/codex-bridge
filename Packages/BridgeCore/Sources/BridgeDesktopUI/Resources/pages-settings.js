@@ -4,8 +4,9 @@
   var D = global.CodexBridgeDesktopFormDraft;
   var M = global.CodexBridgeDesktopSettingsModels;
 
-  function group(container, title) {
+  function group(container, title, className) {
     var section = S.section(container, title);
+    if (className) section.className += " " + className;
     var stack = S.node("div", "settings-stack");
     section.appendChild(stack);
     return stack;
@@ -17,21 +18,21 @@
     container.appendChild(header);
     var content = S.node("div", "settings-content-stack");
     container.appendChild(content);
-    var models = group(content, "模型与执行默认偏好");
-    var preferences = M.preferences(page, emit);
-    var agents = global.CodexBridgeDesktopSettingsAgents.create(page, emit);
+    var models = group(content, "Agent模型与权限", "page-card settings-card");
+    var preferences = M.preferences(page, emit, true);
+    var agents = global.CodexBridgeDesktopSettingsAgents.create(page, emit, true);
     models.appendChild(preferences.root);
     models.appendChild(agents.root);
     var direct = global.CodexBridgeDesktopDirect.create();
     content.appendChild(direct.root);
-    var safety = group(content, "安全策略与全局指令");
+    var safety = group(content, "GPT/Qwen的mcp插件权限与指令");
     var approvals = S.node("div");
     safety.appendChild(approvals);
     var approvalEditor = approvalCard(page, emit);
     approvals.appendChild(approvalEditor.root);
     var instructions = global.CodexBridgeDesktopSettingsInstructions.create(page, emit);
     safety.appendChild(instructions.root);
-    var service = group(content, "后台运行与远程授权");
+    var service = group(content, "退出 App 后继续运行服务", "page-card settings-card");
     var status = S.node("div", "page-message");
     content.appendChild(status);
     var serviceEditor = serviceCard(page, emit);
@@ -96,8 +97,7 @@
 
   function serviceCard(page, emit) {
     var context = { page: page, emit: emit };
-    var card = S.node("section", "page-card settings-card");
-    card.appendChild(S.node("h3", null, "后台服务"));
+    var card = S.node("div", "settings-subsection");
     var description = S.node("p", "hint");
     var platform = S.node("p", "hint");
     card.appendChild(description);
@@ -117,46 +117,31 @@
     function update(next, nextEmit) {
       context.page = next;
       context.emit = nextEmit;
-      description.textContent = next.serviceDescription || "";
+      description.textContent = next.serviceDescription
+        || "开启后可在退出 App 后继续运行后台 Service，远程给本机发送任务时需同时将“远程任务启动”设为“自动批准”。";
       platform.textContent = "平台：" + (next.servicePlatform || "未知");
       keepDraft.update({ keep: next.keepServiceRunningAfterExit == null
         ? false : next.keepServiceRunningAfterExit });
-      keep.control.disabled = !next.canChangeService;
+      keep.control.disabled = false;
       badge.textContent = next.serviceStatusTitle || (next.serviceRegistered ? "已注册" : "未注册");
       badge.className = "status-badge " + serviceTone(next);
       serviceStatus.textContent = next.serviceStatusMessage || "";
       serviceStatus.hidden = !next.serviceStatusMessage;
       S.clear(actions);
-      var availableActions = Array.isArray(next.serviceActions)
-        ? next.serviceActions : fallbackServiceActions(next);
+      var availableActions = next.serviceStatus === "requires_approval"
+        && Array.isArray(next.serviceActions) ? next.serviceActions : [];
       availableActions.forEach(function (action) {
-        if (!action || !action.command || !action.title) return;
-        var mutatesService = action.command === "registerService"
-          || action.command === "unregisterService";
-        if (mutatesService && !next.canChangeService) return;
-        var className = action.command === "unregisterService"
-          ? "small danger" : action.command === "registerService" ? "small primary" : "small";
-        var control = S.button(action.title, null, {}, null, className, false);
+        if (!action || action.command !== "openSystemSettings" || !action.title) return;
+        var control = S.button(action.title, null, {}, null, "small", false);
         control.addEventListener("click", function () {
-          if (action.command === "unregisterService"
-              && !global.confirm("停用后台 Service？退出 App 后将无法继续响应远程请求。")) {
-            return;
-          }
           context.emit(action.command, {});
         });
         actions.appendChild(control);
       });
+      actions.hidden = actions.children.length === 0;
     }
     update(page, emit);
     return { root: card, update: update };
-  }
-
-  function fallbackServiceActions(page) {
-    if (!page.canChangeService) return [];
-    return [{
-      title: page.serviceRegistered ? "注销后台服务" : "注册后台服务",
-      command: page.serviceRegistered ? "unregisterService" : "registerService"
-    }];
   }
 
   function serviceTone(page) {

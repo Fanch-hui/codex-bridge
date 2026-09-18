@@ -144,12 +144,12 @@ final class WindowsServiceRegistrationTests: XCTestCase {
       )
 
       XCTAssertEqual(state.settings?.serviceRegistered, true)
-      XCTAssertEqual(state.settings?.canChangeService, true)
+      XCTAssertEqual(state.settings?.canChangeService, false)
       XCTAssertEqual(state.settings?.keepServiceRunningAfterExit, true)
       XCTAssertEqual(state.settings?.servicePlatform, "Windows")
       XCTAssertEqual(
         state.settings?.serviceDescription,
-        "Windows 用户登录自动启动后台 Service，退出窗口后继续运行。"
+        "开启后可在退出窗口后继续运行后台 Service，远程给本机发送任务时需同时将“远程任务启动”设为“自动批准”。"
       )
 
       let settingsUnregistered = makeSettings(
@@ -164,7 +164,7 @@ final class WindowsServiceRegistrationTests: XCTestCase {
       )
 
       XCTAssertEqual(state2.settings?.serviceRegistered, false)
-      XCTAssertEqual(state2.settings?.canChangeService, true)
+      XCTAssertEqual(state2.settings?.canChangeService, false)
       XCTAssertEqual(state2.settings?.keepServiceRunningAfterExit, false)
     }
   #endif

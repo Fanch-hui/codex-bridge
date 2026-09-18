@@ -15,7 +15,7 @@ extension BridgeDesktopUIStateBuilder {
     return BridgeDesktopSettingsState(
       header: BridgeDesktopPageHeader(
         title: "设置",
-        subtitle: "配置模型、安全审批、外部 Agent 默认偏好与 macOS 后台服务。",
+        subtitle: "配置 Agent模型与权限、安全审批与 macOS 后台服务。",
         symbol: BridgeServiceNavigation.settings.symbol
       ),
       models: models,
@@ -46,9 +46,9 @@ extension BridgeDesktopUIStateBuilder {
         && model.connectionState == .connected,
       canSaveInstructions: model.connectionState == .connected,
       canSaveApprovalModes: model.connectionState == .connected,
-      canChangeService: true,
+      canChangeService: false,
       servicePlatform: "macOS",
-      serviceDescription: "LaunchAgent 后台 Service 可在 App 退出后继续提供本机 MCP 服务。",
+      serviceDescription: "开启后可在退出 App 后继续运行后台 Service，远程给本机发送任务时需同时将“远程任务启动”设为“自动批准”。",
       serviceStatus: service.status,
       serviceStatusTitle: service.title,
       serviceStatusMessage: service.message,

@@ -19,23 +19,12 @@ extension BridgeDesktopUIStateBuilder {
     )
     switch status {
     case .notRegistered:
-      let message =
-        keepServiceRunningAfterExit
-        ? "注册后台服务后，Codex Bridge 可以在 App 退出后持续响应已启用的 MCP 客户端并维持任务执行。"
-        : "注册后台服务后，Codex Bridge 会在 App 打开期间响应已启用的 MCP 客户端；按 ⌘Q 退出时停止。"
       return (
         status.rawValue,
         "未注册",
-        message,
+        "启动时会自动注册后台 Service。",
         .warning,
-        [
-          settingsAction,
-          BridgeDesktopActionLink(
-            id: "register-service",
-            title: "注册后台服务",
-            command: .registerService
-          ),
-        ]
+        []
       )
     case .requiresApproval:
       return (
@@ -51,7 +40,7 @@ extension BridgeDesktopUIStateBuilder {
         "配置缺失",
         "当前 App Bundle 中未检测到打包的 Service plist 配置，请重新构建项目。",
         .error,
-        [settingsAction]
+        []
       )
     case .enabled:
       return (
@@ -59,14 +48,7 @@ extension BridgeDesktopUIStateBuilder {
         "已启用",
         "后台 LaunchAgent 服务正在受监管运行中。",
         .success,
-        [
-          settingsAction,
-          BridgeDesktopActionLink(
-            id: "unregister-service",
-            title: "停用后台服务",
-            command: .unregisterService
-          ),
-        ]
+        []
       )
     }
   }

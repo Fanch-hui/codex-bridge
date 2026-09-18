@@ -157,16 +157,16 @@ test("retry preserves its draft across snapshots and resumes the selected task",
   type(input, "请继续上次检查");
   ui.render(state);
   assert.equal(ui.input(), input);
-  ui.button("继续对话").dispatch("click");
+  ui.button("发送").dispatch("click");
   assert.deepEqual(ui.commands, [{ command: "resumeTask", payload: { taskID: "task-a", input: "请继续上次检查" } }]);
   assert.equal(input.value, "请继续上次检查");
-  assert.equal(ui.button("继续对话").disabled, true);
+  assert.equal(ui.button("发送").disabled, true);
   ui.render({ ...state, commandReceipt: {
     receiptID: "receipt-resume-fail", requestID: ui.requests[0], command: "resumeTask",
     taskID: "task-a", input: "请继续上次检查", accepted: false
   } });
   assert.equal(ui.input().value, "请继续上次检查");
-  assert.equal(ui.button("继续对话").disabled, false);
+  assert.equal(ui.button("发送").disabled, false);
   ui.render({ ...state, selectedTask: { ...state.selectedTask, canResume: false, canRestart: false, canSteer: false, status: "running", turnCount: 2 }, steerModes: [] });
   ui.render({ history: { selectedThreadID: "history-a" }, tasks: [] });
   assert.equal(ui.input(), null);
@@ -230,7 +230,7 @@ test("session fallback keeps provider scope when session IDs collide", () => {
     engineStatus: "已结束"
   };
   ui.render(state);
-  assert.ok(ui.button("继续对话"));
+  assert.ok(ui.button("发送"));
   assert.equal(ui.button("发送指令"), null);
 });
 

@@ -64,17 +64,6 @@ enum BridgeDesktopUIStateBuilder {
         destination: .projects
       ),
       BridgeDesktopMetric(
-        id: "local-agents",
-        title: "本机 Agent",
-        value: String(enabledAgents),
-        symbol: "cpu.fill",
-        subtitle: model.agentInstallations.isEmpty
-          ? "未连接外部 Agent"
-          : "共 \(model.agentInstallations.count) 个已登记",
-        tone: enabledAgents > 0 ? .success : .neutral,
-        destination: .connections
-      ),
-      BridgeDesktopMetric(
         id: "total-tasks",
         title: "任务总数",
         value: String(model.tasks.count),
@@ -87,7 +76,7 @@ enum BridgeDesktopUIStateBuilder {
 
     return BridgeDesktopOverviewState(
       title: "概览",
-      subtitle: "全景监控后台 Service、本地 MCP、Secure Tunnel 与任务执行状态。",
+      subtitle: "",
       notices: notices(from: model),
       metrics: metrics,
       services: services(

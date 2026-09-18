@@ -71,7 +71,7 @@ test("failed saves preserve drafts; saved and untouched values follow Service", 
 
 test("model drafts persist and Fast capability follows the chosen model", () => {
   const ui = runtime(); ui.render(page());
-  const card = ui.section("模型与执行默认偏好");
+  const card = ui.section("Agent模型与权限");
   const controls = card.querySelectorAll("select");
   const fast = card.querySelector("input");
   controls[0].value = "standard"; controls[0].dispatch("change");
@@ -98,17 +98,16 @@ test("approval and service cards preserve DOM and honor save controls", () => {
   const approvals = ui.section("安全审批策略");
   const direct = approvals.querySelector("select");
   direct.focus();
-  const service = ui.section("后台服务");
+  const service = ui.section("退出 App 后继续运行服务");
   const keep = service.querySelector("input");
   keep.checked = true;
   ui.render({ ...state, canSaveApprovalModes: false, serviceRegistered: true });
   assert.equal(ui.section("安全审批策略"), approvals);
   assert.equal(approvals.querySelector("select"), direct);
   assert.equal(direct.disabled, true);
-  assert.equal(ui.section("后台服务"), service);
+  assert.equal(ui.section("退出 App 后继续运行服务"), service);
   assert.equal(keep.checked, true);
-  ui.button("注销后台服务", service).dispatch("click");
-  assert.equal(ui.commands.at(-1).command, "unregisterService");
+  assert.equal(ui.button("注销后台服务", service), null);
 });
 
 test("agent permission defaults remain editable without an installation", () => {
@@ -121,9 +120,10 @@ test("agent permission defaults remain editable without an installation", () => 
     canSave: true, canRefreshModels: false
   };
   ui.render(page({ agentDefaults: [agent] }));
-  const card = ui.section("外部 Agent 默认偏好");
-  assert.equal(card.querySelector(".hint").textContent.includes("自动获取模型"), true);
-  const permission = card.querySelectorAll("select")[2];
+  const card = ui.section("Agent模型与权限");
+  const agentEditor = card.lastChild.lastChild;
+  assert.equal(agentEditor.querySelector(".hint").textContent.includes("自动获取模型"), true);
+  const permission = Array.from(card.querySelectorAll("select")).slice(-1)[0];
   assert.equal(permission.disabled, false);
   permission.dispatch("change");
   assert.equal(ui.commands.at(-1).payload.installationID, null);
@@ -139,8 +139,8 @@ test("agent permission selector follows installation capabilities", () => {
     supportsWorkspaceWrite: false, canSave: true, canRefreshModels: false
   };
   ui.render(page({ agentDefaults: [agent] }));
-  const card = ui.section("外部 Agent 默认偏好");
-  assert.equal(card.querySelectorAll("select")[2].disabled, true);
+  const card = ui.section("Agent模型与权限");
+  assert.equal(Array.from(card.querySelectorAll("select")).slice(-1)[0].disabled, true);
   assert.equal(card.querySelectorAll(".hint").some(item => item.textContent.includes("有效能力")), true);
 });
 
@@ -148,8 +148,8 @@ test("Agent editor retains permission drafts while updating capabilities and cal
   const ui = runtime();
   const agent = { providerID: "opencode", installationID: "install-a", providerName: "OpenCode", model: "one", effort: "medium", permissionMode: "build", modelOptions: [{ modelID: "one", displayName: "One", reasoningEfforts: effort }], effortOptions: effort, permissionOptions: [{ id: "build", title: "Build" }, { id: "plan", title: "Plan" }], canSave: true, canRefreshModels: true };
   ui.render(page({ agentDefaults: [agent] }));
-  const agents = ui.section("外部 Agent 默认偏好");
-  const permission = agents.querySelectorAll("select")[2]; permission.value = "plan";
+  const agents = ui.section("Agent模型与权限");
+  const permission = Array.from(agents.querySelectorAll("select")).slice(-1)[0]; permission.value = "plan";
   permission.dispatch("change");
   const received = [];
   ui.render(page({ canSavePreferences: false, agentDefaults: [{ ...agent, canSave: false }] }));

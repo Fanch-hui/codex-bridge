@@ -137,7 +137,6 @@
       agentReconnectSummary: String?
     ) -> BridgeDesktopOverviewState {
       let projectCount = management.project.rows.count
-      let installationCount = management.agent.installationRows.count
       let metrics = [
         metric(
           id: "running-tasks",
@@ -167,15 +166,6 @@
           destination: .projects
         ),
         metric(
-          id: "local-agents",
-          title: "本机 Agent",
-          value: management.availableAgentCount,
-          symbol: "cpu.fill",
-          subtitle: "共 \(installationCount) 个已登记",
-          tone: management.availableAgentCount > 0 ? .success : .neutral,
-          destination: .connections
-        ),
-        metric(
           id: "total-tasks",
           title: "任务总数",
           value: workbench.taskCount,
@@ -188,7 +178,7 @@
 
       return BridgeDesktopOverviewState(
         title: "概览",
-        subtitle: "全景监控后台 Service、本地 MCP、Secure Tunnel 与任务执行状态。",
+        subtitle: "",
         notices: notices(workbench: workbench),
         metrics: metrics,
         services: services(
