@@ -160,4 +160,33 @@ final class ServiceTaskConcurrencyTests: XCTestCase {
     XCTAssertEqual(stored.state.supervisorStatus, .degraded)
     XCTAssertEqual(stored.state.supervisorSummary, "Supervisor requested approval.")
   }
+
+  func testConcurrentFailureAndSupervisorDisableKeepSupervisorDisabled() async throws {
+    let fixture = try ServiceCoreFixture()
+    defer { fixture.remove() }
+    let store = try SimpleServiceStore(path: fixture.databasePath)
+    let project = try makeServiceProject(id: "prj-failure-state", rootURL: fixture.firstProjectURL)
+    try await store.insertProject(project)
+    let task = try makeServiceTask(
+      id: "tsk-failure-state", projectID: project.id, status: .running,
+      supervisorStatus: .running, supervisorModel: "legacy-model", supervisorEffort: "medium"
+    )
+    _ = try await store.createTask(task, event: creationEvent(at: task.createdAt))
+    let clock = ServiceCoreTestClock(start: task.updatedAt.addingTimeInterval(1))
+    let manager = ServiceTaskManager(store: store, now: clock.next)
+
+    async let disable = manager.updateSupervisor(
+      taskID: task.id, status: .disabled, summary: "Disabled")
+    async let failure = manager.fail(
+      taskID: task.id, failureCode: "provider_failed", summary: "Provider failed")
+    _ = try await (disable, failure)
+
+    let loaded = try await manager.task(id: task.id)
+    let stored = try XCTUnwrap(loaded)
+    XCTAssertEqual(stored.state.status, .failed)
+    XCTAssertEqual(stored.state.supervisorStatus, .disabled)
+    XCTAssertEqual(stored.state.failureCode, "provider_failed")
+    XCTAssertEqual(stored.state.supervisorSummary, "Disabled")
+  }
+
 }

@@ -66,9 +66,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
         retryable: true
       )
     }
-    let response = await handle(decoded)
-    admission.release()
-    return response
+    defer { admission.release() }
+    return await handle(decoded)
   }
 
   private func handle(_ request: BridgeServiceIPCRequest) async -> Data {
