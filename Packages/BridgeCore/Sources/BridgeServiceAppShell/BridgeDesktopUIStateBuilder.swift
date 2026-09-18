@@ -268,16 +268,7 @@ enum BridgeDesktopUIStateBuilder {
   }
 
   static func taskStatusLabel(_ status: String) -> String {
-    switch status {
-    case "awaiting_local_approval": "等待本机批准"
-    case "starting": "正在启动"
-    case "running": "运行中"
-    case "waiting_for_codex_approval": "等待 Codex 审批"
-    case "completed": "已完成"
-    case "failed": "失败"
-    case "interrupted": "已中断"
-    default: status
-    }
+    WorkbenchTaskTextPresentation.statusLabel(status)
   }
 
   private static func lastRefreshSubtitle(for model: BridgeServiceAppModel) -> String {

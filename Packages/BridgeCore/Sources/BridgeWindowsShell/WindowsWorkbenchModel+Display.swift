@@ -231,7 +231,7 @@
 
     private static func sessionRowText(_ session: WorkbenchSessionItem) -> String {
       let task = session.latestTask
-      let state = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
+      let state = WorkbenchTaskTextPresentation.statusLabel(task.status)
       let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
         title: session.title,
         turnCount: session.turnCount
@@ -244,7 +244,7 @@
       projectName: String
     ) -> WindowsRecentTaskPresentation {
       let task = session.latestTask
-      let status = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
+      let status = WorkbenchTaskTextPresentation.statusLabel(task.status)
       return WindowsRecentTaskPresentation(
         taskID: task.taskID,
         title: WorkbenchTaskTextPresentation.sessionMenuTitle(
