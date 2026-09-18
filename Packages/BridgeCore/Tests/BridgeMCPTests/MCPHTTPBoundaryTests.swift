@@ -496,6 +496,22 @@ final class MCPHTTPBoundaryTests: XCTestCase {
     XCTAssertEqual(admission.metrics().activeRequests, 0)
   }
 
+  func testTimedDrainAbandonsLateLeaseWithoutConsumingNewAdmission() async throws {
+    let admission = MCPHTTPAdmission(maximumConnections: 2, maximumActiveRequests: 1)
+    let lateLease = try XCTUnwrap(admission.admitRequest())
+    admission.beginStopping()
+
+    let drained = await admission.waitForRequestDrain(timeout: .milliseconds(20))
+    XCTAssertFalse(drained)
+
+    admission.resetAfterStop()
+    lateLease.release()
+    let replacement = try XCTUnwrap(admission.admitRequest())
+    XCTAssertEqual(admission.metrics().activeRequests, 1)
+    replacement.release()
+    XCTAssertEqual(admission.metrics().activeRequests, 0)
+  }
+
   private var route: String {
     "/mcp/\(secret)"
   }

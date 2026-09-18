@@ -10,6 +10,7 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
   let streamSink: (any ServiceStreamSink)?
   let streams = StreamRegistry()
   let conversationStreamGate = AsyncMutex()
+  var streamingStopped = false
 
   public init(
     composition: ServiceComposition,
@@ -33,6 +34,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
   func stopStreamingAsync() async {
     await conversationStreamGate.acquire()
     defer { conversationStreamGate.release() }
+    guard !streamingStopped else { return }
+    streamingStopped = true
     let active = streams.takeAll()
     for (taskID, registration) in active {
       registration.forwarder.cancel()

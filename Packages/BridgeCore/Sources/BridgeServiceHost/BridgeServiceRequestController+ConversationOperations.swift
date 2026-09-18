@@ -50,6 +50,9 @@ extension BridgeServiceRequestController {
     }
     await conversationStreamGate.acquire()
     defer { conversationStreamGate.release() }
+    guard !streamingStopped else {
+      throw ServiceStoreError.invalidArgument("stream.closed")
+    }
     let payload = try BridgeServiceIPCCodec.payload(
       IPCTaskConversationRequest.self,
       from: request

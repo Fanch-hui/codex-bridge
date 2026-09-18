@@ -2,7 +2,7 @@
   import Foundation
 
   final class XPCStreamBridge: NSObject, CodexBridgeTaskStreamListener, @unchecked Sendable {
-    private let transport: XPCServiceTransport
+    private weak var transport: XPCServiceTransport?
 
     init(transport: XPCServiceTransport) {
       self.transport = transport
@@ -10,7 +10,7 @@
     }
 
     func push(_ payload: Data) {
-      transport.deliverStreamPush(payload)
+      transport?.deliverStreamPush(payload)
     }
   }
 

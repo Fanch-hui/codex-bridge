@@ -49,11 +49,8 @@
       running = false
       let active = connections
       connections.removeAll()
-      let pendingAccept = acceptState.cancel()
+      _ = acceptState.cancel()
       lock.unlock()
-      if pendingAccept != INVALID_HANDLE_VALUE {
-        wakeAcceptLoop()
-      }
       for connection in active {
         connection.close()
       }
@@ -69,33 +66,59 @@
           _ = CloseHandle(handle)
           break
         }
-        let connected = ConnectNamedPipe(handle, nil)
+        guard let connectEvent = CreateEventW(nil, true, false, nil) else {
+          _ = acceptState.finish(handle)
+          _ = CloseHandle(handle)
+          continue
+        }
+        var overlapped = OVERLAPPED()
+        overlapped.hEvent = connectEvent
+        let connected = ConnectNamedPipe(handle, &overlapped)
         var error: DWORD = 0
         if !connected { error = GetLastError() }
+        let accepted: Bool
+        if connected || error == ERROR_PIPE_CONNECTED {
+          accepted = true
+        } else if error == ERROR_IO_PENDING {
+          accepted = acceptState.waitForConnection(
+            handle: handle,
+            overlapped: &overlapped,
+            connectEvent: connectEvent
+          )
+        } else {
+          accepted = false
+        }
+        _ = CloseHandle(connectEvent)
         guard acceptState.finish(handle) else {
           _ = CloseHandle(handle)
           break
         }
-        if !connected {
-          // ERROR_PIPE_CONNECTED: the client connected between creation and
-          // ConnectNamedPipe, which still yields a usable session.
-          guard error == ERROR_PIPE_CONNECTED, isRunning() else {
-            _ = CloseHandle(handle)
-            if !isRunning() { break }
-            continue
-          }
-        }
-        guard isRunning() else {
+        guard accepted, isRunning() else {
           _ = CloseHandle(handle)
-          break
+          if !isRunning() { break }
+          continue
         }
-        let writer = PipeFrameWriter(handle: handle)
+        guard let io = NamedPipeOverlappedIO() else {
+          _ = CloseHandle(handle)
+          continue
+        }
+        let writer = PipeFrameWriter(handle: handle, io: io)
         let controller = BridgeServiceRequestController(
           composition: composition,
           streamSink: PipeStreamSink(writer: writer)
         )
-        let connection = PipeConnection(handle: handle, writer: writer, controller: controller)
+        let connection = PipeConnection(
+          handle: handle,
+          io: io,
+          writer: writer,
+          controller: controller
+        )
         lock.lock()
+        guard running else {
+          lock.unlock()
+          connection.close()
+          return
+        }
         connections.append(connection)
         lock.unlock()
         connection.start { [weak self] connection in
@@ -116,31 +139,12 @@
       lock.unlock()
     }
 
-    private func wakeAcceptLoop() {
-      // Completing the synchronous accept through a local client lets the accept
-      // thread reclaim its own server handle without blocking invalidation.
-      pipeName.withCString(encodedAs: UTF16.self) { name in
-        let client = CreateFileW(
-          name,
-          DWORD(0x8000_0000) | DWORD(0x4000_0000),
-          0,
-          nil,
-          DWORD(OPEN_EXISTING),
-          0,
-          nil
-        )
-        if client != INVALID_HANDLE_VALUE {
-          _ = CloseHandle(client)
-        }
-      }
-    }
-
     private func createPipeInstance() -> HANDLE? {
       var attributes = security.attributes
       return pipeName.withCString(encodedAs: UTF16.self) { name in
         let handle = CreateNamedPipeW(
           name,
-          DWORD(PIPE_ACCESS_DUPLEX),
+          DWORD(PIPE_ACCESS_DUPLEX) | DWORD(FILE_FLAG_OVERLAPPED),
           DWORD(PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT) | Self.rejectRemoteClients,
           Self.maximumPipeInstances,
           DWORD(BridgeServiceIPC.maximumMessageBytes),
@@ -156,11 +160,14 @@
   /// Serializes all frame writes (responses and stream pushes) on one pipe.
   final class PipeFrameWriter: @unchecked Sendable {
     private let handle: HANDLE
-    private let lock = NSLock()
+    private let io: NamedPipeOverlappedIO
+    private let stateLock = NSLock()
+    private let writeLock = NSLock()
     private var closed = false
 
-    init(handle: HANDLE) {
+    init(handle: HANDLE, io: NamedPipeOverlappedIO) {
       self.handle = handle
+      self.io = io
     }
 
     func write(kind: UInt8, payload: Data) -> Bool {
@@ -168,33 +175,35 @@
       var length = UInt32(payload.count).littleEndian
       withUnsafeBytes(of: &length) { frame.append(contentsOf: $0) }
       frame.append(payload)
-      return frame.withUnsafeBytes { raw -> Bool in
-        lock.lock()
-        defer { lock.unlock() }
-        guard !closed else { return false }
-        var offset = 0
-        while offset < raw.count {
-          var written: DWORD = 0
-          guard
-            WriteFile(
-              handle,
-              UnsafeRawPointer(raw.baseAddress!).advanced(by: offset),
-              DWORD(raw.count - offset),
-              &written,
-              nil
-            ), written > 0
-          else { return false }
-          offset += Int(written)
-        }
+      writeLock.lock()
+      defer { writeLock.unlock() }
+      stateLock.lock()
+      let isClosed = closed
+      if !isClosed {
+        io.beginTransfer()
+      }
+      stateLock.unlock()
+      guard !isClosed else { return false }
+      defer { io.endTransfer() }
+      do {
+        try io.writeFullyWhileTracked(handle, data: frame)
         return true
+      } catch {
+        return false
       }
     }
 
     func close() {
-      lock.lock()
-      defer { lock.unlock() }
-      guard !closed else { return }
+      stateLock.lock()
+      guard !closed else {
+        stateLock.unlock()
+        return
+      }
       closed = true
+      stateLock.unlock()
+      io.requestCancellation()
+      _ = CancelIoEx(handle, nil)
+      io.waitForTransfersDrained()
       _ = CloseHandle(handle)
     }
   }
@@ -202,13 +211,20 @@
   /// One connected shell session: serves requests on a dedicated thread.
   private final class PipeConnection: @unchecked Sendable {
     private let handle: HANDLE
+    private let io: NamedPipeOverlappedIO
     private let writer: PipeFrameWriter
     private let controller: BridgeServiceRequestController
     private let closeLock = NSLock()
     private var closed = false
 
-    init(handle: HANDLE, writer: PipeFrameWriter, controller: BridgeServiceRequestController) {
+    init(
+      handle: HANDLE,
+      io: NamedPipeOverlappedIO,
+      writer: PipeFrameWriter,
+      controller: BridgeServiceRequestController
+    ) {
       self.handle = handle
+      self.io = io
       self.writer = writer
       self.controller = controller
     }
@@ -275,26 +291,15 @@
     }
 
     private func readFully(_ count: UInt32) -> Data? {
-      guard count > 0 else { return Data() }
-      var buffer = Data(count: Int(count))
-      let ok = buffer.withUnsafeMutableBytes { raw -> Bool in
-        var total: UInt32 = 0
-        while total < count {
-          var read: DWORD = 0
-          guard
-            ReadFile(
-              handle,
-              raw.baseAddress!.advanced(by: Int(total)),
-              count - total,
-              &read,
-              nil
-            ), read > 0
-          else { return false }
-          total += read
-        }
-        return true
+      closeLock.lock()
+      guard !closed else {
+        closeLock.unlock()
+        return nil
       }
-      return ok ? buffer : nil
+      io.beginTransfer()
+      closeLock.unlock()
+      defer { io.endTransfer() }
+      return io.readFullyWhileTracked(handle, count: count)
     }
 
     func close() {

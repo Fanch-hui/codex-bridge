@@ -99,7 +99,8 @@
       lock.lock()
       controllers[newConnection] = controller
       lock.unlock()
-      newConnection.invalidationHandler = { [weak self] in
+      newConnection.invalidationHandler = { [weak self, weak newConnection] in
+        guard let newConnection else { return }
         self?.remove(newConnection)
       }
       newConnection.resume()

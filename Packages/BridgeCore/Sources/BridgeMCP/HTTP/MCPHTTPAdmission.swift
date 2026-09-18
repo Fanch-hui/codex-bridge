@@ -4,9 +4,11 @@ import Foundation
 package final class MCPHTTPRequestLease: @unchecked Sendable {
   private let lock = NSLock()
   private var admission: MCPHTTPAdmission?
+  private let token: UUID
 
-  fileprivate init(admission: MCPHTTPAdmission) {
+  fileprivate init(admission: MCPHTTPAdmission, token: UUID) {
     self.admission = admission
+    self.token = token
   }
 
   package func release() {
@@ -15,7 +17,7 @@ package final class MCPHTTPRequestLease: @unchecked Sendable {
       self.admission = nil
       return current
     }
-    admission?.releaseRequest()
+    admission?.releaseRequest(token: token)
   }
 
   deinit { release() }
@@ -24,9 +26,10 @@ package final class MCPHTTPRequestLease: @unchecked Sendable {
 package final class MCPHTTPAdmission: @unchecked Sendable {
   private struct State {
     var channels: [ObjectIdentifier: any Channel] = [:]
-    var activeRequests = 0
+    var activeRequestTokens: Set<UUID> = []
     var isStopping = false
-    var drainWaiters: [CheckedContinuation<Void, Never>] = []
+    var drainWaiters: [UUID: CheckedContinuation<Bool, Never>] = [:]
+    var indefiniteDrainWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
   }
 
   private let lock = NSLock()
@@ -55,21 +58,34 @@ package final class MCPHTTPAdmission: @unchecked Sendable {
 
   package func admitRequest() -> MCPHTTPRequestLease? {
     lock.withLock {
-      guard !state.isStopping, state.activeRequests < maximumActiveRequests else { return nil }
-      state.activeRequests += 1
-      return MCPHTTPRequestLease(admission: self)
+      guard
+        !state.isStopping,
+        state.activeRequestTokens.count < maximumActiveRequests
+      else { return nil }
+      let token = UUID()
+      state.activeRequestTokens.insert(token)
+      return MCPHTTPRequestLease(admission: self, token: token)
     }
   }
 
-  fileprivate func releaseRequest() {
-    let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
-      state.activeRequests = max(0, state.activeRequests - 1)
-      guard state.activeRequests == 0 else { return [] }
-      let current = state.drainWaiters
+  fileprivate func releaseRequest(token: UUID) {
+    let waiters = lock.withLock {
+      () -> (
+        bool: [CheckedContinuation<Bool, Never>],
+        indefinite: [CheckedContinuation<Void, Never>]
+      ) in
+      guard state.activeRequestTokens.remove(token) != nil else { return ([], []) }
+      guard state.activeRequestTokens.isEmpty else { return ([], []) }
+      let current = (
+        bool: Array(state.drainWaiters.values),
+        indefinite: Array(state.indefiniteDrainWaiters.values)
+      )
       state.drainWaiters.removeAll(keepingCapacity: false)
+      state.indefiniteDrainWaiters.removeAll(keepingCapacity: false)
       return current
     }
-    for waiter in waiters { waiter.resume() }
+    for waiter in waiters.bool { waiter.resume(returning: true) }
+    for waiter in waiters.indefinite { waiter.resume() }
   }
 
   package func beginStopping() {
@@ -77,26 +93,73 @@ package final class MCPHTTPAdmission: @unchecked Sendable {
   }
 
   package func resetAfterStop() {
-    lock.withLock { state.isStopping = false }
+    let waiters = lock.withLock {
+      () -> (
+        bool: [CheckedContinuation<Bool, Never>],
+        indefinite: [CheckedContinuation<Void, Never>]
+      ) in
+      state.isStopping = false
+      state.activeRequestTokens.removeAll(keepingCapacity: false)
+      let current = (
+        bool: Array(state.drainWaiters.values),
+        indefinite: Array(state.indefiniteDrainWaiters.values)
+      )
+      state.drainWaiters.removeAll(keepingCapacity: false)
+      state.indefiniteDrainWaiters.removeAll(keepingCapacity: false)
+      return current
+    }
+    for waiter in waiters.bool { waiter.resume(returning: true) }
+    for waiter in waiters.indefinite { waiter.resume() }
   }
 
   package func waitForRequestDrain() async {
-    if lock.withLock({ state.activeRequests == 0 }) { return }
+    if lock.withLock({ state.activeRequestTokens.isEmpty }) { return }
     await withCheckedContinuation { continuation in
       let resumeNow = lock.withLock { () -> Bool in
-        guard state.activeRequests > 0 else { return true }
-        state.drainWaiters.append(continuation)
+        guard !state.activeRequestTokens.isEmpty else { return true }
+        let waiterID = UUID()
+        state.indefiniteDrainWaiters[waiterID] = continuation
         return false
       }
       if resumeNow { continuation.resume() }
     }
   }
 
+  /// Waits for all admitted requests to finish, but returns after the bounded
+  /// shutdown window even if a handler ignores cancellation.
+  package func waitForRequestDrain(timeout: Duration) async -> Bool {
+    if lock.withLock({ state.activeRequestTokens.isEmpty }) { return true }
+    let waiterID = UUID()
+    let drained = await withCheckedContinuation { continuation in
+      let resumeNow = lock.withLock { () -> Bool in
+        guard !state.activeRequestTokens.isEmpty else { return true }
+        state.drainWaiters[waiterID] = continuation
+        return false
+      }
+      if resumeNow {
+        continuation.resume(returning: true)
+      } else {
+        Task { [weak self] in
+          try? await Task.sleep(for: timeout)
+          self?.timeoutDrainWaiter(waiterID)
+        }
+      }
+    }
+    return drained
+  }
+
+  private func timeoutDrainWaiter(_ waiterID: UUID) {
+    let waiter = lock.withLock {
+      state.drainWaiters.removeValue(forKey: waiterID)
+    }
+    waiter?.resume(returning: false)
+  }
+
   package func metrics() -> MCPHTTPMetrics {
     lock.withLock {
       MCPHTTPMetrics(
         activeConnections: state.channels.count,
-        activeRequests: state.activeRequests
+        activeRequests: state.activeRequestTokens.count
       )
     }
   }
