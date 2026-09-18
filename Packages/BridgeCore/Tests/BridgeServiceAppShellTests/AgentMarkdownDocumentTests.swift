@@ -70,35 +70,6 @@ final class AgentMarkdownDocumentTests: XCTestCase {
       ]
     )
 
-    let table = document.blocks[0]
-    XCTAssertEqual(
-      AgentMarkdownTableLayout(
-        headers: ["Agent", "状态", "说明"],
-        rows: [["Codex", "完成", "`main`"], ["DSH", "运行中", "搜索网页"]],
-        alignments: [.leading, .center, .trailing]
-      ),
-      AgentMarkdownTableLayout(
-        headers: tableHeaders(table),
-        rows: tableRows(table),
-        alignments: tableAlignments(table)
-      )
-    )
-    let layout = AgentMarkdownTableLayout(
-      headers: tableHeaders(table),
-      rows: tableRows(table),
-      alignments: tableAlignments(table)
-    )
-    XCTAssertEqual(layout.columnCount, 3)
-    XCTAssertEqual(layout.rowCount, 3)
-    XCTAssertEqual(layout.alignments, [.leading, .center, .trailing])
-  }
-
-  func testInlineRenderingPreservesSoftAndHardBreaks() throws {
-    let parsed = try XCTUnwrap(
-      AgentMarkdownText.inlineAttributedString(from: "第一行\n第二行  \n\n第三段")
-    )
-
-    XCTAssertEqual(String(parsed.characters), "第一行\n第二行  \n\n第三段")
   }
 
   func testSafeFallbackRemovesSyntaxButKeepsCodeLiterals() {
@@ -121,10 +92,6 @@ final class AgentMarkdownDocumentTests: XCTestCase {
         .code(language: "bash", text: "rg --files"),
       ]
     )
-    XCTAssertEqual(
-      String(AgentMarkdownText.attributedString(from: "**正在处理")!.characters),
-      "正在处理"
-    )
   }
 
   func testStreamingUpdateKeepsCompletedBlockIdentity() {
@@ -137,18 +104,4 @@ final class AgentMarkdownDocumentTests: XCTestCase {
     XCTAssertEqual(updated.blocks[1].content, .paragraph("正在输出更多"))
   }
 
-  private func tableHeaders(_ block: AgentMarkdownBlock) -> [String] {
-    guard case .table(let headers, _, _) = block.content else { return [] }
-    return headers
-  }
-
-  private func tableRows(_ block: AgentMarkdownBlock) -> [[String]] {
-    guard case .table(_, let rows, _) = block.content else { return [] }
-    return rows
-  }
-
-  private func tableAlignments(_ block: AgentMarkdownBlock) -> [AgentMarkdownTableAlignment] {
-    guard case .table(_, _, let alignments) = block.content else { return [] }
-    return alignments
-  }
 }

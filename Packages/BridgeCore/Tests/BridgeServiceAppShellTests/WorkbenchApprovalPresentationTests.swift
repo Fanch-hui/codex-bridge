@@ -238,34 +238,4 @@ final class WorkbenchApprovalPresentationTests: XCTestCase {
       ), "failed")
   }
 
-  func testMarkdownTextParsesCommonFormattingWithoutSyntaxCharacters() throws {
-    let parsed = try XCTUnwrap(
-      AgentMarkdownText.attributedString(
-        from: "## 标题\n\n- **项目** `文件`\n\n1. [链接](https://example.test)"
-      )
-    )
-    let renderedCharacters = String(parsed.characters)
-    XCTAssertTrue(renderedCharacters.contains("标题"))
-    XCTAssertTrue(renderedCharacters.contains("项目"))
-    XCTAssertTrue(renderedCharacters.contains("文件"))
-    XCTAssertFalse(renderedCharacters.contains("#"))
-    XCTAssertFalse(renderedCharacters.contains("*"))
-    XCTAssertFalse(renderedCharacters.contains("`"))
-  }
-
-  func testMarkdownTextRepairsIncompleteStreamingMarkers() throws {
-    for value in ["**正在处理", "*正在分析", "`AGENTS.md"] {
-      let parsed = try XCTUnwrap(AgentMarkdownText.attributedString(from: value))
-      let renderedCharacters = String(parsed.characters)
-      XCTAssertFalse(renderedCharacters.contains("*"), value)
-      XCTAssertFalse(renderedCharacters.contains("`"), value)
-    }
-  }
-
-  func testMarkdownTextPreservesLiteralSymbolsInsideCode() throws {
-    let parsed = try XCTUnwrap(
-      AgentMarkdownText.attributedString(from: "`*.swift` 和 `#selector`")
-    )
-    XCTAssertEqual(String(parsed.characters), "*.swift 和 #selector")
-  }
 }

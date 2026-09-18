@@ -140,3 +140,12 @@ extension BridgeServiceAppModel {
   }
 
 }
+
+extension MCPServiceExposureMode {
+  public var localizedTitle: String {
+    switch self {
+    case .readOnly: "只读模式"
+    case .full: "完整操作"
+    }
+  }
+}
