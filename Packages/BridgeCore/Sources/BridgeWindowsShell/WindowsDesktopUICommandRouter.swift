@@ -20,6 +20,8 @@
         return .deferAppUpdate
       case .refreshModels:
         return .refreshModels
+      case .scanAgents:
+        return .scanAgents
       case .selectPage:
         return payload.navigation.map(select)
       case .openWorkbench:

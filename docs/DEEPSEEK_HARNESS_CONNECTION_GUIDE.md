@@ -1,8 +1,8 @@
 # DeepSeek Harness 接入指南
 
-本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、登记源码根、一键连接并从 ChatGPT/Qwen 提交任务。
+本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、自动发现并一键连接并从 ChatGPT/Qwen 提交任务。
 
-最短路径是：从官方仓库构建 DSH → 设置 `DEEPSEEK_HARNESS_ROOT` 指向源码根 → 在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key → 点击“连接” → 在设置中刷新模型。Mac 与 Windows 共用这套流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
+最短路径是：从官方仓库构建 DSH → 在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key → 点击“连接” → 在设置中刷新模型。Mac 与 Windows 共用这套流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
 DSH 的 Provider ID 固定为：
 
@@ -88,19 +88,32 @@ Test-Path .\apps\cli\lib\bin.js
 <dsh-source>/apps/cli/lib/bin.js
 ```
 
-完成构建后，请把当前源码根明确提供给 Bridge。macOS、Linux 或 Git Bash：
+### 在 Bridge 中发现安装
+
+首次使用 Bridge 时会自动扫描并保存本机 Agent 目录。若 DSH 是后来安装的，打开 `连接 → 本机 Agent 引擎连接`，点击“扫描 Agent”；发现后填写 Base URL 与 API key，再点击“连接”。App 和后台服务重启会保留发现结果，日常状态刷新和切页使用已保存的目录。
+
+Bridge 优先读取已知启动入口和标准包管理器安装位置，再在本地开发目录进行有界源码索引；源码候选必须有已构建的入口、DSH 包标识和依赖锁文件。保留完整源码目录供 Node 加载依赖。
+
+### 高级：指定安装位置
+
+对于自动扫描未覆盖的位置，可以在“高级：按路径登记已有安装”选择 `apps/cli/lib/bin.js`，或用 `DEEPSEEK_HARNESS_ROOT` 指定包含 `package.json`、`pnpm-lock.yaml` 和 `apps` 的源码根。
+
+Windows PowerShell，在 DSH 源码根执行：
+
+```powershell
+(Get-Item .\apps\cli\lib\bin.js).FullName
+[Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
+```
+
+然后回到连接页点击“扫描 Agent”。Windows Service 会读取新设置。
+
+macOS 终端可为从该终端启动的进程设置：
 
 ```bash
 export DEEPSEEK_HARNESS_ROOT="$PWD"
 ```
 
-Windows PowerShell：
-
-```powershell
-[Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
-```
-
-设置后需要让 Bridge Service 继承新环境：Windows 可重新登录后启动 App；macOS 的 `export` 只对当前终端及其子进程生效。桌面 App 用户可直接使用“高级：按路径登记已有安装”选择构建入口。连接页还会读取 PATH 中名为 `dsh` 的真实 launcher 或 symlink；Windows 下也会检查 pnpm/npm/yarn 的标准用户 bin 目录中的 `dsh.cmd`/`dsh.bat`，只解析其指向的 DSH 入口，不执行 wrapper。无论通过哪种入口找到，Bridge 都会校验完整源码树、依赖锁文件和 Node。自定义位置也可以使用“高级：按路径登记已有安装”。
+从 Finder 启动的 macOS App 可使用高级路径登记。
 
 Bridge 使用现代入口启动：`--profile acp --patch <Bridge 私有运行配置>`。Bridge 会为每次运行生成私有 patch，不修改你的原始 Profile。
 
@@ -567,7 +580,7 @@ waiting_for_codex_approval
 | 选择文件后提示 artifact 无效 | 是否选择官方构建后的 `apps/cli/lib/bin.js`；是否保留完整源码树 |
 | Node 不支持 | 使用 Node 22.19.0+ 的 22.x 或 Node 24+；不要使用 Node 23 |
 | App 找不到 Node | Node 是否只存在于交互式 shell PATH；Service 能否解析 shebang 指向的真实 Node |
-| 构建完成但未发现 DSH | 在 DSH 源码根设置 `DEEPSEEK_HARNESS_ROOT` 后重启 Service；或在“高级：按路径登记已有安装”中选择 `apps/cli/lib/bin.js` |
+| 构建完成但未发现 DSH | 先点击“扫描 Agent”；或在“高级：按路径登记已有安装”中选择 `apps/cli/lib/bin.js` |
 | 找不到 manifest/lock | 是否把 `bin.js` 单独复制走；源根是否仍有 `package.json` 和 `pnpm-lock.yaml` |
 | Profile 位置被拒绝 | 运行时强制把 `cordis.yml`/`.env` 移出 DSH 源码树；同时建议使用任务项目之外的专用目录 |
 | `templateMismatch` | 从当前 Bridge 随包模板重新复制，不要手工删插件或改 sandbox 结构 |

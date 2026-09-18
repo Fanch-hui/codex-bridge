@@ -16,7 +16,8 @@ extension ServiceAgentAutoDiscovery {
       ([managedDeepSeekExecutable(dataPaths: dataPaths)]
       + deepSeekExecutableCandidates(
         existingInstallations: existingInstallations,
-        environment: environment
+        environment: environment,
+        includeSourceSearch: false
       )).compactMap(canonicalRegularFile)
     #if os(Windows)
       executables = executables.filter { !isWindowsGUIExecutable($0) }
@@ -73,16 +74,19 @@ extension ServiceAgentAutoDiscovery {
 
   static func deepSeekExecutableCandidates(
     existingInstallations: [ServiceAgentInstallationRecord],
-    environment: [String: String]
+    environment: [String: String],
+    includeSourceSearch: Bool = true
   ) -> [String] {
-    var candidates = existingInstallations.map(\.executablePath)
+    var knownCandidates = existingInstallations.map(\.executablePath)
     for key in [
       "CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE",
       "DEEPSEEK_HARNESS_EXECUTABLE",
     ] {
-      if let value = environmentValue(key, environment: environment) { candidates.append(value) }
+      if let value = environmentValue(key, environment: environment) {
+        knownCandidates.append(value)
+      }
     }
-    candidates.append(
+    knownCandidates.append(
       contentsOf: deepSeekSourceRoots(environment: environment).flatMap {
         [
           pathJoin($0, "apps", "cli", "lib", "bin.js"),
@@ -90,8 +94,21 @@ extension ServiceAgentAutoDiscovery {
         ]
       }
     )
-    candidates.append(contentsOf: deepSeekLauncherCandidates(environment: environment))
-    return uniquePaths(candidates)
+    knownCandidates.append(contentsOf: deepSeekLauncherCandidates(environment: environment))
+
+    // PATH, package-manager launchers and an explicitly supplied root are cheap
+    // and authoritative. Only when they produce no file do we inspect the
+    // bounded set of local development directories.
+    let known = uniquePaths(knownCandidates)
+    if known.contains(where: { canonicalRegularFile($0) != nil }) {
+      return known
+    }
+    guard includeSourceSearch else { return known }
+    let discoveredRoots = ServiceAgentDeepSeekSourceSearch.discover(environment: environment)
+    let discoveredEntries = discoveredRoots.map {
+      pathJoin($0, "apps", "cli", "lib", "bin.js")
+    }
+    return uniquePaths(known + discoveredEntries)
   }
 
   static func deepSeekConfigurationCandidates(

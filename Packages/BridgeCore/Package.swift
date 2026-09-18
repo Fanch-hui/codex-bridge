@@ -246,7 +246,9 @@ var windowsApplicationLinkerFlags = [
     ),
     .testTarget(
       name: "BridgeServiceHostWindowsTests",
-      dependencies: ["BridgeIPC", "BridgeServiceHost"],
+      dependencies: [
+        "BridgeAgentCore", "BridgeIPC", "BridgeServiceCore", "BridgeServiceHost",
+      ],
       path: "Tests/BridgeServiceHostWindowsTests"
     ),
     .testTarget(

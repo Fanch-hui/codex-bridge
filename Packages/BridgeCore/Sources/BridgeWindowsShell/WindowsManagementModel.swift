@@ -104,17 +104,22 @@
       publishDisplay()
     }
 
-    func refreshAgents() async {
-      guard !agentLoading else { return }
+    func refreshAgents(forceRefresh: Bool = false) async {
+      guard !agentLoading, !agentBusy else { return }
       agentLoading = true
+      if forceRefresh { agentStatusText = "正在扫描本机 Agent…" }
       publishDisplay()
       do {
-        let catalog = try await client.agentCatalog(forceRefresh: agentProviders.isEmpty)
+        let catalog = try await client.agentCatalog(forceRefresh: forceRefresh)
         connectionState = .connected
         agentProviders = catalog.providers
         agentInstallations = catalog.installations
         reconcileAgentSelection()
-        agentStatusText = "已加载 \(agentInstallations.count) 条安装记录。"
+        let discoveredCount = catalog.providers.filter { $0.discoveryState == "discovered" }.count
+        agentStatusText =
+          forceRefresh
+          ? "扫描完成，发现 \(discoveredCount) 个本机 Agent。"
+          : "已加载 \(agentInstallations.count) 条安装记录。"
       } catch {
         agentStatusText = "Agent 目录读取失败：\(BridgeServiceErrorMessage.message(error))"
       }

@@ -11,6 +11,10 @@ antigravity
 
 省略 `provider_id` 时，Bridge 会使用 Codex，不会自动选择 AGY。
 
+## 自动发现与连接
+
+Bridge 首次初始化时扫描本机 Agent 并保存结果。打开连接页后，选择已发现的 Agent 并点击“连接”；需要授权或配置的项目会在连接时提示。后续安装或移动 Agent，可点击“扫描 Agent”更新目录。App 与后台服务重启、切页及日常状态刷新都复用保存的结果。
+
 ## Antigravity 2.0 与 AGY CLI 的关系
 
 Antigravity 2.0 与 AGY CLI 是两个界面，但官方说明它们使用同一套 Agent harness，并同步核心偏好、权限和安全设置。CLI 中的 `/settings`（`/config`）和 `/permissions` 修改，原则上也会影响 Antigravity 2.0；反向修改同样适用。对话默认不会自动在两个界面之间出现，需要使用官方的对话导入功能。

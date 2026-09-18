@@ -32,6 +32,8 @@ enum BridgeDesktopCommandRouter {
       model.refresh()
     case .refreshModels:
       model.refreshModels()
+    case .scanAgents:
+      model.scanAgents()
     case .selectPage:
       guard let navigation = envelope.payload.navigation else { return }
       select(navigation, model: model)

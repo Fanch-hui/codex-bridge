@@ -110,6 +110,35 @@ final class ServiceAgentAutoDiscoveryTests: XCTestCase {
     }
   #endif
 
+  func testDiscoveryPersistsAcrossRestartsUntilManualScan() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let firstEntry = root.appendingPathComponent("first.js")
+    let secondEntry = root.appendingPathComponent("second.js")
+    try Data("#!/usr/bin/env node\n".utf8).write(to: firstEntry)
+    try Data("#!/usr/bin/env node\n".utf8).write(to: secondEntry)
+    let cache = root.appendingPathComponent("discovered-agents.json")
+    let initial = ServiceAgentDiscoveryCatalog(
+      environment: ["DEEPSEEK_HARNESS_EXECUTABLE": firstEntry.path], cacheURL: cache
+    )
+    let first = await initial.summaries(providerIDs: [.deepSeekHarness], existingInstallations: [])
+    XCTAssertEqual(first[.deepSeekHarness]?.executablePath, firstEntry.path)
+
+    let restarted = ServiceAgentDiscoveryCatalog(
+      environment: ["DEEPSEEK_HARNESS_EXECUTABLE": secondEntry.path], cacheURL: cache
+    )
+    let restored = await restarted.summaries(
+      providerIDs: [.deepSeekHarness], existingInstallations: [])
+    XCTAssertEqual(restored[.deepSeekHarness]?.executablePath, firstEntry.path)
+    let scanned = await restarted.summaries(
+      providerIDs: [.deepSeekHarness], existingInstallations: [], forceRefresh: true
+    )
+    XCTAssertEqual(scanned[.deepSeekHarness]?.executablePath, secondEntry.path)
+    let persisted = ServiceAgentDiscoveryCache.load(from: cache)
+    XCTAssertEqual(persisted?[.deepSeekHarness]?.executablePath, secondEntry.path)
+  }
+
   func testDiscoveryCatalogCachesUntilForcedRefresh() async throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "bridge-discovery-cache-\(UUID().uuidString)",

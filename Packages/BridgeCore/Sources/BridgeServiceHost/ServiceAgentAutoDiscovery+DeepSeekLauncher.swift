@@ -5,8 +5,8 @@ extension ServiceAgentAutoDiscovery {
   static func deepSeekLauncherCandidates(
     environment: [String: String]
   ) -> [String] {
-    let resolver = AgentExecutableResolver(environment: environment)
     #if os(Windows)
+      let resolver = AgentExecutableResolver(environment: environment)
       let directories = uniquePaths(
         resolver.searchDirectories()
           + deepSeekPackageManagerDirectories(environment: environment)
@@ -20,6 +20,10 @@ extension ServiceAgentAutoDiscovery {
         }
       }
     #else
+      let resolver = AgentExecutableResolver(
+        environment: environment,
+        additionalDirectories: macOSAgentSearchDirectories(environment: environment)
+      )
       return resolver.searchDirectories().compactMap { directory in
         canonicalRegularFile(pathJoin(directory, "dsh"))
       }

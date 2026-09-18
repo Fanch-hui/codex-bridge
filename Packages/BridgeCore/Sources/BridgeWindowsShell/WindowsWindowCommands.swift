@@ -22,6 +22,7 @@
     case installAppUpdate
     case deferAppUpdate
     case refreshModels
+    case scanAgents
     case openTask(id: String)
     case browserBack
     case browserForward

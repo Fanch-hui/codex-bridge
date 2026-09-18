@@ -16,6 +16,9 @@
         model.setChatBrowserEnabled(enabled)
         updateBrowserMemoryPolicy(model: model)
         return true
+      case .scanAgents:
+        Task { @MainActor in await management.refreshAgents(forceRefresh: true) }
+        return true
       case .refreshModels:
         Task { @MainActor in await auxiliary.refreshModels(model: model) }
         return true

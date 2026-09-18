@@ -99,7 +99,6 @@ public actor ServiceComposition {
         )
       ),
     ]
-    let discoveryEnvironment = ProcessInfo.processInfo.environment
     let agentRegistry = ServiceAgentRegistry(
       store: store,
       providers: agentProviders,
@@ -107,15 +106,13 @@ public actor ServiceComposition {
         try ServiceAgentAutoDiscovery.updatedInstallationRequest(
           for: existing,
           dataPaths: paths,
-          environment: discoveryEnvironment
+          environment: ServiceAgentDiscoveryEnvironment.current()
         )
       }
     )
     _ = try await agentRegistry.refreshInstallationStates()
-    let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog()
-    _ = await agentDiscoveryCatalog.summaries(
-      providerIDs: agentProviders.map(\.descriptor.providerID),
-      existingInstallations: try await agentRegistry.installations()
+    let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog(
+      cacheURL: paths.agentStateURL.appendingPathComponent("discovered-agents.json")
     )
     let agentRunner = ServiceAgentTaskRunner(
       registry: agentRegistry,

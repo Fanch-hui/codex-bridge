@@ -50,11 +50,20 @@
     var dshMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
     var agentsSection = S.section(content, "本机 Agent 引擎连接");
     var agentsCard = S.node("div", "page-card connection-card");
-    agentsCard.appendChild(S.node("h3", null, "连接本机 Agent"));
+    var agentHeading = S.node("div", "section-heading-row");
+    agentHeading.appendChild(S.node("h3", null, "连接本机 Agent"));
+    var scanAgents = S.button("扫描 Agent", null, {}, null, "small", false);
+    scanAgents.type = "button";
+    scanAgents.addEventListener("click", function () {
+      scanAgents.disabled = true;
+      context.emit("scanAgents");
+    });
+    agentHeading.appendChild(scanAgents);
+    agentsCard.appendChild(agentHeading);
     agentsCard.appendChild(S.node(
       "p",
       "card-subtitle",
-      "Bridge 会自动查找本机安装；点击连接后才会启用。"
+      "首次使用时自动查找本机安装。安装新的 Agent 后，点击“扫描 Agent”更新列表。"
     ));
     var agentConnectors = global.CodexBridgeDesktopAgentConnectors.create(emit);
     agentsCard.appendChild(agentConnectors.root);
@@ -97,6 +106,7 @@
         );
         clientsEditor.update(S.safeArray(page.clients), nextEmit);
         renderAgents(agentConnectors, agentEditor, dshMCP, page, nextEmit);
+        scanAgents.disabled = !page.canScanAgents || !!page.isManagingAgents;
         status.textContent = page.statusMessage || "";
         status.hidden = !page.statusMessage;
       }

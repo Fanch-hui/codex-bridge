@@ -35,7 +35,7 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
 2. **添加项目**：登记本地目录，并设置读取、写入和网络权限。
-3. **连接 Agent**：在连接页选择已安装的 Agent，完成发现、验证和启用。Codex 使用本机 Codex 执行通道；DeepSeek Harness 可在 App 中配置服务地址和 API key。
+3. **连接 Agent**：首次初始化自动扫描并保存本机 Agent；在连接页点击连接完成验证和启用。后续安装 Agent 后点击“扫描 Agent”更新目录。Codex 使用本机 Codex 执行通道；DeepSeek Harness 可在 App 中配置服务地址和 API key。
 4. **选择项目和模式**：在工作台选择项目以及 `Read Only` / `Write`。
 5. **连接聊天客户端**：ChatGPT 使用 OpenAI Secure MCP Tunnel；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
 6. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。

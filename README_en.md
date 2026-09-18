@@ -35,7 +35,7 @@ Versions with the built-in updater check GitHub once at startup and show availab
 
 1. Open the app and confirm that the background service is connected. Approve the macOS background item if prompted.
 2. Register a local project and set its read, write, and network permissions.
-3. Connect an installed agent from the Connections page. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
+3. Bridge scans for local agents once on first initialization and saves the catalog. Connect a discovered agent from the Connections page; after installing another agent, click **Scan Agents** to update the catalog. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
 4. Select a project and `Read Only` or `Write` in the workbench.
 5. Connect ChatGPT through OpenAI Secure MCP Tunnel, or Qwen Studio through loopback HTTP MCP. The Connections page provides configuration controls.
 6. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.

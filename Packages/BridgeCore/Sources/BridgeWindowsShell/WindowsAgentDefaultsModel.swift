@@ -69,7 +69,7 @@
         let status = try await client.status()
         workbenchProjectID = status.workbenchProjectID
         connectionState = .connected
-        let catalog = try await client.agentCatalog(forceRefresh: providers.isEmpty)
+        let catalog = try await client.agentCatalog()
         providers = catalog.providers
         installations = catalog.installations
         reconcileSelection()

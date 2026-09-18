@@ -81,11 +81,21 @@ extension BridgeServiceRequestController {
     let existingInstallations = try await composition.agentRegistry.installations(
       providerID: providerID
     )
+    let discovery = await composition.agentDiscoveryCatalog.summaries(
+      providerIDs: [providerID], existingInstallations: existingInstallations
+    )
+    let discoveredPath = discovery[providerID]?.executablePath
+    var environment = ServiceAgentDiscoveryEnvironment.current()
+    if providerID == .deepSeekHarness, let discoveredPath {
+      environment["CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE"] = discoveredPath
+    }
     let candidates = try ServiceAgentAutoDiscovery.registrationRequests(
       providerID: providerID,
       dataPaths: composition.paths,
       existingInstallations: existingInstallations,
-      credentialsProvided: payload.baseURL != nil || payload.apiKey != nil
+      credentialsProvided: payload.baseURL != nil || payload.apiKey != nil,
+      environment: environment,
+      discoveredExecutablePath: discoveredPath
     )
     let record = try await composition.application.serviceConnectManagedAgent(
       providerID: providerID,
