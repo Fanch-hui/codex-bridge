@@ -44,6 +44,25 @@ final class DirectGitCommitTransactionTests: XCTestCase {
     XCTAssertEqual(try runGit(["rev-parse", "HEAD"], at: fixture.root), originalHead)
   }
 
+  func testCompletedIndexTransactionPreservesNextOwnersLock() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    try initializeRepository(at: fixture.root)
+    try Data("baseline\n".utf8).write(to: fixture.root.appending(path: "Baseline.txt"))
+    _ = try runGit(["add", "--", "Baseline.txt"], at: fixture.root)
+    _ = try runGit(["commit", "-m", "baseline"], at: fixture.root)
+    let runner = DirectGitRunner()
+    let transaction = try await DirectGitIndexTransaction.begin(
+      root: fixture.root.path, git: DirectGitRunner.gitPath, runner: runner)
+    try await transaction.synchronize(
+      root: fixture.root.path, git: DirectGitRunner.gitPath, changedFiles: ["Baseline.txt"],
+      runner: runner)
+    let lock = fixture.root.appending(path: ".git/index.lock")
+    try Data("next owner".utf8).write(to: lock)
+    transaction.cancel()
+    transaction.cancel()
+    XCTAssertEqual(try String(contentsOf: lock, encoding: .utf8), "next owner")
+  }
+
   func testPostCommitWorkingTreeEditIsNotAccidentallyStaged() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     try initializeRepository(at: fixture.root)

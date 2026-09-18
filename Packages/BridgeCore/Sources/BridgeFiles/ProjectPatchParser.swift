@@ -126,8 +126,7 @@ public enum ProjectPatchParser {
     }
     let isAdd = header.hasPrefix("*** Add File: ")
     let prefix = isAdd ? "*** Add File: " : "*** Update File: "
-    let path = String(header.dropFirst(prefix.count))
-    try validateRelativePath(path)
+    let path = try validatedRelativePath(String(header.dropFirst(prefix.count)))
 
     var hunks: [ProjectPatchHunk] = []
     var current: ParsedHunk?
@@ -223,14 +222,15 @@ public enum ProjectPatchParser {
   {
     if oldPath == "/dev/null" {
       guard newPath != "/dev/null" else { throw ProjectPatchParserError.malformedFileHeader }
-      try validateRelativePath(newPath)
-      return ("add", newPath)
+      return ("add", try validatedRelativePath(newPath))
     }
     guard newPath != "/dev/null" else { throw ProjectPatchParserError.malformedFileHeader }
-    try validateRelativePath(oldPath)
-    try validateRelativePath(newPath)
-    guard oldPath == newPath else { throw ProjectPatchParserError.malformedFileHeader }
-    return ("update", newPath)
+    let validatedOldPath = try validatedRelativePath(oldPath)
+    let validatedNewPath = try validatedRelativePath(newPath)
+    guard validatedOldPath == validatedNewPath else {
+      throw ProjectPatchParserError.malformedFileHeader
+    }
+    return ("update", validatedNewPath)
   }
 
   private static func unifiedPath(from line: String, prefix: String) throws -> String {
@@ -289,10 +289,14 @@ public enum ProjectPatchParser {
     }
   }
 
-  private static func validateRelativePath(_ path: String) throws {
-    guard !path.isEmpty, !path.hasPrefix("/") else {
+  private static func validatedRelativePath(_ path: String) throws -> String {
+    guard !path.isEmpty, !path.hasPrefix("/") && !path.hasPrefix("\\") else {
       throw ProjectPatchParserError.absolutePath
     }
+    guard let relative = try? SecureRelativePath(path) else {
+      throw ProjectPatchParserError.malformedFileHeader
+    }
+    return relative.value
   }
 
   private static func isCustomBoundary(_ line: String) -> Bool {

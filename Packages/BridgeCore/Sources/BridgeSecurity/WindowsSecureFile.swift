@@ -28,6 +28,7 @@
       package let identity: Identity
       package let isDirectory: Bool
       package let isRegularFile: Bool
+      package let isReparsePoint: Bool
       package let size: Int
     }
 
@@ -43,10 +44,17 @@
       desiredAccess: UInt32,
       creationDisposition: DWORD,
       finalIsDirectory: Bool,
-      shareMode: DWORD = 0,
-      flagsAndAttributes: DWORD = DWORD(FILE_FLAG_BACKUP_SEMANTICS)
+      shareMode: DWORD = DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
+      flagsAndAttributes: DWORD = DWORD(
+        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT
+      )
     ) throws -> (HANDLE, Metadata) {
-      try validateComponents(rootPath: rootPath, components: components)
+      let finalExists = creationDisposition != DWORD(CREATE_NEW)
+      try validateComponents(
+        rootPath: rootPath,
+        components: components,
+        includingFinal: finalExists
+      )
       let targetPath = ([rootPath] + components).joined(separator: "\\")
       let handle = targetPath.withCString(encodedAs: UTF16.self) { wide in
         CreateFileW(
@@ -82,11 +90,12 @@
         throw WindowsSecureFileError.openFailed(Int32(GetLastError()))
       }
       let isDirectory = info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0
+      let isReparsePoint = info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) != 0
       return Metadata(
         identity: Identity(info: info),
         isDirectory: isDirectory,
-        isRegularFile: !isDirectory
-          && info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) == 0,
+        isRegularFile: !isDirectory && !isReparsePoint,
+        isReparsePoint: isReparsePoint,
         size: Int((UInt64(info.nFileSizeHigh) << 32) | UInt64(info.nFileSizeLow))
       )
     }
@@ -102,7 +111,7 @@
         CreateFileW(
           wide,
           DWORD(0),
-          DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE),
+          DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
           nil,
           DWORD(OPEN_EXISTING),
           DWORD(FILE_FLAG_BACKUP_SEMANTICS),
@@ -118,23 +127,6 @@
         currentIdentity.inode == root.identity.inode
       else {
         throw PathSecurityError.rootIdentityChanged
-      }
-    }
-
-    /// Rejects reparse points on every intermediate component, mirroring the
-    /// POSIX O_NOFOLLOW traversal guarantee.
-    private static func validateComponents(rootPath: String, components: [String]) throws {
-      var current = rootPath
-      for component in components {
-        current = current + "\\" + component
-        let attributes = current.withCString(encodedAs: UTF16.self) { wide in
-          GetFileAttributesW(wide)
-        }
-        guard attributes != INVALID_FILE_ATTRIBUTES,
-          attributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) == 0
-        else {
-          throw PathSecurityError.pathEscapeBlocked
-        }
       }
     }
 
@@ -245,9 +237,15 @@
     static func createExclusive(
       root: RegisteredRoot,
       components: [String],
-      content: Data
+      content: Data,
+      createParents: Bool = false
     ) throws {
       try validateRootIdentity(root: root)
+      try ensureParentDirectories(
+        root: root,
+        components: components,
+        createMissing: createParents
+      )
       let (handle, _) = try openResolving(
         rootPath: root.canonicalPath,
         components: components,
@@ -256,7 +254,15 @@
         finalIsDirectory: false
       )
       defer { close(handle) }
-      try writeFile(handle, data: content)
+      do {
+        try writeFile(handle, data: content)
+      } catch {
+        let targetPath = ([root.canonicalPath] + components).joined(separator: "\\")
+        _ = targetPath.withCString(encodedAs: UTF16.self) { wide in
+          DeleteFileW(wide)
+        }
+        throw error
+      }
     }
 
     /// Stages content next to the target and atomically renames over it.
@@ -268,7 +274,9 @@
     ) throws -> SecureFileRevision {
       try validateRootIdentity(root: root)
       let parentComponents = Array(components.dropLast())
-      let name = components.last!
+      guard let name = components.last else {
+        throw PathSecurityError.invalidRelativePath("empty path")
+      }
       let targetPath = ([root.canonicalPath] + components).joined(separator: "\\")
       let parentPath = ([root.canonicalPath] + parentComponents).joined(separator: "\\")
 
@@ -292,21 +300,32 @@
       )
       let replaced = stagingPath.withCString(encodedAs: UTF16.self) { stagingWide in
         targetPath.withCString(encodedAs: UTF16.self) { targetWide in
-          MoveFileExW(stagingWide, targetWide, DWORD(MOVEFILE_REPLACE_EXISTING))
+          MoveFileExW(
+            stagingWide,
+            targetWide,
+            DWORD(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+          )
         }
       }
       guard replaced else {
+        let error = Int32(GetLastError())
         _ = stagingPath.withCString(encodedAs: UTF16.self) { wide in
           DeleteFileW(wide)
         }
-        throw PathSecurityError.writeFailed(Int32(GetLastError()))
+        throw PathSecurityError.writeFailed(error)
       }
+      try validateComponents(
+        rootPath: root.canonicalPath, components: components, includingFinal: true)
       return oldRevision
     }
 
     static func deleteFileValidated(root: RegisteredRoot, components: [String]) throws {
       try validateRootIdentity(root: root)
-      try validateComponents(rootPath: root.canonicalPath, components: components)
+      try validateComponents(
+        rootPath: root.canonicalPath,
+        components: components,
+        includingFinal: true
+      )
       let targetPath = ([root.canonicalPath] + components).joined(separator: "\\")
       let deleted = targetPath.withCString(encodedAs: UTF16.self) { wide in
         DeleteFileW(wide)
@@ -323,31 +342,71 @@
       expectDestinationAbsent: Bool
     ) throws {
       try validateRootIdentity(root: root)
-      try validateComponents(rootPath: root.canonicalPath, components: sourceComponents)
-      try validateComponents(rootPath: root.canonicalPath, components: destinationComponents)
+      try validateComponents(
+        rootPath: root.canonicalPath,
+        components: sourceComponents,
+        includingFinal: true
+      )
+      try validateComponents(
+        rootPath: root.canonicalPath,
+        components: destinationComponents,
+        includingFinal: false
+      )
       let destinationPath = ([root.canonicalPath] + destinationComponents).joined(separator: "\\")
-      if expectDestinationAbsent {
-        let attributes = destinationPath.withCString(encodedAs: UTF16.self) { wide in
-          GetFileAttributesW(wide)
+      let destinationAttributes = destinationPath.withCString(encodedAs: UTF16.self) { wide in
+        GetFileAttributesW(wide)
+      }
+      if destinationAttributes == INVALID_FILE_ATTRIBUTES {
+        let error = Int32(GetLastError())
+        guard error == Int32(ERROR_FILE_NOT_FOUND) || error == Int32(ERROR_PATH_NOT_FOUND) else {
+          throw WindowsSecureFileError.openFailed(error)
         }
-        guard attributes == INVALID_FILE_ATTRIBUTES else {
-          throw PathSecurityError.targetAlreadyExists
-        }
+      } else if expectDestinationAbsent {
+        throw PathSecurityError.targetAlreadyExists
+      } else {
+        try validateComponents(
+          rootPath: root.canonicalPath,
+          components: destinationComponents,
+          includingFinal: true
+        )
       }
       let sourcePath = ([root.canonicalPath] + sourceComponents).joined(separator: "\\")
+      let (sourceHandle, sourceMetadata) = try openResolving(
+        rootPath: root.canonicalPath,
+        components: sourceComponents,
+        desiredAccess: DWORD(GENERIC_READ),
+        creationDisposition: DWORD(OPEN_EXISTING),
+        finalIsDirectory: false
+      )
+      defer { close(sourceHandle) }
       let moved = sourcePath.withCString(encodedAs: UTF16.self) { sourceWide in
         destinationPath.withCString(encodedAs: UTF16.self) { destinationWide in
-          MoveFileExW(sourceWide, destinationWide, DWORD(MOVEFILE_REPLACE_EXISTING))
+          MoveFileExW(
+            sourceWide,
+            destinationWide,
+            DWORD(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+          )
         }
       }
       guard moved else {
         throw PathSecurityError.writeFailed(Int32(GetLastError()))
       }
+      let (destinationHandle, destinationMetadata) = try openResolving(
+        rootPath: root.canonicalPath,
+        components: destinationComponents,
+        desiredAccess: DWORD(GENERIC_READ),
+        creationDisposition: DWORD(OPEN_EXISTING),
+        finalIsDirectory: false
+      )
+      defer { close(destinationHandle) }
+      guard destinationMetadata.identity == sourceMetadata.identity else {
+        throw PathSecurityError.pathChanged
+      }
     }
 
     static func createDirectoryValidated(root: RegisteredRoot, components: [String]) throws {
       try validateRootIdentity(root: root)
-      try validateComponents(rootPath: root.canonicalPath, components: Array(components.dropLast()))
+      try ensureParentDirectories(root: root, components: components, createMissing: false)
       let targetPath = ([root.canonicalPath] + components).joined(separator: "\\")
       let created = targetPath.withCString(encodedAs: UTF16.self) { wide in
         CreateDirectoryW(wide, nil)
@@ -355,6 +414,14 @@
       guard created else {
         throw PathSecurityError.writeFailed(Int32(GetLastError()))
       }
+      let (handle, _) = try openResolving(
+        rootPath: root.canonicalPath,
+        components: components,
+        desiredAccess: DWORD(FILE_READ_ATTRIBUTES),
+        creationDisposition: DWORD(OPEN_EXISTING),
+        finalIsDirectory: true
+      )
+      close(handle)
     }
 
     static func deleteEmptyDirectoryValidated(
@@ -362,7 +429,11 @@
       components: [String]
     ) throws {
       try validateRootIdentity(root: root)
-      try validateComponents(rootPath: root.canonicalPath, components: components)
+      try validateComponents(
+        rootPath: root.canonicalPath,
+        components: components,
+        includingFinal: true
+      )
       let targetPath = ([root.canonicalPath] + components).joined(separator: "\\")
       guard directoryIsEmpty(targetPath) else {
         throw PathSecurityError.writeFailed(Int32(ERROR_DIR_NOT_EMPTY))

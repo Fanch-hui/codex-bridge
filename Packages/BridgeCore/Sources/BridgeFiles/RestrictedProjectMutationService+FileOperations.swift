@@ -9,7 +9,8 @@ extension RestrictedProjectMutationService {
     let data = try textContent(request.content)
 
     let resolver = ProjectPathResolver(root: project.primaryRoot)
-    guard resolver.sensitivePolicy.allows(path) else { throw ProjectMutationError.forbiddenPath }
+    let policy = ProjectFilePolicy(forbiddenPatterns: project.forbiddenPatterns)
+    guard policy.allows(path) else { throw ProjectMutationError.forbiddenPath }
 
     let mode: SecureWriteMode = request.mode == .create ? .create : .replace
     let oldText: String?
@@ -53,7 +54,8 @@ extension RestrictedProjectMutationService {
     let project = try await requireProject(request.projectID)
     let path = try securePath(request.relativePath)
     let resolver = ProjectPathResolver(root: project.primaryRoot)
-    guard resolver.sensitivePolicy.allows(path) else { throw ProjectMutationError.forbiddenPath }
+    let policy = ProjectFilePolicy(forbiddenPatterns: project.forbiddenPatterns)
+    guard policy.allows(path) else { throw ProjectMutationError.forbiddenPath }
 
     guard !request.oldText.isEmpty, !request.newText.isEmpty else {
       throw ProjectMutationError.invalidRequest

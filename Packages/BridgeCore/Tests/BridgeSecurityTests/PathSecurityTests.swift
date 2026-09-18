@@ -19,9 +19,32 @@ final class PathSecurityTests: XCTestCase {
   }
 
   func testRelativePathRejectsTraversalAndAbsoluteForms() {
-    for value in ["../secret", "a/../secret", "/etc/passwd", "~/secret", "file:///tmp/x", "a//b"] {
+    var rejected = [
+      "../secret", "a/../secret", "/etc/passwd", "~/secret", "file:///tmp/x", "a//b",
+    ]
+    #if os(Windows)
+      rejected += [
+        "..\\secret", "a\\..\\secret", "C:\\Windows\\System32", "\\\\server\\share",
+        "config.txt:secret", "CON.txt",
+      ]
+    #endif
+    for value in rejected {
       XCTAssertThrowsError(try SecureRelativePath(value), value)
     }
+    #if os(Windows)
+      XCTAssertEqual(
+        try? SecureRelativePath("Sources\\App.swift").value,
+        "Sources/App.swift"
+      )
+      let sensitivePath = try? SecureRelativePath(".ssh\\id_rsa")
+      XCTAssertEqual(sensitivePath?.value, ".ssh/id_rsa")
+      XCTAssertFalse(sensitivePath.map { SensitivePathPolicy().allows($0) } ?? true)
+    #else
+      XCTAssertEqual(
+        try? SecureRelativePath(".ssh\\id_rsa").value,
+        ".ssh\\id_rsa"
+      )
+    #endif
     XCTAssertNoThrow(try SecureRelativePath("%2e%2e/config.txt"))
   }
 

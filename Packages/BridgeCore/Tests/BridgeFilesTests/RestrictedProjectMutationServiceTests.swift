@@ -8,7 +8,10 @@ import XCTest
 @testable import BridgeFiles
 
 final class RestrictedProjectMutationServiceTests: XCTestCase {
-  private func writeFixture(_ testCase: XCTestCase) async throws -> MutationFixture {
+  private func writeFixture(
+    _ testCase: XCTestCase,
+    forbiddenPatterns: [ForbiddenPathPattern] = []
+  ) async throws -> MutationFixture {
     let root = FileManager.default.temporaryDirectory
       .appending(path: "bridge-mutation-tests-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -23,7 +26,8 @@ final class RestrictedProjectMutationServiceTests: XCTestCase {
           read: .allowed,
           write: .allowed,
           network: .denied
-        )
+        ),
+        forbiddenPatterns: forbiddenPatterns
       )
     )
     return MutationFixture(
@@ -76,6 +80,42 @@ final class RestrictedProjectMutationServiceTests: XCTestCase {
       try String(contentsOf: fixture.root.appending(path: "file.txt"), encoding: .utf8),
       "existing"
     )
+  }
+
+  func testMutationsHonorForbiddenPatterns() async throws {
+    let fixture = try await writeFixture(
+      self,
+      forbiddenPatterns: [try ForbiddenPathPattern("private/**")]
+    )
+    await assertMutationError(
+      try await fixture.service.write(
+        ProjectWriteRequest(
+          projectID: fixture.projectID,
+          relativePath: "private/new.txt",
+          mode: .create,
+          content: "blocked",
+          createParents: true
+        )
+      )
+    ) { error in
+      XCTAssertEqual(error, .forbiddenPath)
+    }
+    await assertMutationError(
+      try await fixture.service.applyPatch(
+        ProjectApplyPatchRequest(
+          projectID: fixture.projectID,
+          operations: [
+            ProjectPatchFileOperation(
+              action: "add",
+              relativePath: "private/patched.txt",
+              hunks: [ProjectPatchHunk(context: "", removals: [], additions: ["blocked"])]
+            )
+          ]
+        )
+      )
+    ) { error in
+      XCTAssertEqual(error, .forbiddenPath)
+    }
   }
 
   func testReplaceRequiresMatchingRevisionAndLeavesFileUntouchedOnConflict() async throws {
@@ -290,6 +330,23 @@ final class RestrictedProjectMutationServiceTests: XCTestCase {
       "original\n"
     )
   }
+
+  #if os(Windows)
+    func testPatchParserRejectsWindowsTraversalAndNormalizesSeparators() throws {
+      XCTAssertThrowsError(
+        try ProjectPatchParser.parse(
+          "*** Begin Patch\n*** Add File: folder\\..\\outside.txt\n+x\n*** End Patch"
+        )
+      ) { error in
+        XCTAssertEqual(error as? ProjectPatchParserError, .malformedFileHeader)
+      }
+
+      let operations = try ProjectPatchParser.parse(
+        "*** Begin Patch\n*** Add File: folder\\new.txt\n+x\n*** End Patch"
+      )
+      XCTAssertEqual(operations.first?.relativePath, "folder/new.txt")
+    }
+  #endif
 
   func testApplyPatchRejectsDuplicatePathsBeforeWriting() async throws {
     let fixture = try await writeFixture(self)
@@ -732,6 +789,20 @@ final class RestrictedProjectMutationServiceTests: XCTestCase {
     let changes = try await fixture.service.changes(projectID: fixture.projectID)
     XCTAssertTrue(changes.notGitRepository)
     XCTAssertTrue(changes.changedFiles.isEmpty)
+  }
+
+  func testChangesParsesPorcelainPathsAndRenames() async throws {
+    let fixture = try await writeFixture(self)
+    try runGit(["init", "-q", "-b", "main"], at: fixture.root)
+    try Data("content\n".utf8).write(to: fixture.root.appending(path: "old name.txt"))
+    try runGit(["add", "--", "old name.txt"], at: fixture.root)
+    try runGit(["commit", "-q", "-m", "init"], at: fixture.root)
+    try runGit(["mv", "--", "old name.txt", "new name.txt"], at: fixture.root)
+
+    let changes = try await fixture.service.changes(projectID: fixture.projectID)
+    XCTAssertTrue(changes.changedFiles.contains("old name.txt"))
+    XCTAssertTrue(changes.changedFiles.contains("new name.txt"))
+    XCTAssertFalse(changes.changedFiles.contains { $0.hasPrefix("R  ") })
   }
 }
 

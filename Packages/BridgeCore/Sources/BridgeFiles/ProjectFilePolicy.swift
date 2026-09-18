@@ -18,8 +18,15 @@ struct ProjectFilePolicy: Sendable {
 
 private enum GlobPathMatcher {
   static func matches(_ path: String, pattern: String) -> Bool {
-    let pathComponents = path.split(separator: "/").map(String.init)
-    let patternComponents = pattern.split(separator: "/").map(String.init)
+    #if os(Windows)
+      let normalizedPath = path.lowercased()
+      let normalizedPattern = pattern.lowercased()
+    #else
+      let normalizedPath = path
+      let normalizedPattern = pattern
+    #endif
+    let pathComponents = normalizedPath.split(separator: "/").map(String.init)
+    let patternComponents = normalizedPattern.split(separator: "/").map(String.init)
     var previous = [Bool](repeating: false, count: pathComponents.count + 1)
     previous[0] = true
 

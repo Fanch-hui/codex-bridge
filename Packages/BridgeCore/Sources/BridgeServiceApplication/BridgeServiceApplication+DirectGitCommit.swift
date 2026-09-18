@@ -248,7 +248,8 @@ extension BridgeServiceApplication {
 
   private static func gitSummary(_ output: DirectCommandOutputBuffer) -> String {
     let tail = output.tail.trimmingCharacters(in: .whitespacesAndNewlines)
-    return tail.isEmpty ? output.head.trimmingCharacters(in: .whitespacesAndNewlines) : tail
+    let summary = tail.isEmpty ? output.head.trimmingCharacters(in: .whitespacesAndNewlines) : tail
+    return OutboundContentSecurity.redacted(summary, maximumUTF8Bytes: 4_096)
   }
 
   private static func indexSynchronizationSummary(_ error: Error) -> String {

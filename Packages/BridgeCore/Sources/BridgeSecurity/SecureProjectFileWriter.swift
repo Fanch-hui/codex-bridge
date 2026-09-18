@@ -80,7 +80,8 @@ public struct SecureProjectFileWriter: Sendable {
         resolver: resolver,
         mode: mode,
         content: content,
-        expectedSHA256: expectedSHA256
+        expectedSHA256: expectedSHA256,
+        createParents: createParents
       )
     #else
       var rootFD = open(
@@ -482,7 +483,8 @@ public struct SecureProjectFileWriter: Sendable {
       resolver: ProjectPathResolver,
       mode: SecureWriteMode,
       content: Data,
-      expectedSHA256: String?
+      expectedSHA256: String?,
+      createParents: Bool
     ) throws -> SecureWriteResult {
       let components = relativePath.components
       switch mode {
@@ -490,7 +492,8 @@ public struct SecureProjectFileWriter: Sendable {
         try WindowsSecureFile.createExclusive(
           root: resolver.root,
           components: components,
-          content: content
+          content: content,
+          createParents: createParents
         )
         return SecureWriteResult(
           mode: .create,
@@ -541,6 +544,8 @@ public struct SecureProjectFileWriter: Sendable {
         default:
           throw error
         }
+      } catch PathSecurityError.pathDoesNotExist {
+        return nil
       }
     }
   #endif

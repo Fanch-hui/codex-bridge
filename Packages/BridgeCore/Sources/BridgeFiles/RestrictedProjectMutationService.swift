@@ -23,6 +23,10 @@ public struct RestrictedProjectMutationService: Sendable {
       destination = try securePath(destinationPath)
     }
     let resolver = ProjectPathResolver(root: project.primaryRoot)
+    let policy = ProjectFilePolicy(forbiddenPatterns: project.forbiddenPatterns)
+    guard policy.allows(path), destination.map(policy.allows) ?? true else {
+      throw ProjectMutationError.forbiddenPath
+    }
 
     let action: SecureDirectoryAction
     switch request.action {
