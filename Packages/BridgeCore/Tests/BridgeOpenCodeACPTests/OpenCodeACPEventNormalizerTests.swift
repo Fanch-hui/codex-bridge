@@ -163,6 +163,32 @@ final class OpenCodeACPEventNormalizerTests: XCTestCase {
     XCTAssertEqual(approval.networkTarget, "https://example.test/api")
   }
 
+  func testCompletedFileToolCarriesRawInputPathAsLocation() async throws {
+    let root = try makeTemporaryDirectory(prefix: "tool-path")
+    defer { try? FileManager.default.removeItem(atPath: root) }
+    let normalizer = try makeNormalizer(projectRoot: root)
+    let notification = OpenCodeACPNotification(
+      method: "session/update",
+      params: .object([
+        "sessionId": .string("session-1"),
+        "update": .object([
+          "sessionUpdate": .string("tool_call_update"),
+          "toolCallId": .string("write-tool"),
+          "title": .string("Write file"),
+          "kind": .string("write"),
+          "status": .string("completed"),
+          "rawInput": .object(["file_path": .string("Sources/main.swift")]),
+        ]),
+      ])
+    )
+
+    let envelope = try await normalizer.normalize(.notification(notification))
+    guard case .tool(let update) = envelope?.event else {
+      return XCTFail("Expected a tool update")
+    }
+    XCTAssertEqual(update.locations, [root + "/Sources/main.swift"])
+  }
+
   func testToolNameUsesSemanticWebSubagentAndThinkCategories() async throws {
     let normalizer = try makeNormalizer()
     let web = try await normalizer.normalize(

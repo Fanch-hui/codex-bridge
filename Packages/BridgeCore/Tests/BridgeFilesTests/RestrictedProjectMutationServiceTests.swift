@@ -10,7 +10,8 @@ import XCTest
 final class RestrictedProjectMutationServiceTests: XCTestCase {
   private func writeFixture(
     _ testCase: XCTestCase,
-    forbiddenPatterns: [ForbiddenPathPattern] = []
+    forbiddenPatterns: [ForbiddenPathPattern] = [],
+    writePermission: ProjectPermission = .allowed
   ) async throws -> MutationFixture {
     let root = FileManager.default.temporaryDirectory
       .appending(path: "bridge-mutation-tests-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -24,7 +25,7 @@ final class RestrictedProjectMutationServiceTests: XCTestCase {
         rootURL: root,
         accessPolicy: ProjectAccessPolicy(
           read: .allowed,
-          write: .allowed,
+          write: writePermission,
           network: .denied
         ),
         forbiddenPatterns: forbiddenPatterns
@@ -789,6 +790,13 @@ final class RestrictedProjectMutationServiceTests: XCTestCase {
     let changes = try await fixture.service.changes(projectID: fixture.projectID)
     XCTAssertTrue(changes.notGitRepository)
     XCTAssertTrue(changes.changedFiles.isEmpty)
+  }
+
+  func testChangesRemainsAvailableToReadOnlyProjects() async throws {
+    let fixture = try await writeFixture(self, writePermission: .denied)
+    let changes = try await fixture.service.changes(projectID: fixture.projectID)
+    XCTAssertTrue(changes.notGitRepository)
+    XCTAssertEqual(changes.diff, "")
   }
 
   func testChangesParsesPorcelainPathsAndRenames() async throws {

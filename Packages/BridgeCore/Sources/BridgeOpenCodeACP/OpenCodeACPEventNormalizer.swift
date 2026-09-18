@@ -180,6 +180,11 @@ public actor OpenCodeACPEventNormalizer {
     }
     if let rawInput = update["rawInput"] {
       state.arguments = rawInput.encodedString()
+      if let input = rawInput.objectValue {
+        state.locations = Array(
+          Set(state.locations + Self.absoluteLocations(from: input, projectRoot: projectRoot))
+        ).sorted()
+      }
     }
     if let output = Self.toolOutput(update["content"]) {
       state.output = output
@@ -188,10 +193,11 @@ public actor OpenCodeACPEventNormalizer {
       guard locations.count <= 128 else { throw OpenCodeACPError.oversizedFrame }
       state.locations = locations.compactMap { value in
         guard let path = value["path"]?.stringValue,
-          AgentPathSemantics.isAbsolute(path)
+          let absolute = Self.absolutePath(path, projectRoot: projectRoot)
         else { return nil }
-        return path
+        return absolute
       }
+      state.locations = Array(Set(state.locations)).sorted()
     }
     let name = Self.semanticToolName(title: state.title, kind: state.kind)
     let payload = try AgentToolUpdate(
@@ -398,7 +404,9 @@ public actor OpenCodeACPEventNormalizer {
     projectRoot: String?
   ) -> [String] {
     guard let projectRoot else { return [] }
-    let keys = ["path", "filePath", "filepath", "file", "source", "destination"]
+    let keys = [
+      "path", "filePath", "filepath", "file_path", "file", "source", "destination",
+    ]
     let values = keys.compactMap { input[$0]?.stringValue }
     var paths = Set<String>()
     for value in values {

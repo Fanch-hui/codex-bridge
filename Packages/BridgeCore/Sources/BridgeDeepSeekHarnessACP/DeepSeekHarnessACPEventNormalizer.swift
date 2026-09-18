@@ -218,7 +218,8 @@ public actor DeepSeekHarnessACPEventNormalizer {
       title: state.title,
       kind: state.kind,
       status: state.status,
-      arguments: state.rawInput?.encodedString()
+      arguments: state.rawInput?.encodedString(),
+      locations: Self.absoluteLocations(from: state.rawInput, projectRoot: projectRoot)
     )
     tools[update.toolCallID] = state
     return try envelope(.tool(payload))
@@ -261,7 +262,9 @@ public actor DeepSeekHarnessACPEventNormalizer {
     projectRoot: String?
   ) -> [String] {
     guard let projectRoot, let input = value?.objectValue else { return [] }
-    let keys = ["path", "filePath", "filepath", "file", "source", "destination"]
+    let keys = [
+      "path", "filePath", "filepath", "file_path", "file", "source", "destination",
+    ]
     var paths = Set<String>()
     for key in keys {
       guard let value = input[key]?.stringValue,
@@ -274,6 +277,16 @@ public actor DeepSeekHarnessACPEventNormalizer {
       paths.insert(path)
     }
     return paths.sorted()
+  }
+
+  private static func absoluteLocations(
+    from value: ACPJSONValue?,
+    projectRoot: String?
+  ) -> [String] {
+    guard let projectRoot else { return [] }
+    return relativePaths(from: value, projectRoot: projectRoot).compactMap {
+      try? DeepSeekHarnessACPPathSupport.append($0, to: projectRoot)
+    }
   }
 
   private static func safeNetworkTarget(_ value: String?) -> String? {

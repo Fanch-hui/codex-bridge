@@ -51,6 +51,9 @@ extension ServiceExecutionCoordinator {
       permissionMode: task.permissionMode,
       networkAllowed: task.networkAllowed
     )
+    let workspaceChangeTracker = ServiceWorkspaceChangeTracker(
+      projectRoot: project.root.canonicalPath
+    )
     let handle: AgentTaskRunHandle
     do {
       handle = try await runner.start(brief)
@@ -94,10 +97,14 @@ extension ServiceExecutionCoordinator {
         shutdown: handle.shutdown,
         resolveApproval: handle.resolveApproval
       )
+      if let workspaceChangeTracker {
+        workspaceChangeTrackers[task.id] = workspaceChangeTracker
+      }
       await conversation.appendUserMessage(taskID: task.id, content: task.prompt)
       try ensureStartIsActive(task.id)
     } catch {
       activeAgentRuns.removeValue(forKey: task.id)
+      workspaceChangeTrackers.removeValue(forKey: task.id)
       await handle.shutdown()
       if !finishedRuns.contains(task.id), !isShuttingDown {
         let conversationPersisted = await conversation.close(taskID: task.id)
@@ -140,6 +147,7 @@ extension ServiceExecutionCoordinator {
 
       case .completed(let summary, let stopReason):
         try await finishAgentRun(taskID: taskID) {
+          try await persistWorkspaceChanges(taskID: taskID)
           try await closeConversation(taskID: taskID)
           let current = try await requiredTask(taskID)
           return try await tasks.complete(
@@ -152,6 +160,7 @@ extension ServiceExecutionCoordinator {
 
       case .interrupted:
         try await finishAgentRun(taskID: taskID) {
+          try await persistWorkspaceChanges(taskID: taskID)
           try await closeConversation(taskID: taskID)
           return try await tasks.interrupt(
             taskID: taskID,
@@ -161,6 +170,7 @@ extension ServiceExecutionCoordinator {
 
       case .failed(let code, let summary):
         try await finishAgentRun(taskID: taskID) {
+          try await persistWorkspaceChanges(taskID: taskID)
           await conversation.appendAgentMessage(taskID: taskID, content: summary)
           try await closeConversation(taskID: taskID)
           return try await tasks.fail(
@@ -172,6 +182,7 @@ extension ServiceExecutionCoordinator {
       }
     } catch {
       finishedRuns.insert(taskID)
+      workspaceChangeTrackers.removeValue(forKey: taskID)
       pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
       if let run = activeAgentRuns.removeValue(forKey: taskID) {
         await run.shutdown()
@@ -209,6 +220,7 @@ extension ServiceExecutionCoordinator {
     if let run = activeAgentRuns.removeValue(forKey: taskID) {
       await run.shutdown()
     }
+    try? await persistWorkspaceChanges(taskID: taskID)
     _ = await conversation.close(taskID: taskID)
     let summary: String
     let failureCode: String
@@ -223,6 +235,23 @@ extension ServiceExecutionCoordinator {
       taskID: taskID,
       failureCode: failureCode,
       summary: summary
+    )
+  }
+
+  private func persistWorkspaceChanges(taskID: TaskID) async throws {
+    guard let tracker = workspaceChangeTrackers.removeValue(forKey: taskID),
+      let task = try await tasks.task(id: taskID)
+    else {
+      return
+    }
+    let observed = tracker.changedFiles()
+    guard !observed.isEmpty else { return }
+    let changedFiles = Array(Set(task.state.changedFiles + observed)).sorted()
+    guard changedFiles != task.state.changedFiles else { return }
+    _ = try await tasks.recordChangedFiles(
+      taskID: taskID,
+      relativePaths: changedFiles,
+      summary: "The agent changed project files."
     )
   }
 

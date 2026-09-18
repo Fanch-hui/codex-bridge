@@ -9,6 +9,46 @@ import XCTest
 @testable import BridgeDeepSeekHarnessACP
 
 final class DeepSeekHarnessACPEventNormalizerTests: XCTestCase {
+  func testCompletedFileToolCarriesRawInputPathAsLocation() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "bridge-dsh-path-(UUID().uuidString)",
+      directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let binding = try AgentBinding(
+      providerID: .deepSeekHarness,
+      installationID: .init(rawValue: "installation"),
+      providerSessionID: "session",
+      providerRunID: "run"
+    )
+    let normalizer = DeepSeekHarnessACPEventNormalizer(
+      taskID: .init(rawValue: "task"),
+      binding: binding,
+      projectRoot: root.path
+    )
+
+    let envelope = try await normalizer.normalize(
+      .init(
+        sequence: 0,
+        event: .toolUpdated(
+          .init(
+            sessionID: "session",
+            toolCallID: "tool",
+            title: "Write file",
+            kind: "write",
+            status: .completed,
+            rawInput: .object(["file_path": .string("Sources/main.swift")])
+          )
+        )
+      )
+    )
+    guard case .tool(let update) = envelope?.event else {
+      return XCTFail("Expected a tool update")
+    }
+    XCTAssertEqual(update.locations, [root.path + "/Sources/main.swift"])
+  }
+
   func testFinalResponseAfterToolIsOrderedAfterToolInSQLite() async throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "bridge-dsh-order-\(UUID().uuidString)",

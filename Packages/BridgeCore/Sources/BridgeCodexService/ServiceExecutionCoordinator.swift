@@ -33,6 +33,7 @@ public actor ServiceExecutionCoordinator {
   let providerDisplayNameResolver: @Sendable (AgentProviderID) -> String
   var collectors: [TaskID: Task<Void, Never>] = [:]
   var activeAgentRuns: [TaskID: ActiveAgentRun] = [:]
+  var workspaceChangeTrackers: [TaskID: ServiceWorkspaceChangeTracker] = [:]
   var pendingAgentApprovals: [String: PendingAgentApproval] = [:]
   var finishedRuns: Set<TaskID> = []
   private var startingTasks: Set<TaskID> = []
@@ -211,6 +212,7 @@ public actor ServiceExecutionCoordinator {
   ) async {
     startingTasks.remove(taskID)
     finishedRuns.insert(taskID)
+    workspaceChangeTrackers.removeValue(forKey: taskID)
     collectors.removeValue(forKey: taskID)?.cancel()
     await stopAgentRun(taskID: taskID)
     await execution.stop(taskID: taskID)
@@ -236,6 +238,7 @@ public actor ServiceExecutionCoordinator {
     for task in executionTasks { task.cancel() }
     let shutdowns = activeAgentRuns.values.map(\.shutdown)
     activeAgentRuns.removeAll(keepingCapacity: false)
+    workspaceChangeTrackers.removeAll(keepingCapacity: false)
     for shutdown in shutdowns {
       await shutdown()
     }
@@ -252,6 +255,7 @@ public actor ServiceExecutionCoordinator {
 
   private func stopAgentRun(taskID: TaskID) async {
     finishedRuns.insert(taskID)
+    workspaceChangeTrackers.removeValue(forKey: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
     if let run = activeAgentRuns.removeValue(forKey: taskID) {
       await run.shutdown()
