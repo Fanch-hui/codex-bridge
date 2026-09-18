@@ -22,6 +22,6 @@ Platform adapters handle filesystem identity, process creation, IPC access, and 
 
 ## Release verification
 
-Release downloads include SHA-256 checksums. macOS packages are architecture-specific and use ad-hoc code signatures; v0.5.0 is not Apple-notarized. Windows packages include architecture-matched runtime components and a payload manifest.
+Release downloads include SHA-256 checksums. macOS packages are architecture-specific and use ad-hoc code signatures; v1.0.0 is not Apple-notarized. Windows packages include architecture-matched runtime components and a payload manifest.
 
 The build verifies packaged helper identities and binary architecture. These checks do not replace project permissions or operating-system security controls.

@@ -1,6 +1,6 @@
 # Antigravity / AGY 连接与权限指南
 
-权限隔离说明适用于包含修复的后续构建；v0.5.0 安装包仍对应原始发布提交。
+适用于 Codex Bridge v1.0.0。
 本指南说明如何让 Antigravity CLI 在 Codex Bridge 中正常完成只读分析、联网检索和项目写入。Bridge 使用的是 `agy` CLI 的 headless `stream-json` 模式，不是 Antigravity Desktop App。
 
 Provider ID 固定为：

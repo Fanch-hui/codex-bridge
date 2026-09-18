@@ -4,7 +4,7 @@ umask 077
 
 readonly script_directory="${0:A:h}"
 readonly repository_root="${script_directory:h}"
-readonly product_version="0.5.0"
+readonly product_version="1.0.0"
 
 if (( $# < 3 || $# > 4 )); then
   print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64|x86_64|all]"
