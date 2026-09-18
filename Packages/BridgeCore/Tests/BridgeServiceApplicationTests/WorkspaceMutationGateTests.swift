@@ -304,6 +304,73 @@ final class WorkspaceMutationGateTests: XCTestCase {
     await lease.release()
   }
 
+  func testAppUpdateAdmissionBlocksNewTasksUntilCancelled() async throws {
+    let gate = ServiceWorkspaceMutationGate()
+    let taskToken = try await gate.beginTaskAdmission()
+    let blockedByTask = await gate.beginAppUpdate()
+    XCTAssertFalse(blockedByTask)
+    await gate.endTaskAdmission(token: taskToken)
+
+    let prepared = await gate.beginAppUpdate()
+    XCTAssertTrue(prepared)
+    let remainsPrepared = await gate.appUpdatePrepared()
+    XCTAssertTrue(remainsPrepared)
+    do {
+      _ = try await gate.beginTaskAdmission()
+      XCTFail("A prepared app update must reject new task admissions")
+    } catch let error as BridgeMCPQueryError {
+      XCTAssertEqual(error, .busy)
+    }
+
+    await gate.cancelAppUpdate()
+    let reopened = try await gate.beginTaskAdmission()
+    await gate.endTaskAdmission(token: reopened)
+  }
+
+  func testAppUpdateAdmissionWaitsForDirectLease() async throws {
+    let gate = ServiceWorkspaceMutationGate()
+    let tasks = ServiceTaskManager(store: try SimpleServiceStore.inMemory())
+    let lease = try await gate.acquireDirectLease(
+      projectID: projectID("prj-update"),
+      owner: .directCommand(sessionID: "cmd-update"),
+      activeCodexWriteTask: {
+        try await tasks.activeWriteTask(projectID: ProjectID(rawValue: "prj-update"))
+      }
+    )
+
+    let blockedByLease = await gate.beginAppUpdate()
+    XCTAssertFalse(blockedByLease)
+    await lease.release()
+    let prepared = await gate.beginAppUpdate()
+    XCTAssertTrue(prepared)
+    await gate.cancelAppUpdate()
+  }
+
+  func testApplicationUpdatePreparationWaitsForNonterminalTask() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceModelCatalogScript
+    )
+    let submission = try await fixture.tasks.submit(
+      ServiceTaskRequest(
+        projectID: fixture.project.id,
+        source: .macOSApp,
+        prompt: "Active task",
+        executionModel: "model-a",
+        executionEffort: "high",
+        permissionMode: .workspaceWrite
+      )
+    )
+
+    let blockedByTask = try await application.prepareAppUpdate()
+    XCTAssertFalse(blockedByTask)
+    _ = try await fixture.tasks.denyStart(taskID: submission.task.id)
+    let prepared = try await application.prepareAppUpdate()
+    XCTAssertTrue(prepared)
+    try await application.cancelAppUpdate()
+  }
+
   func testReadProjectFileReturnsFullFileDigestAndRevision() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     let source = fixture.root.appending(path: "Feature.swift")

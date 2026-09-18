@@ -12,6 +12,12 @@
         return nil
       case .refresh:
         return .refreshAll
+      case .checkAppUpdate:
+        return .checkAppUpdate
+      case .installAppUpdate:
+        return .installAppUpdate
+      case .deferAppUpdate:
+        return .deferAppUpdate
       case .refreshModels:
         return .refreshModels
       case .selectPage:

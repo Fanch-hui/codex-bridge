@@ -609,6 +609,7 @@ let package = Package(
       dependencies: [
         "BridgeIPC",
         "BridgeMCP",
+        .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
     .target(

@@ -220,6 +220,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleDisconnectTunnel(request)
     case .clearTunnel:
       return try await handleClearTunnel(request)
+    case .prepareAppUpdate:
+      return try await handlePrepareAppUpdate(request)
+    case .cancelAppUpdate:
+      return try await handleCancelAppUpdate(request)
     case .shutdownService:
       #if os(Windows)
         return try handleShutdownService(request)

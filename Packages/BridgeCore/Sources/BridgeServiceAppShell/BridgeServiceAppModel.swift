@@ -84,6 +84,8 @@ struct AgentModelCatalogScope: Equatable {
 
 @MainActor
 public final class BridgeServiceAppModel: ObservableObject {
+  @Published var appUpdateState: BridgeDesktopAppUpdateState?
+  lazy var appUpdater = makeAppUpdater()
   @Published public var selection: BridgeServiceNavigation? = .overview {
     didSet { updateChatBrowserVisibility() }
   }

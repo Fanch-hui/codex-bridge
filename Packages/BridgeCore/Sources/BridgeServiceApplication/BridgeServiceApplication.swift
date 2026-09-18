@@ -32,6 +32,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let mutations: RestrictedProjectMutationService
   let runtimeStatus: ServiceRuntimeStatus
   let workspaceGate: ServiceWorkspaceMutationGate
+  var appUpdatePreparationTask: Task<Bool, Error>?
   public let commandPolicy: DirectCommandPolicy
   public let directCommands: DirectCommandSessionManager
   public let approvals: DirectActionApprovalCenter
@@ -74,6 +75,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
       mutations
       ?? RestrictedProjectMutationService(repository: repository)
     self.workspaceGate = workspaceGate ?? ServiceWorkspaceMutationGate()
+    self.appUpdatePreparationTask = nil
     self.commandPolicy = commandPolicy
     self.directCommands = directCommands
     self.approvals = approvals

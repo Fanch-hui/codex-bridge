@@ -23,7 +23,8 @@
       browserStatus: String? = nil,
       browserCanGoBack: Bool = false,
       browserCanGoForward: Bool = false,
-      feedback: BridgeDesktopFeedback? = nil
+      feedback: BridgeDesktopFeedback? = nil,
+      appUpdate: BridgeDesktopAppUpdateState? = nil
     ) -> BridgeDesktopUIState {
       let modelRefreshInProgress = settings?.isRefreshingModels == true
       let canRefreshModels = settings?.busy != true
@@ -126,7 +127,8 @@
           )
         ) {
           settingsPage(settings: settings, agentDefaults: agentDefaults)
-        }
+        },
+        appUpdate: appUpdate
       )
     }
 

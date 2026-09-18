@@ -3,6 +3,9 @@ import Foundation
 public enum BridgeDesktopCommand: String, Codable, Sendable {
   case ready
   case refresh
+  case checkAppUpdate
+  case installAppUpdate
+  case deferAppUpdate
   case refreshModels
   case selectPage
   case openWorkbench

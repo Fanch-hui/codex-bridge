@@ -12,12 +12,15 @@
     return stack;
   }
 
-  function create(container, page, emit) {
+  function create(container, page, emit, updateState) {
     S.clear(container);
     var header = S.node("div");
     container.appendChild(header);
     var content = S.node("div", "settings-content-stack");
     container.appendChild(content);
+    var appUpdate = global.CodexBridgeDesktopAppUpdate
+      ? global.CodexBridgeDesktopAppUpdate.createSettings(updateState, emit) : null;
+    if (appUpdate) content.appendChild(appUpdate.root);
     var models = group(content, "Agent模型与权限", "page-card settings-card");
     var preferences = M.preferences(page, emit, true);
     var agents = global.CodexBridgeDesktopSettingsAgents.create(page, emit, true);
@@ -41,10 +44,11 @@
     S.empty(unavailable, "设置页暂不可用", "连接本机 Service 后，可以配置模型、安全审批与后台服务。");
     container.appendChild(unavailable);
     return {
-      update: function (next, nextEmit) {
+      update: function (next, nextEmit, nextUpdateState) {
         content.hidden = !next;
         unavailable.hidden = !!next;
         S.pageHeader(header, next ? next.header : { title: "设置", subtitle: "正在从本机 Service 读取偏好设置。", symbol: "gearshape" });
+        if (appUpdate) appUpdate.update(nextUpdateState, nextEmit);
         if (!next) return;
         direct.update(next.direct, nextEmit);
         preferences.update(next, nextEmit);
@@ -58,14 +62,14 @@
     };
   }
 
-  function render(page, emit) {
+  function render(page, emit, updateState) {
     var container = document.getElementById("settings-content");
     if (!container.__settingsEditor && !page) {
       S.empty(container, "设置页暂不可用", "连接本机 Service 后，可以配置模型、安全审批与后台服务。");
       return;
     }
-    if (!container.__settingsEditor) container.__settingsEditor = create(container, page, emit);
-    container.__settingsEditor.update(page, emit);
+    if (!container.__settingsEditor) container.__settingsEditor = create(container, page, emit, updateState);
+    container.__settingsEditor.update(page, emit, updateState);
   }
 
   function approvalCard(page, emit) {

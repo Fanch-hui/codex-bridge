@@ -8,6 +8,7 @@ extension BridgeServiceAppModel {
   func startAsync() async {
     guard !started, !stopped else { return }
     started = true
+    startAppUpdateCheck()
     registrationStatus = registration.status
     switch registrationStatus {
     case .enabled:
@@ -25,6 +26,7 @@ extension BridgeServiceAppModel {
   public func shutdownUI() async {
     guard !stopped else { return }
     stopped = true
+    appUpdater.cancel()
     started = false
     pollingTask?.cancel()
     pollingTask = nil

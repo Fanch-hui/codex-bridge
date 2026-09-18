@@ -115,6 +115,13 @@
     renderServices(overview.services, overview.serviceActions);
     renderRecentTasks(overview.recentTasks);
     renderNotices(overview.notices);
+    if (window.CodexBridgeDesktopAppUpdate) {
+      window.CodexBridgeDesktopAppUpdate.renderOverview(
+        document.getElementById("app-update"),
+        state && state.appUpdate,
+        emit
+      );
+    }
   }
 
   function renderServices(rows, actions) {

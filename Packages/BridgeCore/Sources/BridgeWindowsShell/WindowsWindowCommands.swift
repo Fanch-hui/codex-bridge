@@ -18,6 +18,9 @@
     case selectPage(index: Int)
     case windowVisibilityChanged(Bool)
     case refreshAll
+    case checkAppUpdate
+    case installAppUpdate
+    case deferAppUpdate
     case refreshModels
     case openTask(id: String)
     case browserBack

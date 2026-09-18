@@ -18,6 +18,8 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     -> IPCDirectConfiguration
 
   func status() async throws -> IPCServiceStatusResponse
+  func prepareAppUpdate() async throws -> Bool
+  func cancelAppUpdate() async throws
   func projects() async throws -> [MCPProjectSummary]
   func registerProject(_ request: IPCProjectRegistrationRequest) async throws -> MCPProjectDetail
   func updateProjectPolicy(_ request: IPCProjectPolicyRequest) async throws -> MCPProjectDetail
@@ -159,6 +161,14 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func prepareAppUpdate() async throws -> Bool {
+    throw BridgeServiceClientError.serviceRestartRequired
+  }
+
+  public func cancelAppUpdate() async throws {
+    throw BridgeServiceClientError.serviceRestartRequired
+  }
+
   public func directConfiguration() async throws -> IPCDirectConfiguration {
     throw BridgeServiceClientError.unavailable
   }

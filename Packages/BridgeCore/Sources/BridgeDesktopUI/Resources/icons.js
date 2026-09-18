@@ -9,6 +9,8 @@
     "gearshape": '<circle cx="12" cy="12" r="3"/><path d="m19 13 2-1-2-1-.5-2 1-1.7-2.3-2.3-1.7 1-2-.5-1-2-1 2-2 .5-1.7-1L5.5 6.3l1 1.7-.5 2-2 1 2 1 .5 2-1 1.7 2.3 2.3 1.7-1 2 .5 1 2 1-2 2-.5 1.7 1 2.3-2.3-1-1.7z"/>',
     "sidebar.left": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M6 8h1M6 11h1"/>',
     "arrow.clockwise": '<path d="M20 11a8 8 0 0 0-14-4L4 9"/><path d="M4 5v4h4M4 13a8 8 0 0 0 14 4l2-2"/><path d="M20 19v-4h-4"/>',
+    "arrow.down.circle": '<circle cx="12" cy="12" r="9"/><path d="M12 6v9m-4-3 4 4 4-4"/>',
+    "exclamationmark.triangle.fill": '<path d="m12 3 9 17H3z"/><path d="M12 8v6M12 17v.5"/>',
     "bolt.fill": '<path d="m13 2-8 11h6l-1 9 8-12h-6z"/>',
     "shield.lefthalf.filled": '<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="M12 3v18"/>',
     "cpu.fill": '<rect x="7" y="7" width="10" height="10" rx="1"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/>',

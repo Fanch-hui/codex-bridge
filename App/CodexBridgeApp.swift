@@ -8,6 +8,7 @@ struct CodexBridgeApp: App {
   @StateObject private var model: BridgeServiceAppModel
 
   init() {
+    MacAppUpdateHelper.runIfRequested()
     let model = BridgeServiceAppModel()
     _model = StateObject(wrappedValue: model)
     appDelegate.install(model)

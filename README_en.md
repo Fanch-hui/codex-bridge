@@ -22,6 +22,8 @@ The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks t
 
 Upgrades preserve application data and the embedded browser profile. Closing the Windows main window keeps the tray icon; use the tray menu to exit.
 
+Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
+
 ## User guides
 
 - [Complete user guide (Chinese)](./docs/USER_GUIDE.md)

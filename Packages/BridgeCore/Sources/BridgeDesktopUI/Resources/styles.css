@@ -170,6 +170,27 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .notice h4 { margin: 0; font-size: 14px; }
 .notice p { margin: 3px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 19px; }
 
+.app-update { margin-top: 14px; }
+.app-update-card, .app-update-state { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 11px 13px; border: 1px solid; border-radius: 9px; }
+.app-update-card { color: var(--accent); border-color: rgba(8, 125, 245, .24); background: var(--accent-soft); }
+.app-update-card.app-update-phase-available, .app-update-card.app-update-phase-waiting { color: var(--warning); border-color: rgba(232, 139, 0, .24); background: var(--warning-soft); }
+.app-update-card.app-update-phase-failed { color: var(--error); border-color: rgba(224, 68, 68, .24); background: var(--error-soft); }
+.app-update-state { margin-top: 10px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--separator); border-radius: 0; color: var(--accent); }
+.app-update-state.app-update-phase-available, .app-update-state.app-update-phase-waiting { color: var(--warning); }
+.app-update-state.app-update-phase-failed { color: var(--error); }
+.app-update-copy { min-width: 0; }
+.app-update-heading { margin: 0; color: var(--text); font-size: 13px; font-weight: 650; }
+.app-update-version, .app-update-notes, .app-update-message { margin: 3px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.app-update-notes { white-space: pre-wrap; }
+.app-update-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
+.app-update-card .app-update-actions .button:not(.primary) { color: var(--text); }
+.app-update-progress-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--text-secondary); font-size: 11px; }
+.app-update-progress { width: min(280px, 100%); height: 6px; accent-color: var(--accent); }
+.app-update-progress-label { min-width: 34px; font-variant-numeric: tabular-nums; }
+.app-update-spinner { width: 13px; height: 13px; flex: 0 0 13px; border: 2px solid var(--separator); border-top-color: var(--accent); border-radius: 50%; animation: rotate .8s linear infinite; }
+.app-update-settings-card > .app-update-version { margin: -5px 0 0; }
+.app-update-settings-card .app-update-actions { justify-content: flex-start; }
+
 .empty-state, .loading-state { display: grid; place-items: center; gap: 10px; min-height: 280px; color: var(--text-secondary); text-align: center; }
 .empty-state h2 { margin: 0; color: var(--text); font-size: 20px; }
 .empty-state p { margin: 0; }
@@ -194,6 +215,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 @media (max-width: 560px) {
   .metrics-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .app-update-card, .app-update-state { grid-template-columns: 22px minmax(0, 1fr); }
+  .app-update-actions { grid-column: 2; justify-content: flex-start; }
 }
 
 .sidebar-collapsed { grid-template-columns: 76px minmax(0, 1fr); }

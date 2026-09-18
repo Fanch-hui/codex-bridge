@@ -10,6 +10,12 @@ enum BridgeDesktopCommandRouter {
     model: BridgeServiceAppModel
   ) {
     switch envelope.command {
+    case .checkAppUpdate:
+      model.appUpdater.check()
+    case .installAppUpdate:
+      model.appUpdater.install()
+    case .deferAppUpdate:
+      model.appUpdater.deferUpdate()
     case .saveDirectConfiguration:
       model.saveDirectConfiguration(envelope.payload.value)
     case .openExternalURL:

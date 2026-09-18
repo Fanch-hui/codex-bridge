@@ -57,7 +57,7 @@
           model.displayBox.revision, management.displayBox.revision,
           auxiliary.workspace.displayBox.revision, auxiliary.agentDefaults.displayBox.revision,
           auxiliary.logs.displayBox.revision, auxiliary.settings.displayBox.revision,
-          auxiliary.connections.displayBox.revision,
+          auxiliary.connections.displayBox.revision, appUpdateRevision,
         ],
         page: selectedPage,
         feedback: model.feedback.current,
@@ -86,7 +86,8 @@
         browserStatus: browserStatus(for: chat),
         browserCanGoBack: chat.canGoBack,
         browserCanGoForward: chat.canGoForward,
-        feedback: model.feedback.current
+        feedback: model.feedback.current,
+        appUpdate: appUpdateState,
       )
       let snapshot = WindowsDesktopRenderSnapshot(
         state: state,

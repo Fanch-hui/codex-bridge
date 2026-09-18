@@ -25,7 +25,8 @@ enum BridgeDesktopUIStateBuilder {
       projects: projects(from: model),
       logs: logs(from: model),
       connections: connections(from: model),
-      settings: settings(from: model)
+      settings: settings(from: model),
+      appUpdate: model.appUpdateState
     )
   }
 

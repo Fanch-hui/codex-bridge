@@ -14,6 +14,7 @@
       let model = WindowsWorkbenchModel(feedback: feedback)
       let management = WindowsManagementModel(client: model.client, feedback: feedback)
       let auxiliary = WindowsAuxiliaryRuntime(client: model.client, feedback: feedback)
+      startAppUpdateCheck(model: model)
       model.onConnected = { [weak model, weak management, weak auxiliary] in
         guard let model, !model.isShuttingDown,
           let management, let auxiliary
@@ -85,6 +86,12 @@
         refresh(page: page, model: model, management: management, auxiliary: auxiliary)
       case .refreshAll:
         refreshAll(model: model, management: management, auxiliary: auxiliary)
+      case .checkAppUpdate:
+        appUpdater?.check()
+      case .installAppUpdate:
+        appUpdater?.install()
+      case .deferAppUpdate:
+        appUpdater?.deferUpdate()
       case .openTask(let id):
         model.selectTask(id: id)
         synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)

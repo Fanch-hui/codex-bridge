@@ -70,6 +70,8 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case connectTunnel = "connect_tunnel"
   case disconnectTunnel = "disconnect_tunnel"
   case clearTunnel = "clear_tunnel"
+  case prepareAppUpdate = "prepare_app_update"
+  case cancelAppUpdate = "cancel_app_update"
   case shutdownService = "shutdown_service"
 }
 
@@ -183,6 +185,18 @@ public struct IPCServiceShutdownResponse: Codable, Equatable, Sendable {
   private enum CodingKeys: String, CodingKey {
     case processID = "process_id"
     case imagePath = "image_path"
+  }
+}
+
+public struct IPCAppUpdatePreparationResponse: Codable, Equatable, Sendable {
+  public let canInstall: Bool
+
+  public init(canInstall: Bool) {
+    self.canInstall = canInstall
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case canInstall = "can_install"
   }
 }
 

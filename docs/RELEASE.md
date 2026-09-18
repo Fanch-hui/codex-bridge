@@ -1,5 +1,35 @@
 # Release Process
 
+## App 更新清单
+
+桌面 App 每次进程启动读取一次 GitHub Release 的 `latest.json`，设置页支持手动检查。
+macOS 自动更新使用根目录包含 `CodexBridge.app` 的 ZIP；Windows 安装版使用 EXE，
+portable 使用 ZIP。安装前等待任务与 Direct 操作结束，并由 Service 暂停新任务进入。
+
+`Scripts/build-release-candidate.sh` 从 `Config/Base.xcconfig` 读取版本，并生成 macOS
+产物的清单。收齐本次发布的 Windows 与 macOS 产物后，用同一脚本生成最终合并清单，例如：
+
+```bash
+python3 Scripts/generate-update-manifest.py \
+  --output /absolute/release/latest.json \
+  --version 1.0.1 --tag v1.0.1 \
+  --notes-file /absolute/release/notes.md \
+  --asset macos arm64 app /absolute/release/CodexBridge-1.0.1-macos-arm64.zip \
+  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-1.0.1-Setup.exe \
+  --asset windows x64 portable /absolute/release/codex-bridge-windows-x64.zip
+```
+
+Intel macOS 的 architecture 为 `x64`；Windows ARM64 为 `arm64`。每个清单条目包含
+固定版本的 GitHub 下载地址、完整文件大小与 SHA-256，客户端仅选择精确匹配的条目。
+安装包、App 运行版本与 Release tag 必须一致。
+
+在 GitHub 草稿 Release 中上传全部安装包与最终清单，再发布为稳定版。已有 Release
+补齐产物时，最后上传 `latest.json`。清单生成后保持对应安装包内容不变。
+首次启用内置更新需要用户手动安装一次含更新模块的版本。
+
+本地验证覆盖版本和安装包校验、更新等待门禁、程序替换及编译；发布验收使用旧版本
+带项目、会话和浏览器 profile 升级，手动确认重启后的版本与原数据。
+
 v0.4.0 的公开包按开源预览方案发布：`arm64` 与 `x86_64` 分别打包，不配置 Apple Developer ID、不公证，也不上传签名凭据。下载者首次打开 App 时需要手动确认 Gatekeeper 提示。本文同时保留未来配置证书后的签名流程，避免把两种发布边界混在一起。
 
 ## 1. Prepare and verify the pinned helper
