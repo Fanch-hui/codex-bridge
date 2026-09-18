@@ -42,6 +42,74 @@ final class ServiceAgentAutoDiscoveryTests: XCTestCase {
     )
   }
 
+  #if !os(Windows)
+    func testDeepSeekDiscoveryFindsPATHSymlinkToBuiltEntry() throws {
+      let root = FileManager.default.temporaryDirectory.appending(
+        path: "bridge-dsh-path-launcher-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+      )
+      let sourceEntry = root.appendingPathComponent("source/apps/cli/lib/bin.js")
+      let pathDirectory = root.appendingPathComponent("bin", isDirectory: true)
+      let launcher = pathDirectory.appendingPathComponent("dsh")
+      try FileManager.default.createDirectory(
+        at: sourceEntry.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      try FileManager.default.createDirectory(at: pathDirectory, withIntermediateDirectories: true)
+      try Data("#!/usr/bin/env node\n".utf8).write(to: sourceEntry)
+      try FileManager.default.createSymbolicLink(
+        atPath: launcher.path,
+        withDestinationPath: sourceEntry.path
+      )
+      defer { try? FileManager.default.removeItem(at: root) }
+
+      let summary = try ServiceAgentAutoDiscovery.discoverySummary(
+        providerID: .deepSeekHarness,
+        existingInstallations: [],
+        environment: ["HOME": "/empty", "PATH": pathDirectory.path]
+      )
+
+      XCTAssertEqual(summary.state, "discovered")
+      XCTAssertEqual(summary.executablePath, sourceEntry.standardizedFileURL.path)
+    }
+  #endif
+
+  #if os(Windows)
+    func testDeepSeekDiscoveryFindsWindowsLauncherTarget() throws {
+      let root = FileManager.default.temporaryDirectory.appending(
+        path: "bridge-dsh-windows-launcher-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+      )
+      let sourceEntry = root.appendingPathComponent("source/apps/cli/lib/bin.js")
+      let pathDirectory = root.appendingPathComponent("pnpm", isDirectory: true)
+      let launcher = pathDirectory.appendingPathComponent("dsh.cmd")
+      try FileManager.default.createDirectory(
+        at: sourceEntry.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      try FileManager.default.createDirectory(at: pathDirectory, withIntermediateDirectories: true)
+      try Data("#!/usr/bin/env node\n".utf8).write(to: sourceEntry)
+      try Data(
+        "@echo off\r\nSET dp0=%~dp0\r\n\"%dp0%..\\source\\apps\\cli\\lib\\bin.js\" %*\r\n".utf8
+      )
+      .write(to: launcher)
+      defer { try? FileManager.default.removeItem(at: root) }
+
+      let summary = try ServiceAgentAutoDiscovery.discoverySummary(
+        providerID: .deepSeekHarness,
+        existingInstallations: [],
+        environment: [
+          "USERPROFILE": root.path,
+          "PNPM_HOME": pathDirectory.path,
+          "PATH": "C:\\empty",
+        ]
+      )
+
+      XCTAssertEqual(summary.state, "discovered")
+      XCTAssertEqual(summary.executablePath, sourceEntry.standardizedFileURL.path)
+    }
+  #endif
+
   func testDiscoveryCatalogCachesUntilForcedRefresh() async throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "bridge-discovery-cache-\(UUID().uuidString)",

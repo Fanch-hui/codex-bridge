@@ -2,7 +2,7 @@
 
 This guide describes the DeepSeek Harness (DSH) setup supported by Bridge. The [Chinese guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) contains the most detailed troubleshooting and task examples.
 
-The shortest path is: build DSH from the official repository, open `Connections → Local Agent Engine Connections → DeepSeek Harness`, enter the Base URL and API key, connect it, then refresh the model list in Settings. macOS and Windows use the same flow. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
+The shortest path is: build DSH from the official repository, set `DEEPSEEK_HARNESS_ROOT` to the source root, open `Connections → Local Agent Engine Connections → DeepSeek Harness`, enter the Base URL and API key, connect it, then refresh the model list in Settings. macOS and Windows use the same flow. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
 
 The provider ID is:
 
@@ -75,6 +75,20 @@ Test-Path .\apps\cli\lib\bin.js
 ```text
 <dsh-source>/apps/cli/lib/bin.js
 ```
+
+After building, provide the current source root explicitly. On macOS, Linux, or Git Bash:
+
+```bash
+export DEEPSEEK_HARNESS_ROOT="$PWD"
+```
+
+In Windows PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
+```
+
+The Bridge Service must inherit the new environment: on Windows, sign in again before launching the App; on macOS, `export` applies only to the current terminal and its child processes. Desktop App users can directly select the built entry under `Advanced: Register an existing installation`. The connection page also reads a real `dsh` launcher or symlink from PATH. On Windows it checks the standard user bin directories for pnpm/npm/yarn `dsh.cmd`/`dsh.bat` launchers, reads their DSH target without executing the wrapper, and then validates the complete source tree, lockfile, and Node runtime. Use `Advanced: Register an existing installation` for another custom location.
 
 Bridge runs this entry as `--profile acp --patch <Bridge private runtime configuration>`. It creates a private patch for each run and leaves your original profile unchanged.
 
@@ -272,6 +286,7 @@ Choose Continue conversation on an ended task to retain its context after a Serv
 | Invalid artifact | Use the official built `apps/cli/lib/bin.js`; retain the full source tree |
 | Unsupported Node | Use Node 22.19.0+ within 22.x, or Node 24+; do not use Node 23 |
 | Node not found by the app | Ensure the LaunchAgent can resolve the real interpreter, not only an interactive shell alias |
+| DSH not found after building | Set `DEEPSEEK_HARNESS_ROOT` at the DSH source root and restart the Service, or choose `apps/cli/lib/bin.js` under `Advanced: Register an existing installation` |
 | Manifest/lock missing | Do not copy `bin.js` away from its source tree |
 | Profile location rejected | Runtime validation requires moving `cordis.yml` and `.env` outside the DSH source; keeping them outside task projects is also recommended |
 | `templateMismatch` | Preserve the existing external `cordis.yml`; merge only the required structure from the current Bridge template, then Probe again |

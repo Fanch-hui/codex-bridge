@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDeepSeekHarnessACP
 import BridgeServiceApplication
 import BridgeServiceCore
@@ -89,6 +90,7 @@ extension ServiceAgentAutoDiscovery {
         ]
       }
     )
+    candidates.append(contentsOf: deepSeekLauncherCandidates(environment: environment))
     return uniquePaths(candidates)
   }
 
@@ -141,18 +143,19 @@ extension ServiceAgentAutoDiscovery {
     ] {
       if let value = environmentValue(key, environment: environment) { roots.append(value) }
     }
-    guard let home = homeDirectory(environment: environment) else { return uniquePaths(roots) }
-    roots.append(
-      contentsOf: [
-        "deepseek-harness", "deepseek-harness-acp", "Projects/deepseek-harness",
-        "Development/deepseek-harness", "src/deepseek-harness", "Code/deepseek-harness",
-        "Documents/deepseek-harness",
-      ].map { pathJoin(home, $0) })
     #if os(Windows)
       if let programFiles = environmentValue("ProgramFiles", environment: environment) {
         roots.append(pathJoin(programFiles, "deepseek-harness"))
       }
     #endif
+    if let home = homeDirectory(environment: environment) {
+      roots.append(
+        contentsOf: [
+          "deepseek-harness", "deepseek-harness-acp", "Projects/deepseek-harness",
+          "Development/deepseek-harness", "src/deepseek-harness", "Code/deepseek-harness",
+          "Documents/deepseek-harness",
+        ].map { pathJoin(home, $0) })
+    }
     return uniquePaths(roots)
   }
 
