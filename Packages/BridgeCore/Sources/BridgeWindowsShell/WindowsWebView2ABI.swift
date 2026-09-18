@@ -94,8 +94,8 @@
     static let webViewGetCanGoForward = 39
     // ICoreWebView2_19 extends ICoreWebView2_18 with these two methods.
     // The slots are verified against WebView2.h 1.0.4191.47.
-    static let webView19GetMemoryUsageTargetLevel = 122
-    static let webView19PutMemoryUsageTargetLevel = 123
+    static let webView19GetMemoryUsageTargetLevel = 119
+    static let webView19PutMemoryUsageTargetLevel = 120
     static let settingsPutIsStatusBarEnabled = 10
     static let settingsPutAreDevToolsEnabled = 12
     static let settingsPutAreDefaultContextMenusEnabled = 14
