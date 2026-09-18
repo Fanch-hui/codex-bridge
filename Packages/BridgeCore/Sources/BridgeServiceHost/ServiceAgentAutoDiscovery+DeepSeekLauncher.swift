@@ -11,8 +11,8 @@ extension ServiceAgentAutoDiscovery {
         resolver.searchDirectories()
           + deepSeekPackageManagerDirectories(environment: environment)
       )
-      return directories.flatMap { directory in
-        ["dsh", "dsh.cmd", "dsh.bat"].flatMap { name in
+      return directories.flatMap { directory -> [String] in
+        ["dsh", "dsh.cmd", "dsh.bat"].flatMap { name -> [String] in
           let launcher = pathJoin(directory, name)
           guard let canonical = canonicalRegularFile(launcher) else { return [] }
           if name == "dsh" { return [canonical] }
