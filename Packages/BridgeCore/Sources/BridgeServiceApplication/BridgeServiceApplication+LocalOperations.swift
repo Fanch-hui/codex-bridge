@@ -150,18 +150,16 @@ extension BridgeServiceApplication {
       projectID: projectID.map { ProjectID(rawValue: $0) },
       limit: limit
     )
-    var snapshots: [MCPServiceTaskSnapshot] = []
-    snapshots.reserveCapacity(records.count)
-    for record in records {
-      snapshots.append(
-        try await serviceTask(
-          taskID: record.id.rawValue,
-          recentEventLimit: 10,
-          deadline: deadline
-        )
+    let activity = try await tasks.listActivity(taskIDs: records.map(\.id))
+    try Self.checkDeadline(deadline)
+    return records.map { record in
+      taskSnapshot(
+        task: record,
+        events: activity.events[record.id] ?? [],
+        activityMessages: activity.messages[record.id] ?? [],
+        recentActivityAvailable: activity.messagesAvailable
       )
     }
-    return snapshots
   }
 
   public func serviceStopTask(

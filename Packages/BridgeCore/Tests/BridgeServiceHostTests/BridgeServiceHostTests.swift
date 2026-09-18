@@ -363,6 +363,9 @@ final class BridgeServiceHostTests: XCTestCase {
       )
     )
     _ = try await first.tasks.begin(taskID: submitted.task.id)
+    try await first.settings.setExposureMode(.readOnly)
+    try await first.settings.setQwenStudioExposureMode(.readOnly)
+    try await first.settings.setWorkbenchPermissionMode(.workspaceWrite)
     await first.shutdown()
 
     let reopened = try await ServiceComposition.make(
@@ -371,6 +374,12 @@ final class BridgeServiceHostTests: XCTestCase {
       randomBytes: { Data(repeating: 0x44, count: $0) }
     )
     defer { Task { await reopened.shutdown() } }
+    let chatMode = try await reopened.settings.exposureMode()
+    let qwenMode = try await reopened.settings.qwenStudioExposureMode()
+    let taskMode = try await reopened.settings.workbenchPermissionMode()
+    XCTAssertEqual(chatMode, .readOnly)
+    XCTAssertEqual(qwenMode, .readOnly)
+    XCTAssertEqual(taskMode, .workspaceWrite)
     let storedTask = try await reopened.tasks.task(id: submitted.task.id)
     let task = try XCTUnwrap(storedTask)
     XCTAssertEqual(task.state.status, ServiceTaskStatus.unknown)
@@ -913,7 +922,7 @@ final class BridgeServiceHostTests: XCTestCase {
       try await client.setSupervisorEnabled(true)
       XCTFail("Expected Supervisor enablement to be unavailable")
     } catch {
-      XCTAssertTrue(error is BridgeServiceClientError)
+      XCTAssertTrue(error is BridgeServiceIPCCodecError)
     }
     let remainsDisabled = try await client.modelCatalog()
     XCTAssertEqual(remainsDisabled.preferences.supervisorEnabled, false)

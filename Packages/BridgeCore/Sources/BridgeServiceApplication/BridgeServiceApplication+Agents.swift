@@ -28,7 +28,7 @@ extension BridgeServiceApplication {
       }
       do {
         records.append(
-          try await agentRegistry.validateForExecution(installationID: record.id)
+          try await agentRegistry.refreshForDisplay(installationID: record.id)
         )
       } catch {
         records.append(try await agentRegistry.installation(id: record.id) ?? record)

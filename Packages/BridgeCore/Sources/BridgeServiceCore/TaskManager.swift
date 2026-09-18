@@ -80,6 +80,8 @@ public actor ServiceTaskManager {
     authorization: ServiceTaskExecutionAuthorization? = nil
   ) async throws -> ServiceTaskRecord {
     if let authorization {
+      await beginMutation(taskID: taskID)
+      defer { endMutation(taskID: taskID) }
       let date = now()
       return try await store.approveTask(
         id: taskID,
@@ -325,6 +327,14 @@ public actor ServiceTaskManager {
     -> [ServiceTaskRecord]
   {
     try await store.tasks(projectID: projectID, limit: limit)
+  }
+
+  public func nonterminalTasks() async throws -> [ServiceTaskRecord] {
+    try await store.nonterminalTasks()
+  }
+
+  public func listActivity(taskIDs: [TaskID]) async throws -> ServiceTaskListActivity {
+    try await store.taskListActivity(taskIDs: taskIDs)
   }
 
   public func events(taskID: TaskID, limit: Int = 100) async throws

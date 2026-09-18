@@ -27,6 +27,17 @@ extension BridgeServiceApplication {
       activityMessages = []
       recentActivityAvailable = false
     }
+    return taskSnapshot(
+      task: task, events: events, activityMessages: activityMessages,
+      recentActivityAvailable: recentActivityAvailable)
+  }
+
+  func taskSnapshot(
+    task: ServiceTaskRecord,
+    events: [ServiceTaskEventRecord],
+    activityMessages: [ServiceTaskMessageRecord],
+    recentActivityAvailable: Bool
+  ) -> MCPServiceTaskSnapshot {
     let recentActivity = activityMessages.enumerated().compactMap {
       taskActivity($0.element, sequence: Int64($0.offset + 1))
     }

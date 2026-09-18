@@ -129,7 +129,7 @@ public actor TaskConversationBuffer {
   public init(
     tasks: ServiceTaskManager,
     flushDeltaCount: Int = 64,
-    flushInFlightCount: Int = 8,
+    flushInFlightCount: Int = 64,
     flushIntervalNanoseconds: UInt64 = 1_000_000_000,
     closeFlushRetryCount: Int = 30,
     closeFlushRetryDelayNanoseconds: UInt64 = 100_000_000,
@@ -330,8 +330,7 @@ public actor TaskConversationBuffer {
   }
 
   func shouldFlush(_ state: TaskState) async -> Bool {
-    if state.unflushedCount >= flushDeltaCount { return true }
-    if state.unflushedCount >= flushInFlightCount { return true }
+    if state.unflushedCount >= min(flushDeltaCount, flushInFlightCount) { return true }
     if let lastFlush = state.lastFlush {
       let interval = Double(flushIntervalNanoseconds) / 1_000_000_000
       return Date().timeIntervalSince(lastFlush) >= interval

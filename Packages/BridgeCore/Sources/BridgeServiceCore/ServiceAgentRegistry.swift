@@ -45,6 +45,7 @@ public actor ServiceAgentRegistry {
   let now: @Sendable () -> Date
   var refreshProbes: [AgentInstallationID: Task<ServiceAgentInstallationRecord, Error>] = [:]
   var activeRegistrations: Set<RegistrationKey> = []
+  var displayValidations: [AgentInstallationID: DisplayValidation] = [:]
 
   public init(
     store: SimpleServiceStore,
@@ -89,6 +90,7 @@ public actor ServiceAgentRegistry {
   }
 
   public func remove(installationID: AgentInstallationID) async throws {
+    displayValidations.removeValue(forKey: installationID)
     try await store.removeAgentInstallation(id: installationID)
   }
 }

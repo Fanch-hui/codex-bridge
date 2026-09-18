@@ -5,6 +5,30 @@ import XCTest
 @testable import BridgeServiceCore
 
 final class ServiceAgentRegistryStabilityTests: XCTestCase {
+  func testDisplayValidationCacheDoesNotRelaxExecutionArtifactChecks() async throws {
+    let fixture = try StabilityFixture()
+    defer { fixture.remove() }
+    let executable = try makeExecutable(in: fixture.rootURL, named: "display-agent")
+    let configuration = try makeConfiguration(in: fixture.rootURL, named: "display.yml")
+    let state = StabilityProbeState()
+    let registry = try makeRegistry(fixture: fixture, state: state, adapterRevision: 1)
+    let record = try await registry.registerAndProbe(
+      request(executable: executable, configuration: configuration, enabled: true))
+    _ = try await registry.refreshForDisplay(installationID: record.id)
+    _ = try await registry.refreshForDisplay(installationID: record.id)
+    let attributes = try FileManager.default.attributesOfItem(atPath: configuration)
+    try Data("profile: altered\n".utf8).write(to: URL(fileURLWithPath: configuration))
+    if let date = attributes[.modificationDate] as? Date {
+      try touch(configuration, at: date)
+    }
+    do {
+      _ = try await registry.validateForExecution(installationID: record.id)
+      XCTFail("Changed artifact content must require review before execution.")
+    } catch let error as ServiceAgentRegistryError {
+      XCTAssertEqual(error, .installationNeedsReview(record.id))
+    }
+  }
+
   func testAdapterRevisionRefreshProbesAndPreservesEnabledRecord() async throws {
     let fixture = try StabilityFixture()
     defer { fixture.remove() }

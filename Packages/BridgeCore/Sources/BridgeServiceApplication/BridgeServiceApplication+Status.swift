@@ -8,7 +8,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> BridgeStatusSnapshot {
     try Self.checkDeadline(deadline)
-    let taskList = try await tasks.tasks(limit: 500)
+    let taskList = try await tasks.nonterminalTasks()
     let runtime = await runtimeStatus.current()
     let codexApprovals = await coordinator.pendingApprovals().count
     let taskStartApprovals = taskList.filter {

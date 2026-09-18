@@ -355,8 +355,8 @@ final class BridgeServiceApplicationTests: XCTestCase {
     XCTAssertEqual(task.source, .mcpClient)
     XCTAssertEqual(task.sourceClientID, MCPClientID.chatGPT.rawValue)
     XCTAssertEqual(task.executionEffort, "high")
-    XCTAssertEqual(task.supervisorModel, "gpt-5.6-luna")
-    XCTAssertEqual(task.supervisorEffort, "medium")
+    XCTAssertNil(task.supervisorModel)
+    XCTAssertNil(task.supervisorEffort)
     XCTAssertEqual(task.permissionMode, .workspaceWrite)
     XCTAssertTrue(task.prompt.contains("Acceptance criteria:"))
     XCTAssertTrue(task.prompt.contains("The relevant tests pass."))
@@ -775,8 +775,8 @@ final class BridgeServiceApplicationTests: XCTestCase {
       ServiceModelPreferences(
         executionModel: "execution-model",
         executionEffort: "high",
-        supervisorModel: "gpt-5.6-luna",
-        supervisorEffort: "medium"
+        supervisorModel: "",
+        supervisorEffort: ""
       )
     )
 
@@ -809,8 +809,8 @@ final class BridgeServiceApplicationTests: XCTestCase {
     let task = try XCTUnwrap(storedTask)
     XCTAssertEqual(task.executionModel, configured.executionModel)
     XCTAssertEqual(task.executionEffort, configured.executionEffort)
-    XCTAssertEqual(task.supervisorModel, configured.supervisorModel)
-    XCTAssertEqual(task.supervisorEffort, configured.supervisorEffort)
+    XCTAssertNil(task.supervisorModel)
+    XCTAssertNil(task.supervisorEffort)
   }
 
   func testUnavailableCodexCatalogFallsBackToProviderDefaults() async throws {
