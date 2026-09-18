@@ -1,5 +1,6 @@
 import BridgeIPC
 import BridgeMCP
+import BridgeServiceAppCore
 import XCTest
 
 @testable import BridgeServiceAppShell
@@ -45,7 +46,7 @@ final class WorkbenchConversationPresentationTests: XCTestCase {
       updatedAt: "2026-08-29T00:00:00Z"
     )
 
-    let selected = WorkbenchAgentTaskPickerContent.selectedTask(
+    let selected = WorkbenchSessionCatalog.selectedTask(
       tasks: [task],
       selectedTaskID: task.taskID
     )

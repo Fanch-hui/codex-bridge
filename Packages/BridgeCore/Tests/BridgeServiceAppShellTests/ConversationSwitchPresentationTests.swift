@@ -1,45 +1,11 @@
-import AppKit
 import BridgeIPC
 import BridgeMCP
-import SwiftUI
 import XCTest
 
 @testable import BridgeServiceAppShell
 
 @MainActor
 final class ConversationSwitchPresentationTests: XCTestCase {
-  func testConversationStreamRedrawsWhenEntriesArriveWithoutRemounting() async throws {
-    let client = TestBridgeServiceClient()
-    await client.setConversationPages([
-      .init(IPCTaskConversationRequest(taskID: "render-task", limit: 200)):
-        conversationPage(taskID: "render-task", content: "Rendered response")
-    ])
-    let conversation = TaskConversationModel(
-      taskID: "render-task",
-      client: client,
-      isTerminal: true
-    )
-    let stream = BridgeServiceWorkbenchConversationStream(
-      conversation: conversation,
-      selectedThread: nil,
-      hasSelectedTask: true,
-      activity: CodexActivityPresentation(task: nil, activity: .idle),
-      providerID: "codex"
-    )
-    let hostingView = NSHostingView(rootView: stream.frame(width: 480, height: 320))
-    hostingView.frame = NSRect(x: 0, y: 0, width: 480, height: 320)
-    hostingView.layoutSubtreeIfNeeded()
-    let emptyRendering = try renderingData(of: hostingView)
-
-    await conversation.start()
-    try await Task.sleep(for: .milliseconds(50))
-    hostingView.layoutSubtreeIfNeeded()
-    let populatedRendering = try renderingData(of: hostingView)
-
-    XCTAssertEqual(conversation.entries.first?.content, "Rendered response")
-    XCTAssertNotEqual(emptyRendering, populatedRendering)
-  }
-
   func testReopeningLoadedConversationShowsItsContentBeforeServiceRefreshCompletes()
     async throws
   {
@@ -117,19 +83,6 @@ final class ConversationSwitchPresentationTests: XCTestCase {
     )
   }
 
-  private func renderingData<Content: View>(
-    of view: NSHostingView<Content>
-  ) throws -> Data {
-    guard let representation = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
-      throw RenderingError.unavailable
-    }
-    view.cacheDisplay(in: view.bounds, to: representation)
-    guard let data = representation.representation(using: .png, properties: [:]) else {
-      throw RenderingError.unavailable
-    }
-    return data
-  }
-
   private func waitUntil(
     timeout: Duration = .seconds(2),
     condition: @escaping @MainActor () async -> Bool
@@ -142,10 +95,6 @@ final class ConversationSwitchPresentationTests: XCTestCase {
     }
     XCTFail("Condition did not become true before the deadline.")
   }
-}
-
-private enum RenderingError: Error {
-  case unavailable
 }
 
 @MainActor

@@ -1,4 +1,5 @@
 import BridgeMCP
+import BridgeServiceAppCore
 import XCTest
 
 @testable import BridgeServiceAppShell
@@ -47,14 +48,14 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
     ]
 
     XCTAssertEqual(
-      WorkbenchAgentTaskPickerContent.orphanThreads(
+      WorkbenchSessionCatalog.orphanThreads(
         tasks: [codexTask, openCodeTask],
         threads: threads
       ).map(\.threadID),
       ["thread-2"]
     )
     XCTAssertEqual(
-      WorkbenchAgentTaskPickerContent.itemCount(
+      WorkbenchSessionCatalog.itemCount(
         tasks: [codexTask, openCodeTask],
         threads: threads
       ),
@@ -163,7 +164,7 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
       updatedAt: "2026-08-28T00:00:02Z"
     )
 
-    let sessions = WorkbenchAgentTaskPickerContent.sessions(tasks: [turn1, turn2])
+    let sessions = WorkbenchSessionCatalog.sessions(tasks: [turn1, turn2])
     XCTAssertEqual(sessions.count, 1)
     let session = sessions[0]
     XCTAssertEqual(session.sessionID, "agy-session-123")
@@ -202,7 +203,7 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
       updatedAt: "2026-08-28T00:00:03Z"
     )
 
-    let sessions = WorkbenchAgentTaskPickerContent.sessions(
+    let sessions = WorkbenchSessionCatalog.sessions(
       tasks: [antigravityFirst, antigravitySecond, openCode]
     )
 
@@ -250,7 +251,7 @@ final class WorkbenchThreadTitlePresentationTests: XCTestCase {
       updatedAt: "2026-08-28T00:00:03Z"
     )
 
-    let groups = WorkbenchAgentTaskPickerContent.groupedSessions(
+    let groups = WorkbenchSessionCatalog.groupedSessions(
       tasks: [codexTask, agyTask, openCodeTask]
     )
     XCTAssertEqual(
