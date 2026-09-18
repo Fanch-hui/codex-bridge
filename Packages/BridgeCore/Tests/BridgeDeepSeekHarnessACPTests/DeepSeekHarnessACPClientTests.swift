@@ -228,6 +228,7 @@ final class DeepSeekHarnessACPClientTests: XCTestCase {
             ])
           )
         )
+        try await transport.emit(deepSeekPromptResult(id: id))
       default:
         break
       }
@@ -240,12 +241,10 @@ final class DeepSeekHarnessACPClientTests: XCTestCase {
     _ = try await client.initialize()
     let session = try await client.newSession(cwd: "/tmp")
     let prompt = Task { try await client.prompt(sessionID: session.id, text: "permission") }
-    do {
-      _ = try await prompt.value
-      XCTFail("Expected malformed permission to terminate the client")
-    } catch let error as DeepSeekHarnessACPError {
-      XCTAssertEqual(error, .malformedPermission)
-    }
+    _ = try await prompt.value
+    let sent = await transport.sentMessages()
+    let response = try XCTUnwrap(sent.first { $0.id == .string("permission-bad") })
+    XCTAssertEqual(response.error?.code, -32602)
   }
 
   func testPermissionInputAndPendingQueueAreBounded() async throws {
@@ -271,6 +270,7 @@ final class DeepSeekHarnessACPClientTests: XCTestCase {
             ])
           )
         )
+        try await transport.emit(deepSeekPromptResult(id: id))
       default:
         break
       }
@@ -281,12 +281,9 @@ final class DeepSeekHarnessACPClientTests: XCTestCase {
     )
     _ = try await oversizedClient.initialize()
     let oversizedSession = try await oversizedClient.newSession(cwd: "/tmp")
-    do {
-      _ = try await oversizedClient.prompt(sessionID: oversizedSession.id, text: "oversized")
-      XCTFail("Expected oversized permission input to fail closed")
-    } catch let error as DeepSeekHarnessACPError {
-      XCTAssertEqual(error, .malformedPermission)
-    }
+    _ = try await oversizedClient.prompt(sessionID: oversizedSession.id, text: "oversized")
+    let oversizedSent = await oversizedTransport.sentMessages()
+    XCTAssertEqual(oversizedSent.filter { $0.error?.code == -32602 }.count, 1)
     await oversizedClient.shutdown()
 
     let capacityTransport = ScriptedDeepSeekHarnessTransport()
@@ -307,6 +304,7 @@ final class DeepSeekHarnessACPClientTests: XCTestCase {
             )
           )
         }
+        try await transport.emit(deepSeekPromptResult(id: id))
       default:
         break
       }
@@ -317,12 +315,9 @@ final class DeepSeekHarnessACPClientTests: XCTestCase {
     )
     _ = try await capacityClient.initialize()
     let capacitySession = try await capacityClient.newSession(cwd: "/tmp")
-    do {
-      _ = try await capacityClient.prompt(sessionID: capacitySession.id, text: "capacity")
-      XCTFail("Expected pending permission capacity to fail closed")
-    } catch let error as AgentRuntimeError {
-      XCTAssertEqual(error, .approvalUnavailable("capacity"))
-    }
+    _ = try await capacityClient.prompt(sessionID: capacitySession.id, text: "capacity")
+    let capacitySent = await capacityTransport.sentMessages()
+    XCTAssertEqual(capacitySent.filter { $0.error?.code == -32602 }.count, 1)
     await capacityClient.shutdown()
   }
 
@@ -354,6 +349,137 @@ final class DeepSeekHarnessACPClientTests: XCTestCase {
     } catch let error as DeepSeekHarnessACPError {
       XCTAssertEqual(error, .sessionMismatch)
     }
+  }
+
+  func testUnknownSessionUpdateDoesNotTerminateClient() async throws {
+    let transport = ScriptedDeepSeekHarnessTransport()
+    await transport.setHandler { message, transport in
+      guard let id = message.id else { return }
+      switch message.method {
+      case "initialize":
+        try await transport.emit(deepSeekInitializationResult(id: id))
+      case "session/new":
+        try await transport.emit(deepSeekSessionResult(id: id, sessionID: "optional-update"))
+      case "session/prompt":
+        try await transport.emit(
+          ACPWireMessage(
+            method: "session/update",
+            params: .object([
+              "sessionId": .string("optional-update"),
+              "update": .object([
+                "sessionUpdate": .string("current_mode_update"),
+                "mode": .string("build"),
+              ]),
+            ])
+          )
+        )
+        try await transport.emit(deepSeekMessageChunk(sessionID: "optional-update", text: "answer"))
+        try await transport.emit(deepSeekPromptResult(id: id))
+      default:
+        break
+      }
+    }
+    let client = DeepSeekHarnessACPClient(
+      transport: transport,
+      clientInfo: .init(name: "tests", title: "Tests", version: "1")
+    )
+    addTeardownBlock { await client.shutdown() }
+    _ = try await client.initialize()
+    let session = try await client.newSession(cwd: "/tmp")
+    let prompt = Task { try await client.prompt(sessionID: session.id, text: "answer") }
+    var iterator = client.events.makeAsyncIterator()
+    guard let event = await iterator.next() else {
+      return XCTFail("Expected the known text update after the optional update")
+    }
+    guard case .textDelta(_, let text) = event.event else {
+      return XCTFail("Expected the optional update to be ignored")
+    }
+    XCTAssertEqual(text, "answer")
+    _ = try await prompt.value
+    let terminalFailure = await client.terminalFailure()
+    XCTAssertNil(terminalFailure)
+  }
+
+  func testPermissionOptionsFilterSessionRulesWithoutExpandingCapability() async throws {
+    let transport = ScriptedDeepSeekHarnessTransport()
+    await transport.setHandler { message, transport in
+      guard let id = message.id else { return }
+      switch message.method {
+      case "initialize":
+        try await transport.emit(deepSeekInitializationResult(id: id))
+      case "session/new":
+        try await transport.emit(deepSeekSessionResult(id: id, sessionID: "one-shot"))
+      case "session/prompt":
+        try await transport.emit(
+          deepSeekPermissionRequest(
+            sessionID: "one-shot",
+            options: [
+              ("always", "allow_always"),
+              ("allow", "allow_once"),
+              ("reject-always", "reject_always"),
+              ("reject", "reject_once"),
+            ]
+          )
+        )
+        try await transport.emit(deepSeekPromptResult(id: id))
+      default:
+        break
+      }
+    }
+    let client = DeepSeekHarnessACPClient(
+      transport: transport,
+      clientInfo: .init(name: "tests", title: "Tests", version: "1")
+    )
+    addTeardownBlock { await client.shutdown() }
+    _ = try await client.initialize()
+    let session = try await client.newSession(cwd: "/tmp")
+    let prompt = Task { try await client.prompt(sessionID: session.id, text: "permission") }
+    var iterator = client.events.makeAsyncIterator()
+    guard let event = await iterator.next(),
+      case .permissionRequested(let request) = event.event
+    else {
+      return XCTFail("Expected one-shot permission request")
+    }
+    XCTAssertEqual(request.options.map(\.id), ["allow", "reject"])
+    _ = try await prompt.value
+  }
+
+  func testPermissionOptionsWithoutOneShotReturnCapabilityError() async throws {
+    let transport = ScriptedDeepSeekHarnessTransport()
+    await transport.setHandler { message, transport in
+      guard let id = message.id else { return }
+      switch message.method {
+      case "initialize":
+        try await transport.emit(deepSeekInitializationResult(id: id))
+      case "session/new":
+        try await transport.emit(deepSeekSessionResult(id: id, sessionID: "session-rule"))
+      case "session/prompt":
+        try await transport.emit(
+          deepSeekPermissionRequest(
+            sessionID: "session-rule",
+            options: [
+              ("always", "allow_always"),
+              ("reject-always", "reject_always"),
+            ]
+          )
+        )
+        try await transport.emit(deepSeekPromptResult(id: id))
+      default:
+        break
+      }
+    }
+    let client = DeepSeekHarnessACPClient(
+      transport: transport,
+      clientInfo: .init(name: "tests", title: "Tests", version: "1")
+    )
+    addTeardownBlock { await client.shutdown() }
+    _ = try await client.initialize()
+    let session = try await client.newSession(cwd: "/tmp")
+    _ = try await client.prompt(sessionID: session.id, text: "permission")
+    let sent = await transport.sentMessages()
+    let response = try XCTUnwrap(sent.first { $0.id == .string("permission-1") })
+    XCTAssertEqual(response.error?.code, -32001)
+    XCTAssertTrue(response.error?.message.contains("one-shot") == true)
   }
 
   func testUnknownResponseIDFailsClosed() async throws {

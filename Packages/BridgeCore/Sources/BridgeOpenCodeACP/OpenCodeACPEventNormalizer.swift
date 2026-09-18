@@ -48,13 +48,19 @@ public actor OpenCodeACPEventNormalizer {
   }
 
   public func completed(stopReason: String, summary: String? = nil) throws -> AgentEventEnvelope {
-    let resolvedSummary = summary ?? latestAssistantSummary() ?? "OpenCode turn completed."
+    guard let resolvedSummary = summary ?? latestAssistantSummary(),
+      !resolvedSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      throw OpenCodeACPError.malformedResponse
+    }
     return try envelope(.completed(summary: resolvedSummary, stopReason: stopReason))
   }
 
   public func finalizeContent() throws -> [AgentEventEnvelope] {
     try contentOrder.compactMap { key in
-      guard let state = contents[key], state.role == .assistant, !state.content.isEmpty else {
+      guard let state = contents[key], state.role == .assistant, state.kind == .message,
+        !state.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      else {
         return nil
       }
       let update = try AgentContentUpdate(
@@ -68,6 +74,14 @@ public actor OpenCodeACPEventNormalizer {
         authoritative: true
       )
       return try envelope(.content(update))
+    }
+  }
+
+  public func unfinishedToolCount() -> Int {
+    tools.values.reduce(into: 0) { count, state in
+      if state.status == .pending || state.status == .inProgress {
+        count += 1
+      }
     }
   }
 
@@ -316,7 +330,9 @@ public actor OpenCodeACPEventNormalizer {
 
   private func latestAssistantSummary() -> String? {
     for key in contentOrder.reversed() {
-      guard let state = contents[key], state.role == .assistant else { continue }
+      guard let state = contents[key], state.role == .assistant, state.kind == .message else {
+        continue
+      }
       let trimmed = state.content.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty else { continue }
       return String(decoding: trimmed.utf8.prefix(4 * 1_024), as: UTF8.self)

@@ -38,24 +38,39 @@ extension DeepSeekHarnessACPClient {
     id: ACPRequestID,
     method: String,
     params: ACPJSONValue?
-  ) async throws {
-    guard method == "session/request_permission" else {
-      throw DeepSeekHarnessACPError.invalidMessage
+  ) async {
+    do {
+      guard method == "session/request_permission" else {
+        try await broker.send(
+          ACPWireMessage(
+            id: id,
+            error: ACPWireError(code: -32601, message: "Method not found")
+          )
+        )
+        return
+      }
+      guard pendingPermissions.count < DeepSeekHarnessACPConstants.maximumPendingPermissions else {
+        throw AgentRuntimeError.approvalUnavailable("capacity")
+      }
+      let permission = try Self.parsePermission(
+        params,
+        requestID: id,
+        approvalID: try nextApprovalID()
+      )
+      try requireSession(permission.sessionID)
+      guard pendingPermissions[permission.approvalID] == nil else {
+        throw AgentRuntimeError.approvalUnavailable(permission.approvalID)
+      }
+      pendingPermissions[permission.approvalID] = permission
+      yield(.permissionRequested(permission))
+    } catch {
+      try? await broker.send(
+        ACPWireMessage(
+          id: id,
+          error: Self.permissionRequestError(error)
+        )
+      )
     }
-    guard pendingPermissions.count < DeepSeekHarnessACPConstants.maximumPendingPermissions else {
-      throw AgentRuntimeError.approvalUnavailable("capacity")
-    }
-    let permission = try Self.parsePermission(
-      params,
-      requestID: id,
-      approvalID: try nextApprovalID()
-    )
-    try requireSession(permission.sessionID)
-    guard pendingPermissions[permission.approvalID] == nil else {
-      throw AgentRuntimeError.approvalUnavailable(permission.approvalID)
-    }
-    pendingPermissions[permission.approvalID] = permission
-    yield(.permissionRequested(permission))
   }
 
   private func nextApprovalID() throws -> String {
@@ -92,20 +107,23 @@ extension DeepSeekHarnessACPClient {
     if let kind = toolCall["kind"]?.stringValue {
       try validateIdentifier(kind, field: "permission.toolKind")
     }
-    let options = try values.map { value -> AgentApprovalOption in
+    let options = try values.compactMap { value -> AgentApprovalOption? in
       guard let option = value.objectValue,
         let optionID = option["optionId"]?.stringValue,
         let name = option["name"]?.stringValue,
-        let kind = option["kind"]?.stringValue,
-        isOneShotPermissionKind(kind)
+        let kind = option["kind"]?.stringValue
       else {
         throw DeepSeekHarnessACPError.malformedPermission
       }
+      guard isOneShotPermissionKind(kind) else { return nil }
       do {
         return try AgentApprovalOption(id: optionID, name: name, kind: kind)
       } catch {
         throw DeepSeekHarnessACPError.malformedPermission
       }
+    }
+    guard !options.isEmpty else {
+      throw AgentRuntimeError.capabilityUnavailable(.sessionRuleApproval)
     }
     guard Set(options.map(\.id)).count == options.count,
       options.contains(where: { isRejectOnce($0.kind) })
@@ -142,6 +160,16 @@ extension DeepSeekHarnessACPClient {
 
   private static func isAllowOnce(_ value: String) -> Bool {
     value.replacingOccurrences(of: "-", with: "_").lowercased() == "allow_once"
+  }
+
+  private static func permissionRequestError(_ error: any Error) -> ACPWireError {
+    if case AgentRuntimeError.capabilityUnavailable(.sessionRuleApproval) = error {
+      return ACPWireError(
+        code: -32001,
+        message: "DeepSeek Harness supports one-shot permission options only."
+      )
+    }
+    return ACPWireError(code: -32602, message: "Invalid permission request")
   }
 
   static func rejectOptionID(in options: [AgentApprovalOption]) -> String {

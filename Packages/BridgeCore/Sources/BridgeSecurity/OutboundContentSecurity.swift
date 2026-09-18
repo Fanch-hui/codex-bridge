@@ -84,6 +84,17 @@ public enum OutboundContentSecurity {
     redaction(of: value, maximumUTF8Bytes: maximumUTF8Bytes).text
   }
 
+  /// Redacts credential-shaped values while preserving ordinary source paths.
+  /// Skill documents are user-authored code and may legitimately contain paths.
+  public static func redactedSecrets(_ value: String, maximumUTF8Bytes: Int) -> String {
+    redaction(
+      of: value,
+      maximumUTF8Bytes: maximumUTF8Bytes,
+      preservingSourceSyntax: true,
+      pathMode: .none
+    ).text
+  }
+
   public static func redaction(
     of value: String,
     maximumUTF8Bytes: Int,

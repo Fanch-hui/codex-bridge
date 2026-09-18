@@ -31,4 +31,32 @@ final class DeepSeekHarnessACPMCPTests: XCTestCase {
     XCTAssertEqual(all[1]["type"]?.stringValue, "http")
     XCTAssertEqual(all[1]["headers"]?.arrayValue?.first?["name"]?.stringValue, "Authorization")
   }
+
+  func testStdioOnlyMCPDoesNotRequireHTTPCapability() throws {
+    let initialization = DeepSeekHarnessACPInitialization(
+      protocolVersion: 1,
+      agentName: "deepseek-harness-acp",
+      agentTitle: nil,
+      agentVersion: "1",
+      supportsMCPHTTP: false
+    )
+    let servers: [AgentMCPServerConfiguration] = [
+      .init(
+        id: "local",
+        name: "local",
+        transport: .stdio,
+        command: "/usr/bin/node",
+        args: ["server.js"]
+      )
+    ]
+
+    let values = try DeepSeekHarnessACPMCP.parameters(
+      servers: servers,
+      initialization: initialization,
+      networkAllowed: false
+    )
+
+    XCTAssertEqual(values.count, 1)
+    XCTAssertEqual(values[0]["command"]?.stringValue, "/usr/bin/node")
+  }
 }

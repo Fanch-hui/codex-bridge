@@ -1,4 +1,5 @@
 import BridgeMCP
+import BridgeSecurity
 import BridgeSkills
 import Foundation
 
@@ -43,8 +44,18 @@ extension BridgeServiceApplication {
       guard let manifest = manifests.first(where: { $0.name == skillName }) else {
         throw BridgeMCPQueryError.skillNotFound
       }
+      let document = try await skillScanner.readSkillDocument(manifest, subpath: subpath)
+      let safeContent = OutboundContentSecurity.redactedSecrets(
+        document.content,
+        maximumUTF8Bytes: SkillScanner.maximumDocumentBytes
+      )
       return MCPServiceSkillDocument(
-        document: try await skillScanner.readSkillDocument(manifest, subpath: subpath)
+        document: SkillDocument(
+          name: document.name,
+          subpath: document.subpath,
+          content: safeContent,
+          byteCount: safeContent.utf8.count
+        )
       )
     } catch let error as BridgeMCPQueryError {
       throw error

@@ -167,8 +167,14 @@ extension ExecutionSession {
   static func turnFailureSummary(_ turn: CodexTurn) -> String {
     let base = "Codex reported that the Turn failed."
     guard let error = turn.error?.objectValue else { return base }
-    let message = error["message"]?.stringValue ?? ""
-    let info = error["codex_error_info"]?.stringValue ?? ""
+    let message =
+      error["message"]?.stringValue.map {
+        OutboundContentSecurity.redacted($0, maximumUTF8Bytes: 8 * 1_024)
+      } ?? ""
+    let info =
+      error["codex_error_info"]?.stringValue.map {
+        OutboundContentSecurity.redacted($0, maximumUTF8Bytes: 4 * 1_024)
+      } ?? ""
     if !message.isEmpty {
       return info.isEmpty ? "\(base) \(message)" : "\(base) \(message) (\(info))"
     }

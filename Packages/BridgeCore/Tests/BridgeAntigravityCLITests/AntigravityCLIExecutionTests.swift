@@ -158,7 +158,7 @@ final class AntigravityCLIExecutionTests: XCTestCase {
     XCTAssertEqual(tool.key, "tool:1")
     XCTAssertEqual(tool.name, "run_command")
     XCTAssertEqual(tool.arguments, #"{"command":"touch output"}"#)
-    XCTAssertEqual(tool.status, .failed)
+    XCTAssertEqual(tool.status, .declined)
     XCTAssertEqual(itemID, "1")
     XCTAssertEqual(code, "antigravity_permission_denied")
   }
@@ -192,7 +192,7 @@ final class AntigravityCLIExecutionTests: XCTestCase {
     else {
       return XCTFail("Expected failed tool and permission-denied terminal event")
     }
-    XCTAssertEqual(tool.status, .failed)
+    XCTAssertEqual(tool.status, .declined)
     XCTAssertEqual(code, "antigravity_permission_denied")
     XCTAssertFalse(events.contains { if case .completed = $0.event { true } else { false } })
   }
@@ -275,7 +275,7 @@ final class AntigravityCLIExecutionTests: XCTestCase {
     }
     XCTAssertEqual(webTool.key, "tool:4")
     XCTAssertEqual(webTool.name, "read_url_content")
-    XCTAssertEqual(webTool.arguments, #"{"url":"https:\/\/example.com"}"#)
+    XCTAssertEqual(webTool.arguments, #"{"url":"https://example.com"}"#)
     XCTAssertEqual(webTool.status, .failed)
     XCTAssertEqual(webTool.output, "request failed")
     XCTAssertEqual(itemID, "4")
