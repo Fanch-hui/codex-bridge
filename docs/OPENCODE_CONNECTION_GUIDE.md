@@ -1,6 +1,6 @@
 # OpenCode 连接指南
 
-权限隔离说明适用于包含修复的后续构建；v0.5.0 安装包仍对应原始发布提交。
+适用于 Codex Bridge v1.0.0。
 本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并让 ChatGPT、Qwen Studio 或 Bridge 工作台通过 MCP 提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
 
 ## 先说明连接方向
