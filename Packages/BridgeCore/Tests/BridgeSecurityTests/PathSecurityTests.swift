@@ -81,6 +81,37 @@ final class PathSecurityTests: XCTestCase {
     XCTAssertFalse(OutboundContentSecurity.isSafe("eyJabcdefgh.abcdefgh.abcdefgh"))
   }
 
+  func testOutboundContentRedactionPreservesMarkdownStructureAroundPaths() {
+    let input = """
+      - **目录路径**: `/Users/alice/bridge-smoke-test`
+      - **生成文件**:
+        1. [calculator.js](/Users/alice/bridge-smoke-test/calculator.js)
+        2. [calculator.test.js](/Users/alice/bridge-smoke-test/calculator.test.js)
+      - **实际运行命令**: `powershell & "/Users/Alice/Project (Draft)/node.exe"`
+
+      ### 三、MCP 工具验证结果
+
+      > **本次未验证 MCP**
+      """
+
+    let redacted = OutboundContentSecurity.redacted(input, maximumUTF8Bytes: 4_096)
+
+    XCTAssertEqual(
+      redacted,
+      """
+      - **目录路径**: `[REDACTED]`
+      - **生成文件**:
+        1. [calculator.js]([REDACTED])
+        2. [calculator.test.js]([REDACTED])
+      - **实际运行命令**: `powershell & "[REDACTED]"`
+
+      ### 三、MCP 工具验证结果
+
+      > **本次未验证 MCP**
+      """
+    )
+  }
+
   func testCommandDisplayPreservesExecutableAndArgumentsButRedactsSecrets() {
     let command =
       #"/usr/bin/git -C "/Users/alice/project" status --porcelain && curl -H "Authorization: Bearer token-value" https://example.test"#

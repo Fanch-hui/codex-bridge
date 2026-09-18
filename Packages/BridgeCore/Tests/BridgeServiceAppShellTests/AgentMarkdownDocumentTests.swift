@@ -49,6 +49,27 @@ final class AgentMarkdownDocumentTests: XCTestCase {
     )
   }
 
+  func testParsesIndentedListAsFollowingListBlock() {
+    let document = AgentMarkdownDocument(
+      """
+      - **生成文件**:
+        1. [calculator.js]([REDACTED])
+        2. [calculator.test.js]([REDACTED])
+
+      ### 三、MCP 工具验证结果
+      """
+    )
+
+    XCTAssertEqual(
+      document.blocks.map(\.content),
+      [
+        .unorderedList(["**生成文件**:"]),
+        .orderedList(["[calculator.js]([REDACTED])", "[calculator.test.js]([REDACTED])"]),
+        .heading(level: 3, text: "三、MCP 工具验证结果"),
+      ]
+    )
+  }
+
   func testParsesGitHubTableAndAlignment() {
     let document = AgentMarkdownDocument(
       """

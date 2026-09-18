@@ -112,7 +112,9 @@ extension AgentMarkdownDocumentParser {
           next.indent == marker.indent
         else { break }
         nextIndex = lookahead
-      } else if leadingSpaces(in: Array(lines[nextIndex])) > marker.indent {
+      } else if leadingSpaces(in: Array(lines[nextIndex])) > marker.indent,
+        listMarker(in: lines[nextIndex]) == nil
+      {
         items[items.count - 1] += "\n" + lines[nextIndex].trimmingCharacters(in: .whitespaces)
         nextIndex += 1
       } else {

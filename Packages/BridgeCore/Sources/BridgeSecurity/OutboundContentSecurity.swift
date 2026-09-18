@@ -200,13 +200,10 @@ public enum OutboundContentSecurity {
     in line: String,
     preservingSourceSyntax: Bool
   ) -> String {
-    guard
-      let start = unsafePathStart(
-        in: line,
-        preservingSourceSyntax: preservingSourceSyntax
-      )
-    else { return line }
-    return String(line[..<start]) + "[REDACTED]"
+    return Self.redactUnsafeMarkdownPaths(
+      in: line,
+      preservingSourceSyntax: preservingSourceSyntax
+    )
   }
 
   private static func redactCommandOutputPaths(in line: String) -> String {
@@ -298,7 +295,7 @@ public enum OutboundContentSecurity {
       || lowercased.hasPrefix("warning:")
   }
 
-  private static func unsafePathStart(
+  package static func unsafePathStart(
     in line: String,
     preservingSourceSyntax: Bool
   ) -> String.Index? {

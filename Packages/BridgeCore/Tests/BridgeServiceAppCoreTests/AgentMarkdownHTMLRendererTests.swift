@@ -43,4 +43,23 @@ final class AgentMarkdownHTMLRendererTests: XCTestCase {
     XCTAssertFalse(html.contains("##"))
     XCTAssertFalse(html.contains("**"))
   }
+
+  func testRendersRedactedLinksAsLabelsAndKeepsFollowingBlocks() {
+    let html = AgentMarkdownHTMLRenderer.render(
+      """
+      - **生成文件**:
+        1. [calculator.js]([REDACTED])
+        2. [calculator.test.js]([REDACTED])
+
+      ### 三、MCP 工具验证结果
+
+      > **本次未验证 MCP**
+      """
+    )
+
+    XCTAssertTrue(html.contains("<ol><li>calculator.js</li><li>calculator.test.js</li></ol>"))
+    XCTAssertTrue(html.contains("<h5>三、MCP 工具验证结果</h5>"))
+    XCTAssertTrue(html.contains("<blockquote><strong>本次未验证 MCP</strong></blockquote>"))
+    XCTAssertFalse(html.contains("[calculator.js]"))
+  }
 }
