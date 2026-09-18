@@ -79,7 +79,6 @@
         canRefreshModels: true
       )
 
-      workbench.conversationText = "流式消息已更新"
       workbench.history = BridgeDesktopThreadHistoryState(
         conversation: [
           BridgeDesktopConversationEntry(

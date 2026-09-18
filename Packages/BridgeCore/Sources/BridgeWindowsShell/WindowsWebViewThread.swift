@@ -293,28 +293,28 @@
               settings, WebView2Slot.settingsPutAreDefaultContextMenusEnabled,
               as: WebView2PutBoolFn.self
             )
-            _ = put(settings, false)
+            _ = put(settings, 0)
           }
           if configuration.disableStatusBar {
             let put: WebView2PutBoolFn = webView2Method(
               settings, WebView2Slot.settingsPutIsStatusBarEnabled,
               as: WebView2PutBoolFn.self
             )
-            _ = put(settings, false)
+            _ = put(settings, 0)
           }
           if configuration.disableDevTools {
             let put: WebView2PutBoolFn = webView2Method(
               settings, WebView2Slot.settingsPutAreDevToolsEnabled,
               as: WebView2PutBoolFn.self
             )
-            _ = put(settings, false)
+            _ = put(settings, 0)
           }
           if configuration.disableZoomControl {
             let put: WebView2PutBoolFn = webView2Method(
               settings, WebView2Slot.settingsPutIsZoomControlEnabled,
               as: WebView2PutBoolFn.self
             )
-            _ = put(settings, false)
+            _ = put(settings, 0)
           }
         }
       }
@@ -455,7 +455,7 @@
       if visibilityChanged {
         let putVisible: WebView2PutBoolFn = webView2Method(
           controller, WebView2Slot.controllerPutIsVisible, as: WebView2PutBoolFn.self)
-        if putVisible(controller, values.1) == webview2SOK {
+        if putVisible(controller, values.1 ? 1 : 0) == webview2SOK {
           synchronizedVisible = values.1
         }
       }

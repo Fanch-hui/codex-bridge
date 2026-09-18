@@ -115,9 +115,6 @@
         context.emit("setFastMode", { fastModeEnabled: toggle.control.checked });
       }
     });
-    refreshModels.addEventListener("click", function () {
-      if (!refreshModels.disabled) context.emit("refreshModels", {});
-    });
     save.addEventListener("click", function () {
       if (save.disabled) return;
       var values = draft.values();

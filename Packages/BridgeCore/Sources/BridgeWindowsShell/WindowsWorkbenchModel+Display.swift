@@ -50,10 +50,6 @@
       } else {
         windowsConversationPresentationCache.reset()
       }
-      let conversationText = windowsConversationPresentationCache.text(
-        isStreaming: conversation?.isStreaming == true || task?.isRunning == true,
-        errorMessage: conversation?.errorMessage
-      )
       let approvalItems = cached.approvalItems
       let selectedApprovalIndex = selectedApprovalID.flatMap { selectedID in
         approvalItems.firstIndex(where: { $0.id == selectedID })
@@ -145,7 +141,6 @@
             for: task,
             projectName: task.map { cached.projectName(for: $0.projectID) }
           ),
-          conversationText: conversationText,
           interruptEnabled: connectionState == .connected
             && TaskInspectorPresentation.canInterrupt(task),
           stopEnabled: connectionState == .connected && task?.isActive == true,
@@ -180,7 +175,8 @@
           defaultModel: modelPreferences?.executionModel ?? models.first?.displayName
             ?? models.first?.modelID,
           availableModelCount: models.count,
-          modelError: modelError
+          modelError: modelError,
+          commandReceipt: workbenchCommandReceipt
         )
       )
     }

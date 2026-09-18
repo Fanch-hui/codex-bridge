@@ -147,6 +147,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var selectedTaskID: String?
   @Published public internal(set) var selectedProjectID: String?
   @Published public internal(set) var workbenchPermissionMode = "workspace-write"
+  @Published public internal(set) var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
   @Published var desktopLogSearchText = ""
   @Published var desktopLogProjectID: String?
   @Published var desktopLogKind = "all"

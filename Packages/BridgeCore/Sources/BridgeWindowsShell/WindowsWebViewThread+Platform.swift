@@ -63,7 +63,15 @@
     }
 
     func loadLoader() -> HMODULE? {
-      "WebView2Loader.dll".withCString(encodedAs: UTF16.self) { LoadLibraryW($0) }
+      var buffer = [WCHAR](repeating: 0, count: 32_768)
+      let length = buffer.withUnsafeMutableBufferPointer { raw in
+        GetModuleFileNameW(nil, raw.baseAddress, DWORD(raw.count))
+      }
+      guard length > 0, length < DWORD(buffer.count) else { return nil }
+      let executable = String(decoding: buffer.prefix(Int(length)), as: UTF16.self)
+      guard let separator = executable.lastIndex(of: "\\") else { return nil }
+      let path = String(executable[..<separator]) + "\\WebView2Loader.dll"
+      return path.withCString(encodedAs: UTF16.self) { LoadLibraryW($0) }
     }
 
     func loadCreateFunction(_ loader: HMODULE) -> WebView2CreateEnvironmentFn? {

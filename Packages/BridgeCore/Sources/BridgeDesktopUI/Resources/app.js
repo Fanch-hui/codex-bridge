@@ -33,8 +33,8 @@
     }
   }
 
-  function emit(command, payload) {
-    var envelope = { version: 1, requestID: "desktop-ui-" + (++requestSequence), command: command, payload: payload || {} };
+  function emit(command, payload, requestID) {
+    var envelope = { version: 1, requestID: requestID || "desktop-ui-" + (++requestSequence), command: command, payload: payload || {} };
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bridgeDesktopUI) {
       window.webkit.messageHandlers.bridgeDesktopUI.postMessage(envelope);
     }
@@ -42,6 +42,7 @@
       window.chrome.webview.postMessage(envelope);
     }
     window.dispatchEvent(new CustomEvent("codex-bridge-command", { detail: envelope }));
+    return envelope.requestID;
   }
 
   function renderNavigation(items, selected) {

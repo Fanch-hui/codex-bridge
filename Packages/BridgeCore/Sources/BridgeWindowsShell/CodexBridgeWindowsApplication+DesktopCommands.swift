@@ -20,9 +20,13 @@
         Task { @MainActor in await auxiliary.refreshModels(model: model) }
         return true
       case .loadEarlierConversation(let taskID):
-        guard model.selectedTaskID == taskID else { return true }
+        guard model.selectedTaskID == taskID,
+          let conversation = model.conversation,
+          conversation.taskID == taskID
+        else { return true }
         Task { @MainActor in
-          await model.conversation?.loadEarlier()
+          await conversation.loadEarlier()
+          guard model.selectedTaskID == taskID, model.conversation === conversation else { return }
           model.refreshDisplaySnapshot()
         }
         return true
@@ -55,17 +59,30 @@
       case .deleteSession(let taskID):
         Task { @MainActor in await model.deleteSession(containingTaskID: taskID) }
         return true
-      case .steerTask(let taskID, let input, let mode):
+      case .steerTask(let taskID, let input, let mode, let requestID):
         guard let steerMode = MCPTaskSteerMode(rawValue: mode) else { return true }
         Task { @MainActor in
-          _ = await model.submitSteer(taskID: taskID, input: input, mode: steerMode)
+          _ = await model.submitSteer(
+            taskID: taskID, input: input, mode: steerMode, requestID: requestID
+          )
         }
         return true
-      case .resumeTask(let taskID, let input):
-        Task { @MainActor in await model.resumeTask(id: taskID, input: input) }
+      case .resumeTask(let taskID, let input, let requestID):
+        Task { @MainActor in
+          await model.resumeTask(id: taskID, input: input, requestID: requestID)
+        }
         return true
-      case .restartTask(let taskID):
-        Task { @MainActor in await model.restartTask(id: taskID) }
+      case .restartTask(let taskID, let requestID):
+        Task { @MainActor in await model.restartTask(id: taskID, requestID: requestID) }
+        return true
+      case .rejectWorkbenchCommand(let requestID, let command, let taskID, let input):
+        model.rejectWorkbenchCommand(
+          requestID: requestID,
+          command: command,
+          taskID: taskID,
+          input: input,
+          message: "工作台命令无法执行。"
+        )
         return true
       case .resolveTaskApproval(
         let approvalID,

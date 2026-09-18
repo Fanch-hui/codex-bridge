@@ -178,7 +178,8 @@
         .steerTask(
           id: "task-42",
           input: "修正方向",
-          mode: "interrupt-current-then-continue"
+          mode: "interrupt-current-then-continue",
+          requestID: "steer-1"
         )
       )
 
@@ -189,7 +190,7 @@
       )
       XCTAssertEqual(
         WindowsDesktopUICommandRouter.command(for: resume),
-        .resumeTask(id: "task-42", input: "继续完成")
+        .resumeTask(id: "task-42", input: "继续完成", requestID: "resume-1")
       )
 
       let restart = BridgeDesktopCommandEnvelope(
@@ -199,7 +200,7 @@
       )
       XCTAssertEqual(
         WindowsDesktopUICommandRouter.command(for: restart),
-        .restartTask(id: "task-42")
+        .restartTask(id: "task-42", requestID: "restart-1")
       )
 
       let deleteSession = BridgeDesktopCommandEnvelope(

@@ -51,7 +51,8 @@
         modelCount: display.availableModelCount,
         canRefreshModels: canRefreshModels,
         isRefreshingModels: modelRefreshInProgress,
-        modelError: display.modelError
+        modelError: display.modelError,
+        commandReceipt: display.commandReceipt
       )
     }
 

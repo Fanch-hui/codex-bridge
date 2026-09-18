@@ -1571,6 +1571,8 @@ final class BridgeServiceAppModelTests: XCTestCase {
     )
     let base = Duration.seconds(2)
 
+    XCTAssertEqual(model.nextPollingDelay(base: base), base)
+    model.connectionState = .connected
     model.tasks = []
     model.approvals = []
     model.directApprovals = []

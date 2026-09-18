@@ -6,7 +6,7 @@ function runtime() {
   const ui = createHarness([
     "pages-common.js", "pages-form-draft.js", "pages-native-permissions.js",
     "pages-settings-models.js", "pages-settings-agents.js", "pages-settings-instructions.js",
-    "pages-settings-native.js", "pages-direct.js", "pages-settings.js"
+    "pages-direct.js", "pages-settings.js"
   ], ["settings-content"]);
   const commands = [];
   const emit = (command, payload) => commands.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
@@ -144,17 +144,16 @@ test("agent permission selector follows installation capabilities", () => {
   assert.equal(card.querySelectorAll(".hint").some(item => item.textContent.includes("有效能力")), true);
 });
 
-test("Supervisor and Agent editors retain drafts while updating capabilities and callbacks", () => {
+test("Agent editor retains permission drafts while updating capabilities and callbacks", () => {
   const ui = runtime();
   const agent = { providerID: "opencode", installationID: "install-a", providerName: "OpenCode", model: "one", effort: "medium", permissionMode: "build", modelOptions: [{ modelID: "one", displayName: "One", reasoningEfforts: effort }], effortOptions: effort, permissionOptions: [{ id: "build", title: "Build" }, { id: "plan", title: "Plan" }], canSave: true, canRefreshModels: true };
   ui.render(page({ agentDefaults: [agent] }));
-  const supervisor = ui.section("Supervisor 监督");
-  const toggle = supervisor.querySelector("input"); toggle.checked = true;
   const agents = ui.section("外部 Agent 默认偏好");
   const permission = agents.querySelectorAll("select")[2]; permission.value = "plan";
+  permission.dispatch("change");
   const received = [];
   ui.render(page({ canSavePreferences: false, agentDefaults: [{ ...agent, canSave: false }] }));
-  assert.equal(toggle.checked, true); assert.equal(ui.button("保存 Supervisor").disabled, true);
+  assert.equal(permission.value, "plan");
   ui.render(page({ agentDefaults: [agent] }), (command, payload) => received.push({ command, payload }));
   permission.dispatch("change");
   assert.equal(permission.value, "plan");
@@ -162,13 +161,9 @@ test("Supervisor and Agent editors retain drafts while updating capabilities and
   assert.equal(received[0].payload.installationID, "install-a");
 });
 
-test("native AGY permissions are presented as connection-managed status", () => {
+test("native AGY permissions stay out of the general settings page", () => {
   const ui = runtime();
   const policy = { installationID: "agy-a", installationName: "AGY", toolPermission: "always-proceed", availableModes: [], availableActions: ["command"], canEdit: false, rules: [] };
   ui.render(page({ nativePermissionPolicy: policy }));
-  const native = ui.section("AGY 无头运行权限");
-  assert.equal(native.querySelector(".page-message").textContent.includes("已启用 Always Proceed"), true);
-  assert.equal(native.querySelectorAll("button").length, 0);
-  ui.render(page({ nativePermissionPolicy: { ...policy, toolPermission: "request-review" } }));
-  assert.equal(native.querySelector(".page-message").textContent.includes("连接 AGY 时需要同意启用"), true);
+  assert.equal(ui.section("AGY 无头运行权限"), null);
 });

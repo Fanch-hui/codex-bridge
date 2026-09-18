@@ -3,11 +3,6 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var C = global.CodexBridgeDesktopWorkbenchConversation;
 
-  function isWindows() {
-    var root = document.documentElement;
-    return !!(root && root.dataset && root.dataset.platform === "windows");
-  }
-
   function render(container, values, page, emit, options) {
     var owner = options && options.owner ? options.owner : container;
     var context = C.contextKey(page), block = owner.__windowsConversationBlock;
@@ -170,7 +165,6 @@
   }
 
   global.CodexBridgeDesktopWorkbenchConversationIncremental = {
-    isWindows: isWindows,
     render: render
   };
 }(window));

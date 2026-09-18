@@ -11,12 +11,13 @@ function runtime() {
     "pages-workbench-conversation.js",
     "pages-workbench-conversation-incremental.js"
   ], ["workbench-inspector-footer"]);
-  const footer = ui.roots[0], commands = [];
+  const footer = ui.roots[0], commands = [], requests = [];
   return {
-    window: ui.window, document: ui.document, footer, commands, conversation: ui.window.CodexBridgeDesktopWorkbenchConversation,
+    window: ui.window, document: ui.document, footer, commands, requests, conversation: ui.window.CodexBridgeDesktopWorkbenchConversation,
     settingsModels: ui.window.CodexBridgeDesktopSettingsModels,
-    render: page => ui.window.CodexBridgeDesktopWorkbenchControls.render(page, (command, payload) => {
+    render: page => ui.window.CodexBridgeDesktopWorkbenchControls.render(page, (command, payload, requestID) => {
       commands.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
+      requests.push(requestID);
     }),
     input: () => ui.document.getElementById("workbench-task-input"),
     button: title => ui.find(footer, node => node.tagName === "button" && node.textContent === title),
@@ -124,7 +125,7 @@ test("capability changes retain the current task input and selection", () => {
   assert.equal(ui.input().selectionEnd, 3);
 });
 
-test("steer sends the selected mode and clears the submitted draft", () => {
+test("steer keeps the draft until the task acknowledges it", () => {
   const ui = runtime();
   const state = page("task-a");
   state.steerModes.push({ id: "interrupt-current-then-continue", title: "立即纠偏当前轮" });
@@ -136,7 +137,14 @@ test("steer sends the selected mode and clears the submitted draft", () => {
   assert.deepEqual(ui.commands, [{ command: "steerTask", payload: {
     taskID: "task-a", input: "新的方向", mode: "interrupt-current-then-continue"
   } }]);
-  assert.equal(ui.input().value, "");
+  assert.equal(ui.input().value, "新的方向");
+  ui.render({ ...state, selectedTask: { ...state.selectedTask, status: "running", updatedAt: "2" } });
+  assert.equal(ui.input().value, "新的方向");
+  assert.equal(ui.button("发送指令").disabled, true);
+  ui.render({ ...state, commandReceipt: {
+    receiptID: "receipt-steer-1", requestID: ui.requests[0], command: "steerTask",
+    taskID: "task-a", input: "新的方向", accepted: true
+  } });
   ui.render(page("task-b")); ui.render(state);
   assert.equal(ui.input().value, "");
 });
@@ -151,9 +159,44 @@ test("retry preserves its draft across snapshots and resumes the selected task",
   assert.equal(ui.input(), input);
   ui.button("继续对话").dispatch("click");
   assert.deepEqual(ui.commands, [{ command: "resumeTask", payload: { taskID: "task-a", input: "请继续上次检查" } }]);
-  assert.equal(input.value, "");
+  assert.equal(input.value, "请继续上次检查");
+  assert.equal(ui.button("继续对话").disabled, true);
+  ui.render({ ...state, commandReceipt: {
+    receiptID: "receipt-resume-fail", requestID: ui.requests[0], command: "resumeTask",
+    taskID: "task-a", input: "请继续上次检查", accepted: false
+  } });
+  assert.equal(ui.input().value, "请继续上次检查");
+  assert.equal(ui.button("继续对话").disabled, false);
+  ui.render({ ...state, selectedTask: { ...state.selectedTask, canResume: false, canRestart: false, canSteer: false, status: "running", turnCount: 2 }, steerModes: [] });
   ui.render({ history: { selectedThreadID: "history-a" }, tasks: [] });
   assert.equal(ui.input(), null);
+});
+
+test("a stale receipt cannot acknowledge a later identical submission", () => {
+  const ui = runtime();
+  const state = page("task-a");
+  ui.render(state);
+  type(ui.input(), "重复方向");
+  ui.button("发送指令").dispatch("click");
+  const firstRequestID = ui.requests[0];
+  ui.render({ ...state, commandReceipt: {
+    receiptID: "receipt-first-failure", requestID: firstRequestID, command: "steerTask",
+    taskID: "task-a", input: "重复方向", accepted: false
+  } });
+  ui.button("发送指令").dispatch("click");
+  const secondRequestID = ui.requests[1];
+  assert.notEqual(firstRequestID, secondRequestID);
+  ui.render({ ...state, commandReceipt: {
+    receiptID: "receipt-old-success", requestID: firstRequestID, command: "steerTask",
+    taskID: "task-a", input: "重复方向", accepted: true
+  } });
+  assert.equal(ui.input().value, "重复方向");
+  assert.equal(ui.button("发送指令").disabled, true);
+  ui.render({ ...state, commandReceipt: {
+    receiptID: "receipt-second-success", requestID: secondRequestID, command: "steerTask",
+    taskID: "task-a", input: "重复方向", accepted: true
+  } });
+  assert.equal(ui.input().value, "");
 });
 
 test("session fallback keeps provider scope when session IDs collide", () => {

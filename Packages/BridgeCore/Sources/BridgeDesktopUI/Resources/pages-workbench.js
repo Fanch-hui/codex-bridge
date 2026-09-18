@@ -191,7 +191,7 @@
   function prepareContentCard(content, page) {
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
     var detail = page.selectedTask;
-    var keepConversation = incremental && incremental.isWindows() && detail
+    var keepConversation = incremental && detail
       && ((detail.conversation && detail.conversation.length) || detail.conversationState);
     var stableCard = keepConversation && content.__windowsDetailCard;
     if (stableCard) {
@@ -307,5 +307,6 @@
     global.CodexBridgeDesktopWorkbenchControls.render(page, emit);
   }
 
+  global.CodexBridgeDesktopStableRender = renderStable;
   global.CodexBridgeDesktopWorkbenchPage = { render: render };
 }(window));

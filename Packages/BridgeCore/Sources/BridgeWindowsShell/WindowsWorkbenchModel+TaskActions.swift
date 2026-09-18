@@ -144,25 +144,44 @@
 
     public func submitSteer(
       input: String,
-      mode: MCPTaskSteerMode = .queued
+      mode: MCPTaskSteerMode = .queued,
+      requestID: String? = nil
     ) async -> Bool {
       guard let selectedTaskID else {
+        rejectWorkbenchCommand(
+          requestID: requestID,
+          command: "steerTask",
+          taskID: nil,
+          input: input,
+          message: "请先选择要发送 Steer 的任务。"
+        )
         reportFailure("请先选择要发送 Steer 的任务。", taskID: nil)
         return false
       }
-      return await submitSteer(taskID: selectedTaskID, input: input, mode: mode)
+      return await submitSteer(
+        taskID: selectedTaskID, input: input, mode: mode, requestID: requestID
+      )
     }
 
     public func submitSteer(
       taskID: String,
       input: String,
-      mode: MCPTaskSteerMode = .queued
+      mode: MCPTaskSteerMode = .queued,
+      requestID: String? = nil
     ) async -> Bool {
       guard connectionState == .connected else {
+        rejectWorkbenchCommand(
+          requestID: requestID, command: "steerTask", taskID: taskID, input: input,
+          message: "后台 Service 未连接，无法发送 Steer。"
+        )
         reportFailure("后台 Service 未连接，无法发送 Steer。", taskID: taskID)
         return false
       }
       guard let task = task(id: taskID) else {
+        rejectWorkbenchCommand(
+          requestID: requestID, command: "steerTask", taskID: taskID, input: input,
+          message: "任务不存在或已经移除。"
+        )
         reportFailure("任务不存在或已经移除。", taskID: taskID)
         return false
       }
@@ -172,6 +191,10 @@
           providerSupportsSteer: providerSupportsSteer(for: task)
         )
       else {
+        rejectWorkbenchCommand(
+          requestID: requestID, command: "steerTask", taskID: taskID, input: input,
+          message: "当前任务不支持 Steer。"
+        )
         reportFailure("当前任务不支持 Steer。", taskID: taskID)
         return false
       }
@@ -181,6 +204,10 @@
             workbenchDisplaySnapshot.installationByID[installationID]
           }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
         guard supportsImmediate else {
+          rejectWorkbenchCommand(
+            requestID: requestID, command: "steerTask", taskID: taskID, input: input,
+            message: "当前 Agent 不支持立即 Steer。"
+          )
           reportFailure("当前 Agent 不支持立即 Steer。", taskID: taskID)
           return false
         }
@@ -190,31 +217,63 @@
         setActionTextIfSelected("正在发送 Steer…", taskID: taskID)
         do {
           guard let expectedTurnID = task.expectedControlID else {
+            rejectWorkbenchCommand(
+              requestID: requestID, command: "steerTask", taskID: taskID, input: input,
+              message: "当前任务已不在可 Steer 状态。"
+            )
             reportFailure("当前任务已不在可 Steer 状态。", taskID: taskID)
             return false
           }
           let requestTaskID = task.taskID
-          _ = try await client.steerTask(
+          let receipt = try await client.steerTask(
             taskID: requestTaskID,
             expectedTurnID: expectedTurnID,
             input: input,
             mode: mode
           )
           await refreshTasks()
-          reportSuccess("Steer 已发送。", taskID: requestTaskID)
-          return true
+          let message = receipt.accepted ? nil : "本机 Service 未接受这次 Steer。"
+          recordWorkbenchCommandReceipt(
+            requestID: requestID,
+            command: "steerTask",
+            taskID: requestTaskID,
+            input: input,
+            accepted: receipt.accepted,
+            message: message
+          )
+          if receipt.accepted {
+            reportSuccess("Steer 已发送。", taskID: requestTaskID)
+          } else {
+            reportFailure(message ?? "本机 Service 未接受这次 Steer。", taskID: requestTaskID)
+          }
+          return receipt.accepted
         } catch {
           let message = BridgeServiceErrorMessage.message(error)
           await loadTasks()
+          recordWorkbenchCommandReceipt(
+            requestID: requestID,
+            command: "steerTask",
+            taskID: task.taskID,
+            input: input,
+            accepted: false,
+            message: message
+          )
           reportFailure("Steer 发送失败：\(message)", taskID: task.taskID)
           return false
         }
       }
+      rejectWorkbenchCommand(
+        requestID: requestID,
+        command: "steerTask",
+        taskID: taskID,
+        input: input,
+        message: validationMessage
+      )
       reportFailure(validationMessage, taskID: taskID)
       return false
     }
 
-    public func resumeTask(id taskID: String, input: String?) async {
+    public func resumeTask(id taskID: String, input: String?, requestID: String? = nil) async {
       guard connectionState == .connected, let task = task(id: taskID),
         TaskInspectorPresentation.canResume(
           task,
@@ -222,6 +281,10 @@
         ),
         let sessionID = task.effectiveSessionID
       else {
+        rejectWorkbenchCommand(
+          requestID: requestID, command: "resumeTask", taskID: taskID, input: input,
+          message: "当前任务无法续接会话。"
+        )
         reportFailure("当前任务无法续接会话。", taskID: taskID)
         return
       }
@@ -231,15 +294,22 @@
         prompt: trimmed.flatMap { $0.isEmpty ? nil : $0 } ?? "继续执行未完成的任务",
         threadID: sessionID,
         progress: "正在续接任务…",
-        success: "已续接任务。"
+        success: "已续接任务。",
+        requestID: requestID,
+        command: "resumeTask",
+        receiptInput: input ?? ""
       )
     }
 
-    public func restartTask(id taskID: String) async {
+    public func restartTask(id taskID: String, requestID: String? = nil) async {
       guard connectionState == .connected, let task = task(id: taskID), task.canRestart,
         let prompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
         !prompt.isEmpty
       else {
+        rejectWorkbenchCommand(
+          requestID: requestID, command: "restartTask", taskID: taskID, input: nil,
+          message: "当前任务没有可用于重新开始的原始指令。"
+        )
         reportFailure("当前任务没有可用于重新开始的原始指令。", taskID: taskID)
         return
       }
@@ -248,7 +318,10 @@
         prompt: prompt,
         threadID: nil,
         progress: "正在重新开始任务…",
-        success: "已重新开始任务。"
+        success: "已重新开始任务。",
+        requestID: requestID,
+        command: "restartTask",
+        receiptInput: nil
       )
     }
 
@@ -287,7 +360,10 @@
       prompt: String,
       threadID: String?,
       progress: String,
-      success: String
+      success: String,
+      requestID: String?,
+      command: String,
+      receiptInput: String?
     ) async {
       let request = IPCAgentSubmitRequest(
         projectID: task.projectID,
@@ -307,11 +383,27 @@
         let response = try await client.submitAgentTask(request)
         await refreshTasks()
         selectTask(id: response.taskID)
+        recordWorkbenchCommandReceipt(
+          requestID: requestID,
+          command: command,
+          taskID: task.taskID,
+          input: receiptInput,
+          accepted: true
+        )
         reportSuccess(success, taskID: response.taskID)
       } catch {
         await loadTasks()
+        let message = BridgeServiceErrorMessage.message(error)
+        recordWorkbenchCommandReceipt(
+          requestID: requestID,
+          command: command,
+          taskID: task.taskID,
+          input: receiptInput,
+          accepted: false,
+          message: message
+        )
         reportFailure(
-          "任务提交失败：\(BridgeServiceErrorMessage.message(error))",
+          "任务提交失败：\(message)",
           taskID: task.taskID
         )
       }

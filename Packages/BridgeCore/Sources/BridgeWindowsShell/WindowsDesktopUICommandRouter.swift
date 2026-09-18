@@ -68,13 +68,24 @@
         guard let taskID = nonEmpty(payload.taskID), let input = payload.input,
           let mode = nonEmpty(payload.mode),
           ["queued", "interrupt-current-then-continue"].contains(mode)
-        else { return nil }
-        return .steerTask(id: taskID, input: input, mode: mode)
+        else {
+          return rejectWorkbenchCommand(envelope)
+        }
+        return .steerTask(
+          id: taskID, input: input, mode: mode, requestID: envelope.requestID
+        )
       case .resumeTask:
-        guard let taskID = nonEmpty(payload.taskID) else { return nil }
-        return .resumeTask(id: taskID, input: optionalValue(payload.input))
+        guard let taskID = nonEmpty(payload.taskID) else {
+          return rejectWorkbenchCommand(envelope)
+        }
+        return .resumeTask(
+          id: taskID, input: payload.input, requestID: envelope.requestID
+        )
       case .restartTask:
-        return nonEmpty(payload.taskID).map { .restartTask(id: $0) }
+        guard let taskID = nonEmpty(payload.taskID) else {
+          return rejectWorkbenchCommand(envelope)
+        }
+        return .restartTask(id: taskID, requestID: envelope.requestID)
       case .resolveApproval, .resolveDirectApproval:
         return approvalCommand(envelope.command, payload: payload)
       case .selectProject:
@@ -355,6 +366,17 @@
 
     private static func optionalValue(_ value: String?) -> String? {
       nonEmpty(value)
+    }
+
+    private static func rejectWorkbenchCommand(
+      _ envelope: BridgeDesktopCommandEnvelope
+    ) -> MainWindowCommand {
+      .rejectWorkbenchCommand(
+        requestID: envelope.requestID,
+        command: envelope.command.rawValue,
+        taskID: optionalValue(envelope.payload.taskID),
+        input: envelope.payload.input
+      )
     }
 
   }

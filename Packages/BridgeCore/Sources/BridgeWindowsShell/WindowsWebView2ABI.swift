@@ -173,7 +173,7 @@
   typealias WebView2PutBoolFn =
     @convention(c) (
       UnsafeMutableRawPointer?,
-      Bool
+      Int32
     ) -> HRESULT
 
   typealias WebView2PutDoubleFn =

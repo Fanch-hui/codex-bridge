@@ -27,7 +27,6 @@
       selectedTaskID: nil,
       selectedTaskIndex: nil,
       taskMetadata: "未选择任务",
-      conversationText: "",
       interruptEnabled: false,
       stopEnabled: false,
       deleteEnabled: false,

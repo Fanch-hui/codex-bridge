@@ -4,7 +4,10 @@ const { createHarness } = require("./desktop-ui-test-support.cjs");
 
 function runtime() {
   const ui = createHarness([
-    "pages-common.js", "pages-form-draft.js", "pages-connections-editor.js", "pages-connections.js"
+    "pages-common.js", "pages-form-draft.js", "pages-agent-connector-details.js",
+    "pages-agent-headless-consent.js", "pages-agent-connector-row.js", "pages-agent-connectors.js",
+    "pages-codex-connection.js", "pages-connections-editor.js",
+    "pages-deepseek-harness-mcp-editor.js", "pages-deepseek-harness-mcp.js", "pages-connections.js"
   ], ["connections-content"]);
   const root = ui.roots[0], commands = [];
   const emit = (command, payload) => commands.push({
@@ -115,6 +118,7 @@ test("agent registration and MCP client rows retain drafts while lists and permi
   const qwen = client(ui.root, "qwen.studio");
   const exposure = qwen.querySelector("select");
   assert.equal(exposure.value, "read-only");
+  assert.equal(exposure.disabled, false);
   const clientsCard = ui.find(ui.root, node => node.className.split(" ").includes("connection-card")
     && node.querySelector(".client-row"));
   const originalAppend = clientsCard.appendChild.bind(clientsCard);
@@ -167,16 +171,22 @@ test("connection rows expose parity labels and hide ChatGPT toggle", () => {
       installationID: "install-a", providerID: "opencode", displayName: "OpenCode",
       executablePath: "C:\\Tools\\opencode.exe", version: "1.2.3", protocolRevision: "1",
       adapterRevision: 2, availability: "available", effectiveCapabilities: [],
-      isEnabled: true, canToggle: true, canReprobe: true, canRemove: true
+      enabled: true, canToggle: true, canReprobe: true, canRemove: true
     }]
   }));
   const clientRow = client(ui.root, "qwen.studio");
   assert.equal(clientRow.querySelector(".check-field").hidden, false);
   const chatRow = client(ui.root, "chatgpt");
   assert.equal(chatRow.querySelector(".check-field").hidden, true);
-  const agent = ui.find(ui.root, node => node.className.split(" ").includes("agent-row"));
-  assert.equal(agent.querySelector(".status-badge").textContent, "可用");
-  assert.equal(agent.querySelectorAll(".row-detail")[1].textContent.includes("ACP 1"), true);
-  assert.equal(ui.button("重新 Probe", agent).disabled, false);
+  const chatExposure = chatRow.querySelector("select");
+  chatExposure.value = "read-only";
+  chatExposure.dispatch("change");
+  assert.equal(ui.commands.at(-1).command, "setMCPClientExposure");
+  assert.equal(ui.commands.at(-1).payload.clientID, "chatgpt");
+  const agent = ui.find(ui.root, node => node.className.split(" ").includes("agent-connect-row"));
+  const installation = agent.querySelector(".agent-installation-detail");
+  assert.equal(installation.querySelector(".status-badge").textContent, "已连接");
+  assert.equal(installation.querySelectorAll(".row-detail")[1].textContent.includes("ACP 1"), true);
+  assert.equal(ui.button("重新检查", installation).disabled, false);
   assert.equal(ui.button("移除登记", agent).disabled, false);
 });

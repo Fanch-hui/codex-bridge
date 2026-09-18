@@ -48,7 +48,7 @@
     tunnelCard.appendChild(tunnelActions);
     tunnelSection.appendChild(tunnelCard);
 
-    var clientsSection = S.section(content, "本地 MCP 客户端");
+    var clientsSection = S.section(content, "ChatGPT / Qwen 客户端工具权限");
     var clientsEditor = E.createClients(emit);
     clientsSection.appendChild(clientsEditor.root);
     var dshMCPSection = S.section(content, "DeepSeek Harness MCP");
@@ -103,9 +103,7 @@
           page.tunnel,
           context
         );
-        clientsEditor.update(S.safeArray(page.clients).filter(function (client) {
-          return client.clientID !== "openai.chatgpt";
-        }), nextEmit);
+        clientsEditor.update(S.safeArray(page.clients), nextEmit);
         dshMCP.update(page, nextEmit);
         renderAgents(agentConnectors, agentEditor, page, nextEmit);
         status.textContent = page.statusMessage || "";
