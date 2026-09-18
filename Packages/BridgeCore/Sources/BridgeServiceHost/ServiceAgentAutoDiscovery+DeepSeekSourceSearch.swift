@@ -112,55 +112,38 @@ enum ServiceAgentDeepSeekSourceSearch {
       results.append(anchor)
       return
     }
-    let anchorURL = URL(fileURLWithPath: anchor, isDirectory: true)
-    guard
-      let enumerator = fileManager.enumerator(
-        at: anchorURL,
-        includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey],
-        options: [.skipsHiddenFiles, .skipsPackageDescendants]
-      )
-    else { return }
-
-    let anchorComponents = anchorURL.standardizedFileURL.pathComponents
-    while let item = enumerator.nextObject() as? URL {
-      guard directoriesVisited < limits.maximumDirectories, now() < deadline else { break }
+    var pending = [(URL(fileURLWithPath: anchor, isDirectory: true), 0)]
+    var cursor = 0
+    while cursor < pending.count {
+      guard directoriesVisited < limits.maximumDirectories, now() < deadline else { return }
+      let (parent, parentDepth) = pending[cursor]
+      cursor += 1
       guard
-        let values = try? item.resourceValues(
-          forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
+        let enumerator = fileManager.enumerator(
+          at: parent,
+          includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+          options: [.skipsHiddenFiles, .skipsPackageDescendants, .skipsSubdirectoryDescendants]
         )
       else { continue }
-      let path = item.standardizedFileURL.path
-      let components = item.standardizedFileURL.pathComponents
-      let depth = max(0, components.count - anchorComponents.count)
-
-      if values.isSymbolicLink == true || isLinkOrReparsePoint(path) {
-        if values.isDirectory == true { enumerator.skipDescendants() }
-        continue
-      }
-      if values.isDirectory == true {
+      while let item = enumerator.nextObject() as? URL {
+        guard directoriesVisited < limits.maximumDirectories, now() < deadline else { return }
+        let path = item.standardizedFileURL.path
+        guard safeDirectory(path, fileManager: fileManager) else { continue }
         directoriesVisited += 1
-        if depth <= limits.maximumDepth,
-          isDeepSeekSourceRoot(path, fileManager: fileManager),
-          seenRoots.insert(
-            pathKey(path)
-          ).inserted
+        let depth = parentDepth + 1
+        if isDeepSeekSourceRoot(path, fileManager: fileManager),
+          seenRoots.insert(pathKey(path)).inserted
         {
           results.append(path)
-          // A source root contains the complete layout we need. Do not spend
-          // the remaining budget walking its dependencies or build outputs.
-          enumerator.skipDescendants()
-          continue
+          return
         }
-        if depth >= limits.maximumDepth
-          || shouldSkipDirectory(
-            item.lastPathComponent,
-            depth: depth,
-            restrictFirstLevel: restrictFirstLevel
+        if depth < limits.maximumDepth,
+          !shouldSkipDirectory(
+            item.lastPathComponent, depth: depth, restrictFirstLevel: restrictFirstLevel
           )
         {
-          enumerator.skipDescendants()
+          pending.append((item, depth))
         }
-        continue
       }
     }
   }

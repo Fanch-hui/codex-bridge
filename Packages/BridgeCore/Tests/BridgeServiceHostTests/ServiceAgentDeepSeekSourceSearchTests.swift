@@ -22,6 +22,26 @@ final class ServiceAgentDeepSeekSourceSearchTests: XCTestCase {
     XCTAssertEqual(found, [sourceRoot.standardizedFileURL.path])
   }
 
+  func testChecksSiblingCheckoutsBeforeDescendingIntoLargeProject() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let projects = root.appendingPathComponent("Projects")
+    for index in 0..<20 {
+      try FileManager.default.createDirectory(
+        at: projects.appendingPathComponent("project-\(index)/src"),
+        withIntermediateDirectories: true
+      )
+    }
+    let source = root.appendingPathComponent("deepseek-harness")
+    try makeSourceTree(at: source, name: "@deepseek-ai/dsh-root")
+    let found = ServiceAgentDeepSeekSourceSearch.discover(
+      environment: [:],
+      limits: .init(maximumDirectories: 3, maximumDepth: 6, maximumMilliseconds: 2_000),
+      anchors: [root.path]
+    )
+    XCTAssertEqual(found, [source.standardizedFileURL.path])
+  }
+
   func testAcceptsSourceRootAnchor() throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "bridge-dsh-source-anchor-\(UUID().uuidString)",
