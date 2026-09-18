@@ -28,11 +28,11 @@
 
   function attachBlock(container, block) {
     var nodes = [block.heading, block.error, block.list, block.actions].filter(Boolean);
-    nodes.forEach(function (node) {
-      if (node.parentNode !== container) container.appendChild(node);
+    var known = new Set(nodes);
+    Array.prototype.slice.call(container.children).forEach(function (child) {
+      if (!known.has(child)) child.remove();
     });
-    var firstIndex = container.children.length - nodes.length;
-    nodes.forEach(function (node, index) { placeAt(container, node, firstIndex + index); });
+    nodes.forEach(function (node, index) { placeAt(container, node, index); });
   }
 
   function detachBlock(block) {

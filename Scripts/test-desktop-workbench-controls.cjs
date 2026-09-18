@@ -342,7 +342,15 @@ test("Windows streaming keeps the conversation card attached to its parent", () 
   const render = () => ui.window.CodexBridgeDesktopWorkbenchPage.render(state, () => {});
   render();
   const card = content.querySelector(".task-detail-card");
+  const header = card.querySelector(".task-detail-header");
+  const conversation = card.querySelector(".task-conversation-container");
   const entry = card.querySelector(".conversation-entry");
+  assert.ok(header);
+  assert.ok(conversation);
+  assert.equal(card.children[0], header);
+  assert.equal(card.children[1], conversation);
+  assert.equal(header.querySelector(".detail-title").textContent, "Task");
+  assert.equal(conversation.querySelector(".conversation-entry"), entry);
   let cardRemovals = 0;
   const removeChild = content.removeChild.bind(content);
   content.removeChild = child => {
@@ -353,6 +361,10 @@ test("Windows streaming keeps the conversation card attached to its parent", () 
   render();
   assert.equal(content.querySelector(".task-detail-card"), card);
   assert.equal(card.querySelector(".conversation-entry"), entry);
+  assert.equal(card.children[0], header);
+  assert.equal(card.children[1], conversation);
+  assert.equal(header.querySelector(".detail-title").textContent, "Task");
+  assert.equal(conversation.querySelector(".conversation-entry"), entry);
   assert.equal(cardRemovals, 0);
   assert.equal(entry.querySelector(".entry-text").textContent, "First and second");
 });
