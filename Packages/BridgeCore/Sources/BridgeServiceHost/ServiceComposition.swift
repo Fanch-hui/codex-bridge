@@ -99,9 +99,17 @@ public actor ServiceComposition {
         )
       ),
     ]
+    let discoveryEnvironment = ProcessInfo.processInfo.environment
     let agentRegistry = ServiceAgentRegistry(
       store: store,
-      providers: agentProviders
+      providers: agentProviders,
+      resolveUpdatedInstallation: { existing in
+        try ServiceAgentAutoDiscovery.updatedInstallationRequest(
+          for: existing,
+          dataPaths: paths,
+          environment: discoveryEnvironment
+        )
+      }
     )
     _ = try await agentRegistry.refreshInstallationStates()
     let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog()

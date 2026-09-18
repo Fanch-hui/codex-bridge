@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
   import Foundation
 
   /// Projects the live Windows shell snapshots into the shared desktop UI
@@ -26,6 +27,7 @@
     ) -> BridgeDesktopUIState {
       let modelRefreshInProgress = settings?.isRefreshingModels == true
       let canRefreshModels = settings?.busy != true
+      let agentReconnectSummary = agentReconnectSummary(from: management)
       return BridgeDesktopUIState(
         hostContext: BridgeDesktopHostContext(platform: .windows),
         navigation: pageCache.navigation(
@@ -53,11 +55,17 @@
             projectCount: management.project.rows.count,
             installationCount: management.agent.installationRows.count,
             availableAgentCount: management.availableAgentCount,
+            agentReconnectSummary: agentReconnectSummary,
             recentTasks: workbench.recentTasks,
             tunnel: connections?.tunnel
           )
         ) {
-          overview(workbench: workbench, management: management, tunnel: connections?.tunnel)
+          overview(
+            workbench: workbench,
+            management: management,
+            tunnel: connections?.tunnel,
+            agentReconnectSummary: agentReconnectSummary
+          )
         },
         workbench: pageCache.workbench(
           key: WindowsDesktopWorkbenchCacheKey(
@@ -125,7 +133,8 @@
     private static func overview(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
-      tunnel: BridgeDesktopTunnelState?
+      tunnel: BridgeDesktopTunnelState?,
+      agentReconnectSummary: String?
     ) -> BridgeDesktopOverviewState {
       let projectCount = management.project.rows.count
       let installationCount = management.agent.installationRows.count
@@ -185,7 +194,8 @@
         services: services(
           workbench: workbench,
           management: management,
-          tunnel: tunnel
+          tunnel: tunnel,
+          agentReconnectSummary: agentReconnectSummary
         ),
         serviceActions: [
           BridgeDesktopActionLink(
@@ -238,7 +248,8 @@
     private static func services(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
-      tunnel: BridgeDesktopTunnelState?
+      tunnel: BridgeDesktopTunnelState?,
+      agentReconnectSummary: String?
     ) -> [BridgeDesktopServiceRow] {
       let serviceState = connectionStatePresentation(workbench.connectionState)
       let mcpState = mcpPresentation(for: workbench)
@@ -265,12 +276,27 @@
         BridgeDesktopServiceRow(
           id: "local-agents",
           title: "本机 Agent 引擎",
-          value: "\(available) 个可用 / 共 \(registered) 个",
-          symbol: "cpu.fill",
-          tone: available > 0 ? .success : .neutral,
+          value: agentReconnectSummary ?? "\(available) 个可用 / 共 \(registered) 个",
+          symbol: agentReconnectSummary == nil ? "cpu.fill" : "exclamationmark.triangle.fill",
+          tone: agentReconnectSummary == nil
+            ? (available > 0 ? .success : .neutral)
+            : .warning,
           destination: .connections
         ),
       ]
+    }
+
+    private static func agentReconnectSummary(
+      from management: WindowsManagementDisplay
+    ) -> String? {
+      ProjectAgentPresentation.reconnectSummary(
+        names: management.agent.installationItems.compactMap { installation in
+          ProjectAgentPresentation.requiresReconnect(
+            isEnabled: installation.enabled,
+            availability: installation.availability
+          ) ? installation.displayName : nil
+        }
+      )
     }
 
     private static func mcpPresentation(

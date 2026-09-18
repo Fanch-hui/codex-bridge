@@ -56,7 +56,7 @@ final class ServiceAgentRegistryTests: XCTestCase {
     XCTAssertEqual(persisted, record)
   }
 
-  func testRefreshDetectsReplacementWithoutExecutingProvider() async throws {
+  func testRefreshReprobesEnabledReplacementBeforeRestoringAvailability() async throws {
     let fixture = try ServiceCoreFixture()
     defer { fixture.remove() }
     let executable = try makeExecutable(
@@ -89,13 +89,13 @@ final class ServiceAgentRegistryTests: XCTestCase {
     let record = try XCTUnwrap(refreshed.first)
 
     XCTAssertEqual(record.id, registered.id)
-    XCTAssertEqual(record.availability, .needsReview)
+    XCTAssertEqual(record.availability, .available)
     XCTAssertTrue(record.isEnabled)
-    XCTAssertFalse(record.isSelectable)
-    XCTAssertEqual(record.capabilities, .empty)
-    XCTAssertTrue(record.lastProbeError?.contains("changed") == true)
+    XCTAssertTrue(record.isSelectable)
+    XCTAssertTrue(record.capabilities.effective.contains(.workspaceRead))
+    XCTAssertNil(record.lastProbeError)
     let probeCount = await counter.value()
-    XCTAssertEqual(probeCount, 1)
+    XCTAssertEqual(probeCount, 2)
   }
 
   func testExplicitReplacementAcceptanceReprobesAndRestoresAvailability() async throws {

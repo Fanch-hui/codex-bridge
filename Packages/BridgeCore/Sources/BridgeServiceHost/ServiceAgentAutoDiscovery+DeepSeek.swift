@@ -8,7 +8,8 @@ extension ServiceAgentAutoDiscovery {
     dataPaths: ServiceDataPaths,
     existingInstallations: [ServiceAgentInstallationRecord],
     preferGeneratedConfiguration: Bool,
-    environment: [String: String]
+    environment: [String: String],
+    allowGeneratedConfiguration: Bool = true
   ) throws -> [ServiceAgentRegistrationRequest] {
     var executables =
       ([managedDeepSeekExecutable(dataPaths: dataPaths)]
@@ -32,7 +33,7 @@ extension ServiceAgentAutoDiscovery {
         environment: environment
       ).compactMap(canonicalRegularFile)
     }
-    if configurations.isEmpty,
+    if configurations.isEmpty, allowGeneratedConfiguration,
       let generated = try makeGeneratedDeepSeekConfiguration(at: dataPaths.agentStateURL)
     {
       configurations = [generated]

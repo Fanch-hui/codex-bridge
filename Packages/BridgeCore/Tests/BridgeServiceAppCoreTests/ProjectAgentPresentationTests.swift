@@ -74,5 +74,35 @@ final class ProjectAgentPresentationTests: XCTestCase {
   func testUnknownLabelsRemainVisible() {
     XCTAssertEqual(ProjectAgentPresentation.permissionLabel("future"), "未知：future")
     XCTAssertEqual(ProjectAgentPresentation.availabilityLabel("future"), "未知：future")
+    XCTAssertEqual(ProjectAgentPresentation.availabilityLabel("incompatible"), "不兼容")
+  }
+
+  func testReconnectRequirementOnlyIncludesEnabledUnavailableInstallations() {
+    XCTAssertTrue(
+      ProjectAgentPresentation.requiresReconnect(
+        isEnabled: true,
+        availability: "needs_review"
+      )
+    )
+    XCTAssertTrue(
+      ProjectAgentPresentation.requiresReconnect(
+        isEnabled: true,
+        availability: "incompatible"
+      )
+    )
+    XCTAssertFalse(
+      ProjectAgentPresentation.requiresReconnect(
+        isEnabled: false,
+        availability: "unavailable"
+      )
+    )
+    XCTAssertEqual(
+      ProjectAgentPresentation.reconnectSummary(names: ["AGY CLI"]),
+      "AGY CLI 需要重新连接"
+    )
+    XCTAssertEqual(
+      ProjectAgentPresentation.reconnectSummary(names: ["AGY CLI", "OpenCode"]),
+      "AGY CLI、OpenCode 需要重新连接"
+    )
   }
 }

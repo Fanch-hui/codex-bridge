@@ -17,6 +17,7 @@
     let projectCount: Int
     let installationCount: Int
     let availableAgentCount: Int
+    let agentReconnectSummary: String?
     let recentTasks: [WindowsRecentTaskPresentation]
     let tunnel: BridgeDesktopTunnelState?
   }

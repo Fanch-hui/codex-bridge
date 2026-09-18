@@ -62,6 +62,68 @@ final class AgentConnectionPresentationTests: XCTestCase {
     XCTAssertEqual(page?.canRegisterAgent, true)
   }
 
+  func testOverviewWarnsForEnabledAgentThatNeedsReconnect() {
+    let model = makeModel()
+    model.connectionState = .connected
+    model.agentInstallations = [
+      IPCAgentInstallationSummary(
+        installationID: "enabled-review",
+        providerID: "antigravity",
+        displayName: "AGY CLI",
+        executablePath: "/fixture/agy",
+        adapterRevision: 1,
+        trustProfile: "managed",
+        isEnabled: true,
+        availability: "needs_review",
+        effectiveCapabilities: [],
+        lastProbeError: "版本已变化",
+        updatedAt: ""
+      ),
+      IPCAgentInstallationSummary(
+        installationID: "disabled-unavailable",
+        providerID: "opencode",
+        displayName: "OpenCode",
+        executablePath: "/fixture/opencode",
+        adapterRevision: 1,
+        trustProfile: "managed",
+        isEnabled: false,
+        availability: "unavailable",
+        effectiveCapabilities: [],
+        updatedAt: ""
+      ),
+    ]
+
+    let overview = try! XCTUnwrap(BridgeDesktopUIStateBuilder.build(from: model).overview)
+    let agentRow = try! XCTUnwrap(overview.services.first { $0.id == "local-agents" })
+    XCTAssertEqual(agentRow.value, "AGY CLI 需要重新连接")
+    XCTAssertEqual(agentRow.tone, .warning)
+    XCTAssertEqual(agentRow.destination, .connections)
+    XCTAssertFalse(overview.notices.contains { $0.id == "agent-reconnect" })
+
+    model.agentInstallations = [
+      IPCAgentInstallationSummary(
+        installationID: "disabled-unavailable",
+        providerID: "opencode",
+        displayName: "OpenCode",
+        executablePath: "/fixture/opencode",
+        adapterRevision: 1,
+        trustProfile: "managed",
+        isEnabled: false,
+        availability: "unavailable",
+        effectiveCapabilities: [],
+        updatedAt: ""
+      )
+    ]
+    let disabledOverview = try! XCTUnwrap(
+      BridgeDesktopUIStateBuilder.build(from: model).overview
+    )
+    let disabledAgentRow = try! XCTUnwrap(
+      disabledOverview.services.first { $0.id == "local-agents" }
+    )
+    XCTAssertEqual(disabledAgentRow.tone, .neutral)
+    XCTAssertFalse(disabledOverview.notices.contains { $0.id == "agent-reconnect" })
+  }
+
   func testImmediateOperationFailurePublishesCompletion() async throws {
     let model = makeModel()
     model.connectionState = .connected

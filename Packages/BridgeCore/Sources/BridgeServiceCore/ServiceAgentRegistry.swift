@@ -42,6 +42,8 @@ public actor ServiceAgentRegistry {
   let makeInstallationID: @Sendable () -> AgentInstallationID
   let captureIdentity: IdentityCapture
   let captureArtifactIdentity: ArtifactIdentityCapture
+  let resolveUpdatedInstallation:
+    @Sendable (ServiceAgentInstallationRecord) throws -> ServiceAgentRegistrationRequest?
   let now: @Sendable () -> Date
   var refreshProbes: [AgentInstallationID: Task<ServiceAgentInstallationRecord, Error>] = [:]
   var activeRegistrations: Set<RegistrationKey> = []
@@ -59,6 +61,9 @@ public actor ServiceAgentRegistry {
     captureArtifactIdentity: @escaping ArtifactIdentityCapture = { path, requiresExecutable in
       try ServiceAgentFileIdentity(capturing: path, requiresExecutable: requiresExecutable)
     },
+    resolveUpdatedInstallation:
+      @escaping @Sendable (ServiceAgentInstallationRecord) throws ->
+      ServiceAgentRegistrationRequest? = { _ in nil },
     now: @escaping @Sendable () -> Date = Date.init
   ) {
     let pairs = providers.map { ($0.descriptor.providerID, $0) }
@@ -68,6 +73,7 @@ public actor ServiceAgentRegistry {
     self.makeInstallationID = makeInstallationID
     self.captureIdentity = captureIdentity
     self.captureArtifactIdentity = captureArtifactIdentity
+    self.resolveUpdatedInstallation = resolveUpdatedInstallation
     self.now = now
   }
 

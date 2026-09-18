@@ -135,45 +135,6 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     XCTAssertEqual(persisted, current)
   }
 
-  func testContentChangeBlocksAdapterUpgradeWithoutExecutingProvider() async throws {
-    let fixture = try StabilityFixture()
-    defer { fixture.remove() }
-    let executable = try makeExecutable(
-      in: fixture.rootURL,
-      named: "changed-agent",
-      contents: "#!/bin/sh\necho original\n"
-    )
-    let state = StabilityProbeState()
-    let first = try makeRegistry(fixture: fixture, state: state, adapterRevision: 1)
-    let registered = try await first.registerAndProbe(
-      request(executable: executable, enabled: true)
-    )
-    try replaceExecutableContents(at: executable, with: "#!/bin/sh\necho replaced\n")
-    let upgraded = try makeRegistry(fixture: fixture, state: state, adapterRevision: 2)
-
-    let refreshed = try await upgraded.refreshInstallationStates()
-    let review = try XCTUnwrap(refreshed.first)
-    XCTAssertEqual(review.availability, .needsReview)
-    XCTAssertEqual(review.adapterRevision, 1)
-    XCTAssertTrue(review.isEnabled)
-    XCTAssertEqual(review.capabilities, .empty)
-    XCTAssertTrue(review.lastProbeError?.contains("executable changed") == true)
-    let probeCountAfterChange = await state.probeCount()
-    XCTAssertEqual(probeCountAfterChange, 1)
-
-    _ = try await upgraded.refreshInstallationStates()
-    let probeCountAfterSecondRefresh = await state.probeCount()
-    XCTAssertEqual(probeCountAfterSecondRefresh, 1)
-    do {
-      _ = try await upgraded.validateForExecution(installationID: registered.id)
-      XCTFail("A changed executable must remain blocked pending review.")
-    } catch let error as ServiceAgentRegistryError {
-      XCTAssertEqual(error, .installationNeedsReview(registered.id))
-    }
-    let finalProbeCount = await state.probeCount()
-    XCTAssertEqual(finalProbeCount, 1)
-  }
-
   func testLegacyReviewReasonsRecoverWhenCurrentContentIsUnchanged() async throws {
     let fixture = try StabilityFixture()
     defer { fixture.remove() }
@@ -238,7 +199,7 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     XCTAssertEqual(probeCount, 6)
   }
 
-  private func makeRegistry(
+  func makeRegistry(
     fixture: StabilityFixture,
     state: StabilityProbeState,
     adapterRevision: Int
@@ -249,7 +210,7 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     )
   }
 
-  private func request(
+  func request(
     executable: String,
     configuration: String? = nil,
     enabled: Bool
@@ -268,7 +229,7 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     )
   }
 
-  private func makeExecutable(
+  func makeExecutable(
     in directory: URL,
     named name: String,
     contents: String = "#!/bin/sh\nexit 0\n"
@@ -288,7 +249,7 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     return path
   }
 
-  private func makeConfiguration(in directory: URL, named name: String) throws -> String {
+  func makeConfiguration(in directory: URL, named name: String) throws -> String {
     let path = directory.appendingPathComponent(name).path
     try Data("profile: fixture\n".utf8).write(to: URL(fileURLWithPath: path))
     #if canImport(Darwin)
@@ -300,7 +261,7 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     return path
   }
 
-  private func setExecutablePermissions(at path: String) throws {
+  func setExecutablePermissions(at path: String) throws {
     #if canImport(Darwin)
       try FileManager.default.setAttributes(
         [.posixPermissions: NSNumber(value: 0o700)],
@@ -311,7 +272,7 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     #endif
   }
 
-  private func replaceExecutableContents(at path: String, with contents: String) throws {
+  func replaceExecutableContents(at path: String, with contents: String) throws {
     #if os(Windows)
       var data = try Data(contentsOf: URL(fileURLWithPath: path))
       data.append(Data(contents.utf8))
@@ -322,11 +283,11 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     try setExecutablePermissions(at: path)
   }
 
-  private func touch(_ path: String, at date: Date) throws {
+  func touch(_ path: String, at date: Date) throws {
     try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: path)
   }
 
-  private func legacyReview(
+  func legacyReview(
     _ record: ServiceAgentInstallationRecord,
     reason: String,
     adapterRevision: Int
@@ -354,7 +315,7 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
   }
 }
 
-private struct StabilityFixture {
+struct StabilityFixture {
   let rootURL: URL
   let databasePath: String
 
@@ -372,12 +333,12 @@ private struct StabilityFixture {
   }
 }
 
-private enum StabilityProbeOutcome: Sendable {
+enum StabilityProbeOutcome: Sendable {
   case available
   case unavailable(String)
 }
 
-private actor StabilityProbeState {
+actor StabilityProbeState {
   private var outcome: StabilityProbeOutcome = .available
   private var count = 0
 
@@ -431,7 +392,7 @@ private actor StabilityProbeState {
   }
 }
 
-private struct StabilityFixtureProvider: AgentProvider, Sendable {
+struct StabilityFixtureProvider: AgentProvider, Sendable {
   let descriptor: AgentProviderDescriptor
   let state: StabilityProbeState
 

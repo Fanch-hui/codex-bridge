@@ -106,7 +106,7 @@ final class ServiceAgentListTests: XCTestCase {
     }
   }
 
-  func testListAgentsDisablesSubmissionWhenExecutableIdentityChanges() async throws {
+  func testListAgentsAutomaticallyRestoresCompatibleUpdatedInstallation() async throws {
     let fixture = try await makeServiceApplicationFixture(self)
     let executableURL = fixture.root.appending(path: "opencode-list-stale-fixture")
     try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executableURL)
@@ -125,7 +125,7 @@ final class ServiceAgentListTests: XCTestCase {
         enableOnSuccess: true
       )
     )
-    try Data("#!/bin/sh\nexit 1\n".utf8).write(to: executableURL)
+    try Data("#!/bin/sh\n# updated build\nexit 0\n".utf8).write(to: executableURL)
     let application = makeServiceApplication(
       fixture: fixture,
       catalogScript: serviceModelCatalogScript,
@@ -138,9 +138,9 @@ final class ServiceAgentListTests: XCTestCase {
     )
 
     let agent = try XCTUnwrap(list.agents.first)
-    XCTAssertEqual(agent.availability, "needs_review")
-    XCTAssertFalse(agent.taskSubmissionEnabled)
-    XCTAssertEqual(agent.workspaceEnforcement, "unavailable")
+    XCTAssertEqual(agent.availability, "available")
+    XCTAssertTrue(agent.taskSubmissionEnabled)
+    XCTAssertEqual(agent.workspaceEnforcement, "provider_native")
   }
 }
 

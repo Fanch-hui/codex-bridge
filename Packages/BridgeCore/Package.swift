@@ -312,6 +312,7 @@ var windowsApplicationLinkerFlags = [
       path: "Tests/BridgeServiceCoreTests",
       sources: [
         "ServiceAgentRegistryStabilityTests.swift",
+        "ServiceAgentRegistryUpdateTests.swift",
         "ServiceAgentRegistryRecoveryTests.swift",
         "ServiceTaskCompletionSummaryTests.swift",
         "TestSupport.swift",

@@ -45,7 +45,8 @@
 
   func makeManagement(
     availableAgentCount: Int = 0,
-    installationCount: Int = 0
+    installationCount: Int = 0,
+    installationItems: [BridgeDesktopAgentInstallationRow] = []
   ) -> WindowsManagementDisplay {
     WindowsManagementDisplay(
       connectionState: .connected,
@@ -66,7 +67,9 @@
         selectedProviderIndex: nil,
         providerDetailText: "",
         providerRequiresConfiguration: false,
-        installationRows: Array(repeating: "Agent", count: installationCount),
+        installationRows: installationItems.isEmpty
+          ? Array(repeating: "Agent", count: installationCount)
+          : installationItems.map(\.displayName),
         selectedInstallationIndex: nil,
         installationDetailText: "",
         registerEnabled: false,
@@ -75,8 +78,27 @@
         reprobeEnabled: false,
         acceptReplacementEnabled: false,
         removeEnabled: false,
-        statusText: ""
+        statusText: "",
+        installationItems: installationItems
       )
+    )
+  }
+
+  func makeAgentInstallationRow(
+    displayName: String,
+    enabled: Bool,
+    availability: String
+  ) -> BridgeDesktopAgentInstallationRow {
+    BridgeDesktopAgentInstallationRow(
+      installationID: displayName,
+      providerID: "opencode",
+      displayName: displayName,
+      executablePath: "C:/fixture/agent.exe",
+      adapterRevision: 1,
+      trustProfile: "managed",
+      enabled: enabled,
+      availability: availability,
+      updatedAt: ""
     )
   }
 

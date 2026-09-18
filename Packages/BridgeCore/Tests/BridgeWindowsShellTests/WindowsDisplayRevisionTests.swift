@@ -58,5 +58,60 @@
       XCTAssertEqual(box.revision, 1)
       XCTAssertEqual(box.current(), changed)
     }
+
+    func testOverviewAgentReconnectStateChangesAndIgnoresDisabledInstallations() {
+      let workbench = makeWorkbench()
+      let reconnecting = makeAgentInstallationRow(
+        displayName: "AGY CLI",
+        enabled: true,
+        availability: "needs_review"
+      )
+      let reconnectingState = WindowsDesktopUIStateBuilder.build(
+        workbench: workbench,
+        management: makeManagement(
+          installationItems: [reconnecting]
+        ),
+        connections: makeConnections(tunnel: nil)
+      )
+      let reconnectingRow = reconnectingState.overview?.services.first {
+        $0.id == "local-agents"
+      }
+      XCTAssertEqual(reconnectingRow?.value, "AGY CLI 需要重新连接")
+      XCTAssertEqual(reconnectingRow?.tone, .warning)
+      XCTAssertEqual(reconnectingRow?.destination, .connections)
+
+      let disabled = makeAgentInstallationRow(
+        displayName: "AGY CLI",
+        enabled: false,
+        availability: "unavailable"
+      )
+      let disabledState = WindowsDesktopUIStateBuilder.build(
+        workbench: workbench,
+        management: makeManagement(
+          installationItems: [disabled]
+        ),
+        connections: makeConnections(tunnel: nil)
+      )
+      let disabledRow = disabledState.overview?.services.first { $0.id == "local-agents" }
+      XCTAssertEqual(disabledRow?.value, "0 个可用 / 共 1 个")
+      XCTAssertEqual(disabledRow?.tone, .neutral)
+
+      let available = makeAgentInstallationRow(
+        displayName: "AGY CLI",
+        enabled: true,
+        availability: "available"
+      )
+      let availableState = WindowsDesktopUIStateBuilder.build(
+        workbench: workbench,
+        management: makeManagement(
+          availableAgentCount: 1,
+          installationItems: [available]
+        ),
+        connections: makeConnections(tunnel: nil)
+      )
+      let availableRow = availableState.overview?.services.first { $0.id == "local-agents" }
+      XCTAssertEqual(availableRow?.value, "1 个可用 / 共 1 个")
+      XCTAssertEqual(availableRow?.tone, .success)
+    }
   }
 #endif

@@ -13,7 +13,8 @@ enum ServiceAgentAutoDiscovery {
     dataPaths: ServiceDataPaths,
     existingInstallations: [ServiceAgentInstallationRecord] = [],
     credentialsProvided: Bool = false,
-    environment: [String: String] = ProcessInfo.processInfo.environment
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    allowGeneratedConfiguration: Bool = true
   ) throws -> [ServiceAgentRegistrationRequest] {
     switch providerID {
     case .openCode:
@@ -41,7 +42,8 @@ enum ServiceAgentAutoDiscovery {
         dataPaths: dataPaths,
         existingInstallations: existingInstallations,
         preferGeneratedConfiguration: credentialsProvided,
-        environment: environment
+        environment: environment,
+        allowGeneratedConfiguration: allowGeneratedConfiguration
       )
     case .codex:
       return []

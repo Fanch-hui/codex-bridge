@@ -120,7 +120,7 @@ Bridge 实际执行语义是：
 - ACP initialize/session 行为与 wire protocol 1；
 - 当前入口所需的 Profile/patch 结构。
 
-因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。DSH 更新后，即使路径相同，Bridge 也会因工件身份变化要求重新 Probe，而不是静默信任替换后的文件。
+因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。已启用的 DSH 更新后，Bridge 会重新解析当前运行时工件并自动 Probe；通过后沿用原连接。启动配置内容改变仍需本机确认，接口检查失败或无法确定新运行时位置时，首页“本机 Agent 引擎”会提示手动处理。
 
 ## 推荐路径：在 App 中一键连接
 

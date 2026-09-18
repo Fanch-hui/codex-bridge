@@ -33,6 +33,7 @@ enum BridgeDesktopUIStateBuilder {
     let enabledAgents = model.agentInstallations.filter {
       $0.isEnabled && $0.availability == "available"
     }.count
+    let reconnectSummary = agentReconnectSummary(from: model)
     let approvalCount = model.approvals.count + model.directApprovals.count
     let metrics = [
       BridgeDesktopMetric(
@@ -89,7 +90,11 @@ enum BridgeDesktopUIStateBuilder {
       subtitle: "全景监控后台 Service、本地 MCP、Secure Tunnel 与任务执行状态。",
       notices: notices(from: model),
       metrics: metrics,
-      services: services(from: model, enabledAgents: enabledAgents),
+      services: services(
+        from: model,
+        enabledAgents: enabledAgents,
+        reconnectSummary: reconnectSummary
+      ),
       serviceActions: [
         BridgeDesktopActionLink(
           id: "manage-connections",
@@ -120,7 +125,8 @@ enum BridgeDesktopUIStateBuilder {
 
   private static func services(
     from model: BridgeServiceAppModel,
-    enabledAgents: Int
+    enabledAgents: Int,
+    reconnectSummary: String?
   ) -> [BridgeDesktopServiceRow] {
     [
       BridgeDesktopServiceRow(
@@ -136,12 +142,26 @@ enum BridgeDesktopUIStateBuilder {
       BridgeDesktopServiceRow(
         id: "local-agents",
         title: "本机 Agent 引擎",
-        value: "\(enabledAgents) 个可用 / 共 \(model.agentInstallations.count) 个",
-        symbol: "cpu.fill",
-        tone: enabledAgents > 0 ? .success : .neutral,
+        value: reconnectSummary
+          ?? "\(enabledAgents) 个可用 / 共 \(model.agentInstallations.count) 个",
+        symbol: reconnectSummary == nil ? "cpu.fill" : "exclamationmark.triangle.fill",
+        tone: reconnectSummary == nil
+          ? (enabledAgents > 0 ? .success : .neutral)
+          : .warning,
         destination: .connections
       ),
     ]
+  }
+
+  private static func agentReconnectSummary(from model: BridgeServiceAppModel) -> String? {
+    ProjectAgentPresentation.reconnectSummary(
+      names: model.agentInstallations.compactMap { installation in
+        ProjectAgentPresentation.requiresReconnect(
+          isEnabled: installation.isEnabled,
+          availability: installation.availability
+        ) ? installation.displayName : nil
+      }
+    )
   }
 
   private static func mcpRow(from model: BridgeServiceAppModel) -> BridgeDesktopServiceRow {
