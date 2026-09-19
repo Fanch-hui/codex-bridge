@@ -6,16 +6,16 @@ Codex Bridge is a self-hosted desktop app and background service that connects C
 
 macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.0.0`, the first official Codex Bridge release.
+The current release is `v1.0.1`.
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest).
 
-| Platform | v1.0.0 package | Installation |
+| Platform | v1.0.1 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.0.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.0.0-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-1.0.1-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.0.1-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.

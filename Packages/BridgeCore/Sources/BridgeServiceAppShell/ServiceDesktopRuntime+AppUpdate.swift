@@ -13,7 +13,7 @@ extension BridgeServiceAppModel {
     #endif
     let updater = AppUpdateController(
       currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
-        as? String ?? "1.0.0",
+        as? String ?? "1.0.1",
       platform: "macos", architecture: architecture, kind: "app",
       preparePackage: { archive, release in try await installer.prepare(archive, release: release)
       },
