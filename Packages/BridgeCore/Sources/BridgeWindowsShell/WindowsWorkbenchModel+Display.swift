@@ -218,11 +218,8 @@
       }
       guard conversationDisplayTask == nil else { return }
       conversationDisplayTask = Task { [weak self] in
-        do {
-          try await Task.sleep(for: .milliseconds(33))
-        } catch {
-          return
-        }
+        await Task.yield()
+        guard !Task.isCancelled else { return }
         guard let self, self.conversation?.taskID == taskID else { return }
         self.conversationDisplayTask = nil
         self.publishDisplay()
