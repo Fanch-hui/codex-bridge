@@ -48,13 +48,19 @@ public actor OpenCodeACPEventNormalizer {
   }
 
   public func completed(stopReason: String, summary: String? = nil) throws -> AgentEventEnvelope {
-    let resolvedSummary = summary ?? latestAssistantSummary() ?? "OpenCode turn completed."
+    guard let resolvedSummary = summary ?? latestAssistantSummary(),
+      !resolvedSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+      throw OpenCodeACPError.malformedResponse
+    }
     return try envelope(.completed(summary: resolvedSummary, stopReason: stopReason))
   }
 
   public func finalizeContent() throws -> [AgentEventEnvelope] {
     try contentOrder.compactMap { key in
-      guard let state = contents[key], state.role == .assistant, !state.content.isEmpty else {
+      guard let state = contents[key], state.role == .assistant, state.kind == .message,
+        !state.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      else {
         return nil
       }
       let update = try AgentContentUpdate(
@@ -68,6 +74,14 @@ public actor OpenCodeACPEventNormalizer {
         authoritative: true
       )
       return try envelope(.content(update))
+    }
+  }
+
+  public func unfinishedToolCount() -> Int {
+    tools.values.reduce(into: 0) { count, state in
+      if state.status == .pending || state.status == .inProgress {
+        count += 1
+      }
     }
   }
 
@@ -166,6 +180,11 @@ public actor OpenCodeACPEventNormalizer {
     }
     if let rawInput = update["rawInput"] {
       state.arguments = rawInput.encodedString()
+      if let input = rawInput.objectValue {
+        state.locations = Array(
+          Set(state.locations + Self.absoluteLocations(from: input, projectRoot: projectRoot))
+        ).sorted()
+      }
     }
     if let output = Self.toolOutput(update["content"]) {
       state.output = output
@@ -174,10 +193,11 @@ public actor OpenCodeACPEventNormalizer {
       guard locations.count <= 128 else { throw OpenCodeACPError.oversizedFrame }
       state.locations = locations.compactMap { value in
         guard let path = value["path"]?.stringValue,
-          AgentPathSemantics.isAbsolute(path)
+          let absolute = Self.absolutePath(path, projectRoot: projectRoot)
         else { return nil }
-        return path
+        return absolute
       }
+      state.locations = Array(Set(state.locations)).sorted()
     }
     let name = Self.semanticToolName(title: state.title, kind: state.kind)
     let payload = try AgentToolUpdate(
@@ -316,7 +336,9 @@ public actor OpenCodeACPEventNormalizer {
 
   private func latestAssistantSummary() -> String? {
     for key in contentOrder.reversed() {
-      guard let state = contents[key], state.role == .assistant else { continue }
+      guard let state = contents[key], state.role == .assistant, state.kind == .message else {
+        continue
+      }
       let trimmed = state.content.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty else { continue }
       return String(decoding: trimmed.utf8.prefix(4 * 1_024), as: UTF8.self)
@@ -382,7 +404,9 @@ public actor OpenCodeACPEventNormalizer {
     projectRoot: String?
   ) -> [String] {
     guard let projectRoot else { return [] }
-    let keys = ["path", "filePath", "filepath", "file", "source", "destination"]
+    let keys = [
+      "path", "filePath", "filepath", "file_path", "file", "source", "destination",
+    ]
     let values = keys.compactMap { input[$0]?.stringValue }
     var paths = Set<String>()
     for value in values {

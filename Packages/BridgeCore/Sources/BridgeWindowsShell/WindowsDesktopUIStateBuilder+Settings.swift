@@ -38,9 +38,9 @@
         canSaveInstructions: settings.saveInstructionsEnabled,
         canSaveApprovalModes: settings.saveDirectApprovalEnabled
           && settings.saveTaskStartApprovalEnabled,
-        canChangeService: true,
+        canChangeService: false,
         servicePlatform: "Windows",
-        serviceDescription: "Windows 用户登录自动启动后台 Service，退出窗口后继续运行。",
+        serviceDescription: "开启后可在退出窗口后继续运行后台 Service，远程给本机发送任务时需同时将“远程任务启动”设为“自动批准”。",
         serviceStatus: service.status,
         serviceStatusTitle: service.title,
         serviceStatusMessage: service.message,
@@ -68,29 +68,17 @@
         return (
           "enabled",
           "已启用",
-          "Windows 用户登录后自动启动后台 Service，退出窗口后继续运行。",
+          "Windows 用户登录后自动启动后台 Service。",
           .success,
-          [
-            BridgeDesktopActionLink(
-              id: "unregister-service",
-              title: "停用后台服务",
-              command: .unregisterService
-            )
-          ]
+          []
         )
       }
       return (
         "not_registered",
         "未注册",
-        "注册后台服务后，Windows 用户登录时会自动启动后台 Service，退出窗口后继续运行。",
+        "下次启动时会自动注册后台 Service。",
         .warning,
-        [
-          BridgeDesktopActionLink(
-            id: "register-service",
-            title: "注册后台服务",
-            command: .registerService
-          )
-        ]
+        []
       )
     }
 

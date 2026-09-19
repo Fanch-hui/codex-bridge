@@ -50,10 +50,6 @@
       } else {
         windowsConversationPresentationCache.reset()
       }
-      let conversationText = windowsConversationPresentationCache.text(
-        isStreaming: conversation?.isStreaming == true || task?.isRunning == true,
-        errorMessage: conversation?.errorMessage
-      )
       let approvalItems = cached.approvalItems
       let selectedApprovalIndex = selectedApprovalID.flatMap { selectedID in
         approvalItems.firstIndex(where: { $0.id == selectedID })
@@ -145,7 +141,6 @@
             for: task,
             projectName: task.map { cached.projectName(for: $0.projectID) }
           ),
-          conversationText: conversationText,
           interruptEnabled: connectionState == .connected
             && TaskInspectorPresentation.canInterrupt(task),
           stopEnabled: connectionState == .connected && task?.isActive == true,
@@ -180,7 +175,8 @@
           defaultModel: modelPreferences?.executionModel ?? models.first?.displayName
             ?? models.first?.modelID,
           availableModelCount: models.count,
-          modelError: modelError
+          modelError: modelError,
+          commandReceipt: workbenchCommandReceipt
         )
       )
     }
@@ -222,11 +218,8 @@
       }
       guard conversationDisplayTask == nil else { return }
       conversationDisplayTask = Task { [weak self] in
-        do {
-          try await Task.sleep(for: .milliseconds(33))
-        } catch {
-          return
-        }
+        await Task.yield()
+        guard !Task.isCancelled else { return }
         guard let self, self.conversation?.taskID == taskID else { return }
         self.conversationDisplayTask = nil
         self.publishDisplay()
@@ -235,7 +228,7 @@
 
     private static func sessionRowText(_ session: WorkbenchSessionItem) -> String {
       let task = session.latestTask
-      let state = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
+      let state = WorkbenchTaskTextPresentation.statusLabel(task.status)
       let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
         title: session.title,
         turnCount: session.turnCount
@@ -248,7 +241,7 @@
       projectName: String
     ) -> WindowsRecentTaskPresentation {
       let task = session.latestTask
-      let status = task.isRunning ? "运行中" : (task.isTerminal ? "已结束" : task.status)
+      let status = WorkbenchTaskTextPresentation.statusLabel(task.status)
       return WindowsRecentTaskPresentation(
         taskID: task.taskID,
         title: WorkbenchTaskTextPresentation.sessionMenuTitle(

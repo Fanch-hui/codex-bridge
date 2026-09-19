@@ -45,14 +45,13 @@
               <span class="section-icon icon-tile" data-symbol="gauge.with.needle" aria-hidden="true"></span>
               <div>
                 <h2 id="overview-title">概览</h2>
-                <p id="overview-subtitle"></p>
               </div>
             </div>
 
             <div class="notice-stack" id="notices" aria-live="polite"></div>
+            <div class="app-update" id="app-update" aria-live="polite" hidden></div>
 
-            <section class="content-section" aria-labelledby="metrics-title">
-              <h3 id="metrics-title">关键指标</h3>
+            <section class="content-section" aria-label="任务与项目统计">
               <div class="metrics-grid" id="metrics"></div>
             </section>
 
@@ -115,6 +114,7 @@
     </div>
     <div class="feedback-layer" id="feedback-layer" hidden></div>
     <script src="pages-common.js"></script>
+    <script src="app-update.js"></script>
     <script src="pages-native-permissions.js"></script>
     <script src="pages-workbench-controls.js"></script>
     <script src="pages-workbench-conversation.js"></script>

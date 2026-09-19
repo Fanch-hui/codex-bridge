@@ -286,7 +286,9 @@ extension MCPServiceToolDispatcher {
           "Argument 'working_directory' must be a safe relative path.")
       }
     }
-    let yieldTimeMS = try values.optionalNonnegativeInteger("yield_time_ms").map(Int.init)
+    let yieldTimeMS = try values.optionalNonnegativeInteger(
+      "yield_time_ms", maximum: 60_000
+    ).map(Int.init)
     let timeoutMS = try values.optionalPositiveInteger(
       "timeout_ms", maximum: 3_600_000)
     let tty = try values.optionalBoolean("tty") ?? false
@@ -331,8 +333,9 @@ extension MCPServiceToolDispatcher {
       actionName: actionName,
       arguments: arguments,
       projectID: try values.requiredIdentifier("project_id", maximumUTF8Bytes: 128),
-      yieldTimeMS: try values.optionalNonnegativeInteger("yield_time_ms").map(Int.init)
-        ?? 15_000,
+      yieldTimeMS: try values.optionalNonnegativeInteger(
+        "yield_time_ms", maximum: 60_000
+      ).map(Int.init) ?? 15_000,
       timeoutMS: try values.optionalPositiveInteger("timeout_ms", maximum: 3_600_000) ?? 300_000,
       clientRequestID: try values.optionalIdentifier("client_request_id", maximumUTF8Bytes: 512)
     )

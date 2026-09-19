@@ -12,9 +12,8 @@ extension BridgeServiceAppModel {
   ) async {
     async let directConfigurationResult = optional { try await client.directConfiguration() }
     async let projectResult = optional { try await client.projects() }
-    let scanAgents = agentProviders.isEmpty || forceCatalogRefresh
     async let agentCatalogResult = optional {
-      try await client.agentCatalog(forceRefresh: scanAgents)
+      try await client.agentCatalog()
     }
     async let taskResult = optional {
       try await client.tasks(IPCTaskListRequest(limit: 200))
@@ -99,7 +98,7 @@ extension BridgeServiceAppModel {
     }
   }
 
-  private func applyAgentCatalogSnapshot(_ value: IPCAgentCatalogResponse) {
+  func applyAgentCatalogSnapshot(_ value: IPCAgentCatalogResponse) {
     if agentProviders != value.providers { agentProviders = value.providers }
     if agentInstallations != value.installations { agentInstallations = value.installations }
   }

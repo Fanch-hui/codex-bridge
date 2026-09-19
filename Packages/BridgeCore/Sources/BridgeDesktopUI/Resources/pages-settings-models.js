@@ -44,11 +44,14 @@
     return selected && selected.defaultReasoningEffort ? selected.defaultReasoningEffort : "";
   }
 
-  function create(page, emit) {
+  function create(page, emit, embedded) {
     var context = { page: page, emit: emit };
-    var card = S.node("section", "page-card settings-card");
-    card.appendChild(S.node("h3", null, "模型与执行默认偏好"));
-    var grid = S.node("div", "form-grid");
+    var card = S.node(
+      embedded ? "div" : "section",
+      embedded ? "settings-subsection" : "page-card settings-card"
+    );
+    card.appendChild(S.node(embedded ? "h4" : "h3", null, "Codex"));
+    var grid = S.node("div", "form-grid codex-preferences-grid");
     var model = S.selectField(
       "执行模型", page.executionModel,
       S.choices(page.executionModel, modelChoices(page.models)), function () {}, "");
@@ -114,9 +117,6 @@
       if (!toggle.control.disabled) {
         context.emit("setFastMode", { fastModeEnabled: toggle.control.checked });
       }
-    });
-    refreshModels.addEventListener("click", function () {
-      if (!refreshModels.disabled) context.emit("refreshModels", {});
     });
     save.addEventListener("click", function () {
       if (save.disabled) return;

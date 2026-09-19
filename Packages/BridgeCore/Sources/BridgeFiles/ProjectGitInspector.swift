@@ -13,24 +13,39 @@ public struct ProjectGitInspector: Sendable {
       canonicalURL: URL(fileURLWithPath: root.canonicalPath, isDirectory: true))
     let git = try Self.gitExecutable()
 
-    async let statusTask = runGit(
+    let status = try await runGit(
       git: git,
       workingDirectory: workingDirectory,
-      arguments: ["status", "--porcelain=v1", "-z"]
+      arguments: [
+        "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=all", "--",
+      ]
     )
+    if isGitRepositoryFailure(status) {
+      return ProjectChangesResult(
+        changedFiles: [],
+        diff: "",
+        additions: 0,
+        deletions: 0,
+        truncated: false,
+        notGitRepository: true
+      )
+    }
+    try requireSuccess(status)
+
     async let diffTask = runGit(
       git: git,
       workingDirectory: workingDirectory,
-      arguments: ["diff", "--no-ext-diff", "--no-color"]
+      arguments: ["diff", "--no-ext-diff", "--no-textconv", "--no-color", "--"]
     )
     async let cachedTask = runGit(
       git: git,
       workingDirectory: workingDirectory,
-      arguments: ["diff", "--cached", "--no-ext-diff", "--no-color"]
+      arguments: ["diff", "--cached", "--no-ext-diff", "--no-textconv", "--no-color", "--"]
     )
-    let (status, diff, cached) = try await (statusTask, diffTask, cachedTask)
-    let notGitRepository = isGitRepositoryFailure(status)
-    let changedFiles = parseStatus(status)
+    let (diff, cached) = try await (diffTask, cachedTask)
+    try requireSuccess(diff)
+    try requireSuccess(cached)
+    let changedFiles = try parseStatus(status)
     let combined = combine(diff.standardOutput, cached.standardOutput)
     let stats = diffStatistics(combined)
     let output = boundedOutput(combined)
@@ -40,15 +55,27 @@ public struct ProjectGitInspector: Sendable {
       additions: stats.additions,
       deletions: stats.deletions,
       truncated: output.truncated,
-      notGitRepository: notGitRepository
+      notGitRepository: false
     )
   }
 
   private func isGitRepositoryFailure(_ result: BoundedProcessResult) -> Bool {
-    if case .exited(let code) = result.termination {
-      return code == 128
+    guard case .exited(128) = result.termination else { return false }
+    return String(decoding: result.standardError, as: UTF8.self)
+      .lowercased()
+      .contains("not a git repository")
+  }
+
+  private func requireSuccess(_ result: BoundedProcessResult) throws {
+    if case .outputLimit = result.termination {
+      throw ProjectGitInspectorError.commandOutputLimitExceeded
     }
-    return false
+    guard case .exited(let code) = result.termination, code == 0 else {
+      throw ProjectGitInspectorError.commandFailed
+    }
+    guard !result.standardOutputTruncated, !result.standardErrorTruncated else {
+      throw ProjectGitInspectorError.commandOutputLimitExceeded
+    }
   }
 
   private func runGit(
@@ -61,7 +88,7 @@ public struct ProjectGitInspector: Sendable {
     return try await runner.run(
       BoundedProcessConfiguration(
         executableURL: URL(fileURLWithPath: git),
-        arguments: arguments,
+        arguments: Self.globalGitArguments + arguments,
         workingDirectory: workingDirectory,
         environment: Self.gitEnvironment(),
         timeout: .seconds(10),
@@ -83,31 +110,96 @@ public struct ProjectGitInspector: Sendable {
     #endif
   }
 
+  private static let globalGitArguments = [
+    "--no-pager",
+    "--no-optional-locks",
+    "-c", "core.quotepath=false",
+    "-c", "color.ui=false",
+    "-c", "core.fsmonitor=false",
+    "-c", "core.untrackedCache=false",
+    "-c", "submodule.recurse=false",
+  ]
+
   private static func gitEnvironment() -> [String] {
     #if os(Windows)
       let source = ProcessInfo.processInfo.environment
       let keys = [
         "SystemRoot", "WINDIR", "SystemDrive", "TEMP", "TMP", "USERPROFILE", "HOME",
         "LOCALAPPDATA", "APPDATA", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
-        "PATH", "PATHEXT", "LANG", "LC_ALL",
+        "PATH", "PATHEXT", "COMSPEC",
       ]
-      return keys.compactMap { key in
-        guard
-          let sourceKey = source.keys.first(where: {
-            $0.caseInsensitiveCompare(key) == .orderedSame
-          })
-        else { return nil }
-        return "\(key)=\(source[sourceKey] ?? "")"
-      } + ["GIT_OPTIONAL_LOCKS=0"]
+      return [
+        "LANG=C",
+        "LC_ALL=C",
+        "GIT_CONFIG_NOSYSTEM=1",
+        "GIT_CONFIG_GLOBAL=NUL",
+        "GIT_ATTR_NOSYSTEM=1",
+        "GIT_OPTIONAL_LOCKS=0",
+        "GIT_TERMINAL_PROMPT=0",
+        "GIT_PAGER=cat",
+        "PAGER=cat",
+      ]
+        + keys.compactMap { key in
+          guard
+            let sourceKey = source.keys.first(where: {
+              $0.caseInsensitiveCompare(key) == .orderedSame
+            })
+          else { return nil }
+          return "\(key)=\(source[sourceKey] ?? "")"
+        }
     #else
-      return ["LANG=C", "LC_ALL=C", "GIT_OPTIONAL_LOCKS=0"]
+      return [
+        "PATH=/usr/bin:/bin",
+        "LANG=C",
+        "LC_ALL=C",
+        "GIT_CONFIG_NOSYSTEM=1",
+        "GIT_CONFIG_GLOBAL=/dev/null",
+        "GIT_ATTR_NOSYSTEM=1",
+        "GIT_OPTIONAL_LOCKS=0",
+        "GIT_TERMINAL_PROMPT=0",
+        "GIT_PAGER=cat",
+        "PAGER=cat",
+      ]
     #endif
   }
 
-  private func parseStatus(_ result: BoundedProcessResult) -> [String] {
-    guard case .exited(let code) = result.termination, code == 0 else { return [] }
-    let text = String(decoding: result.standardOutput, as: UTF8.self)
-    return text.split(separator: "\0", omittingEmptySubsequences: true).map(String.init)
+  private func parseStatus(_ result: BoundedProcessResult) throws -> [String] {
+    try requireSuccess(result)
+    let records = Array(result.standardOutput)
+      .split(separator: 0, omittingEmptySubsequences: true)
+      .map(Array.init)
+    var paths: [String] = []
+    var index = 0
+    while index < records.count {
+      let record = records[index]
+      guard record.count >= 4, record[2] == UInt8(ascii: " ") else {
+        throw ProjectGitInspectorError.malformedStatus
+      }
+      appendPath(record.dropFirst(3), to: &paths)
+      if record[0] == UInt8(ascii: "R") || record[0] == UInt8(ascii: "C") {
+        index += 1
+        guard index < records.count, !records[index].isEmpty else {
+          throw ProjectGitInspectorError.malformedStatus
+        }
+        appendPath(records[index], to: &paths)
+      }
+      index += 1
+    }
+    return paths
+  }
+
+  private func appendPath<S: Collection>(
+    _ bytes: S,
+    to paths: inout [String]
+  ) where S.Element == UInt8 {
+    let decoded = String(decoding: bytes, as: UTF8.self)
+    #if os(Windows)
+      let path = decoded.replacingOccurrences(of: "\\", with: "/")
+    #else
+      let path = decoded
+    #endif
+    guard !path.isEmpty else { return }
+    paths.append(path)
   }
 
   private func combine(_ a: Data, _ b: Data) -> Data {
@@ -142,4 +234,10 @@ public struct ProjectGitInspector: Sendable {
     }
     return (text, truncated)
   }
+}
+
+private enum ProjectGitInspectorError: Error, Equatable, Sendable {
+  case commandFailed
+  case commandOutputLimitExceeded
+  case malformedStatus
 }

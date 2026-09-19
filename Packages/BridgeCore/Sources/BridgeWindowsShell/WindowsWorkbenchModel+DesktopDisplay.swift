@@ -230,19 +230,7 @@
       pendingUserInput: Bool = false
     ) -> String {
       if pendingUserInput { return "等待回答" }
-      switch task.status {
-      case "awaiting_local_approval": return "等待本机批准"
-      case "starting": return "正在启动"
-      case "running": return "运行中"
-      case "waiting_for_codex_approval": return "等待 Codex 审批"
-      case "completed": return "已完成"
-      case "failed": return "失败"
-      case "interrupted": return "已中断"
-      default:
-        if task.isRunning { return "运行中" }
-        if task.isTerminal { return "已结束" }
-        return task.status
-      }
+      return WorkbenchTaskTextPresentation.statusLabel(task.status)
     }
   }
 #endif

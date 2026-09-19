@@ -14,6 +14,7 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
   public let logs: BridgeDesktopLogsState?
   public let connections: BridgeDesktopConnectionsState?
   public let settings: BridgeDesktopSettingsState?
+  public let appUpdate: BridgeDesktopAppUpdateState?
 
   public init(
     hostContext: BridgeDesktopHostContext? = nil,
@@ -28,7 +29,8 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
     projects: BridgeDesktopProjectsState? = nil,
     logs: BridgeDesktopLogsState? = nil,
     connections: BridgeDesktopConnectionsState? = nil,
-    settings: BridgeDesktopSettingsState? = nil
+    settings: BridgeDesktopSettingsState? = nil,
+    appUpdate: BridgeDesktopAppUpdateState? = nil
   ) {
     self.hostContext = hostContext
     self.navigation = navigation
@@ -43,5 +45,6 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
     self.logs = logs
     self.connections = connections
     self.settings = settings
+    self.appUpdate = appUpdate
   }
 }

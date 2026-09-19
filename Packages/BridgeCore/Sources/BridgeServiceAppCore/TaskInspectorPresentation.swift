@@ -1,9 +1,7 @@
 import BridgeIPC
 import BridgeMCP
 
-/// Platform-neutral text and action rules used by native desktop inspectors.
-/// The Windows shell renders the returned strings in Win32 controls while the
-/// macOS shell keeps its existing SwiftUI presentation unchanged.
+/// Platform-neutral text and action rules for desktop task inspectors.
 public enum TaskInspectorPresentation {
   public static func metadata(
     for task: MCPServiceTaskSnapshot,

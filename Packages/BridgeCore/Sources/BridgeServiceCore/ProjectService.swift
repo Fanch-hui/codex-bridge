@@ -53,12 +53,7 @@ public actor ServiceProjectService {
     _ policy: ProjectAccessPolicy,
     projectID: ProjectID
   ) async throws -> ServiceProjectRecord {
-    guard let current = try await store.project(id: projectID) else {
-      throw ServiceStoreError.unknownProject(projectID)
-    }
-    let updated = try current.updatingAccessPolicy(policy, at: now())
-    try await store.updateProject(updated)
-    return updated
+    try await store.updateProjectAccessPolicy(policy, projectID: projectID, at: now())
   }
 
   @discardableResult
@@ -68,16 +63,16 @@ public actor ServiceProjectService {
     commandBlacklist: [ServiceCommandBlacklistRule] = [],
     projectID: ProjectID
   ) async throws -> ServiceProjectRecord {
-    guard let current = try await store.project(id: projectID) else {
-      throw ServiceStoreError.unknownProject(projectID)
-    }
-    let updated = try current.updatingWorkspaceConfiguration(
+    try await store.updateWorkspaceConfiguration(
+      projectID: projectID,
       directCommandMode: directCommandMode,
       workspaceCommands: workspaceCommands,
       commandBlacklist: commandBlacklist,
       at: now()
     )
-    try await store.updateProject(updated)
+    guard let updated = try await store.project(id: projectID) else {
+      throw ServiceStoreError.unknownProject(projectID)
+    }
     return updated
   }
 

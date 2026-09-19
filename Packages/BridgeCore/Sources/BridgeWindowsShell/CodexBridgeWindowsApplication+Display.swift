@@ -57,7 +57,7 @@
           model.displayBox.revision, management.displayBox.revision,
           auxiliary.workspace.displayBox.revision, auxiliary.agentDefaults.displayBox.revision,
           auxiliary.logs.displayBox.revision, auxiliary.settings.displayBox.revision,
-          auxiliary.connections.displayBox.revision,
+          auxiliary.connections.displayBox.revision, appUpdateRevision,
         ],
         page: selectedPage,
         feedback: model.feedback.current,
@@ -71,7 +71,10 @@
       let auxiliarySnapshot = auxiliary.desktopDisplaySnapshot()
       let display = model.displayBox.current()
       let managementDisplay = management.displayBox.current()
-      let chatSlotEnabled = chat.state == .active && display.browserEnabled
+      let chatSlotEnabled =
+        chat.state == .active
+        && display.browserEnabled
+        && model.feedback.current?.kind != .alert
       let state = WindowsDesktopUIStateBuilder.build(
         workbench: display,
         management: managementDisplay,
@@ -86,7 +89,8 @@
         browserStatus: browserStatus(for: chat),
         browserCanGoBack: chat.canGoBack,
         browserCanGoForward: chat.canGoForward,
-        feedback: model.feedback.current
+        feedback: model.feedback.current,
+        appUpdate: appUpdateState,
       )
       let snapshot = WindowsDesktopRenderSnapshot(
         state: state,
@@ -112,8 +116,8 @@
       snapshot: WindowsDesktopRenderSnapshot,
       desktopUI: WindowsDesktopUIWebView
     ) {
-      desktopUI.setState(snapshot.state)
       WindowsMainWindow.setChatSlotEnabled(snapshot.chatSlotEnabled)
+      desktopUI.setState(snapshot.state)
       WindowsMainWindowChrome.updateStatus(
         connectionLabel: snapshot.state.connectionLabel,
         runningTasks: snapshot.runningTaskCount,

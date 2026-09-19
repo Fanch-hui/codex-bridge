@@ -3,7 +3,7 @@ import BridgeServiceApplication
 import BridgeServiceCore
 import Foundation
 
-struct ServiceAgentDiscoverySummary: Equatable, Sendable {
+struct ServiceAgentDiscoverySummary: Codable, Equatable, Sendable {
   let state: String
   let message: String?
   let executablePath: String?
@@ -17,14 +17,17 @@ struct ServiceAgentDiscoverySummary: Equatable, Sendable {
   )
 }
 
-/// Caches filesystem-only Agent discovery for the lifetime of a service.
+/// Shares filesystem discovery until a desktop client explicitly requests a scan.
 /// Registration and Probe remain explicit user actions.
 actor ServiceAgentDiscoveryCatalog {
-  private let environment: [String: String]
+  private let environment: [String: String]?
+  private let cacheURL: URL?
   private var cached: [AgentProviderID: ServiceAgentDiscoverySummary]?
 
-  init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+  init(environment: [String: String]? = nil, cacheURL: URL? = nil) {
     self.environment = environment
+    self.cacheURL = cacheURL
+    self.cached = cacheURL.flatMap(ServiceAgentDiscoveryCache.load)
   }
 
   func summaries(
@@ -33,11 +36,15 @@ actor ServiceAgentDiscoveryCatalog {
     forceRefresh: Bool = false
   ) -> [AgentProviderID: ServiceAgentDiscoverySummary] {
     if cached == nil || forceRefresh {
+      let currentEnvironment = environment ?? ServiceAgentDiscoveryEnvironment.current()
       cached = ServiceAgentAutoDiscovery.discoverySummaries(
         providerIDs: providerIDs,
         existingInstallations: existingInstallations,
-        environment: environment
+        environment: currentEnvironment
       )
+      if let cached, let cacheURL {
+        try? ServiceAgentDiscoveryCache.save(cached, to: cacheURL)
+      }
     }
     let values = cached ?? [:]
     return Dictionary(
@@ -82,7 +89,7 @@ extension ServiceAgentAutoDiscovery {
     case .openCode:
       let requests = try commandLineRequests(
         providerID: providerID,
-        names: ["opencode"],
+        names: ["opencode", "opencode-cli"],
         displayName: "OpenCode",
         trustProfile: .managed,
         securityProfileID: ServiceAgentProviderPolicyRegistry.controlledReadOnlyProfileID,
@@ -139,7 +146,14 @@ extension ServiceAgentAutoDiscovery {
         return true
       #endif
     })
-    guard let executable else { return .notFound }
+    guard let executable else {
+      return ServiceAgentDiscoverySummary(
+        state: "not_found",
+        message: "未找到已构建的 DSH 安装。请确认构建完成；也可在高级路径登记中选择 apps/cli/lib/bin.js。",
+        executablePath: nil,
+        configurationPath: nil
+      )
+    }
 
     let configuration = deepSeekConfigurationCandidates(
       existingInstallations: existingInstallations,

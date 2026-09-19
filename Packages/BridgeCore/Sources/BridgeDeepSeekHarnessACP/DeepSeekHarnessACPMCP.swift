@@ -9,7 +9,8 @@ enum DeepSeekHarnessACPMCP {
     networkAllowed: Bool
   ) throws -> [ACPJSONValue] {
     let permitted = servers.filter { $0.transport == .stdio || networkAllowed }
-    guard permitted.isEmpty || initialization.supportsMCPHTTP else {
+    let httpServers = permitted.filter { $0.transport == .http }
+    guard httpServers.isEmpty || initialization.supportsMCPHTTP else {
       throw AgentRuntimeError.capabilityUnavailable(.mcpClient)
     }
     return try permitted.map { server in

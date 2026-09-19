@@ -13,6 +13,7 @@ final class DirectGitIndexTransaction: @unchecked Sendable {
   private let indexURL: URL
   private let lockURL: URL
   private let snapshotURL: URL
+  private var ownsLock = true
   #if os(Windows)
     private var lockHandle: HANDLE = INVALID_HANDLE_VALUE
 
@@ -151,6 +152,8 @@ final class DirectGitIndexTransaction: @unchecked Sendable {
   }
 
   func cancel() {
+    guard ownsLock else { return }
+    ownsLock = false
     #if os(Windows)
       if lockHandle != INVALID_HANDLE_VALUE {
         _ = CloseHandle(lockHandle)
@@ -216,6 +219,7 @@ final class DirectGitIndexTransaction: @unchecked Sendable {
           "The commit was created, but the real Git index could not be installed."
         )
       }
+      ownsLock = false
       try? FileManager.default.removeItem(at: snapshotURL)
     #else
       guard lockDescriptor >= 0 else {
@@ -247,6 +251,7 @@ final class DirectGitIndexTransaction: @unchecked Sendable {
           "The commit was created, but the real Git index could not be installed."
         )
       }
+      ownsLock = false
       try? FileManager.default.removeItem(at: snapshotURL)
     #endif
   }

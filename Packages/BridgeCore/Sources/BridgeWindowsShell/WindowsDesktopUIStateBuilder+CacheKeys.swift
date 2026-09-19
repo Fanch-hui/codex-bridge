@@ -17,6 +17,7 @@
     let projectCount: Int
     let installationCount: Int
     let availableAgentCount: Int
+    let agentReconnectSummary: String?
     let recentTasks: [WindowsRecentTaskPresentation]
     let tunnel: BridgeDesktopTunnelState?
   }
@@ -38,6 +39,7 @@
     let defaultModel: String?
     let availableModelCount: Int
     let modelError: String?
+    let commandReceipt: BridgeDesktopWorkbenchCommandReceipt?
     let browserAvailable: Bool
     let browserURL: String?
     let browserStatus: String?
@@ -73,6 +75,7 @@
       defaultModel = workbench.defaultModel
       availableModelCount = workbench.availableModelCount
       modelError = workbench.modelError
+      commandReceipt = workbench.commandReceipt
       self.browserAvailable = browserAvailable
       self.browserURL = browserURL
       self.browserStatus = browserStatus

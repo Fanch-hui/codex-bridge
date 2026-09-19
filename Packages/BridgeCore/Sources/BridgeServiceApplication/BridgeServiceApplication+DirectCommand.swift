@@ -29,6 +29,7 @@ extension BridgeServiceApplication {
   package func shutdownDirectOperations() async {
     await directCommands.cancelAll()
     await approvals.cancelAll()
+    await workspaceGate.releaseAll()
   }
 
   public func serviceDirectExecCommand(

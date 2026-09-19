@@ -58,7 +58,6 @@
     public var selectedTaskID: String?
     public var selectedTaskIndex: Int?
     public var taskMetadata: String
-    public var conversationText: String
     public var interruptEnabled: Bool
     public var stopEnabled: Bool
     public var deleteEnabled: Bool
@@ -82,6 +81,7 @@
     public var defaultModel: String? = nil
     public var availableModelCount: Int = 0
     public var modelError: String? = nil
+    public var commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil
   }
 
   /// Lock-guarded bridge between main-actor model updates and the
@@ -112,7 +112,6 @@
       selectedTaskID: nil,
       selectedTaskIndex: nil,
       taskMetadata: "未选择任务",
-      conversationText: "请从上方选择任务。",
       interruptEnabled: false,
       stopEnabled: false,
       deleteEnabled: false,
@@ -181,6 +180,7 @@
     var workbenchPermissionMode = "workspace-write"
     var isChatBrowserEnabled = true
     var selectedTaskID: String?
+    var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
     var conversation: TaskConversationModel?
     var conversationPresentationCache = TaskConversationPresentationCache()
     var windowsConversationPresentationCache = WindowsConversationPresentationCache()

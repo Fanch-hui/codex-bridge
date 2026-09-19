@@ -66,8 +66,6 @@ public actor ServiceComposition {
     let projects = ServiceProjectService(store: store)
     let tasks = ServiceTaskManager(store: store)
     let settings = ServiceSettings(store: store)
-    try await settings.setExposureMode(.full)
-    try await settings.setQwenStudioExposureMode(.full)
     let deepSeekHarnessMCP = ServiceDeepSeekHarnessMCPConfiguration(
       settings: settings, secretStore: secretStore)
     let deepSeekBaseURL = try await settings.string(for: .deepSeekHarnessBaseURL)
@@ -103,13 +101,18 @@ public actor ServiceComposition {
     ]
     let agentRegistry = ServiceAgentRegistry(
       store: store,
-      providers: agentProviders
+      providers: agentProviders,
+      resolveUpdatedInstallation: { existing in
+        try ServiceAgentAutoDiscovery.updatedInstallationRequest(
+          for: existing,
+          dataPaths: paths,
+          environment: ServiceAgentDiscoveryEnvironment.current()
+        )
+      }
     )
     _ = try await agentRegistry.refreshInstallationStates()
-    let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog()
-    _ = await agentDiscoveryCatalog.summaries(
-      providerIDs: agentProviders.map(\.descriptor.providerID),
-      existingInstallations: try await agentRegistry.installations()
+    let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog(
+      cacheURL: paths.agentStateURL.appendingPathComponent("discovered-agents.json")
     )
     let agentRunner = ServiceAgentTaskRunner(
       registry: agentRegistry,

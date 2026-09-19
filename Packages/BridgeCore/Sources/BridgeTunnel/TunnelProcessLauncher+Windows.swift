@@ -177,7 +177,8 @@
               nil,
               nil,
               true,
-              DWORD(CREATE_UNICODE_ENVIRONMENT) | DWORD(CREATE_NO_WINDOW),
+              DWORD(CREATE_UNICODE_ENVIRONMENT) | DWORD(CREATE_NO_WINDOW)
+                | DWORD(CREATE_SUSPENDED),
               UnsafeMutableRawPointer(mutating: environmentWide),
               workingWide,
               &startup,
@@ -187,16 +188,20 @@
         }
       }
       guard launched else { throw TunnelManagerError.launchFailed }
-      _ = CloseHandle(processInformation.hThread)
       _ = CloseHandle(stdinHandle)
       _ = CloseHandle(stdoutPipe.write)
       _ = CloseHandle(stderrPipe.write)
+      var jobHandle: HANDLE = INVALID_HANDLE_VALUE
       do {
-        let jobHandle = try Self.makeJobObject(assigning: processInformation.hProcess)
+        jobHandle = try Self.makeJobObject(assigning: processInformation.hProcess)
         try helperVerifier.verifyRunning(
           processID: Int32(bitPattern: processInformation.dwProcessId),
           expectedIdentity: verifiedHelper.codeIdentity
         )
+        guard ResumeThread(processInformation.hThread) != DWORD.max else {
+          throw TunnelManagerError.launchFailed
+        }
+        _ = CloseHandle(processInformation.hThread)
         let stdout = RedactedOutputBuffer(limit: outputLimit, sensitiveValues: sensitiveValues)
         let stderr = RedactedOutputBuffer(limit: outputLimit, sensitiveValues: sensitiveValues)
         succeeded = true
@@ -210,8 +215,15 @@
           stderrHandle: stderrPipe.read
         )
       } catch {
+        if processInformation.hThread != INVALID_HANDLE_VALUE {
+          _ = CloseHandle(processInformation.hThread)
+        }
         _ = TerminateProcess(processInformation.hProcess, 1)
+        _ = WaitForSingleObject(processInformation.hProcess, 1_000)
         _ = CloseHandle(processInformation.hProcess)
+        if jobHandle != INVALID_HANDLE_VALUE {
+          _ = CloseHandle(jobHandle)
+        }
         throw error
       }
     }
@@ -275,15 +287,53 @@
       runtimePath: String,
       additions: [(String, String)]
     ) -> String {
-      var entries = currentEnvironmentEntries()
+      var values: [String: String] = [:]
+      for entry in currentEnvironmentEntries() {
+        guard let separator = environmentSeparator(in: entry) else { continue }
+        let name = String(entry[..<separator])
+        let value = String(entry[entry.index(after: separator)...])
+        upsertEnvironmentValue(value, for: name, in: &values)
+      }
       for (name, value) in additions {
-        if let index = entries.firstIndex(where: { $0.hasPrefix(name + "=") }) {
-          entries[index] = name + "=" + value
-        } else {
-          entries.append(name + "=" + value)
+        upsertEnvironmentValue(value, for: name, in: &values)
+      }
+      let entries = values.sorted {
+        windowsEnvironmentNameCompare($0.key, $1.key) == 1
+      }.map { "\($0.key)=\($0.value)" }
+      return entries.joined(separator: "\0") + "\0\0"
+    }
+
+    private static func windowsEnvironmentNameCompare(_ lhs: String, _ rhs: String) -> CInt {
+      lhs.withCString(encodedAs: UTF16.self) { left in
+        rhs.withCString(encodedAs: UTF16.self) { right in
+          CompareStringOrdinal(left, -1, right, -1, true)
         }
       }
-      return entries.joined(separator: "\0") + "\0\0"
+    }
+
+    private static func upsertEnvironmentValue(
+      _ value: String,
+      for name: String,
+      in values: inout [String: String]
+    ) {
+      if let existing = values.keys.first(where: {
+        windowsEnvironmentNameCompare($0, name) == 2
+      }) {
+        values.removeValue(forKey: existing)
+      }
+      values[name] = value
+    }
+
+    private static func environmentSeparator(in entry: String) -> String.Index? {
+      guard let first = entry.firstIndex(of: "=") else { return nil }
+      if first == entry.startIndex {
+        let afterFirst = entry.index(after: first)
+        guard afterFirst < entry.endIndex,
+          let second = entry[afterFirst...].firstIndex(of: "=")
+        else { return nil }
+        return second
+      }
+      return first
     }
 
     private static func currentEnvironmentEntries() -> [String] {
@@ -379,5 +429,6 @@
       _ = CloseHandle(handle)
       lock.withLock { finished = true }
     }
+
   }
 #endif

@@ -293,6 +293,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let providers: [BridgeDesktopAgentProviderRow]
   public let installations: [BridgeDesktopAgentInstallationRow]
   public let canRegisterAgent: Bool
+  public let canScanAgents: Bool?
   public let isManagingAgents: Bool?
   public let agentOperationRevision: Int?
   public let statusMessage: String?
@@ -312,6 +313,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     providers: [BridgeDesktopAgentProviderRow] = [],
     installations: [BridgeDesktopAgentInstallationRow] = [],
     canRegisterAgent: Bool = true,
+    canScanAgents: Bool? = nil,
     isManagingAgents: Bool? = nil,
     agentOperationRevision: Int? = nil,
     statusMessage: String? = nil
@@ -330,6 +332,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.providers = providers
     self.installations = installations
     self.canRegisterAgent = canRegisterAgent
+    self.canScanAgents = canScanAgents
     self.isManagingAgents = isManagingAgents
     self.agentOperationRevision = agentOperationRevision
     self.statusMessage = statusMessage

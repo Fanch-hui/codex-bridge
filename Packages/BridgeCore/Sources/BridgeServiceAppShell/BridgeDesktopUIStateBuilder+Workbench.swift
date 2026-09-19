@@ -38,7 +38,8 @@ extension BridgeDesktopUIStateBuilder {
       modelCount: model.models.count,
       canRefreshModels: !model.isRefreshing,
       isRefreshingModels: model.isRefreshing,
-      modelError: model.modelCatalogError
+      modelError: model.modelCatalogError,
+      commandReceipt: model.workbenchCommandReceipt
     )
   }
 

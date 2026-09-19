@@ -1,6 +1,6 @@
 # Antigravity / AGY 连接与权限指南
 
-适用于 Codex Bridge v1.0.0。
+适用于 Codex Bridge v1.0.1。
 本指南说明如何让 Antigravity CLI 在 Codex Bridge 中正常完成只读分析、联网检索和项目写入。Bridge 使用的是 `agy` CLI 的 headless `stream-json` 模式，不是 Antigravity Desktop App。
 
 Provider ID 固定为：
@@ -10,6 +10,10 @@ antigravity
 ```
 
 省略 `provider_id` 时，Bridge 会使用 Codex，不会自动选择 AGY。
+
+## 自动发现与连接
+
+Bridge 首次初始化时扫描本机 Agent 并保存结果。打开连接页后，选择已发现的 Agent 并点击“连接”；需要授权或配置的项目会在连接时提示。后续安装或移动 Agent，可点击“扫描 Agent”更新目录。App 与后台服务重启、切页及日常状态刷新都复用保存的结果。
 
 ## Antigravity 2.0 与 AGY CLI 的关系
 
@@ -280,7 +284,7 @@ Plan 用于分析和规划，不应依赖它修改项目文件。
    只有点击同意后，Service 才会连接候选、执行 Probe，并把当前用户的 AGY Global `toolPermission` 设为 `always-proceed`；取消不会修改设置。
 4. 检查版本、能力和状态。连接流程 Probe 成功时会自动启用可用安装；手动“登记 Agent”则需在状态为“可用”后打开“启用”。
 
-AGY 更新或二进制身份变化后，Bridge 会显示“需确认更新”/`needs_review`。核对新文件来源后，点击“接受替换并 Probe”；Probe 只根据当前 CLI 的实际帮助能力判断，不使用固定版本范围。移除登记只删除 Bridge 的连接记录，不删除 AGY CLI、登录状态或 Global 配置。
+已启用的 AGY 更新或二进制身份变化后，Bridge 会自动重新 Probe；检查当前 CLI 实际帮助能力，通过后保留原连接，不使用固定版本范围。启动 App 和后台刷新都会触发检查；自动恢复不修改已有的 Always Proceed 授权。接口不兼容、旧路径无法明确重新发现等情况会在首页“本机 Agent 引擎”提醒，点击进入连接页查看原因并手动重连。移除登记只删除 Bridge 的连接记录，不删除 AGY CLI、登录状态或 Global 配置。
 
 ## 7. 刷新模型和默认值
 

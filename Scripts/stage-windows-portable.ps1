@@ -245,32 +245,14 @@ try {
   if ($desktopUIReparseItems.Count -ne 0) {
     throw "BridgeDesktopUI resources cannot contain reparse points."
   }
-  $requiredDesktopUIResources = @(
-    "index.html",
-    "host-context.js",
-    "styles.css",
-    "pages.css",
-    "windows-theme.css",
-    "windows-components.css",
-    "feedback.js",
-    "pages-common.js",
-    "pages-workbench-controls.js",
-    "pages-workbench-conversation.js",
-    "pages-workbench.js",
-    "pages-form-draft.js",
-    "pages-project-editors.js",
-    "pages-project-collections.js",
-    "pages-projects.js",
-    "pages-logs.js",
-    "pages-connections-editor.js",
-    "pages-connections.js",
-    "pages-settings-models.js",
-    "pages-settings-agents.js",
-    "pages-settings-instructions.js",
-    "pages-settings.js",
-    "pages.js",
-    "app.js"
-  )
+  $resourceSource = Join-Path $repoRoot "Packages\BridgeCore\Sources\BridgeDesktopUI\BridgeDesktopUIResources.swift"
+  Assert-RegularFile $resourceSource | Out-Null
+  $requiredDesktopUIResources = @([regex]::Matches(
+      [IO.File]::ReadAllText($resourceSource), 'case\s+\w+\s*=\s*"([^"]+)"') |
+      ForEach-Object { $_.Groups[1].Value })
+  if ($requiredDesktopUIResources.Count -eq 0) {
+    throw "BridgeDesktopUI resource manifest is empty."
+  }
   foreach ($resourceName in $requiredDesktopUIResources) {
     Assert-RegularFile (Join-Path $desktopUIResourceDirectory $resourceName) | Out-Null
   }

@@ -71,6 +71,6 @@ Type: files; Name: "{app}\payload-manifest.json"
 Name: "{group}\Codex Bridge"; Filename: "{app}\codex-bridge-windows-app.exe"; WorkingDir: "{app}"; IconFilename: "{app}\AppIcon.ico"
 
 [Run]
-Filename: "{app}\codex-bridge-windows-app.exe"; Description: "启动 Codex Bridge"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\codex-bridge-windows-app.exe"; Description: "启动 Codex Bridge"; WorkingDir: "{app}"; Flags: nowait postinstall; Check: ShouldLaunchApplication
 
 #include "CodexBridgeLifecycle.iss"

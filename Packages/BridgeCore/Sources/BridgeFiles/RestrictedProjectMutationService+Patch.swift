@@ -18,13 +18,15 @@ extension RestrictedProjectMutationService {
     let project = try await requireProject(request.projectID)
     guard !request.operations.isEmpty else { throw ProjectMutationError.invalidRequest }
     let resolver = ProjectPathResolver(root: project.primaryRoot)
-    let staged = try stagePatch(request.operations, resolver: resolver)
+    let policy = ProjectFilePolicy(forbiddenPatterns: project.forbiddenPatterns)
+    let staged = try stagePatch(request.operations, resolver: resolver, policy: policy)
     return try commitPatch(staged: staged, resolver: resolver)
   }
 
   private func stagePatch(
     _ operations: [ProjectPatchFileOperation],
-    resolver: ProjectPathResolver
+    resolver: ProjectPathResolver,
+    policy: ProjectFilePolicy
   ) throws -> [StagedFile] {
     var staged: [StagedFile] = []
     var paths = Set<String>()
@@ -33,7 +35,7 @@ extension RestrictedProjectMutationService {
       guard paths.insert(path.value).inserted else {
         throw ProjectMutationError.invalidPatchSyntax
       }
-      guard resolver.sensitivePolicy.allows(path) else {
+      guard policy.allows(path) else {
         throw ProjectMutationError.forbiddenPath
       }
       staged.append(try stage(operation, at: path, resolver: resolver))

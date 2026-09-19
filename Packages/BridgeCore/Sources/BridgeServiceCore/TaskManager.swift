@@ -66,7 +66,7 @@ public actor ServiceTaskManager {
       taskID: taskID,
       patch: StatePatch(
         status: .starting,
-        supervisorStatus: try await supervisorStartStatus(taskID: taskID)
+        supervisorStatus: .starting
       ),
       eventKind: .executionStarting,
       summary: "The task was accepted and provider execution is starting."
@@ -80,6 +80,8 @@ public actor ServiceTaskManager {
     authorization: ServiceTaskExecutionAuthorization? = nil
   ) async throws -> ServiceTaskRecord {
     if let authorization {
+      await beginMutation(taskID: taskID)
+      defer { endMutation(taskID: taskID) }
       let date = now()
       return try await store.approveTask(
         id: taskID,
@@ -96,7 +98,7 @@ public actor ServiceTaskManager {
       taskID: taskID,
       patch: StatePatch(
         status: .starting,
-        supervisorStatus: try await supervisorStartStatus(taskID: taskID)
+        supervisorStatus: .starting
       ),
       eventKind: .taskApproved,
       summary: summary,
@@ -246,14 +248,11 @@ public actor ServiceTaskManager {
     failureCode: String,
     summary: String
   ) async throws -> ServiceTaskRecord {
-    let task = try await requiredTask(id: taskID)
-    let supervisorStatus: ServiceSupervisorStatus =
-      task.state.supervisorStatus == .disabled ? .disabled : .degraded
     return try await mutate(
       taskID: taskID,
       patch: StatePatch(
         status: .failed,
-        supervisorStatus: supervisorStatus,
+        supervisorStatus: .failed,
         resultSummary: .set(summary),
         failureCode: .set(failureCode)
       ),
@@ -290,7 +289,7 @@ public actor ServiceTaskManager {
     return try await mutate(
       taskID: taskID,
       patch: StatePatch(
-        supervisorStatus: status,
+        supervisorStatus: .set(status),
         supervisorSummary: .set(summary)
       ),
       eventKind: eventKind,
@@ -325,6 +324,14 @@ public actor ServiceTaskManager {
     -> [ServiceTaskRecord]
   {
     try await store.tasks(projectID: projectID, limit: limit)
+  }
+
+  public func nonterminalTasks() async throws -> [ServiceTaskRecord] {
+    try await store.nonterminalTasks()
+  }
+
+  public func listActivity(taskIDs: [TaskID]) async throws -> ServiceTaskListActivity {
+    try await store.taskListActivity(taskIDs: taskIDs)
   }
 
   public func events(taskID: TaskID, limit: Int = 100) async throws
@@ -414,7 +421,7 @@ public actor ServiceTaskManager {
     defer { endMutation(taskID: taskID) }
     let current = try await requiredTask(id: taskID)
     let date = now()
-    let state = try Self.apply(patch, to: current.state)
+    let state = try Self.apply(patch, to: current)
     let updated = try current.replacingState(state, updatedAt: date)
     try await store.updateTask(
       updated,
@@ -462,15 +469,16 @@ public actor ServiceTaskManager {
 
   private static func apply(
     _ patch: StatePatch,
-    to current: ServiceTaskState
+    to task: ServiceTaskRecord
   ) throws -> ServiceTaskState {
-    try ServiceTaskState(
+    let current = task.state
+    return try ServiceTaskState(
       codexThreadID: patch.codexThreadID.applying(to: current.codexThreadID),
       codexTurnID: patch.codexTurnID.applying(to: current.codexTurnID),
       providerSessionID: patch.providerSessionID.applying(to: current.providerSessionID),
       providerRunID: patch.providerRunID.applying(to: current.providerRunID),
       status: patch.status ?? current.status,
-      supervisorStatus: patch.supervisorStatus ?? current.supervisorStatus,
+      supervisorStatus: patch.supervisorStatus.applying(to: task),
       currentStep: patch.currentStep.applying(to: current.currentStep),
       changedFiles: patch.changedFiles
         ?? Array(Set(current.changedFiles + patch.changedFilesToAppend)).sorted(),
@@ -487,7 +495,7 @@ private struct StatePatch: Sendable {
   var providerSessionID: OptionalUpdate<String> = .keep
   var providerRunID: OptionalUpdate<String> = .keep
   var status: ServiceTaskStatus?
-  var supervisorStatus: ServiceSupervisorStatus?
+  var supervisorStatus: SupervisorUpdate = .keep
   var currentStep: OptionalUpdate<String> = .keep
   var changedFiles: [String]?
   var changedFilesToAppend: [String] = []
@@ -506,6 +514,26 @@ private enum OptionalUpdate<Value: Sendable>: Sendable {
       current
     case .set(let value):
       value
+    }
+  }
+}
+
+private enum SupervisorUpdate: Sendable {
+  case keep
+  case set(ServiceSupervisorStatus)
+  case starting
+  case failed
+
+  func applying(to task: ServiceTaskRecord) -> ServiceSupervisorStatus {
+    switch self {
+    case .keep:
+      task.state.supervisorStatus
+    case .set(let status):
+      status
+    case .starting:
+      task.supervisorModel == nil ? .disabled : .starting
+    case .failed:
+      task.state.supervisorStatus == .disabled ? .disabled : .degraded
     }
   }
 }

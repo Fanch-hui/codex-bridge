@@ -1,3 +1,4 @@
+import BridgeSecurity
 import Foundation
 
 extension BridgeMCPQueryError {
@@ -183,7 +184,7 @@ extension BridgeMCPQueryError {
       }
       return error(
         "command_denied", .policyDenied, false, "list_project_commands",
-        "The requested command was denied: \(reason)"
+        "The requested command was denied: \(OutboundContentSecurity.redacted(reason, maximumUTF8Bytes: 2 * 1_024))"
       )
     case .processLaunchFailed:
       return error(
@@ -193,7 +194,7 @@ extension BridgeMCPQueryError {
     case .gitOperationFailed(let summary):
       return error(
         "git_operation_failed", .infrastructureFailure, true, "inspect_git_result_and_retry",
-        "The Git operation failed: \(summary)"
+        "The Git operation failed: \(OutboundContentSecurity.redacted(summary, maximumUTF8Bytes: 4 * 1_024))"
       )
     case .outputLimitExceeded:
       return error(

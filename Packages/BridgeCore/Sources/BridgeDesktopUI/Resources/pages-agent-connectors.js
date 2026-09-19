@@ -5,7 +5,14 @@
   var R = global.CodexBridgeDesktopAgentConnectorRow;
 
   function create(emit) {
-    var context = { emit: emit, canConnect: false, busy: false, acceptReplacement: true };
+    var context = {
+      emit: emit,
+      canConnect: false,
+      busy: false,
+      acceptReplacement: true,
+      dshMCP: null,
+      dshMCPPage: null
+    };
     var root = S.node("div", "agent-connectors");
     var rows = new Map();
     var empty = S.node("div", "list-empty", "暂无可连接的 Agent Provider。");
@@ -20,6 +27,8 @@
         context.busy = !!settings.busy;
         context.revision = settings.revision;
         context.acceptReplacement = settings.acceptReplacement !== false;
+        context.dshMCP = settings.dshMCP || null;
+        context.dshMCPPage = settings.dshMCPPage || null;
         var visible = new Set();
         var position = 0;
         S.safeArray(providers).forEach(function (provider) {

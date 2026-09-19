@@ -19,6 +19,10 @@ jobs:
             triplet: x64-windows
             library_architecture: x64
             target_triple: ""
+          - architecture: arm64
+            triplet: arm64-windows
+            library_architecture: arm64
+            target_triple: aarch64-unknown-windows-msvc
     steps:
       - uses: actions/checkout@v4
       - name: Exclude build directories from Windows Defender

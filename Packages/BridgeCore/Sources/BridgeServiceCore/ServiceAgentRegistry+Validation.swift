@@ -72,54 +72,56 @@ extension ServiceAgentRegistry {
         reason: "The Provider adapter is unavailable."
       )
     }
-    let current: ServiceAgentExecutableIdentity
+    if record.availability == .unavailable,
+      !record.isEnabled || now().timeIntervalSince(record.updatedAt) < 30
+    {
+      return record
+    }
+    if record.availability == .needsReview, !record.hasRecoverableIdentityReview,
+      record.lastProbedAt == record.updatedAt,
+      now().timeIntervalSince(record.updatedAt) < 30
+    {
+      return record
+    }
+    let candidate: RefreshCandidate
     do {
-      current = try captureIdentity(record.executablePath)
+      candidate = try refreshCandidate(record)
     } catch {
       return try await persistStateIfNeeded(
         record,
         availability: .unavailable,
-        reason: "The registered executable is unavailable."
+        reason: "The registered executable or installation runtime is unavailable."
       )
     }
-    guard current.hasSameContent(as: record.executableIdentity) else {
+    let current = candidate.identity
+    let currentArtifacts = candidate.artifacts
+    guard launchConfigurationUnchanged(candidate, from: record) else {
+      return try await persistStateIfNeeded(
+        record,
+        availability: .needsReview,
+        reason: "A registered installation artifact changed and requires local review."
+      )
+    }
+    let contentChanged =
+      !current.hasSameContent(as: record.executableIdentity)
+      || !artifactsHaveSameContent(currentArtifacts, record.artifacts)
+    if contentChanged, !record.isEnabled {
       return try await persistStateIfNeeded(
         record,
         availability: .needsReview,
         reason: "The registered executable changed and requires local review."
       )
     }
-    let currentArtifacts: [ServiceAgentInstallationArtifact]
-    do {
-      currentArtifacts = try captureArtifacts(record.artifacts, at: now())
-      guard artifactsHaveSameContent(currentArtifacts, record.artifacts) else {
-        return try await persistStateIfNeeded(
-          record,
-          availability: .needsReview,
-          reason: "A registered installation artifact changed and requires local review."
-        )
-      }
-    } catch {
-      return try await persistStateIfNeeded(
-        record,
-        availability: .needsReview,
-        reason: "A registered installation artifact is unavailable and requires local review."
-      )
-    }
-    if record.availability == .unavailable,
-      !record.isEnabled || now().timeIntervalSince(record.updatedAt) < 30
-    {
-      return record
-    }
     let metadataChanged =
       current != record.executableIdentity
       || !artifactsHaveSameIdentity(currentArtifacts, record.artifacts)
     if provider.descriptor.adapterRevision != record.adapterRevision
-      || metadataChanged || record.hasRecoverableIdentityReview
+      || metadataChanged || contentChanged || record.hasRecoverableIdentityReview
       || (record.isEnabled && record.availability == .unavailable)
     {
       return try await refreshProbe(
-        record, provider: provider, identity: current, artifacts: currentArtifacts)
+        record, provider: provider, identity: current, artifacts: currentArtifacts,
+        executablePath: candidate.executablePath)
     }
     return record
   }

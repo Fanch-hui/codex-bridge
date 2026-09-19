@@ -4,6 +4,7 @@ public enum BridgeServiceClientError: Error, Equatable, LocalizedError, Sendable
   case unavailable
   case invalidRemoteProxy
   case responseFailed
+  case serviceRestartRequired
 
   public var errorDescription: String? {
     switch self {
@@ -13,6 +14,8 @@ public enum BridgeServiceClientError: Error, Equatable, LocalizedError, Sendable
       "Codex Bridge Service returned an invalid XPC proxy."
     case .responseFailed:
       "Codex Bridge Service did not return a valid response."
+    case .serviceRestartRequired:
+      "当前后台服务需要重新启动，才能安装 App 更新。"
     }
   }
 }

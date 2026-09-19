@@ -6,21 +6,23 @@ Codex Bridge is a self-hosted desktop app and background service that connects C
 
 macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.0.0`, the first official Codex Bridge release.
+The current release is `v1.0.1`.
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest).
 
-| Platform | v1.0.0 package | Installation |
+| Platform | v1.0.1 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.0.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.0.0-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-1.0.1-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.0.1-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
 
 Upgrades preserve application data and the embedded browser profile. Closing the Windows main window keeps the tray icon; use the tray menu to exit.
+
+Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
 
 ## User guides
 
@@ -33,7 +35,7 @@ Upgrades preserve application data and the embedded browser profile. Closing the
 
 1. Open the app and confirm that the background service is connected. Approve the macOS background item if prompted.
 2. Register a local project and set its read, write, and network permissions.
-3. Connect an installed agent from the Connections page. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
+3. Bridge scans for local agents once on first initialization and saves the catalog. Connect a discovered agent from the Connections page; after installing another agent, click **Scan Agents** to update the catalog. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
 4. Select a project and `Read Only` or `Write` in the workbench.
 5. Connect ChatGPT through OpenAI Secure MCP Tunnel, or Qwen Studio through loopback HTTP MCP. The Connections page provides configuration controls.
 6. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.

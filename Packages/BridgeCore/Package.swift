@@ -190,7 +190,7 @@ let package = Package(
     ),
     .target(
       name: "BridgeACP",
-      dependencies: ["BridgeProcess"]
+      dependencies: ["BridgeProcess", "BridgeSecurity"]
     ),
     .target(
       name: "BridgeOpenCodeACP",
@@ -199,6 +199,7 @@ let package = Package(
         "BridgeAgentCore",
         "BridgeDomain",
         "BridgeProcess",
+        "BridgeSecurity",
         .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
@@ -284,6 +285,7 @@ let package = Package(
       dependencies: [
         "BridgeIPC",
         "BridgeMCP",
+        .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
     .target(

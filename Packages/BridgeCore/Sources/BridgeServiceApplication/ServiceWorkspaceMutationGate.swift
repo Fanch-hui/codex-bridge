@@ -65,14 +65,59 @@ public actor ServiceWorkspaceMutationGate {
   // actor re-entry point instead of relying on a check-then-set sequence.
   private var directReservations: [ProjectID: DirectReservation] = [:]
   private var codexAdmissions: [ProjectID: Set<String>] = [:]
+  private var taskAdmissions: Set<String> = []
+  private var appUpdateLeaseExpiresAt: Date?
+  private let appUpdateLeaseDuration: TimeInterval
 
-  public init() {}
+  public init(appUpdateLeaseDuration: TimeInterval = 60) {
+    self.appUpdateLeaseDuration = max(1, appUpdateLeaseDuration)
+  }
+
+  @discardableResult
+  public func beginTaskAdmission() throws -> String {
+    expireAppUpdateIfNeeded()
+    guard appUpdateLeaseExpiresAt == nil else {
+      throw BridgeMCPQueryError.busy
+    }
+    let token = UUID().uuidString
+    taskAdmissions.insert(token)
+    return token
+  }
+
+  public func endTaskAdmission(token: String) {
+    taskAdmissions.remove(token)
+  }
+
+  @discardableResult
+  public func beginAppUpdate() -> Bool {
+    expireAppUpdateIfNeeded()
+    if appUpdateLeaseExpiresAt != nil { return true }
+    guard directReservations.isEmpty,
+      codexAdmissions.values.allSatisfy(\.isEmpty),
+      taskAdmissions.isEmpty
+    else {
+      return false
+    }
+    appUpdateLeaseExpiresAt = Date().addingTimeInterval(appUpdateLeaseDuration)
+    return true
+  }
+
+  public func appUpdatePrepared() -> Bool {
+    expireAppUpdateIfNeeded()
+    return appUpdateLeaseExpiresAt != nil
+  }
+
+  public func cancelAppUpdate() {
+    appUpdateLeaseExpiresAt = nil
+  }
 
   public func activeDirectOwner(projectID: ProjectID) -> ServiceWorkspaceOwner? {
-    directReservations[projectID]?.owner
+    expireAppUpdateIfNeeded()
+    return directReservations[projectID]?.owner
   }
 
   public func workspaceBusyDetail(projectID: ProjectID) async throws -> WorkspaceBusyDetail? {
+    expireAppUpdateIfNeeded()
     if let direct = directReservations[projectID] {
       return direct.owner.busyDetail
     }
@@ -87,6 +132,10 @@ public actor ServiceWorkspaceMutationGate {
     owner: ServiceWorkspaceOwner,
     activeCodexWriteTask: @Sendable () async throws -> ServiceTaskRecord?
   ) async throws -> DirectWorkspaceLease {
+    expireAppUpdateIfNeeded()
+    guard appUpdateLeaseExpiresAt == nil else {
+      throw ProjectWorkspaceBusyError.busy(.direct(owner: "app_update"))
+    }
     if let direct = directReservations[projectID] {
       throw ProjectWorkspaceBusyError.busy(direct.owner.busyDetail)
     }
@@ -110,6 +159,10 @@ public actor ServiceWorkspaceMutationGate {
 
   @discardableResult
   public func beginCodexAdmission(projectID: ProjectID) async throws -> String {
+    expireAppUpdateIfNeeded()
+    guard appUpdateLeaseExpiresAt == nil else {
+      throw ProjectWorkspaceBusyError.busy(.direct(owner: "app_update"))
+    }
     if let direct = directReservations[projectID] {
       throw ProjectWorkspaceBusyError.busy(direct.owner.busyDetail)
     }
@@ -152,6 +205,13 @@ public actor ServiceWorkspaceMutationGate {
   public func releaseAll() {
     directReservations = [:]
     codexAdmissions = [:]
+    taskAdmissions = []
+    appUpdateLeaseExpiresAt = nil
+  }
+
+  private func expireAppUpdateIfNeeded(now: Date = Date()) {
+    guard let expiresAt = appUpdateLeaseExpiresAt, expiresAt <= now else { return }
+    appUpdateLeaseExpiresAt = nil
   }
 }
 

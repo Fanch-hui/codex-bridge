@@ -4,7 +4,20 @@ umask 077
 
 readonly script_directory="${0:A:h}"
 readonly repository_root="${script_directory:h}"
-readonly product_version="1.0.0"
+readonly product_version="$(
+  /usr/bin/awk -F '=' '
+    /^[[:space:]]*MARKETING_VERSION[[:space:]]*=/ {
+      value = $2
+      gsub(/[[:space:]]/, "", value)
+      print value
+      exit
+    }
+  ' "${repository_root}/Config/Base.xcconfig"
+)"
+[[ "${product_version}" == <->.<->.<-> ]] || {
+  print -u2 "Config/Base.xcconfig must declare a numeric MARKETING_VERSION."
+  exit 64
+}
 
 if (( $# < 3 || $# > 4 )); then
   print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64|x86_64|all]"
@@ -45,6 +58,7 @@ readonly architectures
 temporary_root="$(/usr/bin/mktemp -d "${output_parent}/.codex-bridge-release.XXXXXX")"
 readonly temporary_root
 readonly candidate_directory="${temporary_root}/candidate"
+manifest_asset_arguments=()
 
 cleanup() {
   [[ -d "${temporary_root}" ]] || return
@@ -133,6 +147,16 @@ for architecture in "${architectures[@]}"; do
     -volname "Codex Bridge" \
     -srcfolder "${disk_image_directory}" \
     "${candidate_directory}/${artifact_base}.dmg"
+
+  if [[ "${architecture}" == "arm64" ]]; then
+    manifest_architecture="arm64"
+  else
+    manifest_architecture="x64"
+  fi
+  manifest_asset_arguments+=(
+    --asset macos "${manifest_architecture}" app
+    "${candidate_directory}/${artifact_base}.zip"
+  )
 done
 
 readonly commit_epoch="$(/usr/bin/git show -s --format=%ct HEAD)"
@@ -159,9 +183,20 @@ readonly created_at="$(/bin/date -u -r "${commit_epoch}" '+%Y-%m-%dT%H:%M:%SZ')"
 } > "${candidate_directory}/RELEASE-INFO.txt"
 /bin/chmod 0644 "${candidate_directory}/RELEASE-INFO.txt"
 
+manifest_notes_arguments=()
+if [[ -n "${RELEASE_NOTES_FILE:-}" ]]; then
+  manifest_notes_arguments+=(--notes-file "${RELEASE_NOTES_FILE}")
+fi
+/usr/bin/python3 "${script_directory}/generate-update-manifest.py" \
+  --output "${candidate_directory}/latest.json" \
+  --version "${product_version}" \
+  --tag "v${product_version}" \
+  "${manifest_notes_arguments[@]}" \
+  "${manifest_asset_arguments[@]}"
+
 (
   cd "${candidate_directory}"
-  for artifact in CodexBridge-*-macos-*.dmg CodexBridge-*-macos-*.zip SBOM.spdx.json; do
+  for artifact in CodexBridge-*-macos-*.dmg CodexBridge-*-macos-*.zip SBOM.spdx.json latest.json; do
     /usr/bin/shasum -a 256 "${artifact}"
   done
 ) > "${candidate_directory}/SHA256SUMS"

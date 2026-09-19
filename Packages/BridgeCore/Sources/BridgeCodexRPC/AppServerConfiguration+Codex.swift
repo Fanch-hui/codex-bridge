@@ -129,25 +129,7 @@ extension AppServerConfiguration {
       }
       return nil
     #else
-      let home = FileManager.default.homeDirectoryForCurrentUser
-      let candidates: [URL] = [
-        URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Resources/codex"),
-        home.appendingPathComponent("Applications/ChatGPT.app/Contents/Resources/codex"),
-        URL(fileURLWithPath: "/opt/homebrew/bin/codex"),
-        URL(fileURLWithPath: "/usr/local/bin/codex"),
-        home.appendingPathComponent(".local/bin/codex"),
-        home.appendingPathComponent(".cargo/bin/codex"),
-        home.appendingPathComponent(".npm-global/bin/codex"),
-        home.appendingPathComponent(
-          "Library/Application Support/codex-plusplus/backup/Codex.app/Contents/Resources/codex"
-        ),
-      ]
-      for candidate in candidates {
-        if FileManager.default.isExecutableFile(atPath: candidate.path) {
-          return candidate
-        }
-      }
-      return nil
+      return CodexMacExecutableResolver.resolve()
     #endif
   }
 }

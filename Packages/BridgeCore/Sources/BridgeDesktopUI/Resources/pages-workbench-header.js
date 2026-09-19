@@ -86,17 +86,10 @@
     row1.appendChild(statusWrap);
     header.appendChild(row1);
 
-    // Row 2: Subtitle
-    var subText = "远程 MCP 调用 Codex 或外部 Agent 时，默认在当前选择的项目中执行";
-    if (page.selectedTask && page.selectedTask.provider && page.selectedTask.permissionMode) {
-      subText = page.selectedTask.provider + " 原生 " + page.selectedTask.permissionMode + "，在当前项目执行并在此处显示实时结果";
-    }
-    header.appendChild(S.node("p", "inspector-subtitle", subText));
-
     // Row 3: Permission segmented control: [ Read Only | Write ]
     var row3 = S.node("div", "inspector-header-row row-permissions"), permLabel = S.node("div", "permission-row-label");
     permLabel.appendChild(S.icon("doc.text", "perm-icon"));
-    permLabel.appendChild(S.node("span", null, "GPT/Qwen 新任务"));
+    permLabel.appendChild(S.node("span", null, "Agent权限"));
     row3.appendChild(permLabel);
 
     var seg = S.node("div", "segmented-control"), isRO = page.permissionMode === "read-only";
@@ -166,7 +159,19 @@
   var browserSignature, headerSignature;
   function render(page, emit) {
     var browser = JSON.stringify(page.browser || {});
-    if (browser !== browserSignature) { renderBrowser(page, emit); browserSignature = browser; }
+    if (browser !== browserSignature) {
+      var renderBrowserStable = global.CodexBridgeDesktopStableRender;
+      if (renderBrowserStable) {
+        renderBrowserStable(
+          document.getElementById("workbench-browser-toolbar"),
+          browser,
+          function () { renderBrowser(page, emit); }
+        );
+      } else {
+        renderBrowser(page, emit);
+      }
+      browserSignature = browser;
+    }
     var detail = page.selectedTask || {};
     var header = JSON.stringify([
       page.browser && page.browser.enabled, page.browser && page.browser.canToggle,
@@ -176,7 +181,19 @@
         return [t.taskID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
       })
     ]);
-    if (header !== headerSignature) { renderInspectorHeader(page, emit); headerSignature = header; }
+    if (header !== headerSignature) {
+      var renderHeaderStable = global.CodexBridgeDesktopStableRender;
+      if (renderHeaderStable) {
+        renderHeaderStable(
+          document.getElementById("workbench-inspector-header"),
+          header,
+          function () { renderInspectorHeader(page, emit); }
+        );
+      } else {
+        renderInspectorHeader(page, emit);
+      }
+      headerSignature = header;
+    }
   }
 
   global.CodexBridgeDesktopWorkbenchHeader = {

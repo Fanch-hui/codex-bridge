@@ -48,7 +48,7 @@ public struct RegisteredRoot: Codable, Equatable, Sendable {
         CreateFileW(
           wide,
           DWORD(0),
-          0,
+          DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
           nil,
           DWORD(OPEN_EXISTING),
           DWORD(FILE_FLAG_BACKUP_SEMANTICS),

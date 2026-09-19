@@ -117,6 +117,19 @@ begin
   Result := CompareText(Trim(ConfiguredCommand), ExpectedCommand) = 0;
 end;
 
+function ShouldLaunchApplication: Boolean;
+var
+  Index: Integer;
+begin
+  Result := not WizardSilent;
+  for Index := 1 to ParamCount do
+    if CompareText(ParamStr(Index), '/UPDATE') = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
 #include "CodexBridgeLegacyMigration.iss"
 #include "CodexBridgePreviousInstallMigration.iss"
 

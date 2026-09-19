@@ -6,7 +6,7 @@
 
   function editor(item, emit) {
     var context = { item: item, emit: emit };
-    var root = S.node("div", "page-message");
+    var root = S.node("div", "agent-preferences");
     var title = S.node("h4");
     var installation = S.node("p", "hint");
     root.appendChild(title);
@@ -84,9 +84,12 @@
     return [{ id: "", title: "Provider 默认" }].concat(M.modelChoices(item.modelOptions));
   }
 
-  function create(page, emit) {
-    var root = S.node("section", "page-card settings-card");
-    root.appendChild(S.node("h3", null, "外部 Agent 默认偏好"));
+  function create(page, emit, embedded) {
+    var root = S.node(
+      embedded ? "div" : "section",
+      embedded ? "settings-subsection" : "page-card settings-card"
+    );
+    if (!embedded) root.appendChild(S.node("h3", null, "Agent模型与权限"));
     var empty = S.node("div", "list-empty", "尚未读取 Agent 默认偏好。");
     root.appendChild(empty);
     var editors = new Map();

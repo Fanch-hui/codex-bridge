@@ -68,7 +68,18 @@ public actor MCPHTTPListener {
     let admission = self.admission
     let bootstrap = ServerBootstrap(group: group)
       .serverChannelOption(ChannelOptions.backlog, value: 64)
-      .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+      #if os(Windows)
+        .serverChannelOption(
+          ChannelOptions.socketOption(
+            NIOBSDSocket.Option(
+              rawValue: ~NIOBSDSocket.Option.so_reuseaddr.rawValue
+            )
+          ),
+          value: 1
+        )
+      #else
+        .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+      #endif
       .childChannelInitializer { channel in
         guard admission.register(channel) else {
           return channel.close()
@@ -91,7 +102,9 @@ public actor MCPHTTPListener {
           return channel.close().flatMapThrowing { throw error }
         }
       }
-      .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+      #if !os(Windows)
+        .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+      #endif
       .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 1)
       .childChannelOption(
         ChannelOptions.writeBufferWaterMark,
@@ -152,7 +165,7 @@ public actor MCPHTTPListener {
     for child in children {
       try? await child.close().get()
     }
-    await admission.waitForRequestDrain()
+    _ = await admission.waitForRequestDrain(timeout: .seconds(5))
     try? await group?.shutdownGracefully()
     admission.resetAfterStop()
     isStopping = false

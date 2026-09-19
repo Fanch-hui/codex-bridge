@@ -41,7 +41,7 @@ extension DeepSeekHarnessACPClient {
       case .notification(let method, let params):
         try handleNotification(method: method, params: params)
       case .serverRequest(let id, let method, let params):
-        try await handleServerRequest(id: id, method: method, params: params)
+        await handleServerRequest(id: id, method: method, params: params)
       }
     } catch {
       await failConnection(Self.map(error))
@@ -70,7 +70,10 @@ extension DeepSeekHarnessACPClient {
     case "tool_call", "tool_call_update":
       try handleToolUpdate(sessionID: sessionID, update: update)
     default:
-      throw DeepSeekHarnessACPError.invalidMessage
+      // ACP permits providers to add session update variants. They are not
+      // part of the Bridge presentation contract, so preserve the session
+      // and ignore them instead of terminating an otherwise valid turn.
+      return
     }
   }
 

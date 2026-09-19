@@ -8,7 +8,7 @@
     var card = S.node("section", "page-card settings-card");
     card.appendChild(S.node("h3", null, "全局自定义指令"));
     var field = S.node("div", "field");
-    field.appendChild(S.node("label", null, "发送给 Provider 的全局指令"));
+    field.appendChild(S.node("label", null, "发送给GPT/Qwen的mcp内置指令"));
     var text = S.node("textarea");
     text.value = page.customInstructions || "";
     text.placeholder = "可选。保存后由本机 Service 应用。";

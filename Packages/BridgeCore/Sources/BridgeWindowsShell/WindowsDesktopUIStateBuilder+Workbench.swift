@@ -51,7 +51,8 @@
         modelCount: display.availableModelCount,
         canRefreshModels: canRefreshModels,
         isRefreshingModels: modelRefreshInProgress,
-        modelError: display.modelError
+        modelError: display.modelError,
+        commandReceipt: display.commandReceipt
       )
     }
 
@@ -87,17 +88,23 @@
       if let detail = display.selectedTaskDetail, let step = detail.currentStep, !step.isEmpty {
         return "\(detail.provider) \(step)"
       }
-      if display.selectedTaskDetail?.status == "等待回答" {
-        return "等待你的回答"
-      }
-      if let defaultModel = display.defaultModel, !defaultModel.isEmpty {
-        return "已连接本机 Codex 引擎 · 默认模型：\(defaultModel)"
-      }
-      if display.availableModelCount > 0 {
-        return "已连接本机 Codex 引擎 (\(display.availableModelCount) 个可用模型)"
-      }
-      if let error = display.modelError {
-        return "Codex 引擎未就绪：\(error)"
+      if let detail = display.selectedTaskDetail {
+        switch detail.status {
+        case "等待回答":
+          return "等待你的回答"
+        case "运行中":
+          return "\(detail.provider) 正在处理任务…"
+        case "正在启动":
+          return "\(detail.provider) 正在启动…"
+        case "已完成":
+          return "\(detail.provider) 已完成"
+        case "失败":
+          return "\(detail.provider) 执行失败"
+        case "已中断":
+          return "\(detail.provider) 已中断"
+        default:
+          return "\(detail.provider) \(detail.status)"
+        }
       }
       return "已连接本机 Codex 引擎"
     }

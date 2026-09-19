@@ -72,9 +72,12 @@ extension BridgeDesktopCommandRouter {
         providerID: selectedTask.providerIdentifier
       )
     case .steerTask:
-      steer(payload, model: model)
+      steer(payload, requestID: envelope.requestID, model: model)
     case .resumeTask:
-      guard let selectedTask = task(payload.taskID, in: model), connected(model) else { return }
+      guard let selectedTask = task(payload.taskID, in: model), connected(model) else {
+        reject(envelope, model: model, message: "当前任务无法续接会话。")
+        return
+      }
       let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
         for: selectedTask, providers: model.agentProviders, installations: model.agentInstallations
       )
@@ -83,13 +86,19 @@ extension BridgeDesktopCommandRouter {
           selectedTask,
           providerSupportsSessionContinuation: supportsContinuation
         )
-      else { return }
-      model.resumeTask(selectedTask, prompt: payload.input)
+      else {
+        reject(envelope, model: model, message: "当前任务无法续接会话。")
+        return
+      }
+      model.resumeTask(selectedTask, prompt: payload.input, requestID: envelope.requestID)
     case .restartTask:
       guard let selectedTask = task(payload.taskID, in: model),
         connected(model), selectedTask.canRestart
-      else { return }
-      model.restartTask(selectedTask)
+      else {
+        reject(envelope, model: model, message: "当前任务没有可用于重新开始的原始指令。")
+        return
+      }
+      model.restartTask(selectedTask, requestID: envelope.requestID)
     case .resolveApproval:
       resolveApproval(payload, model: model)
     case .resolveDirectApproval:
@@ -105,6 +114,20 @@ extension BridgeDesktopCommandRouter {
   ) -> MCPServiceTaskSnapshot? {
     guard let taskID = validatedID(taskID) else { return nil }
     return model.tasks.first { $0.taskID == taskID }
+  }
+
+  private static func reject(
+    _ envelope: BridgeDesktopCommandEnvelope,
+    model: BridgeServiceAppModel,
+    message: String
+  ) {
+    model.rejectWorkbenchCommand(
+      requestID: envelope.requestID,
+      command: envelope.command.rawValue,
+      taskID: envelope.payload.taskID,
+      input: envelope.payload.input,
+      message: message
+    )
   }
 
   private static func openBrowserExternally(_ model: BridgeServiceAppModel) {
@@ -135,6 +158,7 @@ extension BridgeDesktopCommandRouter {
 
   private static func steer(
     _ payload: BridgeDesktopCommandPayload,
+    requestID: String,
     model: BridgeServiceAppModel
   ) {
     guard let task = task(payload.taskID, in: model), connected(model),
@@ -147,16 +171,34 @@ extension BridgeDesktopCommandRouter {
       ),
       let input = validatedText(payload.input, maximumBytes: IPCTaskSteerRequest.maximumInputBytes),
       TaskInspectorPresentation.steerValidationMessage(input) == nil
-    else { return }
+    else {
+      model.rejectWorkbenchCommand(
+        requestID: requestID,
+        command: BridgeDesktopCommand.steerTask.rawValue,
+        taskID: payload.taskID,
+        input: payload.input,
+        message: "当前任务不接受这次 Steer。"
+      )
+      return
+    }
     let mode = MCPTaskSteerMode(rawValue: payload.mode ?? "queued") ?? .queued
     if mode == .interruptCurrentThenContinue {
       let supportsImmediate =
         task.installationID.flatMap { installationID in
           model.agentInstallations.first(where: { $0.installationID == installationID })
         }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
-      guard supportsImmediate else { return }
+      guard supportsImmediate else {
+        model.rejectWorkbenchCommand(
+          requestID: requestID,
+          command: BridgeDesktopCommand.steerTask.rawValue,
+          taskID: payload.taskID,
+          input: payload.input,
+          message: "当前 Agent 不支持立即 Steer。"
+        )
+        return
+      }
     }
-    model.steerTask(task, input: input, mode: mode)
+    model.steerTask(task, input: input, mode: mode, requestID: requestID)
   }
 
   private static func resolveApproval(

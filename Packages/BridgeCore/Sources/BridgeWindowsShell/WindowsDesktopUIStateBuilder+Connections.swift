@@ -60,6 +60,7 @@
         providers: management.agent.providerItems,
         installations: management.agent.installationItems,
         canRegisterAgent: management.agent.registerEnabled,
+        canScanAgents: management.connectionState == .connected,
         isManagingAgents: management.agent.isManagingAgents,
         agentOperationRevision: management.agent.agentOperationRevision,
         statusMessage: message.isEmpty ? nil : message

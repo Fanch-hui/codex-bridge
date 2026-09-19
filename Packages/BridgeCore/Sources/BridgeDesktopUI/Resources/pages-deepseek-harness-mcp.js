@@ -5,7 +5,7 @@
   var E = global.CodexBridgeDesktopDeepSeekHarnessMCPEditor;
 
   function create(emit) {
-    var card = S.node("div", "page-card connection-card dsh-mcp-card");
+    var card = S.node("div", "connection-card dsh-mcp-card");
     var heading = S.node("div", "section-heading-row");
     var title = S.node("div");
     title.appendChild(S.node("h3", null, "DeepSeek Harness MCP"));

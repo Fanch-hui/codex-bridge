@@ -1,6 +1,6 @@
 # Codex Bridge 详细使用指南
 
-适用于 v1.0.0 的 macOS Apple Silicon 和 Windows x64。首次使用按“安装 → 项目 → Agent → 模型 → 聊天客户端 → 第一项任务”的顺序操作。
+适用于 v1.0.1 的 macOS Apple Silicon 和 Windows x64。首次使用按“安装 → 项目 → Agent → 模型 → 聊天客户端 → 第一项任务”的顺序操作。
 
 ## 文档导航
 
@@ -25,7 +25,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### macOS Apple Silicon
 
-1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-1.0.0-macos-arm64.dmg`。
+1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-1.0.1-macos-arm64.dmg`。
 2. 打开 DMG，把 `CodexBridge.app` 拖到 Applications。
 3. 从 Applications 启动。当前包使用 ad-hoc 签名、尚未 Apple 公证；若系统拦截，在“系统设置 → 隐私与安全性”允许打开。
 4. 在概览检查 Service。若提示后台项目需批准，按提示打开系统设置并允许 Codex Bridge 后台项目。
@@ -33,7 +33,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### Windows x64
 
-1. 下载 `CodexBridge-Windows-x64-1.0.0-Setup.exe`。
+1. 下载 `CodexBridge-Windows-x64-1.0.1-Setup.exe`。
 2. 运行安装器，选择安装目录，完成后启动 Codex Bridge。
 3. 如提示缺少 WebView2 Runtime，按提示安装微软 WebView2 Runtime，然后重新启动 App。
 4. 在概览确认 Service 和本地 MCP 可用。
@@ -203,7 +203,7 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 | App 连不上 Service | 概览中的启动/注册提示；macOS 后台项目授权；Windows 同目录服务文件 |
 | 本地 MCP 端口不可用 | 连接页状态；确需变更时生成新 Endpoint 并更新客户端配置 |
 | Agent 未发现 | CLI 是否安装；重新打开 App，或通过高级路径登记实际入口 |
-| Agent 需复核 | 确认更新来源后重新 Probe，查看不可用原因 |
+| Agent 需重新连接 | 已启用 Agent 的程序更新会自动 Probe 并恢复连接；若首页“本机 Agent 引擎”仍提示处理，点击进入连接页查看原因并重连 |
 | 模型获取失败 | API Key、Base URL、账号能力和网络；查看对应 Agent 指南 |
 | 任务写入被拒绝 | 项目策略、工作台模式和 Agent 原生权限 |
 | 项目忙碌 | 等待该项目当前写任务结束后再提交 |

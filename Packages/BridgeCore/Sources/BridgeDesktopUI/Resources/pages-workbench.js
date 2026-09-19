@@ -191,17 +191,12 @@
   function prepareContentCard(content, page) {
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
     var detail = page.selectedTask;
-    var keepConversation = incremental && incremental.isWindows() && detail
+    var keepConversation = incremental && detail
       && ((detail.conversation && detail.conversation.length) || detail.conversationState);
     var stableCard = keepConversation && content.__windowsDetailCard;
     if (stableCard) {
       Array.from(content.children).forEach(function (child) {
         if (child !== stableCard) child.remove();
-      });
-      var block = content.__windowsConversationBlock;
-      var retained = block ? [block.heading, block.error, block.list, block.actions] : [];
-      Array.from(stableCard.children).forEach(function (child) {
-        if (retained.indexOf(child) < 0) child.remove();
       });
     } else {
       S.clear(content);
@@ -209,6 +204,20 @@
       if (!page.selectedTask) content.__windowsConversationBlock = null;
     }
     return { card: stableCard, keep: keepConversation };
+  }
+
+  function detailCardSections(card) {
+    var header = card.__detailHeader;
+    if (!header) header = card.__detailHeader = S.node("header", "task-detail-header");
+    var conversation = card.__conversationContainer;
+    if (!conversation) {
+      conversation = card.__conversationContainer = S.node("section", "task-conversation-container");
+    }
+    if (header.parentNode !== card) card.appendChild(header);
+    if (conversation.parentNode !== card) card.appendChild(conversation);
+    if (card.firstChild !== header) card.insertBefore(header, card.firstChild);
+    if (card.lastChild !== conversation) card.appendChild(conversation);
+    return { header: header, conversation: conversation };
   }
 
   function renderContentBody(content, page, emit) {
@@ -238,14 +247,16 @@
     var remediationCard = N && N.remediationCard(detail, emit);
     if (remediationCard) content.appendChild(remediationCard);
     var card = retained.card || S.node("div", "page-card task-detail-card");
+    var sections = detailCardSections(card);
+    S.clear(sections.header);
     if (retained.keep) content.__windowsDetailCard = card;
-    card.appendChild(S.node("h3", "detail-title", detail.title));
-    card.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));
+    sections.header.appendChild(S.node("h3", "detail-title", detail.title));
+    sections.header.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));
     var grid = S.node("dl", "detail-grid");
     addDetail(grid, "状态", detail.status); addDetail(grid, "更新时间", detail.updatedAt);
     addDetail(grid, "模型", detail.model || "未记录"); addDetail(grid, "权限", detail.permissionMode || "未记录");
     if (detail.failureCode) addDetail(grid, "失败代码", detail.failureCode);
-    card.appendChild(grid);
+    sections.header.appendChild(grid);
 
     var actions = S.node("div", "form-actions");
     if (detail.canInterrupt) actions.appendChild(S.button("中断", "interruptTask", { taskID: detail.taskID }, emit, "small danger", false));
@@ -260,17 +271,15 @@
     actions.appendChild(S.button(
       "刷新当前对话", "refreshConversation", { taskID: detail.taskID }, emit, "small", false
     ));
-    card.appendChild(actions);
+    sections.header.appendChild(actions);
 
-    if (detail.changedFiles && detail.changedFiles.length) addListBlock(card, "变更文件", detail.changedFiles);
+    if (detail.changedFiles && detail.changedFiles.length) addListBlock(sections.header, "变更文件", detail.changedFiles);
     if ((detail.conversation && detail.conversation.length) || detail.conversationState) {
       global.CodexBridgeDesktopWorkbenchConversation.render(
-        card, detail.conversation || [], page, emit, { owner: content });
+        sections.conversation, detail.conversation || [], page, emit, { owner: content });
     }
     if (card.parentNode !== content) content.appendChild(card);
-    else Array.from(content.children).forEach(function (child) {
-      if (child !== card) content.insertBefore(child, card);
-    });
+    else if (content.lastChild !== card) content.appendChild(card);
   }
 
   function decisionLabel(approval, decision) {
@@ -307,5 +316,6 @@
     global.CodexBridgeDesktopWorkbenchControls.render(page, emit);
   }
 
+  global.CodexBridgeDesktopStableRender = renderStable;
   global.CodexBridgeDesktopWorkbenchPage = { render: render };
 }(window));

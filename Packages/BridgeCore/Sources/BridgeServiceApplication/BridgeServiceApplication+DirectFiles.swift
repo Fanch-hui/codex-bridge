@@ -172,6 +172,9 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPDirectManagePathReceipt {
     try Self.checkDeadline(deadline)
+    guard let action = ProjectPathAction(rawValue: request.action) else {
+      throw ProjectMutationError.invalidRequest
+    }
     let project = try await approvedDirectProject(
       projectID: request.projectID,
       kind: .pathAction,
@@ -185,7 +188,6 @@ extension BridgeServiceApplication {
         project: project,
         owner: .directFileOperation(operationID: operationID)
       ) {
-        let action = ProjectPathAction(rawValue: request.action) ?? .deleteFile
         let result = try await self.mutations.managePath(
           ProjectManagePathRequest(
             projectID: project.id,

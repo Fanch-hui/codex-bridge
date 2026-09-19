@@ -166,8 +166,33 @@ public enum ProjectAgentPresentation {
     case "available": "可用"
     case "needs_review": "需复核"
     case "unavailable": "不可用"
+    case "incompatible": "不兼容"
     default: "未知：\(value)"
     }
+  }
+
+  /// An enabled installation in one of these states needs a user-visible
+  /// connection action. Disabled installations are intentionally excluded:
+  /// their state is a user choice, not a connection failure.
+  public static func requiresReconnect(isEnabled: Bool, availability: String) -> Bool {
+    guard isEnabled else { return false }
+    return switch availability {
+    case "needs_review", "unavailable", "incompatible": true
+    default: false
+    }
+  }
+
+  public static func reconnectSummary(names: [String]) -> String? {
+    let names = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    guard !names.isEmpty else { return nil }
+    if names.count == 1, let name = names.first {
+      return name + " 需要重新连接"
+    }
+    if names.count <= 3 {
+      return names.joined(separator: "、") + " 需要重新连接"
+    }
+    return String(names.count) + " 个 Agent 需要重新连接"
   }
 
   private static func capabilityNames(_ provider: IPCAgentProviderSummary) -> [String] {

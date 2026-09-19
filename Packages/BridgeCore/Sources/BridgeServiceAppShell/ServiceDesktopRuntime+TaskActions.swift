@@ -1,3 +1,4 @@
+import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
 import BridgeServiceAppCore
@@ -27,28 +28,45 @@ extension BridgeServiceAppModel {
   public func steerTask(
     _ task: MCPServiceTaskSnapshot,
     input: String,
-    mode: MCPTaskSteerMode = .queued
+    mode: MCPTaskSteerMode = .queued,
+    requestID: String? = nil
   ) {
     guard let expectedTurnID = task.expectedControlID,
       !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       input.utf8.count <= IPCTaskSteerRequest.maximumInputBytes,
       !input.contains("\0")
-    else { return }
-    runMutation { [weak self] client in
-      guard let self else { return }
-      _ = try await client.steerTask(
+    else {
+      rejectWorkbenchCommand(
+        requestID: requestID,
+        command: BridgeDesktopCommand.steerTask.rawValue,
+        taskID: task.taskID,
+        input: input,
+        message: "当前任务不接受这次 Steer。"
+      )
+      return
+    }
+    runWorkbenchMutation(
+      requestID: requestID,
+      command: BridgeDesktopCommand.steerTask.rawValue,
+      taskID: task.taskID,
+      input: input
+    ) { [weak self] client in
+      guard let self else { return false }
+      let receipt = try await client.steerTask(
         taskID: task.taskID,
         expectedTurnID: expectedTurnID,
         input: input,
         mode: mode
       )
       await self.refresh(silent: true, includeCatalog: false)
+      return receipt.accepted
     }
   }
 
   public func resumeTask(
     _ task: MCPServiceTaskSnapshot,
-    prompt: String? = nil
+    prompt: String? = nil,
+    requestID: String? = nil
   ) {
     let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
       for: task, providers: agentProviders, installations: agentInstallations
@@ -58,7 +76,16 @@ extension BridgeServiceAppModel {
         task,
         providerSupportsSessionContinuation: supportsContinuation
       ), let sessionID = task.effectiveSessionID
-    else { return }
+    else {
+      rejectWorkbenchCommand(
+        requestID: requestID,
+        command: BridgeDesktopCommand.resumeTask.rawValue,
+        taskID: task.taskID,
+        input: prompt,
+        message: "当前任务无法续接会话。"
+      )
+      return
+    }
     let trimmedPrompt = prompt?.trimmingCharacters(in: .whitespacesAndNewlines)
     let continuationPrompt =
       trimmedPrompt.flatMap { $0.isEmpty ? nil : $0 }
@@ -67,19 +94,34 @@ extension BridgeServiceAppModel {
       task: task,
       prompt: continuationPrompt,
       threadID: sessionID,
-      successMessage: "已续接任务"
+      successMessage: "已续接任务",
+      requestID: requestID,
+      command: BridgeDesktopCommand.resumeTask.rawValue,
+      receiptInput: prompt ?? ""
     )
   }
 
-  public func restartTask(_ task: MCPServiceTaskSnapshot) {
+  public func restartTask(_ task: MCPServiceTaskSnapshot, requestID: String? = nil) {
     guard let prompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
       !prompt.isEmpty
-    else { return }
+    else {
+      rejectWorkbenchCommand(
+        requestID: requestID,
+        command: BridgeDesktopCommand.restartTask.rawValue,
+        taskID: task.taskID,
+        input: nil,
+        message: "当前任务没有可用于重新开始的原始指令。"
+      )
+      return
+    }
     submitRetry(
       task: task,
       prompt: prompt,
       threadID: nil,
-      successMessage: "已重新开始任务"
+      successMessage: "已重新开始任务",
+      requestID: requestID,
+      command: BridgeDesktopCommand.restartTask.rawValue,
+      receiptInput: nil
     )
   }
 
@@ -87,7 +129,10 @@ extension BridgeServiceAppModel {
     task: MCPServiceTaskSnapshot,
     prompt: String,
     threadID: String?,
-    successMessage: String
+    successMessage: String,
+    requestID: String?,
+    command: String,
+    receiptInput: String?
   ) {
     let request = IPCAgentSubmitRequest(
       projectID: task.projectID,
@@ -99,15 +144,21 @@ extension BridgeServiceAppModel {
       prompt: prompt,
       threadID: threadID,
       networkAccess: task.networkAccess,
-      modelOverride: task.executionModel != nil,
+      modelOverride: TaskRetrySubmission.modelOverride(for: task),
       permissionModeOverride: task.permissionMode != nil
     )
-    runMutation { [weak self] client in
-      guard let self else { return }
+    runWorkbenchMutation(
+      requestID: requestID,
+      command: command,
+      taskID: task.taskID,
+      input: receiptInput
+    ) { [weak self] client in
+      guard let self else { return false }
       let response = try await client.submitAgentTask(request)
       await self.refresh(silent: true, includeCatalog: false)
       self.openTask(response.taskID)
       self.postToast(successMessage)
+      return true
     }
   }
 

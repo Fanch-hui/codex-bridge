@@ -187,6 +187,7 @@
         row.insertBefore(configPanel, actionBar);
       }
       updateDetails(nextProvider, currentInstallations, primary);
+      updateProviderSpecificDetails(nextProvider);
       draft.update({
         baseURL: nextProvider.configuredBaseURL || "",
         apiKey: ""
@@ -243,6 +244,16 @@
       } else if (message) {
         message.remove();
       }
+    }
+
+    function updateProviderSpecificDetails(nextProvider) {
+      var component = context.dshMCP;
+      if (!component || nextProvider.providerID !== "deepseek-harness") {
+        if (component && component.root.parentNode === detailsBody) component.root.remove();
+        return;
+      }
+      if (component.root.parentNode !== detailsBody) detailsBody.appendChild(component.root);
+      component.update(context.dshMCPPage || {}, context.emit);
     }
 
     [baseURL.control, apiKey.control].forEach(function (control) {

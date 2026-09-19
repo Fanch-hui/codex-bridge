@@ -76,6 +76,33 @@ Test-Path .\apps\cli\lib\bin.js
 <dsh-source>/apps/cli/lib/bin.js
 ```
 
+### Discover the installation in Bridge
+
+Bridge scans for local Agents on first use and saves the results. If DSH was installed later, open `Connections → Local Agent Engine Connections` and click **Scan Agents**. Once discovered, enter the Base URL and API key, then connect. App and Service restarts, page changes, and regular status refreshes reuse the saved catalog.
+
+Discovery checks known launchers and standard package-manager locations before a bounded source search in local development directories. Source candidates require a built entry, the DSH package identity, and a dependency lockfile. Keep the complete source tree so Node can load its dependencies.
+
+### Advanced: specify an installation location
+
+For a location outside automatic discovery, select `apps/cli/lib/bin.js` under `Advanced: Register an existing installation`, or set `DEEPSEEK_HARNESS_ROOT` to the source root containing `package.json`, `pnpm-lock.yaml`, and `apps`.
+
+In Windows PowerShell, from the DSH source root:
+
+```powershell
+(Get-Item .\apps\cli\lib\bin.js).FullName
+[Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
+```
+
+Then click **Scan Agents** in Connections. The Windows Service reads the updated setting directly.
+
+For processes launched from a macOS terminal:
+
+```bash
+export DEEPSEEK_HARNESS_ROOT="$PWD"
+```
+
+macOS App users launching from Finder can use advanced path registration.
+
 Bridge runs this entry as `--profile acp --patch <Bridge private runtime configuration>`. It creates a private patch for each run and leaves your original profile unchanged.
 
 Bridge executes the built entry directly with Node and does not require a running terminal or browser UI. Keep the complete source tree. Moving `bin.js` by itself removes the manifest, dependency lock, modules, and source-root identity that Bridge validates.
@@ -272,6 +299,7 @@ Choose Continue conversation on an ended task to retain its context after a Serv
 | Invalid artifact | Use the official built `apps/cli/lib/bin.js`; retain the full source tree |
 | Unsupported Node | Use Node 22.19.0+ within 22.x, or Node 24+; do not use Node 23 |
 | Node not found by the app | Ensure the LaunchAgent can resolve the real interpreter, not only an interactive shell alias |
+| DSH not found after building | Click **Scan Agents**, or choose `apps/cli/lib/bin.js` under `Advanced: Register an existing installation` |
 | Manifest/lock missing | Do not copy `bin.js` away from its source tree |
 | Profile location rejected | Runtime validation requires moving `cordis.yml` and `.env` outside the DSH source; keeping them outside task projects is also recommended |
 | `templateMismatch` | Preserve the existing external `cordis.yml`; merge only the required structure from the current Bridge template, then Probe again |
@@ -297,3 +325,21 @@ Do not paste `.env` or raw authentication responses into support reports. Probe 
 - [Detailed Chinese DSH guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
 - [Detailed user guide](./USER_GUIDE.md)
 - [ChatGPT Developer Mode and Secure Tunnel guide](./CHATGPT_DEVELOPER_MODE.md)
+
+## Clash / Mihomo TUN and Fake-IP
+
+DSH validates public destination addresses before direct web fetches. Fake-IP DNS answers such as `198.18.x.x` can therefore cause `WEB_BLOCKED_URL` while browsers and ordinary HTTPS requests still work.
+
+Keep TUN enabled and configure an explicit HTTP proxy for DSH. Add these entries to the `.env` beside its registered external `cordis.yml`, preserving existing settings and avoiding duplicate keys. Replace the example port with Clash's actual HTTP/mixed port:
+
+```dotenv
+HTTP_PROXY=http://127.0.0.1:7897
+HTTPS_PROXY=http://127.0.0.1:7897
+NO_PROXY=localhost,127.0.0.1,::1
+```
+
+New tasks pick up the configuration. Bridge forwards standard proxy variables before DSH starts; inherited launch variables take priority over the profile file, including across letter casing. Lowercase names and `ALL_PROXY` are also supported. DSH requires an HTTP(S) proxy URL, not SOCKS or PAC. The proxy resolves hostnames; non-public IP literal checks remain in place.
+
+Alternatively, when Clash uses `fake-ip-filter-mode: blacklist`, append the required domains to its existing `fake-ip-filter` list, reload the configuration and clear DNS caches. Preserve existing entries; other filter modes require their own rule syntax.
+
+Web search is separate: missing `web_search_tool_result` blocks require checking the configured gateway's native search capability. Successful chat or HTTP 200 does not prove compatibility, and credential-bearing requests must not be redirected automatically to a different provider.

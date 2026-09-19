@@ -9,62 +9,141 @@
   /// are matched to requests in FIFO order; the server preserves per-connection
   /// response ordering.
   final class NamedPipeServiceTransport: ServiceRequestTransport, @unchecked Sendable {
+    private struct PendingResponse {
+      let state: NamedPipeConnectionState
+      let continuation: CheckedContinuation<Data, any Error>
+    }
+
     private let pipeName: String
-    private let io = NamedPipeOverlappedIO()
     private let lock = NSLock()
-    private var handle: HANDLE = INVALID_HANDLE_VALUE
-    private var readerThread: Thread?
-    private var pending: [CheckedContinuation<Data, any Error>] = []
+    private var currentState: NamedPipeConnectionState?
+    private var retiringStates: [NamedPipeConnectionState] = []
+    private var pending: [PendingResponse] = []
+    private var streamHandlerStore: (@Sendable (Data) -> Void)?
     private var invalidated = false
 
-    var streamHandler: (@Sendable (Data) -> Void)?
+    var streamHandler: (@Sendable (Data) -> Void)? {
+      get {
+        lock.lock()
+        defer { lock.unlock() }
+        return streamHandlerStore
+      }
+      set {
+        lock.lock()
+        streamHandlerStore = newValue
+        lock.unlock()
+      }
+    }
 
     init(pipeName: String) {
       self.pipeName = pipeName
     }
 
     deinit {
-      closeHandle()
+      invalidate()
     }
 
     func perform(_ data: Data) async throws -> Data {
-      return try await withCheckedThrowingContinuation { continuation in
-        lock.lock()
-        if invalidated {
-          lock.unlock()
-          continuation.resume(throwing: BridgeServiceClientError.unavailable)
-          return
-        }
+      try await withCheckedThrowingContinuation { continuation in
+        let state: NamedPipeConnectionState
         do {
-          try connectIfNeededLocked()
-          try writeFrameLocked(kind: 0, payload: data)
-          pending.append(continuation)
+          state = try connectIfNeeded()
         } catch {
-          lock.unlock()
-          closeHandle()
           continuation.resume(throwing: BridgeServiceClientError.unavailable)
           return
         }
-        lock.unlock()
+
+        var registered = false
+        do {
+          try state.writeFrame(kind: 0, payload: data) { [weak self] in
+            guard let self else { return false }
+            lock.lock()
+            defer { lock.unlock() }
+            guard !invalidated, currentState === state else { return false }
+            pending.append(PendingResponse(state: state, continuation: continuation))
+            registered = true
+            return true
+          }
+        } catch {
+          if registered {
+            retire(state, waitForReader: true)
+          } else {
+            continuation.resume(throwing: BridgeServiceClientError.unavailable)
+          }
+        }
       }
     }
 
     func invalidate() {
-      io?.requestCancellation()
       lock.lock()
+      guard !invalidated else {
+        lock.unlock()
+        return
+      }
       invalidated = true
+      let state = currentState
+      currentState = nil
+      let retiring = retiringStates
+      retiringStates.removeAll(keepingCapacity: false)
       let failed = pending
       pending.removeAll()
       lock.unlock()
-      for continuation in failed {
-        continuation.resume(throwing: BridgeServiceClientError.unavailable)
+
+      state?.cancelAndClose(waitForReader: true)
+      for retiringState in retiring {
+        retiringState.cancelAndClose(waitForReader: true)
       }
-      closeHandle()
+      for response in failed {
+        response.continuation.resume(throwing: BridgeServiceClientError.unavailable)
+      }
     }
 
-    private func connectIfNeededLocked() throws {
-      guard handle == INVALID_HANDLE_VALUE else { return }
-      guard let io else { throw BridgeServiceClientError.unavailable }
+    private func connectIfNeeded() throws -> NamedPipeConnectionState {
+      while true {
+        lock.lock()
+        guard !invalidated else {
+          lock.unlock()
+          throw BridgeServiceClientError.unavailable
+        }
+        if let state = currentState {
+          if !state.isClosed {
+            lock.unlock()
+            return state
+          }
+          currentState = nil
+          lock.unlock()
+          retire(state, waitForReader: true)
+          continue
+        }
+
+        if let retiringState = retiringStates.popLast() {
+          lock.unlock()
+          retiringState.cancelAndClose(waitForReader: true)
+          continue
+        }
+
+        let state: NamedPipeConnectionState
+        do {
+          state = try makeNamedPipeConnectionStateLocked()
+        } catch {
+          lock.unlock()
+          throw error
+        }
+        currentState = state
+        state.start { [weak self, state] in
+          guard let self else {
+            state.cancelAndClose(waitForReader: false)
+            state.io.signalReaderExited()
+            return
+          }
+          self.readLoop(state)
+        }
+        lock.unlock()
+        return state
+      }
+    }
+
+    private func makeNamedPipeConnectionStateLocked() throws -> NamedPipeConnectionState {
       var opened = openPipe()
       for _ in 0..<50 where opened == INVALID_HANDLE_VALUE {
         guard GetLastError() == ERROR_PIPE_BUSY else { break }
@@ -76,23 +155,17 @@
       guard opened != INVALID_HANDLE_VALUE else {
         throw BridgeServiceClientError.unavailable
       }
-      io.prepareConnection()
-      handle = opened
-      pending.removeAll()
-      let thread = Thread { [weak self] in
-        self?.readLoop()
+      guard let io = NamedPipeOverlappedIO() else {
+        _ = CloseHandle(opened)
+        throw BridgeServiceClientError.unavailable
       }
-      thread.name = "codex-bridge.pipe-reader"
-      thread.stackSize = 1 << 20
-      readerThread = thread
-      thread.start()
+      return NamedPipeConnectionState(handle: opened, io: io)
     }
 
     private func openPipe() -> HANDLE {
       pipeName.withCString(encodedAs: UTF16.self) { name in
         CreateFileW(
           name,
-          // GENERIC_READ | GENERIC_WRITE
           DWORD(0x8000_0000) | DWORD(0x4000_0000),
           0,
           nil,
@@ -103,80 +176,59 @@
       }
     }
 
-    private func writeFrameLocked(kind: UInt8, payload: Data) throws {
-      var frame = Data([kind])
-      var length = UInt32(payload.count).littleEndian
-      withUnsafeBytes(of: &length) { frame.append(contentsOf: $0) }
-      frame.append(payload)
-      guard let io else { throw BridgeServiceClientError.unavailable }
-      try io.writeFully(handle, data: frame)
-    }
-
-    private func readLoop() {
-      defer { io?.signalReaderExited() }
-      while true {
-        lock.lock()
-        let current = handle
-        lock.unlock()
-        guard current != INVALID_HANDLE_VALUE else { return }
-        guard let frame = readFrame(current) else {
-          failPendingAndClose()
+    private func readLoop(_ state: NamedPipeConnectionState) {
+      defer { state.io.signalReaderExited() }
+      while !state.isClosed {
+        guard let frame = state.readFrame() else {
+          state.cancelAndClose(waitForReader: false)
+          retire(state, waitForReader: false)
           return
         }
-        deliver(frame)
+        deliver(frame, from: state)
       }
     }
 
-    private func readFrame(_ handle: HANDLE) -> (kind: UInt8, payload: Data)? {
-      guard let header = readFully(handle, 5) else { return nil }
-      let kind = header[header.startIndex]
-      let length = header.withUnsafeBytes { raw in
-        raw.loadUnaligned(fromByteOffset: 1, as: UInt32.self).littleEndian
-      }
-      guard length <= BridgeServiceIPC.maximumMessageBytes else { return nil }
-      guard let payload = readFully(handle, length) else { return nil }
-      return (kind, payload)
-    }
-
-    private func readFully(_ handle: HANDLE, _ count: UInt32) -> Data? {
-      io?.readFully(handle, count: count)
-    }
-
-    private func deliver(_ frame: (kind: UInt8, payload: Data)) {
+    private func deliver(
+      _ frame: (kind: UInt8, payload: Data),
+      from state: NamedPipeConnectionState
+    ) {
       switch frame.kind {
       case 1:
         lock.lock()
-        let continuation = pending.isEmpty ? nil : pending.removeFirst()
+        let index = pending.firstIndex { $0.state === state && currentState === state }
+        let response = index.map { pending.remove(at: $0) }
         lock.unlock()
-        continuation?.resume(returning: frame.payload)
+        response?.continuation.resume(returning: frame.payload)
       case 2:
-        streamHandler?(frame.payload)
+        let handler: (@Sendable (Data) -> Void)? = lock.withLock {
+          guard currentState === state, !invalidated else { return nil }
+          return streamHandlerStore
+        }
+        handler?(frame.payload)
       default:
-        break
+        state.cancelAndClose(waitForReader: false)
+        retire(state, waitForReader: false)
       }
     }
 
-    private func failPendingAndClose() {
+    private func retire(_ state: NamedPipeConnectionState, waitForReader: Bool) {
       lock.lock()
-      let failed = pending
-      pending.removeAll()
-      lock.unlock()
-      for continuation in failed {
-        continuation.resume(throwing: BridgeServiceClientError.unavailable)
+      if currentState === state {
+        currentState = nil
       }
-      closeHandle(waitForReader: false)
-    }
-
-    private func closeHandle(waitForReader: Bool = true) {
-      io?.requestCancellation()
-      lock.lock()
-      let current = handle
-      handle = INVALID_HANDLE_VALUE
+      if waitForReader {
+        retiringStates.removeAll { $0 === state }
+      } else if !retiringStates.contains(where: { $0 === state }) {
+        retiringStates.append(state)
+      }
+      let failed = pending.filter { $0.state === state }
+      pending.removeAll { $0.state === state }
       lock.unlock()
-      guard current != INVALID_HANDLE_VALUE else { return }
-      _ = CancelIoEx(current, nil)
-      if waitForReader { io?.waitForReaderExit() }
-      _ = CloseHandle(current)
+
+      state.cancelAndClose(waitForReader: waitForReader)
+      for response in failed {
+        response.continuation.resume(throwing: BridgeServiceClientError.unavailable)
+      }
     }
   }
 #endif

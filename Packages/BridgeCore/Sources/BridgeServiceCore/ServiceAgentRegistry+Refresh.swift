@@ -6,17 +6,18 @@ extension ServiceAgentRegistry {
     _ record: ServiceAgentInstallationRecord,
     provider: any AgentProvider,
     identity: ServiceAgentExecutableIdentity,
-    artifacts: [ServiceAgentInstallationArtifact]
+    artifacts: [ServiceAgentInstallationArtifact],
+    executablePath: String
   ) async throws -> ServiceAgentInstallationRecord {
     if let pending = refreshProbes[record.id] {
       return try await pending.value
     }
     let pending = Task {
-      let updated = try await self.probeRecord(
+      let probed = try await self.probeRecord(
         id: record.id,
         provider: provider,
         displayName: record.displayName,
-        executablePath: record.executablePath,
+        executablePath: executablePath,
         identity: identity,
         trustProfile: record.trustProfile,
         securityProfileID: record.securityProfileID,
@@ -25,8 +26,20 @@ extension ServiceAgentRegistry {
         artifacts: artifacts,
         createdAt: record.createdAt
       )
+      let updated =
+        probed.availability == .available
+        ? probed
+        : try self.unavailableRecord(
+          record,
+          availability: probed.availability,
+          identity: record.executableIdentity,
+          reason: probed.lastProbeError ?? "The Agent did not pass the connection Probe.",
+          probedAt: probed.lastProbedAt,
+          updatedAt: probed.updatedAt
+        )
       // A local edit or disconnect made during Probe takes precedence.
-      try await self.store.updateAgentInstallation(updated, expectedRecord: record)
+      try await self.store.updateAgentInstallation(
+        updated, allowExecutableReplacement: true, expectedRecord: record)
       guard let current = try await self.store.agentInstallation(id: record.id) else {
         throw ServiceStoreError.unknownAgentInstallation(record.id)
       }

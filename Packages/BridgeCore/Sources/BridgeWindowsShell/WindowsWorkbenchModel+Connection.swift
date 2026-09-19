@@ -82,8 +82,14 @@
     }
 
     public func shutdown() async {
-      isShuttingDown = true
+      stopSchedulingForApplicationExit()
       onConnected = nil
+      closeConversation()
+      await client.close()
+    }
+
+    func stopSchedulingForApplicationExit() {
+      isShuttingDown = true
       taskPollingTask?.cancel()
       taskPollingTask = nil
       deferredCatalogTask?.cancel()
@@ -92,8 +98,12 @@
       conversationDisplayTask = nil
       interactionRefreshTask?.cancel()
       interactionRefreshTask = nil
-      closeConversation()
-      await client.close()
+    }
+
+    func resumeAfterAppUpdateCancellation() {
+      guard isShuttingDown else { return }
+      isShuttingDown = false
+      startTaskPolling()
     }
 
     func startTaskPolling() {

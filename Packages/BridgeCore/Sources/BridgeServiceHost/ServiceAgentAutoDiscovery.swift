@@ -13,18 +13,25 @@ enum ServiceAgentAutoDiscovery {
     dataPaths: ServiceDataPaths,
     existingInstallations: [ServiceAgentInstallationRecord] = [],
     credentialsProvided: Bool = false,
-    environment: [String: String] = ProcessInfo.processInfo.environment
+    environment: [String: String] = ServiceAgentDiscoveryEnvironment.current(),
+    allowGeneratedConfiguration: Bool = true,
+    discoveredExecutablePath: String? = nil
   ) throws -> [ServiceAgentRegistrationRequest] {
+    var existingPaths = existingInstallations.map(\.executablePath)
+    if let discoveredExecutablePath {
+      existingPaths.insert(discoveredExecutablePath, at: 0)
+    }
     switch providerID {
     case .openCode:
       return try commandLineRequests(
         providerID: providerID,
-        names: ["opencode"],
+        names: ["opencode", "opencode-cli"],
         displayName: "OpenCode",
         trustProfile: .managed,
         securityProfileID: ServiceAgentProviderPolicyRegistry.controlledReadOnlyProfileID,
-        existingPaths: existingInstallations.map(\.executablePath),
-        environment: environment
+        existingPaths: existingPaths,
+        environment: environment,
+        allowInstallationSearch: discoveredExecutablePath == nil
       )
     case .antigravity:
       return try commandLineRequests(
@@ -33,15 +40,21 @@ enum ServiceAgentAutoDiscovery {
         displayName: "Antigravity",
         trustProfile: .userTrusted,
         securityProfileID: AgentProfileID(rawValue: "desktop-shared"),
-        existingPaths: existingInstallations.map(\.executablePath),
-        environment: environment
+        existingPaths: existingPaths,
+        environment: environment,
+        allowInstallationSearch: discoveredExecutablePath == nil
       )
     case .deepSeekHarness:
+      var environment = environment
+      if let discoveredExecutablePath {
+        environment["CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE"] = discoveredExecutablePath
+      }
       return try deepSeekRequests(
         dataPaths: dataPaths,
         existingInstallations: existingInstallations,
         preferGeneratedConfiguration: credentialsProvided,
-        environment: environment
+        environment: environment,
+        allowGeneratedConfiguration: allowGeneratedConfiguration
       )
     case .codex:
       return []
@@ -57,18 +70,47 @@ enum ServiceAgentAutoDiscovery {
     trustProfile: AgentTrustProfile,
     securityProfileID: AgentProfileID,
     existingPaths: [String],
-    environment: [String: String]
+    environment: [String: String],
+    allowInstallationSearch: Bool = true
   ) throws -> [ServiceAgentRegistrationRequest] {
+    let baseDirectories =
+      allowInstallationSearch
+      ? userAgentDirectories(environment: environment) : []
     let resolver = AgentExecutableResolver(
       environment: environment,
-      additionalDirectories: userAgentDirectories(environment: environment)
+      additionalDirectories: baseDirectories,
+      includeEnvironmentPath: allowInstallationSearch,
+      includeUserDirectories: allowInstallationSearch
     )
-    var paths = existingPaths + names.compactMap { resolver.resolve($0) }
+    var paths = existingPaths
+    if allowInstallationSearch {
+      paths.append(contentsOf: names.compactMap { resolver.resolve($0) })
+    }
     #if os(Windows)
-      paths.append(
-        contentsOf: names.flatMap {
-          commandScriptCandidates(name: $0, resolver: resolver)
-        })
+      if allowInstallationSearch {
+        let initialHasUsableCandidate = paths.contains { path in
+          guard let canonical = canonicalExecutable(path) else { return false }
+          return isCommandLineExecutable(canonical)
+        }
+        let searchResolver: AgentExecutableResolver
+        if initialHasUsableCandidate {
+          searchResolver = resolver
+        } else {
+          let directories = ServiceAgentWindowsInstallationSources.searchDirectories(
+            names: names,
+            environment: environment
+          )
+          searchResolver = AgentExecutableResolver(
+            environment: environment,
+            additionalDirectories: uniquePaths(baseDirectories + directories)
+          )
+          paths.append(contentsOf: names.compactMap { searchResolver.resolve($0) })
+        }
+        paths.append(
+          contentsOf: names.flatMap {
+            commandScriptCandidates(name: $0, resolver: searchResolver)
+          })
+      }
     #endif
     var seen = Set<String>()
     return try paths.compactMap { path in
@@ -107,6 +149,8 @@ enum ServiceAgentAutoDiscovery {
       if let local = environmentValue("LOCALAPPDATA", environment: environment) {
         directories.append(pathJoin(local, "Programs", "nodejs"))
       }
+    #else
+      directories.append(contentsOf: macOSAgentSearchDirectories(environment: environment))
     #endif
     return directories
   }

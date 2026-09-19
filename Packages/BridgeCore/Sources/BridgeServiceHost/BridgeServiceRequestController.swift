@@ -10,6 +10,7 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
   let streamSink: (any ServiceStreamSink)?
   let streams = StreamRegistry()
   let conversationStreamGate = AsyncMutex()
+  var streamingStopped = false
 
   public init(
     composition: ServiceComposition,
@@ -33,6 +34,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
   func stopStreamingAsync() async {
     await conversationStreamGate.acquire()
     defer { conversationStreamGate.release() }
+    guard !streamingStopped else { return }
+    streamingStopped = true
     let active = streams.takeAll()
     for (taskID, registration) in active {
       registration.forwarder.cancel()
@@ -63,9 +66,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
         retryable: true
       )
     }
-    let response = await handle(decoded)
-    admission.release()
-    return response
+    defer { admission.release() }
+    return await handle(decoded)
   }
 
   private func handle(_ request: BridgeServiceIPCRequest) async -> Data {
@@ -218,6 +220,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleDisconnectTunnel(request)
     case .clearTunnel:
       return try await handleClearTunnel(request)
+    case .prepareAppUpdate:
+      return try await handlePrepareAppUpdate(request)
+    case .cancelAppUpdate:
+      return try await handleCancelAppUpdate(request)
     case .shutdownService:
       #if os(Windows)
         return try handleShutdownService(request)

@@ -83,6 +83,14 @@ struct StrictToolArguments {
     return Int64(result)
   }
 
+  func optionalNonnegativeInteger(_ key: String, maximum: Int64) throws -> Int64? {
+    guard let value = values[key], value != .null else { return nil }
+    guard case .int(let result) = value, result >= 0, result <= maximum else {
+      throw MCPError.invalidParams("Argument '\(key)' must be a bounded nonnegative integer.")
+    }
+    return Int64(result)
+  }
+
   func optionalPositiveInteger(_ key: String, maximum: Int) throws -> Int? {
     guard let value = values[key], value != .null else { return nil }
     guard case .int(let result) = value, result > 0, result <= maximum else {

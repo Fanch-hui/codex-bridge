@@ -85,8 +85,19 @@ extension MCPServiceToolCatalog {
           "file_write_permission": stringSchema,
           "command_mode": ["type": "string", "enum": ["denied", "safe", "full"]],
           "commands": arraySchema(projectCommandSchema),
+          "command_blacklist": arraySchema(
+            objectSchema(
+              properties: [
+                "rule_id": stringSchema,
+                "executable": nullableStringSchema(maximum: 1_024),
+                "pattern": nullableStringSchema(maximum: 4_096),
+                "arguments": arraySchema(stringSchema),
+              ],
+              required: ["rule_id"]
+            )
+          ),
         ],
-        required: ["file_write_permission", "command_mode", "commands"]
+        required: ["file_write_permission", "command_mode", "commands", "command_blacklist"]
       ),
     ],
     required: ["project_id", "name", "capabilities", "verification_commands"]
@@ -241,6 +252,9 @@ extension MCPServiceToolCatalog {
     properties: [
       "task_id": stringSchema,
       "project_id": stringSchema,
+      "prompt": nullableStringSchema(maximum: 32 * 1_024),
+      "source": nullableStringSchema(maximum: 128),
+      "source_client_id": nullableStringSchema(maximum: 256),
       "status": stringSchema,
       "provider_id": stringSchema,
       "installation_id": stringSchema,
@@ -268,7 +282,7 @@ extension MCPServiceToolCatalog {
     required: [
       "task_id", "project_id", "status", "changed_files", "recent_events",
       "recent_activity_available",
-      "execution_model", "execution_effort", "permission_mode", "network_access",
+      "network_access",
       "supervisor_status",
       "local_approval_required", "updated_at", "wait_policy",
     ]

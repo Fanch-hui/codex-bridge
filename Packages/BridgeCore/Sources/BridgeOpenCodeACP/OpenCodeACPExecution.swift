@@ -180,6 +180,29 @@ public actor OpenCodeACPExecution {
       return nextPrompt
     }
 
+    guard stopReason == "end_turn" else {
+      let failure: (code: String, summary: String) =
+        switch stopReason {
+        case "refusal":
+          (
+            "opencode_refusal",
+            "OpenCode refused the task."
+          )
+        case "max_tokens", "max_turn_requests":
+          (
+            "opencode_incomplete",
+            "OpenCode stopped before producing a complete answer."
+          )
+        default:
+          (
+            "opencode_unknown_stop_reason",
+            "OpenCode returned an unsupported stop reason."
+          )
+        }
+      await failExecution(code: failure.code, summary: failure.summary)
+      return nil
+    }
+
     let finalizedContent = try await normalizer.finalizeContent()
     guard !terminal else { return nil }
     if interruptRequested {
@@ -191,6 +214,29 @@ public actor OpenCodeACPExecution {
     // lost to a completion race.
     if let nextPrompt = dequeueSteer() {
       return nextPrompt
+    }
+    guard await normalizer.unfinishedToolCount() == 0 else {
+      await failExecution(
+        code: "opencode_unfinished_tool",
+        summary: "OpenCode ended the turn with an unfinished tool call."
+      )
+      return nil
+    }
+    guard
+      finalizedContent.contains(where: { envelope in
+        guard case .content(let update) = envelope.event else { return false }
+        return update.role == .assistant
+          && update.kind == .message
+          && update.isFinal
+          && update.authoritative
+          && !update.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      })
+    else {
+      await failExecution(
+        code: "opencode_empty_response",
+        summary: "OpenCode ended the turn without a committed assistant message."
+      )
+      return nil
     }
     guard claimTerminal() else { return nil }
     do {
@@ -293,20 +339,4 @@ public actor OpenCodeACPExecution {
     }
   }
 
-  private static func failureSummary(_ error: any Error) -> String {
-    switch error {
-    case OpenCodeACPError.requestTimedOut:
-      return "OpenCode ACP request timed out."
-    case OpenCodeACPError.processExited:
-      return "OpenCode ACP process exited before completion."
-    case OpenCodeACPError.oversizedFrame:
-      return "OpenCode ACP exceeded a protocol size limit."
-    case OpenCodeACPError.sessionMismatch:
-      return "OpenCode ACP reported an unexpected session."
-    case OpenCodeACPError.remote(let code, _):
-      return "OpenCode ACP returned protocol error \(code)."
-    default:
-      return "OpenCode ACP execution failed."
-    }
-  }
 }

@@ -161,6 +161,10 @@
 .client-row:last-child, .agent-row:last-child { border-bottom: 0; }
 .dsh-mcp-row { display: flex; align-items: flex-start; gap: 12px; }
 .dsh-mcp-card { display: grid; gap: 10px; }
+.agent-details-body > .dsh-mcp-card { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--separator); }
+.detail-grid.tunnel-facts { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.tunnel-facts .detail-item { display: flex; align-items: baseline; gap: 8px; }
+.tunnel-facts .detail-item dd { margin: 0; }
 .dsh-mcp-card .card-subtitle { margin-bottom: 0; }
 .dsh-mcp-card > .section-heading-row { margin: 0; }
 .dsh-mcp-card > .section-heading-row h3 { margin: 0; }
@@ -211,7 +215,11 @@
 .settings-stack { display: grid; gap: 12px; }
 .settings-card { min-width: 0; }
 .settings-card h3 { margin: 0 0 13px; font-size: 15px; }
-.settings-card .field + .field, .settings-card .check-field + .field { margin-top: 11px; }
+.settings-card > .field + .field, .settings-card > .check-field + .field { margin-top: 11px; }
+.settings-subsection h4 { margin: 0 0 14px; color: var(--text); font-size: 14px; }
+.agent-preferences { padding-top: 20px; margin-top: 8px; border-top: 1px solid var(--separator); }
+.agent-preferences > .hint { margin-bottom: 12px; }
+.codex-preferences-grid { align-items: end; }
 .settings-card .hint { margin: 10px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .settings-card .form-actions { justify-content: flex-end; }
 .native-permission-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

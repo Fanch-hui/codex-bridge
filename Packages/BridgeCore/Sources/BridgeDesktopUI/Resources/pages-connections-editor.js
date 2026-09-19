@@ -67,6 +67,13 @@
       main.appendChild(detail);
       row.appendChild(main);
       var controls = S.node("div", "client-controls");
+      var exposure = S.selectField("客户端工具权限", client.exposureMode, client.exposureOptions, function (value) {
+        context.emit("setMCPClientExposure", {
+          clientID: row.dataset.clientID,
+          exposureMode: value
+        });
+      }, "client-exposure");
+      controls.appendChild(exposure.wrapper);
       var toggle = S.node("label", "check-field");
       var checkbox = S.node("input");
       var toggleText = S.node("span");
@@ -100,6 +107,7 @@
         name: name,
         state: state,
         detail: detail,
+        exposure: exposure.control,
         toggle: toggle, checkbox: checkbox, toggleText: toggleText,
         copy: copy,
         rotate: rotate,
@@ -113,6 +121,9 @@
       row.state.className = "status-badge " + (client.enabled ? "success" : "neutral");
       row.detail.textContent = "活动 Session：" + client.activeSessionCount
         + (client.lastConnectedAt ? " · 最近连接：" + client.lastConnectedAt : "");
+      D.selectOptions(row.exposure, client.exposureOptions || [], false);
+      row.exposure.value = client.exposureMode || "full";
+      row.exposure.disabled = !client.exposureOptions || !client.exposureOptions.length;
       row.checkbox.checked = !!client.enabled;
       row.checkbox.disabled = !client.canToggle;
       row.toggle.hidden = !client.canToggle;
@@ -121,7 +132,7 @@
       row.rotate.hidden = !client.canRotateCredential;
       row.copy.disabled = !client.enabled || !client.canCopyConfiguration;
       row.rotate.disabled = !client.enabled || !client.canRotateCredential;
-      row.hint.textContent = "提供完整 Agent 任务与工具能力；执行遵循项目权限和本机审批。";
+      row.hint.textContent = "这里只控制 ChatGPT/Qwen 客户端收到的 MCP 工具集合；Agent 任务仍单独受工作台只读/可写权限控制。";
       context.emit = nextEmit;
     }
     function placeRow(card, row, index) {
@@ -217,7 +228,7 @@
     provider.control.addEventListener("change", function () {
       var selected = getProvider(provider.control.value);
       if (selected) {
-        draft.update({
+        draft.reset({
           providerID: selected.providerID,
           displayName: selected.displayName,
           executable: "",
@@ -262,15 +273,25 @@
         var selected = getProvider(provider.control.value);
         if (!selected) {
           provider.control.value = "";
-          draft.update({ providerID: "", displayName: "", executable: "", configurationPath: "" });
+          draft.reset({ providerID: "", displayName: "", executable: "", configurationPath: "" });
         } else {
-          if (provider.control.value !== selected.providerID) provider.control.value = selected.providerID;
-          draft.update({
-            providerID: selected.providerID,
-            displayName: selected.displayName,
-            executable: "",
-            configurationPath: ""
-          });
+          var providerChanged = provider.control.value !== selected.providerID;
+          if (providerChanged) {
+            provider.control.value = selected.providerID;
+            draft.reset({
+              providerID: selected.providerID,
+              displayName: selected.displayName,
+              executable: "",
+              configurationPath: ""
+            });
+          } else {
+            draft.update({
+              providerID: selected.providerID,
+              displayName: selected.displayName,
+              executable: "",
+              configurationPath: ""
+            });
+          }
         }
         quickSelect.disabled = !context.enabled || !context.providers.length;
         register.disabled = !context.enabled || !context.providers.length;

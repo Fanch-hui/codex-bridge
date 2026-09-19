@@ -1,6 +1,6 @@
 # DeepSeek Harness 接入指南
 
-本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、一键连接并从 ChatGPT/Qwen 提交任务。
+本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、自动发现并一键连接并从 ChatGPT/Qwen 提交任务。
 
 最短路径是：从官方仓库构建 DSH → 在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key → 点击“连接” → 在设置中刷新模型。Mac 与 Windows 共用这套流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
@@ -88,6 +88,33 @@ Test-Path .\apps\cli\lib\bin.js
 <dsh-source>/apps/cli/lib/bin.js
 ```
 
+### 在 Bridge 中发现安装
+
+首次使用 Bridge 时会自动扫描并保存本机 Agent 目录。若 DSH 是后来安装的，打开 `连接 → 本机 Agent 引擎连接`，点击“扫描 Agent”；发现后填写 Base URL 与 API key，再点击“连接”。App 和后台服务重启会保留发现结果，日常状态刷新和切页使用已保存的目录。
+
+Bridge 优先读取已知启动入口和标准包管理器安装位置，再在本地开发目录进行有界源码索引；源码候选必须有已构建的入口、DSH 包标识和依赖锁文件。保留完整源码目录供 Node 加载依赖。
+
+### 高级：指定安装位置
+
+对于自动扫描未覆盖的位置，可以在“高级：按路径登记已有安装”选择 `apps/cli/lib/bin.js`，或用 `DEEPSEEK_HARNESS_ROOT` 指定包含 `package.json`、`pnpm-lock.yaml` 和 `apps` 的源码根。
+
+Windows PowerShell，在 DSH 源码根执行：
+
+```powershell
+(Get-Item .\apps\cli\lib\bin.js).FullName
+[Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
+```
+
+然后回到连接页点击“扫描 Agent”。Windows Service 会读取新设置。
+
+macOS 终端可为从该终端启动的进程设置：
+
+```bash
+export DEEPSEEK_HARNESS_ROOT="$PWD"
+```
+
+从 Finder 启动的 macOS App 可使用高级路径登记。
+
 Bridge 使用现代入口启动：`--profile acp --patch <Bridge 私有运行配置>`。Bridge 会为每次运行生成私有 patch，不修改你的原始 Profile。
 
 ### 不要选择这些对象
@@ -120,7 +147,7 @@ Bridge 实际执行语义是：
 - ACP initialize/session 行为与 wire protocol 1；
 - 当前入口所需的 Profile/patch 结构。
 
-因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。DSH 更新后，即使路径相同，Bridge 也会因工件身份变化要求重新 Probe，而不是静默信任替换后的文件。
+因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。已启用的 DSH 更新后，Bridge 会重新解析当前运行时工件并自动 Probe；通过后沿用原连接。启动配置内容改变仍需本机确认，接口检查失败或无法确定新运行时位置时，首页“本机 Agent 引擎”会提示手动处理。
 
 ## 推荐路径：在 App 中一键连接
 
@@ -266,6 +293,24 @@ Search endpoint 必须同时满足：
 3. 接受当前模板使用的 `DEEPSEEK_API_KEY`。
 
 “主模型能回答”“网关支持 `/messages`”或“认证成功”都不能单独证明 Web Search 可用。自定义网关若用不同的搜索凭据，而当前模板只配置 `DEEPSEEK_API_KEY`，需要先确认该 Key 对两个端点都有效；不要让 Bridge 读取或转换凭据来弥补网关配置差异。
+
+### 8.3 Clash / Mihomo TUN 与 Fake-IP
+
+DSH 的网页抓取会拒绝解析到非公网地址的目标。TUN 的 Fake-IP（例如 `198.18.x.x`）因此可能触发 `WEB_BLOCKED_URL`，即使浏览器和普通 HTTPS 请求正常。这是抓取前的地址校验，不代表整台机器断网。
+
+推荐只为 DSH 指定 Clash 的 HTTP 或 mixed 代理端口，保留 TUN 和 Fake-IP。在登记的外部 `cordis.yml` 同目录 `.env` 中添加以下项（`7897` 只是示例，请使用 Clash 显示的实际 HTTP/mixed 端口）：
+
+```dotenv
+HTTP_PROXY=http://127.0.0.1:7897
+HTTPS_PROXY=http://127.0.0.1:7897
+NO_PROXY=localhost,127.0.0.1,::1
+```
+
+保留文件里已有的配置，避免重复定义同名变量。新任务启动时生效；已有运行中的任务保持原环境。Bridge 会把这些值在 DSH 启动前传入，启动进程已有的同类代理变量优先。也支持标准 `ALL_PROXY` 和小写代理变量；DSH 的该代理实现要求 HTTP(S) 地址，不能填 SOCKS 或 PAC 地址。通过代理时由代理解析域名，DSH 继续保留非公网 IP 字面量校验。
+
+另一种方式是调整 Clash DNS。若当前 `fake-ip-filter-mode` 为 `blacklist`，可在原 `fake-ip-filter` 列表追加需要抓取的域名（例如 `+.x.com`、`+.ycombinator.com`），让它们返回真实 IP；保留现有条目，并重载配置、清理 DNS 缓存。其他过滤模式需按该模式的规则配置，不能直接覆盖原列表。
+
+这只解决网页抓取。`web_search` 若提示没有 `web_search_tool_result`，仍需按 8.2 检查搜索网关的原生搜索能力；HTTP 200 或普通聊天成功不能替代该能力。不要将带密钥的请求自动改发到其他服务商。
 
 ## 9. 检查连接结果与手动登记
 
@@ -553,6 +598,7 @@ waiting_for_codex_approval
 | 选择文件后提示 artifact 无效 | 是否选择官方构建后的 `apps/cli/lib/bin.js`；是否保留完整源码树 |
 | Node 不支持 | 使用 Node 22.19.0+ 的 22.x 或 Node 24+；不要使用 Node 23 |
 | App 找不到 Node | Node 是否只存在于交互式 shell PATH；Service 能否解析 shebang 指向的真实 Node |
+| 构建完成但未发现 DSH | 先点击“扫描 Agent”；或在“高级：按路径登记已有安装”中选择 `apps/cli/lib/bin.js` |
 | 找不到 manifest/lock | 是否把 `bin.js` 单独复制走；源根是否仍有 `package.json` 和 `pnpm-lock.yaml` |
 | Profile 位置被拒绝 | 运行时强制把 `cordis.yml`/`.env` 移出 DSH 源码树；同时建议使用任务项目之外的专用目录 |
 | `templateMismatch` | 从当前 Bridge 随包模板重新复制，不要手工删插件或改 sandbox 结构 |

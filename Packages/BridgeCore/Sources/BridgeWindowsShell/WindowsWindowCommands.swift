@@ -18,7 +18,11 @@
     case selectPage(index: Int)
     case windowVisibilityChanged(Bool)
     case refreshAll
+    case checkAppUpdate
+    case installAppUpdate
+    case deferAppUpdate
     case refreshModels
+    case scanAgents
     case openTask(id: String)
     case browserBack
     case browserForward
@@ -110,9 +114,15 @@
     case stopTask(id: String)
     case deleteTask(id: String)
     case deleteSession(taskID: String)
-    case steerTask(id: String, input: String, mode: String)
-    case resumeTask(id: String, input: String?)
-    case restartTask(id: String)
+    case steerTask(id: String, input: String, mode: String, requestID: String? = nil)
+    case resumeTask(id: String, input: String?, requestID: String? = nil)
+    case restartTask(id: String, requestID: String? = nil)
+    case rejectWorkbenchCommand(
+      requestID: String,
+      command: String,
+      taskID: String?,
+      input: String?
+    )
     case resolveTaskApproval(
       approvalID: String,
       taskID: String,

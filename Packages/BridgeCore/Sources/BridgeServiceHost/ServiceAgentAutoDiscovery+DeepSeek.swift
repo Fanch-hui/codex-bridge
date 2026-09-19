@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDeepSeekHarnessACP
 import BridgeServiceApplication
 import BridgeServiceCore
@@ -8,13 +9,15 @@ extension ServiceAgentAutoDiscovery {
     dataPaths: ServiceDataPaths,
     existingInstallations: [ServiceAgentInstallationRecord],
     preferGeneratedConfiguration: Bool,
-    environment: [String: String]
+    environment: [String: String],
+    allowGeneratedConfiguration: Bool = true
   ) throws -> [ServiceAgentRegistrationRequest] {
     var executables =
       ([managedDeepSeekExecutable(dataPaths: dataPaths)]
       + deepSeekExecutableCandidates(
         existingInstallations: existingInstallations,
-        environment: environment
+        environment: environment,
+        includeSourceSearch: false
       )).compactMap(canonicalRegularFile)
     #if os(Windows)
       executables = executables.filter { !isWindowsGUIExecutable($0) }
@@ -32,24 +35,29 @@ extension ServiceAgentAutoDiscovery {
         environment: environment
       ).compactMap(canonicalRegularFile)
     }
-    if configurations.isEmpty,
+    if configurations.isEmpty, allowGeneratedConfiguration,
       let generated = try makeGeneratedDeepSeekConfiguration(at: dataPaths.agentStateURL)
     {
       configurations = [generated]
     }
     var requests: [ServiceAgentRegistrationRequest] = []
+    var validationError: (any Error)?
     var seen = Set<String>()
     for executable in executables {
       for configuration in configurations {
         let key = "\(pathKey(executable))\n\(pathKey(configuration))"
         guard seen.insert(key).inserted else { continue }
-        guard
-          let artifacts = try? DeepSeekHarnessACPProfile.resolveArtifacts(
+        let artifacts: [AgentInstallationArtifactRole: String]
+        do {
+          artifacts = try DeepSeekHarnessACPProfile.resolveArtifacts(
             executablePath: executable,
             configurationPath: configuration,
             sourceEnvironment: environment
           )
-        else { continue }
+        } catch {
+          validationError = error
+          continue
+        }
         requests.append(
           try ServiceAgentRegistrationRequest(
             providerID: .deepSeekHarness,
@@ -66,21 +74,25 @@ extension ServiceAgentAutoDiscovery {
         )
       }
     }
+    if requests.isEmpty, let validationError { throw validationError }
     return requests
   }
 
   static func deepSeekExecutableCandidates(
     existingInstallations: [ServiceAgentInstallationRecord],
-    environment: [String: String]
+    environment: [String: String],
+    includeSourceSearch: Bool = true
   ) -> [String] {
-    var candidates = existingInstallations.map(\.executablePath)
+    var knownCandidates = existingInstallations.map(\.executablePath)
     for key in [
       "CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE",
       "DEEPSEEK_HARNESS_EXECUTABLE",
     ] {
-      if let value = environmentValue(key, environment: environment) { candidates.append(value) }
+      if let value = environmentValue(key, environment: environment) {
+        knownCandidates.append(value)
+      }
     }
-    candidates.append(
+    knownCandidates.append(
       contentsOf: deepSeekSourceRoots(environment: environment).flatMap {
         [
           pathJoin($0, "apps", "cli", "lib", "bin.js"),
@@ -88,7 +100,21 @@ extension ServiceAgentAutoDiscovery {
         ]
       }
     )
-    return uniquePaths(candidates)
+    knownCandidates.append(contentsOf: deepSeekLauncherCandidates(environment: environment))
+
+    // PATH, package-manager launchers and an explicitly supplied root are cheap
+    // and authoritative. Only when they produce no file do we inspect the
+    // bounded set of local development directories.
+    let known = uniquePaths(knownCandidates)
+    if known.contains(where: { canonicalRegularFile($0) != nil }) {
+      return known
+    }
+    guard includeSourceSearch else { return known }
+    let discoveredRoots = ServiceAgentDeepSeekSourceSearch.discover(environment: environment)
+    let discoveredEntries = discoveredRoots.map {
+      pathJoin($0, "apps", "cli", "lib", "bin.js")
+    }
+    return uniquePaths(known + discoveredEntries)
   }
 
   static func deepSeekConfigurationCandidates(
@@ -140,18 +166,19 @@ extension ServiceAgentAutoDiscovery {
     ] {
       if let value = environmentValue(key, environment: environment) { roots.append(value) }
     }
-    guard let home = homeDirectory(environment: environment) else { return uniquePaths(roots) }
-    roots.append(
-      contentsOf: [
-        "deepseek-harness", "deepseek-harness-acp", "Projects/deepseek-harness",
-        "Development/deepseek-harness", "src/deepseek-harness", "Code/deepseek-harness",
-        "Documents/deepseek-harness",
-      ].map { pathJoin(home, $0) })
     #if os(Windows)
       if let programFiles = environmentValue("ProgramFiles", environment: environment) {
         roots.append(pathJoin(programFiles, "deepseek-harness"))
       }
     #endif
+    if let home = homeDirectory(environment: environment) {
+      roots.append(
+        contentsOf: [
+          "deepseek-harness", "deepseek-harness-acp", "Projects/deepseek-harness",
+          "Development/deepseek-harness", "src/deepseek-harness", "Code/deepseek-harness",
+          "Documents/deepseek-harness",
+        ].map { pathJoin(home, $0) })
+    }
     return uniquePaths(roots)
   }
 

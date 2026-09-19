@@ -91,6 +91,14 @@ extension AgentMarkdownHTMLRenderer {
       let link = parseLink(in: characters, at: bracketIndex, until: end)
     else { return nil }
     guard safeWebURL(link.destination) else {
+      if link.destination == "[REDACTED]" {
+        let label = renderInline(
+          characters,
+          from: link.labelStart + 1,
+          to: link.labelEnd
+        )
+        return InlineToken(html: label, nextIndex: link.end)
+      }
       return InlineToken(
         html: escapeText(String(characters[index..<link.end])),
         nextIndex: link.end

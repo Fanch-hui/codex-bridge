@@ -30,6 +30,16 @@
       update: function (values) {
         Object.keys(fields).forEach(function (key) { sync(fields[key], values[key]); });
       },
+      reset: function (values) {
+        Object.keys(fields).forEach(function (key) {
+          var field = fields[key];
+          var value = values[key];
+          field.composing = false;
+          field.server = value;
+          field.baseline = value;
+          write(field.control, value);
+        });
+      },
       values: function () {
         var values = {};
         Object.keys(fields).forEach(function (key) { values[key] = read(fields[key].control); });

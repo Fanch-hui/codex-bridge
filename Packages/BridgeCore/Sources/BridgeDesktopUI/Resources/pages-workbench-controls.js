@@ -2,7 +2,8 @@
   "use strict";
 
   var S = global.CodexBridgeDesktopPageSupport;
-  var drafts = new Map(), currentKey = null;
+  var drafts = new Map(), pendingSubmissions = new Map(), currentKey = null;
+  var submissionSequence = 0;
   var controls = null, status = null;
 
   function render(page, emit) {
@@ -14,17 +15,72 @@
       footer.appendChild(status);
     }
     var detail = page && page.selectedTask;
+    controls.__receiptID = page && page.commandReceipt ? page.commandReceipt.receiptID : null;
+    acknowledgeSubmission(page);
     var modes = page ? S.safeArray(page.steerModes) : [];
     var kind = detail && detail.canSteer === true ? "steer" : detail && (detail.canResume || detail.canRestart) ? "retry" : "";
     var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, detail.canRestart, modes]) : "";
     if (key !== currentKey) {
-      var focused = captureFocus();
-      S.clear(controls);
-      if (kind === "steer") controls.appendChild(steerForm(detail, modes, emit));
-      if (kind === "retry") controls.appendChild(retryForm(detail, emit));
-      currentKey = key;
-      restoreFocus(focused, detail);
+      var updateControls = function () {
+        var focused = captureFocus();
+        S.clear(controls);
+        controls.__activeForm = null;
+        if (kind === "steer") {
+          controls.__activeForm = steerForm(detail, modes, emit, controls.__receiptID);
+          controls.appendChild(controls.__activeForm);
+        }
+        if (kind === "retry") {
+          controls.__activeForm = retryForm(detail, emit, controls.__receiptID);
+          controls.appendChild(controls.__activeForm);
+        }
+        currentKey = key;
+        restoreFocus(focused, detail);
+      };
+      var renderControlsStable = global.CodexBridgeDesktopStableRender;
+      if (renderControlsStable) renderControlsStable(controls, key, updateControls);
+      else updateControls();
     }
+    var statusSignature = JSON.stringify([
+      page && page.engineStatus,
+      page && page.selectedTaskID
+    ]);
+    var renderStatusStable = global.CodexBridgeDesktopStableRender;
+    if (renderStatusStable) {
+      renderStatusStable(status, statusSignature, function () { renderStatus(page, emit); });
+    } else {
+      renderStatus(page, emit);
+    }
+  }
+
+  function newSubmissionRequestID() {
+    submissionSequence += 1;
+    return "workbench-" + Date.now().toString(36) + "-" + submissionSequence + "-"
+      + Math.random().toString(36).slice(2, 10);
+  }
+
+  function acknowledgeSubmission(page) {
+    var receipt = page && page.commandReceipt;
+    if (!receipt || !receipt.receiptID || !receipt.requestID || !receipt.command) return;
+    var receiptInput = receipt.input == null ? null : receipt.input;
+    pendingSubmissions.forEach(function (pending, taskID) {
+      if (pending.baselineReceiptID && pending.baselineReceiptID === receipt.receiptID) return;
+      if (pending.requestID !== receipt.requestID || pending.command !== receipt.command
+        || pending.taskID !== receipt.taskID || pending.input !== receiptInput) return;
+      pendingSubmissions.delete(taskID);
+      var draft = draftFor(taskID);
+      if (receipt.accepted === true && draft.input === pending.input) {
+        draft.input = "";
+        var form = controls && controls.__activeForm;
+        if (form && form.__taskID === taskID && form.__inputControl) {
+          form.__inputControl.value = "";
+        }
+      }
+      var activeForm = controls && controls.__activeForm;
+      if (activeForm && activeForm.__validate) activeForm.__validate();
+    });
+  }
+
+  function renderStatus(page, emit) {
     S.clear(status);
     status.appendChild(S.node("span", "footer-status-text", page ? page.engineStatus || "等待引擎状态" : "等待本机 Service"));
     var refresh = S.button(
@@ -46,13 +102,15 @@
     var draft = draftFor(detail.taskID);
     var field = S.textField(label, draft.input, placeholder, "full");
     field.control.id = "workbench-task-input";
+    field.control.setAttribute("aria-label", label);
     field.control.dataset.taskID = detail.taskID;
     field.wrapper.querySelector("label").htmlFor = field.control.id;
+    field.wrapper.querySelector("label").hidden = label === "消息";
     field.control.addEventListener("input", function () { draft.input = field.control.value; });
     return field;
   }
 
-  function steerForm(detail, modes, emit) {
+  function steerForm(detail, modes, emit, baselineReceiptID) {
     var draft = draftFor(detail.taskID), form = S.node("div", "steer-form");
     var grid = S.node("div", "form-grid workbench-steer-grid");
     var input = inputField(detail, "补充指令", "当前轮完成后继续");
@@ -77,7 +135,7 @@
     function validate() {
       var value = input.control.value;
       var invalid = value.indexOf("\u0000") >= 0 || new TextEncoder().encode(value).length > 32768;
-      send.disabled = !value.trim() || invalid;
+      send.disabled = pendingSubmissions.has(detail.taskID) || !value.trim() || invalid;
       hint.textContent = invalid ? "指令不能包含 NUL 字符，且不能超过 32768 字节。" : "";
       hint.hidden = !invalid;
       input.control.setAttribute("aria-invalid", String(invalid));
@@ -85,10 +143,16 @@
     function submit() {
       if (send.disabled) return;
       var value = input.control.value;
-      draft.input = "";
-      input.control.value = "";
+      var requestID = newSubmissionRequestID();
+      pendingSubmissions.set(detail.taskID, {
+        command: "steerTask",
+        requestID: requestID,
+        baselineReceiptID: baselineReceiptID,
+        taskID: detail.taskID,
+        input: value
+      });
       validate();
-      emit("steerTask", { taskID: detail.taskID, input: value, mode: draft.mode });
+      emit("steerTask", { taskID: detail.taskID, input: value, mode: draft.mode }, requestID);
     }
     input.control.addEventListener("input", validate);
     input.control.addEventListener("keydown", function (event) {
@@ -96,39 +160,69 @@
     });
     send.addEventListener("click", submit);
     form.appendChild(grid); form.appendChild(hint);
+    form.__taskID = detail.taskID;
+    form.__inputControl = input.control;
+    form.__validate = validate;
     validate();
     return form;
   }
 
-  function retryForm(detail, emit) {
+  function retryForm(detail, emit, baselineReceiptID) {
     var form = S.node("div", "retry-form"), draft = draftFor(detail.taskID);
     var actions = S.node("div", "form-actions");
+    var resumeButton = null, restartButton = null;
     if (detail.canResume) {
-      var input = inputField(detail, "补充说明", "输入下一条指令，沿用当前会话上下文");
+      var input = inputField(detail, "消息", "输入下一条指令，沿用当前会话上下文");
       form.appendChild(input.wrapper);
       function resume() {
+        if (resumeButton.disabled) return;
         var value = input.control.value;
-        draft.input = ""; input.control.value = "";
-        emit("resumeTask", { taskID: detail.taskID, input: value || null });
+        var requestID = newSubmissionRequestID();
+        pendingSubmissions.set(detail.taskID, {
+          command: "resumeTask",
+          requestID: requestID,
+          baselineReceiptID: baselineReceiptID,
+          taskID: detail.taskID,
+          input: value
+        });
+        validate();
+        emit("resumeTask", { taskID: detail.taskID, input: value || null }, requestID);
       }
-      var button = S.button("继续对话", null, {}, emit, "small primary", false);
-      button.addEventListener("click", resume);
+      resumeButton = S.button("发送", null, {}, emit, "small primary", false);
+      resumeButton.addEventListener("click", resume);
       input.control.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); resume(); }
       });
-      actions.appendChild(button);
+      form.__taskID = detail.taskID;
+      form.__inputControl = input.control;
+      actions.appendChild(resumeButton);
     }
     if (detail.canRestart) {
-      var restart = S.button("重新开始", null, {}, emit, "small", false);
-      restart.addEventListener("click", function () {
+      restartButton = S.button("重新开始", null, {}, emit, "small", false);
+      restartButton.addEventListener("click", function () {
+        if (restartButton.disabled) return;
         if (!global.confirm("使用原始指令在当前项目开启全新会话？")) return;
-        draft.input = "";
-        if (input) input.control.value = "";
-        emit("restartTask", { taskID: detail.taskID });
+        var requestID = newSubmissionRequestID();
+        pendingSubmissions.set(detail.taskID, {
+          command: "restartTask",
+          requestID: requestID,
+          baselineReceiptID: baselineReceiptID,
+          taskID: detail.taskID,
+          input: null
+        });
+        validate();
+        emit("restartTask", { taskID: detail.taskID }, requestID);
       });
-      actions.appendChild(restart);
+      actions.appendChild(restartButton);
+    }
+    function validate() {
+      var pending = pendingSubmissions.has(detail.taskID);
+      if (resumeButton) resumeButton.disabled = pending;
+      if (restartButton) restartButton.disabled = pending;
     }
     form.appendChild(actions);
+    form.__validate = validate;
+    validate();
     return form;
   }
 
