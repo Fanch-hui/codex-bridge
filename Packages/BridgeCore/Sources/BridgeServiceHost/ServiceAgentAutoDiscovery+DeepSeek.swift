@@ -41,18 +41,23 @@ extension ServiceAgentAutoDiscovery {
       configurations = [generated]
     }
     var requests: [ServiceAgentRegistrationRequest] = []
+    var validationError: (any Error)?
     var seen = Set<String>()
     for executable in executables {
       for configuration in configurations {
         let key = "\(pathKey(executable))\n\(pathKey(configuration))"
         guard seen.insert(key).inserted else { continue }
-        guard
-          let artifacts = try? DeepSeekHarnessACPProfile.resolveArtifacts(
+        let artifacts: [AgentInstallationArtifactRole: String]
+        do {
+          artifacts = try DeepSeekHarnessACPProfile.resolveArtifacts(
             executablePath: executable,
             configurationPath: configuration,
             sourceEnvironment: environment
           )
-        else { continue }
+        } catch {
+          validationError = error
+          continue
+        }
         requests.append(
           try ServiceAgentRegistrationRequest(
             providerID: .deepSeekHarness,
@@ -69,6 +74,7 @@ extension ServiceAgentAutoDiscovery {
         )
       }
     }
+    if requests.isEmpty, let validationError { throw validationError }
     return requests
   }
 

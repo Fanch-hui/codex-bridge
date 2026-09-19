@@ -68,12 +68,9 @@ enum DeepSeekHarnessACPArtifactRuntime {
   }
 
   static func findSourceRoot(startingAt executable: String) throws -> String {
-    var candidate = URL(fileURLWithPath: executable).deletingLastPathComponent()
+    var candidate = AgentPathSemantics.directoryPath(of: executable)
     var matches: [String] = []
-    while true {
-      guard let candidatePath = AgentPathSemantics.canonicalPath(candidate.path) else {
-        throw DeepSeekHarnessACPError.artifactInvalid("source_root")
-      }
+    while let candidatePath = candidate {
       let package = try DeepSeekHarnessACPPathSupport.append("package.json", to: candidatePath)
       let lock = try? dependencyLockPath(in: candidatePath)
       if FileManager.default.fileExists(atPath: package),
@@ -81,9 +78,7 @@ enum DeepSeekHarnessACPArtifactRuntime {
       {
         matches.append(candidatePath)
       }
-      let parent = candidate.deletingLastPathComponent()
-      guard !DeepSeekHarnessACPPathSupport.samePath(parent.path, candidate.path) else { break }
-      candidate = parent
+      candidate = AgentPathSemantics.directoryPath(of: candidatePath)
     }
     guard matches.count == 1, let root = matches.first else {
       throw DeepSeekHarnessACPError.artifactInvalid("source_root")

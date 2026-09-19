@@ -247,7 +247,8 @@ var windowsApplicationLinkerFlags = [
     .testTarget(
       name: "BridgeServiceHostWindowsTests",
       dependencies: [
-        "BridgeAgentCore", "BridgeIPC", "BridgeServiceCore", "BridgeServiceHost",
+        "BridgeAgentCore", "BridgeDeepSeekHarnessACP", "BridgeIPC", "BridgeSecurity",
+        "BridgeServiceCore", "BridgeServiceHost",
       ],
       path: "Tests/BridgeServiceHostWindowsTests"
     ),
@@ -335,7 +336,9 @@ var windowsApplicationLinkerFlags = [
         "BridgeDeepSeekHarnessACP",
       ],
       path: "Tests/BridgeDeepSeekHarnessACPTests",
-      sources: ["DeepSeekHarnessACPDirectoryLinkTests.swift"]
+      sources: [
+        "DeepSeekHarnessACPDirectoryLinkTests.swift", "DeepSeekHarnessACPSourceRootTests.swift",
+      ]
     ),
     .testTarget(
       name: "BridgeWindowsShellTests",

@@ -85,10 +85,7 @@ extension BridgeServiceRequestController {
       providerIDs: [providerID], existingInstallations: existingInstallations
     )
     let discoveredPath = discovery[providerID]?.executablePath
-    var environment = ServiceAgentDiscoveryEnvironment.current()
-    if providerID == .deepSeekHarness, let discoveredPath {
-      environment["CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE"] = discoveredPath
-    }
+    let environment = ServiceAgentDiscoveryEnvironment.current()
     let candidates = try ServiceAgentAutoDiscovery.registrationRequests(
       providerID: providerID,
       dataPaths: composition.paths,

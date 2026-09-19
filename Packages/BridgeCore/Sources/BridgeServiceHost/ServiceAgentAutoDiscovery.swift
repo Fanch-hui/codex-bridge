@@ -45,6 +45,10 @@ enum ServiceAgentAutoDiscovery {
         allowInstallationSearch: discoveredExecutablePath == nil
       )
     case .deepSeekHarness:
+      var environment = environment
+      if let discoveredExecutablePath {
+        environment["CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE"] = discoveredExecutablePath
+      }
       return try deepSeekRequests(
         dataPaths: dataPaths,
         existingInstallations: existingInstallations,
