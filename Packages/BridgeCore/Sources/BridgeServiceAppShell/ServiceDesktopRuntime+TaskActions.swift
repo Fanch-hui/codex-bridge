@@ -144,7 +144,7 @@ extension BridgeServiceAppModel {
       prompt: prompt,
       threadID: threadID,
       networkAccess: task.networkAccess,
-      modelOverride: task.executionModel != nil,
+      modelOverride: TaskRetrySubmission.modelOverride(for: task),
       permissionModeOverride: task.permissionMode != nil
     )
     runWorkbenchMutation(

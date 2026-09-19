@@ -126,6 +126,44 @@ final class WorkbenchTaskRetryActionTests: XCTestCase {
     XCTAssertEqual(submitted.prompt, "继续执行未完成的任务")
   }
 
+  func testResumeTaskDoesNotTreatProviderDefaultAsModelOverride() async throws {
+    let client = TestBridgeServiceClient()
+    let registration = MockRegistration()
+    let model = BridgeServiceAppModel(
+      registration: registration,
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+
+    let task = MCPServiceTaskSnapshot(
+      taskID: "task-default-model",
+      projectID: "proj-1",
+      status: "completed",
+      providerID: "codex",
+      executionModel: "provider-default",
+      executionEffort: "provider-default",
+      threadID: "thread-default-model",
+      permissionMode: "workspace-write",
+      supervisorStatus: "none",
+      localApprovalRequired: false,
+      updatedAt: "2026-09-03T10:00:00Z"
+    )
+
+    model.resumeTask(task, prompt: "继续执行")
+
+    try await Task.sleep(for: .milliseconds(50))
+
+    let submissions = await client.submittedAgentTasksValue()
+    let submitted = try XCTUnwrap(submissions.first)
+    XCTAssertEqual(submitted.threadID, "thread-default-model")
+    XCTAssertEqual(submitted.model, "provider-default")
+    XCTAssertEqual(submitted.effort, "provider-default")
+    XCTAssertEqual(submitted.modelOverride, false)
+  }
+
   func testRestartTaskSubmitsFreshRequestWithOriginalPromptAndNoThreadID() async throws {
     let client = TestBridgeServiceClient()
     let registration = MockRegistration()
