@@ -4,6 +4,10 @@ import BridgeServiceAppCore
 import Foundation
 
 extension BridgeServiceAppModel {
+  public var isPreparedForUpdateTermination: Bool {
+    stopped && appUpdateState?.phase == "installing"
+  }
+
   func makeAppUpdater() -> AppUpdateController {
     let installer = MacAppUpdateInstaller()
     #if arch(arm64)

@@ -40,7 +40,7 @@ private final class CodexBridgeAppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if canTerminate { return .terminateNow }
+    if canTerminate || model?.isPreparedForUpdateTermination == true { return .terminateNow }
     guard !isClosingClient, let model else { return .terminateNow }
     isClosingClient = true
     Task {
