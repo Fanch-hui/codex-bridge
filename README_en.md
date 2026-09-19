@@ -54,6 +54,19 @@ Credentials are managed through the operating system credential store. Remove cr
 
 Effective capabilities depend on the agent, its connection probe, and project permissions. Requests without `project_id` use the workbench default project; requests without `provider_id` use Codex.
 
+## Task concurrency limits
+
+macOS and Windows use the same task concurrency rules:
+
+| Scope | Limit |
+| --- | --- |
+| Same project | One active write task, shared across all agents |
+| Different projects | Write tasks can run concurrently, subject to the selected agent's limits |
+| Codex | Up to four concurrent execution sessions, counting read-only and write sessions together |
+| External agents | Bridge imposes no single global concurrency cap; project write slots, provider limits, and local resources still apply |
+
+Write tasks awaiting local approval, starting, running, waiting for permission approval, or in an unknown state hold the project's write slot. At capacity, a new task is rejected or fails to start and must be retried after a slot becomes available; it is not automatically queued. Stored task history does not count toward execution concurrency limits.
+
 ## Architecture
 
 ```text
