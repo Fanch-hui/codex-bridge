@@ -59,6 +59,8 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
       sourceEnvironment: [
         "HOME": project,
         "PATH": "/usr/bin:/bin",
+        "HTTPS_PROXY": "http://127.0.0.1:7897",
+        "no_proxy": "localhost,127.0.0.1",
       ]
     )
 
@@ -96,6 +98,8 @@ final class DeepSeekHarnessACPModernLaunchTests: XCTestCase {
       try Data(contentsOf: URL(fileURLWithPath: fixture.configuration)),
       originalConfiguration
     )
+    XCTAssertEqual(launch.process.environment["HTTPS_PROXY"], "http://127.0.0.1:7897")
+    XCTAssertEqual(launch.process.environment["no_proxy"], "localhost,127.0.0.1")
     XCTAssertEqual(launch.process.environment["DSH_PERMISSION_MODE"], "workspace-write")
     XCTAssertTrue(launch.process.environment["DSH_HOME"]?.hasPrefix(run) == true)
     XCTAssertEqual(launch.process.environment["DSH_SNAPSHOT_SESSIONS_ROOT"], persistentState)

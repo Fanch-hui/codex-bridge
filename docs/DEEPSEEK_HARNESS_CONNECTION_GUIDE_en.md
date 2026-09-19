@@ -325,3 +325,21 @@ Do not paste `.env` or raw authentication responses into support reports. Probe 
 - [Detailed Chinese DSH guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
 - [Detailed user guide](./USER_GUIDE.md)
 - [ChatGPT Developer Mode and Secure Tunnel guide](./CHATGPT_DEVELOPER_MODE.md)
+
+## Clash / Mihomo TUN and Fake-IP
+
+DSH validates public destination addresses before direct web fetches. Fake-IP DNS answers such as `198.18.x.x` can therefore cause `WEB_BLOCKED_URL` while browsers and ordinary HTTPS requests still work.
+
+Keep TUN enabled and configure an explicit HTTP proxy for DSH. Add these entries to the `.env` beside its registered external `cordis.yml`, preserving existing settings and avoiding duplicate keys. Replace the example port with Clash's actual HTTP/mixed port:
+
+```dotenv
+HTTP_PROXY=http://127.0.0.1:7897
+HTTPS_PROXY=http://127.0.0.1:7897
+NO_PROXY=localhost,127.0.0.1,::1
+```
+
+New tasks pick up the configuration. Bridge forwards standard proxy variables before DSH starts; inherited launch variables take priority over the profile file, including across letter casing. Lowercase names and `ALL_PROXY` are also supported. DSH requires an HTTP(S) proxy URL, not SOCKS or PAC. The proxy resolves hostnames; non-public IP literal checks remain in place.
+
+Alternatively, when Clash uses `fake-ip-filter-mode: blacklist`, append the required domains to its existing `fake-ip-filter` list, reload the configuration and clear DNS caches. Preserve existing entries; other filter modes require their own rule syntax.
+
+Web search is separate: missing `web_search_tool_result` blocks require checking the configured gateway's native search capability. Successful chat or HTTP 200 does not prove compatibility, and credential-bearing requests must not be redirected automatically to a different provider.

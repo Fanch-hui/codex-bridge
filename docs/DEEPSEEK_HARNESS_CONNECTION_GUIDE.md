@@ -294,6 +294,24 @@ Search endpoint 必须同时满足：
 
 “主模型能回答”“网关支持 `/messages`”或“认证成功”都不能单独证明 Web Search 可用。自定义网关若用不同的搜索凭据，而当前模板只配置 `DEEPSEEK_API_KEY`，需要先确认该 Key 对两个端点都有效；不要让 Bridge 读取或转换凭据来弥补网关配置差异。
 
+### 8.3 Clash / Mihomo TUN 与 Fake-IP
+
+DSH 的网页抓取会拒绝解析到非公网地址的目标。TUN 的 Fake-IP（例如 `198.18.x.x`）因此可能触发 `WEB_BLOCKED_URL`，即使浏览器和普通 HTTPS 请求正常。这是抓取前的地址校验，不代表整台机器断网。
+
+推荐只为 DSH 指定 Clash 的 HTTP 或 mixed 代理端口，保留 TUN 和 Fake-IP。在登记的外部 `cordis.yml` 同目录 `.env` 中添加以下项（`7897` 只是示例，请使用 Clash 显示的实际 HTTP/mixed 端口）：
+
+```dotenv
+HTTP_PROXY=http://127.0.0.1:7897
+HTTPS_PROXY=http://127.0.0.1:7897
+NO_PROXY=localhost,127.0.0.1,::1
+```
+
+保留文件里已有的配置，避免重复定义同名变量。新任务启动时生效；已有运行中的任务保持原环境。Bridge 会把这些值在 DSH 启动前传入，启动进程已有的同类代理变量优先。也支持标准 `ALL_PROXY` 和小写代理变量；DSH 的该代理实现要求 HTTP(S) 地址，不能填 SOCKS 或 PAC 地址。通过代理时由代理解析域名，DSH 继续保留非公网 IP 字面量校验。
+
+另一种方式是调整 Clash DNS。若当前 `fake-ip-filter-mode` 为 `blacklist`，可在原 `fake-ip-filter` 列表追加需要抓取的域名（例如 `+.x.com`、`+.ycombinator.com`），让它们返回真实 IP；保留现有条目，并重载配置、清理 DNS 缓存。其他过滤模式需按该模式的规则配置，不能直接覆盖原列表。
+
+这只解决网页抓取。`web_search` 若提示没有 `web_search_tool_result`，仍需按 8.2 检查搜索网关的原生搜索能力；HTTP 200 或普通聊天成功不能替代该能力。不要将带密钥的请求自动改发到其他服务商。
+
 ## 9. 检查连接结果与手动登记
 
 上面的推荐路径会在 App 中完成一键连接。连接行显示安装状态；失败时先查看行内错误，再使用“重试”。

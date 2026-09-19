@@ -270,6 +270,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
         environment[key] = value
       }
     }
+    DeepSeekHarnessACPProxyEnvironment.apply(to: &environment, from: sourceEnvironment)
     #if os(Windows)
       environment["USERPROFILE"] = home
       environment["TEMP"] = temporary

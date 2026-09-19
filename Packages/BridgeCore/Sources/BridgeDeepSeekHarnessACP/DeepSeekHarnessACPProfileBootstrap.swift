@@ -4,6 +4,10 @@ enum DeepSeekHarnessACPProfileBootstrap {
   static func prepare(configurationDirectory: String, runDirectory: String) throws -> String {
     let source = URL(fileURLWithPath: configurationDirectory).appendingPathComponent(".env").path
     let literal = String(data: try JSONEncoder().encode(source), encoding: .utf8)!
+    let keys =
+      ["DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "DEEPSEEK_SEARCH_BASE_URL"]
+      + DeepSeekHarnessACPProxyEnvironment.keys
+    let names = String(data: try JSONEncoder().encode(keys), encoding: .utf8)!
     let script = """
       import { readFileSync } from 'node:fs';
       import { parseEnv } from 'node:util';
@@ -13,7 +17,10 @@ enum DeepSeekHarnessACPProfileBootstrap {
       } catch (error) {
         if (error.code !== 'ENOENT') throw new Error('DSH profile environment is unreadable.');
       }
-      for (const name of ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DEEPSEEK_SEARCH_BASE_URL']) {
+      const inheritedProxies = new Set(Object.keys(process.env)
+        .filter(name => /^(https?|all|no)_proxy$/i.test(name)).map(name => name.toLowerCase()));
+      for (const name of \(names)) {
+        if (inheritedProxies.has(name.toLowerCase())) continue;
         if (process.env[name] === undefined && values[name] !== undefined) {
           process.env[name] = values[name];
         }
