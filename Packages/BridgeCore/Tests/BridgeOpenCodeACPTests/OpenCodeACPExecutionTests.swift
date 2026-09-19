@@ -75,12 +75,25 @@ final class OpenCodeACPExecutionTests: XCTestCase {
       })
   }
 
+  func testRemoteFailurePreservesSafeProviderDetail() async throws {
+    let events = try await run(scenario: .providerError)
+    let summaries = events.compactMap { envelope -> String? in
+      guard case .failed(_, let summary) = envelope.event else { return nil }
+      return summary
+    }
+    let summary = try XCTUnwrap(summaries.first)
+    XCTAssertTrue(summary.contains("-32603"))
+    XCTAssertTrue(summary.contains("service_overloaded"))
+    XCTAssertFalse(summary.contains("fixture-secret-value"))
+  }
+
   private enum Scenario: Sendable {
     case unknownStopReason
     case maxTokens
     case unfinishedTool
     case reasoningOnly
     case normal
+    case providerError
   }
 
   private func run(scenario: Scenario) async throws -> [AgentEventEnvelope] {
@@ -149,6 +162,19 @@ final class OpenCodeACPExecutionTests: XCTestCase {
     transport: ScriptedACPTransport
   ) async throws {
     switch scenario {
+    case .providerError:
+      try await transport.emit(
+        ACPWireMessage(
+          id: id,
+          error: .init(
+            code: -32603,
+            message: "Internal error",
+            data: .object([
+              "message": .string("service_overloaded; api_key=fixture-secret-value")
+            ])
+          )
+        )
+      )
     case .unknownStopReason:
       try await transport.emit(
         ACPWireMessage(id: id, result: .object(["stopReason": .string("provider_paused")]))

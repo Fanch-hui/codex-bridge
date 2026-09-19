@@ -114,7 +114,8 @@ public final class ACPRequestBroker: @unchecked Sendable {
         return true
       }
       pending.continuation.resume(
-        throwing: ACPError.remote(code: error.code, message: error.message))
+        throwing: ACPError.remote(
+          code: error.code, message: ACPRemoteErrorDiagnostic.message(for: error)))
     } else if let result {
       pending.continuation.resume(
         returning: ACPRequestResponse(
