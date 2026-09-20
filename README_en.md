@@ -26,6 +26,44 @@ Upgrades preserve application data and the embedded browser profile. Closing the
 
 Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
 
+## Screenshots and task demo
+
+These pages were recorded on macOS; Windows uses the same shared product UI. The video shows ChatGPT submitting “你好”, local approval, task execution, and the response in the workbench. The local approval appears at about `00:23`.
+
+[![Codex Bridge real task demo](./docs/assets/workbench-demo.jpg)](./docs/assets/workbench-demo.mp4)
+
+[Watch the real task demo (about 47 seconds, original speed)](./docs/assets/workbench-demo.mp4)
+
+<details>
+<summary>View the task approval screen</summary>
+
+The local approval card shows the pending operation; choosing “Allow once” continues the task.
+
+![Task approval screen](./docs/assets/task-approval.jpg)
+
+</details>
+
+<details>
+<summary>View the overview and settings screens</summary>
+
+The overview shows the background service, local MCP channel, Secure Tunnel, Agent engines, and recent task status.
+
+![Codex Bridge overview](./docs/assets/overview.png)
+
+The Agent settings show models, reasoning levels, and permissions for Codex, Antigravity CLI, and DeepSeek Harness.
+
+![Agent models and permissions](./docs/assets/agent-models.png)
+
+OpenCode model and permission settings, followed by Direct Workspace command mode, allowlist, and blocklist.
+
+![Direct Workspace settings](./docs/assets/direct-workspace.png)
+
+The approvals and MCP settings page shows Direct operation and remote task launch policies, along with custom GPT/Qwen MCP instructions.
+
+![Approvals and MCP settings](./docs/assets/approvals.png)
+
+</details>
+
 ## User guides
 
 - [Complete user guide (Chinese)](./docs/USER_GUIDE.md)

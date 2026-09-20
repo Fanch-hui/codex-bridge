@@ -26,6 +26,44 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 带内置更新功能的版本会在每次启动时后台检查 GitHub 更新，发现新版后在首页提示。点击“立即更新”即可下载并安装；有任务正在执行时，等待任务结束后安装并重新启动。设置页可手动检查更新。旧版本需先手动安装一次带更新功能的版本。
 
+## 实际界面与任务演示
+
+以下页面为 macOS 实录，Windows 共用同一套产品界面。视频展示从 ChatGPT 提交“你好”，经本机批准后执行任务，并在工作台查看回复；本机批准画面约在 `00:23` 出现。
+
+[![Codex Bridge 真实任务演示](./docs/assets/workbench-demo.jpg)](./docs/assets/workbench-demo.mp4)
+
+[观看真实任务演示（约 47 秒，原速）](./docs/assets/workbench-demo.mp4)
+
+<details>
+<summary>查看任务批准画面</summary>
+
+本机批准卡片显示待执行操作，点击“仅本次允许”后继续执行任务。
+
+![任务批准画面](./docs/assets/task-approval.jpg)
+
+</details>
+
+<details>
+<summary>查看概览与设置页面</summary>
+
+概览页集中显示后台服务、本地 MCP 通道、Secure Tunnel、Agent 引擎和最近任务状态。
+
+![Codex Bridge 概览](./docs/assets/overview.png)
+
+Agent 模型设置页展示 Codex、Antigravity CLI 和 DeepSeek Harness 的模型、推理强度与权限。
+
+![Agent 模型与权限](./docs/assets/agent-models.png)
+
+OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白名单和黑名单。
+
+![Direct Workspace 设置](./docs/assets/direct-workspace.png)
+
+审批与 MCP 设置页展示 Direct 操作和远程任务启动策略，以及 GPT/Qwen 的 MCP 自定义指令。
+
+![审批与 MCP 设置](./docs/assets/approvals.png)
+
+</details>
+
 ## 使用指南
 
 - [详细使用指南](./docs/USER_GUIDE.md)：安装、项目权限、Qwen、任务与故障排查
