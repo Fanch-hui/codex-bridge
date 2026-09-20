@@ -30,16 +30,16 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 以下页面为 macOS 实录，Windows 共用同一套产品界面。视频展示从 ChatGPT 提交“你好”，经本机批准后执行任务，并在工作台查看回复；本机批准画面约在 `00:23` 出现。
 
-[![Codex Bridge 真实任务演示](./docs/assets/workbench-demo.jpg)](./docs/assets/workbench-demo.mp4)
+<img src="./docs/assets/workbench-demo.gif" width="640" alt="ChatGPT 提交任务、本机批准与 Codex 执行回复的完整动态演示">
 
-[观看真实任务演示（约 47 秒，原速）](./docs/assets/workbench-demo.mp4)
+[打开清晰版视频（约 47 秒，原速）](./docs/assets/workbench-demo.mp4)
 
 <details>
 <summary>查看任务批准画面</summary>
 
 本机批准卡片显示待执行操作，点击“仅本次允许”后继续执行任务。
 
-![任务批准画面](./docs/assets/task-approval.jpg)
+<img src="./docs/assets/task-approval.jpg" width="640" alt="任务批准画面">
 
 </details>
 
@@ -48,19 +48,19 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 概览页集中显示后台服务、本地 MCP 通道、Secure Tunnel、Agent 引擎和最近任务状态。
 
-![Codex Bridge 概览](./docs/assets/overview.png)
+<img src="./docs/assets/overview.png" width="640" alt="Codex Bridge 概览">
 
 Agent 模型设置页展示 Codex、Antigravity CLI 和 DeepSeek Harness 的模型、推理强度与权限。
 
-![Agent 模型与权限](./docs/assets/agent-models.png)
+<img src="./docs/assets/agent-models.png" width="640" alt="Agent 模型与权限">
 
 OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白名单和黑名单。
 
-![Direct Workspace 设置](./docs/assets/direct-workspace.png)
+<img src="./docs/assets/direct-workspace.png" width="640" alt="Direct Workspace 设置">
 
 审批与 MCP 设置页展示 Direct 操作和远程任务启动策略，以及 GPT/Qwen 的 MCP 自定义指令。
 
-![审批与 MCP 设置](./docs/assets/approvals.png)
+<img src="./docs/assets/approvals.png" width="640" alt="审批与 MCP 设置">
 
 </details>
 

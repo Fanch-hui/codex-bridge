@@ -30,16 +30,16 @@ Versions with the built-in updater check GitHub once at startup and show availab
 
 These pages were recorded on macOS; Windows uses the same shared product UI. The video shows ChatGPT submitting “你好”, local approval, task execution, and the response in the workbench. The local approval appears at about `00:23`.
 
-[![Codex Bridge real task demo](./docs/assets/workbench-demo.jpg)](./docs/assets/workbench-demo.mp4)
+<img src="./docs/assets/workbench-demo.gif" width="640" alt="Full animated demo: ChatGPT submission, local approval, and the Codex response">
 
-[Watch the real task demo (about 47 seconds, original speed)](./docs/assets/workbench-demo.mp4)
+[Open the full-resolution video (about 47 seconds, original speed)](./docs/assets/workbench-demo.mp4)
 
 <details>
 <summary>View the task approval screen</summary>
 
 The local approval card shows the pending operation; choosing “Allow once” continues the task.
 
-![Task approval screen](./docs/assets/task-approval.jpg)
+<img src="./docs/assets/task-approval.jpg" width="640" alt="Task approval screen">
 
 </details>
 
@@ -48,19 +48,19 @@ The local approval card shows the pending operation; choosing “Allow once” c
 
 The overview shows the background service, local MCP channel, Secure Tunnel, Agent engines, and recent task status.
 
-![Codex Bridge overview](./docs/assets/overview.png)
+<img src="./docs/assets/overview.png" width="640" alt="Codex Bridge overview">
 
 The Agent settings show models, reasoning levels, and permissions for Codex, Antigravity CLI, and DeepSeek Harness.
 
-![Agent models and permissions](./docs/assets/agent-models.png)
+<img src="./docs/assets/agent-models.png" width="640" alt="Agent models and permissions">
 
 OpenCode model and permission settings, followed by Direct Workspace command mode, allowlist, and blocklist.
 
-![Direct Workspace settings](./docs/assets/direct-workspace.png)
+<img src="./docs/assets/direct-workspace.png" width="640" alt="Direct Workspace settings">
 
 The approvals and MCP settings page shows Direct operation and remote task launch policies, along with custom GPT/Qwen MCP instructions.
 
-![Approvals and MCP settings](./docs/assets/approvals.png)
+<img src="./docs/assets/approvals.png" width="640" alt="Approvals and MCP settings">
 
 </details>
 
