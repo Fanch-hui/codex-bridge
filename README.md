@@ -121,3 +121,7 @@ pwsh -File Scripts/build-windows.ps1 `
 - [Apache-2.0 许可证](./LICENSE)
 - [第三方声明](./NOTICE) · [依赖说明](./docs/DEPENDENCIES.md)
 - [隐私说明](./PRIVACY.md) · [安全政策](./SECURITY.md)
+
+## 社区
+
+感谢 [LINUX DO](https://linux.do/) 社区。
