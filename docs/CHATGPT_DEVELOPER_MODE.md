@@ -1,6 +1,6 @@
 # ChatGPT 与 Secure MCP Tunnel 配置指南
 
-适用于 Codex Bridge v1.0.1 的 macOS 与 Windows 版本。完成顺序：创建 Tunnel → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 创建 App → 提交第一项任务。
+适用于 Codex Bridge v1.0.1 的 macOS 与 Windows 版本。完成顺序：创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 创建 App → 提交第一项任务。
 
 ## 1. 准备 Bridge
 
@@ -27,8 +27,10 @@ Qwen 配置中的本地 MCP 凭据由 Bridge 生成，和这三项不同。ChatG
 1. 登录 [OpenAI Platform](https://platform.openai.com/)，切换到准备使用的组织。
 2. 打开 [Tunnels](https://platform.openai.com/settings/organization/tunnels)。
 3. 创建 Tunnel，填写便于识别的名称，例如 `Codex Bridge`。
-4. 在 Tunnel 的关联设置中包含目标 ChatGPT Workspace；个人使用选择自己账号对应的组织/空间。
+4. 在 Tunnel 的 **WORKSPACES** 中选择你实际使用的 ChatGPT 工作区并保存；个人空间选择 **Personal**，团队使用则选择对应的工作区。**这一项需要明确选择，不能留空。**
 5. 复制 Tunnel ID，保留给 Bridge 和 ChatGPT 使用。
+
+**已创建 Tunnel，但 ChatGPT 插件的隧道列表里找不到？先检查 WORKSPACES。** 打开 Platform 的 Tunnels 页面，编辑该 Tunnel，在 **WORKSPACES** 中选中目标工作区并保存，再返回同一工作区的 ChatGPT Plugins/Apps 页面，刷新页面或重新打开 Tunnel 选择列表。仅创建 Tunnel、或 Bridge 已显示 `ready`，都不代表已完成工作区关联。
 
 创建和编辑 Tunnel 需要 Tunnels **Read + Manage**；运行 Helper 和在 ChatGPT 选择 Tunnel 需要 **Read + Use**。若入口不可用，由组织管理员检查角色权限。只关联 Platform 组织，可能无法在目标 ChatGPT Workspace 找到它。依据：[OpenAI Secure MCP Tunnel 官方指南](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)。
 
@@ -102,7 +104,7 @@ Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task
 | 问题 | 检查与处理 |
 | --- | --- |
 | 看不到 Tunnels 或无法创建 | 确认 Platform 组织及 Read + Manage 权限 |
-| ChatGPT 中找不到 Tunnel | 检查目标 Workspace 关联和创建者 Read + Use 权限 |
+| 已创建 Tunnel，但 ChatGPT 插件的隧道列表中找不到 | 优先检查 Platform → Tunnels → 编辑该 Tunnel → **WORKSPACES** 是否已选中并保存。个人空间选择 **Personal**，团队选择对应工作区；回到同一工作区的 ChatGPT 刷新列表。仍不可见时，再检查 Read + Use 权限 |
 | 找不到 Developer mode | 检查当前 Workspace 的账号权限和管理员设置 |
 | 保存时报配置无效 | 重新复制 Tunnel ID；Key 不加引号或空白 |
 | 一直认证失败 | 确认 Key 所属组织、Read + Use 权限、是否撤销；查看 Bridge 日志 |
