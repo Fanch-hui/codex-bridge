@@ -117,3 +117,7 @@ The script uses `swiftbuild` and writes the portable ZIP and EXE installer under
 ## License and privacy
 
 [Apache-2.0](./LICENSE) · [Third-party notices](./NOTICE) · [Dependencies](./docs/DEPENDENCIES.md) · [Privacy](./PRIVACY.md) · [Security](./SECURITY.md)
+
+## Community
+
+Thanks to the [LINUX DO](https://linux.do/) community.
