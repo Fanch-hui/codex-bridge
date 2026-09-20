@@ -118,7 +118,7 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 
 完整分步说明见 [Tunnel 配置指南](./CHATGPT_DEVELOPER_MODE.md)，包含平台入口、权限和 Key 获取步骤。
 
-流程是：在 OpenAI Platform 创建 Tunnel 和受限 Runtime Key，在 Bridge 连接页保存并等待 `ready`，再在 ChatGPT 中创建 Tunnel 类型 App。Bridge 和 ChatGPT 使用同一个 Tunnel ID。
+流程是：在 OpenAI Platform 创建 Tunnel，明确选择并保存 **WORKSPACES**（个人空间选 **Personal**，团队选对应工作区），再创建受限 Runtime Key，在 Bridge 连接页保存并等待 `ready`，再在 ChatGPT 中创建 Tunnel 类型 App。Bridge 和 ChatGPT 使用同一个 Tunnel ID。
 
 OpenAI Runtime Key 用于 Tunnel，DeepSeek Key 用于 DSH 模型；两者分别填写。Runtime Key 不填入 ChatGPT 对话或 Qwen 配置。
 
@@ -218,6 +218,7 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 | 模型获取失败 | API Key、Base URL、账号能力和网络；查看对应 Agent 指南 |
 | 任务写入被拒绝 | 项目策略、工作台模式和 Agent 原生权限 |
 | 项目忙碌 | 等待该项目当前写任务结束后再提交 |
+| 已创建隧道，但 ChatGPT 插件中找不到 | 在 Platform 的 Tunnel 编辑页选择并保存 **WORKSPACES**，再回到同一 ChatGPT 工作区刷新隧道列表；详见 [Tunnel 配置指南](./CHATGPT_DEVELOPER_MODE.md#3-创建-tunnel) |
 | ChatGPT 连不上 | 按 Tunnel 指南检查两端状态、Workspace、Key 权限 |
 | Qwen 连不上 | 本机运行位置、客户端启用状态和最新复制的 JSON |
 | 任务等待且不输出 | 查看启动审批、工具审批或问题表单 |
