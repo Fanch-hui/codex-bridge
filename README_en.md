@@ -28,7 +28,7 @@ Versions with the built-in updater check GitHub once at startup and show availab
 
 ## Screenshots and task demo
 
-Recorded on macOS; Windows uses the same shared product UI. This 15-second demo follows ChatGPT submitting “你好” → local approval → Codex execution → the response in the workbench. Waiting intervals have been cut.
+Recorded on macOS; Windows uses the same shared product UI. This 15-second demo follows ChatGPT submitting “你好” → local approval → Codex execution → the response in the workbench.
 
 <img src="./docs/assets/workbench-demo.gif" width="640" alt="Full animated demo: ChatGPT submission, local approval, and the Codex response">
 
