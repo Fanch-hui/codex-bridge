@@ -2,6 +2,8 @@
 
 [简体中文](./README.md) · [English](./README_en.md)
 
+[Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/latest)
+
 Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness 与 Antigravity 的任务、审批和会话。
 
 macOS 与 Windows 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
