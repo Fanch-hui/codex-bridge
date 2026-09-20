@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.yeyuancc0-glitch/codex-bridge",
+  "title": "Codex Bridge",
+  "description": "Connect MCP clients to local Codex Bridge agents, projects, approvals and workspace tools.",
+  "repository": {
+    "url": "https://github.com/yeyuancc0-glitch/codex-bridge",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/yeyuancc0-glitch/codex-bridge#readme",
+  "version": "1.0.1",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/yeyuancc0-glitch/codex-bridge/releases/download/v1.0.1/codex-bridge-1.0.1.mcpb",
+      "fileSha256": "3ecd90de224b96ed3a90af045f3e7cc780862600324578235b2ff032f2c28ccc",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

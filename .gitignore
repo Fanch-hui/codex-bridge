@@ -8,6 +8,8 @@ xcuserdata/
 SupportBundles/
 Secrets/
 *.runtime-key
+/.mcpregistry*
+/Integrations/MCPB/node_modules/
 
 # AI Agent Memory
 AGENTS.md

@@ -30,6 +30,7 @@ Versions with the built-in updater check GitHub once at startup and show availab
 - [ChatGPT / Tunnel / OpenAI Runtime API Key (Chinese)](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness installation and API configuration](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md)
 - [OpenCode (Chinese)](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
+- [MCPB client connection and Registry publishing (Chinese)](./docs/MCP_REGISTRY.md)
 
 ## First setup
 
