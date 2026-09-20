@@ -28,11 +28,9 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 ## 实际界面与任务演示
 
-以下页面为 macOS 实录，Windows 共用同一套产品界面。视频展示从 ChatGPT 提交“你好”，经本机批准后执行任务，并在工作台查看回复；本机批准画面约在 `00:23` 出现。
+以下页面为 macOS 实录，Windows 共用同一套产品界面。约 15 秒演示：ChatGPT 提交“你好” → 本机批准 → Codex 执行 → 工作台显示回复。等待片段已剪去。
 
 <img src="./docs/assets/workbench-demo.gif" width="640" alt="ChatGPT 提交任务、本机批准与 Codex 执行回复的完整动态演示">
-
-[打开清晰版视频（约 47 秒，原速）](./docs/assets/workbench-demo.mp4)
 
 <details>
 <summary>查看任务批准画面</summary>

@@ -28,11 +28,9 @@ Versions with the built-in updater check GitHub once at startup and show availab
 
 ## Screenshots and task demo
 
-These pages were recorded on macOS; Windows uses the same shared product UI. The video shows ChatGPT submitting “你好”, local approval, task execution, and the response in the workbench. The local approval appears at about `00:23`.
+Recorded on macOS; Windows uses the same shared product UI. This 15-second demo follows ChatGPT submitting “你好” → local approval → Codex execution → the response in the workbench. Waiting intervals have been cut.
 
 <img src="./docs/assets/workbench-demo.gif" width="640" alt="Full animated demo: ChatGPT submission, local approval, and the Codex response">
-
-[Open the full-resolution video (about 47 seconds, original speed)](./docs/assets/workbench-demo.mp4)
 
 <details>
 <summary>View the task approval screen</summary>
