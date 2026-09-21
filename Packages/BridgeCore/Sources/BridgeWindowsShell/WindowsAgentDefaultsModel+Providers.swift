@@ -157,7 +157,9 @@
         modelID: modelID,
         forceRefresh: false
       )
-      return mergedCatalog(catalogResponse.models, with: detailed.models)
+      return IPCAgentModelsResponse(
+        models: mergedCatalog(catalogResponse.models, with: detailed.models)
+      )
     }
 
     private func correctDefaultIfNeeded(
@@ -210,7 +212,7 @@
         }
     }
 
-    private func applySelectedProvider(
+    func applySelectedProvider(
       providerID: String,
       installation: IPCAgentInstallationSummary?,
       defaults: IPCAgentModelDefaultResponse,
