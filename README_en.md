@@ -2,20 +2,22 @@
 
 [简体中文](./README.md) · [English](./README_en.md)
 
+[Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/latest)
+
 Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, and Antigravity.
 
 macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.1.0`.
+The current release is `v1.1.1`.
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest).
 
-| Platform | v1.1.0 package | Installation |
+| Platform | v1.1.1 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.1.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.1.0-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-1.1.1-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.1.1-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
@@ -24,12 +26,49 @@ Upgrades preserve application data and the embedded browser profile. Closing the
 
 Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
 
+## Screenshots and task demo
+
+Recorded on macOS; Windows uses the same shared product UI. This 15-second demo follows ChatGPT submitting “你好” → local approval → Codex execution → the response in the workbench.
+
+<img src="./docs/assets/workbench-demo.gif" width="640" alt="Full animated demo: ChatGPT submission, local approval, and the Codex response">
+
+<details>
+<summary>View the task approval screen</summary>
+
+The local approval card shows the pending operation; choosing “Allow once” continues the task.
+
+<img src="./docs/assets/task-approval.jpg" width="640" alt="Task approval screen">
+
+</details>
+
+<details>
+<summary>View the overview and settings screens</summary>
+
+The overview shows the background service, local MCP channel, Secure Tunnel, Agent engines, and recent task status.
+
+<img src="./docs/assets/overview.png" width="640" alt="Codex Bridge overview">
+
+The Agent settings show models, reasoning levels, and permissions for Codex, Antigravity CLI, and DeepSeek Harness.
+
+<img src="./docs/assets/agent-models.png" width="640" alt="Agent models and permissions">
+
+OpenCode model and permission settings, followed by Direct Workspace command mode, allowlist, and blocklist.
+
+<img src="./docs/assets/direct-workspace.png" width="640" alt="Direct Workspace settings">
+
+The approvals and MCP settings page shows Direct operation and remote task launch policies, along with custom GPT/Qwen MCP instructions.
+
+<img src="./docs/assets/approvals.png" width="640" alt="Approvals and MCP settings">
+
+</details>
+
 ## User guides
 
 - [Complete user guide (Chinese)](./docs/USER_GUIDE.md)
 - [ChatGPT / Tunnel / OpenAI Runtime API Key (Chinese)](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness installation and API configuration](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md)
 - [OpenCode (Chinese)](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
+- [MCPB client connection and Registry publishing (Chinese)](./docs/MCP_REGISTRY.md)
 
 ## First setup
 
@@ -53,6 +92,19 @@ Credentials are managed through the operating system credential store. Remove cr
 - **Skills:** local discovery, read-only inspection, and explicit actions.
 
 Effective capabilities depend on the agent, its connection probe, and project permissions. Requests without `project_id` use the workbench default project; requests without `provider_id` use Codex.
+
+## Task concurrency limits
+
+macOS and Windows use the same task concurrency rules:
+
+| Scope | Limit |
+| --- | --- |
+| Same project | One active write task, shared across all agents |
+| Different projects | Write tasks can run concurrently, subject to the selected agent's limits |
+| Codex | Up to four concurrent execution sessions, counting read-only and write sessions together |
+| External agents | Bridge imposes no single global concurrency cap; project write slots, provider limits, and local resources still apply |
+
+Write tasks awaiting local approval, starting, running, waiting for permission approval, or in an unknown state hold the project's write slot. At capacity, a new task is rejected or fails to start and must be retried after a slot becomes available; it is not automatically queued. Stored task history does not count toward execution concurrency limits.
 
 ## Architecture
 
@@ -104,3 +156,7 @@ The script uses `swiftbuild` and writes the portable ZIP and EXE installer under
 ## License and privacy
 
 [Apache-2.0](./LICENSE) · [Third-party notices](./NOTICE) · [Dependencies](./docs/DEPENDENCIES.md) · [Privacy](./PRIVACY.md) · [Security](./SECURITY.md)
+
+## Community
+
+Thanks to the [LINUX DO](https://linux.do/) community.
