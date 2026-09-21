@@ -49,7 +49,9 @@
         || state.canSelectEffort === false || !known || efforts.length === 0;
       error.textContent = state.errorMessage || (state.isRefreshingModels || !known
         ? "正在获取模型推理强度…" : efforts.length === 0
-          ? "当前模型不提供可选推理强度，使用 Provider 默认。" : "选择后自动保存。");
+          ? "当前模型不提供可选推理强度，使用 Provider 默认。" : state.providerID === "deepseek-harness"
+            ? "推理选项由 DSH 适配器提供，可能对不同模型返回相同选项；模型实际支持以 API 为准。"
+            : "选择后自动保存。");
       return efforts;
     }
     model.control.addEventListener("change", function () {
