@@ -90,7 +90,7 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .workbench-page .entry-disclosure .status-badge { padding: 1px 5px; font-size: 10px; line-height: 16px; }
 .workbench-page .entry-disclosure .disclosure-body { padding: 5px 0 0 19px; }
 .workbench-page .entry-disclosure .entry-text { font-size: 11px; line-height: 1.6; }
-.workbench-page .entry-disclosure .entry-arguments { margin-top: 5px; padding: 7px; font-size: 10px; line-height: 1.4; }
+.workbench-page .entry-disclosure :is(.entry-arguments, .entry-output) { margin-top: 5px; padding: 7px; font-size: 10px; line-height: 1.4; }
 .workbench-page .conversation-state-activity { gap: 6px; padding: 6px 8px; font-size: 11px; line-height: 1.35; }
 .workbench-page .conversation-state-activity .conversation-state-spinner { width: 12px; height: 12px; flex-basis: 12px; }
 .workbench-page .conversation-state-detail { margin-top: 2px; }
