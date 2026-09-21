@@ -211,7 +211,8 @@ extension BridgeServiceApplication {
         executionEffort: executionEffort,
         permissionMode: permission,
         networkAllowed: submission.networkAccess,
-        accessMode: .requestApproval
+        accessMode: .requestApproval,
+        queueIfBusy: submission.queueIfBusy == true
       )
     )
   }

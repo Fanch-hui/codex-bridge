@@ -58,6 +58,7 @@
     public var selectedTaskID: String?
     public var selectedTaskIndex: Int?
     public var taskMetadata: String
+    public var projectLoadError: String? = nil
     public var interruptEnabled: Bool
     public var stopEnabled: Bool
     public var deleteEnabled: Bool
@@ -112,6 +113,7 @@
       selectedTaskID: nil,
       selectedTaskIndex: nil,
       taskMetadata: "未选择任务",
+      projectLoadError: nil,
       interruptEnabled: false,
       stopEnabled: false,
       deleteEnabled: false,
@@ -153,6 +155,7 @@
   public final class WindowsWorkbenchModel {
     public internal(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     public internal(set) var errorMessage: String?
+    var projectLoadError: String?
     public let displayBox = WorkbenchDisplayBox()
 
     let client: any BridgeServiceClientProtocol
@@ -209,6 +212,9 @@
     var onConnected: (@MainActor () async -> Void)?
     var isShuttingDown = false
     var taskPollingTask: Task<Void, Never>?
+    var serviceChangesTask: Task<Void, Never>?
+    var serviceChangeRefreshTask: Task<Void, Never>?
+    var serviceChangeRefreshPending = false
     var deferredCatalogTask: Task<Void, Never>?
     var conversationDisplayTask: Task<Void, Never>?
     var interactionRefreshTask: Task<Void, Never>?

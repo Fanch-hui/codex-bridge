@@ -9,7 +9,7 @@ public enum TaskInspectorPresentation {
   ) -> String {
     var lines = [
       "任务：\(task.workbenchTitle)",
-      "状态：\(task.status)",
+      "状态：\(WorkbenchTaskTextPresentation.statusLabel(task.status))",
       "Provider：\(task.providerDisplayName)",
       "项目：\(projectName ?? task.projectID)",
     ]

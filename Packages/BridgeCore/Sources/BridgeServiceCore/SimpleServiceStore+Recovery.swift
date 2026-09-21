@@ -12,7 +12,7 @@ extension SimpleServiceStore {
           sql: """
             SELECT * FROM bridge_service_tasks
             WHERE status IN (
-              'awaiting_local_approval', 'starting', 'running', 'waiting_for_codex_approval'
+              'awaiting_local_approval', 'starting', 'running', 'waiting_for_codex_approval', 'unknown'
             )
             ORDER BY created_at, task_id
             """
@@ -21,13 +21,16 @@ extension SimpleServiceStore {
         updated.reserveCapacity(rows.count)
         for row in rows {
           let task = try Self.decodeTask(row)
+          if task.isQueued {
+            continue
+          }
           if task.state.status == .awaitingLocalApproval,
             task.requiresLocalStartApproval
           {
             continue
           }
           let wasNotStarted = task.state.status == .awaitingLocalApproval
-          let recoveredStatus: ServiceTaskStatus = wasNotStarted ? .interrupted : .unknown
+          let recoveredStatus: ServiceTaskStatus = .interrupted
           let supervisorStatus: ServiceSupervisorStatus =
             task.state.supervisorStatus == .disabled ? .disabled : .degraded
           let state = try ServiceTaskState(
@@ -41,14 +44,14 @@ extension SimpleServiceStore {
             changedFiles: task.state.changedFiles,
             resultSummary: task.state.resultSummary,
             supervisorSummary: task.state.supervisorSummary,
-            failureCode: task.state.failureCode
+            failureCode: task.state.failureCode ?? "service_restarted"
           )
           let recovered = try task.replacingState(state, updatedAt: date)
           try Self.validateTransition(from: task.state.status, to: recoveredStatus)
           try updateTaskRow(recovered, in: db)
           try Self.insert(
             ServiceTaskEventDraft(
-              kind: wasNotStarted ? .taskInterrupted : .taskMarkedUnknown,
+              kind: .taskInterrupted,
               summary: wasNotStarted
                 ? "The service restarted before task execution began."
                 : "The service restarted without an attached provider run.",

@@ -9,7 +9,9 @@ extension ServiceExecutionCoordinator {
     for approval in expired {
       await failExpiredAgentApproval(approval)
     }
-    let codex = await execution.pendingApprovals(taskID: taskID)
+    let codex = await execution.pendingApprovals(taskID: taskID).filter {
+      !$0.isBlocking || presentedCodexApprovals[$0.taskID]?.contains($0.id) == true
+    }
     let agents = pendingAgentApprovals.values
       .filter { taskID == nil || $0.request.taskID == taskID }
       .compactMap { try? executionApproval(from: $0.request) }
@@ -37,6 +39,10 @@ extension ServiceExecutionCoordinator {
       return
     }
     let pending = await execution.pendingApprovals(taskID: taskID).first { $0.id == approvalID }
+    guard let pending,
+      !pending.isBlocking
+        || presentedCodexApprovals[taskID]?.contains(approvalID) == true
+    else { throw ExecutionServiceError.approvalUnavailable(approvalID) }
     try await execution.respondToApproval(
       taskID: taskID,
       approvalID: approvalID,
@@ -44,7 +50,7 @@ extension ServiceExecutionCoordinator {
       answers: answers
     )
     do {
-      if pending?.isBlocking == false {
+      if !pending.isBlocking {
         guard try await tasks.task(id: taskID) != nil else {
           throw ExecutionServiceError.approvalUnavailable(approvalID)
         }
@@ -57,6 +63,8 @@ extension ServiceExecutionCoordinator {
         approvalID: approvalID,
         committed: true
       )
+      presentedCodexApprovals[taskID]?.remove(approvalID)
+      tasks.changes.publish()
     } catch {
       await execution.finalizeApproval(
         taskID: taskID,

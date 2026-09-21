@@ -218,7 +218,8 @@ public actor AntigravityCLIEventNormalizer {
       status: status,
       arguments: Self.safeArguments(info?.parameters),
       output: Self.safeOutput(error?.message ?? info?.output),
-      locations: locations(in: info?.parameters)
+      locations: locations(in: info?.parameters),
+      childRuns: Self.childRuns(from: update)
     )
     return try envelope(.tool(payload))
   }
@@ -239,20 +240,38 @@ public actor AntigravityCLIEventNormalizer {
 
   private func subagent(_ update: AntigravityStepUpdate) throws -> AgentEventEnvelope {
     let subagents = update.subagentInfo?.subagents ?? []
-    let roles = subagents.compactMap { Self.safeText($0.role, maximumBytes: 256) }
-    let output =
-      roles.isEmpty
-      ? "Antigravity updated a subagent run."
-      : "Subagents: " + roles.prefix(16).joined(separator: ", ")
+    let children = Self.childRuns(from: update)
+    let names = subagents.compactMap { Self.safeIdentifier($0.typeName ?? $0.role) }
+    let output = names.isEmpty ? nil : "Subagents: " + names.prefix(16).joined(separator: ", ")
     let payload = try AgentToolUpdate(
       key: "tool:subagent:\(update.stepIndex)",
       name: "subagent",
       title: "Subagent",
       kind: "subagent",
       status: AntigravityToolStatus.resolve(state: update.state, error: update.error),
-      output: output
+      output: output,
+      childRuns: children
     )
     return try envelope(.tool(payload))
+  }
+
+  private static func childRuns(from update: AntigravityStepUpdate) -> [AgentChildRun] {
+    let status = AntigravityToolStatus.resolve(state: update.state, error: update.error).rawValue
+    return (update.subagentInfo?.subagents ?? []).prefix(32).compactMap { child in
+      guard let id = safeIdentifier(child.conversationID) else { return nil }
+      let name = safeIdentifier(child.typeName ?? child.role)
+      let summary = safeText(update.textDelta, maximumBytes: 4 * 1_024)
+      return try? AgentChildRun(
+        id: id,
+        sessionID: id,
+        name: name,
+        status: status,
+        summary: summary,
+        workspaceURLs: child.workspaceURIs?.compactMap {
+          safeText($0, maximumBytes: 4 * 1_024)
+        } ?? []
+      )
+    }
   }
 
   private func usage(_ usage: AntigravityUsage?) throws -> AgentEventEnvelope? {

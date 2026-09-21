@@ -22,13 +22,15 @@ public enum BridgeServiceClientError: Error, Equatable, LocalizedError, Sendable
 
 public actor BridgeServiceClient {
   private let transport: any ServiceRequestTransport
+  let serviceChangeHub = ServiceChangeStreamHub()
   let streamHub = CodexBridgeTaskStreamHub()
   var invalidated = false
   var conversationStreamTokens: [String: [Int: UUID]] = [:]
 
   public init(transport: any ServiceRequestTransport) {
     self.transport = transport
-    transport.streamHandler = { [streamHub] payload in
+    transport.streamHandler = { [streamHub, serviceChangeHub] payload in
+      serviceChangeHub.push(payload)
       streamHub.push(payload)
     }
   }
@@ -50,6 +52,7 @@ public actor BridgeServiceClient {
     transport.invalidate()
     conversationStreamTokens.removeAll(keepingCapacity: false)
     streamHub.clear()
+    serviceChangeHub.clear()
   }
 
   func call<Payload: Encodable, Response: Decodable>(

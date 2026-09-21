@@ -1,7 +1,7 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
-  var disclosureState = new Map();
+  var disclosureState = new Map(), pendingDeletes = new Set();
 
   function renderReadonlyCollections(container, page, emit) {
     if (page.verificationCommands && page.verificationCommands.length) addValues(container, "验证命令", page.verificationCommands, true);
@@ -11,6 +11,8 @@
 
   function addSessionRows(container, sessions, projectID, emit) {
     var values = S.safeArray(sessions);
+    var active = new Set(values.map(function (session) { return deleteKey(projectID, session); }));
+    pendingDeletes.forEach(function (key) { if (key.indexOf(String(projectID || "") + "|") === 0 && !active.has(key)) pendingDeletes.delete(key); });
     var card = collectionCard(
       projectID,
       "sessions",
@@ -33,7 +35,7 @@
         summary.appendChild(S.badge(String(group.sessions.length), "neutral"));
         groupDetails.appendChild(summary);
         var list = S.node("div", "project-session-list");
-        group.sessions.forEach(function (session) { list.appendChild(sessionRow(session, emit)); });
+        group.sessions.forEach(function (session) { list.appendChild(sessionRow(session, projectID, emit)); });
         groupDetails.appendChild(list);
         card.body.appendChild(groupDetails);
       });
@@ -110,7 +112,11 @@
     return groups;
   }
 
-  function sessionRow(session, emit) {
+  function deleteKey(projectID, session) {
+    return String(projectID || "") + "|" + String(session.sessionID || "") + "|" + String(session.taskID || "");
+  }
+
+  function sessionRow(session, projectID, emit) {
     var row = S.node("div", "list-row session-row" + (session.selected ? " selected" : ""));
     var open = S.node("button", "session-open");
     open.type = "button";
@@ -127,17 +133,22 @@
       var confirmation = S.node("div", "agent-confirmation session-confirmation");
       var accept = S.button("确认删除", null, {}, emit, "small danger", false);
       var cancel = S.button("取消", null, {}, emit, "small", false);
-      confirmation.hidden = true;
+      var key = deleteKey(projectID, session);
+      confirmation.hidden = !pendingDeletes.has(key);
+      remove.hidden = pendingDeletes.has(key);
       confirmation.appendChild(S.node("span", null, "删除此会话的全部任务与记录？"));
       confirmation.appendChild(accept); confirmation.appendChild(cancel);
       remove.addEventListener("click", function () {
+        pendingDeletes.add(key);
         remove.hidden = true; confirmation.hidden = false;
       });
       accept.addEventListener("click", function () {
+        pendingDeletes.add(key);
         accept.disabled = true; cancel.disabled = true;
         emit("deleteSession", { taskID: session.taskID, sessionID: session.sessionID });
       });
       cancel.addEventListener("click", function () {
+        pendingDeletes.delete(key);
         confirmation.hidden = true; remove.hidden = false;
       });
       row.appendChild(remove);

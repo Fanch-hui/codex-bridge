@@ -11,6 +11,7 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
   let streams = StreamRegistry()
   let conversationStreamGate = AsyncMutex()
   var streamingStopped = false
+  var stateChangeForwarder: Task<Void, Never>?
 
   public init(
     composition: ServiceComposition,
@@ -36,6 +37,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
     defer { conversationStreamGate.release() }
     guard !streamingStopped else { return }
     streamingStopped = true
+    stateChangeForwarder?.cancel()
+    stateChangeForwarder = nil
     let active = streams.takeAll()
     for (taskID, registration) in active {
       registration.forwarder.cancel()
@@ -89,6 +92,7 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
     case .getDirectConfiguration, .updateDirectConfiguration:
       return try await handleDirectConfiguration(request)
     case .status:
+      await startStateChanges()
       return try await handleStatus(request)
     case .listProjects:
       return try await handleListProjects(request)

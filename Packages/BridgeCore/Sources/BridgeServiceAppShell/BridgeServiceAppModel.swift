@@ -199,6 +199,8 @@ public final class BridgeServiceAppModel: ObservableObject {
   let idlePollInterval: Duration = .seconds(10)
   var client: (any BridgeServiceClientProtocol)?
   var conversationPresentationCache = TaskConversationPresentationCache()
+  var desktopConversationPresentationCache = BridgeDesktopConversationPresentationCache()
+  var stateChangesTask: Task<Void, Never>?
   var pollingTask: Task<Void, Never>?
   var refreshInProgress = false
   var pendingRefresh = false
@@ -265,6 +267,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   }
 
   deinit {
+    stateChangesTask?.cancel()
     pollingTask?.cancel()
     chatWebViewSleepTask?.cancel()
     toastDismissTask?.cancel()

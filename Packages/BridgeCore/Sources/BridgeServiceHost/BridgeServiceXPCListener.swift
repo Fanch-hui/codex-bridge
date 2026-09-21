@@ -22,6 +22,7 @@
       case anonymous
     }
 
+    private let requiresAppIdentity: Bool
     private let listener: NSXPCListener
     private let makeController: (CodexBridgeTaskStreamListener?) -> BridgeServiceXPCController
     private let lock = NSLock()
@@ -33,6 +34,11 @@
       mode: Mode = .machService(BridgeServiceIPC.machServiceName),
       composition: ServiceComposition
     ) {
+      if case .anonymous = mode {
+        requiresAppIdentity = false
+      } else {
+        requiresAppIdentity = true
+      }
       switch mode {
       case .machService(let name):
         precondition(!name.isEmpty)
@@ -86,6 +92,12 @@
       shouldAcceptNewConnection newConnection: NSXPCConnection
     ) -> Bool {
       _ = listener
+      guard
+        !requiresAppIdentity
+          || LocalAppPeerIdentity.accepts(processID: newConnection.processIdentifier)
+      else {
+        return false
+      }
       newConnection.exportedInterface = NSXPCInterface(
         with: CodexBridgeServiceXPCProtocol.self
       )

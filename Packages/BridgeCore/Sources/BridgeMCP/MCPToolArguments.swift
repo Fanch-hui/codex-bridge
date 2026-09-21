@@ -106,6 +106,26 @@ struct StrictToolArguments {
     return value
   }
 
+  func requiredObjectArray(
+    _ key: String,
+    maximumCount: Int,
+    allowedKeys: Set<String> = []
+  ) throws -> [StrictToolArguments] {
+    guard case .array(let rawValues)? = values[key],
+      !rawValues.isEmpty,
+      rawValues.count <= maximumCount
+    else {
+      throw MCPError.invalidParams("Argument '\(key)' must be a bounded object array.")
+    }
+    return try rawValues.map { raw in
+      guard case .object(let object) = raw else {
+        throw MCPError.invalidParams("Argument '\(key)' must contain objects.")
+      }
+      let allowed = allowedKeys.isEmpty ? Set(object.keys) : allowedKeys
+      return try StrictToolArguments(object, allowed: allowed)
+    }
+  }
+
   func stringArray(
     _ key: String,
     maximumCount: Int,

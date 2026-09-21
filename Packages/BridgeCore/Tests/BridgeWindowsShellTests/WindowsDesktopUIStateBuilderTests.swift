@@ -102,6 +102,20 @@
       XCTAssertEqual(state.workbench?.engineStatus, "已连接本机 Codex 引擎")
     }
 
+    func testWorkbenchShowsProjectQueryFailureWithoutReplacingProjectContext() {
+      var workbench = makeWorkbench(projectRows: ["Bridge"])
+      workbench.projectLoadError = "项目查询失败：后台忙"
+
+      let state = WindowsDesktopUIStateBuilder.build(
+        workbench: workbench,
+        management: makeManagement()
+      )
+
+      XCTAssertEqual(state.workbench?.projects.map(\.title), ["Bridge"])
+      XCTAssertEqual(state.workbench?.projectStatus, "项目查询失败")
+      XCTAssertEqual(state.workbench?.projectStatusTone, "error")
+    }
+
     func testWorkbenchPublishesCurrentBrowserURL() {
       let state = WindowsDesktopUIStateBuilder.build(
         workbench: makeWorkbench(),

@@ -118,6 +118,10 @@ final class AntigravityCLIEventNormalizerTests: XCTestCase {
     XCTAssertEqual(subagentTool.kind, "subagent")
     XCTAssertEqual(subagentTool.status, .inProgress)
     XCTAssertTrue(subagentTool.output?.contains("review") == true)
+    XCTAssertEqual(subagentTool.childRuns.count, 1)
+    XCTAssertEqual(subagentTool.childRuns.first?.id, "sub-1")
+    XCTAssertEqual(subagentTool.childRuns.first?.name, "reviewer")
+    XCTAssertEqual(subagentTool.childRuns.first?.status, "in_progress")
 
     let failedToolUpdate = try AntigravityCLITestSupport.decode(
       AntigravityStreamEnvelope.self,

@@ -23,6 +23,31 @@ public struct BridgeDesktopActivityRow: Codable, Equatable, Sendable {
   }
 }
 
+public struct BridgeDesktopChildRun: Codable, Equatable, Sendable {
+  public let id: String
+  public let sessionID: String?
+  public let name: String?
+  public let status: String?
+  public let summary: String?
+  public let workspaceURLs: [String]
+
+  public init(
+    id: String,
+    sessionID: String? = nil,
+    name: String? = nil,
+    status: String? = nil,
+    summary: String? = nil,
+    workspaceURLs: [String] = []
+  ) {
+    self.id = id
+    self.sessionID = sessionID
+    self.name = name
+    self.status = status
+    self.summary = summary
+    self.workspaceURLs = workspaceURLs
+  }
+}
+
 public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
   public let id: String
   public let role: String
@@ -37,6 +62,12 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
   public let isFinal: Bool
   public let status: String?
   public let markdownHTML: String?
+  public let childRuns: [BridgeDesktopChildRun]
+
+  private enum CodingKeys: String, CodingKey {
+    case id, role, text, kind, toolName, toolStatus, toolArguments
+    case displayTitle, displayStatus, symbol, isFinal, status, markdownHTML, childRuns
+  }
 
   public init(
     id: String,
@@ -50,7 +81,8 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
     displayStatus: String? = nil,
     symbol: String? = nil,
     isFinal: Bool = true,
-    status: String? = nil
+    status: String? = nil,
+    childRuns: [BridgeDesktopChildRun] = []
   ) {
     self.id = id
     self.role = role
@@ -65,6 +97,26 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
     self.isFinal = isFinal
     self.status = status
     markdownHTML = AgentMarkdownHTMLRenderer.render(text, isFinal: isFinal)
+    self.childRuns = childRuns
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      id: try values.decode(String.self, forKey: .id),
+      role: try values.decode(String.self, forKey: .role),
+      text: try values.decode(String.self, forKey: .text),
+      kind: try values.decodeIfPresent(String.self, forKey: .kind),
+      toolName: try values.decodeIfPresent(String.self, forKey: .toolName),
+      toolStatus: try values.decodeIfPresent(String.self, forKey: .toolStatus),
+      toolArguments: try values.decodeIfPresent(String.self, forKey: .toolArguments),
+      displayTitle: try values.decodeIfPresent(String.self, forKey: .displayTitle),
+      displayStatus: try values.decodeIfPresent(String.self, forKey: .displayStatus),
+      symbol: try values.decodeIfPresent(String.self, forKey: .symbol),
+      isFinal: try values.decodeIfPresent(Bool.self, forKey: .isFinal) ?? true,
+      status: try values.decodeIfPresent(String.self, forKey: .status),
+      childRuns: try values.decodeIfPresent([BridgeDesktopChildRun].self, forKey: .childRuns) ?? []
+    )
   }
 }
 

@@ -54,4 +54,26 @@ final class AntigravityCLIInterruptTests: XCTestCase {
         "Expected SIGINT to terminate the process group, got \(String(describing: termination))")
     }
   }
+
+  #if !os(Windows)
+    func testDrainRemainingOutputDoesNotWaitForInheritedWriter() throws {
+      let output = BoundedProcessOutputCollector(maximumBytes: 1_024)
+      let process = try ManagedStdioProcess(
+        argv: ["/bin/sh", "-c", "(sleep 0.5) & printf inherited-writer"],
+        workingDirectory: nil,
+        environment: ["PATH": "/usr/bin:/bin"],
+        mergeStandardError: false,
+        onStandardOutput: { output.append($0) }
+      )
+      defer { process.close() }
+
+      XCTAssertEqual(process.waitForExit(timeout: .seconds(2)), .exited(0))
+      let started = ContinuousClock.now
+      process.drainRemainingOutput(timeout: .milliseconds(100))
+      let elapsed = started.duration(to: ContinuousClock.now)
+
+      XCTAssertLessThan(elapsed, .seconds(1))
+      XCTAssertTrue(output.snapshot().tail.contains("inherited-writer"))
+    }
+  #endif
 }

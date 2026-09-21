@@ -46,4 +46,20 @@ final class ToolArgumentRedactionTests: XCTestCase {
     XCTAssertFalse(redacted.contains("real-bearer-secret"))
     XCTAssertTrue(redacted.contains("[REDACTED]"))
   }
+
+  func testStructuredCommandArgumentsRedactFollowingSecretValue() {
+    let redacted = OutboundContentSecurity.redactedCommandArguments([
+      "/usr/bin/tool",
+      "--token",
+      "plain-secret-value",
+      "--mode",
+      "safe",
+      "--api_key=another-secret",
+    ])
+
+    XCTAssertEqual(
+      redacted,
+      ["/usr/bin/tool", "--token", "[REDACTED]", "--mode", "safe", "--api_key=[REDACTED]"]
+    )
+  }
 }

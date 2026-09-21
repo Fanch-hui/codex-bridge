@@ -228,6 +228,17 @@ final class PathSecurityTests: XCTestCase {
     XCTAssertEqual(redacted, "Open [REDACTED_PATH]")
   }
 
+  func testCommandOutputRemovesANSIAndOSCSequencesButKeepsText() {
+    let input = "\u{001B}[32m完成\u{001B}[0m\n\u{001B}]0;agent title\u{0007}git status"
+
+    let redacted = OutboundContentSecurity.redactedCommandOutput(
+      input,
+      maximumUTF8Bytes: 4_096
+    )
+
+    XCTAssertEqual(redacted, "完成\ngit status")
+  }
+
   func testOutboundContentConsumesAuthenticationHeaderValueDuringRedaction() {
     let inputs = [
       "x-codex-bridge-token: topsecret",

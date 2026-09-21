@@ -44,17 +44,60 @@ jobs:
         run: Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore
 
       - name: Test shared desktop UI logic
-        if: ${{ hashFiles('Scripts/test-desktop-*.cjs') != '' }}
         run: |
-          for test in Scripts/test-desktop-*.cjs; do
-            node "$test"
+          shopt -s nullglob
+          desktop_tests=(Scripts/test-desktop-*.cjs)
+          shopt -u nullglob
+          expected_desktop_tests=(
+            Scripts/test-desktop-connections.cjs
+            Scripts/test-desktop-effort-options.cjs
+            Scripts/test-desktop-project-editors.cjs
+            Scripts/test-desktop-settings-editors.cjs
+            Scripts/test-desktop-sidebar.cjs
+            Scripts/test-desktop-viewport.cjs
+            Scripts/test-desktop-workbench-controls.cjs
+            Scripts/test-desktop-workbench-process.cjs
+          )
+          for expected in "${expected_desktop_tests[@]}"; do
+            if [[ ! -f "$expected" ]]; then
+              echo "Expected shared desktop UI test is missing: $expected" >&2
+              exit 1
+            fi
           done
+          if (( ${#desktop_tests[@]} == 0 )); then
+            echo 'No shared desktop UI tests were found.' >&2
+            exit 1
+          fi
+          total_tests=0
+          for test in "${desktop_tests[@]}"; do
+            output="$(node --test "$test" 2>&1)" || {
+              printf '%s\n' "$output"
+              exit 1
+            }
+            printf '%s\n' "$output"
+            count="$(printf '%s\n' "$output" | awk '/^# tests [0-9]+$/{print $3; found=1} END {if (!found) exit 1}')" || {
+              echo "Desktop UI test did not report an executed test count: $test" >&2
+              exit 1
+            }
+            if (( count <= 0 )); then
+              echo "Desktop UI test executed no tests: $test" >&2
+              exit 1
+            fi
+            total_tests=$((total_tests + count))
+          done
+          if (( total_tests <= 0 )); then
+            echo 'Shared desktop UI suite executed no tests.' >&2
+            exit 1
+          fi
 
       - name: Verify MCP Inspector contract
         run: Scripts/verify-mcp-inspector.sh
 
       - name: Verify dependency resolution is unchanged
         run: git diff --exit-code -- Packages/BridgeCore/Package.resolved CodexBridge.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+      - name: Verify release candidate gate wiring
+        run: Scripts/test-release-contract.sh
 
   native:
     name: Native app build
@@ -77,8 +120,8 @@ jobs:
           build
           CODE_SIGNING_ALLOWED=NO
 
-  universal2:
-    name: Unsigned Universal 2 archive
+  macos-archive:
+    name: Unsigned Apple Silicon archive
     runs-on: xcode-27
     timeout-minutes: 35
     steps:
@@ -87,7 +130,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Archive both macOS architectures
+      - name: Archive Apple Silicon app
         run: >-
           Scripts/with-xcode.sh xcodebuild
           -project CodexBridge.xcodeproj
@@ -97,15 +140,14 @@ jobs:
           -archivePath .build/CodexBridge.xcarchive
           archive
           CODE_SIGNING_ALLOWED=NO
-          ARCHS='arm64 x86_64'
+          ARCHS=arm64
           ONLY_ACTIVE_ARCH=NO
           REQUIRE_TUNNEL_HELPER=NO
 
-      - name: Verify archived app is Universal 2
+      - name: Verify archived app architecture
         run: |
           app=".build/CodexBridge.xcarchive/Products/Applications/CodexBridge.app/Contents/MacOS/CodexBridge"
           test -f "$app"
           architectures="$(/usr/bin/lipo -archs "$app")"
-          test "$architectures" = "x86_64 arm64" || test "$architectures" = "arm64 x86_64"
-          /usr/bin/lipo "$app" -verify_arch x86_64
+          test "$architectures" = "arm64"
           /usr/bin/lipo "$app" -verify_arch arm64

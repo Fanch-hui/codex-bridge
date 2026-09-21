@@ -9,6 +9,44 @@ import XCTest
 #endif
 
 final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
+  func testInvalidPreMigrationBackupIsRebuiltAndSupersededCopiesArePruned()
+    async throws
+  {
+    let directory = FileManager.default.temporaryDirectory.appending(
+      path: "bridge-schema-backup-recovery-\(UUID().uuidString)",
+      directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+    let path = directory.appending(path: "service.sqlite").path
+    try await makeVersionFourteenDatabase(at: path)
+
+    let staleBackup = path + ".pre-v8"
+    XCTAssertTrue(FileManager.default.createFile(atPath: staleBackup, contents: Data("stale".utf8)))
+    let currentBackup = path + ".pre-v15"
+    XCTAssertTrue(FileManager.default.createFile(atPath: currentBackup, contents: Data()))
+
+    let store = try SimpleServiceStore(path: path)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: staleBackup))
+    let backupAttributes = try FileManager.default.attributesOfItem(atPath: currentBackup)
+    XCTAssertGreaterThan((backupAttributes[.size] as? NSNumber)?.int64Value ?? 0, 0)
+    let backup = try DatabaseQueue(path: currentBackup)
+    let backupVersion = try await backup.read { db in
+      try Int.fetchOne(
+        db,
+        sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
+      )
+    }
+    XCTAssertEqual(backupVersion, 14)
+    let currentVersion = try await store.database.read { db in
+      try Int.fetchOne(
+        db,
+        sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
+      )
+    }
+    XCTAssertEqual(currentVersion, 17)
+  }
+
   func testVersionFourteenDatabaseMigratesPathsAndPreservesRows() async throws {
     let directory = FileManager.default.temporaryDirectory.appending(
       path: "bridge-schema-migration-v15-\(UUID().uuidString)",
@@ -19,6 +57,7 @@ final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
     let path = directory.appending(path: "service.sqlite").path
 
     try await makeVersionFourteenDatabase(at: path)
+    try assertVersionFourteenBaseline(at: path)
     let store = try SimpleServiceStore(path: path)
 
     let migrated = try await store.database.read { db in
@@ -60,7 +99,7 @@ final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
       return (version, rows, projectSQL, installationSQL, artifactSQL, message, artifactPath)
     }
 
-    XCTAssertEqual(migrated.0, 16)
+    XCTAssertEqual(migrated.0, 17)
     XCTAssertEqual(migrated.1, [1, 1, 1, 1, 1, 1])
     XCTAssertTrue(migrated.2?.contains("GLOB '[A-Za-z]'") ?? false)
     XCTAssertTrue(migrated.3?.contains("GLOB '[A-Za-z]'") ?? false)
@@ -87,10 +126,12 @@ final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
         "bridge_service_agent_installation_artifacts_updated",
         "bridge_service_one_active_write_task",
         "bridge_service_task_events_task",
+        "bridge_service_task_messages_agent_activity",
         "bridge_service_task_messages_activity",
         "bridge_service_task_messages_task",
         "bridge_service_tasks_project_updated",
         "bridge_service_tasks_updated",
+        "bridge_service_task_queue_project_order",
       ])
     )
     let foreignKeyCounts = try await store.database.read { db in
@@ -196,28 +237,86 @@ final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
   private func makeVersionFourteenDatabase(at path: String) async throws {
     let legacy = try DatabaseQueue(path: path)
     try await legacy.writeWithoutTransaction { db in
-      try db.execute(sql: "CREATE TABLE grdb_migrations (identifier TEXT PRIMARY KEY NOT NULL)")
-      for version in 1...14 {
-        try db.execute(
-          sql: "INSERT INTO grdb_migrations (identifier) VALUES (?)",
-          arguments: ["BridgeServiceCore.v\(version)"]
-        )
-      }
-      try ServiceStoreSchema.createVersionOne(in: db)
-      try ServiceStoreSchema.createVersionTwo(in: db)
-      try ServiceStoreSchema.createVersionThree(in: db)
-      try ServiceStoreSchema.createVersionFour(in: db)
-      try ServiceStoreSchema.createVersionFive(in: db)
-      try ServiceStoreSchema.createVersionSix(in: db)
-      try ServiceStoreSchema.createVersionSeven(in: db)
-      try ServiceStoreSchema.createVersionEight(in: db)
-      try ServiceStoreSchema.createVersionNine(in: db)
-      try ServiceStoreSchema.createVersionTen(in: db)
-      try ServiceStoreSchema.createVersionEleven(in: db)
-      try ServiceStoreSchema.createVersionTwelve(in: db)
-      try ServiceStoreSchema.createVersionThirteen(in: db)
-      try ServiceStoreSchema.createVersionFourteen(in: db)
+      try db.execute(sql: ServiceStoreV14Fixture.schema)
       try Self.insertLegacyRows(in: db)
+    }
+  }
+
+  private func assertVersionFourteenBaseline(at path: String) throws {
+    let database = try DatabaseQueue(path: path)
+    try database.read { db in
+      let expectedColumns: [String: Set<String>] = [
+        "bridge_service_projects": [
+          "project_id", "name", "canonical_path", "root_device", "root_inode",
+          "root_volume_uuid", "read_permission", "write_permission", "network_permission",
+          "direct_command_mode", "workspace_commands_json", "direct_blacklist_json",
+          "created_at", "updated_at",
+        ],
+        "bridge_service_tasks": [
+          "task_id", "project_id", "source", "source_client_id", "client_request_id",
+          "prompt", "requested_thread_id", "codex_thread_id", "codex_turn_id", "status",
+          "supervisor_status", "execution_model", "execution_effort", "supervisor_model",
+          "supervisor_effort", "permission_mode", "network_allowed", "access_mode", "fast_mode",
+          "current_step", "changed_files_json", "result_summary", "supervisor_summary",
+          "failure_code", "created_at", "updated_at", "provider_id", "installation_id",
+          "selection_mode", "provider_session_id", "provider_run_id",
+        ],
+        "bridge_service_task_events": ["event_id", "task_id", "kind", "summary", "created_at"],
+        "bridge_service_task_messages": [
+          "message_id", "task_id", "message_key", "role", "content", "created_at", "kind",
+          "tool_name", "tool_status", "tool_arguments", "updated_at",
+        ],
+        "bridge_service_agent_installations": [
+          "installation_id", "provider_id", "display_name", "executable_path",
+          "canonical_executable_path", "executable_device", "executable_inode", "executable_size",
+          "executable_mtime_ns", "executable_sha256", "version", "protocol_revision",
+          "adapter_revision", "trust_profile", "security_profile_id", "is_enabled", "availability",
+          "capabilities_json", "last_probe_error", "last_probed_at", "created_at", "updated_at",
+        ],
+        "bridge_service_agent_installation_artifacts": [
+          "installation_id", "role", "canonical_path", "artifact_device", "artifact_inode",
+          "artifact_size", "artifact_mtime_ns", "artifact_sha256", "created_at", "updated_at",
+        ],
+      ]
+      for (table, columns) in expectedColumns {
+        let actual = Set(
+          try Row.fetchAll(db, sql: "PRAGMA table_info(\(table))").map { row in
+            row["name"] as String
+          }
+        )
+        XCTAssertEqual(actual, columns, "v14 baseline drifted for \(table)")
+      }
+      let indexes = Set(
+        try String.fetchAll(
+          db,
+          sql: "SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL"
+        )
+      )
+      XCTAssertEqual(
+        indexes,
+        Set([
+          "bridge_service_agent_installations_provider",
+          "bridge_service_agent_installations_updated",
+          "bridge_service_agent_installation_artifacts_path",
+          "bridge_service_agent_installation_artifacts_updated",
+          "bridge_service_one_active_write_task",
+          "bridge_service_task_events_task",
+          "bridge_service_task_messages_activity",
+          "bridge_service_task_messages_task",
+          "bridge_service_tasks_project_updated",
+          "bridge_service_tasks_updated",
+        ])
+      )
+      let projectSQL = try String.fetchOne(
+        db,
+        sql: "SELECT sql FROM sqlite_master WHERE name = 'bridge_service_projects'"
+      )
+      XCTAssertTrue(projectSQL?.contains("CHECK (substr(canonical_path, 1, 1) = '/')") == true)
+      let messageSQL = try String.fetchOne(
+        db,
+        sql: "SELECT sql FROM sqlite_master WHERE name = 'bridge_service_task_messages'"
+      )
+      XCTAssertTrue(messageSQL?.contains("'declined', 'cancelled'") == true)
     }
   }
 

@@ -50,6 +50,22 @@ public protocol BridgeMCPServiceAPI: Sendable {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectFileReadPage
 
+  func serviceListProjectDirectory(
+    projectID: String,
+    relativeDirectory: String?,
+    depth: Int,
+    kind: String,
+    cursor: String?,
+    limit: Int,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPProjectDirectoryPage
+
+  func serviceBatchReadProjectFiles(
+    projectID: String,
+    files: [MCPProjectFileBatchReadItemRequest],
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPProjectFileBatchPage
+
   func serviceThreads(
     projectID: String,
     cursor: String?,
@@ -85,6 +101,10 @@ public protocol BridgeMCPServiceAPI: Sendable {
     _ request: MCPRunSkillActionRequest,
     deadline: ContinuousClock.Instant
   ) async throws -> MCPDirectCommandReceipt
+
+  func serviceListTasks(
+    projectID: String?, cursor: String?, limit: Int, deadline: ContinuousClock.Instant
+  ) async throws -> MCPTaskListPage
 
   func serviceTask(
     taskID: String,
@@ -122,6 +142,21 @@ public protocol BridgeMCPServiceAPI: Sendable {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPDirectWriteReceipt
 
+  func serviceDirectPreviewMutation(
+    _ request: MCPDirectMutationRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectMutationPreview
+
+  func serviceDirectApplyMutation(
+    _ request: MCPDirectApplyMutationRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectMutationReceipt
+
+  func serviceDirectUndoMutation(
+    _ request: MCPDirectUndoMutationRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectMutationReceipt
+
   func serviceDirectEditFile(
     _ request: MCPDirectEditRequest,
     deadline: ContinuousClock.Instant
@@ -142,8 +177,20 @@ public protocol BridgeMCPServiceAPI: Sendable {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPDirectCommandReceipt
 
+  func serviceListDirectCommands(
+    projectID: String?,
+    limit: Int,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectCommandPage
+
   func serviceDirectReadCommand(
     sessionID: String,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectCommandOutput
+
+  func serviceDirectReadCommand(
+    sessionID: String,
+    cursor: String?,
     deadline: ContinuousClock.Instant
   ) async throws -> MCPDirectCommandOutput
 
@@ -172,6 +219,70 @@ public protocol BridgeMCPServiceAPI: Sendable {
 }
 
 extension BridgeMCPServiceAPI {
+  public func serviceDirectPreviewMutation(
+    _ request: MCPDirectMutationRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectMutationPreview {
+    throw BridgeMCPQueryError.unavailable
+  }
+
+  public func serviceDirectApplyMutation(
+    _ request: MCPDirectApplyMutationRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectMutationReceipt {
+    throw BridgeMCPQueryError.unavailable
+  }
+
+  public func serviceDirectUndoMutation(
+    _ request: MCPDirectUndoMutationRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectMutationReceipt {
+    throw BridgeMCPQueryError.unavailable
+  }
+
+  public func serviceListProjectDirectory(
+    projectID: String,
+    relativeDirectory: String?,
+    depth: Int,
+    kind: String,
+    cursor: String?,
+    limit: Int,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPProjectDirectoryPage {
+    throw BridgeMCPQueryError.unavailable
+  }
+
+  public func serviceBatchReadProjectFiles(
+    projectID: String,
+    files: [MCPProjectFileBatchReadItemRequest],
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPProjectFileBatchPage {
+    throw BridgeMCPQueryError.unavailable
+  }
+
+  public func serviceDirectReadCommand(
+    sessionID: String,
+    cursor: String?,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectCommandOutput {
+    guard cursor == nil else { throw BridgeMCPQueryError.contractRejected }
+    return try await serviceDirectReadCommand(sessionID: sessionID, deadline: deadline)
+  }
+
+  public func serviceListDirectCommands(
+    projectID: String?,
+    limit: Int,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectCommandPage {
+    throw BridgeMCPQueryError.unavailable
+  }
+
+  public func serviceListTasks(
+    projectID: String?, cursor: String?, limit: Int, deadline: ContinuousClock.Instant
+  ) async throws -> MCPTaskListPage {
+    throw BridgeMCPQueryError.contractRejected
+  }
+
   public func serviceAgents(
     projectID: String?,
     deadline: ContinuousClock.Instant

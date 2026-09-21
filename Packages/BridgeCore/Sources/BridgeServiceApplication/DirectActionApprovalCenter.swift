@@ -41,6 +41,7 @@ public enum DirectApprovalError: Error, Equatable, Sendable {
 }
 
 public actor DirectActionApprovalCenter {
+  public nonisolated let changes = ServiceStateChangeHub()
   private struct Pending {
     let projectID: String
     let kind: DirectApprovalKind
@@ -97,6 +98,7 @@ public actor DirectActionApprovalCenter {
       key: key,
       createdAt: Date()
     )
+    changes.publish()
     return approvalID
   }
 
@@ -120,6 +122,7 @@ public actor DirectActionApprovalCenter {
     pendingByID[approvalID] = nil
     deniedKeys[pending.key] = nil
     grantKeys[pending.key] = Date()
+    changes.publish()
     return true
   }
 
@@ -128,6 +131,7 @@ public actor DirectActionApprovalCenter {
     guard let pending = pendingByID[approvalID] else { return false }
     pendingByID[approvalID] = nil
     deniedKeys[pending.key] = Date()
+    changes.publish()
     return true
   }
 
@@ -138,6 +142,7 @@ public actor DirectActionApprovalCenter {
     expireIfNeeded()
     let key = Self.key(payloadDigest: payloadDigest, clientRequestID: clientRequestID)
     guard grantKeys.removeValue(forKey: key) != nil else { return false }
+    changes.publish()
     return true
   }
 
@@ -151,6 +156,7 @@ public actor DirectActionApprovalCenter {
   }
 
   public func cancelAll() {
+    defer { changes.publish() }
     pendingByID = [:]
     grantKeys = [:]
     deniedKeys = [:]

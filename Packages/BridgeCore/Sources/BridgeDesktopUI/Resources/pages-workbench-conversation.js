@@ -107,8 +107,21 @@
   function updateMessage(item, entry) {
     var isUser = entry.role === "用户";
     item.className = "conversation-entry entry-message " + (isUser ? "entry-user" : "entry-agent") + (entry.isFinal ? "" : " entry-streaming");
-    S.clear(item);
-    item.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
+    if (!item.__text) {
+      item.__text = S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML);
+      item.appendChild(item.__text);
+    } else {
+      updateTextNode(item.__text, entry.text, entry.markdownHTML);
+    }
+  }
+
+  function updateTextNode(node, value, html) {
+    if (typeof html === "string") {
+      if (node.innerHTML !== html) node.innerHTML = html;
+    } else {
+      var text = value || "";
+      if (node.textContent !== text) node.textContent = text;
+    }
   }
 
   function conversationDisclosure(entry, context) {
@@ -127,9 +140,11 @@
     if (disclosures.has(key)) item.open = disclosures.get(key);
     else if (isNewContext) item.open = false;
     item.__disclosureKey = key;
-    item.className = "conversation-entry entry-disclosure entry-" + entry.kind;
-    S.clear(item);
-    var summary = S.node("summary", "entry-heading disclosure-summary");
+    var toolName = String(entry.toolName || "").toLowerCase();
+    var subagent = /(^|[_\s-])(subagent|delegate|fork|agent|task)([_\s-]|$)/.test(toolName);
+    item.className = "conversation-entry entry-disclosure entry-" + entry.kind + (subagent ? " entry-subagent" : "");
+    var summary = item.__summary || (item.__summary = S.node("summary", "entry-heading disclosure-summary"));
+    S.clear(summary);
     summary.appendChild(S.icon("chevron.right", "entry-disclosure-chevron"));
     summary.appendChild(statusIcon(entry));
     summary.appendChild(S.node("span", "entry-title", entry.displayTitle || entry.toolName || (entry.kind === "reasoning" ? "分析过程" : "工具调用")));
@@ -138,20 +153,121 @@
     if (entry.kind === "reasoning" && !entry.isFinal) {
       summary.appendChild(S.node("span", "conversation-state-spinner entry-status-spinner", ""));
     }
-    item.appendChild(summary);
-    var body = S.node("div", "disclosure-body");
+    if (summary.parentNode !== item) item.appendChild(summary);
+    var body = item.__body || (item.__body = S.node("div", "disclosure-body"));
+    if (body.parentNode !== item) item.appendChild(body);
     if (entry.kind === "tool_call") {
-      var commandArguments = entry.toolArguments || "";
-      var output = entry.text || "";
-      if (commandArguments && output.indexOf(commandArguments) === 0) output = output.slice(commandArguments.length).trim();
-      if (commandArguments) body.appendChild(S.node("pre", "entry-arguments entry-details mono", commandArguments));
-      if (output && output !== entry.toolName) {
-        body.appendChild(S.node("pre", "entry-arguments entry-output entry-details mono", output));
-      }
+      if (item.__reasoningText) item.__reasoningText.hidden = true;
+      updateToolBody(item, entry);
     } else if (entry.text) {
-      body.appendChild(S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML));
+      item.__reasoningText = item.__reasoningText || S.markdown("", "entry-text markdown-body");
+      updateTextNode(item.__reasoningText, entry.text, entry.markdownHTML);
+      if (item.__reasoningText.parentNode !== body) body.appendChild(item.__reasoningText);
+      hideToolBlocks(item);
+    } else if (item.__reasoningText) {
+      item.__reasoningText.hidden = true;
+      hideToolBlocks(item);
     }
-    item.appendChild(body);
+    updateChildRuns(item, entry);
+    if (item.__reasoningText && entry.kind === "reasoning") item.__reasoningText.hidden = !entry.text;
+  }
+
+  function toolValue(value) {
+    if (value === null || value === undefined) return "";
+    var text = String(value).replace(/\r\n?/g, "\n");
+    if (!text.trim()) return "";
+    try { return JSON.stringify(JSON.parse(text), null, 2); } catch (_) { return text; }
+  }
+
+  function toolBlock(item, key, title, className, value) {
+    var block = item[key];
+    if (!block) {
+      block = item[key] = S.node("div", "entry-tool-block");
+      block.__label = S.node("div", "entry-detail-label", title);
+      block.__value = S.node("pre", className + " entry-details mono");
+      block.appendChild(block.__label); block.appendChild(block.__value);
+      item.__body.appendChild(block);
+    }
+    var text = toolValue(value);
+    block.hidden = !text;
+    if (text && block.__value.textContent !== text) block.__value.textContent = text;
+  }
+
+  function hideToolBlocks(item) {
+    if (item.__toolName) item.__toolName.hidden = true;
+    if (item.__toolInput) item.__toolInput.hidden = true;
+    if (item.__toolOutput) item.__toolOutput.hidden = true;
+  }
+
+  function updateToolBody(item, entry) {
+    var body = item.__body;
+    if (entry.toolName) {
+      if (!item.__toolName) {
+        item.__toolName = S.node("div", "entry-tool-name mono");
+        if (body.firstChild) body.insertBefore(item.__toolName, body.firstChild);
+        else body.appendChild(item.__toolName);
+      }
+      item.__toolName.hidden = false;
+      item.__toolName.textContent = "工具：" + entry.toolName;
+    } else if (item.__toolName) {
+      item.__toolName.hidden = true;
+    }
+    toolBlock(item, "__toolInput", "输入", "entry-arguments", entry.toolArguments);
+    toolBlock(item, "__toolOutput", "输出", "entry-output", entry.text);
+  }
+
+  function childStatusTone(status) {
+    var value = String(status || "").toLowerCase().replace(/[-\s]/g, "_");
+    if (["failed", "error", "errored"].includes(value)) return "error";
+    if (["declined", "denied", "cancelled", "canceled"].includes(value)) return "warning";
+    if (["completed", "success", "succeeded"].includes(value)) return "success";
+    if (["pending", "queued", "running", "in_progress", "active"].includes(value)) return "running";
+    return "neutral";
+  }
+
+  function updateChildRuns(item, entry) {
+    var runs = Array.isArray(entry.childRuns) ? entry.childRuns : [];
+    var section = item.__childRuns;
+    if (!section) {
+      section = item.__childRuns = S.node("section", "entry-child-runs");
+      section.appendChild(S.node("div", "entry-detail-label", "子代理"));
+      section.__list = S.node("div", "entry-child-run-list");
+      section.appendChild(section.__list);
+      item.__body.appendChild(section);
+      section.__nodes = new Map();
+    }
+    section.hidden = runs.length === 0;
+    var active = new Set();
+    runs.forEach(function (run) {
+      if (!run || !run.id) return;
+      active.add(run.id);
+      var row = section.__nodes.get(run.id);
+      if (!row) {
+        row = S.node("div", "entry-child-run");
+        row.__name = S.node("span", "entry-child-run-name");
+        row.__status = S.node("span", "entry-child-run-status");
+        row.__summary = S.node("div", "entry-child-run-summary");
+        row.__workspaces = S.node("div", "entry-child-run-workspaces mono");
+        row.appendChild(row.__name);
+        row.appendChild(row.__status);
+        row.appendChild(row.__summary);
+        row.appendChild(row.__workspaces);
+        section.__nodes.set(run.id, row);
+      }
+      row.__name.textContent = run.name || run.id;
+      row.__status.textContent = run.status || "";
+      row.__status.hidden = !run.status;
+      row.__status.className = "entry-child-run-status status-badge " + childStatusTone(run.status);
+      row.__summary.textContent = run.summary || "";
+      row.__summary.hidden = !run.summary;
+      var workspaceURLs = Array.isArray(run.workspaceURLs) ? run.workspaceURLs.filter(Boolean) : [];
+      row.__workspaces.textContent = workspaceURLs.join("\n");
+      row.__workspaces.hidden = workspaceURLs.length === 0;
+      if (row.parentNode !== section.__list) section.__list.appendChild(row);
+    });
+    section.__nodes.forEach(function (row, id) {
+      if (!active.has(id)) { row.remove(); section.__nodes.delete(id); }
+    });
   }
 
   function statusIcon(entry) {
@@ -181,8 +297,8 @@
     case "cancelled": return "已取消";
     case "pending": return "等待执行";
     case "in_progress": return "进行中";
-    default: return entry.isFinal ? "" : "状态未知";
-    }
+    default: return entry.toolStatus || (entry.isFinal ? "" : "状态未知");
+  }
   }
 
   function toolStatusTone(entry) {

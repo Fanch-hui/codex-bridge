@@ -11,7 +11,11 @@ extension DirectCommandPolicy {
       ),
       let root = DirectPathSemantics.resolvedPath(projectRoot)
     else { return false }
-    return resolved != root || DirectPathSemantics.isExecutableFile(at: resolved)
+    guard resolved != root else { return false }
+    #if os(Windows)
+      guard resolved.lowercased().hasSuffix(".exe") else { return false }
+    #endif
+    return (try? SecureFileArtifactSnapshot(capturing: resolved, requiresExecutable: true)) != nil
   }
 
   func projectContainedPath(

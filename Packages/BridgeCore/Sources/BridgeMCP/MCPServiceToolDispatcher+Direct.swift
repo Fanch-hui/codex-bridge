@@ -17,8 +17,16 @@ extension MCPServiceToolDispatcher {
       return try await callDirectApplyProjectPatch(arguments)
     case .directManageProjectPath:
       return try await callDirectManageProjectPath(arguments)
+    case .directPreviewProjectMutation:
+      return try await callDirectPreviewProjectMutation(arguments)
+    case .directApplyProjectMutation:
+      return try await callDirectApplyProjectMutation(arguments)
+    case .directUndoProjectMutation:
+      return try await callDirectUndoProjectMutation(arguments)
     case .directExecCommand:
       return try await callDirectExecCommand(arguments)
+    case .listDirectCommands:
+      return try await callListDirectCommands(arguments)
     case .directGitCommit:
       return try await callDirectGitCommit(arguments)
     case .directReadCommand:
@@ -94,6 +102,26 @@ extension MCPServiceToolDispatcher {
     return try resultEncoder.encode(ServiceDirectExecOutput(receipt: receipt))
   }
 
+  private func callListDirectCommands(_ arguments: [String: Value]?) async throws
+    -> CallTool.Result
+  {
+    let values = try StrictToolArguments(
+      arguments,
+      allowed: ["project_id", "limit"]
+    )
+    let projectID = try values.optionalIdentifier("project_id", maximumUTF8Bytes: 128)
+    let limit = try values.limit(maximum: 100)
+    let deadline = clock.now.advanced(by: deadlines.read)
+    let page = try await withToolDeadline(until: deadline) {
+      try await service.serviceListDirectCommands(
+        projectID: projectID,
+        limit: limit,
+        deadline: deadline
+      )
+    }
+    return try resultEncoder.encode(ServiceListDirectCommandsOutput(page: page))
+  }
+
   private func callDirectGitCommit(_ arguments: [String: Value]?) async throws -> CallTool.Result {
     let request = try parseDirectGitCommit(arguments)
     let deadline = clock.now.advanced(by: deadlines.mutation)
@@ -108,26 +136,42 @@ extension MCPServiceToolDispatcher {
   {
     let values = try StrictToolArguments(
       arguments,
-      allowed: ["session_id", "wait_timeout_ms"],
+      allowed: ["session_id", "cursor", "wait_timeout_ms"],
       required: ["session_id"]
     )
     let sessionID = try values.requiredIdentifier("session_id", maximumUTF8Bytes: 128)
+    var cursor = try values.optionalString("cursor", maximumUTF8Bytes: 128)
     let waitTimeoutMS = try values.optionalNonnegativeInteger("wait_timeout_ms") ?? 0
     guard waitTimeoutMS <= 10_000 else {
       throw MCPError.invalidParams("wait_timeout_ms must not exceed 10000.")
     }
     let deadline = clock.now.advanced(by: deadlines.read)
+    let initialCursor = cursor
     var output = try await withToolDeadline(until: deadline) {
-      try await service.serviceDirectReadCommand(sessionID: sessionID, deadline: deadline)
+      try await service.serviceDirectReadCommand(
+        sessionID: sessionID,
+        cursor: initialCursor,
+        deadline: deadline
+      )
     }
     let baselineByteCount = output.byteCount
     let waitDeadline = clock.now.advanced(by: .milliseconds(waitTimeoutMS))
     while waitTimeoutMS > 0, output.status == "running", clock.now < waitDeadline {
       try await Task.sleep(for: .milliseconds(25))
+      let requestedCursor = cursor
       output = try await withToolDeadline(until: deadline) {
-        try await service.serviceDirectReadCommand(sessionID: sessionID, deadline: deadline)
+        try await service.serviceDirectReadCommand(
+          sessionID: sessionID,
+          cursor: requestedCursor,
+          deadline: deadline
+        )
       }
-      if output.status != "running" || output.byteCount != baselineByteCount { break }
+      cursor = output.nextCursor ?? requestedCursor
+      if output.status != "running" || output.byteCount != baselineByteCount
+        || output.output?.isEmpty == false
+      {
+        break
+      }
     }
     if waitTimeoutMS > 0, output.status == "running", output.byteCount == baselineByteCount {
       output = output.markingReadTimeout()

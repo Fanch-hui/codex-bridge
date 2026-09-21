@@ -48,6 +48,8 @@
       conversation: TaskConversationModel?,
       permissionRemediation: BridgeDesktopPermissionRemediationState?,
       conversationEntries: [BridgeDesktopConversationEntry]? = nil,
+      installations: [IPCAgentInstallationSummary] = [],
+      gitState: String? = nil,
       canResume: Bool,
       canSteer: Bool,
       pendingUserInput: Bool = false
@@ -111,6 +113,15 @@
         turnCount: resolvedSession.turnCount,
         canResume: canResume,
         canRestart: task.canRestart,
+        queuePosition: task.queuePosition,
+        queueOccupantTaskID: task.queueOccupantTaskID,
+        queueRequestedAt: task.queueRequestedAt,
+        handoffPrompt: task.isTerminal
+          ? TaskHandoffSummary.prompt(
+            task: task, history: resolvedSession.tasks, gitState: gitState) : nil,
+        handoffProviders: TaskHandoffSummary.providers(
+          excluding: task.providerIdentifier, installations: installations
+        ).map { BridgeDesktopChoice(id: $0.id, title: $0.name) },
         updatedAt: task.updatedAt
       )
     }

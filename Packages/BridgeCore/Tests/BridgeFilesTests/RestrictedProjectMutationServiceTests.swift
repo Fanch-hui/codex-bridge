@@ -83,6 +83,40 @@ final class RestrictedProjectMutationServiceTests: XCTestCase {
     )
   }
 
+  func testPreparedMutationAppliesAndUndoesOnlyAtExpectedRevision() async throws {
+    let fixture = try await writeFixture(self)
+    let path = fixture.root.appending(path: "file.txt")
+    let before = Data("before\n".utf8)
+    try before.write(to: path)
+    let prepared = try await fixture.service.prepare(
+      .write(
+        ProjectWriteRequest(
+          projectID: fixture.projectID,
+          relativePath: "file.txt",
+          mode: .replace,
+          content: "after\n"
+        )
+      )
+    )
+
+    XCTAssertEqual(prepared.changedFiles.count, 1)
+    XCTAssertEqual(try Data(contentsOf: path), before)
+    _ = try await fixture.service.apply(prepared)
+    XCTAssertEqual(try String(contentsOf: path, encoding: .utf8), "after\n")
+    _ = try await fixture.service.undo(prepared)
+    XCTAssertEqual(try Data(contentsOf: path), before)
+
+    _ = try await fixture.service.apply(prepared)
+    try Data("later\n".utf8).write(to: path)
+    await assertMutationError(try await fixture.service.undo(prepared)) { error in
+      guard case .revisionConflictWithContext(let relativePath, _, _) = error else {
+        return XCTFail("Expected a revision conflict, got \(error)")
+      }
+      XCTAssertEqual(relativePath, "file.txt")
+    }
+    XCTAssertEqual(try String(contentsOf: path, encoding: .utf8), "later\n")
+  }
+
   func testMutationsHonorForbiddenPatterns() async throws {
     let fixture = try await writeFixture(
       self,

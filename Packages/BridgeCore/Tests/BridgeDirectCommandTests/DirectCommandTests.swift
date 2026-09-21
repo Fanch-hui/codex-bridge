@@ -374,15 +374,44 @@ final class DirectCommandPolicyTests: XCTestCase {
 
   func testSafeModeAllowsProjectLocalScript() throws {
     let policy = DirectCommandPolicy()
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("direct-policy-local-script-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let script = root.appendingPathComponent("run.sh")
+    try Data("#!/bin/sh\necho ok\n".utf8).write(to: script)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+    let project = try project(mode: .safe, write: .allowed, root: root)
     let result = policy.resolve(
-      project: try project(mode: .safe),
+      project: project,
       request: DirectCommandRequest(
-        projectID: ProjectID(rawValue: "prj-policy"),
+        projectID: project.id,
         commandID: nil,
-        argv: ["Scripts/with-xcode.sh", "swift", "test"]
+        argv: [script.path]
       )
     )
     XCTAssertTrue(result.allowed)
+    XCTAssertTrue(result.requiresApproval)
+  }
+
+  func testSafeModeRejectsProjectLocalNonExecutablePath() throws {
+    let policy = DirectCommandPolicy()
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent("direct-policy-local-file-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("run.sh")
+    try Data("echo no\n".utf8).write(to: file)
+    let project = try project(mode: .safe, root: root)
+    let result = policy.resolve(
+      project: project,
+      request: DirectCommandRequest(
+        projectID: project.id,
+        commandID: nil,
+        argv: [file.path]
+      )
+    )
+    XCTAssertEqual(result.reason, .commandNotRegistered)
   }
 
   func testSafeModeRejectsAbsoluteExecutableOutsideProject() throws {
@@ -942,6 +971,34 @@ final class DirectCommandOutputCollectorTests: XCTestCase {
     XCTAssertLessThanOrEqual(snapshot.head.utf8.count, 4_096)
     XCTAssertLessThanOrEqual(snapshot.tail.utf8.count, 32 * 1_024)
   }
+
+  func testInvalidUTF8IsDisplayedAsEscapedBytes() {
+    let collector = DirectCommandOutputCollector(maximumBytes: 128)
+    collector.append(Data([0xFF, 0x00, 0x41]))
+    XCTAssertEqual(collector.snapshot().tail, "\\xFF\\x00A")
+  }
+
+  func testDeltaUsesAbsoluteCursorAndReportsDroppedPrefix() {
+    let collector = DirectCommandOutputCollector(maximumBytes: 8)
+    collector.append(Data("123456".utf8))
+    let first = collector.delta(from: 0)
+    XCTAssertEqual(first.text, "123456")
+    XCTAssertEqual(first.currentOffset, 0)
+    XCTAssertEqual(first.nextOffset, 6)
+    XCTAssertFalse(first.truncated)
+
+    collector.append(Data("7890".utf8))
+    let second = collector.delta(from: first.nextOffset)
+    XCTAssertEqual(second.text, "7890")
+    XCTAssertEqual(second.currentOffset, 6)
+    XCTAssertEqual(second.nextOffset, 10)
+    XCTAssertTrue(second.truncated)
+
+    let stale = collector.delta(from: 0)
+    XCTAssertEqual(stale.text, "34567890")
+    XCTAssertEqual(stale.currentOffset, 2)
+    XCTAssertTrue(stale.truncated)
+  }
 }
 
 final class DirectCommandSessionManagerTests: XCTestCase {
@@ -1052,6 +1109,66 @@ final class DirectCommandSessionManagerTests: XCTestCase {
     let result = try XCTUnwrap(finished)
     XCTAssertEqual(result.exitCode, 0)
     XCTAssertTrue(result.output.tail.contains("hello-from-direct-command"))
+  }
+
+  func testRunningSnapshotIncludesOutputCollectedAfterLaunch() async throws {
+    let manager = DirectCommandSessionManager(
+      runner: DirectCommandRunner(defaultTimeout: .seconds(5))
+    )
+    defer { Task { await manager.cancelAll() } }
+    _ = try await manager.launch(
+      sessionID: "dcmd-live-output",
+      projectID: ProjectID(rawValue: "prj-live-output"),
+      argv: ["/bin/sh", "-c", "printf live-output; sleep 1"],
+      workingDirectory: nil,
+      requiresNetwork: false,
+      usePTY: false
+    )
+    let deadline = Date().addingTimeInterval(2)
+    while Date() < deadline {
+      if let session = await manager.snapshot(sessionID: "dcmd-live-output"),
+        session.output.byteCount > 0
+      {
+        XCTAssertTrue(session.output.head.contains("live-output"))
+        return
+      }
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    XCTFail("Expected running output to be visible before process exit")
+  }
+
+  func testCompletedSessionsPersistAndRestoreForListing() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "direct-command-history-\(UUID().uuidString)",
+      directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let historyURL = root.appending(path: "history.json")
+    let projectID = ProjectID(rawValue: "prj-history")
+    let manager = DirectCommandSessionManager(
+      runner: DirectCommandRunner(defaultTimeout: .seconds(5)),
+      historyFileURL: historyURL
+    )
+    _ = try await manager.launch(
+      sessionID: "dcmd-history",
+      projectID: projectID,
+      argv: ["/bin/echo", "--token", "plain-secret"],
+      workingDirectory: nil,
+      requiresNetwork: false,
+      usePTY: false
+    )
+    _ = try await waitForFinishedSession(manager, sessionID: "dcmd-history")
+
+    let restored = DirectCommandSessionManager(
+      historyFileURL: historyURL
+    )
+    let sessions = await restored.recentSessions(projectID: projectID, limit: 10)
+    let session = try XCTUnwrap(sessions.first)
+    XCTAssertEqual(session.sessionID, "dcmd-history")
+    XCTAssertEqual(Array(session.argv.suffix(2)), ["--token", "[REDACTED]"])
+    await manager.cancelAll()
+    await restored.cancelAll()
   }
 
   func testProjectBusyRejectsSecondConcurrentSession() async throws {

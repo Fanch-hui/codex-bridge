@@ -71,8 +71,12 @@
       return String(decodingCString: sidString, as: UTF16.self)
     }
 
+    static func sddl(for userSID: String) -> String {
+      "D:P(A;;GA;;;\(userSID))(A;;GA;;;SY)"
+    }
+
     private static func makeDescriptor(for userSID: String) throws -> PSECURITY_DESCRIPTOR {
-      let sddl = "D:P(A;;GA;;;\(userSID))(A;;GA;;;SY)"
+      let sddl = Self.sddl(for: userSID)
       var descriptor: PSECURITY_DESCRIPTOR?
       let converted = sddl.withCString(encodedAs: UTF16.self) { value in
         ConvertStringSecurityDescriptorToSecurityDescriptorW(

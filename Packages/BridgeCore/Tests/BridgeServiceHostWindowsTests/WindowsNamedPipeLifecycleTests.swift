@@ -63,6 +63,7 @@
       await fulfillment(of: [closed], timeout: 2)
       fixture.closeClient()
       await closeTask.value
+      writer.close()
       _ = await writeTask.value
     }
   }

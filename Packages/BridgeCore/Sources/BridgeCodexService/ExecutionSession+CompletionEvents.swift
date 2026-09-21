@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeCodexRPC
 import BridgeSecurity
 
@@ -19,6 +20,38 @@ extension ExecutionSession {
       if collaborationBindings.remove(completedBinding) != nil {
         guard Self.isTerminalTurnStatus(completed.turn.status) else {
           throw ExecutionServiceError.protocolViolation("collaboration turn status")
+        }
+        let status: ExecutionToolCallStatus
+        switch completed.turn.status {
+        case "completed": status = .completed
+        case "failed": status = .failed
+        case "interrupted": status = .cancelled
+        default: throw ExecutionServiceError.protocolViolation("collaboration turn status")
+        }
+        if let childRun = collaborationRuns.removeValue(forKey: completedBinding),
+          let finishedChild = try? AgentChildRun(
+            id: childRun.id,
+            sessionID: childRun.sessionID,
+            name: childRun.name,
+            status: completed.turn.status,
+            summary: (Self.agentMessages(from: completed.turn)
+              .last(where: { $0.role == .agent && $0.kind == .agent })?.content)
+              .map { String(decoding: $0.utf8.prefix(4 * 1_024), as: UTF8.self) }
+              ?? childRun.summary,
+            workspaceURLs: childRun.workspaceURLs
+          )
+        {
+          await yield(
+            .toolCall(
+              try ExecutionToolCall(
+                itemID: Self.collaborationItemID(completedBinding),
+                tool: "subagent",
+                arguments: nil,
+                status: status,
+                childRuns: [finishedChild]
+              )
+            )
+          )
         }
         return
       }

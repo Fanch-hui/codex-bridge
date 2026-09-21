@@ -80,6 +80,27 @@
     return { wrapper: wrapper, control: input };
   }
 
+  function textAreaField(label, value, placeholder, className) {
+    var wrapper = node("div", "field " + (className || ""));
+    wrapper.appendChild(node("label", null, label));
+    var input = node("textarea");
+    input.value = value || "";
+    input.placeholder = placeholder || "";
+    input.rows = 1;
+    input.wrap = "soft";
+    wrapper.appendChild(input);
+    return { wrapper: wrapper, control: input };
+  }
+
+  function autoGrowTextArea(control) {
+    if (!control || !control.style) return;
+    control.style.height = "auto";
+    var height = Math.max(control.scrollHeight || 0, 32);
+    var maxHeight = 180;
+    control.style.height = Math.min(height, maxHeight) + "px";
+    control.style.overflowY = height > maxHeight ? "auto" : "hidden";
+  }
+
   function pageHeader(container, header) {
     clear(container);
     var element = node("div", "page-header");
@@ -138,6 +159,8 @@
     empty: empty,
     choices: choices,
     safeArray: safeArray,
-    markdown: markdown
+    markdown: markdown,
+    textAreaField: textAreaField,
+    autoGrowTextArea: autoGrowTextArea
   };
 }(window));

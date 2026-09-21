@@ -439,6 +439,10 @@ final class ExecutionManagerTests: XCTestCase {
     XCTAssertEqual(completed.state.resultSummary, "The parent integrated the child result.")
 
     let messages = try await coordinator.conversationPage(taskID: task.id)
+    let child = try XCTUnwrap(messages.first { $0.toolName == "subagent" })
+    XCTAssertTrue(child.toolArguments?.contains("thread-child") == true)
+    XCTAssertTrue(child.toolArguments?.contains("child-only output") == true)
+    XCTAssertTrue(child.content.contains("subagent"))
     XCTAssertFalse(messages.contains { $0.content.contains("child-only output") })
     XCTAssertTrue(messages.contains { $0.content.contains("parent integrated") })
 

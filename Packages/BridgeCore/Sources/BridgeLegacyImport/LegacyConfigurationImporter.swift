@@ -65,6 +65,7 @@ public actor LegacyConfigurationImporter {
       sourceFound: true,
       insertedProjectIDs: result.insertedProjectIDs,
       existingProjectIDs: result.existingProjectIDs,
+      skippedProjectIDs: result.skippedProjectIDs,
       reducedProjects: source.reducedProjects,
       insertedSettingKeys: result.insertedSettingKeys,
       existingSettingKeys: result.existingSettingKeys

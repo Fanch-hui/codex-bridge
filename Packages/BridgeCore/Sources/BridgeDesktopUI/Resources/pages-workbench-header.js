@@ -39,107 +39,208 @@
     document.querySelector(".workbench-layout").classList.toggle("browser-collapsed", !browser.enabled);
   }
 
-  function renderInspectorHeader(page, emit) {
-    var header = document.getElementById("workbench-inspector-header");
+  function setOptions(control, options, selected) {
+    var signature = JSON.stringify(options);
+    if (control.__choiceSignature !== signature) {
+      control.__choiceSignature = signature;
+      S.clear(control);
+      options.forEach(function (choice) {
+        var option = S.node("option", null, choice.title);
+        option.value = choice.id;
+        option.disabled = choice.enabled === false;
+        control.appendChild(option);
+      });
+    }
+    control.value = selected || "";
+  }
+
+  function createInspectorHeader(header) {
     S.clear(header);
-    var browser = page.browser || {};
+    var model = { page: null, emit: null };
     var controls = S.node("div", "inspector-browser-controls");
     var toggleWrap = S.node("label", "browser-toggle-wrap");
     toggleWrap.appendChild(S.node("span", "browser-toggle-title", "内置浏览器"));
-    var toggleBtn = S.node("button", "switch-toggle" + (browser.enabled ? " is-active" : ""));
-    toggleBtn.setAttribute("role", "switch");
-    toggleBtn.setAttribute("aria-label", "内置浏览器");
-    toggleBtn.setAttribute("aria-checked", String(!!browser.enabled));
-    toggleBtn.type = "button"; toggleBtn.disabled = !browser.canToggle;
-    toggleBtn.appendChild(S.node("span", "switch-thumb"));
-    toggleBtn.addEventListener("click", function () { emit("setBrowserEnabled", { enabled: !browser.enabled }); });
-    toggleWrap.appendChild(toggleBtn);
+    model.toggle = S.node("button", "switch-toggle");
+    model.toggle.setAttribute("role", "switch");
+    model.toggle.setAttribute("aria-label", "内置浏览器");
+    model.toggle.type = "button";
+    model.toggle.appendChild(S.node("span", "switch-thumb"));
+    model.toggle.addEventListener("click", function () {
+      var browser = model.page && model.page.browser || {};
+      if (!model.toggle.disabled && model.emit) model.emit("setBrowserEnabled", { enabled: !browser.enabled });
+    });
+    toggleWrap.appendChild(model.toggle);
     controls.appendChild(toggleWrap);
     header.appendChild(controls);
 
-
-    // Row 1: Project folder icon + Project dropdown + Status badge
-    var row1 = S.node("div", "inspector-header-row row-project"), pGroup = S.node("div", "project-selector-group");
+    var row1 = S.node("div", "inspector-header-row row-project");
+    var pGroup = S.node("div", "project-selector-group");
     pGroup.appendChild(S.icon("folder.fill", "project-folder-icon"));
-    var selectWrap = S.node("div", "project-select-wrap"), select = S.node("select", "project-native-select");
-    select.setAttribute("aria-label", "工作台项目");
-    var projects = page.projects || [];
-    projects.forEach(function (p) {
-      var opt = S.node("option", null, p.title);
-      opt.value = p.id; if (p.id === page.selectedProjectID) opt.selected = true; select.appendChild(opt);
+    var selectWrap = S.node("div", "project-select-wrap");
+    model.projectSelect = S.node("select", "project-native-select");
+    model.projectSelect.setAttribute("aria-label", "工作台项目");
+    model.projectSelect.addEventListener("change", function () {
+      if (model.emit && model.projectSelect.value) model.emit("selectProject", { projectID: model.projectSelect.value });
     });
-    select.addEventListener("change", function () { emit("selectProject", { projectID: select.value }); });
-    selectWrap.appendChild(select);
-    var curP = projects.find(function (p) { return p.id === page.selectedProjectID; });
+    selectWrap.appendChild(model.projectSelect);
     var pFace = S.node("span", "project-dropdown-face");
-    pFace.appendChild(S.node("span", "project-title-text", (curP ? curP.title : (projects[0] ? projects[0].title : "选择项目"))));
+    model.projectTitle = S.node("span", "project-title-text");
+    pFace.appendChild(model.projectTitle);
     pFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
-    selectWrap.appendChild(pFace); pGroup.appendChild(selectWrap); row1.appendChild(pGroup);
-
-    var statusWrap = S.node("div", "inspector-status-wrap");
-    if (page.selectedTask) {
-      statusWrap.appendChild(S.badge(page.selectedTask.provider, "neutral"));
-      statusWrap.appendChild(S.badge(page.selectedTask.status, toneForStatus(page.selectedTask.status)));
-    } else {
-      statusWrap.appendChild(S.badge(page.projectStatus || "就绪", page.projectStatusTone || "success"));
-    }
-    row1.appendChild(statusWrap);
+    selectWrap.appendChild(pFace);
+    pGroup.appendChild(selectWrap);
+    row1.appendChild(pGroup);
+    model.status = S.node("div", "inspector-status-wrap");
+    row1.appendChild(model.status);
     header.appendChild(row1);
 
-    // Row 3: Permission segmented control: [ Read Only | Write ]
-    var row3 = S.node("div", "inspector-header-row row-permissions"), permLabel = S.node("div", "permission-row-label");
+    var row3 = S.node("div", "inspector-header-row row-permissions");
+    var permLabel = S.node("div", "permission-row-label");
     permLabel.appendChild(S.icon("doc.text", "perm-icon"));
     permLabel.appendChild(S.node("span", null, "Agent权限"));
     row3.appendChild(permLabel);
-
-    var seg = S.node("div", "segmented-control"), isRO = page.permissionMode === "read-only";
-    var rBtn = S.node("button", "segmented-btn" + (isRO ? " is-active" : ""), "Read Only");
-    rBtn.type = "button"; rBtn.addEventListener("click", function () { emit("setWorkbenchPermissionMode", { mode: "read-only" }); });
-    seg.appendChild(rBtn);
-    var wBtn = S.node("button", "segmented-btn" + (!isRO ? " is-active" : ""), "Write");
-    wBtn.type = "button"; wBtn.addEventListener("click", function () { emit("setWorkbenchPermissionMode", { mode: "workspace-write" }); });
-    seg.appendChild(wBtn);
-    row3.appendChild(seg);
+    var seg = S.node("div", "segmented-control");
+    model.readOnly = S.node("button", "segmented-btn", "Read Only");
+    model.readOnly.type = "button";
+    model.readOnly.addEventListener("click", function () {
+      if (model.emit) model.emit("setWorkbenchPermissionMode", { mode: "read-only" });
+    });
+    model.write = S.node("button", "segmented-btn", "Write");
+    model.write.type = "button";
+    model.write.addEventListener("click", function () {
+      if (model.emit) model.emit("setWorkbenchPermissionMode", { mode: "workspace-write" });
+    });
+    seg.appendChild(model.readOnly); seg.appendChild(model.write); row3.appendChild(seg);
     header.appendChild(row3);
 
-    header.appendChild(sessionPicker(page, emit));
-  }
-
-  function sessionPicker(page, emit) {
-    var row4 = S.node("div", "inspector-header-row row-tasks"), taskWrap = S.node("div", "task-picker-wrap");
+    model.taskRow = S.node("div", "inspector-header-row row-tasks");
+    var taskWrap = S.node("div", "task-picker-wrap");
     taskWrap.appendChild(S.icon("list.bullet.rectangle", "task-picker-icon"));
-    var taskSelect = S.node("select", "task-native-select"), tasks = page.tasks || [];
-    var defaultOpt = S.node("option", null, "选择 Agent 会话 (" + tasks.length + ")");
-    defaultOpt.value = ""; taskSelect.appendChild(defaultOpt);
-    var curTask = null;
-    groupTasks(tasks).forEach(function (group) {
-      var taskGroup = S.node("optgroup"); taskGroup.label = group.label + " 会话";
-      group.tasks.forEach(function (t) {
-        var opt = S.node("option", null, t.title + " (" + t.status + ")");
-        opt.value = t.taskID;
-        if (t.taskID === page.selectedTaskID || t.selected) { opt.selected = true; curTask = t; }
-        taskGroup.appendChild(opt);
-      });
-      taskSelect.appendChild(taskGroup);
+    model.taskSelect = S.node("select", "task-native-select");
+    model.taskSelect.setAttribute("aria-label", "当前 Agent 会话");
+    model.taskSelect.addEventListener("change", function () {
+      if (model.emit && model.taskSelect.value) model.emit("selectTask", { taskID: model.taskSelect.value });
     });
-    taskSelect.setAttribute("aria-label", "当前 Agent 会话");
-    taskSelect.addEventListener("change", function () {
-      var option = taskSelect.options[taskSelect.selectedIndex];
-      if (option && taskSelect.value) emit("selectTask", { taskID: taskSelect.value });
-    });
-    taskWrap.appendChild(taskSelect);
-
+    taskWrap.appendChild(model.taskSelect);
     var taskFace = S.node("span", "task-dropdown-face");
-    var taskFaceLabel = curTask ? ("[" + curTask.provider + "] " + curTask.title) : ("选择 Agent 会话 (" + tasks.length + ")");
-    taskFace.appendChild(S.node("span", "task-title-text", taskFaceLabel));
+    model.taskTitle = S.node("span", "task-title-text");
+    taskFace.appendChild(model.taskTitle);
     taskFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
     taskWrap.appendChild(taskFace);
-    row4.appendChild(taskWrap);
+    model.taskRow.appendChild(taskWrap);
+    model.interrupt = S.button("中断", null, {}, null, "small danger", false);
+    model.interrupt.addEventListener("click", function () {
+      var task = model.page && model.page.selectedTask;
+      if (!task || !task.canInterrupt || model.interrupt.disabled || !model.emit) return;
+      model.interrupt.__pendingTaskID = task.taskID;
+      model.interrupt.disabled = true;
+      model.interrupt.textContent = "中断请求中…";
+      model.interrupt.setAttribute("aria-busy", "true");
+      model.emit("interruptTask", { taskID: task.taskID });
+    });
+    model.taskRow.appendChild(model.interrupt);
+    header.appendChild(model.taskRow);
+    model.queue = S.node("div", "workbench-queue-status");
+    model.queueText = S.node("span", "muted");
+    model.queue.appendChild(model.queueText);
+    model.cancelQueue = S.button("取消排队", null, {}, null, "small", false);
+    model.cancelQueue.addEventListener("click", function () {
+      var task = model.page && model.page.selectedTask;
+      if (!task || !task.queuePosition || model.cancelQueue.disabled || !model.emit) return;
+      model.cancelQueue.disabled = true;
+      model.cancelQueue.textContent = "取消中…";
+      model.emit("stopTask", { taskID: task.taskID });
+      global.setTimeout(function () {
+        model.cancelQueue.disabled = false;
+        model.cancelQueue.textContent = "取消排队";
+      }, 2000);
+    });
+    model.queue.appendChild(model.cancelQueue);
+    header.appendChild(model.queue);
+    header.__inspectorHeader = model;
+    return model;
+  }
 
-    if (page.selectedTask && page.selectedTask.canInterrupt === true) {
-      row4.appendChild(S.button("中断", "interruptTask", { taskID: page.selectedTask.taskID }, emit, "small danger", false));
+  function updateInspectorHeader(model, page, emit) {
+    model.page = page; model.emit = emit;
+    var browser = page.browser || {};
+    model.toggle.className = "switch-toggle" + (browser.enabled ? " is-active" : "");
+    model.toggle.setAttribute("aria-checked", String(!!browser.enabled));
+    model.toggle.disabled = !browser.canToggle;
+
+    var projects = S.safeArray(page.projects);
+    setOptions(model.projectSelect, projects.map(function (project) {
+      return { id: project.id, title: project.title };
+    }), page.selectedProjectID);
+    var currentProject = projects.find(function (project) { return project.id === page.selectedProjectID; });
+    model.projectTitle.textContent = currentProject
+      ? currentProject.title : projects.length ? projects[0].title : "选择项目";
+    S.clear(model.status);
+    if (page.selectedTask) {
+      model.status.appendChild(S.badge(page.selectedTask.provider, "neutral"));
+      model.status.appendChild(S.badge(page.selectedTask.status, toneForStatus(page.selectedTask.status)));
+    } else {
+      model.status.appendChild(S.badge(page.projectStatus || "就绪", page.projectStatusTone || "success"));
     }
-    return row4;
+
+    var queueTask = page.selectedTask;
+    model.queue.hidden = !(queueTask && queueTask.queuePosition);
+    if (queueTask && queueTask.queuePosition) {
+      var queueText = "排队第 " + queueTask.queuePosition + " 位";
+      if (queueTask.queueOccupantTaskID) queueText += " · 等待 " + queueTask.queueOccupantTaskID;
+      if (queueTask.queueRequestedAt) queueText += " · " + new Date(queueTask.queueRequestedAt).toLocaleString();
+      model.queueText.textContent = queueText;
+    }
+    var readOnly = page.permissionMode === "read-only";
+    model.readOnly.className = "segmented-btn" + (readOnly ? " is-active" : "");
+    model.write.className = "segmented-btn" + (readOnly ? "" : " is-active");
+
+    var tasks = S.safeArray(page.tasks), choices = [{ id: "", title: "选择 Agent 会话 (" + tasks.length + ")" }];
+    groupTasks(tasks).forEach(function (group) {
+      choices.push({ group: group.label + " 会话", options: group.tasks.map(function (task) {
+        return { id: task.taskID, title: task.title + " (" + task.status + ")" };
+      }) });
+    });
+    var taskSignature = JSON.stringify(choices);
+    if (model.taskSelect.__choiceSignature !== taskSignature) {
+      model.taskSelect.__choiceSignature = taskSignature;
+      S.clear(model.taskSelect);
+      choices.forEach(function (choice) {
+        if (choice.group) {
+          var group = S.node("optgroup"); group.label = choice.group;
+          choice.options.forEach(function (optionValue) {
+            var option = S.node("option", null, optionValue.title);
+            option.value = optionValue.id; group.appendChild(option);
+          });
+          model.taskSelect.appendChild(group);
+          return;
+        }
+        var option = S.node("option", null, choice.title);
+        option.value = choice.id; model.taskSelect.appendChild(option);
+      });
+    }
+    model.taskSelect.value = page.selectedTaskID || "";
+    var currentTask = tasks.find(function (task) {
+      return task.taskID === page.selectedTaskID || task.selected;
+    });
+    model.taskTitle.textContent = currentTask
+      ? "[" + currentTask.provider + "] " + currentTask.title
+      : "选择 Agent 会话 (" + tasks.length + ")";
+    var canInterrupt = !!(page.selectedTask && page.selectedTask.canInterrupt === true);
+    var pendingInterrupt = canInterrupt && model.interrupt.__pendingTaskID === page.selectedTask.taskID;
+    if (!canInterrupt || !page.selectedTask || page.selectedTask.taskID !== model.interrupt.__pendingTaskID) {
+      model.interrupt.__pendingTaskID = null;
+    }
+    model.interrupt.hidden = !canInterrupt;
+    model.interrupt.disabled = !canInterrupt || pendingInterrupt;
+    model.interrupt.textContent = pendingInterrupt ? "中断请求中…" : "中断";
+    model.interrupt.setAttribute("aria-busy", String(pendingInterrupt));
+  }
+
+  function renderInspectorHeader(page, emit) {
+    var header = document.getElementById("workbench-inspector-header");
+    var model = header.__inspectorHeader || createInspectorHeader(header);
+    updateInspectorHeader(model, page, emit);
   }
 
   function groupTasks(tasks) {
@@ -176,7 +277,7 @@
     var header = JSON.stringify([
       page.browser && page.browser.enabled, page.browser && page.browser.canToggle,
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode,
-      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canInterrupt,
+      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canInterrupt, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
       S.safeArray(page.tasks).map(function (t) {
         return [t.taskID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
       })

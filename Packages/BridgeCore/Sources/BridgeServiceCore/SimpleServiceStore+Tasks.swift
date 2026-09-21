@@ -25,11 +25,18 @@ extension SimpleServiceStore {
           return try Self.reusedResult(existing: Self.decodeTask(row), requested: task)
         }
         if task.permissionMode == .workspaceWrite, task.state.status.holdsWriteSlot,
+          !task.isQueued,
           try Self.activeWriteTaskRow(projectID: task.projectID, in: db) != nil
         {
           throw ServiceStoreError.activeWriteTaskExists(task.projectID)
         }
         try insertTask(task, in: db)
+        if task.isQueued {
+          try db.execute(
+            sql: "INSERT INTO bridge_service_task_queue (task_id, enqueued_at) VALUES (?, ?)",
+            arguments: [task.id.rawValue, task.createdAt.timeIntervalSince1970]
+          )
+        }
         try Self.insert(event, taskID: task.id, in: db)
         return ServiceTaskCreationResult(task: task, reusedExistingTask: false)
       }
@@ -103,7 +110,7 @@ extension SimpleServiceStore {
           throw ServiceStoreError.unknownTask(id)
         }
         let existing = try Self.decodeTask(row)
-        guard existing.state.status == .awaitingLocalApproval else {
+        guard existing.state.status == .awaitingLocalApproval, !existing.isQueued else {
           throw ServiceStoreError.invalidTaskTransition(
             from: existing.state.status,
             to: .starting

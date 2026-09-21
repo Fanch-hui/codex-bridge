@@ -66,7 +66,8 @@ extension BridgeServiceAppModel {
   public func resumeTask(
     _ task: MCPServiceTaskSnapshot,
     prompt: String? = nil,
-    requestID: String? = nil
+    requestID: String? = nil,
+    queueIfBusy: Bool = false
   ) {
     let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
       for: task, providers: agentProviders, installations: agentInstallations
@@ -97,11 +98,13 @@ extension BridgeServiceAppModel {
       successMessage: "已续接任务",
       requestID: requestID,
       command: BridgeDesktopCommand.resumeTask.rawValue,
-      receiptInput: prompt ?? ""
+      receiptInput: prompt ?? "", queueIfBusy: queueIfBusy
     )
   }
 
-  public func restartTask(_ task: MCPServiceTaskSnapshot, requestID: String? = nil) {
+  public func restartTask(
+    _ task: MCPServiceTaskSnapshot, requestID: String? = nil, queueIfBusy: Bool = false
+  ) {
     guard let prompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
       !prompt.isEmpty
     else {
@@ -121,7 +124,7 @@ extension BridgeServiceAppModel {
       successMessage: "已重新开始任务",
       requestID: requestID,
       command: BridgeDesktopCommand.restartTask.rawValue,
-      receiptInput: nil
+      receiptInput: nil, queueIfBusy: queueIfBusy
     )
   }
 
@@ -132,7 +135,8 @@ extension BridgeServiceAppModel {
     successMessage: String,
     requestID: String?,
     command: String,
-    receiptInput: String?
+    receiptInput: String?,
+    queueIfBusy: Bool
   ) {
     let request = IPCAgentSubmitRequest(
       projectID: task.projectID,
@@ -145,7 +149,8 @@ extension BridgeServiceAppModel {
       threadID: threadID,
       networkAccess: task.networkAccess,
       modelOverride: TaskRetrySubmission.modelOverride(for: task),
-      permissionModeOverride: task.permissionMode != nil
+      permissionModeOverride: task.permissionMode != nil,
+      clientRequestID: requestID, queueIfBusy: queueIfBusy
     )
     runWorkbenchMutation(
       requestID: requestID,

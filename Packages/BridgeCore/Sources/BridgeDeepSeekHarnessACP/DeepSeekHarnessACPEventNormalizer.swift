@@ -9,6 +9,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
     var kind: String?
     var status: AgentToolStatus = .pending
     var rawInput: ACPJSONValue?
+    var childRuns: [AgentChildRun] = []
   }
 
   private let taskID: TaskID
@@ -210,7 +211,15 @@ public actor DeepSeekHarnessACPEventNormalizer {
     var state = tools[update.toolCallID] ?? ToolState()
     if let title = update.title, !title.isEmpty { state.title = title }
     if let kind = update.kind { state.kind = kind }
-    if let rawInput = update.rawInput { state.rawInput = rawInput }
+    if let rawInput = update.rawInput {
+      state.rawInput = rawInput
+      state.childRuns = Self.childRuns(
+        from: rawInput,
+        title: state.title,
+        kind: state.kind,
+        status: update.status
+      )
+    }
     state.status = update.status
     let payload = try AgentToolUpdate(
       key: "tool:\(update.toolCallID)",
@@ -219,7 +228,8 @@ public actor DeepSeekHarnessACPEventNormalizer {
       kind: state.kind,
       status: state.status,
       arguments: state.rawInput?.encodedString(),
-      locations: Self.absoluteLocations(from: state.rawInput, projectRoot: projectRoot)
+      locations: Self.absoluteLocations(from: state.rawInput, projectRoot: projectRoot),
+      childRuns: state.childRuns
     )
     tools[update.toolCallID] = state
     return try envelope(.tool(payload))
@@ -250,6 +260,41 @@ public actor DeepSeekHarnessACPEventNormalizer {
       !containsSensitiveMarker(value.lowercased())
     else { return nil }
     return value
+  }
+
+  private static func childRuns(
+    from input: ACPJSONValue,
+    title: String?,
+    kind: String?,
+    status: AgentToolStatus
+  ) -> [AgentChildRun] {
+    let words = [title, kind].compactMap { $0?.lowercased() }.joined(separator: " ")
+    guard words.contains("subagent") || words.contains("delegate") || words.contains("fork"),
+      let object = input.objectValue
+    else { return [] }
+    let id = [
+      "childSessionId", "child_session_id", "sessionId", "session_id", "conversationId",
+      "conversation_id", "agentId", "agent_id",
+    ]
+    .compactMap { object[$0]?.stringValue }
+    .first
+    .flatMap(safeText)
+    guard let id else { return [] }
+    let name =
+      ["name", "role", "agent"].compactMap { object[$0]?.stringValue }
+      .first.flatMap(safeText) ?? title.flatMap(safeText)
+    let summary = ["summary", "result", "description"].compactMap { object[$0]?.stringValue }
+      .first.flatMap(safeText)
+    guard
+      let child = try? AgentChildRun(
+        id: id,
+        sessionID: object["sessionId"]?.stringValue ?? object["session_id"]?.stringValue,
+        name: name,
+        status: status.rawValue,
+        summary: summary
+      )
+    else { return [] }
+    return [child]
   }
 
   private static func safeCommand(_ value: String?) -> String? {

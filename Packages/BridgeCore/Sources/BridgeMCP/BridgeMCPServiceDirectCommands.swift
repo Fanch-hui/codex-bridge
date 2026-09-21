@@ -137,6 +137,11 @@ public struct MCPDirectCommandOutput: Codable, Equatable, Sendable {
   public let tail: String
   public let byteCount: Int
   public let truncated: Bool
+  public let output: String?
+  public let currentOffset: Int?
+  public let nextCursor: String?
+  public let eof: Bool?
+  public let outputTruncated: Bool?
   public let executionEnvironment: MCPExecutionEnvironment?
 
   public init(
@@ -151,6 +156,11 @@ public struct MCPDirectCommandOutput: Codable, Equatable, Sendable {
     tail: String,
     byteCount: Int,
     truncated: Bool,
+    output: String? = nil,
+    currentOffset: Int? = nil,
+    nextCursor: String? = nil,
+    eof: Bool? = nil,
+    outputTruncated: Bool? = nil,
     executionEnvironment: MCPExecutionEnvironment? = nil
   ) {
     self.sessionID = sessionID
@@ -164,6 +174,11 @@ public struct MCPDirectCommandOutput: Codable, Equatable, Sendable {
     self.tail = tail
     self.byteCount = byteCount
     self.truncated = truncated
+    self.output = output
+    self.currentOffset = currentOffset
+    self.nextCursor = nextCursor
+    self.eof = eof
+    self.outputTruncated = outputTruncated
     self.executionEnvironment = executionEnvironment
   }
 
@@ -180,6 +195,11 @@ public struct MCPDirectCommandOutput: Codable, Equatable, Sendable {
       tail: tail,
       byteCount: byteCount,
       truncated: truncated,
+      output: output,
+      currentOffset: currentOffset,
+      nextCursor: nextCursor,
+      eof: eof,
+      outputTruncated: outputTruncated,
       executionEnvironment: executionEnvironment
     )
   }
@@ -196,6 +216,11 @@ public struct MCPDirectCommandOutput: Codable, Equatable, Sendable {
     case tail
     case byteCount = "byte_count"
     case truncated
+    case output
+    case currentOffset = "current_offset"
+    case nextCursor = "next_cursor"
+    case eof
+    case outputTruncated = "output_truncated"
     case executionEnvironment = "execution_environment"
   }
 }

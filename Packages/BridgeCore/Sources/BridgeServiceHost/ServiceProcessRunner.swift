@@ -111,6 +111,8 @@ public enum ServiceProcessRunner {
       }
       defer { withExtendedLifetime(instanceLock) {} }
     #endif
+    let dataLock = try ServiceDataRootLock(rootURL: options.dataRootURL)
+    defer { withExtendedLifetime(dataLock) {} }
     let composition = try await ServiceComposition.make(
       configuration: ServiceCompositionConfiguration(
         appVersion: appVersion,
@@ -131,6 +133,8 @@ public enum ServiceProcessRunner {
       active.resume()
       listener = active
     }
+
+    await composition.startAgentInstallationRefresh()
 
     do {
       let endpoint = try await composition.startLocalMCP()

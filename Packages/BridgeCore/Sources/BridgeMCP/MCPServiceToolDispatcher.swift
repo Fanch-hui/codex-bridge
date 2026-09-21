@@ -67,10 +67,18 @@ public struct MCPServiceToolDispatcher: Sendable {
     _ parameters: CallTool.Parameters,
     sessionID: String = "direct"
   ) async throws -> CallTool.Result {
-    guard let contract = MCPServiceToolCatalog.contract(named: parameters.name),
-      contract.isExposed(in: exposureMode)
-    else {
+    guard let contract = MCPServiceToolCatalog.contract(named: parameters.name) else {
       throw MCPError.invalidParams("Unknown tool name.")
+    }
+    guard contract.isExposed(in: exposureMode) else {
+      return try resultEncoder.encode(
+        MCPToolErrorOutput(
+          error: .init(
+            code: "client_permission_read_only", category: .policyDenied,
+            message: "The local user has restricted this client to read-only tools.",
+            retryable: false, nextAction: "request_full_access_from_local_user"
+          )), isError: true
+      )
     }
     let key = sessionID.isEmpty ? "direct" : sessionID
     guard await admission.acquire(sessionID: key) else {

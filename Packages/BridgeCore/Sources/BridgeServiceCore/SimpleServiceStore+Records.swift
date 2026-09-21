@@ -17,10 +17,11 @@ extension SimpleServiceStore {
           execution_effort, supervisor_model, supervisor_effort, permission_mode,
           network_allowed, access_mode, fast_mode, current_step, changed_files_json,
           result_summary, supervisor_summary, failure_code, created_at, updated_at,
-          provider_id, installation_id, selection_mode, provider_session_id, provider_run_id
+          provider_id, installation_id, selection_mode, provider_session_id, provider_run_id,
+          queue_if_busy, queue_state
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?
         )
         """,
       arguments: Self.taskArguments(task, changedFiles: changedFiles)
@@ -38,7 +39,7 @@ extension SimpleServiceStore {
         SET codex_thread_id = ?, codex_turn_id = ?, status = ?, supervisor_status = ?,
             current_step = ?, changed_files_json = ?, result_summary = ?,
             supervisor_summary = ?, failure_code = ?, updated_at = ?,
-            provider_session_id = ?, provider_run_id = ?
+            provider_session_id = ?, provider_run_id = ?, queue_state = ?
         WHERE task_id = ?
         """,
       arguments: [
@@ -54,10 +55,17 @@ extension SimpleServiceStore {
         task.updatedAt.timeIntervalSince1970,
         task.state.providerSessionID,
         task.state.providerRunID,
+        task.isQueued && !task.state.status.isTerminal ? "queued" : "active",
         task.id.rawValue,
       ]
     )
     guard db.changesCount == 1 else { throw ServiceStoreError.storageFailure }
+    if task.state.status.isTerminal {
+      try db.execute(
+        sql: "DELETE FROM bridge_service_task_queue WHERE task_id = ?",
+        arguments: [task.id.rawValue]
+      )
+    }
   }
 
   func existingIdempotentTask(for task: ServiceTaskRecord) throws -> ServiceTaskRecord? {
@@ -247,6 +255,8 @@ extension SimpleServiceStore {
       task.selectionMode.rawValue,
       task.state.providerSessionID,
       task.state.providerRunID,
+      task.queueIfBusy ? 1 : 0,
+      task.isQueued ? "queued" : "active",
     ]
   }
 
@@ -315,6 +325,7 @@ extension SimpleServiceStore {
         SELECT * FROM bridge_service_tasks
         WHERE project_id = ?
           AND permission_mode = 'workspace-write'
+          AND queue_state = 'active'
           AND status IN (
             'awaiting_local_approval', 'starting', 'running',
             'waiting_for_codex_approval', 'unknown'
@@ -389,6 +400,14 @@ extension SimpleServiceStore {
     guard fastModeValue == 0 || fastModeValue == 1 else {
       throw ServiceStoreError.corruptRecord
     }
+    let queueIfBusyValue: Int = row["queue_if_busy"]
+    guard queueIfBusyValue == 0 || queueIfBusyValue == 1 else {
+      throw ServiceStoreError.corruptRecord
+    }
+    let queueState: String = row["queue_state"]
+    guard queueState == "active" || queueState == "queued" else {
+      throw ServiceStoreError.corruptRecord
+    }
     let changedData: Data = row["changed_files_json"]
     let changedFiles: [String]
     do {
@@ -432,6 +451,8 @@ extension SimpleServiceStore {
       networkAllowed: networkAllowedValue == 1,
       accessMode: accessMode,
       fastMode: fastModeValue == 1,
+      queueIfBusy: queueIfBusyValue == 1,
+      isQueued: queueState == "queued",
       state: state,
       createdAt: Date(timeIntervalSince1970: row["created_at"]),
       updatedAt: Date(timeIntervalSince1970: row["updated_at"])

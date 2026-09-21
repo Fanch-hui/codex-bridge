@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeIPC
 
 extension TaskConversationModel {
@@ -20,6 +21,17 @@ extension TaskConversationModel {
     public var isFinal: Bool
 
     public var id: String { key }
+
+    public var displayToolArguments: String? {
+      guard let envelope = AgentToolArgumentsEnvelope.decode(toolArguments) else {
+        return toolArguments
+      }
+      return envelope.arguments
+    }
+
+    public var childRuns: [AgentChildRun] {
+      AgentToolArgumentsEnvelope.decode(toolArguments)?.childRuns ?? []
+    }
 
     public init(
       _ message: IPCTaskConversationMessage,

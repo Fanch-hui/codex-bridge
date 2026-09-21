@@ -254,6 +254,7 @@ extension BridgeServiceRequestController {
       permissionModeOverride: payload.permissionModeOverride,
       acceptanceCriteria: payload.acceptanceCriteria ?? [],
       clientRequestID: payload.clientRequestID,
+      queueIfBusy: payload.queueIfBusy ?? false,
       deadline: deadline
     )
     return try BridgeServiceIPCCodec.success(

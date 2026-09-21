@@ -3,6 +3,7 @@
 
   var S = global.CodexBridgeDesktopPageSupport;
   var drafts = new Map(), pendingSubmissions = new Map(), currentKey = null;
+  var persistedDrafts, draftStorageKey = "codexbridge.workbench.drafts.v1";
   var submissionSequence = 0;
   var controls = null, status = null;
 
@@ -40,6 +41,11 @@
       if (renderControlsStable) renderControlsStable(controls, key, updateControls);
       else updateControls();
     }
+    if (global.CodexBridgeDesktopWorkbenchHandoff) {
+      global.CodexBridgeDesktopWorkbenchHandoff.render(
+        detail, emit, page && page.commandReceipt
+      );
+    }
     var statusSignature = JSON.stringify([
       page && page.engineStatus,
       page && page.selectedTaskID
@@ -70,9 +76,11 @@
       var draft = draftFor(taskID);
       if (receipt.accepted === true && draft.input === pending.input) {
         draft.input = "";
+        persistDraft(taskID, draft);
         var form = controls && controls.__activeForm;
         if (form && form.__taskID === taskID && form.__inputControl) {
           form.__inputControl.value = "";
+          S.autoGrowTextArea(form.__inputControl);
         }
       }
       var activeForm = controls && controls.__activeForm;
@@ -94,19 +102,56 @@
   }
 
   function draftFor(taskID) {
-    if (!drafts.has(taskID)) drafts.set(taskID, { input: "", mode: "queued" });
+    if (!drafts.has(taskID)) {
+      var stored = readPersistedDrafts()[taskID];
+      drafts.set(taskID, {
+        input: stored && typeof stored.input === "string" ? stored.input : "",
+        mode: stored && typeof stored.mode === "string" ? stored.mode : "queued"
+      });
+    }
     return drafts.get(taskID);
+  }
+
+  function readPersistedDrafts() {
+    if (persistedDrafts) return persistedDrafts;
+    persistedDrafts = {};
+    try {
+      var raw = global.localStorage && global.localStorage.getItem(draftStorageKey);
+      var decoded = raw ? JSON.parse(raw) : {};
+      var now = Date.now();
+      Object.keys(decoded || {}).forEach(function (taskID) {
+        var item = decoded[taskID];
+        if (item && now - Number(item.updatedAt || 0) <= 7 * 24 * 60 * 60 * 1000) {
+          persistedDrafts[taskID] = item;
+        }
+      });
+    } catch (_) {}
+    return persistedDrafts;
+  }
+
+  function persistDraft(taskID, draft) {
+    var stored = readPersistedDrafts();
+    if (!draft.input && draft.mode === "queued") delete stored[taskID];
+    else stored[taskID] = { input: draft.input || "", mode: draft.mode || "queued", updatedAt: Date.now() };
+    try {
+      if (global.localStorage) global.localStorage.setItem(draftStorageKey, JSON.stringify(stored));
+    } catch (_) {}
   }
 
   function inputField(detail, label, placeholder) {
     var draft = draftFor(detail.taskID);
-    var field = S.textField(label, draft.input, placeholder, "full");
+    var field = S.textAreaField(label, draft.input, placeholder, "full");
     field.control.id = "workbench-task-input";
     field.control.setAttribute("aria-label", label);
     field.control.dataset.taskID = detail.taskID;
     field.wrapper.querySelector("label").htmlFor = field.control.id;
     field.wrapper.querySelector("label").hidden = label === "消息";
-    field.control.addEventListener("input", function () { draft.input = field.control.value; });
+    field.control.addEventListener("input", function () {
+      draft.input = field.control.value;
+      persistDraft(detail.taskID, draft);
+      S.autoGrowTextArea(field.control);
+    });
+    S.autoGrowTextArea(field.control);
     return field;
   }
 
@@ -117,7 +162,10 @@
     grid.appendChild(input.wrapper);
     var options = modes.length ? modes : [{ id: "queued", title: "当前轮结束后继续" }];
     if (!options.some(function (mode) { return mode.id === draft.mode && mode.enabled !== false; })) draft.mode = options[0].id;
-    var mode = S.selectField("发送方式", draft.mode, options, function (value) { draft.mode = value; }, "");
+    var mode = S.selectField("发送方式", draft.mode, options, function (value) {
+      draft.mode = value;
+      persistDraft(detail.taskID, draft);
+    }, "");
     mode.control.id = "workbench-steer-mode";
     mode.control.dataset.taskID = detail.taskID;
     mode.wrapper.querySelector("label").htmlFor = mode.control.id;
@@ -135,7 +183,11 @@
     function validate() {
       var value = input.control.value;
       var invalid = value.indexOf("\u0000") >= 0 || new TextEncoder().encode(value).length > 32768;
-      send.disabled = pendingSubmissions.has(detail.taskID) || !value.trim() || invalid;
+      var pending = pendingSubmissions.has(detail.taskID);
+      send.disabled = pending || !value.trim() || invalid;
+      send.textContent = "发送指令";
+      send.setAttribute("aria-busy", String(pending));
+      send.setAttribute("data-pending", String(pending));
       hint.textContent = invalid ? "指令不能包含 NUL 字符，且不能超过 32768 字节。" : "";
       hint.hidden = !invalid;
       input.control.setAttribute("aria-invalid", String(invalid));
@@ -156,7 +208,9 @@
     }
     input.control.addEventListener("input", validate);
     input.control.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); submit(); }
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault(); submit();
+      }
     });
     send.addEventListener("click", submit);
     form.appendChild(grid); form.appendChild(hint);
@@ -171,6 +225,13 @@
     var form = S.node("div", "retry-form"), draft = draftFor(detail.taskID);
     var actions = S.node("div", "form-actions");
     var resumeButton = null, restartButton = null;
+    var queueLabel = S.node("label", "checkbox-row");
+    var queueInput = S.node("input"); queueInput.type = "checkbox";
+    queueInput.checked = !!draft.queueIfBusy;
+    queueInput.addEventListener("change", function () { draft.queueIfBusy = queueInput.checked; });
+    queueLabel.appendChild(queueInput);
+    queueLabel.appendChild(S.node("span", null, "项目忙时排队"));
+    form.appendChild(queueLabel);
     if (detail.canResume) {
       var input = inputField(detail, "消息", "输入下一条指令，沿用当前会话上下文");
       form.appendChild(input.wrapper);
@@ -186,12 +247,14 @@
           input: value
         });
         validate();
-        emit("resumeTask", { taskID: detail.taskID, input: value || null }, requestID);
+        emit("resumeTask", { taskID: detail.taskID, input: value || null, ...(queueInput.checked ? { queueIfBusy: true } : {}) }, requestID);
       }
       resumeButton = S.button("发送", null, {}, emit, "small primary", false);
       resumeButton.addEventListener("click", resume);
       input.control.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); resume(); }
+        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+          event.preventDefault(); resume();
+        }
       });
       form.__taskID = detail.taskID;
       form.__inputControl = input.control;
@@ -211,14 +274,24 @@
           input: null
         });
         validate();
-        emit("restartTask", { taskID: detail.taskID }, requestID);
+        emit("restartTask", { taskID: detail.taskID, ...(queueInput.checked ? { queueIfBusy: true } : {}) }, requestID);
       });
       actions.appendChild(restartButton);
     }
     function validate() {
       var pending = pendingSubmissions.has(detail.taskID);
-      if (resumeButton) resumeButton.disabled = pending;
-      if (restartButton) restartButton.disabled = pending;
+      if (resumeButton) {
+        resumeButton.disabled = pending;
+        resumeButton.textContent = "发送";
+        resumeButton.setAttribute("aria-busy", String(pending));
+        resumeButton.setAttribute("data-pending", String(pending));
+      }
+      if (restartButton) {
+        restartButton.disabled = pending;
+        restartButton.textContent = "重新开始";
+        restartButton.setAttribute("aria-busy", String(pending));
+        restartButton.setAttribute("data-pending", String(pending));
+      }
     }
     form.appendChild(actions);
     form.__validate = validate;

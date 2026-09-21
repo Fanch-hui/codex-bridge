@@ -1,8 +1,8 @@
 # Windows 移植说明（WINDOWS_PORT.md）
 
 Codex Bridge 的核心逻辑（代理引擎、MCP 网关、服务编排、IPC 协议、存储）自
-win 分支起与 macOS 解耦，Windows 目标同时面向 x64 与 ARM64。x64 由 GitHub
-Actions 原生编译并运行冒烟测试；ARM64 在同一 x64 runner 上交叉编译和链接。
+win 分支起与 macOS 解耦，当前交付 Apple Silicon macOS 与 Windows x64。Windows
+由 GitHub Actions 原生编译并运行测试。
 本文记录平台层的边界、Windows 侧实现与已知限制。
 
 ## 架构
@@ -113,11 +113,10 @@ Credential Manager 凭据。本项目直接交付 EXE 安装包，不生成 MSI/
 新版本调用壳/服务优雅退出；更早的 Inno EXE 版本由 CloseApplications 关闭占用进程，
 并依据旧 `payload-manifest.json` 安全清除不再属于 Swift payload 的历史文件。
 
-GitHub Actions（`.github/workflows/windows.yml`）在 windows-latest 上构建 x64 与
-ARM64 两套服务/壳、portable ZIP 和 EXE 安装包。x64 门禁通过壳的无界面控制模式从带
+GitHub Actions（`.github/workflows/windows.yml`）在 windows-latest 上构建 x64
+服务、壳、portable ZIP 和 EXE 安装包。门禁通过壳的无界面控制模式从带
 空格的目录拉起服务，随后执行静默安装、运行中升级、陈旧 payload 清理、卸载及用户数据
-保留验证；ARM64 在 x64 runner 上完成交叉编译、payload/PE/hash 校验与安装器编译，
-真实安装运行仍需 ARM64 真机。CI 产出的 EXE 当前未做 Authenticode 签名，发布签名是
+保留验证。CI 产出的 EXE 当前未做 Authenticode 签名，发布签名是
 独立交付步骤。
 
 Windows 可通过 `CODEX_BRIDGE_CODEX_EXECUTABLE` 指定 `codex.exe` 或标准 npm
@@ -223,8 +222,8 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 ## 验证路径与 CI 现状
 
 - macOS：全量 `swift test`（所有套件 0 失败为门禁）+ Xcode Debug 构建。
-- Windows：`.github/workflows/windows.yml`（windows-latest）分别构建 x64 与
-  `aarch64-unknown-windows-msvc`；Windows 专属源码（`#if os(Windows)`）由 CI
+- Windows：`.github/workflows/windows.yml`（windows-latest）构建 x64；
+  Windows 专属源码（`#if os(Windows)`）由 CI
   以 release 配置编译；x64 还运行 Domain、AgentCore、Security、Codex RPC、跨平台
   AppCore，以及 Host/CodexService/Application/ServiceCore/DirectCommand 五组 Windows
   专属测试，并从 staged portable 目录在隔离 PATH 下启动服务，
@@ -233,8 +232,7 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
   拉起、服务优雅退出，
   以及 EXE 安装→启动→运行中升级→卸载全链；检查开始菜单、安装目录哈希、陈旧文件清理
   和用户数据保留。x64 runner 还创建真实 Win32 主窗口，验证六页导航、默认概览、服务拉起
-  与优雅退出；WebView2 Runtime 挂载和业务交互继续由 Windows 真机验收。ARM64 是交叉
-  编译/链接与安装器静态门禁，不能替代 ARM64 真机运行验收。
+  与优雅退出；WebView2 Runtime 挂载和业务交互由 Windows 真机验收。
 - Windows 的 `swift test --filter` 仍会编译 manifest 在该平台声明的其他 target；
   因此 SwiftUI 壳与 macOS 测试 fixture 只在 macOS 清单中声明，Windows 再由
   filter 选择已适配的冒烟套件。

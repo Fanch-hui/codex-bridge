@@ -101,6 +101,46 @@ struct ServiceReadProjectFileOutput: Codable, Sendable {
   }
 }
 
+struct ServiceListProjectDirectoryOutput: Codable, Sendable {
+  let schemaVersion = 1
+  let relativeDirectory: String?
+  let entries: [MCPProjectDirectoryEntry]
+  let nextCursor: String?
+
+  init(page: MCPProjectDirectoryPage) {
+    relativeDirectory = page.relativeDirectory
+    entries = page.entries
+    nextCursor = page.nextCursor
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case relativeDirectory = "relative_directory"
+    case entries
+    case nextCursor = "next_cursor"
+  }
+}
+
+struct ServiceBatchReadProjectFilesOutput: Codable, Sendable {
+  let schemaVersion = 1
+  let items: [MCPProjectFileBatchItem]
+  let truncated: Bool
+  let omittedCount: Int
+
+  init(page: MCPProjectFileBatchPage) {
+    items = page.items
+    truncated = page.truncated
+    omittedCount = page.omittedCount
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case items
+    case truncated
+    case omittedCount = "omitted_count"
+  }
+}
+
 struct ServiceGetTaskOutput: Codable, Sendable {
   let schemaVersion = 1
   let task: MCPServiceTaskSnapshot
@@ -223,6 +263,7 @@ struct ServiceProjectCommandsOutput: Codable, Sendable {
 struct ServiceDirectMutationOutput: Codable, Sendable {
   let schemaVersion = 1
   let receiptType = "file_mutation"
+  let operationID: String?
   let relativePath: String
   let operation: String
   let oldSHA256: String?
@@ -231,6 +272,7 @@ struct ServiceDirectMutationOutput: Codable, Sendable {
   let boundedDiff: MCPBoundedDiff
 
   init(receipt: MCPDirectWriteReceipt) {
+    operationID = receipt.operationID
     relativePath = receipt.relativePath
     operation = receipt.operation
     oldSHA256 = receipt.oldSHA256
@@ -242,6 +284,7 @@ struct ServiceDirectMutationOutput: Codable, Sendable {
   private enum CodingKeys: String, CodingKey {
     case schemaVersion = "schema_version"
     case receiptType = "receipt_type"
+    case operationID = "operation_id"
     case relativePath = "relative_path"
     case operation
     case oldSHA256 = "old_sha256"
@@ -254,15 +297,18 @@ struct ServiceDirectMutationOutput: Codable, Sendable {
 struct ServiceDirectPatchOutput: Codable, Sendable {
   let schemaVersion = 1
   let receiptType = "file_mutation"
+  let operationID: String?
   let operations: [MCPDirectWriteReceipt]
 
   init(receipt: MCPDirectPatchReceipt) {
+    operationID = receipt.operationID
     operations = receipt.operations
   }
 
   private enum CodingKeys: String, CodingKey {
     case schemaVersion = "schema_version"
     case receiptType = "receipt_type"
+    case operationID = "operation_id"
     case operations
   }
 }
@@ -355,6 +401,11 @@ struct ServiceDirectCommandOutput: Codable, Sendable {
   let tail: String
   let byteCount: Int
   let truncated: Bool
+  let output: String?
+  let currentOffset: Int?
+  let nextCursor: String?
+  let eof: Bool?
+  let outputTruncated: Bool?
   let executionEnvironment: MCPExecutionEnvironment?
 
   init(output: MCPDirectCommandOutput) {
@@ -369,6 +420,11 @@ struct ServiceDirectCommandOutput: Codable, Sendable {
     tail = output.tail
     byteCount = output.byteCount
     truncated = output.truncated
+    self.output = output.output
+    currentOffset = output.currentOffset
+    nextCursor = output.nextCursor
+    eof = output.eof
+    outputTruncated = output.outputTruncated
     executionEnvironment = output.executionEnvironment
   }
 
@@ -386,7 +442,26 @@ struct ServiceDirectCommandOutput: Codable, Sendable {
     case tail
     case byteCount = "byte_count"
     case truncated
+    case output
+    case currentOffset = "current_offset"
+    case nextCursor = "next_cursor"
+    case eof
+    case outputTruncated = "output_truncated"
     case executionEnvironment = "execution_environment"
+  }
+}
+
+struct ServiceListDirectCommandsOutput: Codable, Sendable {
+  let schemaVersion = 1
+  let commands: [MCPDirectCommandSummary]
+
+  init(page: MCPDirectCommandPage) {
+    commands = page.commands
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case commands
   }
 }
 

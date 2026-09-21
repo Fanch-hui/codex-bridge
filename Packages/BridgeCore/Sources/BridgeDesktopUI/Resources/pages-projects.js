@@ -46,26 +46,31 @@
   }
 
   function renderList(page) {
-    S.clear(shell.list);
-    var header = S.node("div", "list-panel-header"), copy = S.node("div");
-    copy.appendChild(S.node("h3", null, "已注册项目"));
-    copy.appendChild(S.node("p", null, "共 " + S.safeArray(page.rows).length + " 个目录"));
-    header.appendChild(copy); shell.list.appendChild(header);
-    var body = S.node("div", "list-body");
-    S.safeArray(page.rows).forEach(function (project) {
-      var row = S.node("button", "project-row" + (project.selected ? " selected" : ""));
-      row.type = "button"; row.appendChild(S.icon("folder.fill", "service-icon"));
-      var text = S.node("div", "row-main");
-      text.appendChild(S.node("div", "row-title", project.name));
-      text.appendChild(S.node("div", "row-detail", project.detail || project.projectID));
-      row.appendChild(text);
-      var gitState = S.gitStateBadge(project.gitState);
-      if (gitState) row.appendChild(S.badge(gitState.label, gitState.tone));
-      row.addEventListener("click", function () { context.emit("selectProject", { projectID: project.projectID }); });
-      body.appendChild(row);
-    });
-    if (!S.safeArray(page.rows).length) body.appendChild(S.node("div", "list-empty", "尚未注册项目。"));
-    shell.list.appendChild(body);
+    var signature = JSON.stringify(S.safeArray(page.rows));
+    var render = function () {
+      S.clear(shell.list);
+      var header = S.node("div", "list-panel-header"), copy = S.node("div");
+      copy.appendChild(S.node("h3", null, "已注册项目"));
+      copy.appendChild(S.node("p", null, "共 " + S.safeArray(page.rows).length + " 个目录"));
+      header.appendChild(copy); shell.list.appendChild(header);
+      var body = S.node("div", "list-body");
+      S.safeArray(page.rows).forEach(function (project) {
+        var row = S.node("button", "project-row" + (project.selected ? " selected" : ""));
+        row.type = "button"; row.appendChild(S.icon("folder.fill", "service-icon"));
+        var text = S.node("div", "row-main");
+        text.appendChild(S.node("div", "row-title", project.name));
+        text.appendChild(S.node("div", "row-detail", project.detail || project.projectID));
+        row.appendChild(text);
+        var gitState = S.gitStateBadge(project.gitState);
+        if (gitState) row.appendChild(S.badge(gitState.label, gitState.tone));
+        row.addEventListener("click", function () { context.emit("selectProject", { projectID: project.projectID }); });
+        body.appendChild(row);
+      });
+      if (!S.safeArray(page.rows).length) body.appendChild(S.node("div", "list-empty", "尚未注册项目。"));
+      shell.list.appendChild(body);
+    };
+    var stable = global.CodexBridgeDesktopStableRender;
+    if (stable) stable(shell.list, signature, render); else render();
   }
 
   function createDetail(projectID) {
@@ -100,8 +105,13 @@
           skills: page.skills
         });
         if (nextCollectionsSignature !== collectionsSignature) {
-          S.clear(collections);
-          global.CodexBridgeDesktopProjectCollections.render(collections, page, emit);
+          var renderCollections = function () {
+            S.clear(collections);
+            global.CodexBridgeDesktopProjectCollections.render(collections, page, emit);
+          };
+          var stable = global.CodexBridgeDesktopStableRender;
+          if (stable) stable(collections, nextCollectionsSignature, renderCollections);
+          else renderCollections();
           collectionsSignature = nextCollectionsSignature;
         }
       }

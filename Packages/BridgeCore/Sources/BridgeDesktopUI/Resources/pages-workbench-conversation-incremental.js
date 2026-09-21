@@ -161,7 +161,8 @@
       && previous.toolStatus === entry.toolStatus && previous.toolArguments === entry.toolArguments
       && previous.displayTitle === entry.displayTitle && previous.displayStatus === entry.displayStatus
       && previous.symbol === entry.symbol && previous.isFinal === entry.isFinal
-      && previous.status === entry.status && previous.markdownHTML === entry.markdownHTML;
+      && previous.status === entry.status && previous.markdownHTML === entry.markdownHTML
+      && JSON.stringify(previous.childRuns || []) === JSON.stringify(entry.childRuns || []);
   }
 
   global.CodexBridgeDesktopWorkbenchConversationIncremental = {

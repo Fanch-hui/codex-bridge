@@ -26,10 +26,11 @@
       feedback: BridgeDesktopFeedback? = nil,
       appUpdate: BridgeDesktopAppUpdateState? = nil
     ) -> BridgeDesktopUIState {
+      let startedAt = ContinuousClock.now
       let modelRefreshInProgress = settings?.isRefreshingModels == true
       let canRefreshModels = settings?.busy != true
       let agentReconnectSummary = agentReconnectSummary(from: management)
-      return BridgeDesktopUIState(
+      let state = BridgeDesktopUIState(
         hostContext: BridgeDesktopHostContext(platform: .windows),
         navigation: pageCache.navigation(
           key: WindowsDesktopNavigationCacheKey(
@@ -130,6 +131,14 @@
         },
         appUpdate: appUpdate
       )
+      ConversationPerformanceRecorder.shared.record(
+        ConversationPerformanceSample(
+          stage: .desktopStateBuild,
+          duration: startedAt.duration(to: ContinuousClock.now),
+          entryCount: workbench.selectedTaskDetail?.conversation.count ?? 0
+        )
+      )
+      return state
     }
 
     private static func overview(

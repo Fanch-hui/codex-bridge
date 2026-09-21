@@ -28,8 +28,13 @@ extension ServiceExecutionCoordinator {
         )
 
       case .approvalRequested(let approval):
-        guard approval.isBlocking else { return }
+        guard approval.isBlocking else {
+          tasks.changes.publish()
+          return
+        }
         _ = try await tasks.markWaitingForCodexApproval(taskID: taskID)
+        presentedCodexApprovals[taskID, default: []].insert(approval.id)
+        tasks.changes.publish()
 
       case .agentMessageDelta(let delta):
         await conversation.appendDelta(taskID: taskID, itemID: delta.itemID, delta: delta.delta)
@@ -53,6 +58,7 @@ extension ServiceExecutionCoordinator {
         await conversation.finalize(taskID: taskID, messages: messages)
 
       case .completed(let resultSummary):
+        presentedCodexApprovals.removeValue(forKey: taskID)
         try await closeConversation(taskID: taskID)
         let current = try await requiredTask(taskID)
         _ = try await tasks.complete(
@@ -62,6 +68,7 @@ extension ServiceExecutionCoordinator {
         )
 
       case .interrupted:
+        presentedCodexApprovals.removeValue(forKey: taskID)
         try await closeConversation(taskID: taskID)
         _ = try await tasks.interrupt(
           taskID: taskID,
@@ -69,6 +76,7 @@ extension ServiceExecutionCoordinator {
         )
 
       case .failed(let code, let summary):
+        presentedCodexApprovals.removeValue(forKey: taskID)
         await conversation.appendAgentMessage(taskID: taskID, content: summary)
         try await closeConversation(taskID: taskID)
         _ = try await tasks.fail(

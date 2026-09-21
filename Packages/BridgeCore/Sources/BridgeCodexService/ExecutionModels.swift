@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeCodexRPC
 import BridgeDomain
 import BridgeServiceCore
@@ -381,12 +382,18 @@ public struct ExecutionToolCall: Codable, Equatable, Sendable {
   public let tool: String
   public let arguments: String?
   public let status: ExecutionToolCallStatus
+  public let childRuns: [AgentChildRun]
+
+  private enum CodingKeys: String, CodingKey {
+    case itemID, tool, arguments, status, childRuns
+  }
 
   public init(
     itemID: String,
     tool: String,
     arguments: String?,
-    status: ExecutionToolCallStatus
+    status: ExecutionToolCallStatus,
+    childRuns: [AgentChildRun] = []
   ) throws {
     try ExecutionValidation.identifier(itemID, field: "toolCall.itemID", maximumBytes: 256)
     try ExecutionValidation.text(tool, field: "toolCall.tool", maximumBytes: 256)
@@ -395,10 +402,27 @@ public struct ExecutionToolCall: Codable, Equatable, Sendable {
       field: "toolCall.arguments",
       maximumBytes: 64 * 1_024
     )
+    guard childRuns.count <= 32,
+      Set(childRuns.map(\.id)).count == childRuns.count
+    else {
+      throw ExecutionServiceError.invalidRequest("toolCall.childRuns")
+    }
     self.itemID = itemID
     self.tool = tool
     self.arguments = arguments
     self.status = status
+    self.childRuns = childRuns
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    try self.init(
+      itemID: values.decode(String.self, forKey: .itemID),
+      tool: values.decode(String.self, forKey: .tool),
+      arguments: values.decodeIfPresent(String.self, forKey: .arguments),
+      status: values.decode(ExecutionToolCallStatus.self, forKey: .status),
+      childRuns: values.decodeIfPresent([AgentChildRun].self, forKey: .childRuns) ?? []
+    )
   }
 }
 

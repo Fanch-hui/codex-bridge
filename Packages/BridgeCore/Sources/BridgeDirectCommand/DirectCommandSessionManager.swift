@@ -21,6 +21,7 @@ public struct DirectCommandSession: Sendable {
   public let output: DirectCommandOutputBuffer
   public let processID: Int32?
   public let executionEnvironment: DirectCommandExecutionEnvironment
+  public let endedAt: Date?
 
   public init(
     sessionID: String,
@@ -39,7 +40,8 @@ public struct DirectCommandSession: Sendable {
       nestedSandbox: "unknown",
       loopback: "unknown",
       childNetworkPolicy: "unknown"
-    )
+    ),
+    endedAt: Date? = nil
   ) {
     self.sessionID = sessionID
     self.projectID = projectID
@@ -52,6 +54,7 @@ public struct DirectCommandSession: Sendable {
     self.output = output
     self.processID = processID
     self.executionEnvironment = executionEnvironment
+    self.endedAt = endedAt
   }
 }
 
@@ -73,7 +76,9 @@ public actor DirectCommandSessionManager {
   private let completedSessionTTL: TimeInterval
   private let maximumCompletedSessions: Int
   private let executionEnvironment: DirectExecutionEnvironmentCapabilities
+  private let historyFileURL: URL?
   private var sessions: [String: DirectCommandSession] = [:]
+  private var outputCollectors: [String: DirectCommandOutputCollector] = [:]
   private var completedSessionAccess: [String: Date] = [:]
   private var activeProjectSession: [String: String] = [:]
   private var taskHandles: [String: Task<Void, Never>] = [:]
@@ -87,7 +92,8 @@ public actor DirectCommandSessionManager {
     logger: Logger = Logger(label: "com.codexbridge.direct.command"),
     completedSessionTTL: Duration = .seconds(600),
     maximumCompletedSessions: Int = 128,
-    executionEnvironment: DirectExecutionEnvironmentCapabilities = .current()
+    executionEnvironment: DirectExecutionEnvironmentCapabilities = .current(),
+    historyFileURL: URL? = nil
   ) {
     self.runner = runner
     self.orphanPIDFileURL = orphanPIDFileURL
@@ -95,6 +101,19 @@ public actor DirectCommandSessionManager {
     self.completedSessionTTL = max(0, Self.timeInterval(completedSessionTTL))
     self.maximumCompletedSessions = max(1, maximumCompletedSessions)
     self.executionEnvironment = executionEnvironment
+    self.historyFileURL = historyFileURL
+    let restored = DirectCommandSessionHistory.load(
+      from: historyFileURL,
+      maximumCount: self.maximumCompletedSessions
+    )
+    self.sessions = Dictionary(
+      restored.map { ($0.sessionID, $0) },
+      uniquingKeysWith: { _, newest in newest }
+    )
+    self.completedSessionAccess = Dictionary(
+      restored.map { ($0.sessionID, Date()) },
+      uniquingKeysWith: { _, newest in newest }
+    )
     self.trackedPIDs = Self.loadTrackedPIDs(orphanPIDFileURL)
     Self.reapOrphans(trackedPIDs: trackedPIDs, logger: logger)
     Self.clearTrackedPIDs(orphanPIDFileURL)
@@ -105,18 +124,50 @@ public actor DirectCommandSessionManager {
     if let session = sessions[sessionID], session.status != "running" {
       completedSessionAccess[sessionID] = Date()
     }
-    return sessions[sessionID]
+    guard let session = sessions[sessionID] else { return nil }
+    return liveSnapshot(session)
   }
 
   public func activeSession(projectID: ProjectID) -> DirectCommandSession? {
     pruneCompletedSessions()
     guard let sessionID = activeProjectSession[projectID.rawValue] else { return nil }
-    return sessions[sessionID]
+    guard let session = sessions[sessionID] else { return nil }
+    return liveSnapshot(session)
   }
 
   public func allSessions() -> [DirectCommandSession] {
     pruneCompletedSessions()
-    return sessions.values.sorted { $0.startedAt > $1.startedAt }
+    return sessions.values.map { liveSnapshot($0) }.sorted { $0.startedAt > $1.startedAt }
+  }
+
+  public func recentSessions(
+    projectID: ProjectID?,
+    limit: Int
+  ) -> [DirectCommandSession] {
+    pruneCompletedSessions()
+    guard limit > 0 else { return [] }
+    return sessions.values
+      .filter { projectID == nil || $0.projectID == projectID }
+      .sorted { $0.startedAt > $1.startedAt }
+      .prefix(limit)
+      .map { liveSnapshot($0) }
+  }
+
+  public func output(
+    sessionID: String,
+    from cursor: Int?
+  ) -> (session: DirectCommandSession, delta: DirectCommandOutputDelta)? {
+    guard let session = sessions[sessionID] else { return nil }
+    let live = liveSnapshot(session)
+    let delta =
+      outputCollectors[sessionID]?.delta(from: cursor, final: live.status != "running")
+      ?? DirectCommandOutputDelta(
+        text: "",
+        currentOffset: max(0, cursor ?? live.output.byteCount),
+        nextOffset: max(0, live.output.byteCount),
+        truncated: live.output.truncated
+      )
+    return (live, delta)
   }
 
   public func isBusy(projectID: ProjectID) -> Bool {
@@ -157,6 +208,7 @@ public actor DirectCommandSessionManager {
     let startedAt = Date()
     activeProjectSession[projectID.rawValue] = sessionID
     processes[sessionID] = process
+    outputCollectors[sessionID] = output
     trackPID(sessionID: sessionID, pid: process.pid)
     let initial = DirectCommandSession(
       sessionID: sessionID,
@@ -231,13 +283,15 @@ public actor DirectCommandSessionManager {
       output: result.output,
       processID: nil,
       executionEnvironment: sessions[sessionID]?.executionEnvironment
-        ?? executionEnvironment.commandEnvironment(denyNetwork: false)
+        ?? executionEnvironment.commandEnvironment(denyNetwork: false),
+      endedAt: Date()
     )
     untrackPID(sessionID: sessionID)
     processes[sessionID] = nil
     activeProjectSession[projectID.rawValue] = nil
     taskHandles[sessionID] = nil
     completedSessionAccess[sessionID] = Date()
+    persistHistory()
     pruneCompletedSessions()
     if let onExit {
       await onExit()
@@ -295,6 +349,7 @@ public actor DirectCommandSessionManager {
     activeProjectSession = [:]
     taskHandles.removeAll()
     processes.removeAll()
+    outputCollectors.removeAll()
     sessions.removeAll()
     completedSessionAccess.removeAll()
   }
@@ -372,27 +427,61 @@ public actor DirectCommandSessionManager {
   }
 
   private func pruneCompletedSessions(now: Date = Date()) {
+    var changed = false
     let expired = completedSessionAccess.compactMap { sessionID, lastAccess in
       now.timeIntervalSince(lastAccess) >= completedSessionTTL ? sessionID : nil
     }
     for sessionID in expired {
       completedSessionAccess[sessionID] = nil
       sessions[sessionID] = nil
+      outputCollectors[sessionID] = nil
+      changed = true
     }
 
     let completed = completedSessionAccess.keys.sorted {
       (completedSessionAccess[$0] ?? .distantPast)
         < (completedSessionAccess[$1] ?? .distantPast)
     }
-    guard completed.count > maximumCompletedSessions else { return }
-    for sessionID in completed.prefix(completed.count - maximumCompletedSessions) {
-      completedSessionAccess[sessionID] = nil
-      sessions[sessionID] = nil
+    if completed.count > maximumCompletedSessions {
+      for sessionID in completed.prefix(completed.count - maximumCompletedSessions) {
+        completedSessionAccess[sessionID] = nil
+        sessions[sessionID] = nil
+        outputCollectors[sessionID] = nil
+        changed = true
+      }
     }
+    if changed { persistHistory() }
+  }
+
+  private func persistHistory() {
+    DirectCommandSessionHistory.save(
+      sessions.values,
+      to: historyFileURL,
+      maximumCount: maximumCompletedSessions
+    )
   }
 
   private static func timeInterval(_ duration: Duration) -> TimeInterval {
     let parts = duration.components
     return TimeInterval(parts.seconds) + TimeInterval(parts.attoseconds) / 1e18
+  }
+
+  private func liveSnapshot(_ session: DirectCommandSession) -> DirectCommandSession {
+    guard session.status == "running", let collector = outputCollectors[session.sessionID] else {
+      return session
+    }
+    return DirectCommandSession(
+      sessionID: session.sessionID,
+      projectID: session.projectID,
+      argv: session.argv,
+      workingDirectory: session.workingDirectory,
+      startedAt: session.startedAt,
+      status: session.status,
+      exitCode: session.exitCode,
+      timedOut: session.timedOut,
+      output: collector.snapshot(),
+      processID: session.processID,
+      executionEnvironment: session.executionEnvironment
+    )
   }
 }

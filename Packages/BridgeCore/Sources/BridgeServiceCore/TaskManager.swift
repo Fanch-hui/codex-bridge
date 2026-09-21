@@ -2,12 +2,13 @@ import BridgeDomain
 import Foundation
 
 public actor ServiceTaskManager {
-  private let store: SimpleServiceStore
+  let store: SimpleServiceStore
   private let makeTaskID: @Sendable () -> TaskID
   private let now: @Sendable () -> Date
+  public nonisolated let changes: ServiceStateChangeHub
   // Store awaits reenter this actor; serialize read-modify-write cycles per task.
   private var activeMutationTaskIDs: Set<TaskID> = []
-  private var mutationWaiters: [TaskID: [CheckedContinuation<Void, Never>]] = [:]
+  private var mutationWaiters: [TaskID: [MutationWaiter]] = [:]
 
   public init(
     store: SimpleServiceStore,
@@ -19,11 +20,13 @@ public actor ServiceTaskManager {
     self.store = store
     self.makeTaskID = makeTaskID
     self.now = now
+    self.changes = ServiceStateChangeHub()
   }
 
   public func submit(
     _ request: ServiceTaskRequest,
-    taskID requestedTaskID: TaskID? = nil
+    taskID requestedTaskID: TaskID? = nil,
+    queued: Bool = false
   ) async throws -> ServiceTaskCreationResult {
     let date = now()
     let state = try ServiceTaskState(status: .awaitingLocalApproval)
@@ -46,11 +49,13 @@ public actor ServiceTaskManager {
       networkAllowed: request.networkAllowed,
       accessMode: request.accessMode,
       fastMode: request.fastMode,
+      queueIfBusy: request.queueIfBusy,
+      isQueued: queued,
       state: state,
       createdAt: date,
       updatedAt: date
     )
-    return try await store.createTask(
+    let result = try await store.createTask(
       task,
       event: ServiceTaskEventDraft(
         kind: .taskCreated,
@@ -58,6 +63,8 @@ public actor ServiceTaskManager {
         createdAt: date
       )
     )
+    changes.publish()
+    return result
   }
 
   @discardableResult
@@ -80,8 +87,9 @@ public actor ServiceTaskManager {
     authorization: ServiceTaskExecutionAuthorization? = nil
   ) async throws -> ServiceTaskRecord {
     if let authorization {
-      await beginMutation(taskID: taskID)
+      try await beginMutation(taskID: taskID)
       defer { endMutation(taskID: taskID) }
+      try Task.checkCancellation()
       let date = now()
       return try await store.approveTask(
         id: taskID,
@@ -410,6 +418,32 @@ public actor ServiceTaskManager {
     try await store.activeWriteTask(projectID: projectID)
   }
 
+  public func queuedTasks(projectID: ProjectID? = nil, limit: Int = 500) async throws
+    -> [ServiceTaskRecord]
+  {
+    try await store.queuedTasks(projectID: projectID, limit: limit)
+  }
+
+  public func queueInfo(taskID: TaskID) async throws -> ServiceTaskQueueInfo? {
+    try await store.taskQueueInfo(id: taskID)
+  }
+
+  @discardableResult
+  public func promoteQueued(taskID: TaskID) async throws -> ServiceTaskRecord? {
+    let date = now()
+    let promoted = try await store.promoteQueuedTask(
+      id: taskID,
+      at: date,
+      event: ServiceTaskEventDraft(
+        kind: .executionStarting,
+        summary: "The queued task was admitted after the project became available.",
+        createdAt: date
+      )
+    )
+    if promoted != nil { changes.publish() }
+    return promoted
+  }
+
   private func mutate(
     taskID: TaskID,
     patch: StatePatch,
@@ -417,8 +451,9 @@ public actor ServiceTaskManager {
     summary: String,
     expectedStatus: ServiceTaskStatus? = nil
   ) async throws -> ServiceTaskRecord {
-    await beginMutation(taskID: taskID)
+    try await beginMutation(taskID: taskID)
     defer { endMutation(taskID: taskID) }
+    try Task.checkCancellation()
     let current = try await requiredTask(id: taskID)
     let date = now()
     let state = try Self.apply(patch, to: current)
@@ -435,24 +470,49 @@ public actor ServiceTaskManager {
     return updated
   }
 
-  private func beginMutation(taskID: TaskID) async {
+  private func beginMutation(taskID: TaskID) async throws {
     guard activeMutationTaskIDs.contains(taskID) else {
       activeMutationTaskIDs.insert(taskID)
       return
     }
-    await withCheckedContinuation { continuation in
-      mutationWaiters[taskID, default: []].append(continuation)
-    }
+    let waiterID = UUID()
+    try await withTaskCancellationHandler(
+      operation: {
+        try await withCheckedThrowingContinuation {
+          (continuation: CheckedContinuation<Void, Error>) in
+          guard !Task.isCancelled else {
+            continuation.resume(throwing: CancellationError())
+            return
+          }
+          mutationWaiters[taskID, default: []].append(
+            MutationWaiter(id: waiterID, continuation: continuation)
+          )
+        }
+      },
+      onCancel: { [weak self] in
+        Task { await self?.cancelMutationWaiter(taskID: taskID, id: waiterID) }
+      })
+  }
+
+  private func cancelMutationWaiter(taskID: TaskID, id: UUID) {
+    guard var waiters = mutationWaiters[taskID],
+      let index = waiters.firstIndex(where: { $0.id == id })
+    else { return }
+    let waiter = waiters.remove(at: index)
+    mutationWaiters[taskID] = waiters.isEmpty ? nil : waiters
+    waiter.continuation.resume(throwing: CancellationError())
   }
 
   private func endMutation(taskID: TaskID) {
     guard var waiters = mutationWaiters[taskID], !waiters.isEmpty else {
       activeMutationTaskIDs.remove(taskID)
+      changes.publish()
       return
     }
     let next = waiters.removeFirst()
     mutationWaiters[taskID] = waiters.isEmpty ? nil : waiters
-    next.resume()
+    next.continuation.resume()
+    changes.publish()
   }
 
   private func requiredTask(id: TaskID) async throws -> ServiceTaskRecord {
@@ -486,6 +546,11 @@ public actor ServiceTaskManager {
       supervisorSummary: patch.supervisorSummary.applying(to: current.supervisorSummary),
       failureCode: patch.failureCode.applying(to: current.failureCode)
     )
+  }
+
+  private struct MutationWaiter {
+    let id: UUID
+    let continuation: CheckedContinuation<Void, Error>
   }
 }
 

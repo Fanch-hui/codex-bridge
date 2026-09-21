@@ -380,6 +380,8 @@ extension BridgeServiceAppModel {
   }
 
   func closeClient() async {
+    stateChangesTask?.cancel()
+    stateChangesTask = nil
     let current = client
     client = nil
     await current?.close()

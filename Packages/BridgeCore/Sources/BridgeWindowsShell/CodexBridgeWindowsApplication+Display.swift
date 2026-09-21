@@ -3,7 +3,8 @@
   import Foundation
   import WinSDK
 
-  private struct WindowsDesktopRenderSnapshot: Equatable, Sendable {
+  private struct WindowsDesktopRenderSnapshot: Sendable {
+    let revision: UInt64
     let state: BridgeDesktopUIState
     let chatSlotEnabled: Bool
     let runningTaskCount: Int
@@ -15,7 +16,7 @@
   }
 
   @MainActor
-  private var lastWindowsDesktopRenderSnapshot: WindowsDesktopRenderSnapshot? = nil
+  private var windowsDesktopRenderRevision: UInt64 = 0
 
   private struct WindowsDesktopRenderInputs: Equatable {
     let revisions: [UInt64]
@@ -68,6 +69,7 @@
       )
       guard inputs != lastWindowsDesktopRenderInputs else { return }
       lastWindowsDesktopRenderInputs = inputs
+      windowsDesktopRenderRevision &+= 1
       let auxiliarySnapshot = auxiliary.desktopDisplaySnapshot()
       let display = model.displayBox.current()
       let managementDisplay = management.displayBox.current()
@@ -93,6 +95,7 @@
         appUpdate: appUpdateState,
       )
       let snapshot = WindowsDesktopRenderSnapshot(
+        revision: windowsDesktopRenderRevision,
         state: state,
         chatSlotEnabled: chatSlotEnabled,
         runningTaskCount: display.runningTaskCount,
@@ -102,8 +105,6 @@
         desktopReady: desktopUI.isReady,
         desktopLoadStalled: desktopUI.loadStalled
       )
-      guard snapshot != lastWindowsDesktopRenderSnapshot else { return }
-      lastWindowsDesktopRenderSnapshot = snapshot
       WindowsUIThread.shared.enqueue {
         applyOnUI(
           snapshot: snapshot,
@@ -117,7 +118,7 @@
       desktopUI: WindowsDesktopUIWebView
     ) {
       WindowsMainWindow.setChatSlotEnabled(snapshot.chatSlotEnabled)
-      desktopUI.setState(snapshot.state)
+      desktopUI.setState(snapshot.state, revision: snapshot.revision)
       WindowsMainWindowChrome.updateStatus(
         connectionLabel: snapshot.state.connectionLabel,
         runningTasks: snapshot.runningTaskCount,

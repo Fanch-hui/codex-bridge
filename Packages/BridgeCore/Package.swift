@@ -258,7 +258,6 @@ var windowsApplicationLinkerFlags = [
       path: "Tests/BridgeSecurityTests",
       exclude: [
         "KeychainSecretStoreTests.swift",
-        "PathSecurityTests.swift",
         "SecureFileArtifactSnapshotTests.swift",
       ]
     ),
@@ -287,7 +286,13 @@ var windowsApplicationLinkerFlags = [
     ),
     .testTarget(
       name: "BridgeServiceApplicationWindowsTests",
-      dependencies: ["BridgeIPC", "BridgeServiceApplication"],
+      dependencies: [
+        "BridgeDomain",
+        "BridgeIPC",
+        "BridgeProjects",
+        "BridgeServiceApplication",
+        "BridgeServiceCore",
+      ],
       path: "Tests/BridgeServiceApplicationWindowsTests"
     ),
     .testTarget(
@@ -318,8 +323,13 @@ var windowsApplicationLinkerFlags = [
         "ServiceAgentRegistryUpdateTests.swift",
         "ServiceAgentRegistryRecoveryTests.swift",
         "ServiceTaskCompletionSummaryTests.swift",
+        "ServiceTaskConcurrencyTests.swift",
+        "ServiceTaskQueueTests.swift",
+        "ServiceTaskPageTests.swift",
+        "SimpleServiceStoreTests.swift",
         "TestSupport.swift",
         "ServiceStoreSchemaV15MigrationTests.swift",
+        "ServiceStoreV14Fixture.swift",
         "SkillActionInterpreterWindowsTests.swift",
         "ServiceReviewRegressionTests.swift",
       ]
@@ -608,11 +618,13 @@ let package = Package(
         "BridgeServiceApplication",
         "BridgeServiceCore",
         "BridgeTunnel",
+        .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
     .target(
       name: "BridgeServiceAppCore",
       dependencies: [
+        "BridgeAgentCore",
         "BridgeIPC",
         "BridgeMCP",
         .product(name: "Crypto", package: "swift-crypto"),

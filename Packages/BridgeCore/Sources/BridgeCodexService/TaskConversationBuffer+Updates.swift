@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import BridgeServiceCore
 import Foundation
@@ -83,13 +84,19 @@ extension TaskConversationBuffer {
     let existing = state.index[key].flatMap { index in
       state.entries.indices.contains(index) ? state.entries[index] : nil
     }
-    let arguments = call.arguments ?? existing?.toolArguments
+    let incomingArguments = call.arguments ?? existing?.toolArguments
+    let previousEnvelope = AgentToolArgumentsEnvelope.decode(incomingArguments)
+    let displayArguments = previousEnvelope == nil ? incomingArguments : previousEnvelope?.arguments
+    let arguments = AgentToolArgumentsEnvelope.encode(
+      arguments: displayArguments,
+      childRuns: call.childRuns.isEmpty ? previousEnvelope?.childRuns ?? [] : call.childRuns
+    )
     let content: String
     if let output, !output.isEmpty {
-      let input = Self.toolCallContent(arguments, toolName: call.tool)
+      let input = Self.toolCallContent(displayArguments, toolName: call.tool)
       content = input + "\n" + output
     } else {
-      content = existing?.content ?? Self.toolCallContent(arguments, toolName: call.tool)
+      content = existing?.content ?? Self.toolCallContent(displayArguments, toolName: call.tool)
     }
     let entry = Entry(
       key: key,

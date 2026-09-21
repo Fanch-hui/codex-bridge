@@ -56,8 +56,15 @@ extension ServiceAgentRegistry {
     var refreshed: [ServiceAgentInstallationRecord] = []
     refreshed.reserveCapacity(records.count)
     for record in records {
-      let updated = try await refreshedRecord(record)
-      refreshed.append(updated)
+      do {
+        refreshed.append(try await refreshedRecord(record))
+      } catch is CancellationError {
+        throw CancellationError()
+      } catch {
+        // A single installation can disappear or fail while its siblings remain
+        // usable. Keep its last snapshot for this refresh and retry later.
+        refreshed.append(record)
+      }
     }
     return refreshed
   }

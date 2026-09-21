@@ -25,6 +25,11 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let turnCount: Int
   public let canResume: Bool
   public let canRestart: Bool
+  public let queuePosition: Int?
+  public let queueOccupantTaskID: String?
+  public let queueRequestedAt: String?
+  public let handoffPrompt: String?
+  public let handoffProviders: [BridgeDesktopChoice]?
   public let updatedAt: String
 
   public init(
@@ -52,6 +57,11 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     turnCount: Int = 1,
     canResume: Bool = false,
     canRestart: Bool = false,
+    queuePosition: Int? = nil,
+    queueOccupantTaskID: String? = nil,
+    queueRequestedAt: String? = nil,
+    handoffPrompt: String? = nil,
+    handoffProviders: [BridgeDesktopChoice]? = nil,
     updatedAt: String
   ) {
     self.taskID = taskID
@@ -78,6 +88,11 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.turnCount = max(1, turnCount)
     self.canResume = canResume
     self.canRestart = canRestart
+    self.queuePosition = queuePosition
+    self.queueOccupantTaskID = queueOccupantTaskID
+    self.queueRequestedAt = queueRequestedAt
+    self.handoffPrompt = handoffPrompt
+    self.handoffProviders = handoffProviders
     self.updatedAt = updatedAt
   }
 }

@@ -367,7 +367,7 @@ final class SimpleServiceStoreTests: XCTestCase {
     XCTAssertEqual(events.map(\.kind), [.taskCreated])
   }
 
-  func testRestartMarksInFlightTaskUnknownAndPreservesWriteGate() async throws {
+  func testRestartInterruptsInFlightTaskAndReleasesWriteGate() async throws {
     let fixture = try ServiceCoreFixture()
     defer { fixture.remove() }
     let store = try SimpleServiceStore(path: fixture.databasePath)
@@ -389,49 +389,18 @@ final class SimpleServiceStoreTests: XCTestCase {
 
     let recovered = try await store.markIncompleteTasksUnknown(at: recoveryDate)
 
-    XCTAssertEqual(recovered.map(\.state.status), [.unknown])
+    XCTAssertEqual(recovered.map(\.state.status), [.interrupted])
     XCTAssertEqual(recovered.first?.state.supervisorStatus, .degraded)
     let recoveryEvents = try await store.events(taskID: running.id)
     XCTAssertEqual(
       recoveryEvents.map(\.kind),
-      [.taskCreated, .taskMarkedUnknown]
-    )
-    let blocked = try makeServiceTask(
-      id: "tsk-blocked-by-unknown",
-      projectID: project.id,
-      date: recoveryDate.addingTimeInterval(1)
-    )
-    do {
-      _ = try await store.createTask(blocked, event: creationEvent(at: blocked.createdAt))
-      XCTFail("Expected the unknown write task to retain the project write slot")
-    } catch {
-      XCTAssertEqual(error as? ServiceStoreError, .activeWriteTaskExists(project.id))
-    }
-
-    let recoveredValue = try await store.task(id: running.id)
-    let recoveredTask = try XCTUnwrap(recoveredValue)
-    let interruptedDate = recoveryDate.addingTimeInterval(2)
-    let interruptedState = try ServiceTaskState(
-      status: .interrupted,
-      supervisorStatus: .degraded
-    )
-    let interrupted = try recoveredTask.replacingState(
-      interruptedState,
-      updatedAt: interruptedDate
-    )
-    try await store.updateTask(
-      interrupted,
-      event: ServiceTaskEventDraft(
-        kind: .taskInterrupted,
-        summary: "The local user resolved the unknown task as interrupted.",
-        createdAt: interruptedDate
-      )
+      [.taskCreated, .taskInterrupted]
     )
 
     let replacement = try makeServiceTask(
       id: "tsk-after-interruption",
       projectID: project.id,
-      date: interruptedDate.addingTimeInterval(1)
+      date: recoveryDate.addingTimeInterval(1)
     )
     let replacementResult = try await store.createTask(
       replacement,
@@ -440,7 +409,7 @@ final class SimpleServiceStoreTests: XCTestCase {
     XCTAssertEqual(replacementResult.task.id, replacement.id)
   }
 
-  func testRestartPreservesAgentBindingWhenMarkingRunUnknown() async throws {
+  func testRestartPreservesAgentBindingWhenInterruptingRun() async throws {
     let fixture = try ServiceCoreFixture()
     defer { fixture.remove() }
     let store = try SimpleServiceStore(path: fixture.databasePath)
@@ -466,7 +435,7 @@ final class SimpleServiceStoreTests: XCTestCase {
       at: running.updatedAt.addingTimeInterval(10)
     )
 
-    XCTAssertEqual(recovered.first?.state.status, .unknown)
+    XCTAssertEqual(recovered.first?.state.status, .interrupted)
     XCTAssertEqual(recovered.first?.state.providerSessionID, "session-opencode")
     XCTAssertEqual(recovered.first?.state.providerRunID, "run-opencode")
     let events = try await store.events(taskID: running.id)

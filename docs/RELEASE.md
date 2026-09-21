@@ -19,8 +19,8 @@ python3 Scripts/generate-update-manifest.py \
   --asset windows x64 portable /absolute/release/codex-bridge-windows-x64.zip
 ```
 
-Intel macOS 的 architecture 为 `x64`；Windows ARM64 为 `arm64`。每个清单条目包含
-固定版本的 GitHub 下载地址、完整文件大小与 SHA-256，客户端仅选择精确匹配的条目。
+当前发布架构为 macOS `arm64` 与 Windows `x64`。每个清单条目包含固定版本的
+GitHub 下载地址、完整文件大小与 SHA-256，客户端仅选择精确匹配的条目。
 安装包、App 运行版本与 Release tag 必须一致。
 
 在 GitHub 草稿 Release 中上传全部安装包与最终清单，再发布为稳定版。已有 Release
@@ -30,7 +30,7 @@ Intel macOS 的 architecture 为 `x64`；Windows ARM64 为 `arm64`。每个清�
 本地验证覆盖版本和安装包校验、更新等待门禁、程序替换及编译；发布验收使用旧版本
 带项目、会话和浏览器 profile 升级，手动确认重启后的版本与原数据。
 
-v0.4.0 的公开包按开源预览方案发布：`arm64` 与 `x86_64` 分别打包，不配置 Apple Developer ID、不公证，也不上传签名凭据。下载者首次打开 App 时需要手动确认 Gatekeeper 提示。本文同时保留未来配置证书后的签名流程，避免把两种发布边界混在一起。
+macOS 公开包使用 ad-hoc 签名。下载者首次打开 App 时需要手动确认 Gatekeeper 提示。配置 Developer ID 后可使用下方的证书签名流程。
 
 ## 1. Prepare and verify the pinned helper
 
@@ -45,25 +45,19 @@ Scripts/verify-tunnel-helper.sh "$helper_root/tunnel" "$helper_sha"
 
 Do not derive the trusted digest from the helper manifest inside an untrusted input directory. The separate value is part of the supply-chain boundary.
 
-## 2. Build unsigned architecture-specific release candidates
+## 2. Build Apple Silicon release candidates
 
-The output path must not exist. By default this command creates separate `arm64` and `x86_64` ZIP/DMG packages. Pass one architecture as the fourth argument for a local single-architecture build. Each package contains only the selected App, Service and helper slice. The command also generates an SPDX 2.3 dependency SBOM and SHA-256 files.
+The output path must not exist. This command creates ad-hoc-signed `arm64` ZIP/DMG packages containing the App, Service and helper slice. It also generates an SPDX 2.3 dependency SBOM and SHA-256 files.
 
 ```bash
 Scripts/build-release-candidate.sh \
-  /absolute/output/CodexBridge-0.4.0-candidate \
-  "$helper_root/tunnel" \
-  "$helper_sha"
-
-# Apple Silicon local build only:
-Scripts/build-release-candidate.sh \
-  /absolute/output/CodexBridge-0.4.0-arm64-candidate \
+  /absolute/output/CodexBridge-candidate \
   "$helper_root/tunnel" \
   "$helper_sha" \
   arm64
 ```
 
-The generated files use the product version in their names and include a `RELEASE-CANDIDATE.txt` warning. v0.4.0 上传 Release 时只上传两个架构的 DMG/ZIP、SBOM 和 `SHA256SUMS`；警告文件不作为下载资产上传。
+The generated filenames use the product version. Release assets include the DMG, ZIP, SBOM and `SHA256SUMS`.
 
 OpenCode、DeepSeek Harness 与 Antigravity 是用户安装或构建的外部运行时。App 包含对应适配器、共用的一键连接 UI 和 DSH `cordis.yml` 模板。DSH 一键配置将用户输入的 API key 保存到系统凭据存储，运行时经环境注入；高级手动 Profile 的 `.env` 由 Harness 自行加载。
 

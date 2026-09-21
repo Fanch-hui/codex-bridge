@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import Foundation
 import GRDB
@@ -16,7 +17,6 @@ public struct ServiceConfigurationImportBatch: Sendable {
       throw ServiceStoreError.invalidArgument("configurationImport.marker")
     }
     guard Set(projects.map(\.id)).count == projects.count,
-      Set(projects.map(\.root)).count == projects.count,
       Set(settings.map(\.key)).count == settings.count
     else {
       throw ServiceStoreError.invalidArgument("configurationImport.duplicates")
@@ -31,6 +31,7 @@ public struct ServiceConfigurationImportResult: Equatable, Sendable {
   public let alreadyApplied: Bool
   public let insertedProjectIDs: [ProjectID]
   public let existingProjectIDs: [ProjectID]
+  public let skippedProjectIDs: [ProjectID]
   public let insertedSettingKeys: [String]
   public let existingSettingKeys: [String]
 
@@ -38,12 +39,14 @@ public struct ServiceConfigurationImportResult: Equatable, Sendable {
     alreadyApplied: Bool,
     insertedProjectIDs: [ProjectID] = [],
     existingProjectIDs: [ProjectID] = [],
+    skippedProjectIDs: [ProjectID] = [],
     insertedSettingKeys: [String] = [],
     existingSettingKeys: [String] = []
   ) {
     self.alreadyApplied = alreadyApplied
     self.insertedProjectIDs = insertedProjectIDs
     self.existingProjectIDs = existingProjectIDs
+    self.skippedProjectIDs = skippedProjectIDs
     self.insertedSettingKeys = insertedSettingKeys
     self.existingSettingKeys = existingSettingKeys
   }
@@ -60,7 +63,16 @@ extension SimpleServiceStore {
         }
         var result = ServiceConfigurationImportAccumulator()
         for project in batch.projects {
-          try Self.importProject(project, result: &result, in: db)
+          do {
+            try Self.importProject(project, result: &result, in: db)
+          } catch let error as ServiceStoreError {
+            switch error {
+            case .duplicateProject, .duplicateProjectRoot:
+              result.skippedProjectIDs.append(project.id)
+            default:
+              throw error
+            }
+          }
         }
         for setting in batch.settings {
           try Self.importSetting(setting, result: &result, in: db)
@@ -95,13 +107,13 @@ extension SimpleServiceStore {
   ) throws {
     if let row = try projectRow(id: project.id, in: db) {
       let existing = try decodeProject(row)
-      guard existing.root == project.root else {
+      guard pathsMatch(existing.root.canonicalPath, project.root.canonicalPath) else {
         throw ServiceStoreError.duplicateProject(project.id)
       }
       result.existingProjectIDs.append(project.id)
       return
     }
-    if try projectRow(root: project.root, in: db) != nil {
+    if try hasEquivalentProjectRoot(project.root.canonicalPath, in: db) {
       throw ServiceStoreError.duplicateProjectRoot(project.root.canonicalPath)
     }
     try insert(project, in: db)
@@ -129,6 +141,22 @@ extension SimpleServiceStore {
     )
   }
 
+  private static func hasEquivalentProjectRoot(
+    _ canonicalPath: String,
+    in db: Database
+  ) throws -> Bool {
+    let paths = try String.fetchAll(
+      db,
+      sql: "SELECT canonical_path FROM bridge_service_projects"
+    )
+    return paths.contains { pathsMatch($0, canonicalPath) }
+  }
+
+  private static func pathsMatch(_ lhs: String, _ rhs: String) -> Bool {
+    AgentPathSemantics.relativePath(lhs, from: rhs) == ""
+      && AgentPathSemantics.relativePath(rhs, from: lhs) == ""
+  }
+
   private static func insertSetting(
     _ setting: ServiceSettingRecord,
     in db: Database
@@ -150,6 +178,7 @@ extension SimpleServiceStore {
 private struct ServiceConfigurationImportAccumulator {
   var insertedProjectIDs: [ProjectID] = []
   var existingProjectIDs: [ProjectID] = []
+  var skippedProjectIDs: [ProjectID] = []
   var insertedSettingKeys: [String] = []
   var existingSettingKeys: [String] = []
 
@@ -158,6 +187,7 @@ private struct ServiceConfigurationImportAccumulator {
       alreadyApplied: false,
       insertedProjectIDs: insertedProjectIDs,
       existingProjectIDs: existingProjectIDs,
+      skippedProjectIDs: skippedProjectIDs,
       insertedSettingKeys: insertedSettingKeys,
       existingSettingKeys: existingSettingKeys
     )

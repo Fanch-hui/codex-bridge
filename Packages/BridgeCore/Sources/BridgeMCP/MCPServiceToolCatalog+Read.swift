@@ -160,6 +160,102 @@ extension MCPServiceToolCatalog {
     )
   )
 
+  static let listProjectDirectory = Tool(
+    name: MCPServiceToolName.listProjectDirectory.rawValue,
+    title: "List project directory",
+    description:
+      "List bounded files and directories inside one approved project. Results are sorted and "
+      + "paged by cursor; symbolic links and forbidden paths are omitted.",
+    inputSchema: objectSchema(
+      properties: [
+        "project_id": opaqueProjectIDSchema,
+        "relative_directory": nullableStringSchema(maximum: 1_024),
+        "depth": integerSchema(minimum: 0, maximum: 64),
+        "kind": ["type": "string", "enum": ["all", "files", "directories"]],
+        "cursor": nullableStringSchema(maximum: 128),
+        "limit": integerSchema(minimum: 1, maximum: 100),
+      ],
+      required: ["project_id"]
+    ),
+    annotations: readAnnotations,
+    outputSchema: outputSchema(
+      properties: [
+        "relative_directory": nullableStringSchema(maximum: 1_024),
+        "entries": arraySchema(
+          objectSchema(
+            properties: [
+              "relative_path": stringSchema,
+              "kind": ["type": "string", "enum": ["file", "directory"]],
+              "byte_count": integerSchema(minimum: 0),
+            ],
+            required: ["relative_path", "kind"]
+          )
+        ),
+        "next_cursor": stringSchema,
+      ],
+      required: ["entries"]
+    )
+  )
+
+  static let batchReadProjectFiles = Tool(
+    name: MCPServiceToolName.batchReadProjectFiles.rawValue,
+    title: "Batch read project files",
+    description:
+      "Read several explicitly named files from one approved project in one bounded request. "
+      + "Each item includes its own content, revision, truncation state, or error.",
+    inputSchema: objectSchema(
+      properties: [
+        "project_id": opaqueProjectIDSchema,
+        "files": arraySchema(
+          objectSchema(
+            properties: [
+              "relative_path": boundedStringSchema(maximum: 1_024),
+              "start_line": integerSchema(minimum: 1),
+              "line_count": integerSchema(minimum: 1, maximum: 10_000),
+            ],
+            required: ["relative_path"]
+          )
+        ),
+      ],
+      required: ["project_id", "files"]
+    ),
+    annotations: readAnnotations,
+    outputSchema: outputSchema(
+      properties: [
+        "items": arraySchema(
+          objectSchema(
+            properties: [
+              "relative_path": stringSchema,
+              "result": objectSchema(
+                properties: [
+                  "relative_path": stringSchema,
+                  "start_line": integerSchema(minimum: 1),
+                  "end_line": integerSchema(minimum: 1),
+                  "content": stringSchema,
+                  "redacted_line_count": integerSchema(minimum: 0),
+                  "truncated": boolSchema,
+                  "next_start_line": integerSchema(minimum: 1),
+                  "sha256": stringSchema,
+                  "byte_count": integerSchema(minimum: 0),
+                  "file_revision": stringSchema,
+                ],
+                required: [
+                  "relative_path", "start_line", "content", "redacted_line_count", "truncated",
+                  "sha256", "byte_count", "file_revision",
+                ]
+              ),
+              "error": stringSchema,
+            ],
+            required: ["relative_path"]
+          )
+        ),
+        "truncated": boolSchema,
+        "omitted_count": integerSchema(minimum: 0),
+      ],
+      required: ["items", "truncated", "omitted_count"]
+    )
+  )
+
   static let listThreads = Tool(
     name: MCPServiceToolName.listThreads.rawValue,
     title: "List Codex threads",

@@ -1,9 +1,25 @@
+import BridgeProcess
 import Foundation
 import XCTest
 
 @testable import BridgeAntigravityCLI
 
 final class AntigravityCLIProcessTransportTests: XCTestCase {
+  func testLineDecoderPreservesUTF8WhenCodePointsCrossReads() throws {
+    var decoder = BoundedLineDecoder(maximumFrameBytes: 1_024)
+    let input = Data((#"{"text":"中文命令 /tmp/项目"}"# + "\n").utf8)
+    var frames: [Data] = []
+    for byte in input {
+      frames.append(contentsOf: try decoder.append(Data([byte])))
+    }
+
+    XCTAssertEqual(frames.count, 1)
+    XCTAssertEqual(
+      String(data: try XCTUnwrap(frames.first), encoding: .utf8),
+      #"{"text":"中文命令 /tmp/项目"}"#
+    )
+  }
+
   func testManagedProcessRoundTripsOneStreamJSONFrame() async throws {
     let transport = try AntigravityCLIProcessTransport.launch(
       configuration: AntigravityCLIProcessConfiguration(

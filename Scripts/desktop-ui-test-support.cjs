@@ -9,6 +9,7 @@ function createHarness(scripts, rootIDs = []) {
       this.tagName = tag; this.children = []; this.dataset = {}; this.listeners = {};
       this._value = ""; this.checked = false; this.disabled = false;
       this.selectionStart = 0; this.selectionEnd = 0; this.className = "";
+      this.style = {};
       this.classList = { toggle: () => {}, add: () => {}, remove: () => {} };
     }
     get firstChild() { return this.children[0]; }
@@ -38,6 +39,7 @@ function createHarness(scripts, rootIDs = []) {
     addEventListener(name, callback) { (this.listeners[name] ||= []).push(callback); }
     dispatch(name, event = {}) { for (const callback of this.listeners[name] || []) callback(event); }
     setAttribute(key, value) { this[key] = value; }
+    removeAttribute(key) { delete this[key]; }
     getAttribute(key) { return this[key]; }
     contains(child) { return this === child || this.children.some(node => node.contains(child)); }
     querySelector(selector) { return find(this, node => matches(node, selector)); }
@@ -57,11 +59,22 @@ function createHarness(scripts, rootIDs = []) {
     return (predicate(root) ? [root] : []).concat(root.children.flatMap(child => findAll(child, predicate)));
   }
   const roots = rootIDs.map(id => { const element = new Element("div"); element.id = id; return element; });
+  document.documentElement = new Element("html");
+  document.addEventListener = () => {};
   document.createElement = tag => new Element(tag);
   document.createTextNode = text => { const node = new Element("#text"); node.textContent = text; return node; };
   document.getElementById = id => roots.map(root => find(root, node => node.id === id)).find(Boolean) || null;
-  const window = { confirm: () => true };
-  const context = vm.createContext({ window, document, TextEncoder, URL });
+  document.querySelector = selector => roots.map(root => find(root, node => matches(node, selector))).find(Boolean) || null;
+  document.querySelectorAll = selector => roots.flatMap(root => findAll(root, node => matches(node, selector)));
+  const windowListeners = {};
+  const window = {
+    confirm: () => true,
+    addEventListener: (name, callback) => { (windowListeners[name] ||= []).push(callback); },
+    dispatchEvent: event => { (windowListeners[event.type] || []).forEach(callback => callback(event)); }
+  };
+  const CustomEvent = function (type, init) { this.type = type; this.detail = init && init.detail; };
+  window.CodexBridgeDesktopIcons = { "circle.dashed": "" };
+  const context = vm.createContext({ window, document, TextEncoder, URL, CustomEvent, setTimeout, clearTimeout });
   const resources = path.join(__dirname, "../Packages/BridgeCore/Sources/BridgeDesktopUI/Resources");
   function load(name) { vm.runInContext(fs.readFileSync(path.join(resources, name), "utf8"), context); }
   scripts.forEach(load);

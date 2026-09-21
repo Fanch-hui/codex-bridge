@@ -20,7 +20,7 @@ readonly product_version="$(
 }
 
 if (( $# < 3 || $# > 4 )); then
-  print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64|x86_64|all]"
+  print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64]"
   print -u2 "Builds architecture-specific ad-hoc-signed release packages."
   exit 64
 fi
@@ -44,12 +44,11 @@ readonly output_parent="${output_directory:h}"
   exit 64
 }
 readonly helper_directory="${requested_helper_directory:A}"
-readonly requested_architecture="${4:-all}"
+readonly requested_architecture="${4:-arm64}"
 case "${requested_architecture}" in
-  arm64|x86_64) architectures=("${requested_architecture}") ;;
-  all) architectures=(arm64 x86_64) ;;
+  arm64) architectures=(arm64) ;;
   *)
-    print -u2 "Architecture must be arm64, x86_64, or all."
+    print -u2 "Architecture must be arm64."
     exit 64
     ;;
 esac
@@ -133,13 +132,16 @@ for architecture in "${architectures[@]}"; do
   /usr/bin/codesign --force --sign - \
     --entitlements "${repository_root}/App/CodexBridge.entitlements" "${archived_app}"
   /usr/bin/codesign --verify --deep --strict --verbose=2 "${archived_app}"
+  /bin/zsh "${script_directory}/verify-release-hardening.sh" \
+    --ad-hoc "${archived_app}"
 
   /bin/mkdir -m 0700 "${disk_image_directory}"
   /usr/bin/ditto -c -k --sequesterRsrc --keepParent \
     "${archived_app}" \
     "${candidate_directory}/${artifact_base}.zip"
   /usr/bin/ditto "${archived_app}" "${disk_image_directory}/CodexBridge.app"
-  /usr/bin/codesign --verify --deep --strict "${disk_image_directory}/CodexBridge.app"
+  /bin/zsh "${script_directory}/verify-release-hardening.sh" \
+    --ad-hoc "${disk_image_directory}/CodexBridge.app"
   /bin/ln -s /Applications "${disk_image_directory}/Applications"
   /usr/bin/hdiutil create \
     -quiet \

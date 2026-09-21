@@ -44,17 +44,22 @@
         detail.hidden = !page.detailText;
         unavailable.hidden = true;
         filters.update(page, nextEmit);
-        S.clear(list);
-        S.safeArray(page.rows).forEach(function (row) {
-          list.appendChild(logRow(row, page, filters.emit));
-        });
-        if (!page.rows || page.rows.length === 0) {
-          list.appendChild(S.node(
-            "div",
-            "empty-state",
-            page.searchText ? "没有匹配的日志事件。" : "暂无日志事件。"
-          ));
-        }
+        var signature = JSON.stringify([page.rows, page.selectedRowID, page.searchText]);
+        var renderList = function () {
+          S.clear(list);
+          S.safeArray(page.rows).forEach(function (row) {
+            list.appendChild(logRow(row, page, filters.emit));
+          });
+          if (!page.rows || page.rows.length === 0) {
+            list.appendChild(S.node(
+              "div",
+              "empty-state",
+              page.searchText ? "没有匹配的日志事件。" : "暂无日志事件。"
+            ));
+          }
+        };
+        var stable = global.CodexBridgeDesktopStableRender;
+        if (stable) stable(list, signature, renderList); else renderList();
         detail.textContent = page.detailText || "";
       }
     };

@@ -4,6 +4,10 @@ import Crypto
 import Foundation
 
 extension MCPServiceTaskSnapshot {
+  public var isQueued: Bool {
+    status == "queued"
+  }
+
   public var isTerminal: Bool {
     ["completed", "failed", "interrupted"].contains(status)
   }
@@ -13,7 +17,11 @@ extension MCPServiceTaskSnapshot {
   }
 
   public var isActive: Bool {
-    isRunning || status == "awaiting_local_approval"
+    isQueued || isRunning || status == "awaiting_local_approval"
+  }
+
+  public var canStop: Bool {
+    isActive
   }
 
   public var providerIdentifier: String {
@@ -175,6 +183,10 @@ public struct CodexActivityPresentation: Equatable {
     }
     detailText = task.currentStep
     switch task.status {
+    case "queued":
+      statusText = "(providerName) 排队中…"
+      isActive = true
+      showsBubble = true
     case "starting":
       statusText = "\(providerName) 正在启动…"
       isActive = true

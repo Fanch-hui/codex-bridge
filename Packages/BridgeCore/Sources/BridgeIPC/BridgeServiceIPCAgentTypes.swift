@@ -386,6 +386,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
   public let permissionModeOverride: Bool?
   public let acceptanceCriteria: [String]?
   public let clientRequestID: String?
+  public let queueIfBusy: Bool?
 
   public init(
     projectID: String,
@@ -401,7 +402,8 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     modelOverride: Bool? = nil,
     permissionModeOverride: Bool? = nil,
     acceptanceCriteria: [String]? = nil,
-    clientRequestID: String? = nil
+    clientRequestID: String? = nil,
+    queueIfBusy: Bool? = nil
   ) {
     self.projectID = projectID
     self.providerID = providerID
@@ -417,6 +419,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     self.permissionModeOverride = permissionModeOverride
     self.acceptanceCriteria = acceptanceCriteria
     self.clientRequestID = clientRequestID
+    self.queueIfBusy = queueIfBusy
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -434,6 +437,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     case permissionModeOverride = "permission_mode_override"
     case acceptanceCriteria = "acceptance_criteria"
     case clientRequestID = "client_request_id"
+    case queueIfBusy = "queue_if_busy"
   }
 }
 

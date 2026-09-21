@@ -34,6 +34,7 @@ public actor ServiceExecutionCoordinator {
   var collectors: [TaskID: Task<Void, Never>] = [:]
   var activeAgentRuns: [TaskID: ActiveAgentRun] = [:]
   var workspaceChangeTrackers: [TaskID: ServiceWorkspaceChangeTracker] = [:]
+  var presentedCodexApprovals: [TaskID: Set<String>] = [:]
   var pendingAgentApprovals: [String: PendingAgentApproval] = [:]
   var finishedRuns: Set<TaskID> = []
   private var startingTasks: Set<TaskID> = []
@@ -211,6 +212,7 @@ public actor ServiceExecutionCoordinator {
     summary: String = "The local service stopped the task."
   ) async {
     startingTasks.remove(taskID)
+    presentedCodexApprovals.removeValue(forKey: taskID)
     finishedRuns.insert(taskID)
     workspaceChangeTrackers.removeValue(forKey: taskID)
     collectors.removeValue(forKey: taskID)?.cancel()
@@ -235,6 +237,7 @@ public actor ServiceExecutionCoordinator {
     let executionTasks = collectors.values
     collectors.removeAll(keepingCapacity: false)
     pendingAgentApprovals.removeAll(keepingCapacity: false)
+    presentedCodexApprovals.removeAll(keepingCapacity: false)
     for task in executionTasks { task.cancel() }
     let shutdowns = activeAgentRuns.values.map(\.shutdown)
     activeAgentRuns.removeAll(keepingCapacity: false)
@@ -254,6 +257,7 @@ public actor ServiceExecutionCoordinator {
   }
 
   private func stopAgentRun(taskID: TaskID) async {
+    presentedCodexApprovals.removeValue(forKey: taskID)
     finishedRuns.insert(taskID)
     workspaceChangeTrackers.removeValue(forKey: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }

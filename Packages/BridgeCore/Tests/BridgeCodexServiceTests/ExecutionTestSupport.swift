@@ -172,6 +172,11 @@ func waitForTask(
     }
     try await Task.sleep(for: .milliseconds(10))
   }
+  if let task = try await fixture.tasks.task(id: taskID) {
+    XCTFail(
+      "Task timed out in state \(task.state.status), failure: \(task.state.failureCode ?? "none"), result: \(task.state.resultSummary ?? "none")"
+    )
+  }
   throw ExecutionTestError.timedOut
 }
 

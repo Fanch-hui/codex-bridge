@@ -13,6 +13,7 @@ public protocol BridgeTaskConversationClient: Sendable {
 }
 
 public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Sendable {
+  func serviceChanges() async -> AsyncStream<Void>
   func directConfiguration() async throws -> IPCDirectConfiguration
   func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
     -> IPCDirectConfiguration
@@ -161,6 +162,9 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func serviceChanges() async -> AsyncStream<Void> {
+    AsyncStream { $0.finish() }
+  }
   public func prepareAppUpdate() async throws -> Bool {
     throw BridgeServiceClientError.serviceRestartRequired
   }

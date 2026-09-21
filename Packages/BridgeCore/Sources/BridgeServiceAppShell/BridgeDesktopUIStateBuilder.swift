@@ -7,6 +7,7 @@ import Foundation
 @MainActor
 enum BridgeDesktopUIStateBuilder {
   static func build(from model: BridgeServiceAppModel) -> BridgeDesktopUIState {
+    let startedAt = ContinuousClock.now
     let navigation = BridgeDesktopNavigation.allCases.map { item in
       BridgeDesktopNavigationItem(
         navigation: item,
@@ -14,7 +15,7 @@ enum BridgeDesktopUIStateBuilder {
       )
     }
     let selected = model.navigation
-    return BridgeDesktopUIState(
+    let state = BridgeDesktopUIState(
       navigation: navigation,
       selectedNavigation: selected.desktopNavigation,
       connectionLabel: model.connectionState.label,
@@ -28,6 +29,14 @@ enum BridgeDesktopUIStateBuilder {
       settings: settings(from: model),
       appUpdate: model.appUpdateState
     )
+    ConversationPerformanceRecorder.shared.record(
+      ConversationPerformanceSample(
+        stage: .desktopStateBuild,
+        duration: startedAt.duration(to: ContinuousClock.now),
+        entryCount: model.conversation?.entries.count ?? 0
+      )
+    )
+    return state
   }
 
   private static func overview(from model: BridgeServiceAppModel) -> BridgeDesktopOverviewState {

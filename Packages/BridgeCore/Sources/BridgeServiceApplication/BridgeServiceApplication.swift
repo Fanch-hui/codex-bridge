@@ -21,6 +21,7 @@ public struct ServiceModelCatalog: Equatable, Sendable {
 
 public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let appVersion: String
+  let gitStatusCache = ProjectGitStatusCache()
   let projects: ServiceProjectService
   let tasks: ServiceTaskManager
   let settings: ServiceSettings
@@ -32,11 +33,13 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let mutations: RestrictedProjectMutationService
   let runtimeStatus: ServiceRuntimeStatus
   let workspaceGate: ServiceWorkspaceMutationGate
+  let directMutationOperations: DirectMutationOperationStore
   var appUpdatePreparationTask: Task<Bool, Error>?
   public let commandPolicy: DirectCommandPolicy
   public let directCommands: DirectCommandSessionManager
   public let approvals: DirectActionApprovalCenter
   let skillScanner: SkillScanner
+  var taskQueueProcessor: Task<Void, Never>?
   public let iso8601 = ISO8601DateFormatter()
 
   public init(
@@ -75,10 +78,12 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
       mutations
       ?? RestrictedProjectMutationService(repository: repository)
     self.workspaceGate = workspaceGate ?? ServiceWorkspaceMutationGate()
+    self.directMutationOperations = DirectMutationOperationStore()
     self.appUpdatePreparationTask = nil
     self.commandPolicy = commandPolicy
     self.directCommands = directCommands
     self.approvals = approvals
     self.skillScanner = skillScanner
+    self.taskQueueProcessor = nil
   }
 }

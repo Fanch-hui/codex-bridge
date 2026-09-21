@@ -151,13 +151,20 @@ extension BridgeServiceApplication {
       limit: limit
     )
     let activity = try await tasks.listActivity(taskIDs: records.map(\.id))
+    var queueInfos: [TaskID: ServiceTaskQueueInfo] = [:]
+    for record in records {
+      if let info = try await tasks.queueInfo(taskID: record.id) {
+        queueInfos[record.id] = info
+      }
+    }
     try Self.checkDeadline(deadline)
     return records.map { record in
       taskSnapshot(
         task: record,
         events: activity.events[record.id] ?? [],
         activityMessages: activity.messages[record.id] ?? [],
-        recentActivityAvailable: activity.messagesAvailable
+        recentActivityAvailable: activity.messagesAvailable,
+        queueInfo: queueInfos[record.id]
       )
     }
   }
@@ -167,7 +174,15 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws {
     try Self.checkDeadline(deadline)
-    await coordinator.stop(taskID: TaskID(rawValue: taskID))
+    let id = TaskID(rawValue: taskID)
+    if let task = try await tasks.task(id: id), task.isQueued {
+      _ = try await tasks.interrupt(
+        taskID: id,
+        summary: "The queued task was cancelled before execution started."
+      )
+      return
+    }
+    await coordinator.stop(taskID: id)
   }
 
   public func serviceDeleteTask(

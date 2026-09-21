@@ -38,10 +38,12 @@ extension ExecutionSession {
           idempotencyKey: "codex-bridge:" + project.id.rawValue,
           name: project.name,
           roots: [CodexProjectRoot(path: projectRoot)],
-          metadata: ["managedBy": "codex_bridge_macos"]
+          metadata: ["managedBy": "codex_bridge"]
         )
       )
       return try validatedCodexProjectID(response.project, requiresExactRoot: true)
+    } catch let error as CodexRPCError where Self.isUnsupportedProjectAPI(error) {
+      return nil
     } catch let error as ExecutionServiceError {
       throw error
     } catch {

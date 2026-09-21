@@ -89,6 +89,26 @@ final class TaskConversationModelTests: XCTestCase {
     XCTAssertEqual(model.entries[1].content, "I will inspect the parser. Done.")
   }
 
+  func testRunningSubscriptionStartsBeforePriorHistoryLoads() async throws {
+    let client = TestBridgeServiceClient()
+    await client.setConversationDelay(.milliseconds(150))
+    let model = TaskConversationModel(
+      taskID: "task-1",
+      priorTaskIDs: ["prior-task"],
+      client: client
+    )
+    let start = Task { await model.start() }
+
+    try await waitUntil(timeout: .seconds(1)) {
+      model.subscriptionID == 7 && model.entries.map(\.key) == ["user:1"]
+    }
+    XCTAssertEqual(model.entries.first?.content, "hello")
+    XCTAssertTrue(model.isLoading)
+
+    await start.value
+    XCTAssertFalse(model.isLoading)
+  }
+
   func testUpdateHandlerFiresAfterStreamingPush() async throws {
     let client = TestBridgeServiceClient()
     let updated = expectation(description: "Conversation update is forwarded")

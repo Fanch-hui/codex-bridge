@@ -190,6 +190,13 @@ extension DirectCommandPolicy {
     }
 
     let matchedBuiltInRule = builtInSafeRules.first { matchesSafeRule($0, argv: policyArgv) }
+    let isProjectLocalExecutable = isProjectLocalExecutable(
+      executable,
+      projectRoot: project.root.canonicalPath
+    )
+    let requiresUnregisteredApproval =
+      matched == nil && matchedBuiltInRule == nil
+      && (isProjectLocalExecutable || request.isValidatedSkillScript)
     switch project.directCommandMode {
     case .denied:
       return .denied(.commandModeDenied)
@@ -197,8 +204,7 @@ extension DirectCommandPolicy {
       let allowed =
         matched != nil
         || matchedBuiltInRule != nil
-        || isProjectLocalExecutable(
-          executable, projectRoot: project.root.canonicalPath)
+        || isProjectLocalExecutable
         || request.isValidatedSkillScript
       guard allowed else { return .denied(.commandNotRegistered) }
       if matched == nil, matchedBuiltInRule != nil,
@@ -227,6 +233,7 @@ extension DirectCommandPolicy {
       risk == .elevated
       || project.accessPolicy.write == .requiresLocalApproval
       || (needsNetwork && project.accessPolicy.network == .requiresLocalApproval)
+      || requiresUnregisteredApproval
     return DirectCommandResolution(
       allowed: true,
       requiresApproval: requiresApproval,

@@ -18,7 +18,7 @@ public enum OutboundContentSecurity {
     case commandOutput
   }
 
-  private static let forbiddenPatterns = [
+  static let forbiddenPatterns = [
     #"(?i)-----BEGIN(?: [A-Z0-9]+)* PRIVATE KEY-----"#,
     #"(?i)\bBearer\s+[^\s,;]+"#,
     #"(?i)\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,})\b"#,
@@ -112,8 +112,9 @@ public enum OutboundContentSecurity {
     _ value: String,
     maximumUTF8Bytes: Int
   ) -> String {
-    redaction(
-      of: value,
+    let normalized = stripTerminalControlSequences(value)
+    return redaction(
+      of: normalized,
       maximumUTF8Bytes: maximumUTF8Bytes,
       preservingSourceSyntax: false,
       pathMode: .commandOutput
@@ -133,6 +134,60 @@ public enum OutboundContentSecurity {
       preservingSourceSyntax: false,
       pathMode: .none
     ).text
+  }
+
+  /// Redacts command arguments while preserving their option/value structure.
+  /// Values following credential-shaped options are sensitive even when they
+  /// do not contain a recognizable key prefix or `key=value` spelling.
+  public static func redactedCommandArguments(
+    _ arguments: [String],
+    maximumArguments: Int = 128,
+    maximumArgumentUTF8Bytes: Int = 4 * 1_024
+  ) -> [String] {
+    guard maximumArguments > 0, maximumArgumentUTF8Bytes > 0 else { return [] }
+    var result: [String] = []
+    result.reserveCapacity(min(arguments.count, maximumArguments))
+    var redactNextValue = false
+    for argument in arguments.prefix(maximumArguments) {
+      if redactNextValue {
+        result.append("[REDACTED]")
+        redactNextValue = false
+        continue
+      }
+      let redacted = redactedCommand(argument, maximumUTF8Bytes: maximumArgumentUTF8Bytes)
+      guard let equal = argument.firstIndex(of: "=") else {
+        result.append(redacted)
+        redactNextValue = isSensitiveCommandOption(argument)
+        continue
+      }
+      let option = String(argument[..<equal])
+      guard isSensitiveCommandOption(option) else {
+        result.append(redacted)
+        continue
+      }
+      result.append(
+        redactedCommand(
+          option + "=[REDACTED]",
+          maximumUTF8Bytes: maximumArgumentUTF8Bytes
+        )
+      )
+    }
+    return result
+  }
+
+  private static func isSensitiveCommandOption(_ value: String) -> Bool {
+    let option = value.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+      .lowercased()
+      .replacingOccurrences(of: "_", with: "-")
+    guard !option.isEmpty else { return false }
+    let sensitiveTokens = [
+      "token", "api-key", "runtime-key", "access-key", "access-token", "refresh-token",
+      "secret", "password", "passwd", "authorization", "cookie", "credential", "auth",
+      "client-secret", "mcp-auth",
+    ]
+    return sensitiveTokens.contains { token in
+      option == token || option.hasSuffix("-\(token)")
+    }
   }
 
   private static func redaction(
@@ -188,6 +243,57 @@ public enum OutboundContentSecurity {
       redactedLineCount: redactedLineCount,
       truncated: true
     )
+  }
+
+  private static func stripTerminalControlSequences(_ value: String) -> String {
+    let scalars = Array(value.unicodeScalars)
+    var result: [UnicodeScalar] = []
+    result.reserveCapacity(scalars.count)
+    var index = 0
+    while index < scalars.count {
+      let scalar = scalars[index].value
+      if scalar == 0x1B {
+        index += 1
+        guard index < scalars.count else { break }
+        switch scalars[index].value {
+        case 0x5B:
+          index += 1
+          while index < scalars.count {
+            let value = scalars[index].value
+            index += 1
+            if (0x40...0x7E).contains(value) { break }
+          }
+        case 0x5D:
+          index += 1
+          while index < scalars.count {
+            let value = scalars[index].value
+            if value == 0x07 {
+              index += 1
+              break
+            }
+            if value == 0x1B, index + 1 < scalars.count,
+              scalars[index + 1].value == 0x5C
+            {
+              index += 2
+              break
+            }
+            index += 1
+          }
+        default:
+          index += 1
+        }
+        continue
+      }
+      if scalar < 0x20 && scalar != 0x09 && scalar != 0x0A && scalar != 0x0D
+        || (0x7F...0x9F).contains(scalar)
+      {
+        index += 1
+        continue
+      }
+      result.append(scalars[index])
+      index += 1
+    }
+    return String(String.UnicodeScalarView(result))
   }
 
   private static func containsUnsafePath(_ value: String) -> Bool {

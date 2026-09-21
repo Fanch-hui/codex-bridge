@@ -90,6 +90,8 @@
           conversation: conversation,
           permissionRemediation: desktopPermissionRemediation(for: $0),
           conversationEntries: conversationEntries,
+          installations: agentInstallations,
+          gitState: projects.first { $0.projectID == task?.projectID }?.gitState,
           canResume: TaskInspectorPresentation.canResume(
             $0,
             providerSupportsSessionContinuation: cached.providerSupportsSessionContinuation(
@@ -141,6 +143,7 @@
             for: task,
             projectName: task.map { cached.projectName(for: $0.projectID) }
           ),
+          projectLoadError: projectLoadError,
           interruptEnabled: connectionState == .connected
             && TaskInspectorPresentation.canInterrupt(task),
           stopEnabled: connectionState == .connected && task?.isActive == true,
@@ -162,7 +165,7 @@
             && !(selectedApproval?.allowDecisions.isEmpty ?? true),
           approvalDenyEnabled: approvalActionsEnabled,
           approvalStatusText: approvalStatusText,
-          detailText: errorMessage,
+          detailText: errorMessage ?? projectLoadError,
           taskItems: taskItems,
           selectedTaskDetail: selectedTaskDetail,
           history: BridgeDesktopThreadHistoryState(),

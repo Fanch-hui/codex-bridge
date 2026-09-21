@@ -118,6 +118,7 @@ extension BridgeServiceApplication {
     permissionModeOverride: Bool? = nil,
     acceptanceCriteria: [String] = [],
     clientRequestID: String? = nil,
+    queueIfBusy: Bool = false,
     deadline: ContinuousClock.Instant
   ) async throws -> (taskID: String, status: String) {
     try Self.checkDeadline(deadline)
@@ -135,7 +136,8 @@ extension BridgeServiceApplication {
       permissionModeOverride: permissionModeOverride,
       networkAccess: networkAccess,
       acceptanceCriteria: acceptanceCriteria,
-      clientRequestID: clientRequestID ?? "app-\(UUID().uuidString.lowercased())"
+      clientRequestID: clientRequestID ?? "app-\(UUID().uuidString.lowercased())",
+      queueIfBusy: queueIfBusy
     )
     let receipt = try await serviceSubmitTaskFromLocalApp(
       submission,

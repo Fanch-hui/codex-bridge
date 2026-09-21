@@ -170,6 +170,7 @@ public enum WorkbenchSessionCatalog {
 public enum WorkbenchTaskTextPresentation {
   public static func statusLabel(_ status: String) -> String {
     switch status {
+    case "queued": "排队中"
     case "awaiting_local_approval": "等待本机批准"
     case "starting": "正在启动"
     case "running": "运行中"

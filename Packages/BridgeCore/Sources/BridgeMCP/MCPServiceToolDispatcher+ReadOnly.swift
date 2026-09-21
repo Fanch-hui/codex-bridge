@@ -21,6 +21,10 @@ extension MCPServiceToolDispatcher {
       return try await callSearchProjectFiles(arguments)
     case .readProjectFile:
       return try await callReadProjectFile(arguments)
+    case .listProjectDirectory:
+      return try await callListProjectDirectory(arguments)
+    case .batchReadProjectFiles:
+      return try await callBatchReadProjectFiles(arguments)
     case .listThreads:
       return try await callListThreads(arguments)
     case .readThread:
@@ -150,6 +154,84 @@ extension MCPServiceToolDispatcher {
     }
     return try resultEncoder.encode(ServiceReadProjectFileOutput(page: page))
 
+  }
+
+  private func callListProjectDirectory(_ arguments: [String: Value]?) async throws
+    -> CallTool.Result
+  {
+    let values = try StrictToolArguments(
+      arguments,
+      allowed: [
+        "project_id", "relative_directory", "depth", "kind", "cursor", "limit",
+      ],
+      required: ["project_id"]
+    )
+    let projectID = try values.requiredIdentifier("project_id", maximumUTF8Bytes: 128)
+    let directory = try values.optionalString("relative_directory", maximumUTF8Bytes: 1_024)
+    let depth = Int(try values.optionalNonnegativeInteger("depth") ?? 1)
+    guard depth <= 64 else { throw MCPError.invalidParams("depth must not exceed 64.") }
+    let kind = try values.optionalIdentifier("kind", maximumUTF8Bytes: 16) ?? "all"
+    guard ["all", "files", "directories"].contains(kind) else {
+      throw MCPError.invalidParams("Argument 'kind' is invalid.")
+    }
+    let cursor = try values.optionalString("cursor", maximumUTF8Bytes: 128)
+    let limit = try values.limit(maximum: 100)
+    let deadline = clock.now.advanced(by: deadlines.read)
+    let page = try await withToolDeadline(until: deadline) {
+      try await service.serviceListProjectDirectory(
+        projectID: projectID,
+        relativeDirectory: directory,
+        depth: depth,
+        kind: kind,
+        cursor: cursor,
+        limit: limit,
+        deadline: deadline
+      )
+    }
+    return try resultEncoder.encode(ServiceListProjectDirectoryOutput(page: page))
+  }
+
+  private func callBatchReadProjectFiles(_ arguments: [String: Value]?) async throws
+    -> CallTool.Result
+  {
+    let values = try StrictToolArguments(
+      arguments,
+      allowed: ["project_id", "files"],
+      required: ["project_id", "files"]
+    )
+    let projectID = try values.requiredIdentifier("project_id", maximumUTF8Bytes: 128)
+    let items = try values.requiredObjectArray(
+      "files",
+      maximumCount: 32,
+      allowedKeys: ["relative_path", "start_line", "line_count"]
+    )
+    let requests = try items.map { item -> MCPProjectFileBatchReadItemRequest in
+      let path = try item.requiredIdentifier("relative_path", maximumUTF8Bytes: 1_024)
+      guard OutboundContentSecurity.isSafeRelativePath(path) else {
+        throw MCPError.invalidParams("Argument 'relative_path' must be a safe relative path.")
+      }
+      let start = try item.optionalPositiveInteger("start_line", maximum: Int.max)
+      let count = try item.optionalPositiveInteger("line_count", maximum: Int.max)
+      if let count {
+        guard count <= FileLineRange.maximumLineCount else {
+          throw MCPError.invalidParams("line_count is too large.")
+        }
+      }
+      return MCPProjectFileBatchReadItemRequest(
+        relativePath: path,
+        startLine: start,
+        lineCount: count
+      )
+    }
+    let deadline = clock.now.advanced(by: deadlines.read)
+    let page = try await withToolDeadline(until: deadline) {
+      try await service.serviceBatchReadProjectFiles(
+        projectID: projectID,
+        files: requests,
+        deadline: deadline
+      )
+    }
+    return try resultEncoder.encode(ServiceBatchReadProjectFilesOutput(page: page))
   }
 
   private func callListThreads(_ arguments: [String: Value]?) async throws -> CallTool.Result {

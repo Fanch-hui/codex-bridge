@@ -66,6 +66,23 @@ extension BridgeServiceApplication {
     guard let task = try await tasks.task(id: id) else {
       throw BridgeMCPQueryError.taskNotFound
     }
+    if task.isQueued {
+      do {
+        let cancelled = try await tasks.interrupt(
+          taskID: id,
+          summary: "The queued task was cancelled before provider execution started."
+        )
+        return MCPServiceTaskMutationReceipt(
+          taskID: taskID,
+          status: cancelled.state.status.rawValue,
+          accepted: true
+        )
+      } catch let storeError as ServiceStoreError {
+        throw Self.publicStoreError(storeError)
+      } catch {
+        throw Self.publicExecutionError(error)
+      }
+    }
     guard task.state.status == .running else {
       throw BridgeMCPQueryError.turnMismatch
     }

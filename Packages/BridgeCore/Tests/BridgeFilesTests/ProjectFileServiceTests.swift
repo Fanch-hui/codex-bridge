@@ -62,6 +62,55 @@ final class ProjectFileServiceTests: XCTestCase {
     }
   }
 
+  func testListDirectoryPaginatesAndFiltersEntries() async throws {
+    try await withFixture { fixture in
+      try fixture.write("Sources/App.swift", "let app = true")
+      try fixture.write("Sources/Tests.swift", "let tests = true")
+      try fixture.write("README.md", "read me")
+      let first = try await fixture.service.listDirectory(
+        try ProjectDirectoryRequest(
+          projectID: fixture.projectID,
+          relativeDirectory: "Sources",
+          depth: 0,
+          kind: .files,
+          limit: 1
+        )
+      )
+      let cursor = try XCTUnwrap(first.nextCursor)
+      let second = try await fixture.service.listDirectory(
+        try ProjectDirectoryRequest(
+          projectID: fixture.projectID,
+          relativeDirectory: "Sources",
+          depth: 0,
+          kind: .files,
+          limit: 1,
+          cursor: cursor
+        )
+      )
+      XCTAssertEqual(first.entries.map(\.relativePath), ["Sources/App.swift"])
+      XCTAssertEqual(second.entries.map(\.relativePath), ["Sources/Tests.swift"])
+      XCTAssertNil(second.nextCursor)
+    }
+  }
+
+  func testBatchReadReturnsPerFileErrorWithinBoundedResponse() async throws {
+    try await withFixture { fixture in
+      try fixture.write("one.txt", "one")
+      let result = try await fixture.service.batchRead(
+        try ProjectFileBatchReadRequest(
+          files: [
+            ProjectFileReadRequest(projectID: fixture.projectID, relativePath: "one.txt"),
+            ProjectFileReadRequest(projectID: fixture.projectID, relativePath: "missing.txt"),
+          ]
+        )
+      )
+      XCTAssertEqual(result.items.count, 2)
+      XCTAssertEqual(result.items[0].result?.content, "one")
+      XCTAssertEqual(result.items[1].error, "The target does not exist.")
+      XCTAssertFalse(result.truncated)
+    }
+  }
+
   func testReadTruncatesBeyondLineCapAndReportsNextStartLine() async throws {
     try await withFixture { fixture in
       let text = (1...12_000).map { "l\($0)" }.joined(separator: "\n")

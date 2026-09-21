@@ -12,6 +12,8 @@
     private var snapshot = Snapshot(state: .loading, errorDetail: nil)
     private var worker: WindowsWebViewThread?
     private var latestState: BridgeDesktopUIState?
+    private var latestStateRevision: UInt64?
+    private var patchBuilder = BridgeDesktopUIStatePatchBuilder()
     private var isPageReady = false
     private var readyDeadline: UInt64 = 0
 
@@ -89,13 +91,22 @@
       lock.withLock { worker }?.applyLayout(to: bounds, visible: visible)
     }
 
-    func setState(_ state: BridgeDesktopUIState) {
-      let shouldSend = lock.withLock { () -> Bool in
-        guard latestState != state else { return false }
+    func setState(_ state: BridgeDesktopUIState, revision: UInt64? = nil) {
+      let patch = lock.withLock { () -> BridgeDesktopUIStatePatch? in
+        let nextRevision: UInt64
+        if let revision {
+          guard latestStateRevision != revision else { return nil }
+          nextRevision = revision
+        } else {
+          guard latestState != state else { return nil }
+          nextRevision = (latestStateRevision ?? 0) &+ 1
+        }
+        let patch = patchBuilder.makePatch(state: state, nextRevision: nextRevision)
         latestState = state
-        return isPageReady
+        latestStateRevision = nextRevision
+        return isPageReady ? patch : nil
       }
-      if shouldSend { sendLatestState() }
+      if let patch { send(patch) }
     }
 
     func beginShutdown(notifying window: HWND, message: UINT) -> Bool {
@@ -110,14 +121,20 @@
       active?.shutdown()
     }
 
-    private func sendLatestState() {
-      let value = lock.withLock { latestState }
-      guard
-        let value,
-        let data = try? JSONEncoder().encode(value),
+    private func send(_ patch: BridgeDesktopUIStatePatch) {
+      guard let data = try? JSONEncoder().encode(patch),
         let message = String(data: data, encoding: .utf8)
       else { return }
       lock.withLock { worker }?.postWebMessageAsJSON(message)
+    }
+
+    private func sendFullSnapshot() {
+      let patch = lock.withLock { () -> BridgeDesktopUIStatePatch? in
+        guard let state = latestState, let revision = latestStateRevision else { return nil }
+        let patch = patchBuilder.fullSnapshot(state: state, revision: revision)
+        return isPageReady ? patch : nil
+      }
+      if let patch { send(patch) }
     }
 
     private func receive(_ message: String) {
@@ -128,9 +145,9 @@
         !envelope.requestID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
         envelope.requestID.count <= 128
       else { return }
-      if envelope.command == .ready {
+      if envelope.command == .ready || envelope.command == .requestStateResync {
         lock.withLock { isPageReady = true }
-        sendLatestState()
+        sendFullSnapshot()
         return
       }
       commandHandler(envelope)

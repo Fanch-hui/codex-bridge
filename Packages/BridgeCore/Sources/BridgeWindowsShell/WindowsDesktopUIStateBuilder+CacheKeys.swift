@@ -24,6 +24,7 @@
 
   struct WindowsDesktopWorkbenchCacheKey: Equatable {
     let connectionState: WindowsWorkbenchDisplay.ConnectionState
+    let projectLoadError: String?
     let runningTaskCount: Int
     let selectedProjectID: String?
     let permissionMode: String
@@ -60,6 +61,7 @@
       canRefreshModels: Bool
     ) {
       connectionState = workbench.connectionState
+      projectLoadError = workbench.projectLoadError
       runningTaskCount = workbench.runningTaskCount
       selectedProjectID = workbench.selectedProjectID
       permissionMode = workbench.permissionMode

@@ -26,7 +26,7 @@ enum BridgeDesktopCommandRouter {
       NSPasteboard.general.clearContents()
       NSPasteboard.general.setString(id, forType: .string)
       model.postToast("已复制 Tunnel ID", symbol: "doc.on.doc")
-    case .ready:
+    case .ready, .requestStateResync:
       return
     case .refresh:
       model.refresh()
@@ -59,7 +59,7 @@ enum BridgeDesktopCommandRouter {
     case .browserBack, .browserForward, .browserReload, .setBrowserEnabled,
       .openBrowserExternally, .loadEarlierConversation, .refreshConversation,
       .setWorkbenchPermissionMode, .selectTask, .refreshTasks, .interruptTask,
-      .stopTask, .deleteTask, .deleteSession, .steerTask, .resumeTask, .restartTask,
+      .stopTask, .deleteTask, .deleteSession, .steerTask, .resumeTask, .restartTask, .handoffTask,
       .resolveApproval, .resolveDirectApproval:
       handleWorkbench(envelope, model: model)
     case .selectProject, .refreshProjects, .registerProject, .removeProject,

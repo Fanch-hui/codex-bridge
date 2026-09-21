@@ -12,6 +12,8 @@ extension MCPServiceToolDispatcher {
     switch name {
     case .runSkillAction:
       return try await callRunSkillAction(arguments)
+    case .listTasks:
+      return try await callListTasks(arguments)
     case .getTask:
       return try await callGetTask(arguments)
     case .submitTask:
@@ -98,7 +100,7 @@ extension MCPServiceToolDispatcher {
     let mode: MCPTaskSteerMode
     if let rawMode {
       guard let parsed = MCPTaskSteerMode(rawValue: rawMode) else {
-        throw BridgeMCPQueryError.contractRejected
+        throw MCPError.invalidParams("Unsupported steer mode.")
       }
       mode = parsed
     } else {
@@ -122,10 +124,10 @@ extension MCPServiceToolDispatcher {
     let values = try StrictToolArguments(
       arguments,
       allowed: ["task_id", "expected_turn_id"],
-      required: ["task_id", "expected_turn_id"]
+      required: ["task_id"]
     )
     let taskID = try values.requiredIdentifier("task_id", maximumUTF8Bytes: 128)
-    let turnID = try values.requiredIdentifier("expected_turn_id", maximumUTF8Bytes: 1_024)
+    let turnID = try values.optionalIdentifier("expected_turn_id", maximumUTF8Bytes: 1_024) ?? ""
     let deadline = clock.now.advanced(by: deadlines.mutation)
     let receipt = try await withToolDeadline(until: deadline) {
       try await service.serviceInterruptTask(

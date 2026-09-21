@@ -54,7 +54,8 @@ extension BridgeServiceApplication {
     }
     var result: [PendingTaskStartApproval] = []
     for task in taskList {
-      guard task.state.status == .awaitingLocalApproval,
+      guard !task.isQueued,
+        task.state.status == .awaitingLocalApproval,
         task.requiresLocalStartApproval
       else {
         continue
@@ -85,6 +86,7 @@ extension BridgeServiceApplication {
     try Self.checkDeadline(deadline)
     guard approvalID == PendingTaskStartApproval.approvalID(for: taskID),
       let task = try await tasks.task(id: taskID),
+      !task.isQueued,
       task.state.status == .awaitingLocalApproval,
       task.requiresLocalStartApproval
     else {
@@ -122,14 +124,31 @@ extension BridgeServiceApplication {
         throw Self.publicStoreError(storeError)
       }
     }
+    let wantsQueue = request.queueIfBusy
+    if wantsQueue {
+      let activeWriteTask = try await tasks.activeWriteTask(projectID: projectID)
+      let workspaceBusy = try await workspaceGate.workspaceBusyDetail(projectID: projectID)
+      if activeWriteTask != nil || workspaceBusy != nil {
+        return try await tasks.submit(request, queued: true)
+      }
+    }
     let admissionToken: String
     do {
       admissionToken = try await workspaceGate.beginCodexAdmission(projectID: projectID)
     } catch {
+      if wantsQueue {
+        return try await tasks.submit(request, queued: true)
+      }
       throw Self.publicWorkspaceBusyError(error)
     }
     do {
-      let result = try await tasks.submit(request)
+      let result: ServiceTaskCreationResult
+      do {
+        result = try await tasks.submit(request)
+      } catch ServiceStoreError.activeWriteTaskExists where wantsQueue {
+        await workspaceGate.endCodexAdmission(projectID: projectID, token: admissionToken)
+        return try await tasks.submit(request, queued: true)
+      }
       await workspaceGate.endCodexAdmission(projectID: projectID, token: admissionToken)
       return result
     } catch {
