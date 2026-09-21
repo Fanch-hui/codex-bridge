@@ -35,7 +35,7 @@
         process.terminate()
         process.waitUntilExit()
       }
-      let service = contents.appendingPathComponent("Library/LaunchAgents/codex-bridge-service")
+      let service = contents.appendingPathComponent("Resources/CodexBridgeService")
       XCTAssertTrue(
         LocalAppPeerIdentity.accepts(
           processID: process.processIdentifier, serviceExecutableURL: service))

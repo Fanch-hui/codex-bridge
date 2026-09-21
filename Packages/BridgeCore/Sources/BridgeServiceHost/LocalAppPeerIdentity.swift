@@ -11,8 +11,9 @@ import Foundation
       let service = executable.resolvingSymlinksInPath()
       let directory = service.deletingLastPathComponent()
       let app =
-        directory.lastPathComponent == "LaunchAgents"
-        ? directory.deletingLastPathComponent().deletingLastPathComponent()
+        directory.lastPathComponent == "Resources"
+          && directory.deletingLastPathComponent().lastPathComponent == "Contents"
+        ? directory.deletingLastPathComponent()
           .appendingPathComponent("MacOS/CodexBridge")
         : directory.appendingPathComponent("CodexBridge")
       var guest: SecCode?
