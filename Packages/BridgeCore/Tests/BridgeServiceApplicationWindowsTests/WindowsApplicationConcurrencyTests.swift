@@ -12,33 +12,33 @@
       let store = try SimpleServiceStore.inMemory()
       let tasks = ServiceTaskManager(store: store)
 
-      let outcomes = await withTaskGroup(of: Bool.self, returning: [Bool].self) { group in
+      let leases = try await withThrowingTaskGroup(
+        of: DirectWorkspaceLease?.self, returning: [DirectWorkspaceLease].self
+      ) { group in
         for index in 0..<16 {
           group.addTask {
             do {
-              let lease = try await gate.acquireDirectLease(
+              return try await gate.acquireDirectLease(
                 projectID: projectID,
                 owner: .directFileOperation(operationID: "op-\(index)"),
                 activeCodexWriteTask: {
                   try await tasks.activeWriteTask(projectID: projectID)
                 }
               )
-              try await Task.sleep(for: .milliseconds(10))
-              await lease.release()
-              return true
             } catch is ProjectWorkspaceBusyError {
-              return false
+              return nil
             }
           }
         }
-        var values: [Bool] = []
-        for await value in group {
-          values.append(value)
+        var values: [DirectWorkspaceLease] = []
+        for try await lease in group {
+          if let lease { values.append(lease) }
         }
         return values
       }
 
-      XCTAssertEqual(outcomes.filter { $0 }.count, 1)
+      XCTAssertEqual(leases.count, 1)
+      for lease in leases { await lease.release() }
       let activeOwner = await gate.activeDirectOwner(projectID: projectID)
       XCTAssertNil(activeOwner)
     }
