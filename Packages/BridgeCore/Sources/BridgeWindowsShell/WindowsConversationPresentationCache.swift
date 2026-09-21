@@ -107,7 +107,7 @@
   enum WindowsConversationEntryPresenter {
     static func legacyText(_ entry: TaskConversationModel.Entry) -> String {
       let role = entry.role == "user" ? "用户" : "Agent"
-      var content = entry.content.trimmingCharacters(in: .whitespacesAndNewlines)
+      var content = entry.displayContent.trimmingCharacters(in: .whitespacesAndNewlines)
       if let toolName = nonEmpty(entry.toolName) {
         let tool = nonEmpty(entry.toolStatus).map { "\(toolName)（\($0)）" } ?? toolName
         let prefix = "[工具：\(tool)]"
@@ -140,9 +140,10 @@
         )
       }
       if entry.kind == "tool_call" {
+        let displayContent = entry.displayContent
         let toolStatus = CodexTranscriptPresentation.resolvedToolStatus(
           providerID: providerID, name: entry.toolName, status: entry.toolStatus,
-          output: entry.content
+          output: displayContent
         )
         let presentation = CodexTranscriptPresentation.tool(
           providerID: providerID,
@@ -152,7 +153,7 @@
         return BridgeDesktopConversationEntry(
           id: entry.key,
           role: role,
-          text: entry.content,
+          text: displayContent,
           kind: entry.kind,
           toolName: entry.toolName,
           toolStatus: toolStatus,

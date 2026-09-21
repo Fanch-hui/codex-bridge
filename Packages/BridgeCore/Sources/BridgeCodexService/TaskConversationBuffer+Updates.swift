@@ -89,12 +89,13 @@ extension TaskConversationBuffer {
     let displayArguments = previousEnvelope == nil ? incomingArguments : previousEnvelope?.arguments
     let arguments = AgentToolArgumentsEnvelope.encode(
       arguments: displayArguments,
-      childRuns: call.childRuns.isEmpty ? previousEnvelope?.childRuns ?? [] : call.childRuns
+      childRuns: call.childRuns.isEmpty ? previousEnvelope?.childRuns ?? [] : call.childRuns,
+      contentIsOutput: output?.isEmpty == false
+        || AgentToolArgumentsEnvelope.decode(existing?.toolArguments)?.contentIsOutput == true
     )
     let content: String
     if let output, !output.isEmpty {
-      let input = Self.toolCallContent(displayArguments, toolName: call.tool)
-      content = input + "\n" + output
+      content = output
     } else {
       content = existing?.content ?? Self.toolCallContent(displayArguments, toolName: call.tool)
     }

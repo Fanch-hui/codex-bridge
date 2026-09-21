@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeIPC
 import BridgeMCP
 import Foundation
@@ -7,6 +8,41 @@ import XCTest
 
 @MainActor
 final class TaskConversationModelTests: XCTestCase {
+  func testLegacyToolContentSeparatesExactArgumentPrefixWithoutRemovingOutputJSON() {
+    let arguments = #"{"filePath":"/tmp/project/AGENTS.md"}"#
+    let output = #"{"result":"ok"}"# + "\n正文"
+    let entry = TaskConversationModel.Entry(
+      IPCTaskConversationMessage(
+        messageID: 1,
+        key: "tool:read",
+        role: "agent",
+        kind: "tool_call",
+        content: arguments + "\n" + output,
+        toolName: "read_files",
+        toolStatus: "completed",
+        toolArguments: arguments
+      ),
+      isFinal: true
+    )
+
+    XCTAssertEqual(entry.displayContent, output)
+    XCTAssertEqual(entry.displayToolArguments, arguments)
+  }
+
+  func testSeparatedToolOutputPreservesAnIdenticalInputJSONPrefix() {
+    let arguments = #"{"filePath":"/tmp/project/file.json"}"#
+    let output = arguments + "\nactual file content"
+    let entry = TaskConversationModel.Entry(
+      IPCTaskConversationMessage(
+        messageID: 2, key: "tool:new", role: "agent", kind: "tool_call",
+        content: output, toolName: "read_files", toolStatus: "completed",
+        toolArguments: AgentToolArgumentsEnvelope.encode(
+          arguments: arguments, childRuns: [], contentIsOutput: true)
+      ), isFinal: true)
+    XCTAssertEqual(entry.displayContent, output)
+    XCTAssertEqual(entry.displayToolArguments, arguments)
+  }
+
   func testTaskSourceDisplayNameKeepsLegacyChatGPTAndLabelsQwen() {
     let legacy = taskSnapshot(status: "completed", source: "chatgpt.mcp")
     let chatGPT = taskSnapshot(

@@ -10,19 +10,23 @@ public enum AgentToolArgumentsEnvelope {
   public struct Decoded: Equatable, Sendable {
     public let arguments: String?
     public let childRuns: [AgentChildRun]
+    public let contentIsOutput: Bool
 
-    public init(arguments: String?, childRuns: [AgentChildRun]) {
+    public init(arguments: String?, childRuns: [AgentChildRun], contentIsOutput: Bool = false) {
       self.arguments = arguments
       self.childRuns = childRuns
+      self.contentIsOutput = contentIsOutput
     }
   }
 
   public static func encode(
     arguments: String?,
-    childRuns: [AgentChildRun]
+    childRuns: [AgentChildRun],
+    contentIsOutput: Bool = false
   ) -> String? {
-    guard !childRuns.isEmpty else { return arguments }
-    let payload = Payload(version: version, childRuns: childRuns)
+    guard !childRuns.isEmpty || contentIsOutput else { return arguments }
+    let payload = Payload(
+      version: version, childRuns: childRuns, contentIsOutput: contentIsOutput ? true : nil)
     let envelope = Wire(marker: payload, arguments: arguments)
     guard let data = try? JSONEncoder().encode(envelope),
       data.count <= maximumUTF8Bytes
@@ -35,12 +39,15 @@ public enum AgentToolArgumentsEnvelope {
       let wire = try? JSONDecoder().decode(Wire.self, from: data),
       wire.marker.version == version
     else { return nil }
-    return Decoded(arguments: wire.arguments, childRuns: wire.marker.childRuns)
+    return Decoded(
+      arguments: wire.arguments, childRuns: wire.marker.childRuns,
+      contentIsOutput: wire.marker.contentIsOutput == true)
   }
 
   private struct Payload: Codable {
     let version: Int
     let childRuns: [AgentChildRun]
+    let contentIsOutput: Bool?
   }
 
   private struct Wire: Codable {

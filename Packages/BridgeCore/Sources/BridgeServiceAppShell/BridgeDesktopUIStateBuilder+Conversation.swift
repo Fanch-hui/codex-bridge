@@ -105,9 +105,10 @@ extension BridgeDesktopUIStateBuilder {
       )
     }
     if entry.kind == "tool_call" {
+      let displayContent = entry.displayContent
       let toolStatus = CodexTranscriptPresentation.resolvedToolStatus(
         providerID: providerID, name: entry.toolName, status: entry.toolStatus,
-        output: entry.content
+        output: displayContent
       )
       let presentation = CodexTranscriptPresentation.tool(
         providerID: providerID,
@@ -117,7 +118,7 @@ extension BridgeDesktopUIStateBuilder {
       return BridgeDesktopConversationEntry(
         id: entry.key,
         role: role,
-        text: entry.content,
+        text: displayContent,
         kind: entry.kind,
         toolName: entry.toolName,
         toolStatus: toolStatus,

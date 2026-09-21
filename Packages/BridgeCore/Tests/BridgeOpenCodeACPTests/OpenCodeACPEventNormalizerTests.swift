@@ -189,6 +189,42 @@ final class OpenCodeACPEventNormalizerTests: XCTestCase {
     XCTAssertEqual(update.locations, [root + "/Sources/main.swift"])
   }
 
+  func testCompletedReadToolKeepsACPOutputSeparateFromRawInput() async throws {
+    let normalizer = try makeNormalizer()
+    let rawInput = ACPJSONValue.object(["filePath": .string("/tmp/project/AGENTS.md")])
+    let output = #"{"result":"ok"}"# + "\n正文"
+    let notification = OpenCodeACPNotification(
+      method: "session/update",
+      params: .object([
+        "sessionId": .string("session-1"),
+        "update": .object([
+          "sessionUpdate": .string("tool_call_update"),
+          "toolCallId": .string("read-tool"),
+          "title": .string("Read file"),
+          "kind": .string("read"),
+          "status": .string("completed"),
+          "rawInput": rawInput,
+          "content": .array([
+            .object([
+              "type": .string("content"),
+              "content": .object([
+                "type": .string("text"),
+                "text": .string(output),
+              ]),
+            ])
+          ]),
+        ]),
+      ])
+    )
+
+    let envelope = try await normalizer.normalize(.notification(notification))
+    guard case .tool(let update) = envelope?.event else {
+      return XCTFail("Expected a normalized read tool update")
+    }
+    XCTAssertEqual(update.arguments, rawInput.encodedString())
+    XCTAssertEqual(update.output, output)
+  }
+
   func testToolNameUsesSemanticWebSubagentAndThinkCategories() async throws {
     let normalizer = try makeNormalizer()
     let web = try await normalizer.normalize(

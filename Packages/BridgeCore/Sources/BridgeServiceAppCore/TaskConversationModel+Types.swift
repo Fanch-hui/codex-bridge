@@ -29,6 +29,19 @@ extension TaskConversationModel {
       return envelope.arguments
     }
 
+    public var displayContent: String {
+      guard kind == "tool_call",
+        AgentToolArgumentsEnvelope.decode(toolArguments)?.contentIsOutput != true,
+        let arguments = displayToolArguments
+      else {
+        return content
+      }
+      return Self.removeLegacyToolArgumentPrefix(
+        from: content,
+        arguments: arguments
+      )
+    }
+
     public var childRuns: [AgentChildRun] {
       AgentToolArgumentsEnvelope.decode(toolArguments)?.childRuns ?? []
     }
@@ -68,6 +81,24 @@ extension TaskConversationModel {
       toolStatus = nil
       toolArguments = nil
       self.isFinal = isFinal
+    }
+
+    private static func removeLegacyToolArgumentPrefix(
+      from content: String,
+      arguments: String
+    ) -> String {
+      guard !arguments.isEmpty, content.hasPrefix(arguments) else { return content }
+      let suffix = content.dropFirst(arguments.count)
+      if suffix.isEmpty {
+        return ""
+      }
+      if suffix.hasPrefix("\r\n") {
+        return String(suffix.dropFirst(2))
+      }
+      if suffix.first == "\n" {
+        return String(suffix.dropFirst())
+      }
+      return content
     }
   }
 }
