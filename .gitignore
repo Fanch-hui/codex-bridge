@@ -1,5 +1,4 @@
 .DS_Store
-._*
 .build/
 .swiftpm/
 DerivedData/
@@ -11,12 +10,16 @@ Secrets/
 *.runtime-key
 /.mcpregistry*
 /Integrations/MCPB/node_modules/
+
+# AI Agent Memory
 AGENTS.md
 **/AGENTS.md
-**/Tests/
-UITests/
-Prototypes/
-Schemas/
-**/PLAN*.md
-**/*plan*.md
-**/*optimization*.md
+
+# Internal Planning, Review & Handoff docs
+docs/*PLAN*
+docs/*REVIEW*
+docs/*plan*
+docs/*review*
+docs/HANDOFF_*
+docs/Codex-Bridge-Code-Review*
+docs/QWEN_STUDIO_MCP_ADAPTATION_PLAN*

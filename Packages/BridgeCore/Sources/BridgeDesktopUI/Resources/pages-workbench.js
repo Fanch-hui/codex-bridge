@@ -158,20 +158,24 @@
         }
       });
       function release() {
-        setTimeout(function () {
+        global.setTimeout(function () {
           state.pressed = false;
           var pending = state.pending;
           state.pending = null;
           if (pending) pending();
         }, 0);
       }
+      container.addEventListener("focusout", release);
       global.addEventListener("pointerup", release);
       global.addEventListener("pointercancel", release);
       global.addEventListener("keyup", release);
       global.addEventListener("blur", release);
     }
     var state = container.__renderState;
-    if (state.pressed) {
+    var active = document && document.activeElement;
+    var focusedControl = active && container.contains(active)
+      && /^(SELECT|INPUT|TEXTAREA|BUTTON)$/.test(String(active.tagName || "").toUpperCase());
+    if (state.pressed || focusedControl) {
       state.pending = function () { renderStable(container, signature, render); };
       return;
     }

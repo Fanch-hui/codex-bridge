@@ -27,16 +27,18 @@ extension BridgeServiceApplication {
       activityMessages = []
       recentActivityAvailable = false
     }
+    let queueInfo = try await tasks.queueInfo(taskID: id)
     return taskSnapshot(
       task: task, events: events, activityMessages: activityMessages,
-      recentActivityAvailable: recentActivityAvailable)
+      recentActivityAvailable: recentActivityAvailable, queueInfo: queueInfo)
   }
 
   func taskSnapshot(
     task: ServiceTaskRecord,
     events: [ServiceTaskEventRecord],
     activityMessages: [ServiceTaskMessageRecord],
-    recentActivityAvailable: Bool
+    recentActivityAvailable: Bool,
+    queueInfo: ServiceTaskQueueInfo? = nil
   ) -> MCPServiceTaskSnapshot {
     let recentActivity = activityMessages.enumerated().compactMap {
       taskActivity($0.element, sequence: Int64($0.offset + 1))
@@ -53,7 +55,7 @@ extension BridgeServiceApplication {
       prompt: task.prompt,
       source: task.source.rawValue,
       sourceClientID: task.sourceClientID.isEmpty ? nil : task.sourceClientID,
-      status: task.state.status.rawValue,
+      status: task.isQueued ? "queued" : task.state.status.rawValue,
       providerID: task.providerID,
       installationID: task.installationID,
       executionModel: task.executionModel,
@@ -83,13 +85,17 @@ extension BridgeServiceApplication {
       supervisorSummary: task.state.supervisorSummary.map {
         Self.safe($0, maximum: 8 * 1_024)
       },
-      localApprovalRequired: task.state.status == .awaitingLocalApproval
-        || task.state.status == .waitingForCodexApproval,
+      localApprovalRequired: !task.isQueued
+        && (task.state.status == .awaitingLocalApproval
+          || task.state.status == .waitingForCodexApproval),
       resultSummary: task.state.resultSummary.map {
         Self.safe($0, maximum: 32 * 1_024)
       },
       failureCode: task.state.failureCode,
-      updatedAt: iso8601.string(from: effectiveUpdatedAt)
+      updatedAt: iso8601.string(from: effectiveUpdatedAt),
+      queuePosition: queueInfo?.position,
+      queueOccupantTaskID: queueInfo?.occupyingTaskID?.rawValue,
+      queueRequestedAt: queueInfo.map { iso8601.string(from: $0.enqueuedAt) }
     )
   }
 

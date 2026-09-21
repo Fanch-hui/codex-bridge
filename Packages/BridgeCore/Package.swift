@@ -278,11 +278,13 @@ let package = Package(
         "BridgeServiceApplication",
         "BridgeServiceCore",
         "BridgeTunnel",
+        .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
     .target(
       name: "BridgeServiceAppCore",
       dependencies: [
+        "BridgeAgentCore",
         "BridgeIPC",
         "BridgeMCP",
         .product(name: "Crypto", package: "swift-crypto"),

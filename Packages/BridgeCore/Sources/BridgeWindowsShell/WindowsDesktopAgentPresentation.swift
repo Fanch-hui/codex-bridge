@@ -58,7 +58,9 @@
         reasoningEfforts: model.supportedReasoningEfforts.map {
           BridgeDesktopChoice(id: $0, title: DirectWorkspacePresentation.effortLabel($0))
         },
-        defaultReasoningEffort: model.defaultReasoningEffort
+        defaultReasoningEffort: model.defaultReasoningEffort,
+        reasoningCapabilitiesAvailable: model.reasoningCapabilitiesAvailable,
+        isDefaultModel: model.isDefaultModel
       )
     }
   }

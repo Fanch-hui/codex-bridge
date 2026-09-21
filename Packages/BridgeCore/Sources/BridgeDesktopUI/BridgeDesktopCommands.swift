@@ -2,6 +2,7 @@ import Foundation
 
 public enum BridgeDesktopCommand: String, Codable, Sendable {
   case ready
+  case requestStateResync
   case refresh
   case checkAppUpdate
   case installAppUpdate
@@ -34,6 +35,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case deleteSession
   case steerTask
   case resumeTask
+  case handoffTask
   case restartTask
   case resolveApproval
   case resolveDirectApproval
@@ -159,6 +161,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let fastModeEnabled: Bool?
   public let keepServiceRunningAfterExit: Bool?
   public let oneTimeToolAutoApproval: Bool?
+  public let queueIfBusy: Bool?
   public let confirmed: Bool?
   public let viewport: BridgeDesktopBrowserViewport?
 
@@ -222,6 +225,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     fastModeEnabled: Bool? = nil,
     keepServiceRunningAfterExit: Bool? = nil,
     oneTimeToolAutoApproval: Bool? = nil,
+    queueIfBusy: Bool? = nil,
     confirmed: Bool? = nil,
     viewport: BridgeDesktopBrowserViewport? = nil
   ) {
@@ -284,6 +288,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.fastModeEnabled = fastModeEnabled
     self.keepServiceRunningAfterExit = keepServiceRunningAfterExit
     self.oneTimeToolAutoApproval = oneTimeToolAutoApproval
+    self.queueIfBusy = queueIfBusy
     self.confirmed = confirmed
     self.viewport = viewport
   }

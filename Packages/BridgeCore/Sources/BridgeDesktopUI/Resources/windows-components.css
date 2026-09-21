@@ -169,7 +169,7 @@
   background: var(--error-soft);
 }
 
-:root[data-platform="windows"] :is(.path-row, .activity-row, .conversation-entry.entry-user, .markdown-code, .entry-arguments, .approval-card pre) {
+:root[data-platform="windows"] :is(.path-row, .activity-row, .conversation-entry.entry-user, .markdown-code, .entry-arguments, .entry-output, .approval-card pre) {
   background: color-mix(in srgb, var(--text) 5%, var(--surface));
 }
 
@@ -291,7 +291,7 @@
     background: Highlight;
   }
 
-  :root[data-platform="windows"] :is(.activity-row, .conversation-entry.entry-user, .markdown-code, .entry-arguments, .approval-card pre) {
+  :root[data-platform="windows"] :is(.activity-row, .conversation-entry.entry-user, .markdown-code, .entry-arguments, .entry-output, .approval-card pre) {
     background: Canvas;
   }
 }

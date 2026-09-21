@@ -273,7 +273,9 @@
       return false
     }
 
-    public func resumeTask(id taskID: String, input: String?, requestID: String? = nil) async {
+    public func resumeTask(
+      id taskID: String, input: String?, requestID: String? = nil, queueIfBusy: Bool = false
+    ) async {
       guard connectionState == .connected, let task = task(id: taskID),
         TaskInspectorPresentation.canResume(
           task,
@@ -297,11 +299,13 @@
         success: "已续接任务。",
         requestID: requestID,
         command: "resumeTask",
-        receiptInput: input ?? ""
+        receiptInput: input ?? "", queueIfBusy: queueIfBusy
       )
     }
 
-    public func restartTask(id taskID: String, requestID: String? = nil) async {
+    public func restartTask(id taskID: String, requestID: String? = nil, queueIfBusy: Bool = false)
+      async
+    {
       guard connectionState == .connected, let task = task(id: taskID), task.canRestart,
         let prompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
         !prompt.isEmpty
@@ -321,7 +325,7 @@
         success: "已重新开始任务。",
         requestID: requestID,
         command: "restartTask",
-        receiptInput: nil
+        receiptInput: nil, queueIfBusy: queueIfBusy
       )
     }
 
@@ -363,7 +367,7 @@
       success: String,
       requestID: String?,
       command: String,
-      receiptInput: String?
+      receiptInput: String?, queueIfBusy: Bool
     ) async {
       let request = IPCAgentSubmitRequest(
         projectID: task.projectID,
@@ -376,7 +380,8 @@
         threadID: threadID,
         networkAccess: task.networkAccess,
         modelOverride: TaskRetrySubmission.modelOverride(for: task),
-        permissionModeOverride: task.permissionMode != nil
+        permissionModeOverride: task.permissionMode != nil,
+        clientRequestID: requestID, queueIfBusy: queueIfBusy
       )
       setActionTextIfSelected(progress, taskID: task.taskID)
       do {
@@ -414,17 +419,17 @@
       publishDisplay()
     }
 
-    private func setActionTextIfSelected(_ text: String, taskID: String) {
+    func setActionTextIfSelected(_ text: String, taskID: String) {
       guard selectedTaskID == taskID else { return }
       setActionText(text)
     }
 
-    private func reportSuccess(_ text: String, taskID: String?) {
+    func reportSuccess(_ text: String, taskID: String?) {
       if let taskID { setActionTextIfSelected(text, taskID: taskID) }
       feedback.postToast(text)
     }
 
-    private func reportFailure(_ text: String, taskID: String?) {
+    func reportFailure(_ text: String, taskID: String?) {
       if let taskID {
         setActionTextIfSelected(text, taskID: taskID)
       } else {
@@ -433,7 +438,7 @@
       feedback.postAlert(text, title: "任务操作失败")
     }
 
-    private func task(id: String) -> MCPServiceTaskSnapshot? {
+    func task(id: String) -> MCPServiceTaskSnapshot? {
       workbenchDisplaySnapshot.taskByID[id]
     }
 

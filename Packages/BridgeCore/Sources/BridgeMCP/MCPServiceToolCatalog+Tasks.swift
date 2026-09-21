@@ -34,7 +34,7 @@ extension MCPServiceToolCatalog {
     name: MCPServiceToolName.getTask.rawValue,
     title: "Get task",
     description:
-      "Read task state, lifecycle events, recent provider activity, result and Supervisor state. "
+      "Read task state, lifecycle events, recent provider activity, result. "
       + "While running, recent_activity exposes bounded reasoning, text and tool lifecycle updates, "
       + "recent_activity_available reports whether that projection could be read, and updated_at "
       + "reflects the latest persisted provider activity. After submit_task returns "
@@ -84,8 +84,7 @@ extension MCPServiceToolCatalog {
       + "Set provider_id to route the task to another registered agent provider (for example "
       + "opencode or deepseek-harness). DeepSeek Harness supports "
       + "provider-native read-only or workspace-write sandbox modes. To continue a completed session, "
-      + "pass its provider_session_id as thread_id when lifecycle.session_continue is available. Omit "
-      + "supervisor_model and supervisor_effort, and use an explicitly requested model, effort, "
+      + "pass its provider_session_id as thread_id when lifecycle.session_continue is available. Use an explicitly requested model, effort, "
       + "permission mode, or Skill only when it is supported by the registered installation. "
       + "DeepSeek Harness uses its verified native tool composition; Web, network, MCP, file, command, "
       + "and subagent work should be routed to it when the registered installation exposes those "
@@ -97,7 +96,7 @@ extension MCPServiceToolCatalog {
       + "Codex. For OpenCode, execution_effort accepts only the selected model's ACP effort values; "
       + "when omitted, Bridge uses the saved OpenCode default when supported and otherwise the Provider default. "
       + "If permission_mode is omitted or unmarked, Bridge uses the Workbench default for ChatGPT and Qwen; "
-      + "supervisor and skill fields must also be omitted. To continue an OpenCode conversation, pass the "
+      + "skill fields must also be omitted. To continue an OpenCode conversation, pass the "
       + "provider_session_id returned by get_task as thread_id; Bridge resumes or loads that exact "
       + "ACP session in the selected project. For Antigravity, set provider_id=antigravity; it "
       + "uses the registered official agy stream-json installation and supports native plan/accept-edits "
@@ -107,8 +106,7 @@ extension MCPServiceToolCatalog {
       + "available only when list_agents reports the corresponding effective capability; thread_id "
       + "must be a prior Bridge-bound Antigravity conversation from the same project and installation. "
       + "steer_task queues follow-up input on the same Antigravity session after the current prompt, "
-      + "not real-time insertion. Bridge can inject an explicitly requested skill_name. Antigravity "
-      + "does not support Supervisor. Network and sandboxed tools follow agy's native policy; Bridge "
+      + "not real-time insertion. Bridge can inject an explicitly requested skill_name. Network and sandboxed tools follow agy's native policy; Bridge "
       + "must not reject a task solely because it requests network access. A provider permission denial "
       + "is reported as task failure. The response includes wait_policy; follow "
       + "its recommended_poll_after_seconds before checking get_task again. The three profiles are "
@@ -154,16 +152,6 @@ extension MCPServiceToolCatalog {
           "description":
             "Set true only when the user explicitly requests a per-task model or effort override. Otherwise omit; supplied model fields are ignored for compatibility.",
         ],
-        "supervisor_model": nullableStringSchema(
-          maximum: 256,
-          description:
-            "Omit to use the Codex Bridge Supervisor default. Set only when the user explicitly requests an override."
-        ),
-        "supervisor_effort": nullableStringSchema(
-          maximum: 64,
-          description:
-            "Omit to use the Codex Bridge Supervisor default effort. Set only with an explicit user-requested override."
-        ),
         "permission_mode": [
           "type": ["string", "null"],
           "enum": ["read-only", "workspace-write", .null],
@@ -186,6 +174,11 @@ extension MCPServiceToolCatalog {
           "items": boundedStringSchema(maximum: 4_096),
         ],
         "client_request_id": nullableStringSchema(maximum: 512),
+        "queue_if_busy": [
+          "type": "boolean",
+          "description":
+            "When true, a workspace-write task waits in the durable project queue if another write task is active. The default false preserves immediate busy responses.",
+        ],
       ],
       required: ["prompt"]
     ),
@@ -249,7 +242,7 @@ extension MCPServiceToolCatalog {
         "task_id": boundedStringSchema(maximum: 128),
         "expected_turn_id": boundedStringSchema(maximum: 1_024),
       ],
-      required: ["task_id", "expected_turn_id"]
+      required: ["task_id"]
     ),
     annotations: Tool.Annotations(
       readOnlyHint: false,

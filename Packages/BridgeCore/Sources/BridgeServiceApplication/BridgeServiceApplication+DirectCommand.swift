@@ -201,6 +201,7 @@ extension BridgeServiceApplication {
       status: session.status,
       exitCode: session.exitCode.map(Int.init),
       startedAt: iso8601.string(from: session.startedAt),
+      completedAt: session.endedAt.map { iso8601.string(from: $0) },
       output: Self.output(session)
     )
   }

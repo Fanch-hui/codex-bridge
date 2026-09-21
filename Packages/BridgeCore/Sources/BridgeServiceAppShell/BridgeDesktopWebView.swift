@@ -47,6 +47,9 @@ struct BridgeDesktopWebView: NSViewRepresentable {
   final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     weak var model: BridgeServiceAppModel?
     private var latestState: BridgeDesktopUIState?
+    private var latestPatch: BridgeDesktopUIStatePatch?
+    private var latestRevision: UInt64 = 0
+    private var patchBuilder = BridgeDesktopUIStatePatchBuilder()
     private var didFinishLoading = false
     private let conversationObservation = DesktopConversationObservation()
 
@@ -60,8 +63,10 @@ struct BridgeDesktopWebView: NSViewRepresentable {
         self.update(state: BridgeDesktopUIStateBuilder.build(from: model), webView: webView)
       }
       guard latestState != state else { return }
+      latestRevision &+= 1
       latestState = state
-      sendLatestState(to: webView)
+      latestPatch = patchBuilder.makePatch(state: state, nextRevision: latestRevision)
+      sendLatestPatch(to: webView)
     }
 
     func failLoading() {
@@ -73,12 +78,17 @@ struct BridgeDesktopWebView: NSViewRepresentable {
       didReceive message: WKScriptMessage
     ) {
       guard let envelope = decode(message.body) else { return }
+      if envelope.command == .ready || envelope.command == .requestStateResync {
+        guard let webView = message.webView else { return }
+        sendFullSnapshot(to: webView)
+        return
+      }
       handle(envelope)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
       didFinishLoading = true
-      sendLatestState(to: webView)
+      sendFullSnapshot(to: webView)
     }
 
     func webView(
@@ -92,15 +102,34 @@ struct BridgeDesktopWebView: NSViewRepresentable {
       model = nil
     }
 
-    private func sendLatestState(to webView: WKWebView) {
-      guard didFinishLoading, let latestState,
-        let data = try? JSONEncoder().encode(latestState),
-        let json = String(data: data, encoding: .utf8),
-        let literalData = try? JSONEncoder().encode(json),
-        let literal = String(data: literalData, encoding: .utf8)
+    private func sendLatestPatch(to webView: WKWebView) {
+      let startedAt = ContinuousClock.now
+      guard didFinishLoading, let latestState, let latestPatch,
+        let data = try? JSONEncoder().encode(latestPatch),
+        let json = String(data: data, encoding: .utf8)
       else { return }
       let script =
-        "window.CodexBridgeDesktopUI && window.CodexBridgeDesktopUI.setState(JSON.parse(\(literal)))"
+        "window.CodexBridgeDesktopUI && window.CodexBridgeDesktopUI.applyStatePatch(\(json))"
+      webView.evaluateJavaScript(script, completionHandler: nil)
+      ConversationPerformanceRecorder.shared.record(
+        ConversationPerformanceSample(
+          stage: .desktopStateEncode,
+          duration: startedAt.duration(to: ContinuousClock.now),
+          byteCount: data.count,
+          entryCount: latestState.workbench?.selectedTask?.conversation.count ?? 0
+        )
+      )
+    }
+
+    private func sendFullSnapshot(to webView: WKWebView) {
+      guard didFinishLoading, let latestState else { return }
+      let patch = patchBuilder.fullSnapshot(state: latestState, revision: latestRevision)
+      latestPatch = patch
+      guard let data = try? JSONEncoder().encode(patch),
+        let json = String(data: data, encoding: .utf8)
+      else { return }
+      let script =
+        "window.CodexBridgeDesktopUI && window.CodexBridgeDesktopUI.applyStatePatch(\(json))"
       webView.evaluateJavaScript(script, completionHandler: nil)
     }
 

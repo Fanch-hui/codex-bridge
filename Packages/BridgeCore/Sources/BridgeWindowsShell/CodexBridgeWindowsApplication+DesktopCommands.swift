@@ -70,13 +70,22 @@
           )
         }
         return true
-      case .resumeTask(let taskID, let input, let requestID):
+      case .resumeTask(let taskID, let input, let requestID, let queueIfBusy):
         Task { @MainActor in
-          await model.resumeTask(id: taskID, input: input, requestID: requestID)
+          await model.resumeTask(
+            id: taskID, input: input, requestID: requestID, queueIfBusy: queueIfBusy)
         }
         return true
-      case .restartTask(let taskID, let requestID):
-        Task { @MainActor in await model.restartTask(id: taskID, requestID: requestID) }
+      case .handoffTask(let taskID, let providerID, let prompt, let requestID):
+        Task { @MainActor in
+          await model.handoffTask(
+            id: taskID, providerID: providerID, prompt: prompt, requestID: requestID)
+        }
+        return true
+      case .restartTask(let taskID, let requestID, let queueIfBusy):
+        Task { @MainActor in
+          await model.restartTask(id: taskID, requestID: requestID, queueIfBusy: queueIfBusy)
+        }
         return true
       case .rejectWorkbenchCommand(let requestID, let command, let taskID, let input):
         model.rejectWorkbenchCommand(
@@ -306,7 +315,8 @@
         Task { @MainActor in
           await auxiliary.agentDefaults.refreshModels(
             providerID: providerID,
-            installationID: installationID
+            installationID: installationID,
+            forceRefresh: true
           )
         }
         return true

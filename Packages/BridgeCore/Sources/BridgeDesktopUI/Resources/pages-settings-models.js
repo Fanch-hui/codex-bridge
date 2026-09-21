@@ -57,7 +57,7 @@
       S.choices(page.executionModel, modelChoices(page.models)), function () {}, "");
     var effort = S.selectField(
       "执行推理强度", page.executionEffort,
-      S.choices(page.executionEffort, page.effortOptions), function () {}, "");
+      S.safeArray(page.effortOptions), function () {}, "");
     var toggle = check("快速模式", page.fastModeEnabled);
     var access = S.selectField(
       "访问模式", page.accessMode,

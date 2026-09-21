@@ -277,6 +277,9 @@ extension MCPServiceToolCatalog {
       "result_summary": stringSchema,
       "failure_code": stringSchema,
       "updated_at": stringSchema,
+      "queue_position": integerSchema(minimum: 1),
+      "queue_occupant_task_id": stringSchema,
+      "queue_requested_at": stringSchema,
       "wait_policy": taskWaitPolicySchema,
     ],
     required: [

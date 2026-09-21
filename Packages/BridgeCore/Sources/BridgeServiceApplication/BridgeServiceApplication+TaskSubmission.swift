@@ -66,7 +66,8 @@ extension BridgeServiceApplication {
       )
       if source == .macOSApp,
         let submitted = try await tasks.task(id: result.task.id),
-        submitted.state.status == .awaitingLocalApproval
+        submitted.state.status == .awaitingLocalApproval,
+        !submitted.isQueued
       {
         try await approveAndStartTask(
           submitted.id,
@@ -75,6 +76,7 @@ extension BridgeServiceApplication {
       } else if try await settings.taskStartApprovalMode() == .auto,
         let submitted = try await tasks.task(id: result.task.id),
         submitted.state.status == .awaitingLocalApproval,
+        !submitted.isQueued,
         submitted.requiresLocalStartApproval
       {
         try await approveAndStartTask(submitted.id, automatically: true)
@@ -87,6 +89,7 @@ extension BridgeServiceApplication {
         status: latest.state.status.rawValue,
         reusedExistingTask: result.reusedExistingTask,
         localApprovalRequired: latest.state.status == .awaitingLocalApproval
+          && !latest.isQueued
       )
     } catch {
       await workspaceGate.endTaskAdmission(token: admissionToken)

@@ -13,6 +13,7 @@ public protocol BridgeTaskConversationClient: Sendable {
 }
 
 public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Sendable {
+  func serviceChanges() async -> AsyncStream<Void>
   func directConfiguration() async throws -> IPCDirectConfiguration
   func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
     -> IPCDirectConfiguration
@@ -74,6 +75,13 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     projectID: String?,
     modelID: String?,
     useStoredDefault: Bool
+  ) async throws -> IPCAgentModelsResponse
+  func agentModels(
+    installationID: String,
+    projectID: String?,
+    modelID: String?,
+    useStoredDefault: Bool,
+    forceRefresh: Bool
   ) async throws -> IPCAgentModelsResponse
   func agentModelDefault() async throws -> IPCAgentModelDefaultResponse
   func agentModelDefault(providerID: String) async throws -> IPCAgentModelDefaultResponse
@@ -161,6 +169,9 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func serviceChanges() async -> AsyncStream<Void> {
+    AsyncStream { $0.finish() }
+  }
   public func prepareAppUpdate() async throws -> Bool {
     throw BridgeServiceClientError.serviceRestartRequired
   }
@@ -308,6 +319,21 @@ extension BridgeServiceClientProtocol {
       installationID: installationID,
       projectID: projectID,
       modelID: modelID
+    )
+  }
+
+  public func agentModels(
+    installationID: String,
+    projectID: String?,
+    modelID: String?,
+    useStoredDefault: Bool,
+    forceRefresh _: Bool
+  ) async throws -> IPCAgentModelsResponse {
+    try await agentModels(
+      installationID: installationID,
+      projectID: projectID,
+      modelID: modelID,
+      useStoredDefault: useStoredDefault
     )
   }
 

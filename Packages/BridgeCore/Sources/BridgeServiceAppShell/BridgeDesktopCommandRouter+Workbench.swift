@@ -90,7 +90,18 @@ extension BridgeDesktopCommandRouter {
         reject(envelope, model: model, message: "当前任务无法续接会话。")
         return
       }
-      model.resumeTask(selectedTask, prompt: payload.input, requestID: envelope.requestID)
+      model.resumeTask(
+        selectedTask, prompt: payload.input, requestID: envelope.requestID,
+        queueIfBusy: payload.queueIfBusy ?? false)
+    case .handoffTask:
+      guard let selectedTask = task(payload.taskID, in: model), connected(model),
+        let providerID = payload.providerID, let prompt = payload.input
+      else {
+        reject(envelope, model: model, message: "交接信息不完整。")
+        return
+      }
+      model.handoffTask(
+        selectedTask, providerID: providerID, prompt: prompt, requestID: envelope.requestID)
     case .restartTask:
       guard let selectedTask = task(payload.taskID, in: model),
         connected(model), selectedTask.canRestart
@@ -98,7 +109,8 @@ extension BridgeDesktopCommandRouter {
         reject(envelope, model: model, message: "当前任务没有可用于重新开始的原始指令。")
         return
       }
-      model.restartTask(selectedTask, requestID: envelope.requestID)
+      model.restartTask(
+        selectedTask, requestID: envelope.requestID, queueIfBusy: payload.queueIfBusy ?? false)
     case .resolveApproval:
       resolveApproval(payload, model: model)
     case .resolveDirectApproval:

@@ -128,7 +128,9 @@ extension BridgeDesktopUIStateBuilder {
           reasoningEfforts: item.supportedReasoningEfforts.map {
             BridgeDesktopChoice(id: $0, title: BridgeDesktopPresentation.reasoningTitle($0))
           },
-          defaultReasoningEffort: item.defaultReasoningEffort
+          defaultReasoningEffort: item.defaultReasoningEffort,
+          reasoningCapabilitiesAvailable: item.reasoningCapabilitiesAvailable,
+          isDefaultModel: item.isDefaultModel
         )
       }
       return BridgeDesktopAgentDefaultState(
@@ -153,9 +155,7 @@ extension BridgeDesktopUIStateBuilder {
         errorMessage: model.agentModelRefreshError(for: provider.providerID) ?? model.errorMessage,
         canSelectModel: provider.supportsModelSelection
           && installation?.effectiveCapabilities.contains("selection.model") == true,
-        canSelectEffort: provider.supportsEffortSelection
-          && model.supportsAgentEffortSelection(
-            providerID: provider.providerID, installationID: installation?.installationID)
+        canSelectEffort: provider.supportsEffortSelection && installation != nil
       )
     }
   }

@@ -37,16 +37,17 @@ enum ProjectGitStatus {
 }
 
 extension BridgeServiceApplication {
-  static func checkedProjectSummaries(
+  func checkedProjectSummaries(
     _ projects: [ServiceProjectRecord], deadline: ContinuousClock.Instant
   ) async -> [MCPProjectSummary] {
+    let cache = gitStatusCache
     var summaries: [MCPProjectSummary] = []
     for start in stride(from: 0, to: projects.count, by: 4) {
       let batch = await withTaskGroup(of: (Int, MCPProjectSummary).self) { group in
         for index in start..<min(start + 4, projects.count) {
           let project = projects[index]
           group.addTask {
-            let state = await ProjectGitStatus.read(project, deadline: deadline)
+            let state = await cache.read(project, deadline: deadline)
             return (index, Self.projectSummary(project, gitState: state))
           }
         }

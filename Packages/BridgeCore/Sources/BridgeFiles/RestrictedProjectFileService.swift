@@ -6,7 +6,7 @@ import Foundation
 public struct RestrictedProjectFileService: Sendable {
   private static let maximumReturnedLineBytes = 64 * 1_024
   private let repository: any ProjectRepository
-  private let limits: ProjectFileLimits
+  let limits: ProjectFileLimits
 
   public init(
     repository: any ProjectRepository,
@@ -81,7 +81,7 @@ public struct RestrictedProjectFileService: Sendable {
     )
   }
 
-  private func requireReadableProject(_ id: BridgeDomain.ProjectID) async throws
+  func requireReadableProject(_ id: BridgeDomain.ProjectID) async throws
     -> RegisteredProject
   {
     guard let project = try await repository.project(id: id) else {
@@ -120,28 +120,46 @@ public struct RestrictedProjectFileService: Sendable {
     let lines = normalizedLines(fileInfo.text)
     let startIndex = min(range.startLine - 1, lines.count)
     let endIndex = min(startIndex + range.lineCount, lines.count)
-    var visible = try lines[startIndex..<endIndex].map(sanitizeReturnedLine)
-    let selectedLineCount = visible.count
+    let selected = try lines[startIndex..<endIndex].map(sanitizeReturnedLine)
+    let selectedLineCount = selected.count
     let moreLinesExist = endIndex < lines.count || fileInfo.truncated
-
-    while true {
+    guard selectedLineCount > 0 else {
       let result = readResult(
-        lines: visible,
+        lines: [],
         path: path,
         startLine: range.startLine,
-        moreLinesExist: moreLinesExist || visible.count < endIndex - startIndex,
+        moreLinesExist: moreLinesExist,
         sha256: fileInfo.sha256,
         byteCount: fileInfo.byteCount
       )
-      if try encodedSize(result) <= limits.maximumResponseBytes {
-        guard selectedLineCount == 0 || !visible.isEmpty else {
-          throw ProjectFileError.responseLimitExceeded
-        }
-        return result
+      guard try encodedSize(result) <= limits.maximumResponseBytes else {
+        throw ProjectFileError.responseLimitExceeded
       }
-      guard !visible.isEmpty else { throw ProjectFileError.responseLimitExceeded }
-      visible.removeLast()
+      return result
     }
+
+    var low = 1
+    var high = selected.count
+    var best: ProjectFileReadResult?
+    while low <= high {
+      let count = (low + high) / 2
+      let candidate = readResult(
+        lines: Array(selected.prefix(count)),
+        path: path,
+        startLine: range.startLine,
+        moreLinesExist: moreLinesExist || count < selected.count,
+        sha256: fileInfo.sha256,
+        byteCount: fileInfo.byteCount
+      )
+      if try encodedSize(candidate) <= limits.maximumResponseBytes {
+        best = candidate
+        low = count + 1
+      } else {
+        high = count - 1
+      }
+    }
+    guard let best else { throw ProjectFileError.responseLimitExceeded }
+    return best
   }
 
   private func readResult(

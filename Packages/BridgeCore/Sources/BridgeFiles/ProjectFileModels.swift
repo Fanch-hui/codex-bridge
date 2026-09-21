@@ -9,6 +9,8 @@ public struct ProjectFileLimits: Equatable, Sendable {
   public let maximumCandidateFiles: Int
   public let maximumEnumeratedEntries: Int
   public let maximumDirectoryDepth: Int
+  public let maximumBatchFiles: Int
+  public let maximumBatchResponseBytes: Int
   public let maximumSearchBytes: Int
   public let maximumScannedLines: Int
 
@@ -20,6 +22,8 @@ public struct ProjectFileLimits: Equatable, Sendable {
     maximumCandidateFiles: Int = 20_000,
     maximumEnumeratedEntries: Int = 100_000,
     maximumDirectoryDepth: Int = 64,
+    maximumBatchFiles: Int = 32,
+    maximumBatchResponseBytes: Int = 512 * 1_024,
     maximumSearchBytes: Int = 20 * 1_024 * 1_024,
     maximumScannedLines: Int = 1_000_000
   ) throws {
@@ -32,6 +36,9 @@ public struct ProjectFileLimits: Equatable, Sendable {
       maximumCandidateFiles > 0,
       maximumEnumeratedEntries >= maximumCandidateFiles,
       maximumDirectoryDepth > 0,
+      maximumBatchFiles > 0,
+      maximumBatchFiles <= 100,
+      maximumBatchResponseBytes >= maximumResponseBytes,
       maximumSearchBytes >= maximumFileBytes,
       maximumScannedLines > 0
     else {
@@ -45,6 +52,8 @@ public struct ProjectFileLimits: Equatable, Sendable {
       maximumCandidateFiles: maximumCandidateFiles,
       maximumEnumeratedEntries: maximumEnumeratedEntries,
       maximumDirectoryDepth: maximumDirectoryDepth,
+      maximumBatchFiles: maximumBatchFiles,
+      maximumBatchResponseBytes: maximumBatchResponseBytes,
       maximumSearchBytes: maximumSearchBytes,
       maximumScannedLines: maximumScannedLines
     )
@@ -58,6 +67,8 @@ public struct ProjectFileLimits: Equatable, Sendable {
     maximumCandidateFiles: 20_000,
     maximumEnumeratedEntries: 100_000,
     maximumDirectoryDepth: 64,
+    maximumBatchFiles: 32,
+    maximumBatchResponseBytes: 512 * 1_024,
     maximumSearchBytes: 20 * 1_024 * 1_024,
     maximumScannedLines: 1_000_000
   )
@@ -70,6 +81,8 @@ public struct ProjectFileLimits: Equatable, Sendable {
     maximumCandidateFiles: Int,
     maximumEnumeratedEntries: Int,
     maximumDirectoryDepth: Int,
+    maximumBatchFiles: Int,
+    maximumBatchResponseBytes: Int,
     maximumSearchBytes: Int,
     maximumScannedLines: Int
   ) {
@@ -80,6 +93,8 @@ public struct ProjectFileLimits: Equatable, Sendable {
     self.maximumCandidateFiles = maximumCandidateFiles
     self.maximumEnumeratedEntries = maximumEnumeratedEntries
     self.maximumDirectoryDepth = maximumDirectoryDepth
+    self.maximumBatchFiles = maximumBatchFiles
+    self.maximumBatchResponseBytes = maximumBatchResponseBytes
     self.maximumSearchBytes = maximumSearchBytes
     self.maximumScannedLines = maximumScannedLines
   }
@@ -244,6 +259,8 @@ public enum ProjectFileError: Error, LocalizedError, Equatable, Sendable {
   case readNotAllowed
   case invalidLineRange
   case invalidSearchRequest
+  case invalidDirectoryRequest
+  case invalidBatchRequest
   case invalidCursor
   case forbiddenPath
   case pathMissing
@@ -267,6 +284,10 @@ public enum ProjectFileError: Error, LocalizedError, Equatable, Sendable {
       "A file read can return at most 300 lines from a positive line number."
     case .invalidSearchRequest:
       "The search query, scope, cursor, or match limit is invalid."
+    case .invalidDirectoryRequest:
+      "The directory path, depth, cursor, or entry limit is invalid."
+    case .invalidBatchRequest:
+      "The batch file request is empty, too large, or spans multiple projects."
     case .invalidCursor:
       "The search cursor does not belong to this query."
     case .forbiddenPath:

@@ -48,15 +48,17 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
 
     case .tool(let update):
       let itemID = Self.agentToolItemID(update.key)
+      let arguments = update.arguments.map {
+        OutboundContentSecurity.redactedToolArguments($0, maximumUTF8Bytes: 64 * 1_024)
+      }
       await conversation.upsertToolCall(
         taskID: taskID,
         call: try ExecutionToolCall(
           itemID: itemID,
           tool: update.name.isEmpty ? "tool" : update.name,
-          arguments: update.arguments.map {
-            OutboundContentSecurity.redactedToolArguments($0, maximumUTF8Bytes: 64 * 1_024)
-          },
-          status: Self.toolStatus(update.status)
+          arguments: arguments,
+          status: Self.toolStatus(update.status),
+          childRuns: update.childRuns
         ),
         output: update.output.map {
           OutboundContentSecurity.redactedCommandOutput($0, maximumUTF8Bytes: 256 * 1_024)

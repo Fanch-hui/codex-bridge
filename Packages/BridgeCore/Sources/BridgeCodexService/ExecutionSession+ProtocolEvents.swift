@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeCodexRPC
 
 extension ExecutionSession {
@@ -26,6 +27,23 @@ extension ExecutionSession {
         throw ExecutionServiceError.protocolViolation("collaboration turn started")
       }
       collaborationBindings.insert(eventBinding)
+      let childRun = try AgentChildRun(
+        id: eventBinding.turnID,
+        sessionID: eventBinding.threadID,
+        status: AgentToolStatus.inProgress.rawValue
+      )
+      collaborationRuns[eventBinding] = childRun
+      await yield(
+        .toolCall(
+          try ExecutionToolCall(
+            itemID: Self.collaborationItemID(eventBinding),
+            tool: "subagent",
+            arguments: nil,
+            status: .inProgress,
+            childRuns: [childRun]
+          )
+        )
+      )
     } catch {
       await fail(
         code: "invalid_turn_started",
@@ -90,6 +108,11 @@ extension ExecutionSession {
 
   func isPrimaryBinding(threadID: String, turnID: String) -> Bool {
     threadID == expectedThreadID && startedTurnIDs.contains(turnID)
+  }
+
+  static func collaborationItemID(_ binding: ExecutionBinding) -> String {
+    let value = "collab:\(binding.turnID)"
+    return value.utf8.count <= 256 ? value : String(decoding: value.utf8.prefix(256), as: UTF8.self)
   }
 
   func receiveSemanticNotification(_ notification: RPCNotification) async {

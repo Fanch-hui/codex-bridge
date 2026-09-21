@@ -27,7 +27,7 @@ private struct LegacyWorkspaceCommand: Codable {
 }
 
 enum ServiceStoreSchema {
-  static let version: Int64 = 16
+  static let version: Int64 = 17
   static let migrationPrefix = "BridgeServiceCore."
   static let migrationV1 = "BridgeServiceCore.v1"
   static let migrationV2 = "BridgeServiceCore.v2"
@@ -45,22 +45,32 @@ enum ServiceStoreSchema {
   static let migrationV14 = "BridgeServiceCore.v14"
   static let migrationV15 = "BridgeServiceCore.v15"
   static let migrationV16 = "BridgeServiceCore.v16"
+  static let migrationV17 = "BridgeServiceCore.v17"
   static let knownMigrations: Set<String> = [
     migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7,
     migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13,
-    migrationV14, migrationV15, migrationV16,
+    migrationV14, migrationV15, migrationV16, migrationV17,
   ]
 
   static func prepare(_ database: DatabaseQueue) throws {
     do {
       try preflight(database)
       try makeMigrator().migrate(database)
+      try ensureTaskMessageActivityIndex(database)
       try validate(database)
     } catch let error as ServiceStoreError {
       throw error
+    } catch let error as DatabaseError where Self.isBusy(error) {
+      throw ServiceStoreError.storageBusy
     } catch {
       throw ServiceStoreError.corruptSchema
     }
+  }
+
+  private static func isBusy(_ error: DatabaseError) -> Bool {
+    error.resultCode == .SQLITE_BUSY
+      || error.resultCode == .SQLITE_LOCKED
+      || error.resultCode == .SQLITE_PROTOCOL
   }
 
   static func createPreMigrationBackupIfNeeded(
@@ -68,13 +78,15 @@ enum ServiceStoreSchema {
     sourcePath: String
   ) throws {
     guard sourcePath != ":memory:" else { return }
-    let sourceVersion = try database.read { db -> Int64? in
-      guard try db.tableExists("bridge_service_meta") else { return nil }
-      return try Int64.fetchOne(
-        db,
-        sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
-      )
-    }
+    guard
+      let sourceVersion = try database.read({ db -> Int64? in
+        guard try db.tableExists("bridge_service_meta") else { return nil }
+        return try Int64.fetchOne(
+          db,
+          sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
+        )
+      })
+    else { return }
     let backupSuffix: String
     switch sourceVersion {
     case 7: backupSuffix = ".pre-v8"
@@ -86,42 +98,62 @@ enum ServiceStoreSchema {
     case 13: backupSuffix = ".pre-v14"
     case 14: backupSuffix = ".pre-v15"
     case 15: backupSuffix = ".pre-v16"
+    case 16: backupSuffix = ".pre-v17"
     default: return
     }
     let backupPath = sourcePath + backupSuffix
     if FileManager.default.fileExists(atPath: backupPath) {
-      try validatePrivateBackup(at: backupPath)
-      return
+      do {
+        try validatePrivateBackup(at: backupPath, expectedSchemaVersion: sourceVersion)
+        removeSupersededBackups(sourcePath: sourcePath, keeping: backupPath)
+        return
+      } catch {
+        try FileManager.default.removeItem(atPath: backupPath)
+      }
     }
     var configuration = Configuration()
     configuration.foreignKeysEnabled = true
-    let destination = try DatabaseQueue(path: backupPath, configuration: configuration)
+    guard FileManager.default.createFile(atPath: backupPath, contents: nil) else {
+      throw ServiceStoreError.storageFailure
+    }
     do {
+      try setPrivateBackupPermissions(at: backupPath)
+      let destination = try DatabaseQueue(path: backupPath, configuration: configuration)
       try database.backup(to: destination)
-      #if os(Windows)
-        guard backupPath.withCString(encodedAs: UTF16.self, { _wchmod($0, 0o600) }) == 0 else {
-          throw ServiceStoreError.storageFailure
-        }
-      #else
-        guard chmod(backupPath, 0o600) == 0 else {
-          throw ServiceStoreError.storageFailure
-        }
-      #endif
-      try validatePrivateBackup(at: backupPath)
+      try setPrivateBackupPermissions(at: backupPath)
+      try validatePrivateBackup(at: backupPath, expectedSchemaVersion: sourceVersion)
+      removeSupersededBackups(sourcePath: sourcePath, keeping: backupPath)
     } catch {
       try? FileManager.default.removeItem(atPath: backupPath)
       throw error
     }
   }
 
-  private static func validatePrivateBackup(at path: String) throws {
+  private static func setPrivateBackupPermissions(at path: String) throws {
     #if os(Windows)
-      // Windows uses ACLs; owner and POSIX-mode checks apply to POSIX only.
-      guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-        attributes[.type] as? FileAttributeType == .typeRegular
-      else {
+      guard path.withCString(encodedAs: UTF16.self, { _wchmod($0, 0o600) }) == 0 else {
         throw ServiceStoreError.storageFailure
       }
+    #else
+      guard chmod(path, 0o600) == 0 else {
+        throw ServiceStoreError.storageFailure
+      }
+    #endif
+  }
+
+  private static func validatePrivateBackup(
+    at path: String,
+    expectedSchemaVersion: Int64
+  ) throws {
+    guard
+      let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+      attributes[.type] as? FileAttributeType == .typeRegular,
+      (attributes[.size] as? NSNumber)?.int64Value ?? 0 > 0
+    else {
+      throw ServiceStoreError.storageFailure
+    }
+    #if os(Windows)
+      // Windows uses ACLs; owner and POSIX-mode checks apply to POSIX only.
     #else
       var metadata = stat()
       guard lstat(path, &metadata) == 0,
@@ -132,6 +164,78 @@ enum ServiceStoreSchema {
         throw ServiceStoreError.storageFailure
       }
     #endif
+    var configuration = Configuration()
+    configuration.foreignKeysEnabled = true
+    let backup = try DatabaseQueue(path: path, configuration: configuration)
+    try backup.read { db in
+      guard try String.fetchOne(db, sql: "PRAGMA quick_check(1)") == "ok",
+        try Row.fetchAll(db, sql: "PRAGMA foreign_key_check").isEmpty,
+        try Int64.fetchOne(
+          db,
+          sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
+        ) == expectedSchemaVersion
+      else {
+        throw ServiceStoreError.storageFailure
+      }
+    }
+  }
+
+  private static func removeSupersededBackups(sourcePath: String, keeping: String) {
+    let sourceURL = URL(fileURLWithPath: sourcePath)
+    let directory = sourceURL.deletingLastPathComponent().path
+    let prefix = sourceURL.lastPathComponent + ".pre-v"
+    guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory) else {
+      return
+    }
+    for name in names where name.hasPrefix(prefix) {
+      let candidate = URL(fileURLWithPath: directory).appendingPathComponent(name).path
+      guard candidate != keeping,
+        let attributes = try? FileManager.default.attributesOfItem(atPath: candidate),
+        attributes[.type] as? FileAttributeType == .typeRegular
+      else { continue }
+      try? FileManager.default.removeItem(atPath: candidate)
+    }
+  }
+
+  static func prunePreMigrationBackups(sourcePath: String) {
+    let sourceURL = URL(fileURLWithPath: sourcePath)
+    let directory = sourceURL.deletingLastPathComponent().path
+    let prefix = sourceURL.lastPathComponent + ".pre-v"
+    guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory) else {
+      return
+    }
+    let candidates = names.compactMap { name -> (path: String, version: Int64)? in
+      guard name.hasPrefix(prefix),
+        let targetVersion = Int64(name.dropFirst(prefix.count)),
+        (8...17).contains(targetVersion)
+      else { return nil }
+      return (
+        URL(fileURLWithPath: directory).appendingPathComponent(name).path,
+        targetVersion
+      )
+    }
+    let valid = candidates.filter { candidate in
+      (try? validatePrivateBackup(
+        at: candidate.path,
+        expectedSchemaVersion: candidate.version - 1
+      )) != nil
+    }
+    for candidate in candidates where !valid.contains(where: { $0.path == candidate.path }) {
+      try? FileManager.default.removeItem(atPath: candidate.path)
+    }
+    guard let keep = valid.max(by: { $0.version < $1.version }) else { return }
+    removeSupersededBackups(sourcePath: sourcePath, keeping: keep.path)
+  }
+
+  private static func ensureTaskMessageActivityIndex(_ database: DatabaseQueue) throws {
+    try database.write { db in
+      try db.execute(
+        sql: """
+          CREATE INDEX IF NOT EXISTS bridge_service_task_messages_agent_activity
+          ON bridge_service_task_messages(task_id, role, updated_at DESC, message_id DESC)
+          """
+      )
+    }
   }
 
   static func makeMigrator() -> DatabaseMigrator {
@@ -183,6 +287,9 @@ enum ServiceStoreSchema {
     }
     migrator.registerMigration(migrationV16) { db in
       try createVersionSixteen(in: db)
+    }
+    migrator.registerMigration(migrationV17) { db in
+      try createVersionSeventeen(in: db)
     }
     return migrator
   }
@@ -1092,7 +1199,7 @@ enum ServiceStoreSchema {
           "changed_files_json", "result_summary", "supervisor_summary", "failure_code",
           "created_at", "updated_at",
           "provider_id", "installation_id", "selection_mode",
-          "provider_session_id", "provider_run_id",
+          "provider_session_id", "provider_run_id", "queue_if_busy", "queue_state",
         ],
         "bridge_service_task_events": [
           "event_id", "task_id", "kind", "summary", "created_at",
@@ -1101,6 +1208,7 @@ enum ServiceStoreSchema {
           "message_id", "task_id", "message_key", "role", "kind", "content",
           "tool_name", "tool_status", "tool_arguments", "created_at", "updated_at",
         ],
+        "bridge_service_task_queue": ["task_id", "enqueued_at"],
       ]
       for (table, expected) in requiredColumns {
         guard try db.tableExists(table) else { throw ServiceStoreError.corruptSchema }

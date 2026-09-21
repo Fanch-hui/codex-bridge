@@ -203,6 +203,9 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
   public let networkAllowed: Bool
   public let accessMode: ServiceAccessMode
   public let fastMode: Bool
+  public let queueIfBusy: Bool
+  /// Queued tasks retain the normal awaiting-approval state until admitted.
+  public let isQueued: Bool
   public let state: ServiceTaskState
   public let createdAt: Date
   public let updatedAt: Date
@@ -234,6 +237,8 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
     networkAllowed: Bool,
     accessMode: ServiceAccessMode = .requestApproval,
     fastMode: Bool = false,
+    queueIfBusy: Bool = false,
+    isQueued: Bool = false,
     state: ServiceTaskState,
     createdAt: Date,
     updatedAt: Date
@@ -331,6 +336,8 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
     self.networkAllowed = networkAllowed
     self.accessMode = accessMode
     self.fastMode = fastMode
+    self.queueIfBusy = queueIfBusy
+    self.isQueued = isQueued
     self.state = state
     self.createdAt = createdAt
     self.updatedAt = updatedAt
@@ -359,6 +366,39 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
       networkAllowed: networkAllowed,
       accessMode: accessMode,
       fastMode: fastMode,
+      queueIfBusy: queueIfBusy,
+      isQueued: isQueued,
+      state: state,
+      createdAt: createdAt,
+      updatedAt: updatedAt
+    )
+  }
+
+  func replacingQueueState(
+    _ isQueued: Bool,
+    updatedAt: Date
+  ) throws -> ServiceTaskRecord {
+    try ServiceTaskRecord(
+      id: id,
+      projectID: projectID,
+      source: source,
+      sourceClientID: sourceClientID,
+      clientRequestID: clientRequestID,
+      prompt: prompt,
+      requestedThreadID: requestedThreadID,
+      providerID: providerID,
+      installationID: installationID,
+      selectionMode: selectionMode,
+      executionModel: executionModel,
+      executionEffort: executionEffort,
+      supervisorModel: supervisorModel,
+      supervisorEffort: supervisorEffort,
+      permissionMode: permissionMode,
+      networkAllowed: networkAllowed,
+      accessMode: accessMode,
+      fastMode: fastMode,
+      queueIfBusy: queueIfBusy,
+      isQueued: isQueued,
       state: state,
       createdAt: createdAt,
       updatedAt: updatedAt
@@ -383,6 +423,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
       && networkAllowed == other.networkAllowed
       && accessMode == other.accessMode
       && fastMode == other.fastMode
+      && queueIfBusy == other.queueIfBusy
   }
 
   func hasSameImmutableFields(as other: ServiceTaskRecord) -> Bool {

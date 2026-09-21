@@ -1,6 +1,6 @@
 # Codex Bridge 详细使用指南
 
-适用于 v1.0.1 的 macOS Apple Silicon 和 Windows x64。首次使用按“安装 → 项目 → Agent → 模型 → 聊天客户端 → 第一项任务”的顺序操作。
+适用于 macOS Apple Silicon 和 Windows x64。首次使用按“安装 → 项目 → Agent → 模型 → 聊天客户端 → 第一项任务”的顺序操作。
 
 ## 文档导航
 
@@ -25,7 +25,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### macOS Apple Silicon
 
-1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-1.0.1-macos-arm64.dmg`。
+1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-<版本>-macos-arm64.dmg`。
 2. 打开 DMG，把 `CodexBridge.app` 拖到 Applications。
 3. 从 Applications 启动。当前包使用 ad-hoc 签名、尚未 Apple 公证；若系统拦截，在“系统设置 → 隐私与安全性”允许打开。
 4. 在概览检查 Service。若提示后台项目需批准，按提示打开系统设置并允许 Codex Bridge 后台项目。
@@ -33,7 +33,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### Windows x64
 
-1. 下载 `CodexBridge-Windows-x64-1.0.1-Setup.exe`。
+1. 下载 `CodexBridge-Windows-x64-<版本>-Setup.exe`。
 2. 运行安装器，选择安装目录，完成后启动 Codex Bridge。
 3. 如提示缺少 WebView2 Runtime，按提示安装微软 WebView2 Runtime，然后重新启动 App。
 4. 在概览确认 Service 和本地 MCP 可用。
@@ -109,7 +109,7 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 1. 在设置中找到目标 Agent 的模型区域。
 2. 点击“获取模型”或“刷新模型列表”。
 3. 选择实际返回的模型 ID。
-4. 等待该模型的能力加载，再选择页面提供的推理强度。
+4. 直接选择该模型提供的推理强度。首次加载目录时会预取各模型能力，已缓存的选项可立即切换；尚未获取成功的模型会单独补查。
 5. 按当前区域的保存按钮或“选择后自动保存”提示完成设置。
 
 切换模型后，可选推理强度可能变化。DSH 模型目录来自配置服务的真实 `/models` 响应；接口失败时先解决连接问题。模型 Key、服务地址与套餐应相互匹配。
@@ -176,12 +176,13 @@ OpenAI Runtime Key 用于 Tunnel，DeepSeek Key 用于 DSH 模型；两者分别
 
 写入任务在待本机批准、启动中、运行中、等待权限批准或状态未知时，都会占用该项目的写入名额。只读任务不占用写入名额，但 Codex 只读任务仍占用 Codex 的执行会话名额。
 
-达到限制时，新任务会被拒绝或启动失败，不会自动排队。请先完成或结束占用名额的任务，再重试。例如：同一项目已有写入任务时，另一个 Agent 也不能在该项目启动新的写入任务；不同项目各执行一个 Codex 写入任务时，最多可占用 4 个 Codex 会话。历史任务记录不计入执行并发限制。
+`submit_task` 可设置 `queue_if_busy: true`，在同一项目的写入名额忙碌时进入持久队列；省略时仍立即返回忙碌。排队任务可以取消，等待期间不占写入名额，开始前重新检查项目权限、Agent 和模型配置。远程请求仍遵循启动审批设置。历史任务记录不计入执行并发限制。
 
 ## 10. 输出、审批、继续与中断
 
 | 看到的状态 | 操作 |
 | --- | --- |
+| 排队中 | 查看等待位置，按需要取消 |
 | 等待启动批准 | 核对项目、Agent、权限和任务后批准或拒绝 |
 | 运行中 | 查看实时输出与过程卡片 |
 | 等待工具审批 | 展开命令、路径和理由，选择本次提供的允许范围或拒绝 |
@@ -190,9 +191,11 @@ OpenAI Runtime Key 用于 Tunnel，DeepSeek Key 用于 DSH 模型；两者分别
 | 失败 | 查看错误摘要、失败码和相关日志 |
 | 已中断 | 按需要继续会话或提交新任务 |
 
-客户端通过 `get_task` 的状态和 `wait_policy` 等待结果；暂时没有文本不等于失败。单个工具失败会保留在过程记录中，整项任务结果以最终状态为准。
+客户端可用 `list_tasks` 按项目查找任务，并通过 `get_task` 的状态和 `wait_policy` 等待结果；暂时没有文本不等于失败。单个工具失败会保留在过程记录中，整项任务结果以最终状态为准。
 
 工作台可发送补充指令或中断任务。具体操作服从当前 Agent 的能力；历史续聊选择原项目、原 Agent 安装对应的会话，DSH 的恢复取决于握手能力和已保存会话。模型与安装变化后，先查看连接状态再继续。
+
+补充指令支持多行：Enter 发送，Shift+Enter 换行；中文输入法选词时不会提交。未发送草稿按任务保存在本机，成功提交后清除。任务结束后可选择“交给其他 Agent”，预览并编辑由已有记录组成的摘要，再创建目标 Agent 的新会话。
 
 工作台底部的刷新按钮重新读取当前对话；模型目录在设置中刷新。任务结束后，执行过程默认收起，点击可展开查看工具调用与分析记录；用户指令和最终回复保持显示。会话正文完整保存在本机，较早内容通过“加载更早的消息”按页读取。
 
@@ -204,6 +207,20 @@ Direct 让聊天客户端直接执行授权的文件、命令或 Git 操作，�
 2. 在项目中设置访问策略和需要的 workspace commands。
 3. 命令使用可执行文件与结构化参数；按需要设置允许项和黑名单。
 4. 写入、命令与 Git 请求按实际策略进入批准流程。
+
+常用工具：
+
+| 目的 | 工具 |
+| --- | --- |
+| 浏览目录与模块 | `list_project_directory` |
+| 一次读取多个文件或行范围 | `batch_read_project_files` |
+| 查看运行中命令输出 | `direct_read_command`，首次传 `cursor: "v1.0"`，后续沿用 `next_cursor` |
+| 找回近期命令记录 | `list_direct_commands` |
+| 预览文件写入、编辑或补丁 | `direct_preview_project_mutation` |
+| 应用已预览操作 | `direct_apply_project_mutation` |
+| 撤销已应用操作 | `direct_undo_project_mutation` |
+
+命令历史保存脱敏参数、状态和输出摘要。撤销会校验文件仍是本次操作写出的版本；后续已被修改时返回冲突。预览与撤销记录在当前服务运行期间有界保存，过期后需重新预览。
 
 Skills 区域显示本机发现的技能，可查看内容。需要执行时，由客户端使用实际发现的 Skill 和 Action；页面没有编辑接口。
 
@@ -224,3 +241,15 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 | 任务等待且不输出 | 查看启动审批、工具审批或问题表单 |
 
 日志用于定位具体错误。分享问题时提供系统、App 版本、操作步骤和脱敏错误摘要。密钥保存在系统凭据存储中，配置 JSON 也可能含凭据，请勿公开。
+
+### DeepSeek Harness 推理选项
+
+Bridge 展示 DSH ACP 返回的推理选项。当前 DSH DeepSeek 适配器按连接配置提供统一的 `off / low / high / max`，不根据模型名称区分；这些选项不代表 API 目录中每个模型均支持全部档位。模型目录和模型推理能力是不同信息，使用第三方 API 时以该 API 的模型能力为准。
+
+### Direct 安全模式命令
+
+安全模式的内置规则仅覆盖只读查询、版本查询和受限语法检查。`git branch` 只接受 `--show-current` 或 `--list`；`git tag` 只接受 `--list`，同时支持 `git describe`。内置 Git 查询关闭分页器、文件监视器以及外部 diff/textconv 等执行入口。
+
+`node --version`、`npm --version`、`swift --version`、`rg --version` 和 macOS 的 `xcodebuild -version` 只接受精确的版本查询参数。`node --check` 只接受一个项目根目录内的 `.js`、`.mjs` 或 `.cjs` 文件，不接受其他 Node 执行参数。文件路径不能逃逸项目根目录，指向项目外的符号链接也会被拒绝。`grep -R/--dereference-recursive` 和 `rg -L/--follow` 不属于允许的搜索参数。
+
+`swift build/test`、构建型 `xcodebuild`、`npm test/run` 等会执行项目代码的命令不再属于免审批内置规则。需要使用时，可显式注册为 Direct 命令并配置审批；Full 模式保持原有执行能力。黑名单仍优先于用户规则和内置规则。Windows 继续只使用符合现有信任校验的 EXE，并保留 AppContainer 网络隔离；不会将 npm 的 `.cmd` 入口当作安全 EXE 放行。

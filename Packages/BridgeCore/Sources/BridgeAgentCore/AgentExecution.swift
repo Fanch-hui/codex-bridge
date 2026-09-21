@@ -191,6 +191,11 @@ public struct AgentToolUpdate: Codable, Equatable, Sendable {
   public let arguments: String?
   public let output: String?
   public let locations: [String]
+  public let childRuns: [AgentChildRun]
+
+  private enum CodingKeys: String, CodingKey {
+    case key, name, title, kind, status, arguments, output, locations, childRuns
+  }
 
   public init(
     key: String,
@@ -200,7 +205,8 @@ public struct AgentToolUpdate: Codable, Equatable, Sendable {
     status: AgentToolStatus,
     arguments: String? = nil,
     output: String? = nil,
-    locations: [String] = []
+    locations: [String] = [],
+    childRuns: [AgentChildRun] = []
   ) throws {
     try AgentValidation.identifier(key, field: "tool.key", maximumBytes: 256)
     try AgentValidation.text(name, field: "tool.name", maximumBytes: 256)
@@ -214,6 +220,11 @@ public struct AgentToolUpdate: Codable, Equatable, Sendable {
     for location in locations {
       try AgentValidation.absolutePath(location, field: "tool.locations")
     }
+    guard childRuns.count <= 32,
+      Set(childRuns.map(\.id)).count == childRuns.count
+    else {
+      throw AgentRuntimeError.invalidRequest("tool.childRuns")
+    }
     self.key = key
     self.name = name
     self.title = title
@@ -222,6 +233,22 @@ public struct AgentToolUpdate: Codable, Equatable, Sendable {
     self.arguments = arguments
     self.output = output
     self.locations = locations
+    self.childRuns = childRuns
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    try self.init(
+      key: values.decode(String.self, forKey: .key),
+      name: values.decode(String.self, forKey: .name),
+      title: values.decodeIfPresent(String.self, forKey: .title),
+      kind: values.decodeIfPresent(String.self, forKey: .kind),
+      status: values.decode(AgentToolStatus.self, forKey: .status),
+      arguments: values.decodeIfPresent(String.self, forKey: .arguments),
+      output: values.decodeIfPresent(String.self, forKey: .output),
+      locations: values.decodeIfPresent([String].self, forKey: .locations) ?? [],
+      childRuns: values.decodeIfPresent([AgentChildRun].self, forKey: .childRuns) ?? []
+    )
   }
 }
 

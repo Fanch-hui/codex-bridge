@@ -43,31 +43,59 @@ extension OpenCodeACPProvider {
       let initialization = try await connected.initialize()
       _ = try validate(initialization)
       let session = try await connected.newSession(cwd: launch.process.workingDirectory)
-      let options: [OpenCodeACPConfigOption]
-      let selectedModel: String?
       if let selectedModelID {
         let model = try Self.resolveModel(selectedModelID, from: session)
-        options = try await connected.setSessionConfigOption(
+        let options = try await connected.setSessionConfigOption(
           sessionID: session.id,
           configID: "model",
           value: model
         )
-        selectedModel = model
-      } else if let currentModel = Self.availableCurrentModelID(in: session) {
-        options = try await connected.setSessionConfigOption(
-          sessionID: session.id,
-          configID: "model",
-          value: currentModel
+        let models = try Self.modelDescriptors(
+          from: options,
+          selectedModelID: model,
+          defaultModelID: Self.availableCurrentModelID(in: session)
         )
-        selectedModel = currentModel
-      } else {
-        options = session.configOptions
-        selectedModel = nil
+        await connected.shutdown()
+        cleanup(runDirectory: launch.runDirectory, probeRoot: probeRoot)
+        return models
       }
-      let models = try Self.modelDescriptors(
-        from: options,
-        selectedModelID: selectedModel
-      )
+
+      let modelOption = try Self.modelOption(from: session.configOptions)
+      guard !modelOption.values.isEmpty else {
+        throw AgentRuntimeError.capabilityUnavailable(.modelSelection)
+      }
+      let modelIDs = modelOption.values.map(\.value)
+      let currentModel = Self.availableCurrentModelID(in: session)
+      if modelIDs.count == 1, currentModel == nil {
+        let models = try Self.modelDescriptors(
+          from: session.configOptions,
+          selectedModelID: nil,
+          defaultModelID: currentModel
+        )
+        await connected.shutdown()
+        cleanup(runDirectory: launch.runDirectory, probeRoot: probeRoot)
+        return models
+      }
+
+      var models = try Self.baseModelDescriptors(from: modelOption, defaultModelID: currentModel)
+      for modelID in modelIDs {
+        do {
+          let options = try await connected.setSessionConfigOption(
+            sessionID: session.id,
+            configID: "model",
+            value: modelID
+          )
+          let resolved = try Self.modelDescriptors(
+            from: options,
+            selectedModelID: modelID,
+            defaultModelID: currentModel
+          )
+          guard let descriptor = resolved.first(where: { $0.id == modelID }) else { continue }
+          models = Self.replacingModel(descriptor, in: models)
+        } catch {
+          models = Self.markReasoningUnavailable(for: modelID, in: models)
+        }
+      }
       await connected.shutdown()
       cleanup(runDirectory: launch.runDirectory, probeRoot: probeRoot)
       return models
@@ -108,20 +136,69 @@ extension OpenCodeACPProvider {
 
   static func modelDescriptors(
     from options: [OpenCodeACPConfigOption],
-    selectedModelID: String? = nil
+    selectedModelID: String? = nil,
+    defaultModelID: String? = nil
   ) throws -> [AgentModelDescriptor] {
     guard let option = options.first(where: { $0.id == "model" }) else {
       throw AgentRuntimeError.capabilityUnavailable(.modelSelection)
     }
     let selected = selectedModelID ?? option.currentValue
+    let defaultModel = defaultModelID ?? Self.availableDefaultModelID(in: option)
     let effort = options.first(where: { $0.id == "effort" })
-    return try option.values.map {
+    return try option.values.map { value in
       try AgentModelDescriptor(
-        id: $0.value,
-        displayName: $0.name,
-        supportedReasoningEfforts: $0.value == selected
+        id: value.value,
+        displayName: value.name,
+        supportedReasoningEfforts: value.value == selected
           ? effort?.values.map(\.value) ?? [] : [],
-        defaultReasoningEffort: $0.value == selected ? effort?.currentValue : nil
+        defaultReasoningEffort: value.value == selected ? effort?.currentValue : nil,
+        reasoningCapabilitiesAvailable: value.value == selected,
+        isDefaultModel: defaultModel.map { $0 == value.value }
+      )
+    }
+  }
+
+  private static func modelOption(
+    from options: [OpenCodeACPConfigOption]
+  ) throws -> OpenCodeACPConfigOption {
+    guard let option = options.first(where: { $0.id == "model" }) else {
+      throw AgentRuntimeError.capabilityUnavailable(.modelSelection)
+    }
+    return option
+  }
+
+  private static func baseModelDescriptors(
+    from option: OpenCodeACPConfigOption,
+    defaultModelID: String?
+  ) throws -> [AgentModelDescriptor] {
+    try option.values.map { value in
+      try AgentModelDescriptor(
+        id: value.value,
+        displayName: value.name,
+        reasoningCapabilitiesAvailable: false,
+        isDefaultModel: defaultModelID.map { $0 == value.value }
+      )
+    }
+  }
+
+  private static func replacingModel(
+    _ descriptor: AgentModelDescriptor,
+    in models: [AgentModelDescriptor]
+  ) -> [AgentModelDescriptor] {
+    models.map { $0.id == descriptor.id ? descriptor : $0 }
+  }
+
+  private static func markReasoningUnavailable(
+    for modelID: String,
+    in models: [AgentModelDescriptor]
+  ) -> [AgentModelDescriptor] {
+    models.compactMap {
+      guard $0.id == modelID else { return $0 }
+      return try? AgentModelDescriptor(
+        id: $0.id,
+        displayName: $0.displayName,
+        reasoningCapabilitiesAvailable: false,
+        isDefaultModel: $0.isDefaultModel
       )
     }
   }
@@ -139,6 +216,15 @@ extension OpenCodeACPProvider {
   static func availableCurrentModelID(in session: OpenCodeACPSession) -> String? {
     guard let option = session.configOptions.first(where: { $0.id == "model" }),
       let currentValue = option.currentValue,
+      option.values.contains(where: { $0.value == currentValue })
+    else { return nil }
+    return currentValue
+  }
+
+  private static func availableDefaultModelID(
+    in option: OpenCodeACPConfigOption
+  ) -> String? {
+    guard let currentValue = option.currentValue,
       option.values.contains(where: { $0.value == currentValue })
     else { return nil }
     return currentValue

@@ -10,9 +10,11 @@ extension BridgeServiceApplication {
     try Self.checkDeadline(deadline)
     let taskList = try await tasks.nonterminalTasks()
     let runtime = await runtimeStatus.current()
+    let directApprovals = await approvals.pendingApprovals().count
     let codexApprovals = await coordinator.pendingApprovals().count
     let taskStartApprovals = taskList.filter {
-      $0.state.status == .awaitingLocalApproval
+      !$0.isQueued
+        && $0.state.status == .awaitingLocalApproval
         && $0.requiresLocalStartApproval
     }.count
     let directEnvironment = await directCommands.executionEnvironmentCapabilities()
@@ -35,7 +37,7 @@ extension BridgeServiceApplication {
       executionState: Self.executionState(taskList),
       supervisorState: Self.supervisorState(taskList),
       degradations: degradations,
-      pendingApprovalCount: codexApprovals + taskStartApprovals,
+      pendingApprovalCount: codexApprovals + taskStartApprovals + directApprovals,
       executionEnvironment: Self.mcpEnvironment(directEnvironment)
     )
   }

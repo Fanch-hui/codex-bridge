@@ -49,7 +49,8 @@ extension DirectCommandPolicy {
       if resolvedExecutable == ruleExecutable { return true }
       guard resolvedExecutable.hasPrefix("/") else { return false }
       let url = URL(fileURLWithPath: resolvedExecutable).standardizedFileURL
-      let trustedSystemDirectories: Set<String> = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+      let trustedSystemDirectories = Set(
+        DirectBuiltInCommandResolver.trustedDirectories(for: ruleExecutable))
       return url.lastPathComponent == ruleExecutable
         && trustedSystemDirectories.contains(url.deletingLastPathComponent().path)
     #endif
@@ -190,6 +191,13 @@ extension DirectCommandPolicy {
     }
 
     let matchedBuiltInRule = builtInSafeRules.first { matchesSafeRule($0, argv: policyArgv) }
+    let isProjectLocalExecutable = isProjectLocalExecutable(
+      executable,
+      projectRoot: project.root.canonicalPath
+    )
+    let requiresUnregisteredApproval =
+      matched == nil && matchedBuiltInRule == nil
+      && (isProjectLocalExecutable || request.isValidatedSkillScript)
     switch project.directCommandMode {
     case .denied:
       return .denied(.commandModeDenied)
@@ -197,8 +205,7 @@ extension DirectCommandPolicy {
       let allowed =
         matched != nil
         || matchedBuiltInRule != nil
-        || isProjectLocalExecutable(
-          executable, projectRoot: project.root.canonicalPath)
+        || isProjectLocalExecutable
         || request.isValidatedSkillScript
       guard allowed else { return .denied(.commandNotRegistered) }
       if matched == nil, matchedBuiltInRule != nil,
@@ -227,10 +234,20 @@ extension DirectCommandPolicy {
       risk == .elevated
       || project.accessPolicy.write == .requiresLocalApproval
       || (needsNetwork && project.accessPolicy.network == .requiresLocalApproval)
+      || requiresUnregisteredApproval
+    let executionArgv: [String]
+    let commandName = DirectPathSemantics.basename(policyArgv.first ?? "").lowercased()
+    if project.directCommandMode == .safe, matched == nil, matchedBuiltInRule != nil,
+      commandName == "git" || commandName == "git.exe"
+    {
+      executionArgv = DirectGitArgumentValidator.executionArguments(policyArgv)
+    } else {
+      executionArgv = policyArgv
+    }
     return DirectCommandResolution(
       allowed: true,
       requiresApproval: requiresApproval,
-      argv: policyArgv,
+      argv: executionArgv,
       workingDirectory: matched?.workingDirectory ?? request.workingDirectory,
       requiresNetwork: needsNetwork,
       reason: nil

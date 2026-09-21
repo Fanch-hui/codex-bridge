@@ -97,6 +97,7 @@ public struct MCPDirectWriteRequest: Codable, Equatable, Sendable {
 }
 
 public struct MCPDirectWriteReceipt: Codable, Equatable, Sendable {
+  public let operationID: String?
   public let relativePath: String
   public let operation: String
   public let oldSHA256: String?
@@ -105,6 +106,7 @@ public struct MCPDirectWriteReceipt: Codable, Equatable, Sendable {
   public let boundedDiff: MCPBoundedDiff
 
   public init(
+    operationID: String? = nil,
     relativePath: String,
     operation: String,
     oldSHA256: String?,
@@ -112,6 +114,7 @@ public struct MCPDirectWriteReceipt: Codable, Equatable, Sendable {
     byteCount: Int,
     boundedDiff: MCPBoundedDiff = .empty
   ) {
+    self.operationID = operationID
     self.relativePath = relativePath
     self.operation = operation
     self.oldSHA256 = oldSHA256
@@ -122,6 +125,7 @@ public struct MCPDirectWriteReceipt: Codable, Equatable, Sendable {
 
   public init(result: MCPDirectWriteReceipt, boundedDiff: MCPBoundedDiff) {
     self.init(
+      operationID: result.operationID,
       relativePath: result.relativePath,
       operation: result.operation,
       oldSHA256: result.oldSHA256,
@@ -132,6 +136,7 @@ public struct MCPDirectWriteReceipt: Codable, Equatable, Sendable {
   }
 
   private enum CodingKeys: String, CodingKey {
+    case operationID = "operation_id"
     case relativePath = "relative_path"
     case operation
     case oldSHA256 = "old_sha256"
@@ -144,6 +149,7 @@ public struct MCPDirectWriteReceipt: Codable, Equatable, Sendable {
 extension MCPDirectWriteReceipt {
   func compactedForTransport() -> Self {
     Self(
+      operationID: operationID,
       relativePath: relativePath,
       operation: operation,
       oldSHA256: oldSHA256,
@@ -281,15 +287,22 @@ public struct MCPPartialCommit: Codable, Equatable, Sendable {
 }
 
 public struct MCPDirectPatchReceipt: Codable, Equatable, Sendable {
+  public let operationID: String?
   public let operations: [MCPDirectWriteReceipt]
   public let partialCommit: MCPPartialCommit?
 
-  public init(operations: [MCPDirectWriteReceipt], partialCommit: MCPPartialCommit? = nil) {
+  public init(
+    operationID: String? = nil,
+    operations: [MCPDirectWriteReceipt],
+    partialCommit: MCPPartialCommit? = nil
+  ) {
+    self.operationID = operationID
     self.operations = operations
     self.partialCommit = partialCommit
   }
 
   private enum CodingKeys: String, CodingKey {
+    case operationID = "operation_id"
     case operations
     case partialCommit = "partial_commit"
   }
@@ -298,6 +311,7 @@ public struct MCPDirectPatchReceipt: Codable, Equatable, Sendable {
 extension MCPDirectPatchReceipt {
   func compactedForTransport() -> Self {
     Self(
+      operationID: operationID,
       operations: operations.map { $0.compactedForTransport() },
       partialCommit: partialCommit
     )

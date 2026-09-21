@@ -2,6 +2,8 @@
   "use strict";
 
   var state = null;
+  var stateRevision = null;
+  var fullStateRequested = false;
   var requestSequence = 0;
   var navigationNodes = new Map();
   var iconPaths = window.CodexBridgeDesktopIcons;
@@ -214,8 +216,10 @@
     setIcons(container);
   }
 
-  function renderState(nextState) {
+  function renderState(nextState, revision) {
     state = nextState;
+    if (Number.isInteger(revision)) stateRevision = revision;
+    else stateRevision = null;
     applyHostContext(state && state.hostContext);
     var shell = document.getElementById("app-shell");
     var loading = document.getElementById("loading-state");
@@ -240,7 +244,134 @@
     renderFeedback(state.feedback);
     if (state.selectedNavigation === "overview") renderOverview(state.overview);
     globalPages(state, emit);
-    setIcons(document);
+  }
+
+  function isStatePatch(value) {
+    return !!value && typeof value === "object"
+      && value.type === "statePatch"
+      && Number.isInteger(value.nextRevision)
+      && (value.baseRevision == null || Number.isInteger(value.baseRevision))
+      && Array.isArray(value.changes);
+  }
+
+  function requestFullState() {
+    if (fullStateRequested) return;
+    fullStateRequested = true;
+    emit("requestStateResync");
+  }
+
+  function upsertRows(rows, updates, removedIDs, idKey) {
+    var result = Array.isArray(rows) ? rows.slice() : [];
+    var index = new Map(result.map(function (row, index) {
+      return [row && row[idKey] != null ? String(row[idKey]) : "missing-" + index, index];
+    }));
+    (Array.isArray(updates) ? updates : []).forEach(function (row) {
+      if (!row || row[idKey] == null) return;
+      var key = String(row[idKey]);
+      var existing = index.get(key);
+      if (existing === undefined) {
+        index.set(key, result.length);
+        result.push(row);
+      } else {
+        result[existing] = row;
+      }
+    });
+    var removed = new Set((Array.isArray(removedIDs) ? removedIDs : []).map(String));
+    return result.filter(function (row) {
+      return !removed.has(String(row && row[idKey]));
+    });
+  }
+
+  function applyConversationChange(workbench, change) {
+    if (!workbench || !workbench.selectedTask || !change
+      || change.taskID !== workbench.selectedTask.taskID
+      || (change.conversationMode !== "replace" && change.conversationMode !== "upsert")
+      || !Array.isArray(change.entries) || !Array.isArray(change.removedIDs)) return false;
+    var task = Object.assign({}, workbench.selectedTask);
+    var entries = Array.isArray(task.conversation) ? task.conversation : [];
+    if (change.conversationMode === "replace") {
+      entries = Array.isArray(change.entries) ? change.entries.slice() : [];
+      var removed = new Set(change.removedIDs.map(String));
+      entries = entries.filter(function (entry) { return !removed.has(String(entry && entry.id)); });
+    } else {
+      entries = upsertRows(entries, change.entries, change.removedIDs, "id");
+    }
+    task.conversation = entries;
+    task.conversationState = change.conversationState || null;
+    workbench.selectedTask = task;
+    return true;
+  }
+
+  function applyStateChanges(base, changes) {
+    var next = Object.assign({}, base);
+    var workbench = base && base.workbench
+      ? Object.assign({}, base.workbench) : null;
+    if (!workbench) return null;
+    var valid = true;
+    (Array.isArray(changes) ? changes : []).forEach(function (change) {
+      if (!change || !change.kind) { valid = false; return; }
+      if (change.kind === "conversation") {
+        valid = applyConversationChange(workbench, change) && valid;
+      } else if (change.kind === "taskRows") {
+        if ((change.collectionMode !== "replace" && change.collectionMode !== "upsert")
+          || !Array.isArray(change.taskRows) || !Array.isArray(change.removedIDs)) {
+          valid = false;
+        } else {
+          workbench.tasks = change.collectionMode === "replace"
+            ? change.taskRows.slice()
+            : upsertRows(workbench.tasks, change.taskRows, change.removedIDs, "taskID");
+        }
+      } else if (change.kind === "approvals") {
+        if (!Array.isArray(change.approvalRows)) valid = false;
+        else workbench.approvals = change.approvalRows.slice();
+      } else if (change.kind === "selectedTask" && change.selectedTask) {
+        workbench.selectedTask = change.selectedTask;
+        workbench.selectedTaskID = change.taskID || change.selectedTask.taskID || null;
+      } else {
+        valid = false;
+      }
+    });
+    if (!valid) return null;
+    next.workbench = workbench;
+    return next;
+  }
+
+  function applyStatePatch(envelope) {
+    var nextRevision = envelope.nextRevision;
+    var hasState = envelope.state !== null && envelope.state !== undefined;
+    var hasBase = Number.isInteger(envelope.baseRevision);
+    if (hasState && envelope.baseRevision == null && typeof envelope.state === "object") {
+      fullStateRequested = false;
+      renderState(envelope.state, nextRevision);
+      return true;
+    }
+    if (hasState || !hasBase) {
+      requestFullState();
+      return false;
+    }
+    if (!Number.isInteger(nextRevision) || !Number.isInteger(envelope.baseRevision)
+      || state === null || stateRevision !== envelope.baseRevision
+      || nextRevision !== envelope.baseRevision + 1) {
+      requestFullState();
+      return false;
+    }
+    var next = applyStateChanges(state, envelope.changes);
+    if (!next) {
+      requestFullState();
+      return false;
+    }
+    renderState(next, nextRevision);
+    fullStateRequested = false;
+    return true;
+  }
+
+  function receiveState(value) {
+    if (isStatePatch(value)) {
+      applyStatePatch(value);
+      return;
+    }
+    fullStateRequested = false;
+    renderState(value);
   }
 
   function globalPages(nextState, commandEmitter) {
@@ -279,12 +410,18 @@
     }, { passive: true });
   }
 
-  window.CodexBridgeDesktopUI = { setState: renderState, getState: function () { return state; }, sendCommand: emit };
+  window.CodexBridgeDesktopUI = {
+    setState: receiveState,
+    applyStatePatch: applyStatePatch,
+    getState: function () { return state; },
+    getStateRevision: function () { return stateRevision; },
+    sendCommand: emit
+  };
   if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
     window.chrome.webview.addEventListener("message", function (event) {
       var incoming = event.data;
       if (typeof incoming === "string") { try { incoming = JSON.parse(incoming); } catch (_) { return; } }
-      if (incoming && typeof incoming === "object") renderState(incoming);
+      if (incoming && typeof incoming === "object") receiveState(incoming);
     });
   }
   setIcons(document);

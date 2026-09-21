@@ -329,19 +329,26 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     return waitForExit(timeout: killWait)
   }
 
-  public func drainRemainingOutput() {
+  public func drainRemainingOutput(timeout: Duration = .seconds(1)) {
     lock.lock()
     let hasTerminated = terminationStorage != nil
     lock.unlock()
     guard hasTerminated else { return }
 
     outputLock.lock()
-    defer { outputLock.unlock() }
-    guard !handlesClosed else { return }
+    guard !handlesClosed else {
+      outputLock.unlock()
+      return
+    }
     standardOutputHandle.readabilityHandler = nil
     standardErrorHandle?.readabilityHandler = nil
-    drain(standardOutputHandle, sink: standardOutputSink)
-    if let standardErrorHandle { drain(standardErrorHandle, sink: standardErrorSink) }
+    outputLock.unlock()
+
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    drain(standardOutputHandle, sink: standardOutputSink, until: deadline)
+    if let standardErrorHandle {
+      drain(standardErrorHandle, sink: standardErrorSink, until: deadline)
+    }
   }
 
   public func close() {
@@ -377,12 +384,58 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     if !data.isEmpty { sink(data) }
   }
 
-  private func drain(_ handle: FileHandle, sink: OutputHandler) {
-    while true {
-      let data = handle.readData(ofLength: 16 * 1_024)
+  private func drain(
+    _ handle: FileHandle,
+    sink: OutputHandler,
+    until deadline: ContinuousClock.Instant
+  ) {
+    while ContinuousClock.now < deadline {
+      guard let data = readAvailableData(handle, until: deadline) else { return }
       if data.isEmpty { return }
       sink(data)
     }
+  }
+
+  private func readAvailableData(
+    _ handle: FileHandle,
+    until deadline: ContinuousClock.Instant
+  ) -> Data? {
+    #if canImport(Darwin) || canImport(Glibc)
+      let descriptor = handle.fileDescriptor
+      let previousFlags = fcntl(descriptor, F_GETFL)
+      guard previousFlags >= 0, fcntl(descriptor, F_SETFL, previousFlags | O_NONBLOCK) == 0
+      else { return Data() }
+      defer { _ = fcntl(descriptor, F_SETFL, previousFlags) }
+      var buffer = [UInt8](repeating: 0, count: 16 * 1_024)
+      while ContinuousClock.now < deadline {
+        let count = buffer.withUnsafeMutableBytes { bytes in
+          systemRead(descriptor, bytes.baseAddress, bytes.count)
+        }
+        if count > 0 { return Data(buffer.prefix(count)) }
+        if count == 0 { return Data() }
+        if errno == EINTR { continue }
+        if errno == EAGAIN || errno == EWOULDBLOCK { return Data() }
+        return Data()
+      }
+      return nil
+    #else
+      let result = BlockingReadResult()
+      nonisolated(unsafe) let unsafeHandle = handle
+      DispatchQueue.global(qos: .utility).async {
+        result.set(unsafeHandle.availableData)
+      }
+      let remaining = max(1, Self.milliseconds(until: deadline))
+      guard result.wait(milliseconds: remaining) else { return nil }
+      return result.value
+    #endif
+  }
+
+  private static func milliseconds(until deadline: ContinuousClock.Instant) -> Int {
+    let remaining = ContinuousClock.now.duration(to: deadline).components
+    let seconds = max(0, remaining.seconds)
+    let milliseconds = seconds.multipliedReportingOverflow(by: 1_000).partialValue
+    let nanos = max(0, remaining.attoseconds / 1_000_000_000_000_000)
+    return Int(min(Int64.max, milliseconds + nanos))
   }
 
   private func reapIfExitedLocked() -> ManagedProcessTermination? {
@@ -422,8 +475,35 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   private let systemKill = Darwin.kill
   private let systemWaitPID = Darwin.waitpid
   private let systemWrite = Darwin.write
+  private let systemRead = Darwin.read
 #elseif canImport(Glibc)
   private let systemKill = Glibc.kill
   private let systemWaitPID = Glibc.waitpid
   private let systemWrite = Glibc.write
+  private let systemRead = Glibc.read
+#endif
+
+#if os(Windows)
+  private final class BlockingReadResult: @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var storage: Data?
+
+    var value: Data? {
+      lock.lock()
+      defer { lock.unlock() }
+      return storage
+    }
+
+    func set(_ value: Data) {
+      lock.lock()
+      storage = value
+      lock.unlock()
+      semaphore.signal()
+    }
+
+    func wait(milliseconds: Int) -> Bool {
+      semaphore.wait(timeout: .now() + .milliseconds(milliseconds)) == .success
+    }
+  }
 #endif

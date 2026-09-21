@@ -153,7 +153,9 @@ extension BridgeServiceApplication {
     }) {
       return "active"
     }
-    if tasks.contains(where: { $0.state.status == .awaitingLocalApproval }) {
+    if tasks.contains(where: {
+      $0.isQueued || $0.state.status == .awaitingLocalApproval
+    }) {
       return "pending"
     }
     return "idle"

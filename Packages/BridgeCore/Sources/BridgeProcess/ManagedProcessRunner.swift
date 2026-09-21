@@ -27,7 +27,7 @@ public struct ManagedProcessRunner: Sendable {
 
     while true {
       if let termination = process.reapIfExited() {
-        process.drainRemainingOutput()
+        process.drainRemainingOutput(timeout: gracePeriod)
         process.close()
         return ManagedProcessResult(termination: termination, timedOut: false)
       }
@@ -50,7 +50,7 @@ public struct ManagedProcessRunner: Sendable {
     #else
       let termination = process.terminateAndWait(gracePeriod: gracePeriod) ?? .killed(SIGKILL)
     #endif
-    process.drainRemainingOutput()
+    process.drainRemainingOutput(timeout: gracePeriod)
     process.close()
     return ManagedProcessResult(termination: termination, timedOut: timedOut)
   }

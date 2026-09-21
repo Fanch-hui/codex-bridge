@@ -20,6 +20,7 @@ public enum ServiceStoreError: Error, Equatable, LocalizedError, Sendable {
   case idempotencyConflict(source: ServiceTaskSource, clientRequestID: String)
   case immutableTaskChanged(TaskID)
   case invalidTaskTransition(from: ServiceTaskStatus, to: ServiceTaskStatus)
+  case storageBusy
   case storageFailure
 
   public var errorDescription: String? {
@@ -56,6 +57,8 @@ public enum ServiceStoreError: Error, Equatable, LocalizedError, Sendable {
       "Immutable task fields cannot be changed."
     case .invalidTaskTransition(let source, let destination):
       "The task cannot transition from \(source.rawValue) to \(destination.rawValue)."
+    case .storageBusy:
+      "The service database is busy; please retry shortly."
     case .storageFailure:
       "The service database operation failed."
     }

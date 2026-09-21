@@ -69,9 +69,11 @@
     func perform(_ data: Data) async throws -> Data {
       try await withCheckedThrowingContinuation { continuation in
         let completion = XPCClientCompletion(continuation)
-        if (try? BridgeServiceIPCCodec.decodeRequest(data).operation) == .status {
-          DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
-            completion.resume(throwing: BridgeServiceClientError.unavailable)
+        let operation = try? BridgeServiceIPCCodec.decodeRequest(data).operation
+        let timeout: TimeInterval = operation == .status ? 3 : 120
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
+          if completion.resume(throwing: BridgeServiceClientError.unavailable) {
+            self?.invalidate()
           }
         }
         guard
@@ -109,22 +111,24 @@
     }
 
     func resume(returning data: Data) {
-      resolve { $0.resume(returning: data) }
+      _ = resolve { $0.resume(returning: data) }
     }
 
-    func resume(throwing error: any Error) {
+    @discardableResult
+    func resume(throwing error: any Error) -> Bool {
       resolve { $0.resume(throwing: error) }
     }
 
     private func resolve(
       _ body: (CheckedContinuation<Data, any Error>) -> Void
-    ) {
+    ) -> Bool {
       lock.lock()
       let continuation = continuation
       self.continuation = nil
       lock.unlock()
-      guard let continuation else { return }
+      guard let continuation else { return false }
       body(continuation)
+      return true
     }
   }
 #endif

@@ -59,6 +59,9 @@
     private static func projectStatus(
       for display: WindowsWorkbenchDisplay
     ) -> (String, String) {
+      if display.projectLoadError != nil {
+        return ("项目查询失败", "error")
+      }
       if let detail = display.selectedTaskDetail {
         if detail.status == "运行中" || detail.status == "正在启动" {
           return ("运行中", "running")

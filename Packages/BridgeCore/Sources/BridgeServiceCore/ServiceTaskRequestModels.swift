@@ -29,6 +29,7 @@ public struct ServiceTaskRequest: Equatable, Sendable {
   public let networkAllowed: Bool
   public let accessMode: ServiceAccessMode
   public let fastMode: Bool
+  public let queueIfBusy: Bool
 
   public init(
     projectID: ProjectID,
@@ -47,7 +48,8 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     permissionMode: ServicePermissionMode,
     networkAllowed: Bool = false,
     accessMode: ServiceAccessMode = .requestApproval,
-    fastMode: Bool = false
+    fastMode: Bool = false,
+    queueIfBusy: Bool = false
   ) {
     self.projectID = projectID
     self.source = source
@@ -66,5 +68,6 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     self.networkAllowed = networkAllowed
     self.accessMode = accessMode
     self.fastMode = fastMode
+    self.queueIfBusy = queueIfBusy
   }
 }

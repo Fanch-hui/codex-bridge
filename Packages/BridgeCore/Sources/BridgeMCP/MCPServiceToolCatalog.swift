@@ -6,6 +6,8 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case listAgents = "list_agents"
   case getProject = "get_project"
   case searchProjectFiles = "search_project_files"
+  case listProjectDirectory = "list_project_directory"
+  case batchReadProjectFiles = "batch_read_project_files"
   case readProjectFile = "read_project_file"
   case listThreads = "list_threads"
   case readThread = "read_thread"
@@ -13,6 +15,7 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case listSkills = "list_skills"
   case readSkill = "read_skill"
   case runSkillAction = "run_skill_action"
+  case listTasks = "list_tasks"
   case getTask = "get_task"
   case submitTask = "submit_task"
   case steerTask = "steer_task"
@@ -23,7 +26,11 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case directEditProjectFile = "direct_edit_project_file"
   case directApplyProjectPatch = "direct_apply_project_patch"
   case directManageProjectPath = "direct_manage_project_path"
+  case directPreviewProjectMutation = "direct_preview_project_mutation"
+  case directApplyProjectMutation = "direct_apply_project_mutation"
+  case directUndoProjectMutation = "direct_undo_project_mutation"
   case directExecCommand = "direct_exec_project_command"
+  case listDirectCommands = "list_direct_commands"
   case directReadCommand = "direct_read_command"
   case directWriteStdin = "direct_write_stdin"
   case directInterruptCommand = "direct_interrupt_command"
@@ -48,7 +55,7 @@ struct MCPServiceToolContract: Sendable {
 }
 
 public struct MCPServiceToolCatalog: Sendable {
-  public static let contractVersion = "1.2.1"
+  public static let contractVersion = "1.3.0"
 
   public let definitions: [Tool]
 
@@ -75,12 +82,15 @@ public struct MCPServiceToolCatalog: Sendable {
     contract(.listAgents, listAgents, exposure: .readOnly, route: .readOnly),
     contract(.getProject, getProject, exposure: .readOnly, route: .readOnly),
     contract(.searchProjectFiles, searchProjectFiles, exposure: .readOnly, route: .readOnly),
+    contract(.listProjectDirectory, listProjectDirectory, exposure: .readOnly, route: .readOnly),
+    contract(.batchReadProjectFiles, batchReadProjectFiles, exposure: .readOnly, route: .readOnly),
     contract(.readProjectFile, readProjectFile, exposure: .readOnly, route: .readOnly),
     contract(.listThreads, listThreads, exposure: .readOnly, route: .readOnly),
     contract(.readThread, readThread, exposure: .readOnly, route: .readOnly),
     contract(.listModels, listModels, exposure: .readOnly, route: .readOnly),
     contract(.listSkills, listSkills, exposure: .readOnly, route: .readOnly),
     contract(.readSkill, readSkill, exposure: .readOnly, route: .readOnly),
+    contract(.listTasks, listTasks, exposure: .readOnly, route: .task),
     contract(.getTask, getTask, exposure: .readOnly, route: .task),
     contract(.getProjectChanges, getProjectChanges, exposure: .readOnly, route: .readOnly),
     contract(.listProjectCommands, listProjectCommands, exposure: .readOnly, route: .readOnly),
@@ -92,7 +102,14 @@ public struct MCPServiceToolCatalog: Sendable {
     contract(.directEditProjectFile, directEditProjectFile, exposure: .full, route: .direct),
     contract(.directApplyProjectPatch, directApplyProjectPatch, exposure: .full, route: .direct),
     contract(.directManageProjectPath, directManageProjectPath, exposure: .full, route: .direct),
+    contract(
+      .directPreviewProjectMutation, directPreviewProjectMutation, exposure: .full, route: .direct),
+    contract(
+      .directApplyProjectMutation, directApplyProjectMutation, exposure: .full, route: .direct),
+    contract(
+      .directUndoProjectMutation, directUndoProjectMutation, exposure: .full, route: .direct),
     contract(.directExecCommand, directExecProjectCommand, exposure: .full, route: .direct),
+    contract(.listDirectCommands, listDirectCommands, exposure: .full, route: .direct),
     contract(.directReadCommand, directReadCommand, exposure: .full, route: .direct),
     contract(.directWriteStdin, directWriteStdin, exposure: .full, route: .direct),
     contract(.directInterruptCommand, directInterruptCommand, exposure: .full, route: .direct),

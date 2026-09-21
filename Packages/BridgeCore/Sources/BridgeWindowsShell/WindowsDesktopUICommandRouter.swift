@@ -8,7 +8,7 @@
     static func command(for envelope: BridgeDesktopCommandEnvelope) -> MainWindowCommand? {
       let payload = envelope.payload
       switch envelope.command {
-      case .ready:
+      case .ready, .requestStateResync:
         return nil
       case .refresh:
         return .refreshAll
@@ -87,13 +87,28 @@
           return rejectWorkbenchCommand(envelope)
         }
         return .resumeTask(
-          id: taskID, input: payload.input, requestID: envelope.requestID
+          id: taskID, input: payload.input, requestID: envelope.requestID,
+          queueIfBusy: payload.queueIfBusy ?? false
+        )
+      case .handoffTask:
+        guard let taskID = nonEmpty(payload.taskID),
+          let providerID = nonEmpty(payload.providerID),
+          let prompt = nonEmpty(payload.input)
+        else {
+          return rejectWorkbenchCommand(envelope)
+        }
+        return .handoffTask(
+          id: taskID,
+          providerID: providerID,
+          prompt: prompt,
+          requestID: envelope.requestID
         )
       case .restartTask:
         guard let taskID = nonEmpty(payload.taskID) else {
           return rejectWorkbenchCommand(envelope)
         }
-        return .restartTask(id: taskID, requestID: envelope.requestID)
+        return .restartTask(
+          id: taskID, requestID: envelope.requestID, queueIfBusy: payload.queueIfBusy ?? false)
       case .resolveApproval, .resolveDirectApproval:
         return approvalCommand(envelope.command, payload: payload)
       case .selectProject:

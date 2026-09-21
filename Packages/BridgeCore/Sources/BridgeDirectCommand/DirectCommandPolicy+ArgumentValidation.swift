@@ -11,7 +11,11 @@ extension DirectCommandPolicy {
       ),
       let root = DirectPathSemantics.resolvedPath(projectRoot)
     else { return false }
-    return resolved != root || DirectPathSemantics.isExecutableFile(at: resolved)
+    guard resolved != root else { return false }
+    #if os(Windows)
+      guard resolved.lowercased().hasSuffix(".exe") else { return false }
+    #endif
+    return (try? SecureFileArtifactSnapshot(capturing: resolved, requiresExecutable: true)) != nil
   }
 
   func projectContainedPath(
@@ -53,6 +57,14 @@ extension DirectCommandPolicy {
       } else if argument == "--" {
         pathsEnabled = true
       } else if argument.hasPrefix("-") && argument != "-" {
+        let option = argument.split(separator: "=", maxSplits: 1).first.map(String.init) ?? argument
+        if option.hasPrefix("--") {
+          guard !option.hasPrefix("--dereference") && !"--dereference".hasPrefix(option) else {
+            return false
+          }
+        } else if option.dropFirst().contains(where: { $0 == "L" || $0 == "H" }) {
+          return false
+        }
         continue
       } else {
         guard
@@ -144,6 +156,7 @@ extension DirectCommandPolicy {
       return findArgumentsAreSafe(
         argv.dropFirst(), projectRoot: projectRoot, workingDirectory: workingDirectory)
     case "grep", "rg":
+      if argv.dropFirst().first == "--version" { return argv.count == 2 }
       return DirectSearchArgumentValidator.areArgumentsSafe(
         executable: commandName,
         argv.dropFirst(),
@@ -156,15 +169,12 @@ extension DirectCommandPolicy {
         }
       )
     case "git":
-      let denied = [
-        "--git-dir", "--work-tree", "--no-index", "--output", "--ext-diff", "--textconv",
-        "--exec-path", "--config-env", "-C", "-c", "-p", "--paginate",
-      ]
-      return !argv.dropFirst().contains { argument in
-        denied.contains(argument)
-          || denied.dropLast().contains(where: { argument.hasPrefix($0 + "=") })
-      }
+      return DirectGitArgumentValidator.areArgumentsSafe(Array(argv.dropFirst()))
+    case "node":
+      return nodeArgumentsAreSafe(
+        Array(argv.dropFirst()), projectRoot: projectRoot, workingDirectory: workingDirectory)
     case "npm":
+      if argv.dropFirst().first == "--version" { return argv.count == 2 }
       let denied = [
         "--prefix", "--userconfig", "--globalconfig", "--cache", "--logs-dir", "--cafile",
         "--cert", "--key", "--script-shell", "--nodedir", "--tmp", "--workspace", "-w",
@@ -173,12 +183,14 @@ extension DirectCommandPolicy {
         denied.contains(argument) || denied.contains { argument.hasPrefix($0 + "=") }
       }
     case "swift":
+      if argv.dropFirst().first == "--version" { return argv.count == 2 }
       return !containsOption(argv.dropFirst(), options: Self.swiftDeniedOptions)
         && pathOptionsAreContained(
           argv.dropFirst(), options: Self.swiftPathOptions, projectRoot: projectRoot,
           workingDirectory: workingDirectory
         )
     case "xcodebuild":
+      if argv.dropFirst().first == "-version" { return argv.count == 2 }
       return !containsOption(argv.dropFirst(), options: Self.xcodebuildDeniedOptions)
         && pathOptionsAreContained(
           argv.dropFirst(), options: Self.xcodebuildPathOptions, projectRoot: projectRoot,
@@ -192,6 +204,19 @@ extension DirectCommandPolicy {
     default:
       return true
     }
+  }
+
+  private func nodeArgumentsAreSafe(
+    _ arguments: [String], projectRoot: String, workingDirectory: String?
+  ) -> Bool {
+    if arguments == ["--version"] { return true }
+    guard arguments.count == 2, arguments[0] == "--check",
+      !arguments[1].hasPrefix("-"),
+      ["js", "mjs", "cjs"].contains(URL(fileURLWithPath: arguments[1]).pathExtension.lowercased()),
+      let path = projectContainedPath(
+        arguments[1], projectRoot: projectRoot, workingDirectory: workingDirectory)
+    else { return false }
+    return (try? SecureFileArtifactReader.readPrefix(at: path, maximumBytes: 1)) != nil
   }
 
   private func containsOption(_ arguments: ArraySlice<String>, options: Set<String>) -> Bool {

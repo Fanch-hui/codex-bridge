@@ -19,7 +19,8 @@ extension BridgeServiceApplication {
         return .pathDenied
       case .pathMissing:
         return .pathNotFound
-      case .invalidLineRange, .invalidSearchRequest, .invalidCursor:
+      case .invalidLineRange, .invalidSearchRequest, .invalidDirectoryRequest,
+        .invalidBatchRequest, .invalidCursor:
         return .contractRejected
       case .invalidLimits, .candidateLimitExceeded, .enumerationLimitExceeded,
         .directoryDepthExceeded, .pathLengthExceeded, .lineTooLong,
@@ -65,6 +66,8 @@ extension BridgeServiceApplication {
     case .corruptSchema, .corruptRecord, .unsupportedSchemaVersion,
       .duplicateProject, .duplicateProjectRoot, .storageFailure:
       return .unavailable
+    case .storageBusy:
+      return .busy
     }
   }
 

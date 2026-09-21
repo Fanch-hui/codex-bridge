@@ -19,6 +19,7 @@ extension MCPServiceToolCatalog {
   static let directMutationOutputSchema = outputSchema(
     properties: [
       "receipt_type": receiptTypeSchema(["file_mutation"]),
+      "operation_id": nullableStringSchema(maximum: 128),
       "relative_path": stringSchema,
       "operation": stringSchema,
       "old_sha256": stringSchema,
@@ -39,6 +40,7 @@ extension MCPServiceToolCatalog {
 
   static let directMutationReceiptSchema = objectSchema(
     properties: [
+      "operation_id": nullableStringSchema(maximum: 128),
       "relative_path": stringSchema,
       "operation": stringSchema,
       "old_sha256": stringSchema,
@@ -165,6 +167,7 @@ extension MCPServiceToolCatalog {
     outputSchema: outputSchema(
       properties: [
         "receipt_type": receiptTypeSchema(["file_mutation"]),
+        "operation_id": nullableStringSchema(maximum: 128),
         "operations": arraySchema(directMutationReceiptSchema),
       ],
       required: ["receipt_type", "operations"]
@@ -250,16 +253,56 @@ extension MCPServiceToolCatalog {
       "Read the latest bounded output of a direct command session. Use only when the user "
       + "explicitly asked the MCP client to run commands directly and this session was started with "
       + "direct_exec_project_command. timed_out reports only the command execution deadline; "
-      + "read_timeout reports only expiration of this optional read wait.",
+      + "read_timeout reports only expiration of this optional read wait. Pass the returned "
+      + "next_cursor as cursor to receive only newly appended output; omit it for the legacy "
+      + "head/tail summary.",
     inputSchema: objectSchema(
       properties: [
         "session_id": boundedStringSchema(maximum: 128),
+        "cursor": nullableStringSchema(maximum: 128),
         "wait_timeout_ms": integerSchema(minimum: 0, maximum: 10_000),
       ],
       required: ["session_id"]
     ),
     annotations: readAnnotations,
     outputSchema: directCommandOutputSchema
+  )
+
+  static let listDirectCommands = Tool(
+    name: MCPServiceToolName.listDirectCommands.rawValue,
+    title: "List direct command sessions",
+    description:
+      "List recent bounded Direct command sessions, including session IDs, status, start time, "
+      + "and credential-redacted argv summaries. Use this after a restart when a prior session ID "
+      + "is no longer in the current conversation.",
+    inputSchema: objectSchema(
+      properties: [
+        "project_id": optionalOpaqueProjectIDSchema,
+        "limit": integerSchema(minimum: 1, maximum: 100),
+      ]
+    ),
+    annotations: readAnnotations,
+    outputSchema: outputSchema(
+      properties: [
+        "commands": arraySchema(
+          objectSchema(
+            properties: [
+              "session_id": stringSchema,
+              "project_id": stringSchema,
+              "status": stringSchema,
+              "exit_code": integerSchema(minimum: Int(Int32.min), maximum: Int(Int32.max)),
+              "started_at": stringSchema,
+              "ended_at": stringSchema,
+              "timed_out": boolSchema,
+              "argv": arraySchema(boundedStringSchema(maximum: 512)),
+              "working_directory": stringSchema,
+            ],
+            required: ["session_id", "project_id", "status", "started_at", "timed_out", "argv"]
+          )
+        )
+      ],
+      required: ["commands"]
+    )
   )
 
   static let directWriteStdin = Tool(
@@ -327,6 +370,11 @@ extension MCPServiceToolCatalog {
       "tail": stringSchema,
       "byte_count": integerSchema(minimum: 0),
       "truncated": boolSchema,
+      "output": stringSchema,
+      "current_offset": integerSchema(minimum: 0),
+      "next_cursor": stringSchema,
+      "eof": boolSchema,
+      "output_truncated": boolSchema,
       "execution_environment": executionEnvironmentSchema,
     ],
     required: ["session_id", "status", "timed_out", "head", "tail", "byte_count", "truncated"]
@@ -346,6 +394,11 @@ extension MCPServiceToolCatalog {
       "tail": stringSchema,
       "byte_count": integerSchema(minimum: 0),
       "truncated": boolSchema,
+      "output": stringSchema,
+      "current_offset": integerSchema(minimum: 0),
+      "next_cursor": stringSchema,
+      "eof": boolSchema,
+      "output_truncated": boolSchema,
       "execution_environment": executionEnvironmentSchema,
     ],
     required: [

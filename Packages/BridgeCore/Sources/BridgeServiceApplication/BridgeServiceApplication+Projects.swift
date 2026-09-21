@@ -17,7 +17,7 @@ extension BridgeServiceApplication {
     let visibleDefault = visible.first { $0.id.rawValue == defaultID }?.id.rawValue
     let offset = try Self.decodeOffset(cursor, maximum: visible.count)
     let end = min(offset + limit, visible.count)
-    let page = await Self.checkedProjectSummaries(Array(visible[offset..<end]), deadline: deadline)
+    let page = await checkedProjectSummaries(Array(visible[offset..<end]), deadline: deadline)
     return MCPProjectPage(
       projects: Array(page),
       nextCursor: end < visible.count ? "v1.\(end)" : nil,
@@ -29,7 +29,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> [MCPProjectSummary] {
     try Self.checkDeadline(deadline)
-    return await Self.checkedProjectSummaries(
+    return await checkedProjectSummaries(
       Self.sortedProjects(try await projects.projects()), deadline: deadline
     )
   }

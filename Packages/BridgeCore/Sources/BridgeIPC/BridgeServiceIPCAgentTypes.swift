@@ -386,6 +386,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
   public let permissionModeOverride: Bool?
   public let acceptanceCriteria: [String]?
   public let clientRequestID: String?
+  public let queueIfBusy: Bool?
 
   public init(
     projectID: String,
@@ -401,7 +402,8 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     modelOverride: Bool? = nil,
     permissionModeOverride: Bool? = nil,
     acceptanceCriteria: [String]? = nil,
-    clientRequestID: String? = nil
+    clientRequestID: String? = nil,
+    queueIfBusy: Bool? = nil
   ) {
     self.projectID = projectID
     self.providerID = providerID
@@ -417,6 +419,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     self.permissionModeOverride = permissionModeOverride
     self.acceptanceCriteria = acceptanceCriteria
     self.clientRequestID = clientRequestID
+    self.queueIfBusy = queueIfBusy
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -434,6 +437,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     case permissionModeOverride = "permission_mode_override"
     case acceptanceCriteria = "acceptance_criteria"
     case clientRequestID = "client_request_id"
+    case queueIfBusy = "queue_if_busy"
   }
 }
 
@@ -457,17 +461,20 @@ public struct IPCAgentModelsRequest: Codable, Equatable, Sendable {
   public let projectID: String?
   public let modelID: String?
   public let useStoredDefault: Bool?
+  public let forceRefresh: Bool?
 
   public init(
     installationID: String,
     projectID: String? = nil,
     modelID: String? = nil,
-    useStoredDefault: Bool? = nil
+    useStoredDefault: Bool? = nil,
+    forceRefresh: Bool? = nil
   ) {
     self.installationID = installationID
     self.projectID = projectID
     self.modelID = modelID
     self.useStoredDefault = useStoredDefault
+    self.forceRefresh = forceRefresh
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -475,6 +482,7 @@ public struct IPCAgentModelsRequest: Codable, Equatable, Sendable {
     case projectID = "project_id"
     case modelID = "model_id"
     case useStoredDefault = "use_stored_default"
+    case forceRefresh = "force_refresh"
   }
 }
 
@@ -483,17 +491,23 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
   public let displayName: String
   public let supportedReasoningEfforts: [String]
   public let defaultReasoningEffort: String?
+  public let reasoningCapabilitiesAvailable: Bool?
+  public let isDefaultModel: Bool?
 
   public init(
     modelID: String,
     displayName: String,
     supportedReasoningEfforts: [String] = [],
-    defaultReasoningEffort: String? = nil
+    defaultReasoningEffort: String? = nil,
+    reasoningCapabilitiesAvailable: Bool? = nil,
+    isDefaultModel: Bool? = nil
   ) {
     self.modelID = modelID
     self.displayName = displayName
     self.supportedReasoningEfforts = supportedReasoningEfforts
     self.defaultReasoningEffort = defaultReasoningEffort
+    self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
+    self.isDefaultModel = isDefaultModel
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -501,6 +515,8 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
     case displayName = "display_name"
     case supportedReasoningEfforts = "supported_reasoning_efforts"
     case defaultReasoningEffort = "default_reasoning_effort"
+    case reasoningCapabilitiesAvailable = "reasoning_capabilities_available"
+    case isDefaultModel = "is_default_model"
   }
 
   public init(from decoder: Decoder) throws {
@@ -515,7 +531,12 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
       defaultReasoningEffort: try container.decodeIfPresent(
         String.self,
         forKey: .defaultReasoningEffort
-      )
+      ),
+      reasoningCapabilitiesAvailable: try container.decodeIfPresent(
+        Bool.self,
+        forKey: .reasoningCapabilitiesAvailable
+      ),
+      isDefaultModel: try container.decodeIfPresent(Bool.self, forKey: .isDefaultModel)
     )
   }
 }

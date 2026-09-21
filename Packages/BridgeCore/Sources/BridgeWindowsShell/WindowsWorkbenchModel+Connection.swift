@@ -42,10 +42,16 @@
         let status = try await client.status()
         guard isCurrentConnection(requestGeneration) else { return }
         serviceStatus = status
-        if let refreshedProjects = try? await client.projects(),
-          isCurrentConnection(requestGeneration), projects != refreshedProjects
-        {
-          projects = refreshedProjects
+        do {
+          let refreshedProjects = try await client.projects()
+          guard isCurrentConnection(requestGeneration) else { return }
+          if projects != refreshedProjects {
+            projects = refreshedProjects
+          }
+          projectLoadError = nil
+        } catch {
+          guard isCurrentConnection(requestGeneration) else { return }
+          projectLoadError = "项目查询失败：\(BridgeServiceErrorMessage.message(error))"
         }
         selectedProjectID =
           projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID
@@ -65,6 +71,7 @@
           generation: requestGeneration,
           notifyOnConnect: notifyOnConnect
         )
+        startServiceChangeSubscription(generation: requestGeneration)
       } catch {
         guard isCurrentConnection(requestGeneration) else { return }
         fail(BridgeServiceErrorMessage.message(error))
@@ -92,6 +99,11 @@
       isShuttingDown = true
       taskPollingTask?.cancel()
       taskPollingTask = nil
+      serviceChangesTask?.cancel()
+      serviceChangesTask = nil
+      serviceChangeRefreshTask?.cancel()
+      serviceChangeRefreshTask = nil
+      serviceChangeRefreshPending = false
       deferredCatalogTask?.cancel()
       deferredCatalogTask = nil
       conversationDisplayTask?.cancel()
@@ -143,6 +155,33 @@
 
     private func isCurrentConnection(_ generation: UInt64) -> Bool {
       !isShuttingDown && connectionGeneration == generation
+    }
+
+    private func startServiceChangeSubscription(generation: UInt64) {
+      serviceChangesTask?.cancel()
+      serviceChangesTask = Task { [weak self] in
+        guard let self else { return }
+        let changes = await self.client.serviceChanges()
+        for await _ in changes {
+          guard !Task.isCancelled else { return }
+          self.enqueueServiceChangeRefresh(generation: generation)
+        }
+      }
+    }
+
+    private func enqueueServiceChangeRefresh(generation: UInt64) {
+      guard isCurrentConnection(generation) else { return }
+      serviceChangeRefreshPending = true
+      guard serviceChangeRefreshTask == nil else { return }
+      serviceChangeRefreshTask = Task { [weak self] in
+        guard let self else { return }
+        repeat {
+          self.serviceChangeRefreshPending = false
+          guard self.isCurrentConnection(generation) else { break }
+          await self.refreshTasks()
+        } while self.serviceChangeRefreshPending && !Task.isCancelled
+        self.serviceChangeRefreshTask = nil
+      }
     }
 
     private func scheduleDeferredConnectionWork(
@@ -249,6 +288,11 @@
 
     func fail(_ message: String) {
       connectionGeneration &+= 1
+      serviceChangesTask?.cancel()
+      serviceChangesTask = nil
+      serviceChangeRefreshTask?.cancel()
+      serviceChangeRefreshTask = nil
+      serviceChangeRefreshPending = false
       deferredCatalogTask?.cancel()
       deferredCatalogTask = nil
       errorMessage = message

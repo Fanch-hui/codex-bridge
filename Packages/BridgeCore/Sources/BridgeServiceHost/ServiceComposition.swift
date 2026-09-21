@@ -34,6 +34,7 @@ public actor ServiceComposition {
   private let configuration: ServiceCompositionConfiguration
   private var mcpServer: MCPBridgeServer?
   private var mcpEndpoint: MCPBridgeEndpoint?
+  private var startupAgentRefreshTask: Task<Void, Never>?
   private var tunnelBootstrapped = false
   private var isShutdown = false
 
@@ -110,7 +111,6 @@ public actor ServiceComposition {
         )
       }
     )
-    _ = try await agentRegistry.refreshInstallationStates()
     let agentDiscoveryCatalog = ServiceAgentDiscoveryCatalog(
       cacheURL: paths.agentStateURL.appendingPathComponent("discovered-agents.json")
     )
@@ -160,9 +160,11 @@ public actor ServiceComposition {
       agentRegistry: agentRegistry,
       agentCredentials: agentCredentials,
       directCommands: DirectCommandSessionManager(
-        orphanPIDFileURL: paths.supervisorScratchURL.appending(path: "direct-command-pids.txt")
+        orphanPIDFileURL: paths.supervisorScratchURL.appending(path: "direct-command-pids.txt"),
+        historyFileURL: paths.rootURL.appending(path: "direct-command-history.json")
       )
     )
+    await application.startTaskQueueProcessor()
     let resolvedTunnelFactory =
       tunnelFactory
       ?? BundledServiceTunnelManagerFactory(
@@ -203,6 +205,33 @@ public actor ServiceComposition {
       mcpClients: mcpClients,
       legacyImportReport: legacyImport.report
     )
+  }
+
+  public func startAgentInstallationRefresh() {
+    guard startupAgentRefreshTask == nil else { return }
+    let registry = agentRegistry
+    let runtimeStatus = runtimeStatus
+    startupAgentRefreshTask = Task {
+      do {
+        _ = try await registry.refreshInstallationStates()
+      } catch is CancellationError {
+        return
+      } catch {
+        let current = await runtimeStatus.current()
+        let message =
+          "Agents: initial installation refresh failed; stored states will be retried."
+        guard !current.degradations.contains(message) else { return }
+        await runtimeStatus.update(
+          ServiceRuntimeStatusSnapshot(
+            mcpState: current.mcpState,
+            tunnelState: current.tunnelState,
+            codexVersion: current.codexVersion,
+            loginMode: current.loginMode,
+            degradations: current.degradations + [message]
+          )
+        )
+      }
+    }
   }
 
   private init(
@@ -456,10 +485,15 @@ public actor ServiceComposition {
   public func shutdown() async {
     guard !isShutdown else { return }
     isShutdown = true
+    let refreshTask = startupAgentRefreshTask
+    startupAgentRefreshTask = nil
+    refreshTask?.cancel()
+    _ = await refreshTask?.result
     await tunnel.shutdown()
     await stopMCP()
     await coordinator.shutdown()
     await application.shutdownDirectOperations()
+    await application.shutdownTaskQueueProcessor()
     await runtimeStatus.updateMCP(state: "stopped")
   }
 

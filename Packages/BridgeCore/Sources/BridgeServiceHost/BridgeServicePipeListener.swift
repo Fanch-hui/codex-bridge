@@ -98,6 +98,10 @@
           if !isRunning() { break }
           continue
         }
+        guard LocalAppPeerIdentity.accepts(pipe: handle) else {
+          _ = CloseHandle(handle)
+          continue
+        }
         guard let io = NamedPipeOverlappedIO() else {
           _ = CloseHandle(handle)
           continue

@@ -68,9 +68,11 @@ public actor ServiceWorkspaceMutationGate {
   private var taskAdmissions: Set<String> = []
   private var appUpdateLeaseExpiresAt: Date?
   private let appUpdateLeaseDuration: TimeInterval
+  public nonisolated let changes: ServiceStateChangeHub
 
   public init(appUpdateLeaseDuration: TimeInterval = 60) {
     self.appUpdateLeaseDuration = max(1, appUpdateLeaseDuration)
+    self.changes = ServiceStateChangeHub()
   }
 
   @discardableResult
@@ -109,6 +111,7 @@ public actor ServiceWorkspaceMutationGate {
 
   public func cancelAppUpdate() {
     appUpdateLeaseExpiresAt = nil
+    changes.publish()
   }
 
   public func activeDirectOwner(projectID: ProjectID) -> ServiceWorkspaceOwner? {
@@ -174,6 +177,7 @@ public actor ServiceWorkspaceMutationGate {
   public func endCodexAdmission(projectID: ProjectID, token: String) {
     guard var tokens = codexAdmissions[projectID], tokens.remove(token) != nil else { return }
     codexAdmissions[projectID] = tokens.isEmpty ? nil : tokens
+    changes.publish()
   }
 
   public func releaseDirect(projectID: ProjectID, owner: ServiceWorkspaceOwner) {
@@ -182,6 +186,7 @@ public actor ServiceWorkspaceMutationGate {
     // owned by the same operation value.
     if directReservations[projectID]?.owner == owner {
       directReservations[projectID] = nil
+      changes.publish()
     }
   }
 
@@ -195,6 +200,7 @@ public actor ServiceWorkspaceMutationGate {
       reservation.owner == owner
     else { return }
     directReservations[projectID] = nil
+    changes.publish()
   }
 
   private func removeDirectReservation(projectID: ProjectID, token: String) {
@@ -207,11 +213,13 @@ public actor ServiceWorkspaceMutationGate {
     codexAdmissions = [:]
     taskAdmissions = []
     appUpdateLeaseExpiresAt = nil
+    changes.publish()
   }
 
   private func expireAppUpdateIfNeeded(now: Date = Date()) {
     guard let expiresAt = appUpdateLeaseExpiresAt, expiresAt <= now else { return }
     appUpdateLeaseExpiresAt = nil
+    changes.publish()
   }
 }
 

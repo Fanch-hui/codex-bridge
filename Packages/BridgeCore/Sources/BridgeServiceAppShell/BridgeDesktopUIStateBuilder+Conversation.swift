@@ -33,9 +33,10 @@ extension BridgeDesktopUIStateBuilder {
       failureCode: task.failureCode,
       changedFiles: task.changedFiles,
       activity: taskActivity(task),
-      conversation: conversationEntries(
-        from: model.conversation,
-        providerID: task.providerIdentifier
+      conversation: model.desktopConversationPresentationCache.update(
+        taskID: task.taskID,
+        providerID: task.providerIdentifier,
+        entries: model.conversation?.entries ?? []
       ),
       conversationState: BridgeDesktopConversationState(
         conversation: model.conversation,
@@ -57,6 +58,13 @@ extension BridgeDesktopUIStateBuilder {
       turnCount: session?.turnCount ?? 1,
       canResume: canResume(task, model: model),
       canRestart: task.canRestart,
+      handoffPrompt: task.isTerminal
+        ? TaskHandoffSummary.prompt(
+          task: task, history: sessionTasks,
+          gitState: model.projects.first { $0.projectID == task.projectID }?.gitState) : nil,
+      handoffProviders: TaskHandoffSummary.providers(
+        excluding: task.providerIdentifier, installations: model.agentInstallations
+      ).map { BridgeDesktopChoice(id: $0.id, title: $0.name) },
       updatedAt: task.updatedAt
     )
   }
@@ -73,16 +81,7 @@ extension BridgeDesktopUIStateBuilder {
     }
   }
 
-  private static func conversationEntries(
-    from conversation: TaskConversationModel?,
-    providerID: String
-  ) -> [BridgeDesktopConversationEntry] {
-    conversation?.entries.map {
-      conversationEntry($0, providerID: providerID)
-    } ?? []
-  }
-
-  private static func conversationEntry(
+  static func conversationEntry(
     _ entry: TaskConversationModel.Entry,
     providerID: String
   ) -> BridgeDesktopConversationEntry {
@@ -106,9 +105,10 @@ extension BridgeDesktopUIStateBuilder {
       )
     }
     if entry.kind == "tool_call" {
+      let displayContent = entry.displayContent
       let toolStatus = CodexTranscriptPresentation.resolvedToolStatus(
         providerID: providerID, name: entry.toolName, status: entry.toolStatus,
-        output: entry.content
+        output: displayContent
       )
       let presentation = CodexTranscriptPresentation.tool(
         providerID: providerID,
@@ -118,16 +118,26 @@ extension BridgeDesktopUIStateBuilder {
       return BridgeDesktopConversationEntry(
         id: entry.key,
         role: role,
-        text: entry.content,
+        text: displayContent,
         kind: entry.kind,
         toolName: entry.toolName,
         toolStatus: toolStatus,
-        toolArguments: entry.toolArguments,
+        toolArguments: entry.displayToolArguments,
         displayTitle: presentation.title,
         displayStatus: CodexTranscriptPresentation.statusLabel(toolStatus),
         symbol: presentation.systemImage,
         isFinal: entry.isFinal,
-        status: entry.isFinal ? "final" : "streaming"
+        status: entry.isFinal ? "final" : "streaming",
+        childRuns: entry.childRuns.map {
+          BridgeDesktopChildRun(
+            id: $0.id,
+            sessionID: $0.sessionID,
+            name: $0.name,
+            status: $0.status,
+            summary: $0.summary,
+            workspaceURLs: $0.workspaceURLs
+          )
+        }
       )
     }
     return BridgeDesktopConversationEntry(

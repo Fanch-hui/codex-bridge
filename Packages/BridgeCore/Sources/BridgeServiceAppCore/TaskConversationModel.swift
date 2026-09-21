@@ -51,6 +51,7 @@ public final class TaskConversationModel: Identifiable {
   private var resyncTask: Task<Void, Never>?
   private var pendingPushes: [IPCTaskConversationPush] = []
   private var pendingResyncPushes: [IPCTaskConversationPush] = []
+  private var pendingPushFirstEnqueuedAt: ContinuousClock.Instant?
   var lifecycleGeneration: UInt64 = 0
   var loadGeneration: UInt64 = 0
   private var hasLoadedTerminalSnapshot = false
@@ -87,8 +88,8 @@ public final class TaskConversationModel: Identifiable {
 
   public func start() async {
     defer { isLoading = false }
-    await loadPriorTasks()
     if isTerminal {
+      await loadPriorTasks()
       await reloadAuthoritativeSnapshot()
       return
     }
@@ -127,6 +128,10 @@ public final class TaskConversationModel: Identifiable {
         }
         self?.flushPendingPushes()
       }
+      // Subscribe to the active turn before fetching older turns. Historical
+      // pages may take several round trips, while this stream is the source
+      // of the user's current output.
+      await loadPriorTasks()
     } catch {
       guard isRequestValid(lifecycle: generation, load: requestLoadGeneration) else { return }
       errorMessage = BridgeServiceErrorMessage.message(error)
@@ -136,6 +141,7 @@ public final class TaskConversationModel: Identifiable {
         )
         guard isRequestValid(lifecycle: generation, load: requestLoadGeneration) else { return }
         _ = applyAuthoritativePage(page)
+        await loadPriorTasks()
       } catch {
         guard isRequestValid(lifecycle: generation, load: requestLoadGeneration) else { return }
         errorMessage = BridgeServiceErrorMessage.message(error)
@@ -156,6 +162,7 @@ public final class TaskConversationModel: Identifiable {
     pushFlushTask = nil
     pendingPushes.removeAll(keepingCapacity: false)
     pendingResyncPushes.removeAll(keepingCapacity: false)
+    pendingPushFirstEnqueuedAt = nil
   }
 
   public func refreshPresentation() {
@@ -251,6 +258,7 @@ public final class TaskConversationModel: Identifiable {
     pushFlushTask = nil
     pendingPushes.removeAll(keepingCapacity: false)
     pendingResyncPushes.removeAll(keepingCapacity: false)
+    pendingPushFirstEnqueuedAt = nil
     entries = priorEntries + page.messages.map { Entry($0, isFinal: $0.final) }
     canLoadEarlierCurrentTask = page.messages.count >= Self.conversationPageSize
     updateEarlierAvailability()
@@ -287,6 +295,11 @@ public final class TaskConversationModel: Identifiable {
       scheduleConversationResync()
     }
     pendingPushes.append(push)
+    pendingPushFirstEnqueuedAt = pendingPushFirstEnqueuedAt ?? ContinuousClock.now
+    if Self.requiresImmediateFlush(push) {
+      flushPendingPushes()
+      return
+    }
     guard pushFlushTask == nil else { return }
     pushFlushTask = Task { [weak self] in
       do {
@@ -304,7 +317,37 @@ public final class TaskConversationModel: Identifiable {
     guard !pendingPushes.isEmpty else { return }
     let pushes = pendingPushes
     pendingPushes.removeAll(keepingCapacity: true)
+    let enqueuedAt = pendingPushFirstEnqueuedAt
+    pendingPushFirstEnqueuedAt = nil
     applyPushBatch(pushes)
+    if let enqueuedAt {
+      ConversationPerformanceRecorder.shared.record(
+        ConversationPerformanceSample(
+          stage: .conversationPushMerge,
+          duration: enqueuedAt.duration(to: ContinuousClock.now),
+          byteCount: pushes.reduce(into: 0) { $0 += Self.byteCount(of: $1) },
+          queueDepth: pushes.count,
+          entryCount: entries.count
+        )
+      )
+    }
+  }
+
+  private static func requiresImmediateFlush(_ push: IPCTaskConversationPush) -> Bool {
+    if push.final { return true }
+    switch push.toolStatus?.lowercased() {
+    case "completed", "failed", "cancelled", "canceled", "declined", "denied":
+      return true
+    default:
+      break
+    }
+    return ["approval", "question", "error"].contains(push.kind.lowercased())
+  }
+
+  private static func byteCount(of push: IPCTaskConversationPush) -> Int {
+    (push.delta?.utf8.count ?? 0)
+      + (push.fullContent?.utf8.count ?? 0)
+      + (push.toolArguments?.utf8.count ?? 0)
   }
 
   private func applyPushBatch(_ pushes: [IPCTaskConversationPush]) {

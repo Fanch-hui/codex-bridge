@@ -303,6 +303,12 @@ extension BridgeServiceRequestController {
         message: "The local service store is unavailable.",
         retryable: true
       )
+    case .storageBusy:
+      return .init(
+        code: "busy",
+        message: "The service database is busy; please retry shortly.",
+        retryable: true
+      )
     }
   }
 

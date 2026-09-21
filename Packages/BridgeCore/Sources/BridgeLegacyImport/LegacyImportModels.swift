@@ -29,6 +29,7 @@ public struct LegacyImportReport: Equatable, Sendable {
   public let sourceFound: Bool
   public let insertedProjectIDs: [ProjectID]
   public let existingProjectIDs: [ProjectID]
+  public let skippedProjectIDs: [ProjectID]
   public let reducedProjects: [LegacyProjectReduction]
   public let insertedSettingKeys: [String]
   public let existingSettingKeys: [String]
@@ -38,6 +39,7 @@ public struct LegacyImportReport: Equatable, Sendable {
     sourceFound: Bool,
     insertedProjectIDs: [ProjectID] = [],
     existingProjectIDs: [ProjectID] = [],
+    skippedProjectIDs: [ProjectID] = [],
     reducedProjects: [LegacyProjectReduction] = [],
     insertedSettingKeys: [String] = [],
     existingSettingKeys: [String] = []
@@ -46,6 +48,7 @@ public struct LegacyImportReport: Equatable, Sendable {
     self.sourceFound = sourceFound
     self.insertedProjectIDs = insertedProjectIDs
     self.existingProjectIDs = existingProjectIDs
+    self.skippedProjectIDs = skippedProjectIDs
     self.reducedProjects = reducedProjects
     self.insertedSettingKeys = insertedSettingKeys
     self.existingSettingKeys = existingSettingKeys

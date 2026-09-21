@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeCodexRPC
 import BridgeDomain
 import BridgeProjects
@@ -35,6 +36,7 @@ package actor ExecutionSession {
   var binding: ExecutionBinding?
   var startedTurnIDs: Set<String> = []
   var collaborationBindings: Set<ExecutionBinding> = []
+  var collaborationRuns: [ExecutionBinding: AgentChildRun] = [:]
   var seenItems: [CodexApprovalItemKey: String] = [:]
   var knownItems: [CodexApprovalItemKey: CodexApprovalItemEvidence] = [:]
   var usedApprovalRequests: Set<ApprovalRequestKey> = []

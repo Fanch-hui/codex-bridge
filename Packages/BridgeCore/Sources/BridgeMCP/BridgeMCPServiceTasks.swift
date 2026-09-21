@@ -111,6 +111,15 @@ public struct MCPServiceTaskWaitPolicy: Codable, Equatable, Sendable {
         nextAction: "await_local_approval",
         doNotInferFailure: true
       )
+    case "queued":
+      return Self(
+        waitProfile: "standard",
+        recommendedPollAfterSeconds: 300,
+        diagnosticAfterQuietSeconds: 1_800,
+        terminal: false,
+        nextAction: "poll_get_task",
+        doNotInferFailure: true
+      )
     case "starting":
       return Self(
         waitProfile: "standard",
@@ -198,6 +207,9 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
   public let resultSummary: String?
   public let failureCode: String?
   public let updatedAt: String
+  public let queuePosition: Int?
+  public let queueOccupantTaskID: String?
+  public let queueRequestedAt: String?
   public let waitPolicy: MCPServiceTaskWaitPolicy
 
   public init(
@@ -228,6 +240,9 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     resultSummary: String? = nil,
     failureCode: String? = nil,
     updatedAt: String,
+    queuePosition: Int? = nil,
+    queueOccupantTaskID: String? = nil,
+    queueRequestedAt: String? = nil,
     waitPolicy: MCPServiceTaskWaitPolicy? = nil
   ) {
     self.taskID = taskID
@@ -257,6 +272,9 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     self.resultSummary = resultSummary
     self.failureCode = failureCode
     self.updatedAt = updatedAt
+    self.queuePosition = queuePosition
+    self.queueOccupantTaskID = queueOccupantTaskID
+    self.queueRequestedAt = queueRequestedAt
     self.waitPolicy =
       waitPolicy
       ?? MCPServiceTaskWaitPolicy.forTask(
@@ -294,6 +312,9 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     case resultSummary = "result_summary"
     case failureCode = "failure_code"
     case updatedAt = "updated_at"
+    case queuePosition = "queue_position"
+    case queueOccupantTaskID = "queue_occupant_task_id"
+    case queueRequestedAt = "queue_requested_at"
     case waitPolicy = "wait_policy"
   }
 
@@ -329,6 +350,9 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     resultSummary = try container.decodeIfPresent(String.self, forKey: .resultSummary)
     failureCode = try container.decodeIfPresent(String.self, forKey: .failureCode)
     updatedAt = try container.decode(String.self, forKey: .updatedAt)
+    queuePosition = try container.decodeIfPresent(Int.self, forKey: .queuePosition)
+    queueOccupantTaskID = try container.decodeIfPresent(String.self, forKey: .queueOccupantTaskID)
+    queueRequestedAt = try container.decodeIfPresent(String.self, forKey: .queueRequestedAt)
     waitPolicy =
       try container.decodeIfPresent(MCPServiceTaskWaitPolicy.self, forKey: .waitPolicy)
       ?? MCPServiceTaskWaitPolicy.forTask(
@@ -359,6 +383,7 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
   public let networkAccess: Bool
   public let acceptanceCriteria: [String]
   public let clientRequestID: String?
+  public let queueIfBusy: Bool?
 
   public init(
     projectID: String? = nil,
@@ -376,7 +401,8 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
     permissionModeOverride: Bool? = nil,
     networkAccess: Bool = false,
     acceptanceCriteria: [String] = [],
-    clientRequestID: String? = nil
+    clientRequestID: String? = nil,
+    queueIfBusy: Bool? = nil
   ) {
     self.projectID = projectID
     self.prompt = prompt
@@ -394,6 +420,7 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
     self.networkAccess = networkAccess
     self.acceptanceCriteria = acceptanceCriteria
     self.clientRequestID = clientRequestID
+    self.queueIfBusy = queueIfBusy
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -413,6 +440,7 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
     case networkAccess = "network_access"
     case acceptanceCriteria = "acceptance_criteria"
     case clientRequestID = "client_request_id"
+    case queueIfBusy = "queue_if_busy"
   }
 }
 

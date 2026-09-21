@@ -179,6 +179,100 @@ public struct MCPProjectFileReadPage: Codable, Equatable, Sendable {
   }
 }
 
+public struct MCPProjectDirectoryEntry: Codable, Equatable, Sendable {
+  public let relativePath: String
+  public let kind: String
+  public let byteCount: Int?
+
+  public init(relativePath: String, kind: String, byteCount: Int?) {
+    self.relativePath = relativePath
+    self.kind = kind
+    self.byteCount = byteCount
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case relativePath = "relative_path"
+    case kind
+    case byteCount = "byte_count"
+  }
+}
+
+public struct MCPProjectDirectoryPage: Codable, Equatable, Sendable {
+  public let relativeDirectory: String?
+  public let entries: [MCPProjectDirectoryEntry]
+  public let nextCursor: String?
+
+  public init(
+    relativeDirectory: String?,
+    entries: [MCPProjectDirectoryEntry],
+    nextCursor: String?
+  ) {
+    self.relativeDirectory = relativeDirectory
+    self.entries = entries
+    self.nextCursor = nextCursor
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case relativeDirectory = "relative_directory"
+    case entries
+    case nextCursor = "next_cursor"
+  }
+}
+
+public struct MCPProjectFileBatchItem: Codable, Equatable, Sendable {
+  public let relativePath: String
+  public let result: MCPProjectFileReadPage?
+  public let error: String?
+
+  public init(relativePath: String, result: MCPProjectFileReadPage?, error: String?) {
+    self.relativePath = relativePath
+    self.result = result
+    self.error = error
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case relativePath = "relative_path"
+    case result
+    case error
+  }
+}
+
+public struct MCPProjectFileBatchReadItemRequest: Codable, Equatable, Sendable {
+  public let relativePath: String
+  public let startLine: Int?
+  public let lineCount: Int?
+
+  public init(relativePath: String, startLine: Int?, lineCount: Int?) {
+    self.relativePath = relativePath
+    self.startLine = startLine
+    self.lineCount = lineCount
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case relativePath = "relative_path"
+    case startLine = "start_line"
+    case lineCount = "line_count"
+  }
+}
+
+public struct MCPProjectFileBatchPage: Codable, Equatable, Sendable {
+  public let items: [MCPProjectFileBatchItem]
+  public let truncated: Bool
+  public let omittedCount: Int
+
+  public init(items: [MCPProjectFileBatchItem], truncated: Bool, omittedCount: Int) {
+    self.items = items
+    self.truncated = truncated
+    self.omittedCount = omittedCount
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case items
+    case truncated
+    case omittedCount = "omitted_count"
+  }
+}
+
 public struct MCPOpenInCodexReceipt: Codable, Equatable, Sendable {
   public let projectID: String
   public let threadID: String

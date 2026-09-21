@@ -1,6 +1,7 @@
 import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
+import BridgeServiceAppCore
 
 extension BridgeDesktopCommandRouter {
   static func handleSettings(
@@ -86,10 +87,8 @@ extension BridgeDesktopCommandRouter {
     }
     let current = model.agentModelDefault(for: providerID)
     let options = model.agentModelOptions(for: providerID)
-    let effectiveModel =
-      selectedModel
-      ?? options.first(where: { !$0.supportedReasoningEfforts.isEmpty })?.modelID
-      ?? options.first?.modelID
+    let effectiveModel = AgentModelCatalogResolver.modelForSelection(
+      modelID: selectedModel, models: options)?.modelID
     let selectedEffort = payload.effort.flatMap { validatedID($0, maximumBytes: 64) }
     if let selectedEffort {
       guard provider.supportsEffortSelection,
@@ -107,13 +106,17 @@ extension BridgeDesktopCommandRouter {
     model.saveAgentDefaults(
       providerID: providerID, model: selectedModel, permissionMode: permission,
       effort: selectedEffort)
-    if selectedModel != current.model {
+    if selectedModel != current.model,
+      options.first(where: { $0.modelID == effectiveModel })?.reasoningCapabilitiesAvailable
+        == false
+    {
       let installationID =
         payload.installationID
         ?? model.agentInstallations.first {
           $0.providerID == providerID && $0.isEnabled && $0.availability == "available"
         }?.installationID
-      model.refreshAgentModelCatalog(installationID: installationID, providerID: providerID)
+      model.refreshAgentModelCatalog(
+        installationID: installationID, providerID: providerID, forceRefresh: false)
     }
   }
 

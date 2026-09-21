@@ -93,7 +93,12 @@
         }
         S.pageHeader(header, page.header);
         codex.update(page.codex, nextEmit);
-        renderLocalMCP(localCard, page, context);
+        var localSignature = JSON.stringify([
+          page.localMCPURL, page.localMCPState, page.canCopyLocalMCPURL, page.canRotateLocalMCPEndpoint
+        ]);
+        var renderLocal = function () { renderLocalMCP(localCard, page, context); };
+        var stable = global.CodexBridgeDesktopStableRender;
+        if (stable) stable(localCard, localSignature, renderLocal); else renderLocal();
         renderTunnel(
           tunnelBadge,
           tunnelSubtitle,
@@ -126,13 +131,17 @@
     state.appendChild(S.badge(page.localMCPState, page.localMCPState === "ready" ? "success" : "neutral"));
     if (page.canCopyLocalMCPURL) {
       var copy = S.button("复制 Endpoint", null, {}, null, "small", false);
-      copy.addEventListener("click", function () { context.emit("copyLocalMCPEndpoint", {}); });
+      copy.addEventListener("click", function () {
+        copy.disabled = true; copy.textContent = "已发送";
+        context.emit("copyLocalMCPEndpoint", {});
+      });
       state.appendChild(copy);
     }
     if (page.canRotateLocalMCPEndpoint) {
       var rotate = S.button("重新生成 Endpoint", null, {}, null, "small danger", false);
       rotate.addEventListener("click", function () {
         if (global.confirm("重新生成本地 MCP Endpoint？现有客户端地址将立即失效。")) {
+          rotate.disabled = true; rotate.textContent = "请求中…";
           context.emit("rotateLocalMCPEndpoint", {});
         }
       });
@@ -168,27 +177,42 @@
       diagnostics.appendChild(S.node("div", "page-message warning", "Tunnel 需要检查凭据，请核对 Tunnel ID、Runtime Key 以及当前工作区权限。"));
     }
     editor.update(tunnel, context.emit);
-    S.clear(actions);
-    if (tunnel.canConnect) {
-      var connect = S.button("连接", null, {}, null, "small primary", false);
-      connect.addEventListener("click", function () { context.emit("connectTunnel", {}); });
-      actions.appendChild(connect);
-    }
-    if (tunnel.canDisconnect) {
-      var disconnect = S.button("断开", null, {}, null, "small", false);
-      disconnect.addEventListener("click", function () { context.emit("disconnectTunnel", {}); });
-      actions.appendChild(disconnect);
-    }
-    if (tunnel.canClear) {
-      var clear = S.button("清除配置", null, {}, null, "small danger", false);
-      clear.addEventListener("click", function () {
-        if (global.confirm("清除 Secure Tunnel 配置？\n这会移除已保存的 Runtime Key 并重置 Tunnel 绑定。")) {
-          editor.clearRuntimeKey();
-          context.emit("clearTunnel", {});
-        }
-      });
-      actions.appendChild(clear);
-    }
+    var renderActions = function () {
+      S.clear(actions);
+      if (tunnel.canConnect) {
+        var connect = S.button("连接", null, {}, null, "small primary", false);
+        connect.addEventListener("click", function () {
+          connect.disabled = true; connect.textContent = "请求中…";
+          context.emit("connectTunnel", {});
+        });
+        actions.appendChild(connect);
+      }
+      if (tunnel.canDisconnect) {
+        var disconnect = S.button("断开", null, {}, null, "small", false);
+        disconnect.addEventListener("click", function () {
+          disconnect.disabled = true; disconnect.textContent = "请求中…";
+          context.emit("disconnectTunnel", {});
+        });
+        actions.appendChild(disconnect);
+      }
+      if (tunnel.canClear) {
+        var clear = S.button("清除配置", null, {}, null, "small danger", false);
+        clear.addEventListener("click", function () {
+          if (global.confirm("清除 Secure Tunnel 配置？\n这会移除已保存的 Runtime Key 并重置 Tunnel 绑定。")) {
+            clear.disabled = true; clear.textContent = "请求中…";
+            editor.clearRuntimeKey();
+            context.emit("clearTunnel", {});
+          }
+        });
+        actions.appendChild(clear);
+      }
+    };
+    var stable = global.CodexBridgeDesktopStableRender;
+    var signature = JSON.stringify([
+      tunnel.lifecycle, tunnel.actionRequired, tunnel.enabled, tunnel.configured,
+      tunnel.helperAvailable, tunnel.canConnect, tunnel.canDisconnect, tunnel.canClear
+    ]);
+    if (stable) stable(actions, signature, renderActions); else renderActions();
   }
 
   function renderAgents(connectors, editor, dshMCP, page, emit) {

@@ -15,6 +15,7 @@ public actor OpenCodeACPEventNormalizer {
     var arguments: String?
     var output: String?
     var locations: [String] = []
+    var childRuns: [AgentChildRun] = []
     var status: AgentToolStatus = .pending
   }
 
@@ -180,6 +181,12 @@ public actor OpenCodeACPEventNormalizer {
     }
     if let rawInput = update["rawInput"] {
       state.arguments = rawInput.encodedString()
+      state.childRuns = Self.childRuns(
+        from: rawInput,
+        title: state.title,
+        kind: state.kind,
+        status: state.status
+      )
       if let input = rawInput.objectValue {
         state.locations = Array(
           Set(state.locations + Self.absoluteLocations(from: input, projectRoot: projectRoot))
@@ -208,7 +215,8 @@ public actor OpenCodeACPEventNormalizer {
       status: state.status,
       arguments: state.arguments,
       output: state.output,
-      locations: state.locations
+      locations: state.locations,
+      childRuns: state.childRuns
     )
     tools[toolCallID] = state
     return try envelope(.tool(payload))
@@ -269,6 +277,40 @@ public actor OpenCodeACPEventNormalizer {
       .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
       .joined(separator: "_")
     return normalized.isEmpty ? nil : normalized
+  }
+
+  private static func childRuns(
+    from input: ACPJSONValue,
+    title: String?,
+    kind: String?,
+    status: AgentToolStatus
+  ) -> [AgentChildRun] {
+    guard semanticToolName(title: title, kind: kind) == "subagent",
+      let object = input.objectValue
+    else { return [] }
+    let id = [
+      "childSessionId", "child_session_id", "sessionId", "session_id", "conversationId",
+      "conversation_id", "agentId", "agent_id",
+    ]
+    .compactMap { object[$0]?.stringValue }
+    .first
+    .flatMap(safeText)
+    guard let id else { return [] }
+    let name =
+      ["name", "role", "agent"].compactMap { object[$0]?.stringValue }
+      .first.flatMap(safeText) ?? title.flatMap(safeText)
+    let summary = ["summary", "result", "description"].compactMap { object[$0]?.stringValue }
+      .first.flatMap(safeText)
+    guard
+      let child = try? AgentChildRun(
+        id: id,
+        sessionID: object["sessionId"]?.stringValue ?? object["session_id"]?.stringValue,
+        name: name,
+        status: status.rawValue,
+        summary: summary
+      )
+    else { return [] }
+    return [child]
   }
 
   private func plan(_ update: [String: ACPJSONValue]) throws -> AgentEventEnvelope? {

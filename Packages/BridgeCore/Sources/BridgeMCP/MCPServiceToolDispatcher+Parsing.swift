@@ -17,8 +17,6 @@ extension MCPServiceToolDispatcher {
   private struct SubmissionExecutionPolicy {
     let permissionMode: String?
     let permissionModeOverride: Bool
-    let supervisorModel: String?
-    let supervisorEffort: String?
   }
 
   func parseSubmission(_ arguments: [String: Value]?) throws
@@ -44,11 +42,11 @@ extension MCPServiceToolDispatcher {
       arguments,
       allowed: [
         "project_id", "prompt", "thread_id", "provider_id", "installation_id",
-        "execution_model", "execution_effort",
+        "execution_model", "execution_effort", "supervisor_model", "supervisor_effort",
         "model_override", "skill_name",
-        "supervisor_model", "supervisor_effort", "permission_mode", "permission_mode_override",
+        "permission_mode", "permission_mode_override",
         "network_access",
-        "acceptance_criteria", "client_request_id",
+        "acceptance_criteria", "client_request_id", "queue_if_busy",
       ],
       required: ["prompt"]
     )
@@ -95,24 +93,9 @@ extension MCPServiceToolDispatcher {
     {
       throw MCPError.invalidParams("Argument 'permission_mode' is invalid.")
     }
-    let supervisorModel = try values.optionalIdentifier(
-      "supervisor_model",
-      maximumUTF8Bytes: 256
-    )
-    let supervisorEffort = try values.optionalIdentifier(
-      "supervisor_effort",
-      maximumUTF8Bytes: 64
-    )
-    guard (supervisorModel == nil) == (supervisorEffort == nil) else {
-      throw MCPError.invalidParams(
-        "Supervisor model and effort must be supplied together."
-      )
-    }
     return SubmissionExecutionPolicy(
       permissionMode: permissionMode,
-      permissionModeOverride: permissionModeOverride,
-      supervisorModel: supervisorModel,
-      supervisorEffort: supervisorEffort
+      permissionModeOverride: permissionModeOverride
     )
   }
 
@@ -138,8 +121,6 @@ extension MCPServiceToolDispatcher {
         maximumUTF8Bytes: 64
       ),
       modelOverride: try values.optionalBoolean("model_override"),
-      supervisorModel: execution.supervisorModel,
-      supervisorEffort: execution.supervisorEffort,
       permissionMode: execution.permissionMode,
       permissionModeOverride: execution.permissionModeOverride,
       networkAccess: try values.optionalBoolean("network_access") ?? false,
@@ -147,7 +128,8 @@ extension MCPServiceToolDispatcher {
       clientRequestID: try values.optionalIdentifier(
         "client_request_id",
         maximumUTF8Bytes: 512
-      )
+      ),
+      queueIfBusy: try values.optionalBoolean("queue_if_busy")
     )
   }
 

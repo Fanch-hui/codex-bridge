@@ -72,6 +72,7 @@
           clientID: row.dataset.clientID,
           exposureMode: value
         });
+        exposure.control.setAttribute("aria-busy", "true");
       }, "client-exposure");
       controls.appendChild(exposure.wrapper);
       var toggle = S.node("label", "check-field");
@@ -83,6 +84,7 @@
           clientID: row.dataset.clientID,
           enabled: checkbox.checked
         });
+        checkbox.setAttribute("aria-busy", "true");
       });
       toggle.appendChild(checkbox);
       toggle.appendChild(toggleText);
@@ -102,6 +104,7 @@
       row.appendChild(controls);
       var hint = S.node("p", "client-exposure-hint");
       row.appendChild(hint);
+      var draft = D.bind({ exposure: exposure.control, enabled: checkbox });
       return {
         root: row,
         name: name,
@@ -109,6 +112,7 @@
         detail: detail,
         exposure: exposure.control,
         toggle: toggle, checkbox: checkbox, toggleText: toggleText,
+        draft: draft,
         copy: copy,
         rotate: rotate,
         hint: hint
@@ -122,10 +126,11 @@
       row.detail.textContent = "活动 Session：" + client.activeSessionCount
         + (client.lastConnectedAt ? " · 最近连接：" + client.lastConnectedAt : "");
       D.selectOptions(row.exposure, client.exposureOptions || [], false);
-      row.exposure.value = client.exposureMode || "full";
+      row.draft.update({ exposure: client.exposureMode || "full", enabled: !!client.enabled });
       row.exposure.disabled = !client.exposureOptions || !client.exposureOptions.length;
-      row.checkbox.checked = !!client.enabled;
       row.checkbox.disabled = !client.canToggle;
+      row.exposure.setAttribute("aria-busy", "false");
+      row.checkbox.setAttribute("aria-busy", "false");
       row.toggle.hidden = !client.canToggle;
       row.toggleText.textContent = client.clientID === "qwen.studio" ? "启用 Qwen Studio" : "启用";
       row.copy.hidden = !client.canCopyConfiguration;

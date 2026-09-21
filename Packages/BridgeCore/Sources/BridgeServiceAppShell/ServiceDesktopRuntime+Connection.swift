@@ -32,6 +32,7 @@ extension BridgeServiceAppModel {
         serviceStatus = status
         applyWorkbenchPermissionMode(status.workbenchPermissionMode)
         client = candidate
+        await observeServiceChanges(candidate)
         connectionState = .connected
         registrationStatus = .enabled
         lastRefreshAt = Date()

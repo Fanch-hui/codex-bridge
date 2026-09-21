@@ -153,12 +153,21 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
   public let displayName: String
   public let supportedReasoningEfforts: [String]
   public let defaultReasoningEffort: String?
+  /// Whether the provider has actually resolved this model's effort options.
+  ///
+  /// A false value means that the effort list is not authoritative yet. An
+  /// empty list with a true value is a valid provider response for models
+  /// which do not expose selectable effort levels.
+  public let reasoningCapabilitiesAvailable: Bool
+  public let isDefaultModel: Bool?
 
   public init(
     id: String,
     displayName: String,
     supportedReasoningEfforts: [String] = [],
-    defaultReasoningEffort: String? = nil
+    defaultReasoningEffort: String? = nil,
+    reasoningCapabilitiesAvailable: Bool = true,
+    isDefaultModel: Bool? = nil
   ) throws {
     try AgentValidation.identifier(id, field: "model.id", maximumBytes: 256)
     try AgentValidation.text(displayName, field: "model.displayName", maximumBytes: 512)
@@ -184,6 +193,8 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
     self.displayName = displayName
     self.supportedReasoningEfforts = supportedReasoningEfforts
     self.defaultReasoningEffort = defaultReasoningEffort
+    self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
+    self.isDefaultModel = isDefaultModel
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -191,6 +202,8 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
     case displayName
     case supportedReasoningEfforts
     case defaultReasoningEffort
+    case reasoningCapabilitiesAvailable
+    case isDefaultModel
   }
 
   public init(from decoder: Decoder) throws {
@@ -205,7 +218,12 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
       defaultReasoningEffort: container.decodeIfPresent(
         String.self,
         forKey: .defaultReasoningEffort
-      )
+      ),
+      reasoningCapabilitiesAvailable: container.decodeIfPresent(
+        Bool.self,
+        forKey: .reasoningCapabilitiesAvailable
+      ) ?? true,
+      isDefaultModel: container.decodeIfPresent(Bool.self, forKey: .isDefaultModel)
     )
   }
 }

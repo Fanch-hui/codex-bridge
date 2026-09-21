@@ -18,30 +18,41 @@ extension BridgeServiceApplication {
       clientRequestID: request.clientRequestID
     )
     let operationID = "op-" + UUID().uuidString.lowercased()
+    let directRequest = MCPDirectMutationRequest(
+      projectID: request.projectID,
+      kind: ProjectMutationKind.write.rawValue,
+      relativePath: request.relativePath,
+      mode: request.mode,
+      content: request.content,
+      expectedSHA256: request.expectedSHA256,
+      createParents: request.createParents,
+      clientRequestID: request.clientRequestID
+    )
     do {
-      return try await withDirectLease(
+      let (prepared, result) = try await withDirectLease(
         project: project,
         owner: .directFileOperation(operationID: operationID)
       ) {
-        let result = try await self.mutations.write(
-          ProjectWriteRequest(
-            projectID: project.id,
-            relativePath: request.relativePath,
-            mode: request.mode == "create" ? .create : .replace,
-            content: request.content,
-            expectedSHA256: request.expectedSHA256,
-            createParents: request.createParents
-          )
-        )
-        return MCPDirectWriteReceipt(
-          relativePath: result.relativePath,
-          operation: result.operation,
-          oldSHA256: result.oldSHA256,
-          newSHA256: result.newSHA256,
-          byteCount: result.byteCount,
-          boundedDiff: Self.safeBoundedDiff(result.boundedDiff)
-        )
+        let prepared = try await self.prepareDirectMutation(directRequest)
+        let applied = try await self.mutations.apply(prepared)
+        let result = applied.first
+        guard let result else { throw ProjectMutationError.invalidRequest }
+        return (prepared, result)
       }
+      await directMutationOperations.insertApplied(
+        operationID: operationID,
+        request: directRequest,
+        prepared: prepared
+      )
+      return MCPDirectWriteReceipt(
+        operationID: operationID,
+        relativePath: result.relativePath,
+        operation: result.operation,
+        oldSHA256: result.oldSHA256,
+        newSHA256: result.newSHA256,
+        byteCount: result.byteCount,
+        boundedDiff: Self.safeBoundedDiff(result.boundedDiff)
+      )
     } catch {
       throw Self.publicMutationError(error)
     }
@@ -60,30 +71,41 @@ extension BridgeServiceApplication {
       clientRequestID: request.clientRequestID
     )
     let operationID = "op-" + UUID().uuidString.lowercased()
+    let directRequest = MCPDirectMutationRequest(
+      projectID: request.projectID,
+      kind: ProjectMutationKind.edit.rawValue,
+      relativePath: request.relativePath,
+      expectedSHA256: request.expectedSHA256,
+      oldText: request.oldText,
+      newText: request.newText,
+      expectedReplacements: request.expectedReplacements,
+      clientRequestID: request.clientRequestID
+    )
     do {
-      return try await withDirectLease(
+      let (prepared, result) = try await withDirectLease(
         project: project,
         owner: .directFileOperation(operationID: operationID)
       ) {
-        let result = try await self.mutations.edit(
-          ProjectEditRequest(
-            projectID: project.id,
-            relativePath: request.relativePath,
-            expectedSHA256: request.expectedSHA256,
-            oldText: request.oldText,
-            newText: request.newText,
-            expectedReplacements: request.expectedReplacements
-          )
-        )
-        return MCPDirectWriteReceipt(
-          relativePath: result.relativePath,
-          operation: result.operation,
-          oldSHA256: result.oldSHA256,
-          newSHA256: result.newSHA256,
-          byteCount: result.byteCount,
-          boundedDiff: Self.safeBoundedDiff(result.boundedDiff)
-        )
+        let prepared = try await self.prepareDirectMutation(directRequest)
+        let applied = try await self.mutations.apply(prepared)
+        let result = applied.first
+        guard let result else { throw ProjectMutationError.invalidRequest }
+        return (prepared, result)
       }
+      await directMutationOperations.insertApplied(
+        operationID: operationID,
+        request: directRequest,
+        prepared: prepared
+      )
+      return MCPDirectWriteReceipt(
+        operationID: operationID,
+        relativePath: result.relativePath,
+        operation: result.operation,
+        oldSHA256: result.oldSHA256,
+        newSHA256: result.newSHA256,
+        byteCount: result.byteCount,
+        boundedDiff: Self.safeBoundedDiff(result.boundedDiff)
+      )
     } catch {
       throw Self.publicMutationError(error)
     }
@@ -102,37 +124,38 @@ extension BridgeServiceApplication {
       clientRequestID: request.clientRequestID
     )
     let operationID = "op-" + UUID().uuidString.lowercased()
+    let directRequest = MCPDirectMutationRequest(
+      projectID: request.projectID,
+      kind: ProjectMutationKind.patch.rawValue,
+      patch: request.patch,
+      clientRequestID: request.clientRequestID
+    )
     do {
-      return try await withDirectLease(
+      let (prepared, results) = try await withDirectLease(
         project: project,
         owner: .directFileOperation(operationID: operationID)
       ) {
-        let operations: [ProjectPatchFileOperation]
-        do {
-          operations = try ProjectPatchParser.parse(request.patch)
-        } catch ProjectPatchParserError.absolutePath {
-          throw BridgeMCPQueryError.pathForbidden
-        } catch {
-          throw BridgeMCPQueryError.invalidPatchSyntax
-        }
-        let results = try await self.mutations.applyPatch(
-          ProjectApplyPatchRequest(
-            projectID: project.id,
-            operations: operations
-          )
-        )
-        let receipts = results.map { result in
-          MCPDirectWriteReceipt(
-            relativePath: result.relativePath,
-            operation: result.operation,
-            oldSHA256: result.oldSHA256,
-            newSHA256: result.newSHA256,
-            byteCount: result.byteCount,
-            boundedDiff: Self.safeBoundedDiff(result.boundedDiff)
-          )
-        }
-        return MCPDirectPatchReceipt(operations: receipts)
+        let prepared = try await self.prepareDirectMutation(directRequest)
+        let results = try await self.mutations.apply(prepared)
+        return (prepared, results)
       }
+      await directMutationOperations.insertApplied(
+        operationID: operationID,
+        request: directRequest,
+        prepared: prepared
+      )
+      let receipts = results.map { result in
+        MCPDirectWriteReceipt(
+          operationID: operationID,
+          relativePath: result.relativePath,
+          operation: result.operation,
+          oldSHA256: result.oldSHA256,
+          newSHA256: result.newSHA256,
+          byteCount: result.byteCount,
+          boundedDiff: Self.safeBoundedDiff(result.boundedDiff)
+        )
+      }
+      return MCPDirectPatchReceipt(operationID: operationID, operations: receipts)
     } catch let error as ProjectMutationError {
       if case .partialCommit(let changedFiles, let rollbackStatus) = error {
         throw BridgeMCPQueryError.patchPartialCommit(

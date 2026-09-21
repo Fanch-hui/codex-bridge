@@ -10,9 +10,14 @@ extension BridgeServiceAppModel {
     includeProjectResources: Bool,
     forceCatalogRefresh: Bool = false
   ) async {
-    async let directConfigurationResult = optional { try await client.directConfiguration() }
+    let managementVisible =
+      includeCatalog || includeProjectResources
+      || navigation == .settings || navigation == .connections
+    async let directConfigurationResult = optional(when: managementVisible) {
+      try await client.directConfiguration()
+    }
     async let projectResult = optional { try await client.projects() }
-    async let agentCatalogResult = optional {
+    async let agentCatalogResult = optional(when: managementVisible) {
       try await client.agentCatalog()
     }
     async let taskResult = optional {
@@ -24,8 +29,8 @@ extension BridgeServiceAppModel {
     async let taskStartApprovalModeResult = optional {
       try await client.taskStartApprovalMode()
     }
-    async let mcpClientResult = optional { try await client.mcpClients() }
-    async let deepSeekHarnessMCPResult = optional {
+    async let mcpClientResult = optional(when: managementVisible) { try await client.mcpClients() }
+    async let deepSeekHarnessMCPResult = optional(when: managementVisible) {
       try await client.deepSeekHarnessMCPServers()
     }
 
@@ -81,7 +86,8 @@ extension BridgeServiceAppModel {
       for installation in agentInstallations
       where installation.isEnabled && installation.availability == "available" {
         refreshAgentModelCatalog(
-          installationID: installation.installationID, providerID: installation.providerID)
+          installationID: installation.installationID, providerID: installation.providerID,
+          forceRefresh: forceCatalogRefresh)
       }
     }
     scheduleServiceUpgradeIfNeeded()
@@ -220,7 +226,9 @@ private struct TaskCatalogKey: Equatable {
 }
 
 private func optional<Value: Sendable>(
+  when enabled: Bool = true,
   _ operation: @escaping @Sendable () async throws -> Value
 ) async -> Value? {
-  try? await operation()
+  guard enabled else { return nil }
+  return try? await operation()
 }

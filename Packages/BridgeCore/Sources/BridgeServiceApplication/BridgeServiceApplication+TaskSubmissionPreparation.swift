@@ -71,7 +71,8 @@ extension BridgeServiceApplication {
         permissionMode: permission,
         networkAllowed: submission.networkAccess,
         accessMode: accessMode,
-        fastMode: fastMode
+        fastMode: fastMode,
+        queueIfBusy: submission.queueIfBusy == true
       )
     )
   }
