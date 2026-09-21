@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import BridgeIPC
   import XCTest
   @testable import BridgeWindowsShell
 
@@ -325,6 +326,21 @@
         WindowsAgentDefaultsModel.permissionValues(for: "opencode"),
         ["build", "plan"]
       )
+    }
+
+    func testAgentModelProjectionPreservesReasoningCapabilityState() {
+      let model = IPCAgentModelSummary(
+        modelID: "provider/model",
+        displayName: "Model",
+        supportedReasoningEfforts: [],
+        reasoningCapabilitiesAvailable: false,
+        isDefaultModel: true
+      )
+
+      let option = WindowsDesktopAgentPresentation.model(model)
+
+      XCTAssertEqual(option.reasoningCapabilitiesAvailable, false)
+      XCTAssertEqual(option.isDefaultModel, true)
     }
 
     func testTunnelCommandsRouteToServiceBackedWindowCommands() {

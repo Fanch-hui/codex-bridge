@@ -32,10 +32,28 @@
       context.emit("saveAgentDefault", { providerID: state.providerID, installationID: state.installationID,
         modelID: values.model || null, effort: values.effort || null, permissionMode: values.permission });
     }
+    function updateEfforts(state, changedModel) {
+      var selected = S.safeArray(state.modelOptions).find(function (option) {
+        return option.modelID === model.control.value
+          || (!model.control.value && option.isDefaultModel === true);
+      });
+      var known = !selected || selected.reasoningCapabilitiesAvailable !== false;
+      var sameModel = model.control.value === (state.model || "");
+      var efforts = known && selected && Array.isArray(selected.reasoningEfforts)
+        ? selected.reasoningEfforts
+        : known && sameModel ? S.safeArray(state.effortOptions) : [];
+      efforts = efforts.filter(function (option) { return option.id !== ""; });
+      M.chooseEffort(effort.control, [{ id: "", title: "Provider 默认" }].concat(efforts),
+        changedModel, selected && selected.defaultReasoningEffort);
+      effort.control.disabled = !state.canSave || state.isRefreshingModels
+        || state.canSelectEffort === false || !known || efforts.length === 0;
+      error.textContent = state.errorMessage || (state.isRefreshingModels || !known
+        ? "正在获取模型推理强度…" : efforts.length === 0
+          ? "当前模型不提供可选推理强度，使用 Provider 默认。" : "选择后自动保存。");
+      return efforts;
+    }
     model.control.addEventListener("change", function () {
-      M.chooseEffort(effort.control, [{ id: "", title: "Provider 默认" }], true, "");
-      model.control.disabled = true;
-      effort.control.disabled = true;
+      updateEfforts(context.item, true);
       persistSelection();
     });
     effort.control.addEventListener("change", persistSelection);
@@ -56,24 +74,15 @@
       var sameModel = model.control.value === (next.model || "");
       draft.update({ model: next.model || "", effort: sameModel ? next.effort || "" : effort.control.value, permission: next.permissionMode });
       sameModel = model.control.value === (next.model || "");
-      var efforts = sameModel ? S.safeArray(next.effortOptions).filter(function (item) { return item.id !== ""; }) : [];
-      var options = [{ id: "", title: "Provider 默认" }].concat(efforts);
-      M.chooseEffort(
-        effort.control,
-        options,
-        false,
-        M.defaultEffort(model.control.value, next.modelOptions)
-      );
+      updateEfforts(next, false);
       permission.control.disabled = next.supportsWorkspaceWrite === false;
       permissionHint.textContent = next.supportsWorkspaceWrite === false
         ? "当前安装的有效能力不包含工作区写入，将按只读执行。" : "";
       permissionHint.hidden = next.supportsWorkspaceWrite !== false;
       model.control.disabled = !next.canSave || next.isRefreshingModels || next.canSelectModel === false;
-      effort.control.disabled = !next.canSave || next.isRefreshingModels || next.canSelectEffort === false || efforts.length === 0;
       refresh.hidden = !next.canRefreshModels;
       refresh.disabled = !!next.isRefreshingModels;
       refresh.textContent = next.isRefreshingModels ? "刷新中…" : "刷新模型列表";
-      error.textContent = next.errorMessage || (next.isRefreshingModels ? "正在读取所选模型的推理强度…" : efforts.length === 0 ? "当前模型不提供可选推理强度，使用 Provider 默认。" : "选择后自动保存。");
       error.hidden = false;
     }
     update(item, emit);

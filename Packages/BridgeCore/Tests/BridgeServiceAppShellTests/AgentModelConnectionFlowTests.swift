@@ -29,12 +29,12 @@ final class AgentModelConnectionFlowTests: XCTestCase {
     )
     await client.configureAgentInstallations([installation])
     await client.configureAgentModels([
-      option("first", efforts: ["high"]), option("second", efforts: []),
+      option("first", efforts: ["high"]), option("second", efforts: [], known: false),
     ])
     await client.configureAgentDefault("first")
     await client.configureSelectedModelResponse(
       "second",
-      models: [option("first", efforts: []), option("second", efforts: ["low", "medium"])])
+      models: [option("first", efforts: ["high"]), option("second", efforts: ["low", "medium"])])
     let model = makeModel(client)
     await model.startAsync()
     for _ in 0..<200 where model.isRefreshingAgentModels(for: "opencode") {
@@ -48,7 +48,10 @@ final class AgentModelConnectionFlowTests: XCTestCase {
           permissionMode: "build"
         )), model: model
     )
-    for _ in 0..<200 where model.isRefreshingAgentModels(for: "opencode") {
+    for _ in 0..<200
+    where model.agentSelectedModel(for: "opencode")?
+      .supportedReasoningEfforts != ["low", "medium"]
+    {
       try await Task.sleep(for: .milliseconds(5))
     }
     let settings = BridgeDesktopUIStateBuilder.build(from: model).settings?.agentDefaults.first {
@@ -84,8 +87,49 @@ final class AgentModelConnectionFlowTests: XCTestCase {
     await model.shutdownUI()
   }
 
-  private func option(_ id: String, efforts: [String]) -> IPCAgentModelSummary {
-    IPCAgentModelSummary(modelID: id, displayName: id, supportedReasoningEfforts: efforts)
+  func testCachedModelSwitchPublishesEffortsImmediatelyWithoutAnotherQuery() async throws {
+    let client = TestBridgeServiceClient()
+    await client.configureAgentInstallations([
+      IPCAgentInstallationSummary(
+        installationID: "installation", providerID: "opencode", displayName: "OpenCode",
+        executablePath: "/fixture/opencode", adapterRevision: 1, trustProfile: "managed",
+        isEnabled: true, availability: "available", effectiveCapabilities: ["selection.model"],
+        updatedAt: "")
+    ])
+    await client.configureAgentModels([
+      option("first", efforts: ["high"]), option("second", efforts: ["low", "medium"]),
+    ])
+    await client.configureAgentDefault("first")
+    let model = makeModel(client)
+    await model.startAsync()
+    for _ in 0..<200 where model.isRefreshingAgentModels(for: "opencode") {
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    let initialQueries = await client.agentModelsQueriesValue().count
+    BridgeDesktopCommandRouter.handle(
+      BridgeDesktopCommandEnvelope(
+        requestID: "cached-model", command: .saveAgentDefault,
+        payload: BridgeDesktopCommandPayload(
+          providerID: "opencode", installationID: "installation", modelID: "second",
+          permissionMode: "build"
+        )), model: model
+    )
+    XCTAssertFalse(model.isRefreshingAgentModels(for: "opencode"))
+    let settings = BridgeDesktopUIStateBuilder.build(from: model).settings?.agentDefaults.first {
+      $0.providerID == "opencode"
+    }
+    XCTAssertEqual(settings?.model, "second")
+    XCTAssertEqual(settings?.effortOptions.map(\.id), ["low", "medium"])
+    await model.agentModelDefaultMutationTasks["opencode"]?.value
+    let finalQueries = await client.agentModelsQueriesValue().count
+    XCTAssertEqual(finalQueries, initialQueries)
+    await model.shutdownUI()
+  }
+
+  private func option(_ id: String, efforts: [String], known: Bool = true) -> IPCAgentModelSummary {
+    IPCAgentModelSummary(
+      modelID: id, displayName: id, supportedReasoningEfforts: efforts,
+      reasoningCapabilitiesAvailable: known)
   }
 
   private func makeModel(_ client: TestBridgeServiceClient) -> BridgeServiceAppModel {

@@ -309,10 +309,8 @@ public final class BridgeServiceAppModel: ObservableObject {
 
   func agentSelectedModel(for providerID: String) -> IPCAgentModelSummary? {
     let options = agentModelOptions(for: providerID)
-    if let modelID = agentModelDefault(for: providerID).model {
-      return options.first(where: { $0.modelID == modelID })
-    }
-    return options.first(where: { !$0.supportedReasoningEfforts.isEmpty }) ?? options.first
+    return AgentModelCatalogResolver.modelForSelection(
+      modelID: agentModelDefault(for: providerID).model, models: options)
   }
 
   func isRefreshingAgentModels(for providerID: String) -> Bool {

@@ -8,17 +8,26 @@
       for provider in providers {
         await refreshModels(
           providerID: provider.providerID,
-          installationID: availableInstallation(for: provider.providerID)?.installationID
+          installationID: availableInstallation(for: provider.providerID)?.installationID,
+          forceRefresh: false
         )
       }
     }
 
-    func refreshModels() async {
+    func refreshModels(forceRefresh: Bool = true) async {
       guard let providerID = selectedProviderID else { return }
-      await refreshModels(providerID: providerID, installationID: selectedInstallationID)
+      await refreshModels(
+        providerID: providerID,
+        installationID: selectedInstallationID,
+        forceRefresh: forceRefresh
+      )
     }
 
-    func refreshModels(providerID: String, installationID: String?) async {
+    func refreshModels(
+      providerID: String,
+      installationID: String?,
+      forceRefresh: Bool = false
+    ) async {
       guard connectionState == .connected,
         let provider = providers.first(where: { $0.providerID == providerID }),
         !refreshingProviderIDs.contains(providerID)
@@ -30,15 +39,24 @@
         }
       }
       guard installationID == nil || installation != nil else { return }
+      let hasCachedCatalog =
+        !forceRefresh
+        && cachedCatalog(providerID: providerID, installationID: installation?.installationID)
+          != nil
+      let locksModelSelection = forceRefresh || !hasCachedCatalog
 
       modelRefreshGenerations[providerID, default: 0] &+= 1
       let generation = modelRefreshGenerations[providerID, default: 0]
-      refreshingProviderIDs.insert(providerID)
+      if locksModelSelection {
+        refreshingProviderIDs.insert(providerID)
+      }
       providerErrors[providerID] = nil
-      statusText = "正在读取 \(provider.displayName) 模型…"
-      publishDisplay()
+      if locksModelSelection {
+        statusText = "正在读取 \(provider.displayName) 模型…"
+        publishDisplay()
+      }
       defer {
-        if modelRefreshGenerations[providerID] == generation {
+        if locksModelSelection, modelRefreshGenerations[providerID] == generation {
           refreshingProviderIDs.remove(providerID)
           publishDisplay()
         }
@@ -49,18 +67,28 @@
         workbenchProjectID = status.workbenchProjectID
         let persistedDefault = try await client.agentModelDefault(providerID: providerID)
         guard modelRefreshGenerations[providerID] == generation else { return }
-        let catalogResponse = try await loadModels(
-          provider: provider,
-          installation: installation,
-          modelID: nil
-        )
+        let catalogResponse: IPCAgentModelsResponse
+        if hasCachedCatalog,
+          let cached = cachedCatalog(
+            providerID: providerID,
+            installationID: installation?.installationID
+          )
+        {
+          catalogResponse = IPCAgentModelsResponse(models: cached)
+        } else {
+          catalogResponse = try await loadModels(
+            provider: provider,
+            installation: installation,
+            modelID: nil,
+            forceRefresh: forceRefresh
+          )
+        }
         guard modelRefreshGenerations[providerID] == generation else { return }
         let defaultWasRemoved = AgentModelCatalogResolver.defaultModelWasRemoved(
           persistedDefault.model,
           from: catalogResponse
         )
         let response = try await modelSpecificResponse(
-          providerID: providerID,
           provider: provider,
           installation: installation,
           persistedDefault: persistedDefault,
@@ -91,6 +119,7 @@
           defaults: finalDefault,
           catalog: resolution.response.models
         )
+        catalogInstallationIDs[providerID] = installation?.installationID ?? ""
         providerErrors[providerID] = nil
         if resolution.addedCount == 0, resolution.removedCount == 0 {
           statusText = "已加载 \(provider.displayName) 的 \(resolution.response.models.count) 个模型。"
@@ -98,131 +127,19 @@
           statusText =
             "\(provider.displayName) 模型已刷新：新增 \(resolution.addedCount) 个，移除 \(resolution.removedCount) 个。"
         }
+        if !locksModelSelection {
+          publishDisplay()
+        }
       } catch {
         guard modelRefreshGenerations[providerID] == generation else { return }
         let message = BridgeServiceErrorMessage.message(error)
         providerErrors[providerID] = "Agent 模型读取失败：\(message)"
         statusText = providerErrors[providerID]!
-      }
-    }
-
-    func saveDefaults(model: String, permissionMode: String, effort: String) async {
-      guard let providerID = selectedProviderID else {
-        statusText = "请选择 Agent Provider。"
-        feedback.postAlert(statusText, title: "Agent 默认设置无法保存")
-        publishDisplay()
-        return
-      }
-      await saveDefaults(
-        providerID: providerID,
-        installationID: selectedInstallationID,
-        model: model,
-        permissionMode: permissionMode,
-        effort: effort
-      )
-    }
-
-    func saveDefaults(
-      providerID: String,
-      installationID: String?,
-      model: String?,
-      permissionMode: String,
-      effort: String
-    ) async {
-      guard connectionState == .connected, !busy,
-        !refreshingProviderIDs.contains(providerID),
-        let provider = providers.first(where: { $0.providerID == providerID }),
-        Self.permissionValues(for: providerID).contains(permissionMode)
-      else { return }
-      let installation = installationID.flatMap { requestedID in
-        installations.first {
-          $0.installationID == requestedID && $0.providerID == providerID
-            && $0.isEnabled && $0.availability == "available"
-        }
-      }
-      guard installationID == nil || installation != nil else { return }
-      let normalizedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
-      let requestedModel = normalizedModel.flatMap { $0.isEmpty ? nil : $0 }
-      let catalog = modelCatalogs[providerID] ?? []
-      if let requestedModel {
-        guard provider.supportsModelSelection,
-          catalog.contains(where: { $0.modelID == requestedModel })
-        else { return }
-      }
-      if !effort.isEmpty {
-        let effectiveModel =
-          requestedModel
-          ?? catalog.first(where: { !$0.supportedReasoningEfforts.isEmpty })?.modelID
-          ?? catalog.first?.modelID
-        guard provider.supportsEffortSelection,
-          catalog.first(where: { $0.modelID == effectiveModel })?
-            .supportedReasoningEfforts.contains(effort) == true
-        else { return }
-      }
-      modelRefreshGenerations[providerID, default: 0] &+= 1
-      busy = true
-      statusText = "正在保存 Agent 默认设置…"
-      publishDisplay()
-      defer {
-        busy = false
         publishDisplay()
       }
-      do {
-        let persisted = try await client.setAgentDefaults(
-          providerID: providerID,
-          model: requestedModel,
-          permissionMode: permissionMode,
-          effort: effort.isEmpty ? nil : effort
-        )
-        persistedDefaults[providerID] = persisted
-        let refreshedCatalog = try await refreshedCatalogAfterSave(
-          providerID: providerID,
-          provider: provider,
-          installation: installation,
-          persistedDefault: persisted
-        )
-        persistedDefaults[providerID] = persisted
-        modelCatalogs[providerID] = refreshedCatalog
-        providerErrors[providerID] = nil
-        applySelectedProvider(
-          providerID: providerID,
-          installation: installation,
-          defaults: persisted,
-          catalog: refreshedCatalog
-        )
-        statusText = "\(providerName(providerID)) 默认设置已保存。"
-        feedback.postToast(statusText)
-      } catch {
-        statusText = "Agent 默认设置保存失败：\(BridgeServiceErrorMessage.message(error))"
-        providerErrors[providerID] = statusText
-        feedback.postAlert(statusText)
-      }
-    }
-
-    private func refreshedCatalogAfterSave(
-      providerID: String,
-      provider: IPCAgentProviderSummary,
-      installation: IPCAgentInstallationSummary?,
-      persistedDefault: IPCAgentModelDefaultResponse
-    ) async throws -> [IPCAgentModelSummary] {
-      guard provider.supportsModelSelection else { return [] }
-      let catalog = try await loadModels(
-        provider: provider,
-        installation: installation,
-        modelID: nil
-      )
-      guard let modelID = persistedDefault.model else {
-        return catalog.models
-      }
-      return try await loadModels(
-        provider: provider,
-        installation: installation,
-        modelID: modelID
-      ).models
     }
 
     private func modelSpecificResponse(
-      providerID: String,
       provider: IPCAgentProviderSummary,
       installation: IPCAgentInstallationSummary?,
       persistedDefault: IPCAgentModelDefaultResponse,
@@ -230,13 +147,17 @@
       defaultWasRemoved: Bool
     ) async throws -> IPCAgentModelsResponse {
       guard !defaultWasRemoved,
-        let modelID = persistedDefault.model
+        let modelID = persistedDefault.model,
+        catalogResponse.models.first(where: { $0.modelID == modelID })?
+          .reasoningCapabilitiesAvailable != true
       else { return catalogResponse }
-      return try await loadModels(
+      let detailed = try await loadModels(
         provider: provider,
         installation: installation,
-        modelID: modelID
+        modelID: modelID,
+        forceRefresh: false
       )
+      return mergedCatalog(catalogResponse.models, with: detailed.models)
     }
 
     private func correctDefaultIfNeeded(
@@ -255,10 +176,11 @@
       )
     }
 
-    private func loadModels(
+    func loadModels(
       provider: IPCAgentProviderSummary,
       installation: IPCAgentInstallationSummary?,
-      modelID: String?
+      modelID: String?,
+      forceRefresh: Bool = false
     ) async throws -> IPCAgentModelsResponse {
       guard provider.supportsModelSelection, let installation else {
         return IPCAgentModelsResponse(models: [])
@@ -267,8 +189,25 @@
         installationID: installation.installationID,
         projectID: workbenchProjectID,
         modelID: modelID,
-        useStoredDefault: false
+        useStoredDefault: false,
+        forceRefresh: forceRefresh && modelID == nil
       )
+    }
+
+    func cachedCatalog(providerID: String, installationID: String?) -> [IPCAgentModelSummary]? {
+      guard catalogInstallationIDs[providerID] == (installationID ?? "") else { return nil }
+      return modelCatalogs[providerID]
+    }
+
+    func mergedCatalog(
+      _ catalog: [IPCAgentModelSummary],
+      with detailedModels: [IPCAgentModelSummary]
+    ) -> [IPCAgentModelSummary] {
+      guard !detailedModels.isEmpty else { return catalog }
+      let detailsByID = Dictionary(uniqueKeysWithValues: detailedModels.map { ($0.modelID, $0) })
+      return catalog.map { detailsByID[$0.modelID] ?? $0 }
+        + detailedModels.filter { model in !catalog.contains(where: { $0.modelID == model.modelID })
+        }
     }
 
     private func applySelectedProvider(
@@ -278,18 +217,16 @@
       catalog: [IPCAgentModelSummary]
     ) {
       guard selectedProviderID == providerID else { return }
+      let visibleDefaults = pendingDefaults[providerID] ?? defaults
       selectedInstallationID = installation?.installationID
       models = catalog
-      selectedModelID = defaults.model
-      selectedEffort = defaults.effort ?? ""
+      selectedModelID = visibleDefaults.model
+      selectedEffort = visibleDefaults.effort ?? ""
       let permissions = Self.permissionValues(for: providerID)
       selectedPermissionMode =
-        permissions.contains(defaults.permissionMode)
-        ? defaults.permissionMode : permissions[0]
+        permissions.contains(visibleDefaults.permissionMode)
+        ? visibleDefaults.permissionMode : permissions[0]
     }
 
-    private func providerName(_ providerID: String) -> String {
-      providers.first(where: { $0.providerID == providerID })?.displayName ?? providerID
-    }
   }
 #endif

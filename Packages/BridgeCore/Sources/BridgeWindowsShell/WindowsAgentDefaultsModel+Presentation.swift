@@ -7,15 +7,13 @@
     func providerDefaultItems() -> [BridgeDesktopAgentDefaultState] {
       providers.map { provider in
         let installation = availableInstallation(for: provider.providerID)
-        let defaults = persistedDefaults[provider.providerID]
+        let defaults =
+          pendingDefaults[provider.providerID] ?? persistedDefaults[provider.providerID]
         let catalog = modelCatalogs[provider.providerID] ?? []
-        let selectedModel: IPCAgentModelSummary?
-        if let modelID = defaults?.model {
-          selectedModel = catalog.first(where: { $0.modelID == modelID })
-        } else {
-          selectedModel =
-            catalog.first(where: { !$0.supportedReasoningEfforts.isEmpty }) ?? catalog.first
-        }
+        let selectedModel = AgentModelCatalogResolver.modelForSelection(
+          modelID: defaults?.model,
+          models: catalog
+        )
         let efforts = selectedModel?.supportedReasoningEfforts ?? []
         return BridgeDesktopAgentDefaultState(
           providerID: provider.providerID,
@@ -42,7 +40,6 @@
           canSelectModel: provider.supportsModelSelection
             && installation?.effectiveCapabilities.contains("selection.model") == true,
           canSelectEffort: provider.supportsEffortSelection && installation != nil
-            && selectedModel?.supportedReasoningEfforts.isEmpty == false
         )
       }
     }

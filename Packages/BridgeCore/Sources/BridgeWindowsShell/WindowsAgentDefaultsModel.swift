@@ -19,10 +19,15 @@
     var selectedEffort = ""
     var selectedPermissionMode: String = "build"
     var modelCatalogs: [String: [IPCAgentModelSummary]] = [:]
+    var catalogInstallationIDs: [String: String] = [:]
     var persistedDefaults: [String: IPCAgentModelDefaultResponse] = [:]
+    var pendingDefaults: [String: IPCAgentModelDefaultResponse] = [:]
     var providerErrors: [String: String] = [:]
     var refreshingProviderIDs: Set<String> = []
     var modelRefreshGenerations: [String: UInt64] = [:]
+    var saveGenerations: [String: UInt64] = [:]
+    var saveTasks: [String: Task<Void, Never>] = [:]
+    var savingProviderIDs: Set<String> = []
     var workbenchProjectID: String?
     var nativePermissionPolicy: IPCAgentNativePermissionPolicyResponse?
     var nativePermissionInstallationID: String?
@@ -58,6 +63,12 @@
           statusText: statusText
         )
       )
+    }
+
+    deinit {
+      for task in saveTasks.values {
+        task.cancel()
+      }
     }
 
     func refresh() async {

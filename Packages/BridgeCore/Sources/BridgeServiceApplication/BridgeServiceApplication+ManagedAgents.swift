@@ -152,17 +152,23 @@ public struct ServiceAgentModelListItem: Codable, Equatable, Sendable {
   public let displayName: String
   public let supportedReasoningEfforts: [String]
   public let defaultReasoningEffort: String?
+  public let reasoningCapabilitiesAvailable: Bool
+  public let isDefaultModel: Bool?
 
   public init(
     modelID: String,
     displayName: String,
     supportedReasoningEfforts: [String] = [],
-    defaultReasoningEffort: String? = nil
+    defaultReasoningEffort: String? = nil,
+    reasoningCapabilitiesAvailable: Bool = true,
+    isDefaultModel: Bool? = nil
   ) {
     self.modelID = modelID
     self.displayName = displayName
     self.supportedReasoningEfforts = supportedReasoningEfforts
     self.defaultReasoningEffort = defaultReasoningEffort
+    self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
+    self.isDefaultModel = isDefaultModel
   }
 }
 
@@ -174,6 +180,7 @@ extension BridgeServiceApplication {
     projectID: String? = nil,
     modelID: String? = nil,
     useStoredDefault: Bool = true,
+    forceRefresh: Bool = false,
     deadline: ContinuousClock.Instant
   ) async throws -> [ServiceAgentModelListItem] {
     try Self.checkDeadline(deadline)
@@ -207,7 +214,9 @@ extension BridgeServiceApplication {
       registry: registry,
       installationID: installationID,
       projectRoot: projectRoot,
-      selectedModelID: selectedModelID
+      selectedModelID: selectedModelID,
+      forceRefresh: forceRefresh,
+      requireSelectedModel: modelID != nil
     )
     try Self.checkDeadline(deadline)
     return models.map {
@@ -215,7 +224,9 @@ extension BridgeServiceApplication {
         modelID: $0.id,
         displayName: $0.displayName,
         supportedReasoningEfforts: $0.supportedReasoningEfforts,
-        defaultReasoningEffort: $0.defaultReasoningEffort
+        defaultReasoningEffort: $0.defaultReasoningEffort,
+        reasoningCapabilitiesAvailable: $0.reasoningCapabilitiesAvailable,
+        isDefaultModel: $0.isDefaultModel
       )
     }
   }
@@ -224,7 +235,9 @@ extension BridgeServiceApplication {
     registry: ServiceAgentRegistry,
     installationID: AgentInstallationID,
     projectRoot: String?,
-    selectedModelID: String?
+    selectedModelID: String?,
+    forceRefresh: Bool = false,
+    requireSelectedModel: Bool = true
   ) async throws -> [AgentModelDescriptor] {
     guard try await registry.installation(id: installationID) != nil else {
       throw BridgeMCPQueryError.unavailable
@@ -232,7 +245,9 @@ extension BridgeServiceApplication {
     return try await registry.models(
       installationID: installationID,
       projectRoot: projectRoot,
-      selectedModelID: selectedModelID
+      selectedModelID: selectedModelID,
+      forceRefresh: forceRefresh,
+      requireSelectedModel: requireSelectedModel
     )
   }
 

@@ -61,6 +61,53 @@ final class ServiceAgentRegistryStabilityTests: XCTestCase {
     XCTAssertEqual(finalProbeCount, 2)
   }
 
+  func testModelCatalogCacheDeduplicatesRefreshesAndScopesProjectRoots() async throws {
+    let fixture = try StabilityFixture()
+    defer { fixture.remove() }
+    let executable = try makeExecutable(in: fixture.rootURL, named: "model-cache-agent")
+    let state = StabilityProbeState()
+    let registry = try makeRegistry(fixture: fixture, state: state, adapterRevision: 1)
+    let registered = try await registry.registerAndProbe(
+      request(executable: executable, enabled: true)
+    )
+
+    async let first = registry.models(
+      installationID: registered.id, projectRoot: fixture.rootURL.path)
+    async let second = registry.models(
+      installationID: registered.id, projectRoot: fixture.rootURL.path)
+    _ = try await (first, second)
+    var modelCount = await state.modelCount()
+    XCTAssertEqual(modelCount, 1)
+
+    _ = try await registry.models(installationID: registered.id, projectRoot: fixture.rootURL.path)
+    modelCount = await state.modelCount()
+    XCTAssertEqual(modelCount, 1)
+
+    let staleDefault = try await registry.models(
+      installationID: registered.id,
+      projectRoot: fixture.rootURL.path,
+      selectedModelID: "removed-default",
+      requireSelectedModel: false
+    )
+    XCTAssertEqual(staleDefault.map(\.id), ["fixture-model"])
+    modelCount = await state.modelCount()
+    XCTAssertEqual(modelCount, 1)
+
+    _ = try await registry.models(
+      installationID: registered.id,
+      projectRoot: fixture.rootURL.path,
+      forceRefresh: true
+    )
+    modelCount = await state.modelCount()
+    XCTAssertEqual(modelCount, 2)
+
+    let otherRoot = fixture.rootURL.appendingPathComponent("other-project", isDirectory: true)
+    try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: false)
+    _ = try await registry.models(installationID: registered.id, projectRoot: otherRoot.path)
+    modelCount = await state.modelCount()
+    XCTAssertEqual(modelCount, 3)
+  }
+
   func testAdapterRevisionProbeFailureIsPersistedWithoutRepeatedProbe() async throws {
     let fixture = try StabilityFixture()
     defer { fixture.remove() }
@@ -341,6 +388,7 @@ enum StabilityProbeOutcome: Sendable {
 actor StabilityProbeState {
   private var outcome: StabilityProbeOutcome = .available
   private var count = 0
+  private var models = 0
 
   func setOutcome(_ outcome: StabilityProbeOutcome) {
     self.outcome = outcome
@@ -348,6 +396,14 @@ actor StabilityProbeState {
 
   func probeCount() -> Int {
     count
+  }
+
+  func modelCount() -> Int {
+    models
+  }
+
+  func recordModelRequest() {
+    models += 1
   }
 
   func result(for request: AgentProbeRequest) -> AgentProbeResult {
@@ -414,7 +470,8 @@ struct StabilityFixtureProvider: AgentProvider, Sendable {
     projectRoot _: String?,
     selectedModelID _: String?
   ) async throws -> [AgentModelDescriptor] {
-    [try AgentModelDescriptor(id: "fixture-model", displayName: "Fixture Model")]
+    await state.recordModelRequest()
+    return [try AgentModelDescriptor(id: "fixture-model", displayName: "Fixture Model")]
   }
 
   func start(

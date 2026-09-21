@@ -120,13 +120,30 @@ extension BridgeServiceClient {
     modelID: String?,
     useStoredDefault: Bool
   ) async throws -> IPCAgentModelsResponse {
+    try await agentModels(
+      installationID: installationID,
+      projectID: projectID,
+      modelID: modelID,
+      useStoredDefault: useStoredDefault,
+      forceRefresh: false
+    )
+  }
+
+  public func agentModels(
+    installationID: String,
+    projectID: String?,
+    modelID: String?,
+    useStoredDefault: Bool,
+    forceRefresh: Bool
+  ) async throws -> IPCAgentModelsResponse {
     try await call(
       operation: .listAgentModels,
       payload: IPCAgentModelsRequest(
         installationID: installationID,
         projectID: projectID,
         modelID: modelID,
-        useStoredDefault: useStoredDefault
+        useStoredDefault: useStoredDefault,
+        forceRefresh: forceRefresh ? true : nil
       )
     )
   }

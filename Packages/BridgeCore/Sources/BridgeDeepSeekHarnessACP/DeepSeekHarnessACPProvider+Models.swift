@@ -59,26 +59,64 @@ extension DeepSeekHarnessACPProvider {
       }
       let catalog = Self.modelCatalog(from: modelOption)
       let selected = selectedModelID.flatMap { Self.model(for: $0, in: catalog) }
-      let options: [DeepSeekHarnessACPConfigOption]
-      let effectiveModelID: String?
       if let selected {
-        options = try await connected.setSessionConfigOption(
+        let options = try await connected.setSessionConfigOption(
           sessionID: session.id,
           configID: "model",
           value: selected.wireValue
         )
-        effectiveModelID = selected.modelID
-      } else {
-        options = session.configOptions
-        effectiveModelID = Self.currentModelID(in: modelOption, catalog: catalog)
+        await connected.shutdown()
+        cleanup(runDirectory: launch.runDirectory, probeRoot: catalogRoot)
+        return try Self.modelDescriptors(
+          from: options,
+          selectedModelID: selected.modelID,
+          fallback: fallback,
+          defaultModelID: Self.currentModelID(in: modelOption, catalog: catalog)
+        )
+      }
+
+      let effectiveModelID = Self.currentModelID(in: modelOption, catalog: catalog)
+      let modern = catalog.contains(where: \.modernRoute)
+      if !modern || (catalog.count == 1 && effectiveModelID == nil) {
+        await connected.shutdown()
+        cleanup(runDirectory: launch.runDirectory, probeRoot: catalogRoot)
+        return try Self.modelDescriptors(
+          from: session.configOptions,
+          selectedModelID: effectiveModelID,
+          fallback: fallback,
+          defaultModelID: effectiveModelID
+        )
+      }
+
+      var models = try Self.modelDescriptors(
+        from: session.configOptions,
+        selectedModelID: nil,
+        fallback: fallback,
+        defaultModelID: effectiveModelID
+      )
+      for entry in catalog {
+        do {
+          let options = try await connected.setSessionConfigOption(
+            sessionID: session.id,
+            configID: "model",
+            value: entry.wireValue
+          )
+          let resolved = try Self.modelDescriptors(
+            from: options,
+            selectedModelID: entry.modelID,
+            fallback: fallback,
+            defaultModelID: effectiveModelID
+          )
+          if let descriptor = resolved.first(where: { $0.id == entry.modelID }) {
+            models = Self.replacingModel(descriptor, in: models)
+          }
+        } catch {
+          models = Self.markReasoningUnavailable(for: entry.modelID, in: models)
+        }
       }
       await connected.shutdown()
       cleanup(runDirectory: launch.runDirectory, probeRoot: catalogRoot)
-      return try Self.modelDescriptors(
-        from: options,
-        selectedModelID: effectiveModelID,
-        fallback: fallback
-      )
+      return models
     } catch {
       await client?.shutdown()
       cleanup(runDirectory: runDirectory, probeRoot: catalogRoot)
@@ -142,7 +180,8 @@ extension DeepSeekHarnessACPProvider {
   static func modelDescriptors(
     from options: [DeepSeekHarnessACPConfigOption],
     selectedModelID: String?,
-    fallback: [AgentModelDescriptor]
+    fallback: [AgentModelDescriptor],
+    defaultModelID: String? = nil
   ) throws -> [AgentModelDescriptor] {
     guard
       let modelOption = options.first(where: {
@@ -157,7 +196,8 @@ extension DeepSeekHarnessACPProvider {
       catalog: catalog,
       options: options,
       selectedModelID: effectiveModelID,
-      fallback: fallback
+      fallback: fallback,
+      defaultModelID: defaultModelID ?? effectiveModelID
     )
   }
 
@@ -165,7 +205,8 @@ extension DeepSeekHarnessACPProvider {
     catalog: [ModelCatalogEntry],
     options: [DeepSeekHarnessACPConfigOption],
     selectedModelID: String?,
-    fallback: [AgentModelDescriptor]
+    fallback: [AgentModelDescriptor],
+    defaultModelID: String?
   ) throws -> [AgentModelDescriptor] {
     let modern = catalog.contains(where: \.modernRoute)
     let thoughtLevel = options.first {
@@ -183,7 +224,31 @@ extension DeepSeekHarnessACPProvider {
         id: entry.modelID,
         displayName: entry.displayName,
         supportedReasoningEfforts: useDynamic ? dynamicEfforts : modern ? [] : fallbackEfforts,
-        defaultReasoningEffort: useDynamic ? dynamicDefault : modern ? nil : fallbackDefault
+        defaultReasoningEffort: useDynamic ? dynamicDefault : modern ? nil : fallbackDefault,
+        reasoningCapabilitiesAvailable: !modern || useDynamic,
+        isDefaultModel: defaultModelID.map { $0 == entry.modelID }
+      )
+    }
+  }
+
+  private static func replacingModel(
+    _ descriptor: AgentModelDescriptor,
+    in models: [AgentModelDescriptor]
+  ) -> [AgentModelDescriptor] {
+    models.map { $0.id == descriptor.id ? descriptor : $0 }
+  }
+
+  private static func markReasoningUnavailable(
+    for modelID: String,
+    in models: [AgentModelDescriptor]
+  ) -> [AgentModelDescriptor] {
+    models.compactMap { model in
+      guard model.id == modelID else { return model }
+      return try? AgentModelDescriptor(
+        id: model.id,
+        displayName: model.displayName,
+        reasoningCapabilitiesAvailable: false,
+        isDefaultModel: model.isDefaultModel
       )
     }
   }

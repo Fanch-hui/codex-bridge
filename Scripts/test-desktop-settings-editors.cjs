@@ -167,3 +167,53 @@ test("native AGY permissions stay out of the general settings page", () => {
   ui.render(page({ nativePermissionPolicy: policy }));
   assert.equal(ui.section("AGY 无头运行权限"), null);
 });
+
+test("cached Agent model capabilities switch immediately and survive an older snapshot", () => {
+  const ui = runtime();
+  const agent = {
+    providerID: "opencode", installationID: "install-a", providerName: "OpenCode",
+    model: "one", effort: "medium", permissionMode: "build", canSave: true,
+    canSelectModel: true, canSelectEffort: true, canRefreshModels: true,
+    permissionOptions: [{ id: "build", title: "Build" }], effortOptions: effort,
+    modelOptions: [
+      { modelID: "one", displayName: "One", reasoningEfforts: effort, reasoningCapabilitiesAvailable: true },
+      { modelID: "two", displayName: "Two", reasoningEfforts: [{ id: "max", title: "最大" }], defaultReasoningEffort: "max", reasoningCapabilitiesAvailable: true }
+    ]
+  };
+  ui.render(page({ agentDefaults: [agent] }));
+  const editor = ui.find(ui.root, node => node.className === "agent-preferences");
+  const [model, reasoning] = editor.querySelectorAll("select");
+  model.value = "two";
+  model.dispatch("change");
+  assert.equal(model.disabled, false);
+  assert.equal(reasoning.disabled, false);
+  assert.deepEqual(reasoning.children.map(option => option.value), ["", "max"]);
+  assert.equal(ui.commands.at(-1).payload.modelID, "two");
+  assert.equal(ui.commands.at(-1).payload.effort, "max");
+  ui.render(page({ agentDefaults: [agent] }));
+  assert.equal(model.value, "two");
+  assert.deepEqual(reasoning.children.map(option => option.value), ["", "max"]);
+});
+
+test("unknown Agent model capabilities do not borrow another model's efforts", () => {
+  const ui = runtime();
+  const agent = {
+    providerID: "opencode", installationID: "install-a", providerName: "OpenCode",
+    model: "one", effort: "medium", permissionMode: "build", canSave: true,
+    canSelectModel: true, canSelectEffort: true, effortOptions: effort,
+    permissionOptions: [{ id: "build", title: "Build" }],
+    modelOptions: [
+      { modelID: "one", displayName: "One", reasoningEfforts: effort },
+      { modelID: "two", displayName: "Two", reasoningEfforts: [], reasoningCapabilitiesAvailable: false }
+    ]
+  };
+  ui.render(page({ agentDefaults: [agent] }));
+  const editor = ui.find(ui.root, node => node.className === "agent-preferences");
+  const [model, reasoning] = editor.querySelectorAll("select");
+  model.value = "two";
+  model.dispatch("change");
+  assert.equal(model.disabled, false);
+  assert.equal(reasoning.disabled, true);
+  assert.deepEqual(reasoning.children.map(option => option.value), [""]);
+  assert.equal(ui.commands.at(-1).payload.effort, null);
+});

@@ -6,19 +6,25 @@ public struct BridgeDesktopModelOption: Codable, Equatable, Sendable {
   public let reasoningEfforts: [BridgeDesktopChoice]
   public let defaultReasoningEffort: String?
   public let supportsFastMode: Bool?
+  public let reasoningCapabilitiesAvailable: Bool?
+  public let isDefaultModel: Bool?
 
   public init(
     modelID: String,
     displayName: String,
     reasoningEfforts: [BridgeDesktopChoice] = [],
     defaultReasoningEffort: String? = nil,
-    supportsFastMode: Bool? = nil
+    supportsFastMode: Bool? = nil,
+    reasoningCapabilitiesAvailable: Bool? = nil,
+    isDefaultModel: Bool? = nil
   ) {
     self.modelID = modelID
     self.displayName = displayName
     self.reasoningEfforts = reasoningEfforts
     self.defaultReasoningEffort = defaultReasoningEffort
     self.supportsFastMode = supportsFastMode
+    self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
+    self.isDefaultModel = isDefaultModel
   }
 }
 

@@ -18,38 +18,6 @@ extension ServiceAgentRegistry {
     return record
   }
 
-  public func models(
-    installationID: AgentInstallationID,
-    projectRoot: String? = nil,
-    selectedModelID: String? = nil
-  ) async throws -> [AgentModelDescriptor] {
-    let record = try await validateForExecution(installationID: installationID)
-    let provider = try provider(for: record.providerID)
-    let installation = try AgentInstallation(
-      id: record.id,
-      providerID: record.providerID,
-      executablePath: record.executableIdentity.canonicalPath,
-      version: record.version,
-      protocolRevision: record.protocolRevision,
-      artifacts: record.artifacts.map { artifact in
-        AgentInstallationArtifact(
-          role: artifact.role,
-          canonicalPath: artifact.identity.canonicalPath,
-          device: artifact.identity.device,
-          inode: artifact.identity.inode,
-          fileSize: artifact.identity.fileSize,
-          modificationTimeNanoseconds: artifact.identity.modificationTimeNanoseconds,
-          sha256: artifact.identity.sha256
-        )
-      }
-    )
-    return try await provider.models(
-      installation: installation,
-      projectRoot: projectRoot,
-      selectedModelID: selectedModelID
-    )
-  }
-
   @discardableResult
   public func refreshInstallationStates() async throws -> [ServiceAgentInstallationRecord] {
     let records = try await store.agentInstallations()

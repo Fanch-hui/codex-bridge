@@ -5,7 +5,8 @@ import Foundation
 extension BridgeServiceAppModel {
   func refreshAgentModelCatalog(
     installationID: String?,
-    providerID: String = "opencode"
+    providerID: String = "opencode",
+    forceRefresh: Bool = true
   ) {
     guard !agentModelRefreshingProviders.contains(providerID) else { return }
     guard let installationID, !installationID.isEmpty else {
@@ -24,7 +25,8 @@ extension BridgeServiceAppModel {
     let previousMutation = agentModelDefaultMutationTasks[providerID]
     let projectID = selectedProjectID
     setAgentModelsHydrating(false, providerID: providerID)
-    setAgentModelsRefreshing(true, providerID: providerID)
+    setAgentModelsRefreshing(
+      forceRefresh || agentModelOptions(for: providerID).isEmpty, providerID: providerID)
     setAgentModelRefreshError(nil, providerID: providerID)
 
     Task { [weak self, previousMutation] in
@@ -35,7 +37,8 @@ extension BridgeServiceAppModel {
         projectID: projectID,
         catalogGeneration: catalogGeneration,
         refreshGeneration: refreshGeneration,
-        previousMutation: previousMutation
+        previousMutation: previousMutation,
+        forceRefresh: forceRefresh
       )
     }
   }
@@ -46,7 +49,8 @@ extension BridgeServiceAppModel {
     projectID: String?,
     catalogGeneration: UInt64,
     refreshGeneration: UInt64,
-    previousMutation: Task<Void, Never>?
+    previousMutation: Task<Void, Never>?,
+    forceRefresh: Bool
   ) async {
     defer {
       if agentModelRefreshGeneration(for: providerID) == refreshGeneration {
@@ -69,7 +73,8 @@ extension BridgeServiceAppModel {
         installationID: installationID,
         projectID: projectID,
         modelID: nil,
-        useStoredDefault: false
+        useStoredDefault: false,
+        forceRefresh: forceRefresh
       )
       guard !Task.isCancelled,
         catalogGeneration == agentModelCatalogGeneration(for: providerID),
@@ -130,7 +135,10 @@ extension BridgeServiceAppModel {
       from: catalogResponse
     )
     let response: IPCAgentModelsResponse
-    if let defaultModel, !defaultWasRemoved {
+    if let defaultModel, !defaultWasRemoved,
+      catalogResponse.models.first(where: { $0.modelID == defaultModel })?
+        .reasoningCapabilitiesAvailable == false
+    {
       response = try await client.agentModels(
         installationID: installationID,
         projectID: projectID,
@@ -270,7 +278,8 @@ extension BridgeServiceAppModel {
       )
       if let rawResponse,
         let defaultModel = persistedDefault?.model,
-        rawResponse.models.contains(where: { $0.modelID == defaultModel })
+        rawResponse.models.first(where: { $0.modelID == defaultModel })?
+          .reasoningCapabilitiesAvailable == false
       {
         modelResponse =
           (try? await client.agentModels(

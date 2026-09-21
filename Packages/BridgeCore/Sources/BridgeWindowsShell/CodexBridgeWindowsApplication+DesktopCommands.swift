@@ -315,7 +315,8 @@
         Task { @MainActor in
           await auxiliary.agentDefaults.refreshModels(
             providerID: providerID,
-            installationID: installationID
+            installationID: installationID,
+            forceRefresh: true
           )
         }
         return true

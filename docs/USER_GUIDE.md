@@ -1,6 +1,6 @@
 # Codex Bridge 详细使用指南
 
-适用于 v1.0.1 的 macOS Apple Silicon 和 Windows x64。首次使用按“安装 → 项目 → Agent → 模型 → 聊天客户端 → 第一项任务”的顺序操作。
+适用于 macOS Apple Silicon 和 Windows x64。首次使用按“安装 → 项目 → Agent → 模型 → 聊天客户端 → 第一项任务”的顺序操作。
 
 ## 文档导航
 
@@ -25,7 +25,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### macOS Apple Silicon
 
-1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-1.0.1-macos-arm64.dmg`。
+1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-<版本>-macos-arm64.dmg`。
 2. 打开 DMG，把 `CodexBridge.app` 拖到 Applications。
 3. 从 Applications 启动。当前包使用 ad-hoc 签名、尚未 Apple 公证；若系统拦截，在“系统设置 → 隐私与安全性”允许打开。
 4. 在概览检查 Service。若提示后台项目需批准，按提示打开系统设置并允许 Codex Bridge 后台项目。
@@ -33,7 +33,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### Windows x64
 
-1. 下载 `CodexBridge-Windows-x64-1.0.1-Setup.exe`。
+1. 下载 `CodexBridge-Windows-x64-<版本>-Setup.exe`。
 2. 运行安装器，选择安装目录，完成后启动 Codex Bridge。
 3. 如提示缺少 WebView2 Runtime，按提示安装微软 WebView2 Runtime，然后重新启动 App。
 4. 在概览确认 Service 和本地 MCP 可用。
@@ -109,7 +109,7 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 1. 在设置中找到目标 Agent 的模型区域。
 2. 点击“获取模型”或“刷新模型列表”。
 3. 选择实际返回的模型 ID。
-4. 等待该模型的能力加载，再选择页面提供的推理强度。
+4. 直接选择该模型提供的推理强度。首次加载目录时会预取各模型能力，已缓存的选项可立即切换；尚未获取成功的模型会单独补查。
 5. 按当前区域的保存按钮或“选择后自动保存”提示完成设置。
 
 切换模型后，可选推理强度可能变化。DSH 模型目录来自配置服务的真实 `/models` 响应；接口失败时先解决连接问题。模型 Key、服务地址与套餐应相互匹配。

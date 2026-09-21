@@ -146,14 +146,14 @@
       switch command {
       case .selectDefaultProvider(let index):
         agentDefaults.selectProvider(at: index)
-        Task { await agentDefaults.refreshModels() }
+        Task { await agentDefaults.refreshModels(forceRefresh: false) }
       case .selectDefaultInstallation(let index):
         agentDefaults.selectInstallation(at: index)
-        Task { await agentDefaults.refreshModels() }
+        Task { await agentDefaults.refreshModels(forceRefresh: false) }
       case .refreshAgentDefaults:
         Task { await agentDefaults.refresh() }
       case .refreshAgentModels:
-        Task { await agentDefaults.refreshModels() }
+        Task { await agentDefaults.refreshModels(forceRefresh: true) }
       case .saveAgentDefaults(let model, let permissionMode, let effort):
         Task {
           await agentDefaults.saveDefaults(

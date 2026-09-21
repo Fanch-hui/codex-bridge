@@ -86,7 +86,8 @@ extension BridgeServiceAppModel {
       for installation in agentInstallations
       where installation.isEnabled && installation.availability == "available" {
         refreshAgentModelCatalog(
-          installationID: installation.installationID, providerID: installation.providerID)
+          installationID: installation.installationID, providerID: installation.providerID,
+          forceRefresh: forceCatalogRefresh)
       }
     }
     scheduleServiceUpgradeIfNeeded()

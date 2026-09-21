@@ -9,6 +9,14 @@ public struct AgentModelCatalogResolution {
 }
 
 public enum AgentModelCatalogResolver {
+  public static func modelForSelection(
+    modelID: String?, models: [IPCAgentModelSummary]
+  ) -> IPCAgentModelSummary? {
+    if let modelID { return models.first(where: { $0.modelID == modelID }) }
+    return models.first(where: { $0.isDefaultModel == true })
+      ?? models.first(where: { !$0.supportedReasoningEfforts.isEmpty }) ?? models.first
+  }
+
   public static func defaultModelWasRemoved(
     _ defaultModel: String?,
     from response: IPCAgentModelsResponse
@@ -28,13 +36,11 @@ public enum AgentModelCatalogResolver {
   ) -> AgentModelCatalogResolution {
     let previousIDs = Set(previousOptions.map(\.modelID))
     let currentIDs = Set(catalogResponse.models.map(\.modelID))
-    let effortModel =
-      defaultModel.flatMap { selected in
-        response.models.first(where: { $0.modelID == selected })
-      } ?? response.models.first(where: { !$0.supportedReasoningEfforts.isEmpty })
+    let effortModel = modelForSelection(modelID: defaultModel, models: response.models)
     let effortWasRemoved =
       persistedEffort.map { effort in
-        effortModel?.supportedReasoningEfforts.contains(effort) != true
+        effortModel?.reasoningCapabilitiesAvailable != false
+          && effortModel?.supportedReasoningEfforts.contains(effort) != true
       } ?? false
     return AgentModelCatalogResolution(
       response: response,

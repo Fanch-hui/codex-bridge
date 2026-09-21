@@ -48,6 +48,10 @@ public actor ServiceAgentRegistry {
   var refreshProbes: [AgentInstallationID: Task<ServiceAgentInstallationRecord, Error>] = [:]
   var activeRegistrations: Set<RegistrationKey> = []
   var displayValidations: [AgentInstallationID: DisplayValidation] = [:]
+  var modelCatalogCache: [ServiceAgentModelCatalogCacheKey: ServiceAgentModelCatalogCacheEntry] =
+    [:]
+  var modelCatalogInFlight:
+    [ServiceAgentModelCatalogCacheKey: Task<[AgentModelDescriptor], Error>] = [:]
 
   public init(
     store: SimpleServiceStore,
@@ -97,6 +101,8 @@ public actor ServiceAgentRegistry {
 
   public func remove(installationID: AgentInstallationID) async throws {
     displayValidations.removeValue(forKey: installationID)
+    modelCatalogCache = modelCatalogCache.filter { $0.key.installationID != installationID }
+    modelCatalogInFlight = modelCatalogInFlight.filter { $0.key.installationID != installationID }
     try await store.removeAgentInstallation(id: installationID)
   }
 }

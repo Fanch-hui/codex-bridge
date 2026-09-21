@@ -271,6 +271,7 @@ extension BridgeServiceRequestController {
       projectID: payload.projectID,
       modelID: payload.modelID,
       useStoredDefault: payload.useStoredDefault != false,
+      forceRefresh: payload.forceRefresh == true,
       deadline: deadline
     )
     return try BridgeServiceIPCCodec.success(
@@ -281,7 +282,9 @@ extension BridgeServiceRequestController {
             modelID: $0.modelID,
             displayName: $0.displayName,
             supportedReasoningEfforts: $0.supportedReasoningEfforts,
-            defaultReasoningEffort: $0.defaultReasoningEffort
+            defaultReasoningEffort: $0.defaultReasoningEffort,
+            reasoningCapabilitiesAvailable: $0.reasoningCapabilitiesAvailable,
+            isDefaultModel: $0.isDefaultModel
           )
         }
       )
