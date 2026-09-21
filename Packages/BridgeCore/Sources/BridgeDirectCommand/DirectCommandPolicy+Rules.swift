@@ -49,7 +49,8 @@ extension DirectCommandPolicy {
       if resolvedExecutable == ruleExecutable { return true }
       guard resolvedExecutable.hasPrefix("/") else { return false }
       let url = URL(fileURLWithPath: resolvedExecutable).standardizedFileURL
-      let trustedSystemDirectories: Set<String> = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+      let trustedSystemDirectories = Set(
+        DirectBuiltInCommandResolver.trustedDirectories(for: ruleExecutable))
       return url.lastPathComponent == ruleExecutable
         && trustedSystemDirectories.contains(url.deletingLastPathComponent().path)
     #endif
@@ -234,10 +235,19 @@ extension DirectCommandPolicy {
       || project.accessPolicy.write == .requiresLocalApproval
       || (needsNetwork && project.accessPolicy.network == .requiresLocalApproval)
       || requiresUnregisteredApproval
+    let executionArgv: [String]
+    let commandName = DirectPathSemantics.basename(policyArgv.first ?? "").lowercased()
+    if project.directCommandMode == .safe, matched == nil, matchedBuiltInRule != nil,
+      commandName == "git" || commandName == "git.exe"
+    {
+      executionArgv = DirectGitArgumentValidator.executionArguments(policyArgv)
+    } else {
+      executionArgv = policyArgv
+    }
     return DirectCommandResolution(
       allowed: true,
       requiresApproval: requiresApproval,
-      argv: policyArgv,
+      argv: executionArgv,
       workingDirectory: matched?.workingDirectory ?? request.workingDirectory,
       requiresNetwork: needsNetwork,
       reason: nil

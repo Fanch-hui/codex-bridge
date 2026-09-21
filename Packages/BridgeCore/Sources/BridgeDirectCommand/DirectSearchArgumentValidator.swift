@@ -78,7 +78,8 @@ enum DirectSearchArgumentValidator {
       return true
     }
     if argument.hasPrefix("-") && argument != "-" {
-      return consumeSearchOption(argument, pathIsSafe: pathIsSafe, state: &state)
+      return consumeSearchOption(
+        argument, executable: executable, pathIsSafe: pathIsSafe, state: &state)
     }
     if state.filesMode || state.patternSeen {
       return pathIsSafe(argument)
@@ -104,6 +105,7 @@ enum DirectSearchArgumentValidator {
 
   private static func consumeSearchOption(
     _ argument: String,
+    executable: String,
     pathIsSafe: (String) -> Bool,
     state: inout SearchArgumentState
   ) -> Bool {
@@ -115,6 +117,10 @@ enum DirectSearchArgumentValidator {
     let parts = argument.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
     let option = String(parts[0])
     let inlineValue = parts.count == 2 ? String(parts[1]) : nil
+    let deniedFlags: Set<String> =
+      executable == "rg"
+      ? ["-L", "--follow"] : ["-R", "--dereference-recursive"]
+    guard !deniedFlags.contains(option) else { return false }
     if searchValueOptions.contains(option) {
       return consumeSearchValueOption(
         option,
@@ -123,8 +129,9 @@ enum DirectSearchArgumentValidator {
         state: &state
       )
     }
+    guard inlineValue == nil else { return false }
     guard !searchFlags.contains(option) else { return true }
-    return shortSearchFlagClusterIsSafe(option)
+    return shortSearchFlagClusterIsSafe(option, deniedFlags: deniedFlags)
   }
 
   private static func consumeSearchValueOption(
@@ -146,8 +153,12 @@ enum DirectSearchArgumentValidator {
     )
   }
 
-  private static func shortSearchFlagClusterIsSafe(_ option: String) -> Bool {
+  private static func shortSearchFlagClusterIsSafe(
+    _ option: String, deniedFlags: Set<String>
+  ) -> Bool {
     guard option.count > 2, option.first == "-", !option.hasPrefix("--") else { return false }
-    return option.dropFirst().allSatisfy { searchFlags.contains("-\($0)") }
+    return option.dropFirst().allSatisfy {
+      searchFlags.contains("-\($0)") && !deniedFlags.contains("-\($0)")
+    }
   }
 }

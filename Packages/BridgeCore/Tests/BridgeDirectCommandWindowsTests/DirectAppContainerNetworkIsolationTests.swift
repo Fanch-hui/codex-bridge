@@ -134,9 +134,17 @@
 
       for rule in rules where rule.executable.lowercased() == "git" {
         let safeSubcommands = [
-          "status", "diff", "log", "show", "branch", "rev-parse", "ls-files", "--version",
+          "status", "diff", "log", "show", "branch", "tag", "describe", "rev-parse", "ls-files",
+          "--version",
         ]
         XCTAssertTrue(rule.argumentsPrefix.first.map { safeSubcommands.contains($0) } ?? false)
+        if rule.argumentsPrefix.first == "tag" {
+          XCTAssertEqual(rule.argumentsPrefix, ["tag", "--list"])
+        }
+        if rule.argumentsPrefix.first == "branch" {
+          XCTAssertTrue(
+            [["branch", "--list"], ["branch", "--show-current"]].contains(rule.argumentsPrefix))
+        }
       }
     }
   }

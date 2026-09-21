@@ -2,7 +2,14 @@ import BridgeAgentCore
 import Foundation
 
 struct DirectBuiltInCommandResolver: Sendable {
-  private static let trustedSystemDirectories = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+  static let trustedSystemDirectories = [
+    "/usr/bin", "/bin", "/usr/sbin", "/sbin",
+  ]
+
+  static func trustedDirectories(for executable: String) -> [String] {
+    guard ["node", "npm", "rg"].contains(executable) else { return trustedSystemDirectories }
+    return trustedSystemDirectories + ["/opt/homebrew/bin", "/usr/local/bin"]
+  }
 
   let rules: [DirectCommandPolicy.DirectSafeCommandRule]
 
@@ -66,12 +73,19 @@ struct DirectBuiltInCommandResolver: Sendable {
       }
       if exe == "git" {
         let safeSubcommands = [
-          "status", "diff", "log", "show", "branch", "rev-parse", "ls-files", "--version",
+          "status", "diff", "log", "show", "branch", "tag", "describe", "rev-parse", "ls-files",
+          "--version",
         ]
         return rule.argumentsPrefix.first.map { safeSubcommands.contains($0) } ?? false
       }
-      if ["node", "npm"].contains(exe) {
+      if exe == "node" {
+        return [["--version"], ["--check"]].contains(rule.argumentsPrefix)
+      }
+      if ["npm", "swift"].contains(exe) {
         return rule.argumentsPrefix == ["--version"]
+      }
+      if exe == "rg" {
+        return rule.argumentsPrefix.isEmpty || rule.argumentsPrefix == ["--version"]
       }
       return false
     }
@@ -93,19 +107,20 @@ struct DirectBuiltInCommandResolver: Sendable {
     for rule: DirectCommandPolicy.DirectSafeCommandRule
   ) -> [String] {
     var seen = Set<String>()
+    let trustedDirectories = Self.trustedDirectories(for: rule.executable)
     let declared = rules.compactMap { candidate -> String? in
       let url = URL(fileURLWithPath: candidate.executable).standardizedFileURL
       guard candidate.executable.hasPrefix("/"),
         candidate.argumentsPrefix == rule.argumentsPrefix,
         url.lastPathComponent == rule.executable,
-        Self.trustedSystemDirectories.contains(url.deletingLastPathComponent().path)
+        trustedDirectories.contains(url.deletingLastPathComponent().path)
       else { return nil }
       return url.path
     }
-    let conventional = Self.trustedSystemDirectories.map {
+    let conventional = trustedDirectories.map {
       URL(fileURLWithPath: $0, isDirectory: true).appendingPathComponent(rule.executable).path
     }
-    return (declared + conventional).filter { seen.insert($0).inserted }
+    return (conventional + declared).filter { seen.insert($0).inserted }
   }
 
   private func containsPathSeparator(_ value: String) -> Bool {

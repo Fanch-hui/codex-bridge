@@ -245,3 +245,11 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 ### DeepSeek Harness 推理选项
 
 Bridge 展示 DSH ACP 返回的推理选项。当前 DSH DeepSeek 适配器按连接配置提供统一的 `off / low / high / max`，不根据模型名称区分；这些选项不代表 API 目录中每个模型均支持全部档位。模型目录和模型推理能力是不同信息，使用第三方 API 时以该 API 的模型能力为准。
+
+### Direct 安全模式命令
+
+安全模式的内置规则仅覆盖只读查询、版本查询和受限语法检查。`git branch` 只接受 `--show-current` 或 `--list`；`git tag` 只接受 `--list`，同时支持 `git describe`。内置 Git 查询关闭分页器、文件监视器以及外部 diff/textconv 等执行入口。
+
+`node --version`、`npm --version`、`swift --version`、`rg --version` 和 macOS 的 `xcodebuild -version` 只接受精确的版本查询参数。`node --check` 只接受一个项目根目录内的 `.js`、`.mjs` 或 `.cjs` 文件，不接受其他 Node 执行参数。文件路径不能逃逸项目根目录，指向项目外的符号链接也会被拒绝。`grep -R/--dereference-recursive` 和 `rg -L/--follow` 不属于允许的搜索参数。
+
+`swift build/test`、构建型 `xcodebuild`、`npm test/run` 等会执行项目代码的命令不再属于免审批内置规则。需要使用时，可显式注册为 Direct 命令并配置审批；Full 模式保持原有执行能力。黑名单仍优先于用户规则和内置规则。Windows 继续只使用符合现有信任校验的 EXE，并保留 AppContainer 网络隔离；不会将 npm 的 `.cmd` 入口当作安全 EXE 放行。

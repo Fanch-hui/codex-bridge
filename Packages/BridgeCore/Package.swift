@@ -335,6 +335,16 @@ var windowsApplicationLinkerFlags = [
       ]
     ),
     .testTarget(
+      name: "BridgeDirectCommandPolicyWindowsTests",
+      dependencies: ["BridgeDirectCommand", "BridgeDomain", "BridgeProjects", "BridgeServiceCore"],
+      path: "Tests/BridgeDirectCommandTests",
+      sources: [
+        "DirectSafeArgumentValidationTests.swift", "DirectCommandNodeCheckTests.swift",
+        "DirectCommandSafeBuiltInTests.swift", "DirectCommandSafeVersionTests.swift",
+        "DirectCommandPolicyTestSupport.swift",
+      ]
+    ),
+    .testTarget(
       name: "BridgeDirectCommandWindowsTests",
       dependencies: ["BridgeDirectCommand"],
       path: "Tests/BridgeDirectCommandWindowsTests"
