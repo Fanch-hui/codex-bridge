@@ -14,7 +14,9 @@ param(
   [string]$TargetTriple = "",
   [string]$VcpkgRoot = "",
   [string]$VCRedistRoot = "",
-  [string]$TunnelClientDir = ""
+  [Parameter(Mandatory = $true)]
+  [ValidateNotNullOrEmpty()]
+  [string]$TunnelClientDir
 )
 
 Set-StrictMode -Version Latest
@@ -22,6 +24,10 @@ $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path Env:OS) -or $env:OS -ne "Windows_NT") {
   throw "Scripts\stage-windows-portable.ps1 must run on Windows."
+}
+
+if ([string]::IsNullOrWhiteSpace($TunnelClientDir)) {
+  throw "TunnelClientDir is required for a complete Windows package."
 }
 
 $scriptDirectory = Split-Path -Parent $PSCommandPath
@@ -136,34 +142,31 @@ try {
   Stage-File (Join-Path $repoRoot "LICENSE") "LICENSE.txt"
   Stage-File (Join-Path $repoRoot "NOTICE") "NOTICE.txt"
 
-  $tunnelClientSHA256 = $null
-  if (-not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
-    $tunnelClientFull = Get-FullPath $TunnelClientDir
-    Assert-Directory $tunnelClientFull | Out-Null
-    $tunnelExecutablePath = Join-Path $tunnelClientFull "tunnel-client.exe"
-    Assert-RegularFile $tunnelExecutablePath | Out-Null
-    if ((Get-PEMachine $tunnelExecutablePath) -ne $expectedMachine) {
-      throw "tunnel-client.exe has the wrong architecture: $tunnelExecutablePath"
-    }
-    $tunnelDigestPath = Join-Path $tunnelClientFull "tunnel-client.sha256"
-    Assert-RegularFile $tunnelDigestPath | Out-Null
-    $tunnelDigest = (Get-Content -LiteralPath $tunnelDigestPath | Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_) }) -join ""
-    if ($tunnelDigest -notmatch "^[0-9a-f]{64}$") {
-      throw "tunnel-client.sha256 must contain a single 64-character lowercase hex digest."
-    }
-    if ((Get-Sha256 $tunnelExecutablePath) -ne $tunnelDigest) {
-      throw "tunnel-client.exe does not match its staged digest."
-    }
-    Stage-File $tunnelExecutablePath "tunnel-client.exe"
-    Stage-File $tunnelDigestPath "tunnel-client.sha256"
-    $tunnelManifestPath = Join-Path $tunnelClientFull "tunnel-client.manifest.json"
-    if (Test-Path -LiteralPath $tunnelManifestPath) {
-      Assert-RegularFile $tunnelManifestPath | Out-Null
-      Stage-File $tunnelManifestPath "tunnel-client.manifest.json"
-    }
-    $tunnelClientSHA256 = $tunnelDigest
+  $tunnelClientFull = Get-FullPath $TunnelClientDir
+  Assert-Directory $tunnelClientFull | Out-Null
+  $tunnelExecutablePath = Join-Path $tunnelClientFull "tunnel-client.exe"
+  Assert-RegularFile $tunnelExecutablePath | Out-Null
+  if ((Get-PEMachine $tunnelExecutablePath) -ne $expectedMachine) {
+    throw "tunnel-client.exe has the wrong architecture: $tunnelExecutablePath"
   }
+  $tunnelDigestPath = Join-Path $tunnelClientFull "tunnel-client.sha256"
+  Assert-RegularFile $tunnelDigestPath | Out-Null
+  $tunnelDigest = (Get-Content -LiteralPath $tunnelDigestPath | Where-Object {
+      -not [string]::IsNullOrWhiteSpace($_) }) -join ""
+  if ($tunnelDigest -notmatch "^[0-9a-f]{64}$") {
+    throw "tunnel-client.sha256 must contain a single 64-character lowercase hex digest."
+  }
+  if ((Get-Sha256 $tunnelExecutablePath) -ne $tunnelDigest) {
+    throw "tunnel-client.exe does not match its staged digest."
+  }
+  Stage-File $tunnelExecutablePath "tunnel-client.exe"
+  Stage-File $tunnelDigestPath "tunnel-client.sha256"
+  $tunnelManifestPath = Join-Path $tunnelClientFull "tunnel-client.manifest.json"
+  if (Test-Path -LiteralPath $tunnelManifestPath) {
+    Assert-RegularFile $tunnelManifestPath | Out-Null
+    Stage-File $tunnelManifestPath "tunnel-client.manifest.json"
+  }
+  $tunnelClientSHA256 = $tunnelDigest
 
   $swiftRuntimeModule = Resolve-SwiftRuntimeMergeModule $Architecture
   $swiftRuntimeDirectory = Join-Path $temporaryRoot "swift-runtime"
