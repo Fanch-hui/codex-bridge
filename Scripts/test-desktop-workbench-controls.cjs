@@ -368,3 +368,23 @@ test("Windows streaming keeps the conversation card attached to its parent", () 
   assert.equal(cardRemovals, 0);
   assert.equal(entry.querySelector(".entry-text").textContent, "First and second");
 });
+
+test("reply composer grows with wrapped content, caps height and shrinks after deletion", () => {
+  const ui = runtime();
+  ui.render(page("task-compose", { canResume: true }));
+  const input = ui.input();
+  assert.equal(input.rows, 1);
+  assert.equal(input.style.height, "32px");
+  input.scrollHeight = 90;
+  type(input, "多行内容\n第二行\n第三行");
+  assert.equal(input.style.height, "90px");
+  assert.equal(input.style.overflowY, "hidden");
+  input.scrollHeight = 280;
+  type(input, "很长的指令".repeat(200));
+  assert.equal(input.style.height, "180px");
+  assert.equal(input.style.overflowY, "auto");
+  input.scrollHeight = 28;
+  type(input, "短指令");
+  assert.equal(input.style.height, "32px");
+  assert.equal(input.style.overflowY, "hidden");
+});

@@ -99,9 +99,10 @@
 .markdown-code, .entry-arguments { max-height: 240px; margin: 7px 0 0; padding: 9px; overflow: auto; border-radius: 6px; background: rgba(0, 0, 0, .06); white-space: pre-wrap; }
 .entry-details { line-height: 1.5; max-height: calc(18em + 18px); }
 .entry-tool-name { margin-top: 5px; color: var(--text-secondary); font-size: 10px; overflow-wrap: anywhere; }
-.entry-tool-block { margin-top: 5px; }
+.entry-tool-block { min-width: 0; max-width: 100%; margin-top: 5px; }
 .entry-detail-label { margin-bottom: 3px; color: var(--text-tertiary); font-size: 10px; font-weight: 650; }
-.entry-tool-block pre { margin-top: 0; }
+.entry-tool-block pre { box-sizing: border-box; min-width: 0; max-width: 100%; margin-top: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; }
+.entry-output { margin-bottom: 0; padding: 7px 9px; border-radius: 6px; background: var(--surface-muted); }
 .entry-subagent .entry-tool-name { color: var(--accent); }
 .entry-child-runs { margin-top: 9px; }
 .entry-child-run-list { display: grid; gap: 5px; }

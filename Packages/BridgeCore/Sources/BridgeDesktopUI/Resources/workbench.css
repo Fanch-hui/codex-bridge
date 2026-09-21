@@ -63,7 +63,7 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .workbench-controls .workbench-steer-grid.has-mode { grid-template-columns: minmax(0, 1fr) minmax(130px, 180px) auto; }
 .workbench-steer-grid .field.full { grid-column: auto; }
 .workbench-steer-grid .field { gap: 4px; }
-.workbench-steer-grid textarea { min-height: 32px; max-height: 180px; resize: none; overflow-y: hidden; line-height: 1.45; }
+.workbench-controls .field textarea.workbench-message-input { min-height: 32px; max-height: 180px; resize: none; overflow-y: hidden; line-height: 1.45; }
 .workbench-steer-grid .form-actions { min-width: max-content; margin-top: 0; }
 .workbench-steer-grid .form-actions .button { min-height: 32px; }
 .workbench-controls .hint { margin: 0; }

@@ -95,7 +95,8 @@
   function autoGrowTextArea(control) {
     if (!control || !control.style) return;
     control.style.height = "auto";
-    var height = Math.max(control.scrollHeight || 0, 32);
+    var border = Math.max(0, (control.offsetHeight || 0) - (control.clientHeight || 0));
+    var height = Math.max((control.scrollHeight || 0) + border, 32);
     var maxHeight = 180;
     control.style.height = Math.min(height, maxHeight) + "px";
     control.style.overflowY = height > maxHeight ? "auto" : "hidden";

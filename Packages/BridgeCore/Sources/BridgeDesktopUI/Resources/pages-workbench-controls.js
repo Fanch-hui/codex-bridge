@@ -14,6 +14,15 @@
       status = S.node("div", "workbench-status-bar");
       footer.appendChild(controls);
       footer.appendChild(status);
+      if (global.ResizeObserver) {
+        var width = 0;
+        new global.ResizeObserver(function (entries) {
+          var next = entries[0].contentRect.width;
+          if (next === width) return;
+          width = next;
+          S.autoGrowTextArea(controls.__activeForm && controls.__activeForm.__inputControl);
+        }).observe(footer);
+      }
     }
     var detail = page && page.selectedTask;
     controls.__receiptID = page && page.commandReceipt ? page.commandReceipt.receiptID : null;
@@ -35,6 +44,7 @@
           controls.appendChild(controls.__activeForm);
         }
         currentKey = key;
+        S.autoGrowTextArea(controls.__activeForm && controls.__activeForm.__inputControl);
         restoreFocus(focused, detail);
       };
       var renderControlsStable = global.CodexBridgeDesktopStableRender;
@@ -142,6 +152,7 @@
     var draft = draftFor(detail.taskID);
     var field = S.textAreaField(label, draft.input, placeholder, "full");
     field.control.id = "workbench-task-input";
+    field.control.classList.add("workbench-message-input");
     field.control.setAttribute("aria-label", label);
     field.control.dataset.taskID = detail.taskID;
     field.wrapper.querySelector("label").htmlFor = field.control.id;
