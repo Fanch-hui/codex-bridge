@@ -74,12 +74,12 @@
   function messageFor(update) {
     if (update && update.message) return String(update.message);
     switch (phaseOf(update)) {
-      case "available": return "新版已发布，点击立即更新。";
+      case "available": return "新版已发布，点击立即更新。更新后请在 ChatGPT 刷新一次插件，以防保留旧版缓存。";
       case "checking": return "正在从发布源读取最新版本。";
       case "upToDate": return "当前版本已经是最新版本。";
       case "downloading": return "下载完成后会继续安装。";
       case "waiting": return "当前任务结束后会继续安装。";
-      case "installing": return "安装完成后 App 会重新启动。";
+      case "installing": return "安装完成后 App 会重新启动。更新后请在 ChatGPT 刷新一次插件，以防保留旧版缓存。";
       case "failed": return update && update.availableVersion
         ? "可以重试下载和安装。" : "可以重试检查更新。";
       default: return "启动 App 时会自动检查更新。";

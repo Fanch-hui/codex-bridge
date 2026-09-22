@@ -24,7 +24,7 @@ The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks t
 
 Upgrades preserve application data and the embedded browser profile. Closing the Windows main window keeps the tray icon; use the tray menu to exit.
 
-Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
+Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. After every update, refresh the plugin in ChatGPT to prevent stale caches (see [ChatGPT Guide](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)). Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
 
 ## Screenshots and task demo
 

@@ -23,10 +23,12 @@
           return try await model.client.prepareAppUpdate()
         },
         installPackage: { [weak model] in
+          UserDefaults.standard.set(true, forKey: "CodexBridgeJustUpdated")
           model?.stopSchedulingForApplicationExit()
           try await installer.installPackage()
         },
         cancelInstallation: { [weak model] in
+          UserDefaults.standard.removeObject(forKey: "CodexBridgeJustUpdated")
           installer.cancelPackage()
           try? await model?.client.cancelAppUpdate()
           model?.resumeAfterAppUpdateCancellation()
@@ -45,6 +47,24 @@
       appUpdater = updater
       if let message = WindowsAppUpdateInstaller.consumeFailureReceipt() {
         model.feedback.postAlert(message, title: "上次更新未完成")
+      }
+      let currentVersion = WindowsAppUpdateInstaller.currentVersion
+      let lastSeenVersionKey = "CodexBridgeLastSeenVersion"
+      let justUpdatedKey = "CodexBridgeJustUpdated"
+      let previousVersion = UserDefaults.standard.string(forKey: lastSeenVersionKey)
+      let justUpdated = UserDefaults.standard.bool(forKey: justUpdatedKey)
+      let isNewVersion =
+        previousVersion != nil && previousVersion != currentVersion && currentVersion != "0.0.0"
+      if justUpdated || isNewVersion {
+        model.feedback.postToast(
+          "请在 ChatGPT 刷新一次插件，以防保留旧版缓存",
+          title: "应用已更新",
+          tone: .success
+        )
+        UserDefaults.standard.removeObject(forKey: justUpdatedKey)
+      }
+      if currentVersion != "0.0.0" {
+        UserDefaults.standard.set(currentVersion, forKey: lastSeenVersionKey)
       }
       updater.start()
     }
