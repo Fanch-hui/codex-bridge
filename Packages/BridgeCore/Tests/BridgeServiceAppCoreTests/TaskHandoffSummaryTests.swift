@@ -1,26 +1,57 @@
+import BridgeIPC
 import BridgeMCP
 import BridgeServiceAppCore
+import Foundation
 import XCTest
 
 final class TaskHandoffSummaryTests: XCTestCase {
-  func testSummaryUsesRecordedWorkAndKeepsChineseTextValid() {
-    let task = MCPServiceTaskSnapshot(
-      taskID: "tsk-handoff", projectID: "prj-handoff",
-      prompt: String(repeating: "处理中文任务", count: 2000), status: "failed", providerID: "codex",
-      changedFiles: ["Sources/main.swift"],
-      recentEvents: [
-        .init(
-          sequence: 1, kind: "execution.command_completed", summary: "swift test (exit 1)",
-          occurredAt: "2026-09-21")
-      ],
-      supervisorStatus: "disabled", localApprovalRequired: false,
-      resultSummary: "已修改入口，测试尚未通过。", failureCode: "test_failed", updatedAt: "2026-09-21"
-    )
-    let summary = TaskHandoffSummary.prompt(task: task, history: [task], gitState: "dirty")
-    XCTAssertTrue(summary.contains("swift test (exit 1)"))
-    XCTAssertTrue(summary.contains("Sources/main.swift"))
-    XCTAssertTrue(summary.contains("测试尚未通过"))
-    XCTAssertFalse(summary.contains("�"))
-    XCTAssertLessThan(summary.utf8.count, 32 * 1024)
+  func testCandidateListExcludesSourceProvider() {
+    XCTAssertTrue(TaskHandoffSummary.providers(excluding: "codex", installations: []).isEmpty)
+    XCTAssertEqual(
+      TaskHandoffSummary.providers(excluding: "opencode", installations: []).map(\.id), ["codex"])
+  }
+
+  func testLegacyUnversionedSubmissionFailsClosed() {
+    XCTAssertThrowsError(
+      try WorkbenchHandoffClient.request(
+        sourceTaskID: "source", providerID: "opencode", additionalInstructions: "legacy text",
+        action: nil, handoffID: nil, revision: nil))
+    XCTAssertThrowsError(
+      try WorkbenchHandoffClient.request(
+        sourceTaskID: "source", providerID: "opencode", additionalInstructions: "",
+        action: "submit", handoffID: "transfer-one", revision: nil))
+  }
+
+  func testPrepareAcceptsEmptySupplementAndSubmitUsesExactRevision() throws {
+    let prepare = try WorkbenchHandoffClient.request(
+      sourceTaskID: "source", providerID: "opencode", additionalInstructions: "",
+      action: "prepare", handoffID: "transfer-one", revision: nil)
+    XCTAssertEqual(prepare.action, .prepare)
+    let submit = try WorkbenchHandoffClient.request(
+      sourceTaskID: "source", providerID: "opencode", additionalInstructions: "",
+      action: "submit", handoffID: prepare.handoffID, revision: "frozen-hash")
+    XCTAssertEqual(submit.handoffID, prepare.handoffID)
+    XCTAssertEqual(submit.expectedRevision, "frozen-hash")
+    let restored = try JSONDecoder().decode(
+      MCPTaskHandoffRequest.self, from: JSONEncoder().encode(submit))
+    XCTAssertEqual(restored, submit)
+  }
+
+  func testStatusRecoveryDoesNotNeedPlaintextDraftOrSourceSessionFormat() throws {
+    let request = try WorkbenchHandoffClient.request(
+      sourceTaskID: "source", providerID: "antigravity", additionalInstructions: "",
+      action: "status", handoffID: "transfer-one", revision: nil)
+    XCTAssertEqual(request.action, .status)
+    XCTAssertTrue(request.additionalInstructions.isEmpty)
+    let preview = MCPTaskHandoffPreview(
+      handoffID: "transfer-one", sourceTaskID: "source", providerID: "antigravity",
+      model: "selected-model", permissionMode: "read-only", networkAllowed: false,
+      revision: "frozen-hash", prompt: "中文\n```json\n{}\n```", additionalInstructions: "",
+      warnings: ["Context capacity is unknown"], ready: false, estimatedTokens: 100,
+      phase: "running", targetTaskID: "target-one")
+    let restored = try JSONDecoder().decode(
+      MCPTaskHandoffPreview.self, from: JSONEncoder().encode(preview))
+    XCTAssertEqual(restored, preview)
+    XCTAssertNil(restored.contextWindowTokens)
   }
 }

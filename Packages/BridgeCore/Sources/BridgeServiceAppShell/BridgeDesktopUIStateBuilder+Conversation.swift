@@ -59,9 +59,7 @@ extension BridgeDesktopUIStateBuilder {
       canResume: canResume(task, model: model),
       canRestart: task.canRestart,
       handoffPrompt: task.isTerminal
-        ? TaskHandoffSummary.prompt(
-          task: task, history: sessionTasks,
-          gitState: model.projects.first { $0.projectID == task.projectID }?.gitState) : nil,
+        ? "请先生成服务端交接预览；确认前不会发送任务。" : nil,
       handoffProviders: TaskHandoffSummary.providers(
         excluding: task.providerIdentifier, installations: model.agentInstallations
       ).map { BridgeDesktopChoice(id: $0.id, title: $0.name) },

@@ -278,6 +278,8 @@
 .workbench-handoff-form textarea { min-height: 56px; max-height: 180px; resize: none; overflow-y: hidden; line-height: 1.45; }
 .workbench-handoff-form .form-actions { margin-top: 0; }
 .workbench-handoff-hint { margin: 0; }
+.workbench-handoff-preview { max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; margin: 0; padding: 8px; border: 1px solid var(--separator); border-radius: 6px; }
+.workbench-handoff-warnings { white-space: pre-line; overflow-wrap: anywhere; }
 
 .project-detail-host { min-width: 0; }
 

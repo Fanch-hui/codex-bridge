@@ -164,8 +164,19 @@ final class WorkspaceMutationGateTests: XCTestCase {
         permissionMode: .workspaceWrite
       )
     )
-    _ = try await tasks.begin(taskID: submitted.task.id)
-    try await tasks.recoverIncompleteTasks()
+    let started = try await tasks.begin(taskID: submitted.task.id)
+    let unknownTask = try started.replacingState(
+      try ServiceTaskState(status: .unknown),
+      updatedAt: started.updatedAt.addingTimeInterval(1)
+    )
+    try await store.updateTask(
+      unknownTask,
+      event: ServiceTaskEventDraft(
+        kind: .taskFailed,
+        summary: "Task status is unknown.",
+        createdAt: unknownTask.updatedAt
+      )
+    )
 
     do {
       _ = try await gate.acquireDirectLease(

@@ -17,7 +17,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
   private let projectRoot: String?
   private var content = ""
   private var reasoning = DeepSeekHarnessACPReasoningBuffer()
-  private var lastFinalizedContent = ""
+  private var completedTurnContents: [String] = []
   private var assistantMessageIndex: UInt64 = 0
   private var nextProviderSequence: Int64 = 0
   private var tools: [String: ToolState] = [:]
@@ -114,7 +114,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
       isFinal: true,
       authoritative: true
     )
-    lastFinalizedContent = content
+    completedTurnContents.append(content)
     content = ""
     assistantMessageIndex += 1
     return try envelope(.content(update))
@@ -122,10 +122,13 @@ public actor DeepSeekHarnessACPEventNormalizer {
 
   public func completed(stopReason: String) throws -> AgentEventEnvelope {
     let summary =
-      lastFinalizedContent.isEmpty
-      ? (content.isEmpty ? "DeepSeek Harness turn completed." : content)
-      : lastFinalizedContent
+      AgentTurnSummary.combined(completedTurnContents + [content])
+      ?? "DeepSeek Harness turn completed."
     return try envelope(.completed(summary: summary, stopReason: stopReason))
+  }
+
+  public func steerDispatched(_ text: String) throws -> AgentEventEnvelope {
+    try envelope(.steerDispatched(text))
   }
 
   public func failed(code: String, summary: String) throws -> AgentEventEnvelope {

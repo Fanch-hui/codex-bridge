@@ -5,7 +5,8 @@ import GRDB
 extension SimpleServiceStore {
   public func createTask(
     _ task: ServiceTaskRecord,
-    event: ServiceTaskEventDraft
+    event: ServiceTaskEventDraft,
+    handoffID: String? = nil
   ) throws -> ServiceTaskCreationResult {
     guard event.kind == .taskCreated,
       event.createdAt == task.updatedAt,
@@ -18,10 +19,13 @@ extension SimpleServiceStore {
         guard try Self.projectRow(id: task.projectID, in: db) != nil else {
           throw ServiceStoreError.unknownProject(task.projectID)
         }
+        if let handoffID { try Self.validateHandoffSubmission(handoffID, task: task, in: db) }
         if let existing = try Self.idempotentTask(for: task, in: db) {
+          if let handoffID { try Self.linkHandoff(handoffID, taskID: existing.id.rawValue, in: db) }
           return try Self.reusedResult(existing: existing, requested: task)
         }
         if let row = try Self.taskRow(id: task.id, in: db) {
+          if let handoffID { try Self.linkHandoff(handoffID, taskID: task.id.rawValue, in: db) }
           return try Self.reusedResult(existing: Self.decodeTask(row), requested: task)
         }
         if task.permissionMode == .workspaceWrite, task.state.status.holdsWriteSlot,
@@ -38,8 +42,11 @@ extension SimpleServiceStore {
           )
         }
         try Self.insert(event, taskID: task.id, in: db)
+        if let handoffID { try Self.linkHandoff(handoffID, taskID: task.id.rawValue, in: db) }
         return ServiceTaskCreationResult(task: task, reusedExistingTask: false)
       }
+    } catch let error as TaskHandoffError {
+      throw error
     } catch let error as ServiceStoreError {
       throw error
     } catch {

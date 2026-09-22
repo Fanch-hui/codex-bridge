@@ -58,8 +58,19 @@ final class AntigravityCLIEventNormalizerTests: XCTestCase {
       )
     )
 
-    XCTAssertTrue(first.isEmpty)
-    XCTAssertTrue(second.isEmpty)
+    guard case .content(let firstDelta) = try XCTUnwrap(first.first).event,
+      case .content(let secondDelta) = try XCTUnwrap(second.first).event
+    else {
+      return XCTFail("Expected streamed narration deltas")
+    }
+    XCTAssertEqual(first.count, 1)
+    XCTAssertEqual(second.count, 1)
+    XCTAssertEqual(firstDelta.mode, .delta)
+    XCTAssertEqual(firstDelta.content, "Hello ")
+    XCTAssertEqual(firstDelta.key, "message:step:0")
+    XCTAssertEqual(secondDelta.mode, .delta)
+    XCTAssertEqual(secondDelta.content, "world")
+    XCTAssertEqual(secondDelta.key, "message:step:1")
     guard case .tool(let toolUpdate) = try XCTUnwrap(tool.first).event,
       case .usage(let usageUpdate) = try XCTUnwrap(tool.last).event
     else {
@@ -91,12 +102,13 @@ final class AntigravityCLIEventNormalizerTests: XCTestCase {
     }
     XCTAssertEqual(finalUpdate.mode, .full)
     XCTAssertEqual(finalUpdate.content, "All done.")
+    XCTAssertEqual(finalUpdate.key, "message:result:0")
     XCTAssertTrue(finalUpdate.isFinal)
     XCTAssertTrue(finalUpdate.authoritative)
     XCTAssertEqual(summary, "All done.")
     XCTAssertEqual(stopReason, "SUCCESS")
 
-    let all = tool + result
+    let all = first + second + tool + result
     XCTAssertEqual(all.map(\.providerSequence), Array(0..<all.count).map(Int64.init))
   }
 

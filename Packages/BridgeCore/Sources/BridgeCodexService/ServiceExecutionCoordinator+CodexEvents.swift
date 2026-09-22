@@ -54,6 +54,9 @@ extension ServiceExecutionCoordinator {
         await conversation.appendToolCallProgress(
           taskID: taskID, itemID: itemID, progress: progress)
 
+      case .agentMessageCompleted(let message):
+        await conversation.finalize(taskID: taskID, messages: [message])
+
       case .turnCompleted(let messages):
         await conversation.finalize(taskID: taskID, messages: messages)
 

@@ -276,8 +276,8 @@ final class BridgeServiceApplicationTests: XCTestCase {
     let readOnly = MCPServiceToolCatalog(exposureMode: .readOnly).definitions.map(\.name)
     let full = MCPServiceToolCatalog(exposureMode: .full).definitions.map(\.name)
 
-    XCTAssertEqual(readOnly.count, 14)
-    XCTAssertEqual(full.count, 27)
+    XCTAssertEqual(readOnly.count, 17)
+    XCTAssertEqual(full.count, 34)
     XCTAssertFalse(readOnly.contains(MCPServiceToolName.submitTask.rawValue))
     XCTAssertFalse(readOnly.contains(MCPServiceToolName.steerTask.rawValue))
     XCTAssertFalse(readOnly.contains(MCPServiceToolName.interruptTask.rawValue))
@@ -1347,8 +1347,12 @@ final class BridgeServiceApplicationTests: XCTestCase {
       initial.builtInCommands.contains {
         $0.executable == "npm" && $0.argumentsPrefix == ["run", "build"]
       })
-    XCTAssertEqual(initial.recommendedUsage["swift_build"]?.argv, ["swift", "build"])
-    XCTAssertNil(initial.recommendedUsage["swift_build"]?.commandID)
+    XCTAssertFalse(
+      initial.builtInCommands.contains {
+        $0.executable == "swift" && $0.argumentsPrefix == ["build"]
+      })
+    XCTAssertEqual(initial.recommendedUsage["git_status"]?.argv, ["git", "status"])
+    XCTAssertNil(initial.recommendedUsage["git_status"]?.commandID)
 
     _ = try await fixture.projects.updateWorkspaceConfiguration(
       directCommandMode: .safe,
@@ -1381,8 +1385,8 @@ final class BridgeServiceApplicationTests: XCTestCase {
     XCTAssertEqual(commands.commands[0].name, "Codex Bridge Tests")
     XCTAssertEqual(commands.commands[1].risk, "elevated")
     XCTAssertTrue(commands.commands[1].requiresNetwork)
-    XCTAssertNotNil(commands.recommendedUsage["swift_build"])
-    XCTAssertNotNil(commands.recommendedUsage["swift_test"])
+    XCTAssertNotNil(commands.recommendedUsage["git_status"])
+    XCTAssertNil(commands.recommendedUsage["swift_build"])
     XCTAssertEqual(
       commands.recommendedUsage["wcmd-tests"]?.argv,
       [
@@ -1728,13 +1732,17 @@ final class BridgeServiceApplicationTests: XCTestCase {
 
     XCTAssertFalse(hidden.isEmpty)
     for name in hidden {
-      do {
-        _ = try await dispatcher.call(.init(name: name.rawValue))
-        XCTFail("Read-only mode accepted hidden tool \(name.rawValue)")
-      } catch let error as MCPError {
-        guard case .invalidParams = error else {
-          return XCTFail("Unexpected error for \(name.rawValue): \(error)")
-        }
+      let result = try await dispatcher.call(.init(name: name.rawValue))
+      XCTAssertEqual(result.isError, true)
+      XCTAssertTrue(String(describing: result.content).contains("client_permission_read_only"))
+    }
+
+    do {
+      _ = try await dispatcher.call(.init(name: "completely_unknown_tool"))
+      XCTFail("Unknown tool should throw invalidParams")
+    } catch let error as MCPError {
+      guard case .invalidParams = error else {
+        return XCTFail("Unexpected error for unknown tool: \(error)")
       }
     }
   }

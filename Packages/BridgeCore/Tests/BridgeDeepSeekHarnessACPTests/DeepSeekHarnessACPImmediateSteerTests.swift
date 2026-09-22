@@ -32,7 +32,7 @@ final class DeepSeekHarnessACPImmediateSteerTests: XCTestCase {
     guard case .completed(let summary, _) = events.last?.event else {
       return XCTFail("Expected completion after immediate correction")
     }
-    XCTAssertEqual(summary, " response-3")
+    XCTAssertEqual(summary, " response-2\n\n---\n\n response-3")
   }
 
   func testSecondImmediateSteerIsRejectedUntilCurrentCancellationSettles() async throws {

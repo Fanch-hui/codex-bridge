@@ -40,6 +40,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   public let approvals: DirectActionApprovalCenter
   let skillScanner: SkillScanner
   var taskQueueProcessor: Task<Void, Never>?
+  var handoffOperations = Set<String>()
   public let iso8601 = ISO8601DateFormatter()
 
   public init(

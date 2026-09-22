@@ -143,7 +143,7 @@ extension BridgeServiceAppModel {
       providerID: task.providerIdentifier,
       installationID: task.installationID,
       model: task.executionModel,
-      effort: task.executionEffort,
+      effort: TaskRetrySubmission.effort(for: task),
       permissionMode: task.permissionMode,
       prompt: prompt,
       threadID: threadID,

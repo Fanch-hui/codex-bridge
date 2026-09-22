@@ -23,7 +23,7 @@ final class TaskInspectorPresentationTests: XCTestCase {
 
     let text = TaskInspectorPresentation.metadata(for: task, projectName: "Bridge")
 
-    XCTAssertTrue(text.contains("状态：running"))
+    XCTAssertTrue(text.contains("状态：运行中"))
     XCTAssertTrue(text.contains("Provider：OpenCode"))
     XCTAssertTrue(text.contains("项目：Bridge"))
     XCTAssertTrue(text.contains("模型：gpt-5.4"))

@@ -960,7 +960,11 @@ final class BridgeServiceAppModelTests: XCTestCase {
       defaultReasoningEffort: "high"
     )
     await client.configureAgentModels([
-      IPCAgentModelSummary(modelID: option.modelID, displayName: option.displayName)
+      IPCAgentModelSummary(
+        modelID: option.modelID,
+        displayName: option.displayName,
+        reasoningCapabilitiesAvailable: false
+      )
     ])
     await client.configureSelectedModelResponse(option.modelID, models: [option])
     _ = try await client.setAgentDefaults(

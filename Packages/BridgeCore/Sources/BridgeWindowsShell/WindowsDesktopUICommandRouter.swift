@@ -98,7 +98,7 @@
       case .handoffTask:
         guard let taskID = nonEmpty(payload.taskID),
           let providerID = nonEmpty(payload.providerID),
-          let prompt = nonEmpty(payload.input)
+          let prompt = payload.input
         else {
           return rejectWorkbenchCommand(envelope)
         }
@@ -106,7 +106,8 @@
           id: taskID,
           providerID: providerID,
           prompt: prompt,
-          requestID: envelope.requestID
+          requestID: envelope.requestID,
+          action: payload.action, handoffID: payload.value, revision: payload.messageKey
         )
       case .restartTask:
         guard let taskID = nonEmpty(payload.taskID) else {

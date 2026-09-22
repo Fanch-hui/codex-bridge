@@ -117,8 +117,7 @@
         queueOccupantTaskID: task.queueOccupantTaskID,
         queueRequestedAt: task.queueRequestedAt,
         handoffPrompt: task.isTerminal
-          ? TaskHandoffSummary.prompt(
-            task: task, history: resolvedSession.tasks, gitState: gitState) : nil,
+          ? "请先生成服务端交接预览；确认前不会发送任务。" : nil,
         handoffProviders: TaskHandoffSummary.providers(
           excluding: task.providerIdentifier, installations: installations
         ).map { BridgeDesktopChoice(id: $0.id, title: $0.name) },

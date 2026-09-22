@@ -349,6 +349,9 @@ public actor AntigravityCLIExecution {
     if canContinue, let nextPrompt = dequeueSteer() {
       guard !terminal, !interruptRequested else { return }
       try await sendPrompt(nextPrompt)
+      guard emit(try await normalizer.steerDispatched(nextPrompt)) else {
+        throw AntigravityCLIError.transportClosed
+      }
       return
     }
     guard claimTerminal() else { return }

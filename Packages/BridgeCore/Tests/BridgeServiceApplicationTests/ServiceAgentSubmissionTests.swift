@@ -829,6 +829,7 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     )
     _ = try await application.serviceListAgentModels(
       installationID: AgentInstallationID(rawValue: "ainst-route-opencode"),
+      forceRefresh: true,
       deadline: ContinuousClock.now.advanced(by: .seconds(10))
     )
     XCTAssertEqual(

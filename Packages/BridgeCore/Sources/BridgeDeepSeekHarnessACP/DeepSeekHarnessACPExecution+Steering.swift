@@ -63,6 +63,14 @@ extension DeepSeekHarnessACPExecution {
     return prompt
   }
 
+  /// Recorded before the prompt is sent so the queued instruction always keeps
+  /// a lower provider sequence than the events of the turn it starts.
+  func emitSteerDispatched(_ text: String) async throws {
+    guard emit(try await normalizer.steerDispatched(text)) else {
+      throw DeepSeekHarnessACPError.transportClosed
+    }
+  }
+
   func clearSteers() {
     queuedSteers.removeAll(keepingCapacity: false)
     queuedSteerBytes = 0

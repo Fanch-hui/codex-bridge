@@ -80,7 +80,7 @@ final class DeepSeekHarnessACPQueuedSteerTests: XCTestCase {
     guard case .completed(let summary, _) = events.last?.event else {
       return XCTFail("Expected a final completion")
     }
-    XCTAssertEqual(summary, " response-3")
+    XCTAssertEqual(summary, " initial\n\n---\n\n response-2\n\n---\n\n response-3")
     XCTAssertEqual(
       events.count(where: { if case .completed = $0.event { true } else { false } }), 1)
     XCTAssertEqual(

@@ -86,6 +86,7 @@ extension DeepSeekHarnessACPExecution {
     // turn. Re-check before claiming terminal so accepted input is never
     // lost to a completion race.
     if let nextPrompt = dequeueSteer() {
+      try await emitSteerDispatched(nextPrompt)
       return nextPrompt
     }
     guard claimTerminal() else { return nil }

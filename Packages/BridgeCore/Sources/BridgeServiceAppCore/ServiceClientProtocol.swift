@@ -60,6 +60,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   ) async throws -> IPCAgentInstallationSummary
   func removeAgentInstallation(installationID: String) async throws
   func submitAgentTask(_ request: IPCAgentSubmitRequest) async throws -> IPCAgentSubmitResponse
+  func taskHandoff(_ request: MCPTaskHandoffRequest) async throws -> MCPTaskHandoffPreview
   func agentModels(installationID: String) async throws -> IPCAgentModelsResponse
   func agentModels(
     installationID: String,
@@ -170,6 +171,10 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func taskHandoff(_ request: MCPTaskHandoffRequest) async throws -> MCPTaskHandoffPreview {
+    throw BridgeServiceClientError.serviceRestartRequired
+  }
+
   public func serviceChanges() async -> AsyncStream<Void> {
     AsyncStream { $0.finish() }
   }

@@ -74,7 +74,7 @@ final class MCPServiceExposureTests: XCTestCase {
   func testReadOnlyModeExposesCommandsAndObservationOnly() {
     let catalog = MCPServiceToolCatalog(exposureMode: .readOnly)
     let names = catalog.definitions.map(\.name)
-    XCTAssertEqual(names.count, 14)
+    XCTAssertEqual(names.count, 17)
     XCTAssertTrue(names.contains("list_agents"))
     XCTAssertTrue(names.contains("list_project_commands"))
     XCTAssertTrue(names.contains("get_project_changes"))
@@ -89,7 +89,7 @@ final class MCPServiceExposureTests: XCTestCase {
   func testFullModeExposesDirectAndCodexActions() {
     let catalog = MCPServiceToolCatalog(exposureMode: .full)
     let names = catalog.definitions.map(\.name)
-    XCTAssertEqual(names.count, 27)
+    XCTAssertEqual(names.count, 34)
     for name in directToolNames {
       XCTAssertTrue(names.contains(name), "full must expose \(name)")
     }
@@ -106,12 +106,15 @@ final class MCPServiceExposureTests: XCTestCase {
       "list_agents",
       "get_project",
       "search_project_files",
+      "list_project_directory",
+      "batch_read_project_files",
       "read_project_file",
       "list_threads",
       "read_thread",
       "list_models",
       "list_skills",
       "read_skill",
+      "list_tasks",
       "get_task",
       "get_project_changes",
       "list_project_commands",
@@ -125,7 +128,11 @@ final class MCPServiceExposureTests: XCTestCase {
       "direct_edit_project_file",
       "direct_apply_project_patch",
       "direct_manage_project_path",
+      "direct_preview_project_mutation",
+      "direct_apply_project_mutation",
+      "direct_undo_project_mutation",
       "direct_exec_project_command",
+      "list_direct_commands",
       "direct_read_command",
       "direct_write_stdin",
       "direct_interrupt_command",

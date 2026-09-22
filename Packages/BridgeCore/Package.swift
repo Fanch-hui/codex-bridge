@@ -326,6 +326,7 @@ var windowsApplicationLinkerFlags = [
         "ServiceTaskCompletionSummaryTests.swift",
         "ServiceTaskConcurrencyTests.swift",
         "ServiceTaskQueueTests.swift",
+        "ServiceTaskHandoffTests.swift",
         "ServiceTaskPageTests.swift",
         "SimpleServiceStoreTests.swift",
         "TestSupport.swift",

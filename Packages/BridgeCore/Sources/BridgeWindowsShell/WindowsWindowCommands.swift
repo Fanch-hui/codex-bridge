@@ -117,7 +117,10 @@
     case deleteSession(taskID: String)
     case steerTask(id: String, input: String, mode: String, requestID: String? = nil)
     case resumeTask(id: String, input: String?, requestID: String? = nil, queueIfBusy: Bool = false)
-    case handoffTask(id: String, providerID: String, prompt: String, requestID: String?)
+    case handoffTask(
+      id: String, providerID: String, prompt: String, requestID: String?,
+      action: String? = nil, handoffID: String? = nil, revision: String? = nil
+    )
     case restartTask(id: String, requestID: String? = nil, queueIfBusy: Bool = false)
     case rejectWorkbenchCommand(
       requestID: String,

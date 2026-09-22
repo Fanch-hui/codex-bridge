@@ -381,6 +381,9 @@ public struct AgentApprovalRequest: Codable, Equatable, Sendable {
 
 public enum AgentEvent: Equatable, Sendable {
   case content(AgentContentUpdate)
+  /// A queued steer reached the agent, so the user instruction belongs here in
+  /// the conversation timeline rather than at the moment it was queued.
+  case steerDispatched(String)
   case tool(AgentToolUpdate)
   case plan([AgentPlanEntry])
   case usage(AgentUsageUpdate)

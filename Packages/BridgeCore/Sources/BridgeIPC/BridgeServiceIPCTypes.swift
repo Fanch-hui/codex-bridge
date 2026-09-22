@@ -51,6 +51,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setTaskStartApprovalMode = "set_task_start_approval_mode"
   case setExposureMode = "set_exposure_mode"
   case submitAgentTask = "submit_agent_task"
+  case taskHandoff = "task_handoff"
   case listAgentModels = "list_agent_models"
   case getAgentModelDefault = "get_agent_model_default"
   case setAgentModelDefault = "set_agent_model_default"

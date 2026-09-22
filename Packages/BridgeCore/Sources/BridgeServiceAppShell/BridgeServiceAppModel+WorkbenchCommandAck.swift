@@ -9,7 +9,8 @@ extension BridgeServiceAppModel {
     taskID: String?,
     input: String?,
     accepted: Bool,
-    message: String? = nil
+    message: String? = nil,
+    handoff: WorkbenchHandoffPreview? = nil
   ) {
     guard let requestID, !requestID.isEmpty else { return }
     if !accepted { errorMessage = message }
@@ -19,7 +20,8 @@ extension BridgeServiceAppModel {
       taskID: taskID,
       input: input,
       accepted: accepted,
-      message: message
+      message: message,
+      handoff: handoff
     )
   }
 

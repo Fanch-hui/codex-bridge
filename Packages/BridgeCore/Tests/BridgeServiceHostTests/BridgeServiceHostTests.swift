@@ -311,7 +311,7 @@ final class BridgeServiceHostTests: XCTestCase {
     defer { Task { await client.disconnect() } }
 
     let tools = try await client.listTools()
-    XCTAssertEqual(tools.tools.count, 27)
+    XCTAssertEqual(tools.tools.count, 34)
     XCTAssertTrue(tools.tools.contains { $0.name == MCPServiceToolName.submitTask.rawValue })
     XCTAssertEqual(secret.utf8.count, 43)
   }
@@ -382,9 +382,9 @@ final class BridgeServiceHostTests: XCTestCase {
     XCTAssertEqual(taskMode, .workspaceWrite)
     let storedTask = try await reopened.tasks.task(id: submitted.task.id)
     let task = try XCTUnwrap(storedTask)
-    XCTAssertEqual(task.state.status, ServiceTaskStatus.unknown)
+    XCTAssertEqual(task.state.status, ServiceTaskStatus.interrupted)
     let activeWriteTask = try await reopened.tasks.activeWriteTask(projectID: project.id)
-    XCTAssertEqual(activeWriteTask?.id, submitted.task.id)
+    XCTAssertNil(activeWriteTask)
   }
 
   func testAnonymousXPCClientRegistersAndListsAProject() async throws {
@@ -435,7 +435,7 @@ final class BridgeServiceHostTests: XCTestCase {
     let mcpClient = try await connectMCP(endpoint: endpoint.localURL, secret: secret)
     defer { Task { await mcpClient.disconnect() } }
     let tools = try await mcpClient.listTools()
-    XCTAssertEqual(tools.tools.count, 27)
+    XCTAssertEqual(tools.tools.count, 34)
 
     try await client.removeProject(projectID: registered.projectID)
     let remainingProjects = try await client.projects()

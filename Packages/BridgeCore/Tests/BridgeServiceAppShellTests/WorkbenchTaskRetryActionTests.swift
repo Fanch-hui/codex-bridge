@@ -160,8 +160,47 @@ final class WorkbenchTaskRetryActionTests: XCTestCase {
     let submitted = try XCTUnwrap(submissions.first)
     XCTAssertEqual(submitted.threadID, "thread-default-model")
     XCTAssertEqual(submitted.model, "provider-default")
-    XCTAssertEqual(submitted.effort, "provider-default")
+    XCTAssertNil(submitted.effort)
     XCTAssertEqual(submitted.modelOverride, false)
+  }
+
+  func testResumeTaskDropsTheEffortSentinelWhileKeepingAModelOverride() async throws {
+    let client = TestBridgeServiceClient()
+    let registration = MockRegistration()
+    let model = BridgeServiceAppModel(
+      registration: registration,
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+
+    let task = MCPServiceTaskSnapshot(
+      taskID: "task-real-model",
+      projectID: "proj-1",
+      status: "completed",
+      providerID: "codex",
+      executionModel: "gpt-5-codex",
+      executionEffort: "provider-default",
+      threadID: "thread-real-model",
+      permissionMode: "workspace-write",
+      supervisorStatus: "none",
+      localApprovalRequired: false,
+      updatedAt: "2026-09-03T10:00:00Z"
+    )
+
+    model.resumeTask(task, prompt: "继续执行")
+
+    try await Task.sleep(for: .milliseconds(50))
+
+    let submissions = await client.submittedAgentTasksValue()
+    let submitted = try XCTUnwrap(submissions.first)
+    // The service rejects an explicit effort that the selected model does not
+    // list, so the sentinel has to fall back to the configured default.
+    XCTAssertEqual(submitted.model, "gpt-5-codex")
+    XCTAssertEqual(submitted.modelOverride, true)
+    XCTAssertNil(submitted.effort)
   }
 
   func testRestartTaskSubmitsFreshRequestWithOriginalPromptAndNoThreadID() async throws {

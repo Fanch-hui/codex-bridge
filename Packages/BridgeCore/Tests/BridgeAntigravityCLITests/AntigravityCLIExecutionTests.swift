@@ -68,18 +68,22 @@ final class AntigravityCLIExecutionTests: XCTestCase {
       sentMessages,
       ["Inspect the repository.", "Follow up on the findings."]
     )
-    XCTAssertEqual(events.count, 3)
+    XCTAssertEqual(events.count, 4)
     guard case .content(let firstContent) = events[0].event,
-      case .content(let secondContent) = events[1].event,
-      case .completed(let summary, let stopReason) = events[2].event
+      case .steerDispatched(let dispatched) = events[1].event,
+      case .content(let secondContent) = events[2].event,
+      case .completed(let summary, let stopReason) = events[3].event
     else {
-      return XCTFail("Expected two result contents and one terminal completion")
+      return XCTFail("Expected the queued steer to land between the two turn results")
     }
     XCTAssertEqual(firstContent.content, "Initial pass complete.")
+    XCTAssertEqual(firstContent.key, "message:result:0")
+    XCTAssertEqual(dispatched, "Follow up on the findings.")
     XCTAssertEqual(secondContent.content, "Follow-up complete.")
-    XCTAssertEqual(summary, "Follow-up complete.")
+    XCTAssertEqual(secondContent.key, "message:result:1")
+    XCTAssertEqual(summary, "Initial pass complete.\n\n---\n\nFollow-up complete.")
     XCTAssertEqual(stopReason, "SUCCESS")
-    XCTAssertEqual(events.map(\.providerSequence), [0, 1, 2])
+    XCTAssertEqual(events.map(\.providerSequence), [0, 1, 2, 3])
   }
 
   func testSoftDeniedSuccessProducesFailureAndNoCompletion() async throws {
@@ -467,14 +471,16 @@ final class AntigravityCLIExecutionTests: XCTestCase {
     let events = await eventsTask.value
     let sentFrames = await transport.sentFramesValue()
     XCTAssertEqual(sentFrames.count, 2)
-    XCTAssertEqual(events.count, 3)
+    XCTAssertEqual(events.count, 4)
     guard case .content(let firstContent) = events[0].event,
-      case .content(let secondContent) = events[1].event,
-      case .interrupted = events[2].event
+      case .steerDispatched(let dispatched) = events[1].event,
+      case .content(let secondContent) = events[2].event,
+      case .interrupted = events[3].event
     else {
-      return XCTFail("Expected both result contents followed by interruption")
+      return XCTFail("Expected the dispatched steer between both results, then interruption")
     }
     XCTAssertEqual(firstContent.content, "Initial pass complete.")
+    XCTAssertEqual(dispatched, "Follow up before interruption.")
     XCTAssertEqual(secondContent.content, "Partial follow-up output.")
   }
 

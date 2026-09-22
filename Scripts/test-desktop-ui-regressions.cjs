@@ -208,13 +208,18 @@ test("tool cards keep real name, status, input and output while streaming", () =
   assert.equal(output.textContent, "完成\n[REDACTED]");
 });
 
-test("terminal handoff keeps an editable prompt until receipt", () => {
+test("terminal handoff requires a server preview before submission", () => {
   const ui = createHarness([
     "pages-common.js", "pages-form-draft.js", "pages-workbench-handoff.js"
   ], ["workbench-inspector-footer"]);
   const footer = ui.roots[0], status = ui.document.createElement("div");
   footer.appendChild(status);
   const commands = [], handoff = ui.window.CodexBridgeDesktopWorkbenchHandoff;
+  const storage = new Map();
+  ui.window.localStorage = {
+    getItem: key => storage.get(key) || null,
+    setItem: (key, value) => storage.set(key, value)
+  };
   const detail = {
     taskID: "task-terminal", handoffPrompt: "请接续检查失败日志", handoffProviders: [
       { id: "opencode", title: "OpenCode" }, { id: "agy", title: "Antigravity" }
@@ -229,6 +234,7 @@ test("terminal handoff keeps an editable prompt until receipt", () => {
   input.dispatch("input");
   footer.querySelector("button").dispatch("click");
   assert.equal(commands[0].command, "handoffTask");
+  assert.equal(commands[0].payload.action, "prepare");
   assert.equal(commands[0].payload.providerID, "opencode");
   assert.equal(commands[0].payload.input, input.value);
   const failed = {
@@ -241,8 +247,21 @@ test("terminal handoff keeps an editable prompt until receipt", () => {
   footer.querySelector("button").dispatch("click");
   const accepted = {
     ...failed, receiptID: "handoff-ok", requestID: commands[1].requestID,
-    input: commands[1].payload.input, accepted: true
+    input: commands[1].payload.input, accepted: true,
+    handoff: {
+      handoffID: commands[1].payload.value, sourceTaskID: detail.taskID,
+      providerID: "opencode", revision: "preview-revision", model: "model",
+      permissionMode: "read-only", networkAllowed: false, phase: "prepared",
+      prompt: "服务端完整交接正文", additionalInstructions: commands[1].payload.input,
+      ready: true, warnings: []
+    }
   };
   handoff.render(detail, () => {}, accepted);
-  assert.equal(input.value, "");
+  assert.equal(input.value, commands[1].payload.input);
+  const confirm = footer.querySelectorAll("button").find(button => button.textContent === "确认交接");
+  assert.equal(confirm.disabled, false);
+  confirm.dispatch("click");
+  assert.equal(commands[2].payload.action, "submit");
+  assert.equal(commands[2].payload.value, commands[1].payload.value);
+  assert.equal(commands[2].payload.messageKey, "preview-revision");
 });
