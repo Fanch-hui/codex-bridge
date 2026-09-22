@@ -572,7 +572,7 @@ public actor ServiceComposition {
         degradations: []
       )
     } catch {
-      return .failed
+      return .failure(error: error)
     }
   }
 
@@ -619,12 +619,14 @@ private struct LegacyConfigurationImportBootstrap: Sendable {
     report: nil,
     degradations: []
   )
-  static let failed = LegacyConfigurationImportBootstrap(
-    report: nil,
-    degradations: [
-      "Migration: Legacy configuration import failed; existing Service data was left unchanged."
-    ]
-  )
+  static func failure(error: any Error) -> LegacyConfigurationImportBootstrap {
+    LegacyConfigurationImportBootstrap(
+      report: nil,
+      degradations: [
+        "Migration: Legacy configuration import failed (\(error)); existing Service data was left unchanged."
+      ]
+    )
+  }
 
   let report: LegacyImportReport?
   let degradations: [String]
