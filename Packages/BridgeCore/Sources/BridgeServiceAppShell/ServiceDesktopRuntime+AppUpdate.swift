@@ -27,6 +27,7 @@ extension BridgeServiceAppModel {
       },
       installPackage: { [weak self] in
         guard let self else { throw CancellationError() }
+        self.userDefaults.set(true, forKey: "CodexBridgeJustUpdated")
         let servicePIDs = try await MacAppUpdateServiceExit.processIDs()
         try await installer.launch()
         self.pollingTask?.cancel()
@@ -39,6 +40,7 @@ extension BridgeServiceAppModel {
       cancelInstallation: { [weak self] in
         installer.cancel()
         guard let self else { return }
+        self.userDefaults.removeObject(forKey: "CodexBridgeJustUpdated")
         try? await self.client?.cancelAppUpdate()
         if self.registration.status == .notRegistered {
           await self.enableBackgroundService()
@@ -59,6 +61,21 @@ extension BridgeServiceAppModel {
       postToast(message, symbol: "exclamationmark.triangle", tone: .warning)
       try? FileManager.default.removeItem(at: MacAppUpdateHelper.failureURL)
     }
+    let currentVersion =
+      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1.2"
+    let lastSeenVersionKey = "CodexBridgeLastSeenVersion"
+    let justUpdatedKey = "CodexBridgeJustUpdated"
+    let previousVersion = userDefaults.string(forKey: lastSeenVersionKey)
+    let justUpdated = userDefaults.bool(forKey: justUpdatedKey)
+    if justUpdated || (previousVersion != nil && previousVersion != currentVersion) {
+      postToast(
+        "应用已更新，请在 ChatGPT 刷新一次插件以防保留旧版缓存",
+        symbol: "arrow.clockwise.circle.fill",
+        tone: .success
+      )
+      userDefaults.removeObject(forKey: justUpdatedKey)
+    }
+    userDefaults.set(currentVersion, forKey: lastSeenVersionKey)
     appUpdater.start()
   }
 }
