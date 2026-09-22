@@ -1,6 +1,6 @@
 # ChatGPT 与 Secure MCP Tunnel 配置指南
 
-适用于 Codex Bridge v1.1.0 的 macOS 与 Windows 版本。完成顺序：创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 创建 App → 提交第一项任务。
+适用于 Codex Bridge v1.1.2 的 macOS 与 Windows 版本。完成顺序：创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 创建 App → 提交第一项任务。
 
 ## 1. 准备 Bridge
 
@@ -68,6 +68,9 @@ Runtime Key 由后台 Service 存入 macOS Keychain 或 Windows Credential Manag
 
 ## 6. 在 ChatGPT 创建连接
 
+> [!NOTE]
+> ChatGPT 需要有 Plus 及以上订阅或团队订阅才可以使用 Developer mode 与 Secure MCP Tunnel（免费版账号不提供开发者模式入口）。实测订阅用户都可以使用完整权限的 MCP。
+
 1. 打开 ChatGPT 设置，在 **Security and login** 中启用 **Developer mode**。
 2. 打开 Plugins/Apps 管理页面，点击加号创建 developer-mode App。
 3. 连接类型选择 **Tunnel**。
@@ -75,7 +78,7 @@ Runtime Key 由后台 Service 存入 macOS Keychain 或 Windows Credential Manag
 5. 完成工具扫描并保存。
 6. 新建对话，从加号菜单的 Developer mode 中选择这个 App。
 
-这是当前官方入口；受管 Workspace 还需管理员授予开发者模式权限。入口随账号与网页版本变化，以 [OpenAI Developer mode 文档](https://developers.openai.com/api/docs/guides/developer-mode) 为准。
+这是当前官方入口；受管 Workspace 还需管理员授予开发者模式权限。实测订阅用户都可以使用完整权限的 MCP（包括工具发现、`bridge_status` 查询与 `submit_task` 执行）。入口随账号与网页版本变化，以 [OpenAI Developer mode 文档](https://developers.openai.com/api/docs/guides/developer-mode) 为准。
 
 Tunnel 表单使用 Tunnel ID，不填写本机 `127.0.0.1` 地址。Runtime Key 只保存在 Bridge。若表单只有公共 MCP URL，返回连接类型选择 Tunnel。
 
@@ -97,7 +100,7 @@ Tunnel 表单使用 Tunnel ID，不填写本机 `127.0.0.1` 地址。Runtime Key
 
 若希望使用 DeepSeek Harness，请明确说“使用 DeepSeek Harness”，客户端应发送 `provider_id=deepseek-harness`。先按 [DSH 配置指南](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) 完成连接。
 
-Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task`；实际执行仍服从项目策略和审批。工具目录变更后，在 ChatGPT 刷新 App/重新扫描工具。
+Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task`；实测订阅用户都可以使用完整权限的 MCP，实际执行仍服从项目策略和审批。工具目录变更后，在 ChatGPT 刷新 App/重新扫描工具。
 
 ## 8. 常见问题
 
@@ -105,7 +108,7 @@ Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task
 | --- | --- |
 | 看不到 Tunnels 或无法创建 | 确认 Platform 组织及 Read + Manage 权限 |
 | 已创建 Tunnel，但 ChatGPT 插件的隧道列表中找不到 | 优先检查 Platform → Tunnels → 编辑该 Tunnel → **WORKSPACES** 是否已选中并保存。个人空间选择 **Personal**，团队选择对应工作区；回到同一工作区的 ChatGPT 刷新列表。仍不可见时，再检查 Read + Use 权限 |
-| 找不到 Developer mode | 检查当前 Workspace 的账号权限和管理员设置 |
+| 找不到 Developer mode | 确认账号是否拥有 Plus 及以上或团队订阅（免费版账号不提供开发者模式入口）；受管 Workspace 需检查账号权限和管理员设置 |
 | 保存时报配置无效 | 重新复制 Tunnel ID；Key 不加引号或空白 |
 | 一直认证失败 | 确认 Key 所属组织、Read + Use 权限、是否撤销；查看 Bridge 日志 |
 | 连接失败或反复掉线 | 检查本机到 OpenAI 的出站 HTTPS 与代理配置；查看 Tunnel 诊断 |
