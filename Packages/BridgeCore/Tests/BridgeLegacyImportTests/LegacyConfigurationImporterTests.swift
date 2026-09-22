@@ -184,45 +184,47 @@ final class LegacyConfigurationImporterTests: XCTestCase {
     XCTAssertEqual(storedTunnelEnabled, "0")
   }
 
-  func testProjectConflictRollsBackSettingsAndMarker() async throws {
+  func testProjectConflictSkipsLegacyProjectWithoutOverwritingIt() async throws {
     let fixture = try LegacyImportFixture(testCase: self)
     let legacy = try fixture.project(id: "conflicting-project")
     try fixture.writeRepository(projects: [legacy])
-    try fixture.writeOnboarding(
-      tunnelID: "tunnel_" + String(repeating: "d", count: 32)
-    )
+    let tunnelID = "tunnel_" + String(repeating: "d", count: 32)
+    try fixture.writeOnboarding(tunnelID: tunnelID)
     let conflictRoot = try fixture.createDirectory("conflict")
     let store = try fixture.store()
     let date = Date(timeIntervalSince1970: 1_950_000_000)
-    try await store.insertProject(
-      ServiceProjectRecord(
-        id: legacy.id,
-        name: "Conflicting New Project",
-        root: ServiceRootIdentity(capturing: conflictRoot),
-        accessPolicy: .init(),
-        createdAt: date,
-        updatedAt: date
-      )
+    let conflictingRoot = try ServiceRootIdentity(capturing: conflictRoot)
+    let conflicting = try ServiceProjectRecord(
+      id: legacy.id,
+      name: "Conflicting New Project",
+      root: conflictingRoot,
+      accessPolicy: .init(),
+      createdAt: date,
+      updatedAt: date
     )
+    try await store.insertProject(conflicting)
 
-    do {
-      _ = try await LegacyConfigurationImporter(
-        legacyRootURL: fixture.legacyRoot,
-        store: store
-      ).importIfNeeded()
-      XCTFail("Expected the conflicting project to abort the import")
-    } catch {
-      XCTAssertEqual(error as? ServiceStoreError, .duplicateProject(legacy.id))
-    }
+    let report = try await LegacyConfigurationImporter(
+      legacyRootURL: fixture.legacyRoot,
+      store: store
+    ).importIfNeeded()
     let storedTunnelID = try await store.setting(
       key: ServiceSettingKey.tunnelID.rawValue
-    )
+    )?.value
     let markerExists = try await store.hasConfigurationImportMarker(
       LegacyConfigurationImporter.markerKey
     )
+    let survivingRecord = try await store.project(id: legacy.id)
+    let surviving = try XCTUnwrap(survivingRecord)
     let projectCount = try await store.projects().count
-    XCTAssertNil(storedTunnelID)
-    XCTAssertFalse(markerExists)
+
+    XCTAssertEqual(report.status, .imported)
+    XCTAssertEqual(report.skippedProjectIDs, [legacy.id])
+    XCTAssertTrue(report.insertedProjectIDs.isEmpty)
+    XCTAssertEqual(storedTunnelID, tunnelID)
+    XCTAssertTrue(markerExists)
+    XCTAssertEqual(surviving.name, conflicting.name)
+    XCTAssertEqual(surviving.root.canonicalPath, conflicting.root.canonicalPath)
     XCTAssertEqual(projectCount, 1)
   }
 
