@@ -97,10 +97,18 @@ function Assert-Payload([string]$Root) {
       "swiftCore.dll",
       "sqlite3.dll",
       "WebView2Loader.dll",
+      "tunnel-client.exe",
+      "tunnel-client.sha256",
       "BUILD-INFO.json",
       "CodexBridgeControl.v1",
       "unins000.exe")) {
     Assert-RegularFile (Join-Path $Root $required) | Out-Null
+  }
+  $tunnelExecutable = Join-Path $Root "tunnel-client.exe"
+  $tunnelDigest = (Get-Content -LiteralPath (Join-Path $Root "tunnel-client.sha256") -Raw).Trim()
+  if ($tunnelDigest -cnotmatch "^[0-9a-f]{64}$" -or
+      (Get-Sha256 $tunnelExecutable) -cne $tunnelDigest) {
+    throw "Installed Tunnel helper does not match its staged digest."
   }
 }
 

@@ -52,6 +52,17 @@ extension BridgeServiceAppModel {
     }
   }
 
+  /// Applies a user-configured Codex executable; an empty path restores discovery.
+  func setCodexExecutablePath(_ path: String?) {
+    let configured = (path?.isEmpty ?? true) ? nil : path
+    runMutation { [weak self] client in
+      guard let self else { return }
+      self.serviceStatus = try await client.setCodexExecutablePath(configured)
+      await self.refresh(silent: true, includeCatalog: true, forceCatalogRefresh: true)
+      self.postToast(configured == nil ? "Codex 已恢复自动发现" : "Codex 可执行文件已更新")
+    }
+  }
+
   func setModelPreferences(_ preferences: IPCModelPreferences) {
     let previous = modelPreferences
     modelPreferences = preferences

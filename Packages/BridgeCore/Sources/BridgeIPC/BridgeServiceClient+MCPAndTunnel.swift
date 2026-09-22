@@ -20,6 +20,15 @@ extension BridgeServiceClient {
     )
   }
 
+  /// Applies a user-configured Codex executable path and returns the refreshed
+  /// service status.
+  public func setCodexExecutablePath(_ path: String?) async throws -> IPCServiceStatusResponse {
+    try await call(
+      operation: .setCodexExecutablePath,
+      payload: IPCCodexExecutablePath(path: path)
+    )
+  }
+
   public func models() async throws -> MCPModelList {
     try await call(operation: .listModels, payload: Optional<IPCMutationResponse>.none)
   }

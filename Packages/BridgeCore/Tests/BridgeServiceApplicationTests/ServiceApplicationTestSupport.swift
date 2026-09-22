@@ -41,9 +41,11 @@ func makeServiceApplicationFixture(_ testCase: XCTestCase) async throws
   let settings = ServiceSettings(store: store)
   let execution = ExecutionManager(
     configuration: ExecutionManagerConfiguration(
-      appServer: AppServerConfiguration(
-        executableURL: URL(fileURLWithPath: "/bin/sh"),
-        arguments: ["-c", serviceExecutionStartScript(root: root.path)]
+      appServer: CodexAppServerLocator(
+        configuration: AppServerConfiguration(
+          executableURL: URL(fileURLWithPath: "/bin/sh"),
+          arguments: ["-c", serviceExecutionStartScript(root: root.path)]
+        )
       ),
       clientInfo: .bridge(version: "service-app-tests")
     )
@@ -95,9 +97,11 @@ func makeServiceApplication(
 ) -> BridgeServiceApplication {
   let execution = ExecutionManager(
     configuration: ExecutionManagerConfiguration(
-      appServer: AppServerConfiguration(
-        executableURL: URL(fileURLWithPath: "/bin/sh"),
-        arguments: ["-c", serviceExecutionStartScript(root: fixture.root.path)]
+      appServer: CodexAppServerLocator(
+        configuration: AppServerConfiguration(
+          executableURL: URL(fileURLWithPath: "/bin/sh"),
+          arguments: ["-c", serviceExecutionStartScript(root: fixture.root.path)]
+        )
       ),
       clientInfo: .bridge(version: "service-app-tests")
     )
@@ -117,9 +121,11 @@ func makeServiceApplication(
     coordinator: coordinator,
     catalog: ServiceCodexCatalog(
       configuration: ServiceCodexCatalogConfiguration(
-        appServer: AppServerConfiguration(
-          executableURL: URL(fileURLWithPath: "/bin/sh"),
-          arguments: ["-c", catalogScript]
+        appServer: CodexAppServerLocator(
+          configuration: AppServerConfiguration(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", catalogScript]
+          )
         ),
         clientInfo: .bridge(version: "service-app-tests"),
         requestTimeoutNanoseconds: 2_000_000_000

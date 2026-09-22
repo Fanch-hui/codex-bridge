@@ -4,8 +4,13 @@ import Foundation
   import WinSDK
 #endif
 
-enum ServiceAgentDiscoveryEnvironment {
-  static func current() -> [String: String] {
+/// Environment snapshot used when discovering locally installed tools.
+///
+/// A background service keeps the environment captured when it was launched, so
+/// `PATH` and tool roots written by an installation completed afterwards stay
+/// invisible to it; on Windows the registry values are the current ones.
+public enum ToolDiscoveryEnvironment {
+  public static func current() -> [String: String] {
     var environment = ProcessInfo.processInfo.environment
     #if os(Windows)
       let machineKey = #"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"#
@@ -18,7 +23,9 @@ enum ServiceAgentDiscoveryEnvironment {
       environment["PATH"] = path.joined(separator: ";")
       for name in [
         "PNPM_HOME", "NPM_CONFIG_PREFIX", "YARN_GLOBAL_FOLDER", "BUN_INSTALL", "CARGO_HOME",
+        "VOLTA_HOME",
         "NVM_HOME", "NVM_SYMLINK",
+        "CODEX_BRIDGE_CODEX_EXECUTABLE",
         "CODEX_BRIDGE_DEEPSEEK_HARNESS_ROOT", "DEEPSEEK_HARNESS_ROOT",
         "CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE", "DEEPSEEK_HARNESS_EXECUTABLE",
         "CODEX_BRIDGE_DEEPSEEK_HARNESS_CONFIGURATION", "DEEPSEEK_HARNESS_CONFIGURATION",

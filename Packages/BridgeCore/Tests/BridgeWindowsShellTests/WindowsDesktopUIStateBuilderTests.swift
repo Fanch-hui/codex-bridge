@@ -77,6 +77,42 @@
       XCTAssertFalse(state.connections?.codex?.canRefresh == true)
     }
 
+    func testConnectionsExposeConfiguredCodexExecutable() {
+      var connections = makeConnections(tunnel: nil)
+      connections.codexExecutablePath = "C:\\Tools\\codex\\codex.exe"
+      connections.codexResolvedExecutablePath = "C:\\Tools\\codex\\codex.exe"
+      let state = WindowsDesktopUIStateBuilder.build(
+        workbench: makeWorkbench(),
+        management: makeManagement(),
+        connections: connections,
+        settings: makeSettings()
+      )
+
+      XCTAssertEqual(state.connections?.codex?.executablePath, "C:\\Tools\\codex\\codex.exe")
+      XCTAssertEqual(
+        state.connections?.codex?.resolvedExecutablePath, "C:\\Tools\\codex\\codex.exe")
+      XCTAssertTrue(state.connections?.codex?.canEditExecutable == true)
+    }
+
+    func testConnectionsReflectCodexExecutableChangesInTheCacheKey() {
+      var connections = makeConnections(tunnel: nil)
+      let initial = WindowsDesktopConnectionsCacheKey(
+        workbench: makeWorkbench(),
+        management: makeManagement(),
+        connections: connections,
+        settings: makeSettings()
+      )
+      connections.codexExecutablePath = "C:\\Tools\\codex\\codex.exe"
+      let updated = WindowsDesktopConnectionsCacheKey(
+        workbench: makeWorkbench(),
+        management: makeManagement(),
+        connections: connections,
+        settings: makeSettings()
+      )
+
+      XCTAssertNotEqual(initial, updated)
+    }
+
     func testLegacyRowsDoNotCreateSyntheticRecentTaskIdentifiers() {
       let workbench = makeWorkbench(recentTaskRows: ["本机任务 — 已结束"])
       let state = WindowsDesktopUIStateBuilder.build(

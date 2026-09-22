@@ -74,6 +74,100 @@
       XCTAssertEqual(resolved?.path, explicit.path)
     }
 
+    func testConfiguredPathMustBeAnExecutableFile() throws {
+      let root = try makeTemporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let executable = root.appendingPathComponent("bin/codex")
+      try makeExecutable(at: executable)
+      let plain = root.appendingPathComponent("bin/notes.txt")
+      try Data("codex".utf8).write(to: plain)
+
+      XCTAssertEqual(
+        CodexMacExecutableResolver.resolve(configuredPath: executable.path)?.path,
+        executable.path
+      )
+      XCTAssertNil(
+        CodexMacExecutableResolver.resolve(
+          configuredPath: root.appendingPathComponent("bin").path
+        )
+      )
+      XCTAssertNil(CodexMacExecutableResolver.resolve(configuredPath: plain.path))
+      XCTAssertNil(CodexMacExecutableResolver.resolve(configuredPath: "codex"))
+      XCTAssertNil(CodexMacExecutableResolver.resolve(configuredPath: ""))
+    }
+
+    func testConfiguredPathOverridesAutomaticDiscovery() throws {
+      let root = try makeTemporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let executable = root.appendingPathComponent("custom/codex")
+      try makeExecutable(at: executable)
+
+      let configuration = AppServerConfiguration.codex(configuredPath: executable.path)
+      XCTAssertEqual(configuration.executableURL.path, executable.path)
+      XCTAssertEqual(configuration.arguments, ["app-server", "--stdio"])
+      XCTAssertNil(configuration.launchFailureReason)
+    }
+
+    func testUnavailableConfiguredPathBlocksTheLaunch() {
+      let configuration = AppServerConfiguration.codex(
+        configuredPath: "/missing/codex-\(UUID().uuidString)"
+      )
+      XCTAssertNotNil(configuration.launchFailureReason)
+      XCTAssertNotEqual(configuration.executableURL.path, "/usr/bin/env")
+    }
+
+    func testLocatorAppliesAndClearsConfiguredPath() throws {
+      let root = try makeTemporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let executable = root.appendingPathComponent("custom/codex")
+      try makeExecutable(at: executable)
+      let automatic = AppServerConfiguration(
+        executableURL: URL(fileURLWithPath: "/bin/false"),
+        arguments: []
+      )
+      let locator = CodexAppServerLocator(configuration: automatic)
+      XCTAssertEqual(locator.current(), automatic)
+
+      locator.update(configuredPath: "   ")
+      XCTAssertEqual(locator.current(), automatic)
+
+      locator.update(configuredPath: executable.path)
+      XCTAssertEqual(locator.current().executableURL.path, executable.path)
+      XCTAssertEqual(locator.current().arguments, ["app-server", "--stdio"])
+
+      locator.update(configuredPath: nil)
+      XCTAssertEqual(locator.current(), automatic)
+    }
+
+    func testLocatorBlocksAnUnavailableConfiguredPath() {
+      let automatic = AppServerConfiguration(
+        executableURL: URL(fileURLWithPath: "/bin/false"),
+        arguments: []
+      )
+      let locator = CodexAppServerLocator(configuration: automatic)
+      locator.update(configuredPath: "/missing/codex-\(UUID().uuidString)")
+      XCTAssertNotNil(locator.current().launchFailureReason)
+    }
+
+    func testLocatorReResolvesAutomaticDiscoveryOnEverySpawn() {
+      let counter = LockedCounter()
+      let locator = CodexAppServerLocator(resolve: {
+        AppServerConfiguration(
+          executableURL: URL(fileURLWithPath: "/bin/echo"),
+          arguments: ["spawn-\(counter.next())"]
+        )
+      })
+
+      XCTAssertEqual(locator.current().arguments, ["spawn-0"])
+      XCTAssertEqual(locator.current().arguments, ["spawn-1"])
+
+      locator.update(configuredPath: "/missing/codex-\(UUID().uuidString)")
+      XCTAssertNotNil(locator.current().launchFailureReason)
+
+      locator.update(configuredPath: nil)
+      XCTAssertEqual(locator.current().arguments, ["spawn-2"])
+    }
+
     private func makeTemporaryRoot() throws -> URL {
       let root = FileManager.default.temporaryDirectory.appending(
         path: "bridge-codex-mac-resolver-\(UUID().uuidString)",
@@ -93,6 +187,19 @@
         [.posixPermissions: NSNumber(value: 0o700)],
         ofItemAtPath: url.path
       )
+    }
+  }
+
+  private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func next() -> Int {
+      lock.lock()
+      defer { lock.unlock() }
+      let current = value
+      value += 1
+      return current
     }
   }
 #endif

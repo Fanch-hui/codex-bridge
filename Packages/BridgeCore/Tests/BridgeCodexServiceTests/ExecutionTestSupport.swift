@@ -96,9 +96,11 @@ func makeExecutionManager(
 ) -> ExecutionManager {
   ExecutionManager(
     configuration: ExecutionManagerConfiguration(
-      appServer: AppServerConfiguration(
-        executableURL: URL(fileURLWithPath: "/bin/sh"),
-        arguments: ["-c", script]
+      appServer: CodexAppServerLocator(
+        configuration: AppServerConfiguration(
+          executableURL: URL(fileURLWithPath: "/bin/sh"),
+          arguments: ["-c", script]
+        )
       ),
       clientInfo: .bridge(version: "execution-tests"),
       requestTimeoutNanoseconds: 3_000_000_000,

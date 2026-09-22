@@ -5,6 +5,8 @@ public struct ServiceRuntimeStatusSnapshot: Equatable, Sendable {
   public let tunnelState: String
   public let codexVersion: String?
   public let loginMode: String?
+  public let codexExecutablePath: String?
+  public let codexResolvedExecutablePath: String?
   public let degradations: [String]
 
   public init(
@@ -12,12 +14,16 @@ public struct ServiceRuntimeStatusSnapshot: Equatable, Sendable {
     tunnelState: String = "stopped",
     codexVersion: String? = nil,
     loginMode: String? = nil,
+    codexExecutablePath: String? = nil,
+    codexResolvedExecutablePath: String? = nil,
     degradations: [String] = []
   ) {
     self.mcpState = mcpState
     self.tunnelState = tunnelState
     self.codexVersion = codexVersion
     self.loginMode = loginMode
+    self.codexExecutablePath = codexExecutablePath
+    self.codexResolvedExecutablePath = codexResolvedExecutablePath
     self.degradations = degradations
   }
 }
@@ -55,6 +61,18 @@ public actor ServiceRuntimeStatus {
     )
   }
 
+  public func updateCodexExecutable(configuredPath: String?, resolvedPath: String?) {
+    snapshot = ServiceRuntimeStatusSnapshot(
+      mcpState: snapshot.mcpState,
+      tunnelState: snapshot.tunnelState,
+      codexVersion: snapshot.codexVersion,
+      loginMode: snapshot.loginMode,
+      codexExecutablePath: configuredPath,
+      codexResolvedExecutablePath: resolvedPath,
+      degradations: snapshot.degradations
+    )
+  }
+
   private func replacing(
     mcpState: String,
     tunnelState: String,
@@ -72,6 +90,8 @@ public actor ServiceRuntimeStatus {
       tunnelState: tunnelState,
       codexVersion: snapshot.codexVersion,
       loginMode: snapshot.loginMode,
+      codexExecutablePath: snapshot.codexExecutablePath,
+      codexResolvedExecutablePath: snapshot.codexResolvedExecutablePath,
       degradations: degradations
     )
   }

@@ -145,6 +145,8 @@ public struct BridgeStatusSnapshot: Codable, Equatable, Sendable {
   public let tunnelState: String
   public let codexVersion: String?
   public let loginMode: String?
+  public let codexExecutablePath: String?
+  public let codexResolvedExecutablePath: String?
   public let executionState: String
   public let supervisorState: String
   public let degradations: [String]
@@ -157,6 +159,8 @@ public struct BridgeStatusSnapshot: Codable, Equatable, Sendable {
     tunnelState: String,
     codexVersion: String? = nil,
     loginMode: String? = nil,
+    codexExecutablePath: String? = nil,
+    codexResolvedExecutablePath: String? = nil,
     executionState: String,
     supervisorState: String,
     degradations: [String] = [],
@@ -168,6 +172,8 @@ public struct BridgeStatusSnapshot: Codable, Equatable, Sendable {
     self.tunnelState = tunnelState
     self.codexVersion = codexVersion
     self.loginMode = loginMode
+    self.codexExecutablePath = codexExecutablePath
+    self.codexResolvedExecutablePath = codexResolvedExecutablePath
     self.executionState = executionState
     self.supervisorState = supervisorState
     self.degradations = degradations
@@ -181,6 +187,8 @@ public struct BridgeStatusSnapshot: Codable, Equatable, Sendable {
     case tunnelState = "tunnel_state"
     case codexVersion = "codex_version"
     case loginMode = "login_mode"
+    case codexExecutablePath = "codex_executable_path"
+    case codexResolvedExecutablePath = "codex_resolved_executable_path"
     case executionState = "execution_state"
     case supervisorState = "supervisor_state"
     case degradations

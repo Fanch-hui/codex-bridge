@@ -27,7 +27,7 @@ extension ServiceAgentAutoDiscovery {
   static func deepSeekReplacementRequest(
     existing: ServiceAgentInstallationRecord,
     dataPaths: ServiceDataPaths,
-    environment: [String: String] = ServiceAgentDiscoveryEnvironment.current()
+    environment: [String: String] = ToolDiscoveryEnvironment.current()
   ) throws -> ServiceAgentRegistrationRequest {
     guard
       let configuration = existing.artifacts.first(where: {

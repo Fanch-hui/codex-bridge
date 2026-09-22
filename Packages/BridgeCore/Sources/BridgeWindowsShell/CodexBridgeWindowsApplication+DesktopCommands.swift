@@ -22,6 +22,12 @@
       case .refreshModels:
         Task { @MainActor in await auxiliary.refreshModels(model: model) }
         return true
+      case .setCodexExecutablePath(let path):
+        Task { @MainActor in
+          await auxiliary.connections.setCodexExecutablePath(path)
+          await auxiliary.refreshModels(model: model)
+        }
+        return true
       case .loadEarlierConversation(let taskID):
         guard model.selectedTaskID == taskID,
           let conversation = model.conversation,

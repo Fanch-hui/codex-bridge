@@ -51,7 +51,10 @@ extension BridgeDesktopUIStateBuilder {
       isRefreshing: model.isRefreshing,
       canRefresh: !model.isRefreshing,
       isConnected: model.connectionState == .connected && !model.models.isEmpty
-        && model.modelCatalogError == nil
+        && model.modelCatalogError == nil,
+      executablePath: model.serviceStatus?.status.codexExecutablePath,
+      resolvedExecutablePath: model.serviceStatus?.status.codexResolvedExecutablePath,
+      canEditExecutable: model.connectionState == .connected
     )
   }
 

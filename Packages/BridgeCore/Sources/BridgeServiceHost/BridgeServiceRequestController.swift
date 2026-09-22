@@ -128,6 +128,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleGetCustomInstructions(request)
     case .setCustomInstructions:
       return try await handleSetCustomInstructions(request)
+    case .setCodexExecutablePath:
+      return try await handleSetCodexExecutablePath(request)
     case .listModels:
       return try await handleListModels(request)
     case .getModelCatalog:

@@ -85,7 +85,7 @@ extension BridgeServiceRequestController {
       providerIDs: [providerID], existingInstallations: existingInstallations
     )
     let discoveredPath = discovery[providerID]?.executablePath
-    let environment = ServiceAgentDiscoveryEnvironment.current()
+    let environment = ToolDiscoveryEnvironment.current()
     let candidates = try ServiceAgentAutoDiscovery.registrationRequests(
       providerID: providerID,
       dataPaths: composition.paths,

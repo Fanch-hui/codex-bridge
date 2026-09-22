@@ -280,6 +280,113 @@
       let configuration = AppServerConfiguration.codex()
       XCTAssertNotEqual(configuration.executableURL.path, "/usr/bin/env")
     }
+
+    func testEnvironmentDerivedPackageManagersAreSearched() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let pnpmNative = try fixture.makeNativeExecutable(
+        packageRoot: fixture.path("pnpm-home", "global", "6", "node_modules", "@openai", "codex"),
+        architecture: .current
+      )
+      let bunExecutable = try fixture.makeDirectExecutable(
+        directory: fixture.path("bun", "bin"), architecture: .current)
+      let cargoExecutable = try fixture.makeDirectExecutable(
+        directory: fixture.path("cargo", "bin"), architecture: .current)
+      let voltaExecutable = try fixture.makeDirectExecutable(
+        directory: fixture.path("volta", "bin"), architecture: .current)
+
+      let baseEnvironment = fixture.environment(path: fixture.path("empty-path"))
+      XCTAssertEqual(
+        try resolve(
+          environment: baseEnvironment.merging(["PNPM_HOME": fixture.path("pnpm-home")]) { $1 }
+        ),
+        try XCTUnwrap(CodexWindowsPath.normalize(pnpmNative))
+      )
+      XCTAssertEqual(
+        try resolve(
+          environment: baseEnvironment.merging(["BUN_INSTALL": fixture.path("bun")]) { $1 }
+        ),
+        try XCTUnwrap(CodexWindowsPath.normalize(bunExecutable))
+      )
+      XCTAssertEqual(
+        try resolve(
+          environment: baseEnvironment.merging(["CARGO_HOME": fixture.path("cargo")]) { $1 }
+        ),
+        try XCTUnwrap(CodexWindowsPath.normalize(cargoExecutable))
+      )
+      XCTAssertEqual(
+        try resolve(
+          environment: baseEnvironment.merging(["VOLTA_HOME": fixture.path("volta")]) { $1 }
+        ),
+        try XCTUnwrap(CodexWindowsPath.normalize(voltaExecutable))
+      )
+    }
+
+    func testProgramDataScoopAndVoltaDefaultsAreSearched() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let scooped = try fixture.makeDirectExecutable(
+        directory: fixture.path("ProgramData", "scoop", "shims"),
+        architecture: .current
+      )
+      let environment = fixture.environment(path: fixture.path("empty-path"))
+        .merging(["ProgramData": fixture.path("ProgramData")]) { $1 }
+      XCTAssertEqual(
+        try resolve(environment: environment),
+        try XCTUnwrap(CodexWindowsPath.normalize(scooped))
+      )
+
+      // The Volta default is listed before the ProgramData scoop entries, so it
+      // is created only after the scoop assertion above.
+      let voltad = try fixture.makeDirectExecutable(
+        directory: fixture.path("AppData", "Local", "Volta", "bin"),
+        architecture: .current
+      )
+      XCTAssertEqual(
+        try resolve(environment: environment),
+        try XCTUnwrap(CodexWindowsPath.normalize(voltad))
+      )
+    }
+
+    func testConfiguredPathMustBeANativeBinaryOrCommandShim() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let native = try fixture.makeDirectExecutable(
+        directory: fixture.path("custom"), architecture: .current)
+      let script = fixture.path("custom", "codex.js")
+      try fixture.write("codex", to: script)
+      let shim = fixture.path("shims", "codex.cmd")
+      try fixture.write("@echo off\r\n", to: shim)
+
+      XCTAssertEqual(
+        try XCTUnwrap(CodexWindowsPath.normalize(native)),
+        try XCTUnwrap(
+          AppServerConfiguration.resolveConfiguredCodexExecutable(native).flatMap(
+            CodexWindowsPath.normalize))
+      )
+      XCTAssertEqual(
+        try XCTUnwrap(CodexWindowsPath.normalize(shim)),
+        try XCTUnwrap(
+          AppServerConfiguration.resolveConfiguredCodexExecutable(shim).flatMap(
+            CodexWindowsPath.normalize))
+      )
+      XCTAssertNil(AppServerConfiguration.resolveConfiguredCodexExecutable(script))
+      XCTAssertNil(AppServerConfiguration.resolveConfiguredCodexExecutable("codex"))
+      XCTAssertNil(AppServerConfiguration.resolveConfiguredCodexExecutable("   "))
+    }
+
+    private func resolve(environment: [String: String]) throws -> String {
+      let resolver = CodexExecutableResolver(
+        packagedInstallations: { [] },
+        environment: environment,
+        architecture: .current
+      )
+      let resolved = try XCTUnwrap(resolver.resolve())
+      return try XCTUnwrap(CodexWindowsPath.normalize(resolved))
+    }
   }
 
   private final class Fixture {

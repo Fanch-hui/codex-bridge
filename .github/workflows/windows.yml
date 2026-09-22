@@ -211,19 +211,26 @@ jobs:
             -Architecture "${{ matrix.architecture }}" `
             -Destination $tunnelClientDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Add-Content $env:GITHUB_ENV "TUNNEL_CLIENT_DIR=$tunnelClientDir"
       - name: Stage Windows portable package
         if: matrix.publish
         shell: pwsh
         run: |
           $targetTriple = "${{ matrix.target_triple }}"
           $portableDir = Join-Path $env:GITHUB_WORKSPACE ".build\windows-dist\${{ matrix.architecture }}"
+          # The helper directory is derived here instead of being forwarded
+          # through GITHUB_ENV, so a package can never be staged without it.
+          $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
+          foreach ($required in @("tunnel-client.exe", "tunnel-client.sha256")) {
+            if (-not (Test-Path -LiteralPath (Join-Path $tunnelClientDir $required) -PathType Leaf)) {
+              throw "Staged Tunnel helper is incomplete: $tunnelClientDir\$required"
+            }
+          }
           $stageArguments = @{
             BinPath = $env:SWIFT_BIN_PATH
             OutDir = $portableDir
             Architecture = "${{ matrix.architecture }}"
             VcpkgTriplet = "${{ matrix.triplet }}"
-            TunnelClientDir = $env:TUNNEL_CLIENT_DIR
+            TunnelClientDir = $tunnelClientDir
           }
           if ($targetTriple) {
             $stageArguments["TargetTriple"] = $targetTriple

@@ -287,6 +287,7 @@ var windowsApplicationLinkerFlags = [
     .testTarget(
       name: "BridgeServiceApplicationWindowsTests",
       dependencies: [
+        "BridgeDirectCommand",
         "BridgeDomain",
         "BridgeIPC",
         "BridgeProjects",

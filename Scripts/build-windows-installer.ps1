@@ -116,10 +116,22 @@ foreach ($required in @(
     "swiftCore.dll",
     "sqlite3.dll",
     "WebView2Loader.dll",
+    "tunnel-client.exe",
+    "tunnel-client.sha256",
     "AppIcon.ico",
     "LICENSE.txt",
     "NOTICE.txt")) {
   Assert-RegularFile (Join-Path $payloadFull $required) | Out-Null
+}
+
+$tunnelExecutable = Join-Path $payloadFull "tunnel-client.exe"
+$tunnelDigest = (Get-Content -LiteralPath (Join-Path $payloadFull "tunnel-client.sha256") -Raw).Trim()
+$expectedMachine = if ($Architecture -eq "x64") { [UInt16]0x8664 } else { [UInt16]0xAA64 }
+if ($tunnelDigest -cnotmatch "^[0-9a-f]{64}$" -or
+    (Get-Sha256 $tunnelExecutable) -cne $tunnelDigest -or
+    (Get-PEMachine $tunnelExecutable) -ne $expectedMachine -or
+    $buildInfo.tunnelClientSHA256 -cne $tunnelDigest) {
+  throw "Tunnel helper identity does not match the Windows payload."
 }
 
 $isccFull = Resolve-ISCC $ISCCPath

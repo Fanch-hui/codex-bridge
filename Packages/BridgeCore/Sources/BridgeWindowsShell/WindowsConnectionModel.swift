@@ -140,6 +140,17 @@
       }
     }
 
+    /// Applies a user-configured Codex executable; an empty path restores discovery.
+    func setCodexExecutablePath(_ path: String?) async {
+      let configured = (path?.isEmpty ?? true) ? nil : path
+      await mutate(
+        "正在更新 Codex 可执行文件…",
+        success: configured == nil ? "Codex 已恢复自动发现。" : "Codex 可执行文件已更新。"
+      ) {
+        self.serviceStatus = try await self.client.setCodexExecutablePath(configured)
+      }
+    }
+
     func saveDeepSeekHarnessMCPServer(
       _ request: IPCDeepSeekHarnessMCPServerInput
     ) async {
@@ -313,7 +324,9 @@
               canDelete: !busy
             )
           },
-          tunnel: projectedTunnel
+          tunnel: projectedTunnel,
+          codexExecutablePath: serviceStatus?.status.codexExecutablePath,
+          codexResolvedExecutablePath: serviceStatus?.status.codexResolvedExecutablePath
         )
       )
     }

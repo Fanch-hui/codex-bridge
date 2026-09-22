@@ -33,6 +33,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case executionFastMode = "execution.fast_mode"
   case workbenchProjectID = "workbench.project_id"
   case workbenchPermissionMode = "workbench.permission_mode"
+  case codexExecutablePath = "codex.executable_path"
   case openCodeDefaultModel = "agent.opencode.default_model"
   case openCodeDefaultPermissionMode = "agent.opencode.default_permission_mode"
   case openCodeDefaultEffort = "agent.opencode.default_effort"
@@ -288,6 +289,25 @@ public actor ServiceSettings {
       return nil
     }
     return value
+  }
+
+  /// User-configured Codex executable; nil means Bridge discovers it on its own.
+  public func codexExecutablePath() async throws -> String? {
+    try await string(for: .codexExecutablePath)
+  }
+
+  public func setCodexExecutablePath(_ path: String?) async throws {
+    guard let path else {
+      try await set(nil, for: .codexExecutablePath)
+      return
+    }
+    let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      try await set(nil, for: .codexExecutablePath)
+      return
+    }
+    try ServiceValidation.absolutePath(trimmed, field: "codex.executable_path")
+    try await set(trimmed, for: .codexExecutablePath)
   }
 
   public func isSupervisorEnabled() async throws -> Bool {

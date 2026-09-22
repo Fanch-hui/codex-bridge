@@ -210,6 +210,59 @@ test("connection rows expose parity labels and hide ChatGPT toggle", () => {
   assert.equal(ui.button("移除登记", agent).disabled, false);
 });
 
+test("codex page applies an executable path and restores automatic discovery", () => {
+  const ui = runtime();
+  const unavailable = {
+    connectionState: "ready",
+    modelCount: 0,
+    modelError: "Codex 执行引擎不可用",
+    executablePath: null,
+    resolvedExecutablePath: null,
+    canEditExecutable: true,
+    canRefresh: true,
+    isRefreshing: false
+  };
+  ui.render(page({ codex: unavailable }));
+  const path = ui.input("留空自动发现；也可填写 codex.exe 或 npm 的 codex.cmd 绝对路径");
+  assert.equal(path.disabled, false);
+  assert.equal(ui.button("保存路径").disabled, false);
+  assert.equal(ui.button("恢复自动发现").disabled, true);
+  assert.ok(
+    ui.find(ui.root, node =>
+      node.textContent === "若 Codex 装在非常规位置，请在路径输入框填写 codex.exe 或 codex.cmd 的绝对路径后重试。"));
+
+  type(path, "C:\\Tools\\codex.exe");
+  ui.button("保存路径").dispatch("click");
+  assert.deepEqual(ui.commands.at(-1), {
+    command: "setCodexExecutable",
+    payload: { path: "C:\\Tools\\codex.exe" }
+  });
+
+  ui.render(page({
+    codex: {
+      ...unavailable,
+      modelCount: 4,
+      modelError: null,
+      executablePath: "C:\\Tools\\codex.exe",
+      resolvedExecutablePath: "C:\\Tools\\codex.exe"
+    }
+  }));
+  assert.equal(path.value, "C:\\Tools\\codex.exe");
+  const usage = ui.findAll(ui.root, node => node.className.split(" ").includes("detail-item"))
+    .find(item => item.querySelector("dt").textContent === "当前使用");
+  assert.equal(usage.querySelector("dd").textContent, "C:\\Tools\\codex.exe");
+  ui.button("恢复自动发现").dispatch("click");
+  assert.deepEqual(ui.commands.at(-1), { command: "setCodexExecutable", payload: { path: "" } });
+
+  ui.render(page({ codex: { ...unavailable, executablePath: "C:\\Tools\\codex.exe" } }));
+  assert.ok(
+    ui.find(ui.root, node => node.textContent === "指定的路径当前不可用，请重新选择或恢复自动发现。"));
+
+  ui.render(page({ codex: { ...unavailable, canEditExecutable: false } }));
+  assert.equal(path.disabled, true);
+  assert.equal(ui.button("保存路径").disabled, true);
+});
+
 test("DeepSeek MCP stays inside the DSH connection details across refreshes", () => {
   const ui = runtime();
   const provider = {

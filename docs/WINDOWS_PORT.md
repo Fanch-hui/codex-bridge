@@ -119,9 +119,15 @@ GitHub Actions（`.github/workflows/windows.yml`）在 windows-latest 上构建 
 保留验证。CI 产出的 EXE 当前未做 Authenticode 签名，发布签名是
 独立交付步骤。
 
-Windows 可通过 `CODEX_BRIDGE_CODEX_EXECUTABLE` 指定 `codex.exe` 或标准 npm
-`codex.cmd`；后者不会直接作为子进程启动，而是解析并验证其架构对应的原生
-`codex.exe`。未显式配置时依次检查常见用户安装位置与 `PATH`。
+Windows 的 Codex 可执行文件默认自动发现，依次检查商店包、官方安装位置、
+npm/pnpm/yarn/bun/Cargo/Volta/scoop/WinGet 等包管理器位置与 `PATH`。发现使用注册表
+刷新的当前用户/机器 `PATH` 与包管理器前缀，因此安装 Codex 之后无需重启 App；
+`CODEX_BRIDGE_CODEX_EXECUTABLE` 仍可作为临时覆盖。用户也可以在内置页面
+“连接 → Codex 执行引擎”填写 `codex.exe` 或标准 npm `codex.cmd` 的绝对路径：保存时校验
+架构与可执行性并写入 `codex.executable_path`，下一次启动 app-server（连接/刷新模型/新任务）
+即生效，无需重启服务；清除后恢复自动发现。指定路径不可用时 fail-closed 并给出可操作原因，
+不会静默回退到其他安装。`codex.cmd` 不会直接作为子进程启动，而是解析并验证其架构对应的原生
+`codex.exe`。
 
 macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 `Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore`。

@@ -202,39 +202,43 @@ try {
     }
   }
 
-  $portableDir = Join-Path $resolvedOutDir $architecture
-  $stageScript = Join-Path $repoRoot "Scripts\stage-windows-portable.ps1"
-  $stageArguments = @{
-    BinPath = $binPath
-    OutDir = $portableDir
-    Architecture = $architecture
-    VcpkgTriplet = $vcpkgTriplet
-  }
-  if ($targetTriple) {
-    $stageArguments["TargetTriple"] = $targetTriple
-  }
-  if ($resolvedVcpkgRoot) {
-    $stageArguments["VcpkgRoot"] = $resolvedVcpkgRoot
-  }
-  if ($resolvedVCRedistRoot) {
-    $stageArguments["VCRedistRoot"] = $resolvedVCRedistRoot
-  }
-  if (-not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
-    $resolvedTunnelClientDir = if ([IO.Path]::IsPathRooted($TunnelClientDir)) {
-      [IO.Path]::GetFullPath($TunnelClientDir)
-    } else {
-      [IO.Path]::GetFullPath((Join-Path $repoRoot $TunnelClientDir))
+  # Test-only runs stop here: packaging needs the Tunnel helper, which may have
+  # to be downloaded, and tests do not consume the portable package.
+  if (-not $Test -or $Installer -or -not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
+    $portableDir = Join-Path $resolvedOutDir $architecture
+    $stageScript = Join-Path $repoRoot "Scripts\stage-windows-portable.ps1"
+    $stageArguments = @{
+      BinPath = $binPath
+      OutDir = $portableDir
+      Architecture = $architecture
+      VcpkgTriplet = $vcpkgTriplet
     }
-    $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
-  } elseif ($Installer) {
-    $resolvedTunnelClientDir = Join-Path $resolvedOutDir "tunnel-client"
-    & (Join-Path $repoRoot "Scripts\stage-windows-tunnel-client.ps1") `
-      -Architecture $architecture -Destination $resolvedTunnelClientDir
+    if ($targetTriple) {
+      $stageArguments["TargetTriple"] = $targetTriple
+    }
+    if ($resolvedVcpkgRoot) {
+      $stageArguments["VcpkgRoot"] = $resolvedVcpkgRoot
+    }
+    if ($resolvedVCRedistRoot) {
+      $stageArguments["VCRedistRoot"] = $resolvedVCRedistRoot
+    }
+    if (-not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
+      $resolvedTunnelClientDir = if ([IO.Path]::IsPathRooted($TunnelClientDir)) {
+        [IO.Path]::GetFullPath($TunnelClientDir)
+      } else {
+        [IO.Path]::GetFullPath((Join-Path $repoRoot $TunnelClientDir))
+      }
+      $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
+    } else {
+      $resolvedTunnelClientDir = Join-Path $resolvedOutDir "tunnel-client"
+      & (Join-Path $repoRoot "Scripts\stage-windows-tunnel-client.ps1") `
+        -Architecture $architecture -Destination $resolvedTunnelClientDir
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
+    }
+    & $stageScript @stageArguments
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
   }
-  & $stageScript @stageArguments
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   if ($Installer) {
     $installerOutDir = Join-Path $repoRoot ".build\windows-installer\$architecture"

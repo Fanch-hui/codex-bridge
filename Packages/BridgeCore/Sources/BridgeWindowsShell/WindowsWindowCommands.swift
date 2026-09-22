@@ -45,6 +45,7 @@
     case resolveApproval(decision: String)
     case selectMCPClient(index: Int)
     case refreshMCPConnections
+    case setCodexExecutablePath(String)
     case toggleSelectedMCPClient
     case setSelectedMCPExposure(index: Int)
     case copySelectedMCPConfiguration

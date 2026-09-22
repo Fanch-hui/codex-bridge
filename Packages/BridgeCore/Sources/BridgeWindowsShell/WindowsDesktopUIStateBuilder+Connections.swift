@@ -53,7 +53,7 @@
           && connections.endpointText.hasPrefix("http"),
         canRotateLocalMCPEndpoint: connections.rotateEndpointEnabled,
         tunnel: tunnel,
-        codex: codexState(workbench: workbench, settings: settings),
+        codex: codexState(workbench: workbench, settings: settings, connections: connections),
         clients: connections.clientItems,
         deepSeekHarnessMCPServers: connections.deepSeekHarnessMCPItems,
         canManageDeepSeekHarnessMCP: connections.connectionState == .connected,
@@ -69,7 +69,8 @@
 
     private static func codexState(
       workbench: WindowsWorkbenchDisplay,
-      settings: WindowsSettingsDisplay?
+      settings: WindowsSettingsDisplay?,
+      connections: WindowsConnectionDisplay
     ) -> BridgeDesktopCodexConnectionState {
       let service = statusLabel(workbench.connectionState)
       guard let settings, settings.connectionState != .idle || settings.busy else {
@@ -79,7 +80,10 @@
           modelError: workbench.modelError,
           canRefresh: workbench.connectionState == .connected,
           isConnected: workbench.connectionState == .connected && workbench.availableModelCount > 0
-            && workbench.modelError == nil
+            && workbench.modelError == nil,
+          executablePath: connections.codexExecutablePath,
+          resolvedExecutablePath: connections.codexResolvedExecutablePath,
+          canEditExecutable: connections.connectionState == .connected
         )
       }
       return BridgeDesktopCodexConnectionState(
@@ -89,7 +93,10 @@
         isRefreshing: settings.isRefreshingModels,
         canRefresh: !settings.busy && !settings.isRefreshingModels,
         isConnected: workbench.connectionState == .connected && !settings.modelOptions.isEmpty
-          && settings.modelError == nil
+          && settings.modelError == nil,
+        executablePath: connections.codexExecutablePath,
+        resolvedExecutablePath: connections.codexResolvedExecutablePath,
+        canEditExecutable: connections.connectionState == .connected
       )
     }
 

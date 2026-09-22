@@ -95,6 +95,8 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(headlessConsent.contains("Always Proceed"))
     let codexConnection = try BridgeDesktopUIResources.read(.pagesCodexConnectionJS)
     XCTAssertTrue(codexConnection.contains("refreshModels"))
+    XCTAssertTrue(codexConnection.contains("setCodexExecutable"))
+    XCTAssertTrue(codexConnection.contains("canEditExecutable"))
     XCTAssertFalse(codexConnection.contains("installationID"))
     let settingsScript = try BridgeDesktopUIResources.read(.pagesSettingsJS)
     XCTAssertTrue(settingsScript.contains("settings-stack"))
@@ -115,13 +117,30 @@ final class BridgeDesktopUITests: XCTestCase {
       modelCount: 3,
       modelError: nil,
       isRefreshing: false,
-      canRefresh: true
+      canRefresh: true,
+      executablePath: "C:\\Tools\\codex\\codex.exe",
+      resolvedExecutablePath: "C:\\Tools\\codex\\codex.exe",
+      canEditExecutable: true
     )
     let decoded = try JSONDecoder().decode(
       BridgeDesktopCodexConnectionState.self,
       from: JSONEncoder().encode(state)
     )
     XCTAssertEqual(decoded, state)
+  }
+
+  func testCodexExecutableCommandCarriesTheConfiguredPath() throws {
+    let envelope = BridgeDesktopCommandEnvelope(
+      requestID: "req-codex-executable",
+      command: .setCodexExecutable,
+      payload: BridgeDesktopCommandPayload(path: "/opt/codex/bin/codex")
+    )
+    let decoded = try JSONDecoder().decode(
+      BridgeDesktopCommandEnvelope.self,
+      from: JSONEncoder().encode(envelope)
+    )
+    XCTAssertEqual(decoded.command, .setCodexExecutable)
+    XCTAssertEqual(decoded.payload.path, "/opt/codex/bin/codex")
   }
 
   func testStateRoundTripsThroughJSON() throws {

@@ -32,6 +32,8 @@ public actor ServiceComposition {
   public let legacyImportReport: LegacyImportReport?
 
   private let configuration: ServiceCompositionConfiguration
+  private let executionAppServer: CodexAppServerLocator
+  private let catalogAppServer: CodexAppServerLocator
   private var mcpServer: MCPBridgeServer?
   private var mcpEndpoint: MCPBridgeEndpoint?
   private var startupAgentRefreshTask: Task<Void, Never>?
@@ -107,7 +109,7 @@ public actor ServiceComposition {
         try ServiceAgentAutoDiscovery.updatedInstallationRequest(
           for: existing,
           dataPaths: paths,
-          environment: ServiceAgentDiscoveryEnvironment.current()
+          environment: ToolDiscoveryEnvironment.current()
         )
       }
     )
@@ -120,9 +122,14 @@ public actor ServiceComposition {
         uniqueKeysWithValues: agentProviders.map { ($0.descriptor.providerID, $0) }
       )
     )
+    let codexExecutablePath = try await settings.codexExecutablePath()
+    let executionAppServer = Self.makeAppServerLocator(configuration.executionAppServer)
+    executionAppServer.update(configuredPath: codexExecutablePath)
+    let catalogAppServer = Self.makeAppServerLocator(configuration.catalogAppServer)
+    catalogAppServer.update(configuredPath: codexExecutablePath)
     let execution = ExecutionManager(
       configuration: ExecutionManagerConfiguration(
-        appServer: configuration.executionAppServer,
+        appServer: executionAppServer,
         clientInfo: configuration.clientInfo,
         synchronizeCodexProjects: configuration.synchronizeCodexProjects
       )
@@ -138,7 +145,7 @@ public actor ServiceComposition {
     )
     let catalog = ServiceCodexCatalog(
       configuration: ServiceCodexCatalogConfiguration(
-        appServer: configuration.catalogAppServer,
+        appServer: catalogAppServer,
         clientInfo: configuration.clientInfo
       )
     )
@@ -146,6 +153,10 @@ public actor ServiceComposition {
       initial: ServiceRuntimeStatusSnapshot(
         mcpState: "stopped",
         tunnelState: "stopped",
+        codexExecutablePath: codexExecutablePath,
+        codexResolvedExecutablePath: Self.resolvedCodexExecutablePath(
+          configuredPath: codexExecutablePath
+        ),
         degradations: legacyImport.degradations
       )
     )
@@ -188,6 +199,8 @@ public actor ServiceComposition {
     )
     return ServiceComposition(
       configuration: configuration,
+      executionAppServer: executionAppServer,
+      catalogAppServer: catalogAppServer,
       paths: paths,
       store: store,
       projects: projects,
@@ -236,6 +249,8 @@ public actor ServiceComposition {
 
   private init(
     configuration: ServiceCompositionConfiguration,
+    executionAppServer: CodexAppServerLocator,
+    catalogAppServer: CodexAppServerLocator,
     paths: ServiceDataPaths,
     store: SimpleServiceStore,
     projects: ServiceProjectService,
@@ -254,6 +269,8 @@ public actor ServiceComposition {
     legacyImportReport: LegacyImportReport?
   ) {
     self.configuration = configuration
+    self.executionAppServer = executionAppServer
+    self.catalogAppServer = catalogAppServer
     self.paths = paths
     self.store = store
     self.projects = projects
@@ -476,6 +493,42 @@ public actor ServiceComposition {
 
   public func tunnelStatus() async -> ServiceTunnelSnapshot {
     await tunnel.status()
+  }
+
+  /// Applies a user-configured Codex executable. The path is validated before it
+  /// is persisted, and both app-server consumers resolve it on their next spawn.
+  @discardableResult
+  public func setCodexExecutablePath(_ path: String?) async throws
+    -> ServiceRuntimeStatusSnapshot
+  {
+    let trimmed = path?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let configured = (trimmed?.isEmpty ?? true) ? nil : trimmed
+    if let configured, AppServerConfiguration.resolveConfiguredCodexExecutable(configured) == nil {
+      throw ServiceCodexExecutableError.unavailable
+    }
+    try await settings.setCodexExecutablePath(configured)
+    executionAppServer.update(configuredPath: configured)
+    catalogAppServer.update(configuredPath: configured)
+    await catalog.invalidateModelCache()
+    await runtimeStatus.updateCodexExecutable(
+      configuredPath: configured,
+      resolvedPath: Self.resolvedCodexExecutablePath(configuredPath: configured)
+    )
+    return await runtimeStatus.current()
+  }
+
+  private static func makeAppServerLocator(
+    _ pinned: AppServerConfiguration?
+  ) -> CodexAppServerLocator {
+    guard let pinned else { return CodexAppServerLocator() }
+    return CodexAppServerLocator(configuration: pinned)
+  }
+
+  private static func resolvedCodexExecutablePath(configuredPath: String?) -> String? {
+    if let configuredPath {
+      return AppServerConfiguration.resolveConfiguredCodexExecutable(configuredPath)
+    }
+    return AppServerConfiguration.defaultCodexExecutableURL()?.path
   }
 
   public func endpoint() -> MCPBridgeEndpoint? {

@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeAgentCore
   import Foundation
 
   enum CodexWindowsArchitecture: Sendable {
@@ -50,7 +51,7 @@
     init(
       packagedInstallations: @escaping @Sendable () -> [String] =
         CodexWindowsPackageDiscovery.installationDirectories,
-      environment: [String: String] = ProcessInfo.processInfo.environment,
+      environment: [String: String] = ToolDiscoveryEnvironment.current(),
       architecture: CodexWindowsArchitecture = .current,
       validator: @escaping Validator = CodexWindowsNativeExecutable.isValid,
       regularFileCheck: @escaping RegularFileCheck = CodexWindowsNativeExecutable.isRegularFile
@@ -95,6 +96,7 @@
       let programFiles = CodexWindowsPath.environmentValue("ProgramFiles", in: environment)
       let programFilesX86 = CodexWindowsPath.environmentValue("ProgramFiles(x86)", in: environment)
       let programW6432 = CodexWindowsPath.environmentValue("ProgramW6432", in: environment)
+      let programData = CodexWindowsPath.environmentValue("ProgramData", in: environment)
       var result: [String] = []
 
       if let configured = CodexWindowsPath.environmentValue(
@@ -111,6 +113,7 @@
         programFiles: programFiles,
         programFilesX86: programFilesX86,
         programW6432: programW6432,
+        programData: programData,
         userProfile: userProfile,
         to: &result
       )
@@ -132,6 +135,7 @@
       programFiles: String?,
       programFilesX86: String?,
       programW6432: String?,
+      programData: String?,
       userProfile: String?,
       to result: inout [String]
     ) {
@@ -141,6 +145,9 @@
           CodexWindowsPath.join(localAppData, "Programs", "Codex", "bin", "codex.exe"),
           CodexWindowsPath.join(localAppData, "Programs", "Codex", "resources", "codex.exe"),
           CodexWindowsPath.join(localAppData, "Programs", "ChatGPT", "resources", "codex.exe"),
+          CodexWindowsPath.join(
+            localAppData, "Programs", "OpenAI", "ChatGPT", "resources", "codex.exe"),
+          CodexWindowsPath.join(localAppData, "Volta", "bin", "codex.exe"),
         ])
       }
       if let userProfile {
@@ -180,6 +187,12 @@
           CodexWindowsPath.join(localAppData, "Microsoft", "WinGet", "Links", "codex.exe")
         )
       }
+      if let programData {
+        result.append(contentsOf: [
+          CodexWindowsPath.join(programData, "scoop", "shims", "codex.exe"),
+          CodexWindowsPath.join(programData, "scoop", "apps", "codex", "current", "codex.exe"),
+        ])
+      }
       result.append("C:\\ProgramData\\chocolatey\\bin\\codex.exe")
       for root in [programW6432, programFiles, programFilesX86].compactMap({ $0 }) {
         result.append(contentsOf: [
@@ -204,19 +217,20 @@
         roots.append(CodexWindowsPath.join(appData, "npm", "node_modules", "@openai", "codex"))
       }
       if let localAppData {
-        result.append(CodexWindowsPath.join(localAppData, "pnpm", "codex.exe"))
-        for version in 5...10 {
-          roots.append(
-            CodexWindowsPath.join(
-              localAppData,
-              "pnpm",
-              "global",
-              String(version),
-              "node_modules",
-              "@openai",
-              "codex"
-            ))
-        }
+        let pnpmHome = CodexWindowsPath.join(localAppData, "pnpm")
+        result.append(CodexWindowsPath.join(pnpmHome, "codex.exe"))
+        result.append(CodexWindowsPath.join(localAppData, "Yarn", "bin", "codex.exe"))
+        roots.append(contentsOf: pnpmPackageRoots(home: pnpmHome))
+        roots.append(
+          CodexWindowsPath.join(
+            localAppData,
+            "Yarn",
+            "Data",
+            "global",
+            "node_modules",
+            "@openai",
+            "codex"
+          ))
       }
       if let userProfile {
         result.append(
@@ -237,15 +251,53 @@
             "codex"
           ))
       }
+      // Package managers can relocate their global prefixes through the
+      // environment, so the reflected values must be searched as well.
+      if let prefix = CodexWindowsPath.environmentValue("NPM_CONFIG_PREFIX", in: environment) {
+        result.append(CodexWindowsPath.join(prefix, "codex.exe"))
+        roots.append(CodexWindowsPath.join(prefix, "node_modules", "@openai", "codex"))
+      }
+      if let pnpmHome = CodexWindowsPath.environmentValue("PNPM_HOME", in: environment) {
+        result.append(CodexWindowsPath.join(pnpmHome, "codex.exe"))
+        roots.append(contentsOf: pnpmPackageRoots(home: pnpmHome))
+      }
+      if let bunRoot = CodexWindowsPath.environmentValue("BUN_INSTALL", in: environment) {
+        result.append(CodexWindowsPath.join(bunRoot, "bin", "codex.exe"))
+        roots.append(
+          CodexWindowsPath.join(
+            bunRoot, "install", "global", "node_modules", "@openai", "codex"))
+      }
+      if let cargoHome = CodexWindowsPath.environmentValue("CARGO_HOME", in: environment) {
+        result.append(CodexWindowsPath.join(cargoHome, "bin", "codex.exe"))
+      }
+      if let voltaHome = CodexWindowsPath.environmentValue("VOLTA_HOME", in: environment) {
+        result.append(CodexWindowsPath.join(voltaHome, "bin", "codex.exe"))
+      }
       result.append(contentsOf: roots.flatMap { nativeCodexPaths(packageRoot: $0) })
       return result
+    }
+
+    /// pnpm keeps global packages beside its shim directory instead of inside it.
+    private func pnpmPackageRoots(home: String) -> [String] {
+      (5...10).map { version in
+        CodexWindowsPath.join(
+          home,
+          "global",
+          String(version),
+          "node_modules",
+          "@openai",
+          "codex"
+        )
+      }
     }
 
     private func pathExecutables(path: String) -> [String] {
       CodexWindowsPath.splitSearchPath(path).flatMap { directory in
         var result = [CodexWindowsPath.join(directory, "codex.exe")]
-        let shim = CodexWindowsPath.join(directory, "codex.cmd")
-        guard regularFileCheck(shim) else { return result }
+        let hasCommandShim = ["codex.cmd", "codex.bat"]
+          .map { CodexWindowsPath.join(directory, $0) }
+          .contains(where: regularFileCheck)
+        guard hasCommandShim else { return result }
         let packageRoot = CodexWindowsPath.join(directory, "node_modules", "@openai", "codex")
         result.append(contentsOf: nativeCodexPaths(packageRoot: packageRoot))
         if let parent = CodexWindowsPath.parent(directory) {

@@ -39,7 +39,7 @@
         options: .atomic
       )
 
-      var sourceEnvironment = ServiceAgentDiscoveryEnvironment.current()
+      var sourceEnvironment = ToolDiscoveryEnvironment.current()
       sourceEnvironment["CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE"] = executablePath
       let artifacts: [AgentInstallationArtifactRole: String]
       do {

@@ -32,6 +32,10 @@ enum BridgeDesktopCommandRouter {
       model.refresh()
     case .refreshModels:
       model.refreshModels()
+    case .setCodexExecutable:
+      guard let path = envelope.payload.path, path.utf8.count <= 16 * 1_024, !path.contains("\0")
+      else { return }
+      model.setCodexExecutablePath(path.trimmingCharacters(in: .whitespacesAndNewlines))
     case .scanAgents:
       model.scanAgents()
     case .selectPage:
