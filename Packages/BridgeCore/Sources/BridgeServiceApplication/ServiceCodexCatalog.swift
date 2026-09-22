@@ -5,14 +5,14 @@ import BridgeSecurity
 import Foundation
 
 public struct ServiceCodexCatalogConfiguration: Sendable {
-  public let appServer: AppServerConfiguration
+  public let appServer: CodexAppServerLocator
   public let clientInfo: CodexClientInfo
   public let requestTimeoutNanoseconds: UInt64
   public let eventBufferLimit: Int
   public let modelsCacheTTL: Duration
 
   public init(
-    appServer: AppServerConfiguration = .codex(),
+    appServer: CodexAppServerLocator = CodexAppServerLocator(),
     clientInfo: CodexClientInfo,
     requestTimeoutNanoseconds: UInt64 = 20_000_000_000,
     eventBufferLimit: Int = 64,
@@ -213,6 +213,12 @@ public actor ServiceCodexCatalog {
     return try await listModels(deadline: deadline)
   }
 
+  /// Drops cached models without fetching, so the next request uses a re-resolved
+  /// app-server configuration.
+  public func invalidateModelCache() {
+    modelCache = nil
+  }
+
   private func makeModelsFetchTask() -> Task<MCPModelList, any Error> {
     let configuration = self.configuration
     let fetchDeadline =
@@ -266,7 +272,7 @@ public actor ServiceCodexCatalog {
   ) async throws -> Output {
     try checkDeadline(deadline)
     let client = CodexAppServerClient(
-      configuration: configuration.appServer,
+      configuration: configuration.appServer.current(),
       defaultTimeoutNanoseconds: configuration.requestTimeoutNanoseconds,
       eventBufferLimit: configuration.eventBufferLimit
     )

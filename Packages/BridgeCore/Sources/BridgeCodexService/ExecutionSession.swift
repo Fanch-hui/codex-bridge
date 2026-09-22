@@ -64,7 +64,7 @@ package actor ExecutionSession {
     self.approvalLimits = approvalLimits
     self.onTermination = onTermination
     client = CodexAppServerClient(
-      configuration: configuration.appServer,
+      configuration: configuration.appServer.current(),
       defaultTimeoutNanoseconds: configuration.requestTimeoutNanoseconds,
       eventBufferLimit: configuration.eventBufferLimit
     )

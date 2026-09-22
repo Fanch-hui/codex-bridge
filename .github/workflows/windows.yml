@@ -7,6 +7,13 @@ on:
     branches: [win]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: build (${{ matrix.architecture }})
@@ -19,8 +26,12 @@ jobs:
             triplet: x64-windows
             library_architecture: x64
             target_triple: ""
+            run_tests: true
+            publish: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Exclude build directories from Windows Defender
         shell: pwsh
         run: |
@@ -37,7 +48,7 @@ jobs:
           $proc = Start-Process -Wait -PassThru -FilePath .\swift-installer.exe `
             -ArgumentList "/quiet", "/norestart", "InstallPerMachine=1"
           Remove-Item .\swift-installer.exe
-          Write-Host "installer exit code: $($proc.ExitCode)"
+          if ($proc.ExitCode -notin @(0, 3010)) { throw "Swift installer failed: $($proc.ExitCode)" }
           $roots = @(
             "$env:ProgramFiles\Swift",
             "$env:LOCALAPPDATA\Programs\Swift",
@@ -60,6 +71,7 @@ jobs:
           }
           $swiftRoot = $toolchainVersionDirectory.Parent.Parent.FullName
           $sdkVersion = $toolchainVersionDirectory.Name -replace "\+.*$", ""
+          if ($sdkVersion -ne "6.3.3") { throw "Expected Swift 6.3.3, found $sdkVersion" }
           # The host runtime is separate from the toolchain and must be on PATH.
           $runtimeBin = Join-Path $swiftRoot "Runtimes\$sdkVersion\usr\bin"
           if (-not (Test-Path (Join-Path $runtimeBin "swiftCore.dll"))) {
@@ -123,9 +135,6 @@ jobs:
             "$kitsInc\winrt"
           ) -join ";"
           Add-Content $env:GITHUB_ENV "INCLUDE=$inc"
-          # Preflight the target libraries. ARM64 keeps the host LIB untouched
-          # so SwiftPM can compile its x64 manifest, then receives these paths
-          # as target linker arguments in the build step.
           $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -property installationPath | Select-Object -First 1
           $msvcLib = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory |
@@ -194,6 +203,7 @@ jobs:
           if (-not $binPath) { throw "Swift build output directory was empty." }
           Add-Content $env:GITHUB_ENV "SWIFT_BIN_PATH=$binPath"
       - name: Stage Windows tunnel client
+        if: matrix.publish
         shell: pwsh
         run: |
           $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
@@ -201,30 +211,118 @@ jobs:
             -Architecture "${{ matrix.architecture }}" `
             -Destination $tunnelClientDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Add-Content $env:GITHUB_ENV "TUNNEL_CLIENT_DIR=$tunnelClientDir"
       - name: Stage Windows portable package
+        if: matrix.publish
         shell: pwsh
         run: |
           $targetTriple = "${{ matrix.target_triple }}"
           $portableDir = Join-Path $env:GITHUB_WORKSPACE ".build\windows-dist\${{ matrix.architecture }}"
+          # The helper directory is derived here instead of being forwarded
+          # through GITHUB_ENV, so a package can never be staged without it.
+          $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
+          foreach ($required in @("tunnel-client.exe", "tunnel-client.sha256")) {
+            if (-not (Test-Path -LiteralPath (Join-Path $tunnelClientDir $required) -PathType Leaf)) {
+              throw "Staged Tunnel helper is incomplete: $tunnelClientDir\$required"
+            }
+          }
           $stageArguments = @{
             BinPath = $env:SWIFT_BIN_PATH
             OutDir = $portableDir
             Architecture = "${{ matrix.architecture }}"
             VcpkgTriplet = "${{ matrix.triplet }}"
-            TunnelClientDir = $env:TUNNEL_CLIENT_DIR
+            TunnelClientDir = $tunnelClientDir
           }
           if ($targetTriple) {
             $stageArguments["TargetTriple"] = $targetTriple
           }
           & "$env:GITHUB_WORKSPACE\Scripts\stage-windows-portable.ps1" @stageArguments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke portable service startup
+        if: matrix.run_tests
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-portable-service.ps1" `
+            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke app-to-service launch from spaced path
+        if: matrix.run_tests
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-spaced-path-launch.ps1" `
+            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke Windows GUI startup
+        if: matrix.run_tests
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-gui-startup.ps1" `
+            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke tests
+        if: matrix.run_tests
+        working-directory: Packages/BridgeCore
+        shell: pwsh
+        run: |
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
+          $swiftArguments = @(Get-WindowsSwiftArguments `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
+            -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
+          $developerRoot = Split-Path -Parent (Split-Path -Parent $env:SDKROOT)
+          $testRuntimePaths = Get-ChildItem "$developerRoot\Library" -Directory |
+            ForEach-Object { Join-Path $_.FullName "usr\bin64" } |
+            Where-Object { Test-Path $_ }
+          $env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join ";"
+          $filters = @(
+            "BridgeDomainTests", "BridgeAgentCoreTests", "BridgeSecurityTests",
+            "BridgeCodexRPCTests", "BridgeProcessWindowsTests", "BridgeDesktopUITests",
+            "BridgeServiceAppCoreTests", "BridgeServiceHostWindowsTests", "BridgeTunnelWindowsTests",
+            "BridgeCodexServiceWindowsTests", "BridgeConversationWindowsTests",
+            "BridgeServiceApplicationWindowsTests", "BridgeFilesWindowsTests",
+            "BridgeServiceCoreWindowsTests", "BridgeDirectCommandWindowsTests",
+            "BridgeDeepSeekHarnessACPWindowsTests", "BridgeWindowsShellTests"
+          )
+          foreach ($filter in $filters) {
+            $output = @(& swift test @swiftArguments --filter $filter 2>&1)
+            $exitCode = $LASTEXITCODE
+            $output | ForEach-Object { Write-Host $_ }
+            if ($exitCode -ne 0) { exit $exitCode }
+            $summary = @(
+              $output | Select-String -Pattern 'Executed\s+(\d+)\s+tests?|# tests\s+(\d+)|Test run with\s+(\d+)\s+tests?'
+            )
+            if ($summary.Count -eq 0) {
+              throw "Swift filter '$filter' did not report an executed test count."
+            }
+            $executed = 0
+            foreach ($line in $summary) {
+              $match = [regex]::Match(
+                $line.ToString(),
+                'Executed\s+(\d+)\s+tests?|# tests\s+(\d+)|Test run with\s+(\d+)\s+tests?'
+              )
+              if ($match.Success) {
+                $value = if ($match.Groups[1].Success) {
+                  $match.Groups[1].Value
+                } elseif ($match.Groups[2].Success) {
+                  $match.Groups[2].Value
+                } else {
+                  $match.Groups[3].Value
+                }
+                $executed += [int]$value
+              }
+            }
+            if ($executed -le 0) {
+              throw "Swift filter '$filter' executed no tests."
+            }
+          }
       - name: Install pinned Inno Setup 7.1.0
+        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\.github\scripts\install-inno-setup.ps1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build Windows EXE installer
+        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\Scripts\build-windows-installer.ps1" `
@@ -232,13 +330,26 @@ jobs:
             -PayloadDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}" `
             -OutputDir "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke EXE install, upgrade, and uninstall
+        if: matrix.run_tests
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          $installerRoot = "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
+          $installers = @(Get-ChildItem -LiteralPath $installerRoot -Filter "*-Setup.exe" -File)
+          if ($installers.Count -ne 1) { throw "Expected exactly one EXE installer." }
+          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-exe-install.ps1" `
+            -InstallerPath $installers[0].FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows portable ZIP
+        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}
           path: .build/windows-dist/codex-bridge-windows-${{ matrix.architecture }}.zip
           if-no-files-found: error
       - name: Upload Windows EXE installer
+        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}-installer

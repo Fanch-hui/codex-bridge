@@ -36,7 +36,7 @@ actor ServiceAgentDiscoveryCatalog {
     forceRefresh: Bool = false
   ) -> [AgentProviderID: ServiceAgentDiscoverySummary] {
     if cached == nil || forceRefresh {
-      let currentEnvironment = environment ?? ServiceAgentDiscoveryEnvironment.current()
+      let currentEnvironment = environment ?? ToolDiscoveryEnvironment.current()
       cached = ServiceAgentAutoDiscovery.discoverySummaries(
         providerIDs: providerIDs,
         existingInstallations: existingInstallations,

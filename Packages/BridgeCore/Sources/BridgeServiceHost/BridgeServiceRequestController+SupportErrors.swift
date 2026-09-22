@@ -16,6 +16,13 @@ extension BridgeServiceRequestController {
     if let error = error as? ServiceLocalMCPError {
       return mapLocalMCPError(error)
     }
+    if error is ServiceCodexExecutableError {
+      return .init(
+        code: "codex_executable_invalid",
+        message:
+          "The selected file is not a usable Codex executable. Choose codex.exe, or the npm codex.cmd shim."
+      )
+    }
     if let error = error as? ServiceMCPClientRegistryError {
       return mapMCPClientRegistryError(error)
     }

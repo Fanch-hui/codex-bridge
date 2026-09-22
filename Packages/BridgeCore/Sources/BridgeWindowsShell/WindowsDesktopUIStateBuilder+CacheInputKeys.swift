@@ -59,6 +59,8 @@
       let clientItems: [BridgeDesktopMCPClientRow]
       let deepSeekHarnessMCPItems: [BridgeDesktopDeepSeekHarnessMCPRow]
       let statusText: String
+      let codexExecutablePath: String?
+      let codexResolvedExecutablePath: String?
 
       init(_ display: WindowsConnectionDisplay) {
         connectionState = display.connectionState
@@ -68,6 +70,8 @@
         clientItems = display.clientItems
         deepSeekHarnessMCPItems = display.deepSeekHarnessMCPItems
         statusText = display.statusText
+        codexExecutablePath = display.codexExecutablePath
+        codexResolvedExecutablePath = display.codexResolvedExecutablePath
       }
     }
 

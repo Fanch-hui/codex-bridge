@@ -26,26 +26,41 @@ extension BridgeServiceRequestController {
   }
 
   func handleStatus(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    return try BridgeServiceIPCCodec.success(
+      requestID: request.requestID,
+      payload: try await makeStatusResponse()
+    )
+  }
+
+  func handleSetCodexExecutablePath(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let payload = try BridgeServiceIPCCodec.optionalPayload(
+      IPCCodexExecutablePath.self, from: request
+    )
+    _ = try await composition.setCodexExecutablePath(payload?.path)
+    return try BridgeServiceIPCCodec.success(
+      requestID: request.requestID,
+      payload: try await makeStatusResponse()
+    )
+  }
+
+  private func makeStatusResponse() async throws -> IPCServiceStatusResponse {
     let status = try await composition.application.serviceStatus(
       deadline: Self.deadline()
     )
     let endpoint = await composition.endpoint()?.localURL.absoluteString
     let exposureMode = try await composition.application.serviceExposureMode()
     let tunnel = await composition.tunnelStatus()
-    return try BridgeServiceIPCCodec.success(
-      requestID: request.requestID,
-      payload: IPCServiceStatusResponse(
-        status: status,
-        localMCPURL: endpoint,
-        exposureMode: Self.mcpExposureMode(exposureMode),
-        tunnel: Self.tunnelStatus(tunnel),
-        workbenchProjectID: try await composition.application.serviceWorkbenchProjectID(
-          deadline: Self.deadline()
-        ),
-        workbenchPermissionMode: try await composition.application.serviceWorkbenchPermissionMode(
-          deadline: Self.deadline()
-        ).rawValue
-      )
+    return IPCServiceStatusResponse(
+      status: status,
+      localMCPURL: endpoint,
+      exposureMode: Self.mcpExposureMode(exposureMode),
+      tunnel: Self.tunnelStatus(tunnel),
+      workbenchProjectID: try await composition.application.serviceWorkbenchProjectID(
+        deadline: Self.deadline()
+      ),
+      workbenchPermissionMode: try await composition.application.serviceWorkbenchPermissionMode(
+        deadline: Self.deadline()
+      ).rawValue
     )
   }
 

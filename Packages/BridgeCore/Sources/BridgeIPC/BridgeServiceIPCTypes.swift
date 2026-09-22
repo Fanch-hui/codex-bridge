@@ -22,6 +22,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case removeAgentInstallation = "remove_agent_installation"
   case getCustomInstructions = "get_custom_instructions"
   case setCustomInstructions = "set_custom_instructions"
+  case setCodexExecutablePath = "set_codex_executable_path"
   case listModels = "list_models"
   case getModelCatalog = "get_model_catalog"
   case getModelPreferences = "get_model_preferences"
@@ -205,5 +206,15 @@ public struct IPCCustomInstructions: Codable, Equatable, Sendable {
 
   public init(instructions: String) {
     self.instructions = instructions
+  }
+}
+
+public struct IPCCodexExecutablePath: Codable, Equatable, Sendable {
+  /// Absolute path to the Codex executable; absent or nil restores automatic
+  /// discovery.
+  public let path: String?
+
+  public init(path: String? = nil) {
+    self.path = path
   }
 }

@@ -20,6 +20,11 @@
         return .deferAppUpdate
       case .refreshModels:
         return .refreshModels
+      case .setCodexExecutable:
+        guard let path = payload.path, path.utf8.count <= 16 * 1_024, !path.contains("\0") else {
+          return nil
+        }
+        return .setCodexExecutablePath(path.trimmingCharacters(in: .whitespacesAndNewlines))
       case .scanAgents:
         return .scanAgents
       case .selectPage:

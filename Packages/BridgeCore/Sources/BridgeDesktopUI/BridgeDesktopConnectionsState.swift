@@ -47,6 +47,9 @@ public struct BridgeDesktopCodexConnectionState: Codable, Equatable, Sendable {
   public let isRefreshing: Bool
   public let canRefresh: Bool
   public let isConnected: Bool?
+  public let executablePath: String?
+  public let resolvedExecutablePath: String?
+  public let canEditExecutable: Bool
 
   public init(
     connectionState: String = "unknown",
@@ -54,7 +57,10 @@ public struct BridgeDesktopCodexConnectionState: Codable, Equatable, Sendable {
     modelError: String? = nil,
     isRefreshing: Bool = false,
     canRefresh: Bool = false,
-    isConnected: Bool? = nil
+    isConnected: Bool? = nil,
+    executablePath: String? = nil,
+    resolvedExecutablePath: String? = nil,
+    canEditExecutable: Bool = false
   ) {
     self.connectionState = connectionState
     self.modelCount = modelCount
@@ -62,6 +68,9 @@ public struct BridgeDesktopCodexConnectionState: Codable, Equatable, Sendable {
     self.isRefreshing = isRefreshing
     self.canRefresh = canRefresh
     self.isConnected = isConnected
+    self.executablePath = executablePath
+    self.resolvedExecutablePath = resolvedExecutablePath
+    self.canEditExecutable = canEditExecutable
   }
 }
 

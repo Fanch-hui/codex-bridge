@@ -5,7 +5,7 @@ import BridgeServiceCore
 import Foundation
 
 public struct ExecutionManagerConfiguration: Sendable {
-  public let appServer: AppServerConfiguration
+  public let appServer: CodexAppServerLocator
   public let clientInfo: CodexClientInfo
   public let requestTimeoutNanoseconds: UInt64
   public let turnStartTimeoutNanoseconds: UInt64
@@ -18,7 +18,7 @@ public struct ExecutionManagerConfiguration: Sendable {
   public let synchronizeCodexProjects: Bool
 
   public init(
-    appServer: AppServerConfiguration = .codex(),
+    appServer: CodexAppServerLocator = CodexAppServerLocator(),
     clientInfo: CodexClientInfo,
     requestTimeoutNanoseconds: UInt64 = 30_000_000_000,
     turnStartTimeoutNanoseconds: UInt64 = 10_000_000_000,

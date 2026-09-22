@@ -10,6 +10,20 @@
         URL.init(fileURLWithPath:))
     }
 
+    /// Resolves a user-configured path, which must point at an executable file.
+    static func resolve(configuredPath: String) -> URL? {
+      guard let normalized = AgentPathSemantics.canonicalPath(configuredPath),
+        AgentPathSemantics.isAbsolute(normalized), !normalized.contains("\0"),
+        normalized.utf8.count <= 16 * 1_024
+      else { return nil }
+      var isDirectory = ObjCBool(false)
+      guard FileManager.default.fileExists(atPath: normalized, isDirectory: &isDirectory),
+        !isDirectory.boolValue,
+        FileManager.default.isExecutableFile(atPath: normalized)
+      else { return nil }
+      return URL(fileURLWithPath: normalized)
+    }
+
     static func candidates(environment: [String: String]) -> [String] {
       let home = homeDirectory(environment: environment)
       var values: [String] = []

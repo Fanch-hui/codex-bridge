@@ -25,14 +25,22 @@ enum ProjectGitStatus {
       try project.root.validateCurrentIdentity()
       if result.exitCode == 0 {
         if result.output.byteCount == 0 { return "clean" }
-        return result.output.head.contains("\0") || result.output.tail.contains("\0")
-          ? "dirty" : "check_failed"
+        return hasPorcelainRecords(result) ? "dirty" : "check_failed"
       }
       let output = result.output.head
       return output.contains("fatal: not a git repository") ? "not_git" : "check_failed"
     } catch {
       return "check_failed"
     }
+  }
+
+  /// `git status --porcelain -z` NUL-terminates every record. The output
+  /// collector escapes control bytes for display, so the collected raw data is
+  /// authoritative while the output fits the buffer; the escaped `\x00` marker is
+  /// the only surviving evidence once the output overflows it.
+  static func hasPorcelainRecords(_ result: DirectGitResult) -> Bool {
+    if let complete = result.completeOutput { return complete.contains(0) }
+    return result.output.head.contains(#"\x00"#) || result.output.tail.contains(#"\x00"#)
   }
 }
 

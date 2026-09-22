@@ -13,7 +13,7 @@ enum ServiceAgentAutoDiscovery {
     dataPaths: ServiceDataPaths,
     existingInstallations: [ServiceAgentInstallationRecord] = [],
     credentialsProvided: Bool = false,
-    environment: [String: String] = ServiceAgentDiscoveryEnvironment.current(),
+    environment: [String: String] = ToolDiscoveryEnvironment.current(),
     allowGeneratedConfiguration: Bool = true,
     discoveredExecutablePath: String? = nil
   ) throws -> [ServiceAgentRegistrationRequest] {

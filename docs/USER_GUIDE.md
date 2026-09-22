@@ -85,11 +85,11 @@ AGY 的 Always Proceed 由 AGY 连接流程单独征得同意后设置；它属�
 ### Codex
 
 1. 准备当前系统用户能够运行并已完成登录的本机 Codex。
-2. 在“连接 → Codex 执行引擎”点击“连接”。Bridge 自动管理 Codex 发现，无需在页面选择路径或配置文件；连接失败时先查看卡片的错误信息并确认本机 Codex 可用。
+2. 在“连接 → Codex 执行引擎”点击“连接”。Bridge 自动发现 Codex，通常无需手工指定路径；页面显示“当前使用”的实际可执行文件。连接或模型列表失败时，先查看卡片中的错误信息：如果 Codex 装在非常规位置，在“可执行文件路径（可选）”中填写 `codex`（Windows 为 `codex.exe` 或 npm 的 `codex.cmd`）的绝对路径并保存，清除该字段即恢复自动发现。
 3. 打开设置中的 Codex 模型区域，获取模型，选择默认模型和推理强度，保存模型偏好。
 4. 回到工作台选择项目，提交只读任务。
 
-Windows 可发现商店版及受支持的 CLI 安装位置；外部 Agent 应连接 CLI 入口。只有安装了 GUI 应用，并不代表存在可供 Bridge 调用的 Agent 协议入口。
+Bridge 在每次启动 Codex 时按当前系统信息重新发现，安装 Codex 之后不需要重启 App 或后台服务；临时排障仍可用 `CODEX_BRIDGE_CODEX_EXECUTABLE` 覆盖。Windows 可发现商店版及受支持的 CLI 安装位置；外部 Agent 应连接 CLI 入口。只有安装了 GUI 应用，并不代表存在可供 Bridge 调用的 Agent 协议入口。
 
 ### DeepSeek Harness
 

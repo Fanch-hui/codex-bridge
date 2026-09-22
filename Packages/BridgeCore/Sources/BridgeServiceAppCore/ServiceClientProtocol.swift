@@ -111,6 +111,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   ) async throws -> IPCAgentNativePermissionPolicyResponse
   func customInstructions() async throws -> String
   func setCustomInstructions(_ instructions: String) async throws
+  func setCodexExecutablePath(_ path: String?) async throws -> IPCServiceStatusResponse
   func removeProject(projectID: String) async throws
   func models() async throws -> MCPModelList
   func modelCatalog() async throws -> IPCModelCatalogResponse
@@ -382,6 +383,10 @@ extension BridgeServiceClientProtocol {
   }
 
   public func setCustomInstructions(_ instructions: String) async throws {
+    throw BridgeServiceClientError.unavailable
+  }
+
+  public func setCodexExecutablePath(_ path: String?) async throws -> IPCServiceStatusResponse {
     throw BridgeServiceClientError.unavailable
   }
 

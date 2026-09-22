@@ -1,22 +1,28 @@
+import BridgeAgentCore
 @preconcurrency import Foundation
 
 extension AppServerConfiguration {
-  public static func codex(executableURL: URL? = nil) -> AppServerConfiguration {
+  /// Resolves the Codex app-server launch configuration.
+  ///
+  /// A configured path is strict: when the user pointed Bridge at a specific
+  /// executable, a resolution failure must stay visible instead of silently
+  /// falling back to another installation.
+  public static func codex(configuredPath: String? = nil) -> AppServerConfiguration {
     #if os(Windows)
-      if let executableURL {
-        if let discovered = CodexExecutableResolver().resolve(explicitPath: executableURL.path) {
-          return AppServerConfiguration(
-            executableURL: URL(fileURLWithPath: discovered),
-            arguments: ["app-server", "--stdio"],
-            environment: CodexWindowsPath.childEnvironment()
-          )
+      if let configuredPath, let resolved = resolveConfiguredCodexExecutable(configuredPath) {
+        if let commandScript = commandScriptPath(resolved) {
+          return cmdScriptLaunchConfiguration(scriptPath: commandScript)
         }
-        if let cmdScript = resolveCommandScript(executableURL.path) {
-          return cmdScriptLaunchConfiguration(scriptPath: cmdScript)
-        }
+        return AppServerConfiguration(
+          executableURL: URL(fileURLWithPath: resolved),
+          arguments: ["app-server", "--stdio"],
+          environment: CodexWindowsPath.childEnvironment()
+        )
+      }
+      if let configuredPath, !configuredPath.isEmpty {
         return unavailableWindowsCodexConfiguration(
           reason:
-            "The configured Codex app-server executable is unavailable or not a native Windows binary."
+            "The configured Codex executable is unavailable or not a native Windows binary; update or clear it in the Codex connection card."
         )
       }
       if let discovered = CodexExecutableResolver().resolve() {
@@ -31,9 +37,15 @@ extension AppServerConfiguration {
       }
       return defaultWindowsCodexFallbackConfiguration()
     #else
-      if let executableURL {
+      if let configuredPath, !configuredPath.isEmpty {
+        guard let resolved = resolveConfiguredCodexExecutable(configuredPath) else {
+          return unavailableCodexConfiguration(
+            reason:
+              "The configured Codex executable is unavailable or not executable; update or clear it in the Codex connection card."
+          )
+        }
         return AppServerConfiguration(
-          executableURL: executableURL,
+          executableURL: URL(fileURLWithPath: resolved),
           arguments: ["app-server", "--stdio"]
         )
       }
@@ -50,17 +62,49 @@ extension AppServerConfiguration {
     #endif
   }
 
-  #if os(Windows)
-    private static func resolveCommandScript(_ path: String) -> String? {
-      let normalized = CodexWindowsPath.normalize(path) ?? path
-      let lower = normalized.lowercased()
-      guard lower.hasSuffix(".cmd") || lower.hasSuffix(".bat") else { return nil }
-      guard FileManager.default.fileExists(atPath: normalized) else { return nil }
+  /// Resolves a user-configured executable path to the program Bridge would
+  /// launch, or nil when the path cannot be used.
+  public static func resolveConfiguredCodexExecutable(_ configuredPath: String) -> String? {
+    let trimmed = configuredPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    #if os(Windows)
+      let resolver = CodexExecutableResolver()
+      if let resolved = resolver.resolve(explicitPath: trimmed) { return resolved }
+      guard let normalized = CodexWindowsPath.normalize(trimmed),
+        normalized.lowercased().hasSuffix(".cmd") || normalized.lowercased().hasSuffix(".bat"),
+        CodexWindowsNativeExecutable.isRegularFile(at: normalized)
+      else {
+        return nil
+      }
       return normalized
+    #else
+      return CodexMacExecutableResolver.resolve(configuredPath: trimmed)?.path
+    #endif
+  }
+
+  public static func defaultCodexExecutableURL() -> URL? {
+    #if os(Windows)
+      if let path = CodexExecutableResolver().resolve() {
+        return URL(fileURLWithPath: path)
+      }
+      if let cmd = defaultWindowsCodexCommandPath() {
+        return URL(fileURLWithPath: cmd)
+      }
+      return nil
+    #else
+      return CodexMacExecutableResolver.resolve()
+    #endif
+  }
+
+  #if os(Windows)
+    private static func commandScriptPath(_ path: String) -> String? {
+      let lower = path.lowercased()
+      guard lower.hasSuffix(".cmd") || lower.hasSuffix(".bat") else { return nil }
+      return path
     }
 
     private static func defaultWindowsCodexCommandPath() -> String? {
-      let env = ProcessInfo.processInfo.environment
+      let env = ToolDiscoveryEnvironment.current()
       var candidates: [String] = []
       if let appData = CodexWindowsPath.environmentValue("APPDATA", in: env) {
         candidates.append(CodexWindowsPath.join(appData, "npm", "codex.cmd"))
@@ -107,29 +151,24 @@ extension AppServerConfiguration {
     private static func unavailableWindowsCodexConfiguration(reason: String)
       -> AppServerConfiguration
     {
-      AppServerConfiguration(
-        executableURL: URL(fileURLWithPath: "C:\\CodexBridge\\Unavailable\\codex.exe"),
-        arguments: ["app-server", "--stdio"],
-        currentDirectoryURL: nil,
-        environment: nil,
-        maximumProtocolLineBytes: 64 * 1024 * 1024,
-        stderrBufferBytes: 64 * 1024,
-        launchFailureReason: reason
-      )
+      unavailableCodexConfiguration(reason: reason)
     }
   #endif
 
-  public static func defaultCodexExecutableURL() -> URL? {
+  private static func unavailableCodexConfiguration(reason: String) -> AppServerConfiguration {
     #if os(Windows)
-      if let path = CodexExecutableResolver().resolve() {
-        return URL(fileURLWithPath: path)
-      }
-      if let cmd = defaultWindowsCodexCommandPath() {
-        return URL(fileURLWithPath: cmd)
-      }
-      return nil
+      let sentinelPath = "C:\\CodexBridge\\Unavailable\\codex.exe"
     #else
-      return CodexMacExecutableResolver.resolve()
+      let sentinelPath = "/CodexBridge/Unavailable/codex"
     #endif
+    return AppServerConfiguration(
+      executableURL: URL(fileURLWithPath: sentinelPath),
+      arguments: ["app-server", "--stdio"],
+      currentDirectoryURL: nil,
+      environment: nil,
+      maximumProtocolLineBytes: 64 * 1024 * 1024,
+      stderrBufferBytes: 64 * 1024,
+      launchFailureReason: reason
+    )
   }
 }

@@ -34,6 +34,8 @@ extension BridgeServiceApplication {
       tunnelState: runtime.tunnelState,
       codexVersion: runtime.codexVersion,
       loginMode: runtime.loginMode,
+      codexExecutablePath: runtime.codexExecutablePath,
+      codexResolvedExecutablePath: runtime.codexResolvedExecutablePath,
       executionState: Self.executionState(taskList),
       supervisorState: Self.supervisorState(taskList),
       degradations: degradations,

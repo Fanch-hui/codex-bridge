@@ -94,7 +94,7 @@ public struct ServiceProcessOptions: Equatable, Sendable {
 public enum ServiceProcessRunner {
   public static func run(
     arguments: [String] = Array(CommandLine.arguments.dropFirst()),
-    appVersion: String = "1.1.1"
+    appVersion: String = "1.1.2"
   ) async throws {
     applyDefaultUmask()
     let options = try ServiceProcessOptions.parse(arguments)

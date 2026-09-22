@@ -20,5 +20,7 @@
     var clientItems: [BridgeDesktopMCPClientRow] = []
     var deepSeekHarnessMCPItems: [BridgeDesktopDeepSeekHarnessMCPRow] = []
     var tunnel: BridgeDesktopTunnelState? = nil
+    var codexExecutablePath: String? = nil
+    var codexResolvedExecutablePath: String? = nil
   }
 #endif

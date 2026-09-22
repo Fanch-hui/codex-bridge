@@ -6,6 +6,11 @@ public enum ServiceLocalMCPError: Error, Equatable, Sendable {
   case endpointManagedByConfiguration
 }
 
+public enum ServiceCodexExecutableError: Error, Equatable, Sendable {
+  /// The configured path is not a usable Codex executable for this platform.
+  case unavailable
+}
+
 public struct ServiceMCPClientStatus: Equatable, Sendable {
   public let profile: ServiceMCPClientProfile
   public let activeSessionCount: Int
@@ -25,9 +30,11 @@ public struct ServiceMCPClientStatus: Equatable, Sendable {
 public struct ServiceCompositionConfiguration: Sendable {
   public let appVersion: String
   public let dataRootURL: URL
-  public let executionAppServer: AppServerConfiguration
-  public let supervisorAppServer: AppServerConfiguration
-  public let catalogAppServer: AppServerConfiguration
+  /// A pinned Codex app-server configuration; `nil` keeps automatic discovery,
+  /// which is re-evaluated on every spawned process.
+  public let executionAppServer: AppServerConfiguration?
+  public let supervisorAppServer: AppServerConfiguration?
+  public let catalogAppServer: AppServerConfiguration?
   public let clientInfo: CodexClientInfo
   public let synchronizeCodexProjects: Bool
   public let mcpPort: Int
@@ -37,9 +44,9 @@ public struct ServiceCompositionConfiguration: Sendable {
   public init(
     appVersion: String,
     dataRootURL: URL = ServiceDataPaths.defaultRoot(),
-    executionAppServer: AppServerConfiguration = .codex(),
-    supervisorAppServer: AppServerConfiguration = .codex(),
-    catalogAppServer: AppServerConfiguration = .codex(),
+    executionAppServer: AppServerConfiguration? = nil,
+    supervisorAppServer: AppServerConfiguration? = nil,
+    catalogAppServer: AppServerConfiguration? = nil,
     clientInfo: CodexClientInfo,
     synchronizeCodexProjects: Bool = true,
     mcpPort: Int = 0,

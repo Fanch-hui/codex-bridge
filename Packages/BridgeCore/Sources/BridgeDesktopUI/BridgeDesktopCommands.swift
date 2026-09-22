@@ -94,6 +94,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case saveSettings
   case saveDirectConfiguration
   case saveCustomInstructions
+  case setCodexExecutable
   case registerService
   case unregisterService
   case setKeepServiceRunning
