@@ -11,10 +11,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yeyuancc0-glitch/codex-bridge.git"
+    "url": "https://github.com/Fanch-hui/codex-bridge.git"
   },
-  "homepage": "https://github.com/yeyuancc0-glitch/codex-bridge",
-  "support": "https://github.com/yeyuancc0-glitch/codex-bridge/issues",
+  "homepage": "https://github.com/Fanch-hui/codex-bridge",
+  "support": "https://github.com/Fanch-hui/codex-bridge/issues",
   "server": {
     "type": "node",
     "entry_point": "server.mjs",

@@ -25,7 +25,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### macOS Apple Silicon
 
-1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-<版本>-macos-arm64.dmg`。
+1. 从 [最新版下载页](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载 `CodexBridge-<版本>-macos-arm64.dmg`。
 2. 打开 DMG，把 `CodexBridge.app` 拖到 Applications。
 3. 从 Applications 启动。当前包使用 ad-hoc 签名、尚未 Apple 公证；若系统拦截，在“系统设置 → 隐私与安全性”允许打开。
 4. 在概览检查 Service。若提示后台项目需批准，按提示打开系统设置并允许 Codex Bridge 后台项目。

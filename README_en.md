@@ -8,16 +8,16 @@ Codex Bridge is a self-hosted desktop app and background service that connects C
 
 macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.1.2`.
+The current release is `v1.2.0`.
 
 ## Download and install
 
-Get the latest version from [GitHub Releases](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest).
+Get the latest version from [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest).
 
-| Platform | v1.1.2 package | Installation |
+| Platform | v1.2.0 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.1.2-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.1.2-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-1.2.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.2.0-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
@@ -124,7 +124,7 @@ macOS uses WKWebView and XPC; Windows uses WebView2 and named pipes. Both use `B
 The default development branch is `win`.
 
 ```bash
-git clone --branch win https://github.com/yeyuancc0-glitch/codex-bridge.git
+git clone --branch win https://github.com/Fanch-hui/codex-bridge.git
 cd codex-bridge
 ```
 

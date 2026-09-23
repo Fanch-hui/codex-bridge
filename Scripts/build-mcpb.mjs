@@ -10,8 +10,8 @@ const source = join(root, 'Integrations', 'MCPB');
 const output = resolve(process.argv[2] ?? join(root, '.build', 'mcp-registry'));
 const manifest = JSON.parse(await readFile(join(source, 'manifest.json'), 'utf8'));
 const stage = await mkdtemp(join(tmpdir(), 'codex-bridge-mcpb-'));
-const registryName = 'io.github.yeyuancc0-glitch/codex-bridge';
-const repository = 'https://github.com/yeyuancc0-glitch/codex-bridge';
+const registryName = 'io.github.Fanch-hui/codex-bridge';
+const repository = 'https://github.com/Fanch-hui/codex-bridge';
 
 function run(command, args) {
   const result = spawnSync(command, args, {

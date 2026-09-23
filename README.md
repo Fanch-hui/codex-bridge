@@ -8,16 +8,16 @@ Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 C
 
 macOS 与 Windows 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 `v1.1.2`。
+当前版本为 `v1.2.0`。
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载最新版本。
+从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v1.1.2 安装包 | 安装方式 |
+| 平台 | v1.2.0 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-1.1.2-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.1.2-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-1.2.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.2.0-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64，便携运行 | `codex-bridge-windows-x64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
@@ -126,7 +126,7 @@ macOS 使用 WKWebView 和 XPC；Windows 使用 WebView2 和命名管道。两�
 默认开发主线为 `win`。
 
 ```bash
-git clone --branch win https://github.com/yeyuancc0-glitch/codex-bridge.git
+git clone --branch win https://github.com/Fanch-hui/codex-bridge.git
 cd codex-bridge
 ```
 
