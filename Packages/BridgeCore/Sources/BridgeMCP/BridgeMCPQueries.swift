@@ -23,6 +23,11 @@ public enum BridgeMCPQueryError: Error, Equatable, Sendable {
   case busy
   case timeout
   case unavailable
+  /// The local Codex app-server could not be started, or failed while it was
+  /// starting. The detail carries host-only diagnostics (configured executable
+  /// path, OS error, stderr excerpt) that the desktop surfaces verbatim; remote
+  /// MCP clients receive a generic message instead.
+  case codexAppServerUnavailable(String)
   case internalFailure(correlationID: String)
   case projectBusy(WorkspaceBusyDetail)
   case fileRevisionConflict

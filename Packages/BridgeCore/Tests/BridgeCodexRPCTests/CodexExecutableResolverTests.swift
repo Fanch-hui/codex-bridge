@@ -378,6 +378,31 @@
       XCTAssertNil(AppServerConfiguration.resolveConfiguredCodexExecutable("   "))
     }
 
+    func testConfiguredPathAcceptsQuotedClipboardForms() throws {
+      let fixture = try Fixture()
+      defer { fixture.remove() }
+
+      let native = try fixture.makeDirectExecutable(
+        directory: fixture.path("custom"), architecture: .current)
+      let shim = fixture.path("shims", "codex.cmd")
+      try fixture.write("@echo off\r\n", to: shim)
+
+      XCTAssertEqual(
+        try XCTUnwrap(CodexWindowsPath.normalize(native)),
+        try XCTUnwrap(
+          AppServerConfiguration.resolveConfiguredCodexExecutable("\"\(native)\"").flatMap(
+            CodexWindowsPath.normalize))
+      )
+      XCTAssertEqual(
+        try XCTUnwrap(CodexWindowsPath.normalize(shim)),
+        try XCTUnwrap(
+          AppServerConfiguration.resolveConfiguredCodexExecutable(" '\(shim)' ").flatMap(
+            CodexWindowsPath.normalize))
+      )
+      XCTAssertNil(AppServerConfiguration.resolveConfiguredCodexExecutable("\"\""))
+      XCTAssertNil(AppServerConfiguration.resolveConfiguredCodexExecutable("\"  \""))
+    }
+
     private func resolve(environment: [String: String]) throws -> String {
       let resolver = CodexExecutableResolver(
         packagedInstallations: { [] },

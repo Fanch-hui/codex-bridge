@@ -64,7 +64,9 @@
     }
 
     func resolve(explicitPath: String? = nil) -> String? {
-      let candidates = explicitPath.map(expandedExplicitPaths) ?? candidatePaths()
+      let candidates =
+        explicitPath.map { expandedExplicitPaths(CodexExecutablePathInput.normalized($0)) }
+        ?? candidatePaths()
       return CodexWindowsPath.unique(candidates).first(where: {
         validator($0, architecture)
       })
@@ -102,7 +104,8 @@
       if let configured = CodexWindowsPath.environmentValue(
         "CODEX_BRIDGE_CODEX_EXECUTABLE", in: environment
       ) {
-        result.append(contentsOf: expandedExplicitPaths(configured))
+        result.append(
+          contentsOf: expandedExplicitPaths(CodexExecutablePathInput.normalized(configured)))
       }
       result.append(
         contentsOf: packagedInstallations().map {

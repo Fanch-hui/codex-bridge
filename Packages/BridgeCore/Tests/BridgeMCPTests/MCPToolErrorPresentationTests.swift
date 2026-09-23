@@ -30,6 +30,18 @@ final class MCPToolErrorPresentationTests: XCTestCase {
     }
   }
 
+  func testCodexAppServerFailuresStayGenericForRemoteClients() {
+    let value = BridgeMCPQueryError.codexAppServerUnavailable(
+      "Could not launch Codex app-server: C:\\Tools\\codex.exe"
+    ).toolError
+
+    XCTAssertEqual(value.code, "codex_app_server_unavailable")
+    XCTAssertEqual(value.category, .infrastructureFailure)
+    XCTAssertTrue(value.retryable)
+    XCTAssertFalse(value.message.contains("C:\\Tools"), value.message)
+    XCTAssertFalse(value.message.contains("Could not launch"), value.message)
+  }
+
   func testCommandDenialsKeepPolicyReasonMachineReadable() {
     let cases: [(MCPCommandDenialReason, MCPToolErrorCategory, String)] = [
       (.commandNotRegistered, .policyDenied, "list_project_commands"),

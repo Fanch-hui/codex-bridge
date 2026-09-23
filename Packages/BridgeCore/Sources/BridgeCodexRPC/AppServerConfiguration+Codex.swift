@@ -65,7 +65,7 @@ extension AppServerConfiguration {
   /// Resolves a user-configured executable path to the program Bridge would
   /// launch, or nil when the path cannot be used.
   public static func resolveConfiguredCodexExecutable(_ configuredPath: String) -> String? {
-    let trimmed = configuredPath.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmed = CodexExecutablePathInput.normalized(configuredPath)
     guard !trimmed.isEmpty else { return nil }
     #if os(Windows)
       let resolver = CodexExecutableResolver()
