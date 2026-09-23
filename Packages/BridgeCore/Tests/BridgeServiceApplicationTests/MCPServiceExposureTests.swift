@@ -20,7 +20,11 @@ final class MCPServiceExposureTests: XCTestCase {
         clientID: clientID
       )
       XCTAssertTrue(instructions.contains(custom))
-      XCTAssertTrue(instructions.contains("before calling any Codex Bridge tool"))
+      XCTAssertTrue(instructions.hasPrefix("The following custom instructions guide you"))
+      XCTAssertTrue(instructions.contains("not the local Agent"))
+      XCTAssertTrue(instructions.contains("Never put their text or paraphrases in an Agent prompt"))
+      XCTAssertTrue(instructions.contains("submit_task.prompt, steer_task.input"))
+      XCTAssertTrue(instructions.contains("unless the user's current request explicitly asks"))
       XCTAssertTrue(instructions.contains("Workbench default task mode"))
       XCTAssertTrue(instructions.contains("Plan/read-only"))
       XCTAssertTrue(instructions.contains("network_access does not override it"))

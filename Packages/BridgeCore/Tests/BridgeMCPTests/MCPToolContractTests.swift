@@ -47,11 +47,19 @@ final class MCPToolContractTests: XCTestCase {
     )
     XCTAssertTrue(
       submit.description?.contains("Web, network, MCP, file, command") == true)
+    XCTAssertTrue(submit.description?.contains("not the global custom instructions") == true)
+    XCTAssertTrue(submit.description?.contains("concrete task") == true)
     XCTAssertFalse(
       submit.description?.localizedCaseInsensitiveContains(
         "does not provide Web search"
       ) == true
     )
+    let steer = try XCTUnwrap(
+      MCPServiceToolCatalog(exposureMode: .full).definitions.first(where: {
+        $0.name == MCPServiceToolName.steerTask.rawValue
+      })
+    )
+    XCTAssertTrue(steer.description?.contains("not global custom instructions") == true)
   }
 
   func testServiceCatalogPublishesStrictClosedSchemasAndExposureBoundaries() throws {
