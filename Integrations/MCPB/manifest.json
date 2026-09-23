@@ -1,0 +1,58 @@
+{
+  "manifest_version": "0.3",
+  "name": "codex-bridge",
+  "display_name": "Codex Bridge",
+  "version": "1.0.1",
+  "description": "Connect MCP clients to a local Codex Bridge desktop app and its authorized workspace tools.",
+  "long_description": "Install and configure Codex Bridge before installing this bundle. In Codex Bridge, open Connections and copy the Qwen local HTTP MCP endpoint and token. This bundle forwards MCP requests to that local endpoint and inherits the Qwen Studio client tool permission configured in Codex Bridge.",
+  "author": {
+    "name": "yeyuancc0-glitch",
+    "url": "https://github.com/yeyuancc0-glitch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Fanch-hui/codex-bridge.git"
+  },
+  "homepage": "https://github.com/Fanch-hui/codex-bridge",
+  "support": "https://github.com/Fanch-hui/codex-bridge/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server.mjs"
+      ],
+      "env": {
+        "CODEX_BRIDGE_MCP_URL": "${user_config.endpoint}",
+        "CODEX_BRIDGE_MCP_TOKEN": "${user_config.api_key}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "license": "Apache-2.0",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32"
+    ],
+    "runtimes": {
+      "node": ">=22.0.0"
+    }
+  },
+  "user_config": {
+    "endpoint": {
+      "type": "string",
+      "title": "Codex Bridge MCP Endpoint",
+      "description": "Copy the current local HTTP MCP endpoint from Codex Bridge → Connections → Qwen Studio. The endpoint uses the Bridge port and the /mcp path.",
+      "required": true
+    },
+    "api_key": {
+      "type": "string",
+      "title": "Qwen Studio MCP Token",
+      "description": "Copy the current Qwen Studio local HTTP token from Codex Bridge → Connections. The configured Qwen Studio client tool permission is applied by Codex Bridge.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

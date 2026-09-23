@@ -92,6 +92,24 @@ extension ExecutionSession {
     return messages
   }
 
+  /// Captures an agentMessage item that never streamed deltas, so its text
+  /// reaches the conversation when the item completes instead of at turn end.
+  static func agentMessage(from params: JSONValue?) -> ExecutionAgentMessage? {
+    guard let item = params?.objectValue?["item"]?.objectValue,
+      let itemID = item["id"]?.stringValue,
+      let text = agentMessageContent(from: item),
+      let message = try? ExecutionAgentMessage(
+        key: "agent:" + itemID,
+        role: .agent,
+        kind: .agent,
+        content: OutboundContentSecurity.redacted(text, maximumUTF8Bytes: 256 * 1_024)
+      )
+    else {
+      return nil
+    }
+    return message
+  }
+
   private static func agentMessageContent(from object: [String: JSONValue]) -> String? {
     if let text = object["text"]?.stringValue, !text.isEmpty {
       return text

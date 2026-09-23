@@ -41,6 +41,15 @@ extension ExecutionSession {
         await yield(.toolCall(call))
         return
       }
+      if item.type == "agentMessage" {
+        guard isPrimaryBinding(threadID: item.key.threadID, turnID: item.key.turnID),
+          let message = Self.agentMessage(from: notification.params)
+        else {
+          return
+        }
+        await yield(.agentMessageCompleted(message))
+        return
+      }
       guard item.type == "commandExecution" || item.type == "fileChange" else { return }
       await receiveSemanticNotification(notification)
     case "item/agentMessage/delta":

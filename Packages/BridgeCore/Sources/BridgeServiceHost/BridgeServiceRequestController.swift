@@ -184,6 +184,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleSetTaskStartApprovalMode(request)
     case .submitAgentTask:
       return try await handleSubmitAgentTask(request)
+    case .taskHandoff:
+      return try await handleTaskHandoff(request)
     case .listAgentModels:
       return try await handleListAgentModels(request)
     case .getAgentModelDefault:

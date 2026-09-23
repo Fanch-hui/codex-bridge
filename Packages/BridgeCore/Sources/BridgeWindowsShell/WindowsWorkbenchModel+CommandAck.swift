@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
 
   extension WindowsWorkbenchModel {
     func recordWorkbenchCommandReceipt(
@@ -8,7 +9,8 @@
       taskID: String?,
       input: String?,
       accepted: Bool,
-      message: String? = nil
+      message: String? = nil,
+      handoff: WorkbenchHandoffPreview? = nil
     ) {
       guard let requestID, !requestID.isEmpty else { return }
       if !accepted { errorMessage = message }
@@ -18,7 +20,8 @@
         taskID: taskID,
         input: input,
         accepted: accepted,
-        message: message
+        message: message,
+        handoff: handoff
       )
       publishDisplay()
     }

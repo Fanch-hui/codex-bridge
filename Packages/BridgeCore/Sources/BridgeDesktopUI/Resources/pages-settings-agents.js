@@ -30,7 +30,9 @@
       var values = draft.values(), state = context.item;
       if (!state.canSave || state.isRefreshingModels) return;
       context.emit("saveAgentDefault", { providerID: state.providerID, installationID: state.installationID,
-        modelID: values.model || null, effort: values.effort || null, permissionMode: values.permission });
+        modelID: values.model || null,
+        effort: state.providerID === "antigravity" ? null : values.effort || null,
+        permissionMode: values.permission });
     }
     function updateEfforts(state, changedModel) {
       var selected = S.safeArray(state.modelOptions).find(function (option) {
@@ -47,11 +49,14 @@
         changedModel, selected && selected.defaultReasoningEffort);
       effort.control.disabled = !state.canSave || state.isRefreshingModels
         || state.canSelectEffort === false || !known || efforts.length === 0;
-      error.textContent = state.errorMessage || (state.isRefreshingModels || !known
-        ? "正在获取模型推理强度…" : efforts.length === 0
-          ? "当前模型不提供可选推理强度，使用 Provider 默认。" : state.providerID === "deepseek-harness"
-            ? "推理选项由 DSH 适配器提供，可能对不同模型返回相同选项；模型实际支持以 API 为准。"
-            : "选择后自动保存。");
+      var message = "选择后自动保存。";
+      if (state.providerID === "antigravity") message = "模型选项已包含推理强度，选择后自动保存。";
+      else if (state.isRefreshingModels || !known) message = "正在获取模型推理强度…";
+      else if (efforts.length === 0) message = "当前模型不提供可选推理强度，使用 Provider 默认。";
+      else if (state.providerID === "deepseek-harness") {
+        message = "推理选项由 DSH 适配器提供，可能对不同模型返回相同选项；模型实际支持以 API 为准。";
+      }
+      error.textContent = state.errorMessage || message;
       return efforts;
     }
     model.control.addEventListener("change", function () {
@@ -66,6 +71,7 @@
     function update(next, nextEmit) {
       context.item = next;
       context.emit = nextEmit;
+      effort.wrapper.hidden = next.providerID === "antigravity";
       title.textContent = next.providerName;
       installation.textContent = next.installationName
         ? "安装：" + next.installationName

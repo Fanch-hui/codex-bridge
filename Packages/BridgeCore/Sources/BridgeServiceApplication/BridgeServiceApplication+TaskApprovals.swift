@@ -113,13 +113,14 @@ extension BridgeServiceApplication {
 
   func submitTaskWithAdmission(
     _ request: ServiceTaskRequest,
-    projectID: ProjectID
+    projectID: ProjectID,
+    handoffID: String? = nil
   ) async throws -> ServiceTaskCreationResult {
     // Read-only submissions never occupy the project write slot, so they do
     // not take the Codex admission token.
     if request.permissionMode == .readOnly {
       do {
-        return try await tasks.submit(request)
+        return try await tasks.submit(request, handoffID: handoffID)
       } catch let storeError as ServiceStoreError {
         throw Self.publicStoreError(storeError)
       }
@@ -129,7 +130,7 @@ extension BridgeServiceApplication {
       let activeWriteTask = try await tasks.activeWriteTask(projectID: projectID)
       let workspaceBusy = try await workspaceGate.workspaceBusyDetail(projectID: projectID)
       if activeWriteTask != nil || workspaceBusy != nil {
-        return try await tasks.submit(request, queued: true)
+        return try await tasks.submit(request, queued: true, handoffID: handoffID)
       }
     }
     let admissionToken: String
@@ -137,17 +138,17 @@ extension BridgeServiceApplication {
       admissionToken = try await workspaceGate.beginCodexAdmission(projectID: projectID)
     } catch {
       if wantsQueue {
-        return try await tasks.submit(request, queued: true)
+        return try await tasks.submit(request, queued: true, handoffID: handoffID)
       }
       throw Self.publicWorkspaceBusyError(error)
     }
     do {
       let result: ServiceTaskCreationResult
       do {
-        result = try await tasks.submit(request)
+        result = try await tasks.submit(request, handoffID: handoffID)
       } catch ServiceStoreError.activeWriteTaskExists where wantsQueue {
         await workspaceGate.endCodexAdmission(projectID: projectID, token: admissionToken)
-        return try await tasks.submit(request, queued: true)
+        return try await tasks.submit(request, queued: true, handoffID: handoffID)
       }
       await workspaceGate.endCodexAdmission(projectID: projectID, token: admissionToken)
       return result

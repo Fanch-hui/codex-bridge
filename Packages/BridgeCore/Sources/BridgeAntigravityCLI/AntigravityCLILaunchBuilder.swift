@@ -69,13 +69,6 @@ public struct AntigravityCLILaunchBuilder: Sendable {
     if let model = request.model {
       providerArgv.append(contentsOf: ["--model", model])
     }
-    if let effort = request.effort {
-      guard ["low", "medium", "high"].contains(effort) else {
-        throw AgentRuntimeError.invalidRequest("request.effort")
-      }
-      providerArgv.append(contentsOf: ["--effort", effort])
-    }
-
     providerArgv.append(contentsOf: ["--add-dir", projectRoot])
     return AntigravityCLILaunchConfiguration(
       process: AntigravityCLIProcessConfiguration(

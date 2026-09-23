@@ -26,7 +26,8 @@ public actor ServiceTaskManager {
   public func submit(
     _ request: ServiceTaskRequest,
     taskID requestedTaskID: TaskID? = nil,
-    queued: Bool = false
+    queued: Bool = false,
+    handoffID: String? = nil
   ) async throws -> ServiceTaskCreationResult {
     let date = now()
     let state = try ServiceTaskState(status: .awaitingLocalApproval)
@@ -61,7 +62,8 @@ public actor ServiceTaskManager {
         kind: .taskCreated,
         summary: "The task was accepted.",
         createdAt: date
-      )
+      ),
+      handoffID: handoffID
     )
     changes.publish()
     return result

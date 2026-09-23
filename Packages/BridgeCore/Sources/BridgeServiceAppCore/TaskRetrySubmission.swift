@@ -10,4 +10,13 @@ public enum TaskRetrySubmission {
     }
     return model != "provider-default"
   }
+
+  public static func effort(for task: MCPServiceTaskSnapshot) -> String? {
+    guard let effort = task.executionEffort?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !effort.isEmpty, effort != "provider-default"
+    else {
+      return nil
+    }
+    return effort
+  }
 }

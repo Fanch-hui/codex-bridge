@@ -86,6 +86,12 @@ extension BridgeMCPQueryError {
         "unavailable", .infrastructureFailure, true, "retry_or_check_bridge_status",
         "A required local Bridge component is unavailable."
       )
+    case .codexAppServerUnavailable:
+      return error(
+        "codex_app_server_unavailable", .infrastructureFailure, true,
+        "ask_local_user_to_check_codex_engine",
+        "The local Codex app-server is unavailable. Ask the local user to check the Codex engine on the Bridge connection page."
+      )
     case .internalFailure(let correlationID):
       return error(
         "internal_error", .infrastructureFailure, true, "retry_or_contact_local_user",

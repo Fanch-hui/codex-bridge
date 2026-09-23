@@ -169,13 +169,14 @@
   function steerForm(detail, modes, emit, baselineReceiptID) {
     var draft = draftFor(detail.taskID), form = S.node("div", "steer-form");
     var grid = S.node("div", "form-grid workbench-steer-grid");
-    var input = inputField(detail, "补充指令", "当前轮完成后继续");
+    var input = inputField(detail, "补充指令", "");
     grid.appendChild(input.wrapper);
     var options = modes.length ? modes : [{ id: "queued", title: "当前轮结束后继续" }];
     if (!options.some(function (mode) { return mode.id === draft.mode && mode.enabled !== false; })) draft.mode = options[0].id;
     var mode = S.selectField("发送方式", draft.mode, options, function (value) {
       draft.mode = value;
       persistDraft(detail.taskID, draft);
+      updateModeText();
     }, "");
     mode.control.id = "workbench-steer-mode";
     mode.control.dataset.taskID = detail.taskID;
@@ -185,6 +186,13 @@
       grid.appendChild(mode.wrapper);
     }
     var send = S.button("发送指令", null, {}, emit, "small primary", false);
+    function updateModeText() {
+      var immediate = draft.mode === "interrupt-current-then-continue";
+      input.control.placeholder = immediate ? "输入指令，立即插入对话引导" : "输入指令，当前轮结束后运行";
+      send.textContent = immediate ? "立即插入对话引导" : "结束后运行";
+      send.title = immediate ? "中断当前轮并继续执行这条指令" : "当前轮结束后执行这条指令";
+    }
+    updateModeText();
     var actions = S.node("div", "form-actions workbench-steer-actions");
     actions.appendChild(send);
     grid.appendChild(actions);
@@ -196,7 +204,7 @@
       var invalid = value.indexOf("\u0000") >= 0 || new TextEncoder().encode(value).length > 32768;
       var pending = pendingSubmissions.has(detail.taskID);
       send.disabled = pending || !value.trim() || invalid;
-      send.textContent = "发送指令";
+      updateModeText();
       send.setAttribute("aria-busy", String(pending));
       send.setAttribute("data-pending", String(pending));
       hint.textContent = invalid ? "指令不能包含 NUL 字符，且不能超过 32768 字节。" : "";

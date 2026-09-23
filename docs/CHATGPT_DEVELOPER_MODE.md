@@ -1,10 +1,10 @@
 # ChatGPT 与 Secure MCP Tunnel 配置指南
 
-适用于 Codex Bridge v1.1.2 的 macOS 与 Windows 版本。完成顺序：创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 创建 App → 提交第一项任务。
+适用于 Codex Bridge v1.2.0 的 macOS 与 Windows 版本。完成顺序：创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 创建 App → 提交第一项任务。
 
 ## 1. 准备 Bridge
 
-1. 从 [Releases](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 安装对应平台版本。
+1. 从 [Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 安装对应平台版本。
 2. 打开 App，在概览中确认后台 Service 已连接。
 3. 在“项目”添加一个本地目录并允许读取。
 4. 在工作台选择该项目和 `Read Only`。

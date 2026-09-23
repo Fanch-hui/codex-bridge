@@ -1,6 +1,6 @@
 # MCP Registry 与 MCPB
 
-Registry name：`io.github.yeyuancc0-glitch/codex-bridge`。
+Registry name：`io.github.Fanch-hui/codex-bridge`。
 
 MCPB 是可选的本机连接器，供支持 MCP Bundles 的客户端安装。使用前先安装并运行
 Codex Bridge，在 App 连接页启用 Qwen 本地 HTTP 连接，再将页面提供的本机 URL 与

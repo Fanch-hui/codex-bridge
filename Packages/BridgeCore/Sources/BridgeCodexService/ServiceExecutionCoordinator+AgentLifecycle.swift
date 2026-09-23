@@ -46,7 +46,8 @@ extension ServiceExecutionCoordinator {
       requestedSessionID: task.requestedThreadID,
       model: task.executionModel == serviceDefaultProviderExecutionModel
         ? nil : task.executionModel,
-      effort: task.executionEffort == serviceDefaultProviderExecutionEffort
+      effort: task.providerID == AgentProviderID.antigravity.rawValue
+        || task.executionEffort == serviceDefaultProviderExecutionEffort
         ? nil : task.executionEffort,
       permissionMode: task.permissionMode,
       networkAllowed: task.networkAllowed
@@ -139,7 +140,7 @@ extension ServiceExecutionCoordinator {
     do {
       try validateAgentEnvelope(envelope, taskID: taskID)
       switch envelope.event {
-      case .content, .tool, .plan, .usage, .approvalAutomaticallyDenied:
+      case .content, .steerDispatched, .tool, .plan, .usage, .approvalAutomaticallyDenied:
         try await agentEventProcessor.process(envelope.event, taskID: taskID)
 
       case .approvalRequested(let approval):

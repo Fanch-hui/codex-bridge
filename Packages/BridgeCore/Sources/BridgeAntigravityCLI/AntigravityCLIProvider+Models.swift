@@ -68,28 +68,10 @@ extension AntigravityCLIProvider {
         fields.count == 2
         ? String(fields[1]).trimmingCharacters(in: .whitespacesAndNewlines)
         : slug
-      let efforts = Self.efforts(slug: slug, displayName: displayName)
       return try? AgentModelDescriptor(
         id: slug,
-        displayName: displayName.isEmpty ? slug : displayName,
-        supportedReasoningEfforts: efforts,
-        defaultReasoningEffort: efforts.count == 1 ? efforts[0] : nil
+        displayName: displayName.isEmpty ? slug : displayName
       )
     }
-  }
-
-  static func efforts(slug: String, displayName: String) -> [String] {
-    let values = ["low", "medium", "high"]
-    let lowerSlug = slug.lowercased()
-    if let effort = values.first(where: { lowerSlug.hasSuffix("-\($0)") }) {
-      return [effort]
-    }
-    let lowerDisplayName = displayName.lowercased()
-    if let effort = values.first(where: {
-      lowerDisplayName.contains("(\($0))") || lowerDisplayName.hasSuffix(" \($0)")
-    }) {
-      return [effort]
-    }
-    return values
   }
 }

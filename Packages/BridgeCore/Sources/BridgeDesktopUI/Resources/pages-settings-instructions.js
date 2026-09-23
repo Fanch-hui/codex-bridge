@@ -8,11 +8,12 @@
     var card = S.node("section", "page-card settings-card");
     card.appendChild(S.node("h3", null, "全局自定义指令"));
     var field = S.node("div", "field");
-    field.appendChild(S.node("label", null, "发送给GPT/Qwen的mcp内置指令"));
+    field.appendChild(S.node("label", null, "给 GPT / Qwen 的指令"));
     var text = S.node("textarea");
     text.value = page.customInstructions || "";
     text.placeholder = "可选。保存后由本机 Service 应用。";
     field.appendChild(text);
+    field.appendChild(S.node("p", "hint", "用于指导 GPT / Qwen 理解和处理请求；Agent 任务应只包含你交代的具体工作。"));
     var counter = S.node("div", "hint");
     field.appendChild(counter);
     card.appendChild(field);

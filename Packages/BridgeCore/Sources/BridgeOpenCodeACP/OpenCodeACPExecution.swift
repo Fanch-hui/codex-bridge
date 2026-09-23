@@ -176,10 +176,6 @@ public actor OpenCodeACPExecution {
   }
 
   private func nextPromptOrTerminal(stopReason: String) async throws -> String? {
-    if let nextPrompt = dequeueSteer() {
-      return nextPrompt
-    }
-
     guard stopReason == "end_turn" else {
       let failure: (code: String, summary: String) =
         switch stopReason {
@@ -209,10 +205,12 @@ public actor OpenCodeACPExecution {
       await finishInterrupted()
       return nil
     }
+    try emitFinalizedContent(finalizedContent)
     // A steer can arrive while the normalizer is finalizing the previous
     // turn. Re-check before claiming terminal so accepted input is never
     // lost to a completion race.
     if let nextPrompt = dequeueSteer() {
+      try await emitSteerDispatched(nextPrompt)
       return nextPrompt
     }
     guard await normalizer.unfinishedToolCount() == 0 else {
@@ -241,11 +239,6 @@ public actor OpenCodeACPExecution {
     guard claimTerminal() else { return nil }
     do {
       let final = try await normalizer.completed(stopReason: stopReason)
-      for event in finalizedContent {
-        guard emit(event) else {
-          throw OpenCodeACPError.transportClosed
-        }
-      }
       guard emit(final) else {
         throw OpenCodeACPError.transportClosed
       }
@@ -254,6 +247,22 @@ public actor OpenCodeACPExecution {
       await closeStream(throwing: error)
     }
     return nil
+  }
+
+  private func emitFinalizedContent(_ events: [AgentEventEnvelope]) throws {
+    for event in events {
+      guard emit(event) else {
+        throw OpenCodeACPError.transportClosed
+      }
+    }
+  }
+
+  /// Recorded before the next prompt is sent so the queued instruction always
+  /// keeps a lower provider sequence than the events of the turn it starts.
+  private func emitSteerDispatched(_ text: String) async throws {
+    guard emit(try await normalizer.steerDispatched(text)) else {
+      throw OpenCodeACPError.transportClosed
+    }
   }
 
   private func finishInterrupted() async {

@@ -70,7 +70,11 @@ public struct MCPServiceServerFactory: Sendable {
 
   package static func instructions(customInstructions: String) -> String {
     let base =
-      "This service exposes only user-approved local projects. List projects, "
+      "Global custom instructions guide this MCP client only. Do not copy or paraphrase "
+      + "them into submit_task.prompt, steer_task.input, or other Agent-facing fields unless "
+      + "the user's current request explicitly asks you to send that content. Build Agent "
+      + "tasks from the user's concrete request. This service exposes only user-approved "
+      + "local projects. List projects, "
       + "Threads and models before submitting work. Task submission never grants local "
       + "approval; the user must approve execution in the desktop App. Use default_project_id from list_projects "
       + "as the current default project. Omit project_id when submitting work unless the user explicitly "
@@ -105,7 +109,7 @@ public struct MCPServiceServerFactory: Sendable {
       + "to antigravity. It supports native plan/accept-edits modes: Plan/read-only (agy mode: plan) "
       + "and Accept Edits/workspace-write "
       + "(agy mode: accept-edits) in-place "
-      + "modes, model and effort selection, exact continuation, and queued steer when list_agents "
+      + "modes, model selection (including effort in the model ID), exact continuation, and queued steer when list_agents "
       + "reports the matching effective capabilities. For ChatGPT and Qwen, an unmarked permission_mode "
       + "uses the Workbench default; any override requires permission_mode_override=true and an explicit user request. "
       + "Continue only with a provider_session_id returned by a terminal "
@@ -132,8 +136,10 @@ public struct MCPServiceServerFactory: Sendable {
       + " A git_commit receipt proves the call completed; only a non-null commit_hash proves that "
       + "a new commit was created."
     guard !customInstructions.isEmpty else { return base }
-    return "The user's global custom instructions follow. Read and follow them before "
-      + "calling any Codex Bridge tool, subject to the service's security and approval "
-      + "boundaries:\n\n" + customInstructions + "\n\n" + base
+    return "The following custom instructions guide you (ChatGPT/Qwen), not the local "
+      + "Agent. Apply them to your own behavior. Never put their text or paraphrases in an "
+      + "Agent prompt or follow-up unless the user's current request explicitly asks you "
+      + "to send that content. Service security and local approval still apply:\n\n"
+      + customInstructions + "\n\n" + base
   }
 }

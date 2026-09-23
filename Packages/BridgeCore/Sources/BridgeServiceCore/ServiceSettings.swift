@@ -379,21 +379,6 @@ public actor ServiceSettings {
     try await set(model, for: .antigravityDefaultModel)
   }
 
-  public func antigravityDefaultEffort() async throws -> String? {
-    try await string(for: .antigravityDefaultEffort)
-  }
-
-  public func setAntigravityDefaultEffort(_ effort: String?) async throws {
-    if let effort {
-      try ServiceValidation.identifier(
-        effort,
-        field: "agent.antigravity.default_effort",
-        maximumBytes: 64
-      )
-    }
-    try await set(effort, for: .antigravityDefaultEffort)
-  }
-
   public func openCodeDefaultEffort() async throws -> String? {
     try await string(for: .openCodeDefaultEffort)
   }

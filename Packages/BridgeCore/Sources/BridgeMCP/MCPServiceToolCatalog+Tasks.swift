@@ -65,7 +65,10 @@ extension MCPServiceToolCatalog {
     title: "Submit task",
     description:
       "Create a provider task; Codex remains the default provider. ChatGPT and Qwen submissions "
-      + "wait for the local user to approve the provider invocation in Codex Bridge before "
+      + "must contain the user's concrete task, not the global custom instructions that guide "
+      + "ChatGPT or Qwen. Do not copy or paraphrase those instructions into the Agent prompt "
+      + "unless the user's current request explicitly asks for that content. "
+      + "They wait for the local user to approve the provider invocation in Codex Bridge before "
       + "execution starts. Return immediately with "
       + "awaiting_local_approval and local_approval_required=true, then use get_task to observe "
       + "approval, execution, or an explicit local_approval_denied result. Risky Codex operations "
@@ -102,7 +105,7 @@ extension MCPServiceToolCatalog {
       + "uses the registered official agy stream-json installation and supports native plan/accept-edits "
       + "modes: Plan/read-only "
       + "(agy mode: plan) or Accept Edits/workspace-write (agy mode: accept-edits) in-place modes. "
-      + "Model, effort, and session continuation are "
+      + "Model selection, including effort encoded in the model ID, and session continuation are "
       + "available only when list_agents reports the corresponding effective capability; thread_id "
       + "must be a prior Bridge-bound Antigravity conversation from the same project and installation. "
       + "steer_task queues follow-up input on the same Antigravity session after the current prompt, "
@@ -145,7 +148,7 @@ extension MCPServiceToolCatalog {
         "execution_effort": nullableStringSchema(
           maximum: 64,
           description:
-            "Omit to use the selected provider default effort. For OpenCode, DeepSeek Harness, or Antigravity, set only a value advertised for the selected model when the user explicitly requests a per-task override and selection.effort is effective; external providers require model_override=true."
+            "Omit to use the selected provider default effort. For OpenCode or DeepSeek Harness, set only a value advertised for the selected model when the user explicitly requests a per-task override and selection.effort is effective; external providers require model_override=true. Antigravity effort is part of the model ID, so omit this field."
         ),
         "model_override": [
           "type": ["boolean", "null"],
@@ -208,7 +211,7 @@ extension MCPServiceToolCatalog {
     name: MCPServiceToolName.steerTask.rawValue,
     title: "Steer task",
     description:
-      "Send bounded corrective input to the exact active provider run. The default queued mode preserves existing behavior. For DeepSeek Harness, mode=interrupt-current-then-continue cancels only the current prompt and sends the correction on the same session without terminating the task. Other external providers currently accept queued mode only.",
+      "Send bounded corrective input to the exact active provider run. Send only the user's concrete correction, not global custom instructions for ChatGPT or Qwen. The default queued mode preserves existing behavior. For DeepSeek Harness, mode=interrupt-current-then-continue cancels only the current prompt and sends the correction on the same session without terminating the task. Other external providers currently accept queued mode only.",
     inputSchema: objectSchema(
       properties: [
         "task_id": boundedStringSchema(maximum: 128),

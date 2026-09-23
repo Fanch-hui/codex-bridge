@@ -25,6 +25,7 @@ public actor OpenCodeACPEventNormalizer {
   private var sequence: Int64 = 0
   private var contentOrder: [String] = []
   private var contents: [String: ContentState] = [:]
+  private var completedTurnSummaries: [String] = []
   private var tools: [String: ToolState] = [:]
   private static let maximumContentBytes = 256 * 1_024
   private static let maximumContentStreams = 64
@@ -49,7 +50,11 @@ public actor OpenCodeACPEventNormalizer {
   }
 
   public func completed(stopReason: String, summary: String? = nil) throws -> AgentEventEnvelope {
-    guard let resolvedSummary = summary ?? latestAssistantSummary(),
+    guard
+      let resolvedSummary =
+        summary
+        ?? AgentTurnSummary.combined(completedTurnSummaries)
+        ?? latestAssistantSummary(),
       !resolvedSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
       throw OpenCodeACPError.malformedResponse
@@ -58,7 +63,7 @@ public actor OpenCodeACPEventNormalizer {
   }
 
   public func finalizeContent() throws -> [AgentEventEnvelope] {
-    try contentOrder.compactMap { key in
+    let events = try contentOrder.compactMap { key -> AgentEventEnvelope? in
       guard let state = contents[key], state.role == .assistant, state.kind == .message,
         !state.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       else {
@@ -76,6 +81,16 @@ public actor OpenCodeACPEventNormalizer {
       )
       return try envelope(.content(update))
     }
+    if let turnSummary = latestAssistantSummary() {
+      completedTurnSummaries.append(turnSummary)
+    }
+    contentOrder.removeAll(keepingCapacity: true)
+    contents.removeAll(keepingCapacity: true)
+    return events
+  }
+
+  public func steerDispatched(_ text: String) throws -> AgentEventEnvelope {
+    try envelope(.steerDispatched(text))
   }
 
   public func unfinishedToolCount() -> Int {

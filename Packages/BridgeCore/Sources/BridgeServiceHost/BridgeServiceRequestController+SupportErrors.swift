@@ -1,6 +1,7 @@
 import BridgeAgentCore
 import BridgeCodexService
 import BridgeDeepSeekHarnessACP
+import BridgeDomain
 import BridgeIPC
 import BridgeMCP
 import BridgeServiceApplication
@@ -10,6 +11,9 @@ import Foundation
 
 extension BridgeServiceRequestController {
   static func map(_ error: Error) -> BridgeServiceIPCError {
+    if let error = error as? TaskHandoffError {
+      return .init(code: "handoff_rejected", message: error.localizedDescription, retryable: false)
+    }
     if error is BridgeServiceIPCCodecError {
       return .init(code: "invalid_request", message: "The XPC request is invalid.")
     }

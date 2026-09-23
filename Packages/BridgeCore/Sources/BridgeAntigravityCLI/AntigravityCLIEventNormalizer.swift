@@ -51,7 +51,7 @@ public actor AntigravityCLIEventNormalizer {
   private let projectRoot: String
   private var sequence: Int64 = 0
   private var turnOrdinal = 0
-  private var latestMessageKey: String?
+  private var turnSummaries: [String] = []
   private var contents: [String: ContentState] = [:]
   private static let maximumContentBytes = 256 * 1_024
   private static let maximumContentStreams = 64
@@ -79,7 +79,7 @@ public actor AntigravityCLIEventNormalizer {
     var events: [AgentEventEnvelope] = []
     switch update.stepType {
     case "agent_response":
-      try accumulateContent(update)
+      if let event = try accumulateContent(update) { events.append(event) }
     case "tool":
       if !Self.isAnonymousPermissionDenial(update) {
         events.append(try tool(update))
@@ -106,13 +106,11 @@ public actor AntigravityCLIEventNormalizer {
     if let usage = try usage(result.usage) { events.append(usage) }
     let safeResponse = Self.safeContent(result.response)
     if !safeResponse.isEmpty {
-      let key = latestMessageKey ?? "message:result:\(turnOrdinal)"
-      contents[key] = ContentState(content: safeResponse)
       events.append(
         try envelope(
           .content(
             AgentContentUpdate(
-              key: key,
+              key: "message:result:\(turnOrdinal)",
               role: .assistant,
               kind: .message,
               mode: .full,
@@ -124,9 +122,13 @@ public actor AntigravityCLIEventNormalizer {
         )
       )
     }
+    let turnSummary = Self.summary(
+      result.response,
+      fallback: "Antigravity completed the task."
+    )
+    turnSummaries.append(turnSummary)
     let completedTurnOrdinal = turnOrdinal
     turnOrdinal += 1
-    latestMessageKey = nil
     contents.removeAll(keepingCapacity: true)
 
     guard terminal else { return events }
@@ -158,11 +160,14 @@ public actor AntigravityCLIEventNormalizer {
     let status = result.status.uppercased()
     switch status {
     case "SUCCESS":
-      let summary = Self.summary(
-        result.response,
-        fallback: "Antigravity completed the task."
+      events.append(
+        try envelope(
+          .completed(
+            summary: AgentTurnSummary.combined(turnSummaries) ?? turnSummary,
+            stopReason: status
+          )
+        )
       )
-      events.append(try envelope(.completed(summary: summary, stopReason: status)))
     case "CANCELED", "INTERRUPTED":
       events.append(try envelope(.interrupted))
     default:
@@ -190,9 +195,15 @@ public actor AntigravityCLIEventNormalizer {
     try envelope(.interrupted)
   }
 
-  private func accumulateContent(_ update: AntigravityStepUpdate) throws {
-    guard let delta = update.textDelta, !delta.isEmpty else { return }
-    let key = "message:\(update.stepIndex)"
+  public func steerDispatched(_ text: String) throws -> AgentEventEnvelope {
+    try envelope(.steerDispatched(text))
+  }
+
+  private func accumulateContent(
+    _ update: AntigravityStepUpdate
+  ) throws -> AgentEventEnvelope? {
+    guard let delta = update.textDelta, !delta.isEmpty else { return nil }
+    let key = "message:step:\(update.stepIndex)"
     if contents[key] == nil, contents.count >= Self.maximumContentStreams {
       throw AntigravityCLIError.oversizedFrame
     }
@@ -202,7 +213,17 @@ public actor AntigravityCLIEventNormalizer {
       throw AntigravityCLIError.oversizedFrame
     }
     contents[key] = ContentState(content: combined)
-    latestMessageKey = key
+    return try envelope(
+      .content(
+        AgentContentUpdate(
+          key: key,
+          role: .assistant,
+          kind: .message,
+          mode: .delta,
+          content: delta
+        )
+      )
+    )
   }
 
   private func tool(_ update: AntigravityStepUpdate) throws -> AgentEventEnvelope {

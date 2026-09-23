@@ -279,9 +279,12 @@ extension BridgeServiceApplication {
     if providerID == .deepSeekHarness {
       model = try await migratedDeepSeekModelDefault(model)
     }
-    let effort = try await settings.string(
-      for: try Self.agentDefaultEffortKey(providerID: providerID)
-    )
+    let effort: String?
+    if providerID == .antigravity {
+      effort = nil
+    } else {
+      effort = try await settings.string(for: Self.agentDefaultEffortKey(providerID: providerID))
+    }
     let permissionMode: String
     if providerID == .openCode {
       permissionMode = try await settings.openCodeDefaultPermissionMode()
@@ -329,7 +332,8 @@ extension BridgeServiceApplication {
   ) async throws -> (model: String?, permissionMode: String, effort: String?) {
     try Self.checkDeadline(deadline)
     guard let policy = ServiceAgentProviderPolicyRegistry.policy(for: providerID),
-      policy.supportsModelSelection
+      policy.supportsModelSelection,
+      policy.supportsEffortSelection || !updateEffort || effort == nil
     else {
       throw BridgeMCPQueryError.contractRejected
     }
@@ -367,7 +371,9 @@ extension BridgeServiceApplication {
         throw BridgeMCPQueryError.contractRejected
       }
     }
-    if updateEffort {
+    if providerID == .antigravity {
+      try await settings.set(nil, for: .antigravityDefaultEffort)
+    } else if updateEffort {
       if let effort {
         guard !effort.isEmpty, effort.utf8.count <= 64,
           !effort.contains("\0"),

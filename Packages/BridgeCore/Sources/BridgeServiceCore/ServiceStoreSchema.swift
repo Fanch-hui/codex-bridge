@@ -27,7 +27,7 @@ private struct LegacyWorkspaceCommand: Codable {
 }
 
 enum ServiceStoreSchema {
-  static let version: Int64 = 17
+  static let version: Int64 = 18
   static let migrationPrefix = "BridgeServiceCore."
   static let migrationV1 = "BridgeServiceCore.v1"
   static let migrationV2 = "BridgeServiceCore.v2"
@@ -46,10 +46,11 @@ enum ServiceStoreSchema {
   static let migrationV15 = "BridgeServiceCore.v15"
   static let migrationV16 = "BridgeServiceCore.v16"
   static let migrationV17 = "BridgeServiceCore.v17"
+  static let migrationV18 = "BridgeServiceCore.v18"
   static let knownMigrations: Set<String> = [
     migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7,
     migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13,
-    migrationV14, migrationV15, migrationV16, migrationV17,
+    migrationV14, migrationV15, migrationV16, migrationV17, migrationV18,
   ]
 
   static func prepare(_ database: DatabaseQueue) throws {
@@ -99,6 +100,7 @@ enum ServiceStoreSchema {
     case 14: backupSuffix = ".pre-v15"
     case 15: backupSuffix = ".pre-v16"
     case 16: backupSuffix = ".pre-v17"
+    case 17: backupSuffix = ".pre-v18"
     default: return
     }
     let backupPath = sourcePath + backupSuffix
@@ -207,7 +209,7 @@ enum ServiceStoreSchema {
     let candidates = names.compactMap { name -> (path: String, version: Int64)? in
       guard name.hasPrefix(prefix),
         let targetVersion = Int64(name.dropFirst(prefix.count)),
-        (8...17).contains(targetVersion)
+        (8...18).contains(targetVersion)
       else { return nil }
       return (
         URL(fileURLWithPath: directory).appendingPathComponent(name).path,
@@ -290,6 +292,9 @@ enum ServiceStoreSchema {
     }
     migrator.registerMigration(migrationV17) { db in
       try createVersionSeventeen(in: db)
+    }
+    migrator.registerMigration(migrationV18) { db in
+      try createVersionEighteen(in: db)
     }
     return migrator
   }
@@ -413,9 +418,7 @@ enum ServiceStoreSchema {
           SET direct_command_mode = 'safe'
           WHERE direct_command_mode = 'registered';
 
-        ALTER TABLE bridge_service_projects RENAME TO bridge_service_projects_v5;
-
-        CREATE TABLE bridge_service_projects (
+        CREATE TABLE bridge_service_projects_v6 (
             project_id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL,
             canonical_path TEXT NOT NULL,
@@ -445,7 +448,7 @@ enum ServiceStoreSchema {
             CHECK (updated_at >= created_at)
         ) WITHOUT ROWID;
 
-        INSERT INTO bridge_service_projects (
+        INSERT INTO bridge_service_projects_v6 (
             project_id, name, canonical_path, root_device, root_inode,
             read_permission, write_permission, network_permission,
             direct_command_mode, workspace_commands_json,
@@ -458,9 +461,11 @@ enum ServiceStoreSchema {
             direct_command_mode, workspace_commands_json,
             '[]', '[]',
             created_at, updated_at
-        FROM bridge_service_projects_v5;
+        FROM bridge_service_projects;
 
-        DROP TABLE bridge_service_projects_v5;
+        DROP TABLE bridge_service_projects;
+
+        ALTER TABLE bridge_service_projects_v6 RENAME TO bridge_service_projects;
 
         UPDATE bridge_service_meta SET schema_version = 6 WHERE singleton = 1;
         """)
@@ -1209,6 +1214,10 @@ enum ServiceStoreSchema {
           "tool_name", "tool_status", "tool_arguments", "created_at", "updated_at",
         ],
         "bridge_service_task_queue": ["task_id", "enqueued_at"],
+        "bridge_service_handoffs": [
+          "handoff_id", "project_id", "source_task_id", "target_task_id",
+          "target_fingerprint", "packet_json", "preview_json", "created_at",
+        ],
       ]
       for (table, expected) in requiredColumns {
         guard try db.tableExists(table) else { throw ServiceStoreError.corruptSchema }

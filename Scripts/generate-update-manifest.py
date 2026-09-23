@@ -13,7 +13,7 @@ from typing import NoReturn
 from urllib.parse import quote
 
 
-REPOSITORY = "yeyuancc0-glitch/codex-bridge"
+REPOSITORY = "Fanch-hui/codex-bridge"
 PLATFORMS = {"macos", "windows"}
 ARCHITECTURES = {"arm64", "x64"}
 KINDS = {"app", "installer", "portable"}

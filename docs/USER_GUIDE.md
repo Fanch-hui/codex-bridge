@@ -25,7 +25,7 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ### macOS Apple Silicon
 
-1. 从 [最新版下载页](https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest) 下载 `CodexBridge-<版本>-macos-arm64.dmg`。
+1. 从 [最新版下载页](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载 `CodexBridge-<版本>-macos-arm64.dmg`。
 2. 打开 DMG，把 `CodexBridge.app` 拖到 Applications。
 3. 从 Applications 启动。当前包使用 ad-hoc 签名、尚未 Apple 公证；若系统拦截，在“系统设置 → 隐私与安全性”允许打开。
 4. 在概览检查 Service。若提示后台项目需批准，按提示打开系统设置并允许 Codex Bridge 后台项目。
@@ -85,7 +85,7 @@ AGY 的 Always Proceed 由 AGY 连接流程单独征得同意后设置；它属�
 ### Codex
 
 1. 准备当前系统用户能够运行并已完成登录的本机 Codex。
-2. 在“连接 → Codex 执行引擎”点击“连接”。Bridge 自动发现 Codex，通常无需手工指定路径；页面显示“当前使用”的实际可执行文件。连接或模型列表失败时，先查看卡片中的错误信息：如果 Codex 装在非常规位置，在“可执行文件路径（可选）”中填写 `codex`（Windows 为 `codex.exe` 或 npm 的 `codex.cmd`）的绝对路径并保存，清除该字段即恢复自动发现。
+2. 在“连接 → Codex 执行引擎”点击“连接”。Bridge 自动发现 Codex，通常无需手工指定路径；页面显示“当前使用”的实际可执行文件。连接或模型列表失败时，先查看卡片中的错误信息：如果 Codex 装在非常规位置，在“可执行文件路径（可选）”中填写 `codex`（Windows 为 `codex.exe` 或 npm 的 `codex.cmd`）的绝对路径并保存，清除该字段即恢复自动发现。路径可直接从资源管理器复制粘贴（含引号的“复制为路径”会自动去掉引号）；保存被拒绝或模型目录仍失败时，卡片与提示会给出具体原因和 Bridge 实际尝试启动的可执行文件。
 3. 打开设置中的 Codex 模型区域，获取模型，选择默认模型和推理强度，保存模型偏好。
 4. 回到工作台选择项目，提交只读任务。
 

@@ -439,6 +439,7 @@ public enum ExecutionEvent: Equatable, Sendable {
   case reasoningDelta(ExecutionReasoningDelta)
   case toolCall(ExecutionToolCall)
   case toolCallProgress(itemID: String, progress: String)
+  case agentMessageCompleted(ExecutionAgentMessage)
   case turnCompleted(messages: [ExecutionAgentMessage])
   case completed(resultSummary: String)
   case interrupted

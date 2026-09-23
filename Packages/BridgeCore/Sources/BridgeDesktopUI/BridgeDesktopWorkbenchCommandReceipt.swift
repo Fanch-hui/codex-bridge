@@ -1,3 +1,4 @@
+import BridgeServiceAppCore
 import Foundation
 
 public struct BridgeDesktopWorkbenchCommandReceipt: Codable, Equatable, Sendable {
@@ -8,6 +9,7 @@ public struct BridgeDesktopWorkbenchCommandReceipt: Codable, Equatable, Sendable
   public let input: String?
   public let accepted: Bool
   public let message: String?
+  public let handoff: WorkbenchHandoffPreview?
 
   public init(
     requestID: String,
@@ -16,6 +18,7 @@ public struct BridgeDesktopWorkbenchCommandReceipt: Codable, Equatable, Sendable
     input: String?,
     accepted: Bool,
     message: String? = nil,
+    handoff: WorkbenchHandoffPreview? = nil,
     receiptID: String = UUID().uuidString
   ) {
     self.receiptID = receiptID
@@ -25,6 +28,7 @@ public struct BridgeDesktopWorkbenchCommandReceipt: Codable, Equatable, Sendable
     self.input = input
     self.accepted = accepted
     self.message = message
+    self.handoff = handoff
   }
 }
 
@@ -35,7 +39,8 @@ public enum BridgeDesktopWorkbenchCommandAck {
     taskID: String?,
     input: String?,
     accepted: Bool,
-    message: String? = nil
+    message: String? = nil,
+    handoff: WorkbenchHandoffPreview? = nil
   ) -> BridgeDesktopWorkbenchCommandReceipt {
     BridgeDesktopWorkbenchCommandReceipt(
       requestID: requestID,
@@ -43,7 +48,8 @@ public enum BridgeDesktopWorkbenchCommandAck {
       taskID: taskID,
       input: input,
       accepted: accepted,
-      message: message
+      message: message,
+      handoff: handoff
     )
   }
 }

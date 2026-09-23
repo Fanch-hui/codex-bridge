@@ -101,7 +101,8 @@ extension BridgeDesktopCommandRouter {
         return
       }
       model.handoffTask(
-        selectedTask, providerID: providerID, prompt: prompt, requestID: envelope.requestID)
+        selectedTask, providerID: providerID, prompt: prompt, requestID: envelope.requestID,
+        action: payload.action, handoffID: payload.value, revision: payload.messageKey)
     case .restartTask:
       guard let selectedTask = task(payload.taskID, in: model),
         connected(model), selectedTask.canRestart

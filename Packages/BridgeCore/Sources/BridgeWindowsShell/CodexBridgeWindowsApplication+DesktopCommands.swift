@@ -82,10 +82,13 @@
             id: taskID, input: input, requestID: requestID, queueIfBusy: queueIfBusy)
         }
         return true
-      case .handoffTask(let taskID, let providerID, let prompt, let requestID):
+      case .handoffTask(
+        let taskID, let providerID, let prompt, let requestID, let action, let handoffID,
+        let revision):
         Task { @MainActor in
           await model.handoffTask(
-            id: taskID, providerID: providerID, prompt: prompt, requestID: requestID)
+            id: taskID, providerID: providerID, prompt: prompt, requestID: requestID,
+            action: action, handoffID: handoffID, revision: revision)
         }
         return true
       case .restartTask(let taskID, let requestID, let queueIfBusy):

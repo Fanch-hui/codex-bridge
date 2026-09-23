@@ -4,7 +4,7 @@ Codex Bridge executes local developer tools against explicitly registered projec
 
 ## Reporting
 
-Use the repository's [Security page](https://github.com/yeyuancc0-glitch/codex-bridge/security) for security reports. Include the affected version, operating system, expected behavior, actual behavior, and a minimal reproduction using synthetic data.
+Use the repository's [Security page](https://github.com/Fanch-hui/codex-bridge/security) for security reports. Include the affected version, operating system, expected behavior, actual behavior, and a minimal reproduction using synthetic data.
 
 Do not attach credentials, authentication files, browser cookies, private keys, or unrelated project content to a report.
 

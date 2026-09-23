@@ -7,10 +7,10 @@ import Foundation
 
 public final class AppUpdateClient: AppUpdateClientProtocol, @unchecked Sendable {
   public static let feedURL = URL(
-    string: "https://github.com/yeyuancc0-glitch/codex-bridge/releases/latest/download/latest.json"
+    string: "https://github.com/Fanch-hui/codex-bridge/releases/latest/download/latest.json"
   )!
 
-  private static let releasePathPrefix = "/yeyuancc0-glitch/codex-bridge/releases/download/"
+  private static let releasePathPrefix = "/Fanch-hui/codex-bridge/releases/download/"
   private let session: URLSession
 
   public init() {

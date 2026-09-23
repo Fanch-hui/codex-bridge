@@ -1,6 +1,6 @@
 # OpenCode 连接指南
 
-适用于 Codex Bridge v1.1.0。
+适用于 Codex Bridge v1.0.1。
 本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并让 ChatGPT、Qwen Studio 或 Bridge 工作台通过 MCP 提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
 
 ## 自动发现与连接
