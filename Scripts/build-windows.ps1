@@ -178,7 +178,6 @@ try {
         "BridgeFilesWindowsTests",
         "BridgeCodexRPCTests",
         "BridgeProcessWindowsTests",
-        "BridgeOpenCodeACPTests",
         "BridgeDesktopUITests",
         "BridgeServiceAppCoreTests",
         "BridgeServiceHostWindowsTests",
@@ -188,6 +187,7 @@ try {
         "BridgeServiceApplicationWindowsTests",
         "BridgeServiceCoreWindowsTests",
         "BridgeDirectCommandWindowsTests",
+        "BridgeDirectCommandPolicyWindowsTests",
         "BridgeDeepSeekHarnessACPWindowsTests",
         "BridgeWindowsShellTests"
       )
