@@ -346,7 +346,12 @@ final class PathSecurityTests: XCTestCase {
 
     let resolved = try resolver.resolve(SecureRelativePath("Sources/App.swift"))
 
-    XCTAssertEqual(resolved.canonicalURL.path, file.path)
+    // CI runners expose 8.3 short names (RUNNER~1), so the expected path has to
+    // travel the same canonicalization chain the resolver applies.
+    XCTAssertEqual(
+      resolved.canonicalURL.path,
+      file.standardizedFileURL.resolvingSymlinksInPath().path
+    )
   }
 
   func testBlocksSymlinkEscapeAndSensitiveAlias() throws {

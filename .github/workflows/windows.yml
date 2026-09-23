@@ -275,16 +275,21 @@ jobs:
             "BridgeServiceCoreWindowsTests", "BridgeDirectCommandWindowsTests",
             "BridgeDeepSeekHarnessACPWindowsTests", "BridgeWindowsShellTests"
           )
+          $failedFilters = @()
           foreach ($filter in $filters) {
             $output = @(& swift test @swiftArguments --filter $filter 2>&1)
             $exitCode = $LASTEXITCODE
             $output | ForEach-Object { Write-Host $_ }
-            if ($exitCode -ne 0) { exit $exitCode }
+            if ($exitCode -ne 0) {
+              $failedFilters += "$filter (exit $exitCode)"
+              continue
+            }
             $summary = @(
               $output | Select-String -Pattern 'Executed\s+(\d+)\s+tests?|# tests\s+(\d+)|Test run with\s+(\d+)\s+tests?'
             )
             if ($summary.Count -eq 0) {
-              throw "Swift filter '$filter' did not report an executed test count."
+              $failedFilters += "$filter (no executed test count reported)"
+              continue
             }
             $executed = 0
             foreach ($line in $summary) {
@@ -304,8 +309,11 @@ jobs:
               }
             }
             if ($executed -le 0) {
-              throw "Swift filter '$filter' executed no tests."
+              $failedFilters += "$filter (no tests executed)"
             }
+          }
+          if ($failedFilters.Count -gt 0) {
+            throw "Failed filters: $($failedFilters -join '; ')"
           }
       - name: Smoke Windows GUI startup
         if: matrix.run_tests
