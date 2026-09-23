@@ -45,27 +45,22 @@ final class ServiceSettingsTests: XCTestCase {
     XCTAssertEqual(persistedMode, .auto)
   }
 
-  func testAntigravityDefaultsToWorkspaceWriteAndPersistsBuildPlanValues() async throws {
+  func testAntigravityDefaultsToWorkspaceWriteAndPersistsModelAndPermission() async throws {
     let fixture = try ServiceCoreFixture()
     defer { fixture.remove() }
     let settings = ServiceSettings(store: try SimpleServiceStore(path: fixture.databasePath))
 
     let initialModel = try await settings.antigravityDefaultModel()
-    let initialEffort = try await settings.antigravityDefaultEffort()
     let initialPermissionMode = try await settings.antigravityDefaultPermissionMode()
     XCTAssertNil(initialModel)
-    XCTAssertNil(initialEffort)
     XCTAssertEqual(initialPermissionMode, "workspace-write")
 
     try await settings.setAntigravityDefaultModel("antigravity/model")
-    try await settings.setAntigravityDefaultEffort("high")
     try await settings.setAntigravityDefaultPermissionMode("read-only")
 
     let persistedModel = try await settings.antigravityDefaultModel()
-    let persistedEffort = try await settings.antigravityDefaultEffort()
     let persistedPermissionMode = try await settings.antigravityDefaultPermissionMode()
     XCTAssertEqual(persistedModel, "antigravity/model")
-    XCTAssertEqual(persistedEffort, "high")
     XCTAssertEqual(persistedPermissionMode, "read-only")
   }
 

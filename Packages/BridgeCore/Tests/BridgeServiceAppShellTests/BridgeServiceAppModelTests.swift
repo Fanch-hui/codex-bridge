@@ -743,7 +743,7 @@ final class BridgeServiceAppModelTests: XCTestCase {
       providerID: "antigravity",
       model: "antigravity/model",
       permissionMode: "workspace-write",
-      effort: "high"
+      effort: nil
     )
     await client.setAgentDefaultReadDelay(.milliseconds(25), providerID: "opencode")
     await client.setAgentDefaultReadDelay(.milliseconds(10), providerID: "deepseek-harness")
@@ -762,7 +762,7 @@ final class BridgeServiceAppModelTests: XCTestCase {
 
     model.saveAgentEffort("xhigh", providerID: "opencode")
     model.saveAgentEffort("high", providerID: "deepseek-harness")
-    model.saveAgentEffort("low", providerID: "antigravity")
+    model.saveAgentModelDefault("antigravity/model-high", providerID: "antigravity")
 
     try await waitUntil {
       let openCode = try? await client.agentModelDefault(providerID: "opencode")
@@ -770,10 +770,11 @@ final class BridgeServiceAppModelTests: XCTestCase {
       let antigravity = try? await client.agentModelDefault(providerID: "antigravity")
       return openCode?.effort == "xhigh"
         && deepSeek?.effort == "high"
-        && antigravity?.effort == "low"
+        && antigravity?.model == "antigravity/model-high"
+        && antigravity?.effort == nil
         && model.agentModelDefault(for: "opencode").effort == "xhigh"
         && model.agentModelDefault(for: "deepseek-harness").effort == "high"
-        && model.agentModelDefault(for: "antigravity").effort == "low"
+        && model.agentModelDefault(for: "antigravity").model == "antigravity/model-high"
     }
   }
 

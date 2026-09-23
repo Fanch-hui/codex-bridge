@@ -46,7 +46,8 @@ extension ServiceExecutionCoordinator {
       requestedSessionID: task.requestedThreadID,
       model: task.executionModel == serviceDefaultProviderExecutionModel
         ? nil : task.executionModel,
-      effort: task.executionEffort == serviceDefaultProviderExecutionEffort
+      effort: task.providerID == AgentProviderID.antigravity.rawValue
+        || task.executionEffort == serviceDefaultProviderExecutionEffort
         ? nil : task.executionEffort,
       permissionMode: task.permissionMode,
       networkAllowed: task.networkAllowed

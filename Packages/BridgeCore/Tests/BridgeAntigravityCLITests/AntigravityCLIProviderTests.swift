@@ -18,7 +18,8 @@ final class AntigravityCLIProviderTests: XCTestCase {
       "\u{001B}[32mgemini-pro Gemini Pro\u{001B}[0m\n"
       + "gemini-pro Duplicate\n"
       + "bad:model Bad Namespace\n"
-      + "gemini-flash\n"
+      + "gemini-3.8-flash-high\tGemini 3.8 Flash (High)\n"
+      + "gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n"
       + "\n"
     let commandRunner = RecordingAntigravityCommandRunner(
       result: AntigravityCLICommandResult(
@@ -55,9 +56,15 @@ final class AntigravityCLIProviderTests: XCTestCase {
       projectRoot: projectRoot
     )
 
-    XCTAssertEqual(models.map(\.id), ["gemini-pro", "gemini-flash"])
-    XCTAssertEqual(models.map(\.displayName), ["Gemini Pro", "gemini-flash"])
-    XCTAssertEqual(models.first?.supportedReasoningEfforts, ["low", "medium", "high"])
+    XCTAssertEqual(
+      models.map(\.id),
+      ["gemini-pro", "gemini-3.8-flash-high", "gemini-3.8-flash-medium"]
+    )
+    XCTAssertEqual(
+      models.map(\.displayName),
+      ["Gemini Pro", "Gemini 3.8 Flash (High)", "Gemini 3.8 Flash (Medium)"]
+    )
+    XCTAssertTrue(models.allSatisfy { $0.supportedReasoningEfforts.isEmpty })
     let calls = await commandRunner.calls()
     XCTAssertEqual(calls.count, 1)
     XCTAssertEqual(calls[0].argv, ["/bin/echo", "models"])

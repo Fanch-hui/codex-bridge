@@ -67,7 +67,7 @@ extension BridgeServiceApplication {
       providerDefaultMode = configuredMode == "read-only" ? .readOnly : .workspaceWrite
     } else if policy.providerID == .antigravity {
       configuredModel = try await settings.antigravityDefaultModel()
-      configuredEffort = try await settings.antigravityDefaultEffort()
+      configuredEffort = nil
       let configuredMode = try await settings.antigravityDefaultPermissionMode()
       providerDefaultMode = configuredMode == "read-only" ? .readOnly : .workspaceWrite
     } else {

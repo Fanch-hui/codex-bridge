@@ -29,7 +29,7 @@ final class ServiceAgentProviderPolicyTests: XCTestCase {
     XCTAssertFalse(policy.supportsInteractiveApproval)
     XCTAssertFalse(policy.supportsOneTimeToolAutoApproval)
     XCTAssertTrue(policy.supportsModelSelection)
-    XCTAssertTrue(policy.supportsEffortSelection)
+    XCTAssertFalse(policy.supportsEffortSelection)
     XCTAssertTrue(policy.supportsSkillSelection)
     XCTAssertFalse(policy.supportsSupervisor)
     XCTAssertTrue(policy.allowsNetworkAccess)
@@ -43,7 +43,7 @@ final class ServiceAgentProviderPolicyTests: XCTestCase {
       policy.effectiveCapabilities(reported, projectAllowsWorkspaceWrite: true),
       [
         .sessionCreate, .sessionContinue, .interrupt, .steer, .toolLifecycle, .usage,
-        .workspaceRead, .workspaceWriteInPlace, .modelSelection, .effortSelection, .shell,
+        .workspaceRead, .workspaceWriteInPlace, .modelSelection, .shell,
         .webSearch, .webFetch, .mcpClient, .subagents, .childRuns,
       ]
     )
@@ -51,7 +51,7 @@ final class ServiceAgentProviderPolicyTests: XCTestCase {
       policy.effectiveCapabilities(reported, projectAllowsWorkspaceWrite: false),
       [
         .sessionCreate, .sessionContinue, .interrupt, .steer, .toolLifecycle, .usage,
-        .workspaceRead, .modelSelection, .effortSelection, .shell, .webSearch, .webFetch,
+        .workspaceRead, .modelSelection, .shell, .webSearch, .webFetch,
         .mcpClient, .subagents, .childRuns,
       ]
     )

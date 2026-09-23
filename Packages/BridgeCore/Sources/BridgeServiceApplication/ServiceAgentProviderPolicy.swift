@@ -234,7 +234,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     supportsInteractiveApproval: false,
     supportsOneTimeToolAutoApproval: false,
     supportsModelSelection: true,
-    supportsEffortSelection: true,
+    supportsEffortSelection: false,
     supportsSkillSelection: true,
     allowsNetworkAccess: true,
     requiresHeadlessAlwaysProceed: true,
@@ -243,7 +243,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     networkEnforcement: "provider_native",
     allowedCapabilities: [
       .sessionCreate, .interrupt, .steer, .toolLifecycle, .usage, .workspaceRead,
-      .workspaceWriteInPlace, .sessionContinue, .modelSelection, .effortSelection, .shell,
+      .workspaceWriteInPlace, .sessionContinue, .modelSelection, .shell,
       .webSearch, .webFetch, .mcpClient, .subagents, .childRuns,
     ],
     requiredArtifactRoles: [],

@@ -129,8 +129,6 @@ final class AntigravityCLIProfileTests: XCTestCase {
         "conversation-1",
         "--model",
         "gemini-test",
-        "--effort",
-        "high",
         "--add-dir",
         projectRoot,
       ]
@@ -237,7 +235,7 @@ final class AntigravityCLIProfileTests: XCTestCase {
     XCTAssertEqual(launch.process.argv[timeoutIndex + 1], "12h")
   }
 
-  func testLaunchBuilderRejectsUnsupportedEffort() throws {
+  func testLaunchBuilderIgnoresLegacyEffort() throws {
     let projectRoot = try AntigravityCLITestSupport.temporaryDirectory(prefix: "agy-project")
     let runDirectory = FileManager.default.temporaryDirectory
       .appendingPathComponent("agy-runtime-\(UUID().uuidString)", isDirectory: true).path
@@ -261,15 +259,12 @@ final class AntigravityCLIProfileTests: XCTestCase {
       networkAccessRequested: false
     )
 
-    XCTAssertThrowsError(
-      try AntigravityCLILaunchBuilder().make(
-        installation: installation,
-        request: request,
-        runDirectory: runDirectory,
-        sourceEnvironment: [:]
-      )
-    ) { error in
-      XCTAssertEqual(error as? AgentRuntimeError, .invalidRequest("request.effort"))
-    }
+    let launch = try AntigravityCLILaunchBuilder().make(
+      installation: installation,
+      request: request,
+      runDirectory: runDirectory,
+      sourceEnvironment: [:]
+    )
+    XCTAssertFalse(launch.process.argv.contains("--effort"))
   }
 }
