@@ -56,10 +56,19 @@ final class PathSecurityTests: XCTestCase {
       OutboundContentSecurity.isSafeOutboundRelativePath("password=actual-secret-value"))
     for value in [
       "", ".", "..", "a//b", "a/./b", "a/../b", "/tmp/x", "~/x",
-      "Sources/back\\slash.swift", "Sources/control\u{1}name.swift",
+      "Sources/control\u{1}name.swift",
     ] {
       XCTAssertFalse(OutboundContentSecurity.isSafeRelativePath(value), value)
     }
+    #if os(Windows)
+      // Backslash separates components on Windows, so mixing separators stays a
+      // safe relative path while the traversal form built from it must not.
+      XCTAssertTrue(OutboundContentSecurity.isSafeRelativePath("Sources/back\\slash.swift"))
+      XCTAssertFalse(
+        OutboundContentSecurity.isSafeRelativePath("Sources/back\\..\\slash.swift"))
+    #else
+      XCTAssertFalse(OutboundContentSecurity.isSafeRelativePath("Sources/back\\slash.swift"))
+    #endif
   }
 
   func testOutboundContentRedactsAbsolutePathsAcrossURLAndMarkdownBoundaries() {
