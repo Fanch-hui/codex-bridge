@@ -8,7 +8,10 @@ public struct AppServerConfiguration: Equatable, Sendable {
   public let maximumProtocolLineBytes: Int
   public let stderrBufferBytes: Int
 
-  let launchFailureReason: String?
+  /// A non-nil reason marks a configuration that is known to be unusable: the
+  /// app-server is not spawned and the reason is reported to the local user, so
+  /// an unusable configured executable never degrades into a generic failure.
+  public let launchFailureReason: String?
 
   public init(
     executableURL: URL,

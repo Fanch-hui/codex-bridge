@@ -96,6 +96,27 @@
       XCTAssertNil(CodexMacExecutableResolver.resolve(configuredPath: ""))
     }
 
+    func testConfiguredPathAcceptsQuotedClipboardForms() throws {
+      let root = try makeTemporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let executable = root.appendingPathComponent("bin/codex")
+      try makeExecutable(at: executable)
+
+      XCTAssertEqual(
+        CodexMacExecutableResolver.resolve(configuredPath: "\"\(executable.path)\"")?.path,
+        executable.path
+      )
+      XCTAssertEqual(
+        CodexMacExecutableResolver.resolve(configuredPath: "  '\(executable.path)'\n")?.path,
+        executable.path
+      )
+      XCTAssertEqual(
+        AppServerConfiguration.codex(configuredPath: "\"\(executable.path)\"").executableURL.path,
+        executable.path
+      )
+      XCTAssertNil(CodexMacExecutableResolver.resolve(configuredPath: "\"\""))
+    }
+
     func testConfiguredPathOverridesAutomaticDiscovery() throws {
       let root = try makeTemporaryRoot()
       defer { try? FileManager.default.removeItem(at: root) }

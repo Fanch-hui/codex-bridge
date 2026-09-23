@@ -12,7 +12,8 @@
 
     /// Resolves a user-configured path, which must point at an executable file.
     static func resolve(configuredPath: String) -> URL? {
-      guard let normalized = AgentPathSemantics.canonicalPath(configuredPath),
+      let configured = CodexExecutablePathInput.normalized(configuredPath)
+      guard let normalized = AgentPathSemantics.canonicalPath(configured),
         AgentPathSemantics.isAbsolute(normalized), !normalized.contains("\0"),
         normalized.utf8.count <= 16 * 1_024
       else { return nil }

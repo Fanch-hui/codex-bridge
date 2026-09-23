@@ -501,8 +501,8 @@ public actor ServiceComposition {
   public func setCodexExecutablePath(_ path: String?) async throws
     -> ServiceRuntimeStatusSnapshot
   {
-    let trimmed = path?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let configured = (trimmed?.isEmpty ?? true) ? nil : trimmed
+    let trimmed = CodexExecutablePathInput.normalized(path ?? "")
+    let configured = trimmed.isEmpty ? nil : trimmed
     if let configured, AppServerConfiguration.resolveConfiguredCodexExecutable(configured) == nil {
       throw ServiceCodexExecutableError.unavailable
     }

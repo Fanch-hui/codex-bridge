@@ -37,6 +37,12 @@ extension BridgeServiceRequestController {
         message: "A local component is unavailable.",
         retryable: true
       )
+    case .codexAppServerUnavailable(let detail):
+      return .init(
+        code: "codex_app_server_unavailable",
+        message: "The Codex app-server is unavailable: \(detail)",
+        retryable: true
+      )
     case .internalFailure(let correlationID):
       return .init(
         code: "internal_error",

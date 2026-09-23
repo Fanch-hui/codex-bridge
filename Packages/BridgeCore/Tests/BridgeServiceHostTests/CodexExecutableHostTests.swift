@@ -43,6 +43,28 @@ final class CodexExecutableHostTests: XCTestCase {
     XCTAssertNil(storedAfterClear)
   }
 
+  func testQuotedConfiguredCodexExecutableIsStoredUnquoted() async throws {
+    let fixture = try await makeServiceHostFixture(self)
+    let executable = fixture.root.appending(path: "bin/codex")
+    try FileManager.default.createDirectory(
+      at: executable.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try Data("#!/bin/sh\n".utf8).write(to: executable)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: NSNumber(value: 0o700)],
+      ofItemAtPath: executable.path
+    )
+
+    let applied = try await fixture.composition.setCodexExecutablePath(
+      "  \"\(executable.path)\" "
+    )
+    XCTAssertEqual(applied.codexExecutablePath, executable.path)
+    XCTAssertEqual(applied.codexResolvedExecutablePath, executable.path)
+    let stored = try await fixture.composition.settings.codexExecutablePath()
+    XCTAssertEqual(stored, executable.path)
+  }
+
   func testConfiguredCodexExecutableIsRestoredAfterRestart() async throws {
     let fixture = try await makeServiceHostFixture(self)
     let executable = fixture.root.appending(path: "bin/codex")

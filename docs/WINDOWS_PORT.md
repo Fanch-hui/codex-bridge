@@ -123,11 +123,13 @@ Windows 的 Codex 可执行文件默认自动发现，依次检查商店包、�
 npm/pnpm/yarn/bun/Cargo/Volta/scoop/WinGet 等包管理器位置与 `PATH`。发现使用注册表
 刷新的当前用户/机器 `PATH` 与包管理器前缀，因此安装 Codex 之后无需重启 App；
 `CODEX_BRIDGE_CODEX_EXECUTABLE` 仍可作为临时覆盖。用户也可以在内置页面
-“连接 → Codex 执行引擎”填写 `codex.exe` 或标准 npm `codex.cmd` 的绝对路径：保存时校验
+“连接 → Codex 执行引擎”填写 `codex.exe` 或标准 npm `codex.cmd` 的绝对路径：输入先归一化
+（去掉资源管理器“复制为路径”产生的成对引号与首尾空白），保存时校验
 架构与可执行性并写入 `codex.executable_path`，下一次启动 app-server（连接/刷新模型/新任务）
 即生效，无需重启服务；清除后恢复自动发现。指定路径不可用时 fail-closed 并给出可操作原因，
-不会静默回退到其他安装。`codex.cmd` 不会直接作为子进程启动，而是解析并验证其架构对应的原生
-`codex.exe`。
+不会静默回退到其他安装；app-server 启动失败时，连接页显示具体原因（可执行文件路径、
+进程退出状态与 stderr 摘要），不再退化为通用“组件不可用”。`codex.cmd` 不会直接作为
+子进程启动，而是解析并验证其架构对应的原生 `codex.exe`。
 
 macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 `Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore`。

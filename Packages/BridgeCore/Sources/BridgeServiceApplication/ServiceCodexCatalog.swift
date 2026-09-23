@@ -271,8 +271,9 @@ public actor ServiceCodexCatalog {
     operation: @escaping @Sendable (CodexAppServerClient) async throws -> Output
   ) async throws -> Output {
     try checkDeadline(deadline)
+    let appServer = configuration.appServer.current()
     let client = CodexAppServerClient(
-      configuration: configuration.appServer.current(),
+      configuration: appServer,
       defaultTimeoutNanoseconds: configuration.requestTimeoutNanoseconds,
       eventBufferLimit: configuration.eventBufferLimit
     )
@@ -302,11 +303,51 @@ public actor ServiceCodexCatalog {
       drain.cancel()
       await client.stop()
       throw error
+    } catch let error as CodexRPCError {
+      let stderr = await client.stderrSnapshot()
+      drain.cancel()
+      await client.stop()
+      guard
+        let detail = Self.appServerFailureDetail(error, appServer: appServer, stderr: stderr)
+      else { throw BridgeMCPQueryError.unavailable }
+      throw BridgeMCPQueryError.codexAppServerUnavailable(detail)
     } catch {
       drain.cancel()
       await client.stop()
       throw BridgeMCPQueryError.unavailable
     }
+  }
+
+  /// Renders why the app-server could not serve the request, so a user who
+  /// configured an executable path is told which binary Bridge tried and what
+  /// the process reported instead of a generic unavailability. Error replies
+  /// from a healthy app-server keep their existing mapping.
+  private static func appServerFailureDetail(
+    _ error: CodexRPCError,
+    appServer: AppServerConfiguration,
+    stderr: Data
+  ) -> String? {
+    guard case .remote = error else {
+      var detail: String
+      if let reason = appServer.launchFailureReason {
+        detail = reason
+      } else {
+        detail = "\(error.localizedDescription) (executable: \(appServer.executableURL.path))"
+      }
+      if let excerpt = stderrExcerpt(stderr) {
+        detail += "; stderr: \(excerpt)"
+      }
+      return OutboundContentSecurity.redactedSecrets(detail, maximumUTF8Bytes: 512)
+    }
+    return nil
+  }
+
+  private static func stderrExcerpt(_ stderr: Data) -> String? {
+    guard let text = String(data: stderr, encoding: .utf8) else { return nil }
+    let lines = text.split(whereSeparator: \.isNewline).map(String.init)
+    guard let line = lines.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+    else { return nil }
+    return String(line.trimmingCharacters(in: .whitespaces).prefix(240))
   }
 
   private static func summary(_ source: CodexThread) throws -> MCPThreadSummary {
