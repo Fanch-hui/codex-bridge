@@ -35,7 +35,7 @@
 
       XCTAssertEqual(
         requests.map(\.executablePath),
-        [try XCTUnwrap(AgentPathSemantics.canonicalPath(launcher.standardizedFileURL.path))])
+        [try XCTUnwrap(ServiceAgentAutoDiscovery.canonicalRegularFile(launcher.path))])
     }
 
     func testPackageManagerHomeFindsAntigravityLauncherWithoutPATH() throws {
@@ -63,7 +63,7 @@
 
       XCTAssertEqual(
         requests.map(\.executablePath),
-        [try XCTUnwrap(AgentPathSemantics.canonicalPath(launcher.standardizedFileURL.path))])
+        [try XCTUnwrap(ServiceAgentAutoDiscovery.canonicalRegularFile(launcher.path))])
     }
 
     func testExplicitPathSkipsInstallationSearch() throws {
@@ -101,7 +101,7 @@
 
       XCTAssertEqual(
         requests.map(\.executablePath),
-        [try XCTUnwrap(AgentPathSemantics.canonicalPath(explicitLauncher.standardizedFileURL.path))]
+        [try XCTUnwrap(ServiceAgentAutoDiscovery.canonicalRegularFile(explicitLauncher.path))]
       )
     }
 
