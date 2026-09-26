@@ -139,7 +139,7 @@ export class QoderSession {
           this.nativeSkills = Array.isArray(message.skills) ? message.skills.filter(skill => typeof skill === 'string') : [];
           this.mcpServers = Array.isArray(message.mcp_servers) ? message.mcp_servers.filter(server =>
             server && typeof server.name === 'string' && typeof server.status === 'string') : [];
-          this.resolveNativeInitialization(); this.resolveNativeInitialization = null;
+          this.resolveNativeInitialization?.(); this.resolveNativeInitialization = null;
         }
         await this.projection.message(message);
         if (message.type === 'result') await this.result(message);

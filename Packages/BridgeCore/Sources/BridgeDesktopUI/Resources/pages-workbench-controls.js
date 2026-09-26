@@ -28,8 +28,8 @@
     controls.__receiptID = page && page.commandReceipt ? page.commandReceipt.receiptID : null;
     acknowledgeSubmission(page);
     var modes = page ? S.safeArray(page.steerModes) : [];
-    var kind = detail && detail.canSteer === true ? "steer" : detail && (detail.canResume || detail.canRestart) ? "retry" : "";
-    var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, detail.canRestart, modes]) : "";
+    var kind = detail && detail.canSteer === true ? "steer" : detail && detail.canResume ? "continue" : "";
+    var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, modes]) : "";
     if (key !== currentKey) {
       var updateControls = function () {
         var focused = captureFocus();
@@ -39,8 +39,8 @@
           controls.__activeForm = steerForm(detail, modes, emit, controls.__receiptID);
           controls.appendChild(controls.__activeForm);
         }
-        if (kind === "retry") {
-          controls.__activeForm = retryForm(detail, emit, controls.__receiptID);
+        if (kind === "continue") {
+          controls.__activeForm = continuationForm(detail, emit, controls.__receiptID);
           controls.appendChild(controls.__activeForm);
         }
         currentKey = key;
@@ -93,20 +93,6 @@
           S.autoGrowTextArea(form.__inputControl);
         }
       }
-      var attachmentField = pending.attachmentField || "attachmentPaths";
-      var attachmentErrorField = attachmentField === "attachmentPaths"
-        ? "attachmentError" : attachmentField + "Error";
-      if (receipt.accepted === true && Array.isArray(pending.attachmentPaths)
-        && JSON.stringify(draft[attachmentField]) === JSON.stringify(pending.attachmentPaths)) {
-        draft[attachmentField] = [];
-        draft[attachmentErrorField] = "";
-        var attachmentForm = controls && controls.__activeForm;
-        var attachmentUpdate = attachmentForm && attachmentForm.__attachmentUpdates
-          && attachmentForm.__attachmentUpdates[attachmentField];
-        if (attachmentForm && attachmentForm.__taskID === taskID && attachmentUpdate) {
-          attachmentUpdate();
-        }
-      }
       var activeForm = controls && controls.__activeForm;
       if (activeForm && activeForm.__validate) activeForm.__validate();
     });
@@ -130,8 +116,7 @@
       var stored = readPersistedDrafts()[taskID];
       drafts.set(taskID, {
         input: stored && typeof stored.input === "string" ? stored.input : "",
-        mode: stored && typeof stored.mode === "string" ? stored.mode : "queued",
-        attachmentPaths: [], attachmentError: "", restartAttachmentPaths: null
+        mode: stored && typeof stored.mode === "string" ? stored.mode : "queued"
       });
     }
     return drafts.get(taskID);
@@ -255,116 +240,43 @@
     return form;
   }
 
-  function retryForm(detail, emit, baselineReceiptID) {
-    var form = S.node("div", "retry-form"), draft = draftFor(detail.taskID);
-    if (!Array.isArray(draft.restartAttachmentPaths)) {
-      draft.restartAttachmentPaths = Array.isArray(detail.attachmentPaths)
-        ? detail.attachmentPaths.slice() : [];
-    }
+  function continuationForm(detail, emit, baselineReceiptID) {
+    var form = S.node("div", "workbench-continuation-form"), draft = draftFor(detail.taskID);
     var actions = S.node("div", "form-actions");
-    var resumeButton = null, restartButton = null;
-    var queueLabel = S.node("label", "checkbox-row");
-    var queueInput = S.node("input"); queueInput.type = "checkbox";
-    queueInput.checked = !!draft.queueIfBusy;
-    queueInput.addEventListener("change", function () { draft.queueIfBusy = queueInput.checked; });
-    queueLabel.appendChild(queueInput);
-    queueLabel.appendChild(S.node("span", null, "项目忙时排队"));
-    form.appendChild(queueLabel);
-    var skills = global.CodexBridgeDesktopWorkbenchSkills.create(detail, draft);
-    if (skills) form.appendChild(skills.wrapper);
-    var attachmentUpdates = {};
-    if (detail.canResume) {
-      var resumeAttachments = global.CodexBridgeDesktopWorkbenchAttachments.create(
-        detail, draft, validate, "attachmentPaths", "选择续写图片"
-      );
-      if (resumeAttachments) {
-        form.appendChild(resumeAttachments.wrapper);
-        attachmentUpdates.attachmentPaths = resumeAttachments.update;
+    var input = inputField(detail, "消息", "输入消息，续写当前会话");
+    var send = S.button("插入对话", null, {}, emit, "small primary", false);
+    form.appendChild(input.wrapper);
+    actions.appendChild(send);
+    send.addEventListener("click", insertMessage);
+    input.control.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault(); insertMessage();
       }
-      var input = inputField(detail, "消息", "输入下一条指令，沿用当前会话上下文");
-      form.appendChild(input.wrapper);
-      function resume() {
-        if (resumeButton.disabled) return;
-        var value = input.control.value;
-        var requestID = newSubmissionRequestID();
-        pendingSubmissions.set(detail.taskID, {
-          command: "resumeTask",
-          requestID: requestID,
-          baselineReceiptID: baselineReceiptID,
-          taskID: detail.taskID,
-          input: value,
-          attachmentPaths: draft.attachmentPaths.slice(),
-          attachmentField: "attachmentPaths"
-        });
-        validate();
-        emit("resumeTask", {
-          taskID: detail.taskID, input: value || null,
-          ...(skills ? skills.payload() : {}),
-          ...(queueInput.checked ? { queueIfBusy: true } : {}),
-          ...(draft.attachmentPaths.length ? { attachmentPaths: draft.attachmentPaths.slice() } : {})
-        }, requestID);
-      }
-      resumeButton = S.button("发送", null, {}, emit, "small primary", false);
-      resumeButton.addEventListener("click", resume);
-      input.control.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-          event.preventDefault(); resume();
-        }
+    });
+    function insertMessage() {
+      if (send.disabled) return;
+      var value = input.control.value;
+      var requestID = newSubmissionRequestID();
+      pendingSubmissions.set(detail.taskID, {
+        command: "resumeTask",
+        requestID: requestID,
+        baselineReceiptID: baselineReceiptID,
+        taskID: detail.taskID,
+        input: value || null
       });
-      form.__taskID = detail.taskID;
-      form.__inputControl = input.control;
-      actions.appendChild(resumeButton);
-    }
-    if (detail.canRestart) {
-      var restartAttachments = global.CodexBridgeDesktopWorkbenchAttachments.create(
-        detail, draft, validate, "restartAttachmentPaths", "选择重开图片"
-      );
-      if (restartAttachments) {
-        form.appendChild(restartAttachments.wrapper);
-        attachmentUpdates.restartAttachmentPaths = restartAttachments.update;
-      }
-      restartButton = S.button("重新开始", null, {}, emit, "small", false);
-      restartButton.addEventListener("click", function () {
-        if (restartButton.disabled) return;
-        if (!global.confirm("使用原始指令和当前图片路径在当前项目开启全新会话？")) return;
-        var requestID = newSubmissionRequestID();
-        pendingSubmissions.set(detail.taskID, {
-          command: "restartTask",
-          requestID: requestID,
-          baselineReceiptID: baselineReceiptID,
-          taskID: detail.taskID,
-          input: null,
-          attachmentPaths: draft.restartAttachmentPaths.slice(),
-          attachmentField: "restartAttachmentPaths"
-        });
-        validate();
-        emit("restartTask", {
-          taskID: detail.taskID,
-          ...(queueInput.checked ? { queueIfBusy: true } : {}),
-          attachmentPaths: draft.restartAttachmentPaths.slice(),
-          ...(skills ? skills.payload() : {})
-        }, requestID);
-      });
-      actions.appendChild(restartButton);
+      validate();
+      emit("resumeTask", { taskID: detail.taskID, input: value || null }, requestID);
     }
     function validate() {
       var pending = pendingSubmissions.has(detail.taskID);
-      if (resumeButton) {
-        resumeButton.disabled = pending || !!draft.attachmentError;
-        resumeButton.textContent = "发送";
-        resumeButton.setAttribute("aria-busy", String(pending));
-        resumeButton.setAttribute("data-pending", String(pending));
-      }
-      if (restartButton) {
-        restartButton.disabled = pending || !!draft.restartAttachmentPathsError;
-        restartButton.textContent = "重新开始";
-        restartButton.setAttribute("aria-busy", String(pending));
-        restartButton.setAttribute("data-pending", String(pending));
-      }
+      send.disabled = pending;
+      send.setAttribute("aria-busy", String(pending));
+      send.setAttribute("data-pending", String(pending));
     }
     form.appendChild(actions);
+    form.__taskID = detail.taskID;
+    form.__inputControl = input.control;
     form.__validate = validate;
-    form.__attachmentUpdates = attachmentUpdates;
     validate();
     return form;
   }

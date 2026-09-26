@@ -266,6 +266,18 @@ test('open initializes SDK from native init metadata without sending model input
   assert.match(opened.accountScopeDigest, /^[0-9a-f]{64}$/u);
   assert.equal(opened.accountScopeDigest.includes('fixture-account-id'), false);
 });
+test('execution accepts native initialization repeated after the first input', async t => {
+  const { session, query, config, events } = await sessionFixture(t);
+  await session.dispatchInput({ id: randomUUID(), text: 'hello' });
+  await query.input.next();
+  query.messages.send({ type: 'system', subtype: 'init', session_id: config.sessionID,
+    cwd: config.cwd, tools: ['Read'], capabilities: [], skills: [], mcp_servers: [] });
+  query.messages.send(result(config, 'OK'));
+  await until(() => session.phase === 'closed');
+  assert.equal(events.some(value => value.kind === 'failed'), false);
+  assert.equal(events.find(value => value.kind === 'completed')?.summary, 'OK');
+  assert.deepEqual([...session.nativeTools], ['Read']);
+});
 test('resume rejects a changed account scope before reading native session metadata', async t => {
   const config = await fixture(t, { resume: true, expectedAccountScope: '0'.repeat(64) });
   const query = new QueryFixture(config); let sessionInfoReads = 0;

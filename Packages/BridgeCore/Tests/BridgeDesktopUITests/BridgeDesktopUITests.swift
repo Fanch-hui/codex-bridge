@@ -51,8 +51,12 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(workbenchScript.contains("remediationCard"))
     XCTAssertTrue(workbenchScript.contains("deleteSession"))
     let workbenchControls = try BridgeDesktopUIResources.read(.pagesWorkbenchControlsJS)
+    XCTAssertTrue(workbenchControls.contains("detail.canResume"))
     XCTAssertTrue(workbenchControls.contains("resumeTask"))
-    XCTAssertTrue(workbenchControls.contains("restartTask"))
+    XCTAssertTrue(workbenchControls.contains("插入对话"))
+    XCTAssertFalse(workbenchControls.contains("restartTask"))
+    XCTAssertFalse(workbenchControls.contains("CodexBridgeDesktopWorkbenchSkills"))
+    XCTAssertFalse(workbenchControls.contains("CodexBridgeDesktopWorkbenchAttachments"))
     XCTAssertTrue(
       try BridgeDesktopUIResources.read(.pagesWorkbenchConversationJS).contains(
         "conversationDisclosure"))
