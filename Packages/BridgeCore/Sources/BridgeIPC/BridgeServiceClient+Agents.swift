@@ -35,13 +35,32 @@ extension BridgeServiceClient {
     apiKey: String? = nil,
     alwaysProceedConfirmed: Bool
   ) async throws -> IPCAgentInstallationSummary {
+    try await connectAgentInstallation(
+      providerID: providerID,
+      baseURL: baseURL,
+      apiKey: apiKey,
+      alwaysProceedConfirmed: alwaysProceedConfirmed,
+      qoderDistribution: nil
+    )
+  }
+
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String? = nil,
+    apiKey: String? = nil,
+    alwaysProceedConfirmed: Bool,
+    qoderDistribution: String?,
+    installationID: String? = nil
+  ) async throws -> IPCAgentInstallationSummary {
     try await call(
       operation: .connectAgentInstallation,
       payload: IPCAgentConnectRequest(
         providerID: providerID,
         baseURL: baseURL,
         apiKey: apiKey,
-        alwaysProceedConfirmed: alwaysProceedConfirmed
+        alwaysProceedConfirmed: alwaysProceedConfirmed,
+        qoderDistribution: qoderDistribution,
+        installationID: installationID
       )
     )
   }
@@ -194,6 +213,12 @@ extension BridgeServiceClient {
         effort: effort ?? ""
       )
     )
+  }
+
+  public func setQoderRuntimeSettings(
+    _ request: IPCAgentQoderRuntimeSettingsRequest
+  ) async throws -> IPCAgentQoderRuntimeSettingsRequest {
+    try await call(operation: .setQoderRuntimeSettings, payload: request)
   }
 
   public func agentNativePermissionPolicy(

@@ -85,6 +85,55 @@ final class MCPToolContractTests: XCTestCase {
     }
   }
 
+  func testGetTaskSchemaIncludesProviderUsageStatistics() throws {
+    let definition = try XCTUnwrap(
+      MCPServiceToolCatalog(exposureMode: .readOnly).definitions.first(where: {
+        $0.name == MCPServiceToolName.getTask.rawValue
+      })
+    )
+    let taskProperties = try XCTUnwrap(
+      definition.outputSchema?.objectValue?["properties"]?.objectValue?[
+        "task"]?.objectValue?["properties"]?.objectValue
+    )
+    let usage = try XCTUnwrap(taskProperties["usage"]?.objectValue)
+    XCTAssertEqual(usage["type"]?.arrayValue, [.string("object"), .string("null")])
+    XCTAssertEqual(usage["additionalProperties"], .bool(false))
+
+    let properties = try XCTUnwrap(usage["properties"]?.objectValue)
+    for name in [
+      "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "totalTokens",
+      "contextTokens", "contextWindow", "contextUsedPercentage", "costAmount", "currency",
+    ] {
+      XCTAssertNotNil(properties[name], "Missing usage schema property: \(name)")
+    }
+    XCTAssertEqual(
+      properties["contextUsedPercentage"]?.objectValue?["type"]?.arrayValue,
+      [.string("number"), .string("null")]
+    )
+    XCTAssertNotNil(taskProperties["attachment_paths"])
+  }
+
+  func testTaskSnapshotDecodesBeforeAttachmentPathsWereAdded() throws {
+    let snapshot = MCPServiceTaskSnapshot(
+      taskID: "task-1",
+      projectID: "project-1",
+      status: "completed",
+      supervisorStatus: "none",
+      localApprovalRequired: false,
+      updatedAt: "2026-09-26T00:00:00Z"
+    )
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as? [String: Any]
+    )
+    object.removeValue(forKey: "attachment_paths")
+
+    let decoded = try JSONDecoder().decode(
+      MCPServiceTaskSnapshot.self,
+      from: JSONSerialization.data(withJSONObject: object)
+    )
+    XCTAssertEqual(decoded.attachmentPaths, [])
+  }
+
   func testModelSummaryDecodesPayloadWithoutDefaultEffort() throws {
     let data = Data(
       #"""

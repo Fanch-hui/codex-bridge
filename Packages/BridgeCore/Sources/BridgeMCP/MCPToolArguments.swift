@@ -106,6 +106,37 @@ struct StrictToolArguments {
     return value
   }
 
+  func optionalStringArrayMap(
+    _ key: String,
+    maximumKeys: Int,
+    maximumValues: Int,
+    maximumValueUTF8Bytes: Int
+  ) throws -> [String: [String]]? {
+    guard let rawValue = values[key], rawValue != .null else { return nil }
+    guard case .object(let object) = rawValue, object.count <= maximumKeys else {
+      throw MCPError.invalidParams("Argument '\(key)' must be a bounded string-array object.")
+    }
+    var result: [String: [String]] = [:]
+    for (questionID, rawAnswers) in object {
+      guard !questionID.isEmpty, questionID.utf8.count <= 256,
+        questionID.rangeOfCharacter(from: .controlCharacters) == nil,
+        case .array(let values) = rawAnswers, values.count <= maximumValues
+      else {
+        throw MCPError.invalidParams("Argument '\(key)' contains an invalid question answer.")
+      }
+      result[questionID] = try values.map { value in
+        guard case .string(let text) = value,
+          text.utf8.count <= maximumValueUTF8Bytes,
+          text.rangeOfCharacter(from: .controlCharacters.subtracting(.newlines)) == nil
+        else {
+          throw MCPError.invalidParams("Argument '\(key)' must contain bounded text values.")
+        }
+        return text
+      }
+    }
+    return result
+  }
+
   func requiredObjectArray(
     _ key: String,
     maximumCount: Int,

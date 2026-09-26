@@ -128,6 +128,18 @@
     taskFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
     taskWrap.appendChild(taskFace);
     model.taskRow.appendChild(taskWrap);
+    model.nativeHistory = S.button("原生历史", null, {}, null, "small", false);
+    model.nativeHistory.addEventListener("click", function () {
+      var page = model.page || {}, directory = page.nativeSessions || {};
+      var installations = S.safeArray(directory.installations);
+      var installationID = directory.installationID || (installations[0] && installations[0].installationID);
+      var projectID = page.selectedProjectID || (page.projects[0] && page.projects[0].id);
+      if (!model.emit || !installationID || !projectID) return;
+      model.emit("manageNativeAgentSession", {
+        action: "list", projectID: projectID, installationID: installationID, offset: 0, limit: 50
+      });
+    });
+    model.taskRow.appendChild(model.nativeHistory);
     model.interrupt = S.button("中断", null, {}, null, "small danger", false);
     model.interrupt.addEventListener("click", function () {
       var task = model.page && model.page.selectedTask;
@@ -163,6 +175,7 @@
 
   function updateInspectorHeader(model, page, emit) {
     model.page = page; model.emit = emit;
+    model.nativeHistory.disabled = !S.safeArray((page.nativeSessions || {}).installations).length;
     var browser = page.browser || {};
     model.toggle.className = "switch-toggle" + (browser.enabled ? " is-active" : "");
     model.toggle.setAttribute("aria-checked", String(!!browser.enabled));

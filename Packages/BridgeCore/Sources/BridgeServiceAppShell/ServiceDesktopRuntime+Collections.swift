@@ -30,8 +30,9 @@ extension BridgeServiceAppModel {
       try await client.taskStartApprovalMode()
     }
     async let mcpClientResult = optional(when: managementVisible) { try await client.mcpClients() }
+    let agentMCPScope = selectedAgentMCPScope
     async let deepSeekHarnessMCPResult = optional(when: managementVisible) {
-      try await client.deepSeekHarnessMCPServers()
+      try await client.deepSeekHarnessMCPServers(scope: agentMCPScope)
     }
 
     if let value = await directConfigurationResult { directConfiguration = value }
@@ -77,6 +78,7 @@ extension BridgeServiceAppModel {
       mcpClients = value
     }
     if let value = await deepSeekHarnessMCPResult,
+      selectedAgentMCPScope == agentMCPScope,
       deepSeekHarnessMCPServers != value.servers
     {
       deepSeekHarnessMCPServers = value.servers

@@ -254,7 +254,63 @@ public enum ServiceAgentProviderPolicyRegistry {
   )
 
   public static let all: [ServiceAgentProviderPolicy] =
-    [codex, openCode, deepSeekHarness, antigravity]
+    [codex, openCode, deepSeekHarness, antigravity, pi, qoder]
+
+  public static let qoder = ServiceAgentProviderPolicy(
+    providerID: .qoder,
+    displayName: "Qoder",
+    supportsWorkspaceWrite: true,
+    supportsSessionContinuation: true,
+    supportsSteer: true,
+    supportsInteractiveApproval: true,
+    supportsModelSelection: true,
+    supportsEffortSelection: true,
+    supportsSkillSelection: true,
+    allowsNetworkAccess: true,
+    workspaceEnforcement: "provider_hooks",
+    approvalEnforcement: "local_app",
+    networkEnforcement: "provider_tool_policy",
+    allowedCapabilities: [
+      .sessionCreate, .sessionContinue, .interrupt, .steer, .steerInterruptAndContinue,
+      .textDelta, .reasoningDelta, .toolLifecycle, .oneShotApproval, .sessionRuleApproval,
+      .structuredApprovalPayload, .workspaceRead, .workspaceWriteInPlace,
+      .modelSelection, .effortSelection, .skills, .readOnlyExecution, .structuredUserInput,
+      .plan, .usage, .mcpClient, .webSearch, .webFetch, .shell, .subagents, .childRuns, .workflow,
+    ],
+    requiredProtocolRevision: "qoder-sdk-v1",
+    registrationTrustProfile: .userTrusted,
+    registrationSecurityProfileID: AgentProfileID(rawValue: "qoder-managed"),
+    requiresExactRegistrationProfile: true,
+    selectionsRequireObservedCapabilities: true
+  )
+
+  public static let pi = ServiceAgentProviderPolicy(
+    providerID: .pi,
+    displayName: "Pi",
+    supportsWorkspaceWrite: true,
+    supportsSessionContinuation: true,
+    supportsSteer: true,
+    supportsInteractiveApproval: true,
+    supportsModelSelection: true,
+    supportsEffortSelection: true,
+    supportsSkillSelection: true,
+    allowsNetworkAccess: true,
+    workspaceEnforcement: "provider_extension",
+    approvalEnforcement: "local_app",
+    networkEnforcement: "extension_tool_allowlist",
+    allowedCapabilities: [
+      .sessionCreate, .sessionContinue, .interrupt, .steer, .steerInterruptAndContinue,
+      .textDelta, .reasoningDelta, .toolLifecycle, .oneShotApproval, .sessionRuleApproval,
+      .structuredApprovalPayload, .workspaceRead, .workspaceWriteInPlace,
+      .modelSelection, .effortSelection, .skills, .readOnlyExecution, .structuredUserInput,
+      .plan, .usage, .mcpClient, .webSearch, .webFetch, .shell, .subagents, .childRuns, .workflow,
+    ],
+    requiredProtocolRevision: "pi-rpc-v1",
+    registrationTrustProfile: .userTrusted,
+    registrationSecurityProfileID: AgentProfileID(rawValue: "pi-managed"),
+    requiresExactRegistrationProfile: true,
+    selectionsRequireObservedCapabilities: true
+  )
 
   private static let byID: [AgentProviderID: ServiceAgentProviderPolicy] =
     Dictionary(uniqueKeysWithValues: all.map { ($0.providerID, $0) })

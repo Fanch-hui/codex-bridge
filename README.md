@@ -67,6 +67,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 - [详细使用指南](./docs/USER_GUIDE.md)：安装、项目权限、Qwen、任务与故障排查
 - [ChatGPT / Tunnel / OpenAI API Key 配置](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness 安装与 API 配置](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
+- [Pi 与 Qoder 安装、地区选择与连接](./docs/PI_QODER_CONNECTION_GUIDE.md)
 - [OpenCode 连接](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity 连接与权限](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
 - [MCPB 客户端连接与 Registry 发布](./docs/MCP_REGISTRY.md)
 

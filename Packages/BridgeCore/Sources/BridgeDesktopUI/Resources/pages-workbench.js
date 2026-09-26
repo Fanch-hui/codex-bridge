@@ -52,6 +52,15 @@
           });
         });
         actions.appendChild(answerButton);
+        var cancelButton = S.button("取消提问", null, {}, emit, "small", appr.resolving);
+        cancelButton.addEventListener("click", function () {
+          emit("resolveApproval", {
+            approvalID: appr.approvalID,
+            taskID: appr.taskID,
+            decision: "cancel"
+          });
+        });
+        actions.appendChild(cancelButton);
         card.appendChild(actions); section.appendChild(card);
         return;
       }
@@ -90,15 +99,29 @@
       legend.textContent = question.header || question.question;
       fieldset.appendChild(legend);
       fieldset.appendChild(S.node("p", "user-input-prompt", question.question));
+      var inputType = question.inputType || "select";
+      var isTextInput = inputType === "input" || inputType === "editor";
+      var optionControls = [];
+      var customInput = null;
       S.safeArray(question.options).forEach(function (option) {
         var label = S.node("label", "user-input-option");
         var control = document.createElement("input");
-        control.type = "radio";
+        control.type = question.allowsMultiple === true ? "checkbox" : "radio";
         control.name = "approval-" + approval.approvalID + "-" + question.id;
         control.value = option.label;
         control.checked = questionDraft.options.indexOf(option.label) >= 0;
+        optionControls.push(control);
         control.addEventListener("change", function () {
-          if (control.checked) questionDraft.options = [option.label];
+          if (question.allowsMultiple === true) {
+            questionDraft.options = questionDraft.options.filter(function (item) {
+              return item !== option.label;
+            });
+            if (control.checked) questionDraft.options.push(option.label);
+          } else if (control.checked) {
+            questionDraft.options = [option.label];
+            questionDraft.other = "";
+            if (customInput) customInput.value = "";
+          }
         });
         label.appendChild(control);
         var copy = S.node("span", "user-input-option-copy");
@@ -109,15 +132,23 @@
         label.appendChild(copy);
         fieldset.appendChild(label);
       });
-      if (question.isOther || !question.options || question.options.length === 0) {
-        var other = document.createElement("input");
+      if (question.isOther || isTextInput || !question.options || question.options.length === 0) {
+        var useEditor = inputType === "editor" && !question.isSecret;
+        var other = document.createElement(useEditor ? "textarea" : "input");
+        customInput = other;
         other.className = "user-input-other";
-        other.type = question.isSecret ? "password" : "text";
+        if (!useEditor) other.type = question.isSecret ? "password" : "text";
         other.value = questionDraft.other || "";
-        other.placeholder = question.isOther ? "其他回答" : "请输入回答";
+        other.placeholder = question.isOther && !isTextInput ? "其他回答" : "请输入回答";
         other.setAttribute("aria-label", question.header || question.question);
-        other.autocomplete = question.isSecret ? "off" : "on";
-        other.addEventListener("input", function () { questionDraft.other = other.value; });
+        if (other.tagName === "INPUT") other.autocomplete = question.isSecret ? "off" : "on";
+        other.addEventListener("input", function () {
+          questionDraft.other = other.value;
+          if (question.allowsMultiple !== true && other.value) {
+            questionDraft.options = [];
+            optionControls.forEach(function (control) { control.checked = false; });
+          }
+        });
         fieldset.appendChild(other);
       }
       body.appendChild(fieldset);
@@ -142,7 +173,9 @@
     if (!questions.length) return false;
     var answers = collectAnswers(approval, questions, drafts);
     return questions.every(function (question) {
-      return S.safeArray(answers[question.id]).some(function (value) {
+      if (question.isRequired === false) return true;
+      var values = S.safeArray(answers[question.id]);
+      return values.some(function (value) {
         return typeof value === "string" && value.trim().length > 0;
       });
     });
@@ -259,6 +292,17 @@
     var grid = S.node("dl", "detail-grid");
     addDetail(grid, "状态", detail.status); addDetail(grid, "更新时间", detail.updatedAt);
     addDetail(grid, "模型", detail.model || "未记录"); addDetail(grid, "权限", detail.permissionMode || "未记录");
+    if (detail.usage) {
+      var usage = detail.usage;
+      if (usage.contextTokens != null) addDetail(grid, "上下文 Token", String(usage.contextTokens) + (usage.contextWindow != null ? " / " + usage.contextWindow : ""));
+      else if (usage.contextUsedPercentage != null) addDetail(grid, "上下文占用", String(usage.contextUsedPercentage) + "%");
+      if (usage.inputTokens != null) addDetail(grid, "累计输入 Token", String(usage.inputTokens));
+      if (usage.outputTokens != null) addDetail(grid, "累计输出 Token", String(usage.outputTokens));
+      if (usage.cacheReadTokens != null) addDetail(grid, "缓存读取 Token", String(usage.cacheReadTokens));
+      if (usage.cacheWriteTokens != null) addDetail(grid, "缓存写入 Token", String(usage.cacheWriteTokens));
+      if (usage.totalTokens != null) addDetail(grid, "累计 Token", String(usage.totalTokens));
+      if (usage.costAmount != null) addDetail(grid, usage.currency ? "费用" : "原生费用值", String(usage.costAmount) + (usage.currency ? " " + usage.currency : "（单位未提供）"));
+    }
     if (detail.failureCode) addDetail(grid, "失败代码", detail.failureCode);
     sections.header.appendChild(grid);
 

@@ -50,6 +50,21 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     apiKey: String?,
     alwaysProceedConfirmed: Bool
   ) async throws -> IPCAgentInstallationSummary
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed: Bool,
+    qoderDistribution: String?
+  ) async throws -> IPCAgentInstallationSummary
+  func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed: Bool,
+    qoderDistribution: String?,
+    installationID: String?
+  ) async throws -> IPCAgentInstallationSummary
   func reprobeAgentInstallation(
     installationID: String,
     acceptReplacement: Bool
@@ -84,6 +99,9 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     useStoredDefault: Bool,
     forceRefresh: Bool
   ) async throws -> IPCAgentModelsResponse
+  func manageAgentNativeSessionDirectory(
+    _ request: MCPNativeSessionDirectoryRequest
+  ) async throws -> MCPNativeSessionDirectoryResponse
   func agentModelDefault() async throws -> IPCAgentModelDefaultResponse
   func agentModelDefault(providerID: String) async throws -> IPCAgentModelDefaultResponse
   func setAgentModelDefault(_ model: String?) async throws
@@ -98,6 +116,9 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     permissionMode: String?,
     effort: String?
   ) async throws -> IPCAgentModelDefaultResponse
+  func setQoderRuntimeSettings(
+    _ request: IPCAgentQoderRuntimeSettingsRequest
+  ) async throws -> IPCAgentQoderRuntimeSettingsRequest
   func agentNativePermissionPolicy(
     installationID: String
   ) async throws -> IPCAgentNativePermissionPolicyResponse
@@ -148,10 +169,12 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setExposureMode(_ mode: MCPServiceExposureMode) async throws
   func mcpClients() async throws -> [IPCMCPClientStatus]
   func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse
+  func deepSeekHarnessMCPServers(scope: String?) async throws -> IPCDeepSeekHarnessMCPListResponse
   func saveDeepSeekHarnessMCPServer(
     _ request: IPCDeepSeekHarnessMCPServerInput
   ) async throws -> IPCDeepSeekHarnessMCPServerSummary
   func deleteDeepSeekHarnessMCPServer(id: String) async throws
+  func deleteDeepSeekHarnessMCPServer(id: String, scope: String?) async throws
   func setMCPClientEnabled(clientID: String, enabled: Bool) async throws
   func setMCPClientExposureMode(clientID: String, mode: MCPServiceExposureMode) async throws
   func exportMCPClientConfiguration(clientID: String) async throws -> String
@@ -171,6 +194,12 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func manageAgentNativeSessionDirectory(
+    _: MCPNativeSessionDirectoryRequest
+  ) async throws -> MCPNativeSessionDirectoryResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
   public func taskHandoff(_ request: MCPTaskHandoffRequest) async throws -> MCPTaskHandoffPreview {
     throw BridgeServiceClientError.serviceRestartRequired
   }
@@ -253,6 +282,39 @@ extension BridgeServiceClientProtocol {
       providerID: providerID,
       baseURL: baseURL,
       apiKey: apiKey
+    )
+  }
+
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed: Bool,
+    qoderDistribution: String?
+  ) async throws -> IPCAgentInstallationSummary {
+    try await connectAgentInstallation(
+      providerID: providerID,
+      baseURL: baseURL,
+      apiKey: apiKey,
+      alwaysProceedConfirmed: alwaysProceedConfirmed,
+      qoderDistribution: qoderDistribution,
+      installationID: nil
+    )
+  }
+
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed: Bool,
+    qoderDistribution _: String?,
+    installationID _: String?
+  ) async throws -> IPCAgentInstallationSummary {
+    try await connectAgentInstallation(
+      providerID: providerID,
+      baseURL: baseURL,
+      apiKey: apiKey,
+      alwaysProceedConfirmed: alwaysProceedConfirmed
     )
   }
 
@@ -383,6 +445,12 @@ extension BridgeServiceClientProtocol {
     )
   }
 
+  public func setQoderRuntimeSettings(
+    _: IPCAgentQoderRuntimeSettingsRequest
+  ) async throws -> IPCAgentQoderRuntimeSettingsRequest {
+    throw BridgeServiceClientError.unavailable
+  }
+
   public func customInstructions() async throws -> String {
     throw BridgeServiceClientError.unavailable
   }
@@ -403,6 +471,12 @@ extension BridgeServiceClientProtocol {
     throw BridgeServiceClientError.unavailable
   }
 
+  public func deepSeekHarnessMCPServers(scope _: String?) async throws
+    -> IPCDeepSeekHarnessMCPListResponse
+  {
+    try await deepSeekHarnessMCPServers()
+  }
+
   public func saveDeepSeekHarnessMCPServer(
     _: IPCDeepSeekHarnessMCPServerInput
   ) async throws -> IPCDeepSeekHarnessMCPServerSummary {
@@ -411,6 +485,10 @@ extension BridgeServiceClientProtocol {
 
   public func deleteDeepSeekHarnessMCPServer(id _: String) async throws {
     throw BridgeServiceClientError.unavailable
+  }
+
+  public func deleteDeepSeekHarnessMCPServer(id: String, scope _: String?) async throws {
+    try await deleteDeepSeekHarnessMCPServer(id: id)
   }
 
   public func setMCPClientEnabled(clientID: String, enabled: Bool) async throws {

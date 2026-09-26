@@ -134,12 +134,12 @@ final class BridgeServiceHostTests: XCTestCase {
       providerID: "antigravity",
       model: "antigravity/model",
       permissionMode: "build",
-      effort: "high"
+      effort: nil
     )
     XCTAssertEqual(saved.providerID, "antigravity")
     XCTAssertEqual(saved.model, "antigravity/model")
     XCTAssertEqual(saved.permissionMode, "workspace-write")
-    XCTAssertEqual(saved.effort, "high")
+    XCTAssertNil(saved.effort)
 
     let reloaded = try await client.agentModelDefault(providerID: "antigravity")
     XCTAssertEqual(reloaded, saved)
@@ -276,7 +276,7 @@ final class BridgeServiceHostTests: XCTestCase {
     let initialStatus = try await client.status()
     XCTAssertEqual(initialStatus.status.mcpState, "stopped")
     let initialAgents = try await client.agentCatalog()
-    XCTAssertEqual(initialAgents.providers.count, 3)
+    XCTAssertEqual(initialAgents.providers.count, 5)
     XCTAssertTrue(initialAgents.installations.isEmpty)
 
     do {
@@ -311,7 +311,7 @@ final class BridgeServiceHostTests: XCTestCase {
     defer { Task { await client.disconnect() } }
 
     let tools = try await client.listTools()
-    XCTAssertEqual(tools.tools.count, 34)
+    XCTAssertEqual(tools.tools.count, 40)
     XCTAssertTrue(tools.tools.contains { $0.name == MCPServiceToolName.submitTask.rawValue })
     XCTAssertEqual(secret.utf8.count, 43)
   }
@@ -435,7 +435,7 @@ final class BridgeServiceHostTests: XCTestCase {
     let mcpClient = try await connectMCP(endpoint: endpoint.localURL, secret: secret)
     defer { Task { await mcpClient.disconnect() } }
     let tools = try await mcpClient.listTools()
-    XCTAssertEqual(tools.tools.count, 34)
+    XCTAssertEqual(tools.tools.count, 40)
 
     try await client.removeProject(projectID: registered.projectID)
     let remainingProjects = try await client.projects()
@@ -455,7 +455,7 @@ final class BridgeServiceHostTests: XCTestCase {
     let initial = try await client.agentCatalog()
     XCTAssertEqual(
       initial.providers.map(\.providerID),
-      ["antigravity", "deepseek-harness", "opencode"]
+      ["antigravity", "deepseek-harness", "opencode", "pi", "qoder"]
     )
     XCTAssertTrue(initial.installations.isEmpty)
 

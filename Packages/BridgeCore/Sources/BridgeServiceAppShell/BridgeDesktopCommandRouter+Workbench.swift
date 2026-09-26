@@ -92,7 +92,9 @@ extension BridgeDesktopCommandRouter {
       }
       model.resumeTask(
         selectedTask, prompt: payload.input, requestID: envelope.requestID,
-        queueIfBusy: payload.queueIfBusy ?? false)
+        queueIfBusy: payload.queueIfBusy ?? false,
+        skillNames: payload.skillNames,
+        attachmentPaths: payload.attachmentPaths ?? [])
     case .handoffTask:
       guard let selectedTask = task(payload.taskID, in: model), connected(model),
         let providerID = payload.providerID, let prompt = payload.input
@@ -111,7 +113,9 @@ extension BridgeDesktopCommandRouter {
         return
       }
       model.restartTask(
-        selectedTask, requestID: envelope.requestID, queueIfBusy: payload.queueIfBusy ?? false)
+        selectedTask, requestID: envelope.requestID, queueIfBusy: payload.queueIfBusy ?? false,
+        skillNames: payload.skillNames,
+        attachmentPaths: payload.attachmentPaths ?? [])
     case .resolveApproval:
       resolveApproval(payload, model: model)
     case .resolveDirectApproval:
@@ -226,12 +230,16 @@ extension BridgeDesktopCommandRouter {
     else { return }
     let answers: [String: [String]]?
     if approval.kind == "user_input" {
-      guard let input = validatedText(payload.input, maximumBytes: 64 * 1_024),
-        let data = input.data(using: .utf8),
-        let decoded = try? JSONDecoder().decode([String: [String]].self, from: data),
-        !decoded.isEmpty
-      else { return }
-      answers = decoded
+      if decision == "cancel" {
+        guard payload.input == nil else { return }
+        answers = nil
+      } else {
+        guard let input = validatedText(payload.input, maximumBytes: 64 * 1_024),
+          let data = input.data(using: .utf8),
+          let decoded = try? JSONDecoder().decode([String: [String]].self, from: data)
+        else { return }
+        answers = decoded
+      }
     } else {
       answers = nil
     }
@@ -240,7 +248,11 @@ extension BridgeDesktopCommandRouter {
       approval,
       projectName: projectID.map { model.projectName(for: $0) }
     )
-    guard decision == "deny" || presentation.allowDecisions.contains(decision) else { return }
+    guard
+      decision == "cancel"
+        ? approval.kind == "user_input"
+        : decision == "deny" || presentation.allowDecisions.contains(decision)
+    else { return }
     let oneTimeToolAutoApproval = payload.oneTimeToolAutoApproval == true
     if oneTimeToolAutoApproval {
       guard decision == "allow", approval.kind == "task_start",

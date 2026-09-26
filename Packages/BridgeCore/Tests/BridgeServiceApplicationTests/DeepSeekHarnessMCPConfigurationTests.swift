@@ -6,6 +6,28 @@ import Foundation
 import XCTest
 
 final class DeepSeekHarnessMCPConfigurationTests: XCTestCase {
+  func testProviderAndRegionConfigurationsKeepSameServerIDIndependent() async throws {
+    let settings = ServiceSettings(store: try SimpleServiceStore.inMemory())
+    let secrets = DeepSeekHarnessMCPTestSecretStore()
+    for scope in ServiceAgentMCPScope.allCases {
+      let configuration = ServiceDeepSeekHarnessMCPConfiguration(
+        settings: settings, secretStore: secrets, scope: scope)
+      _ = try await configuration.save(
+        ServiceDeepSeekHarnessMCPServerInput(
+          id: "tools", name: "Tools", enabled: true, transport: .http,
+          url: "https://example.test/mcp",
+          headers: [.init(name: "X-Test", value: scope.rawValue)]))
+    }
+    for scope in ServiceAgentMCPScope.allCases {
+      let configuration = ServiceDeepSeekHarnessMCPConfiguration(
+        settings: settings, secretStore: secrets, scope: scope)
+      let values = try await configuration.enabledRuntimeConfigurations()
+      XCTAssertEqual(values.count, 1)
+      XCTAssertEqual(values.first?.headers["X-Test"], scope.rawValue)
+    }
+    XCTAssertEqual(secrets.values.count, 4)
+  }
+
   func testSaveRedactsSecretsAndResolvesEnabledRuntimeConfiguration() async throws {
     let store = try SimpleServiceStore.inMemory()
     let secrets = DeepSeekHarnessMCPTestSecretStore()

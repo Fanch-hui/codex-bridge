@@ -26,8 +26,12 @@ extension ServiceAgentRegistry {
     }
 
     let createdAt = now()
-    let artifacts = try captureArtifacts(request.artifactRequests, at: createdAt)
     let installationID = makeInstallationID()
+    let artifacts = try await runtimeArtifacts(
+      provider: provider, installationID: installationID,
+      executablePath: identity.canonicalPath,
+      existing: captureArtifacts(request.artifactRequests, at: createdAt), at: createdAt
+    )
     let record = try await probeRecord(
       id: installationID,
       provider: provider,
@@ -85,7 +89,11 @@ extension ServiceAgentRegistry {
 
     let currentArtifacts: [ServiceAgentInstallationArtifact]
     do {
-      currentArtifacts = try captureArtifacts(existing.artifacts, at: now())
+      currentArtifacts = try await runtimeArtifacts(
+        provider: provider, installationID: existing.id,
+        executablePath: currentIdentity.canonicalPath,
+        existing: captureArtifacts(existing.artifacts, at: now()), at: now()
+      )
     } catch {
       let review = try unavailableRecord(
         existing,

@@ -11,7 +11,7 @@ extension BridgeDesktopCommandRouter {
     switch envelope.command {
     case .refreshAgentNativePermission:
       guard connected(model),
-        let installationID = antigravityInstallationID(payload.installationID, model: model)
+        let installationID = nativePermissionInstallationID(payload.installationID, model: model)
       else { return }
       model.focusedAgentNativePermissionInstallationID = installationID
       Task { await model.loadNativePermissionPolicy(installationID: installationID) }
@@ -34,7 +34,7 @@ extension BridgeDesktopCommandRouter {
 
   static func loadNativePermissionPolicyIfNeeded(_ model: BridgeServiceAppModel) {
     guard connected(model),
-      let installationID = antigravityInstallationID(nil, model: model),
+      let installationID = nativePermissionInstallationID(nil, model: model),
       model.nativePermissionPolicy(installationID: installationID) == nil,
       !model.isLoadingNativePermissionPolicy(installationID)
     else { return }
@@ -77,13 +77,24 @@ extension BridgeDesktopCommandRouter {
       guard let candidate = validatedID(payload.ruleID, maximumBytes: 128),
         let rule = snapshot.rules.first(where: { $0.ruleID == candidate }),
         rule.isEditable,
-        (!rule.requiresConfirmation && !requiresRuleConfirmation(action: action, target: target))
+        (!rule.requiresConfirmation
+          && !requiresRuleConfirmation(
+            providerID: snapshot.providerID,
+            effect: effect,
+            action: action,
+            target: target
+          ))
           || payload.confirmed == true
       else { return }
       ruleID = candidate
     } else {
       guard operation == .addRule,
-        !requiresRuleConfirmation(action: action, target: target) || payload.confirmed == true
+        !requiresRuleConfirmation(
+          providerID: snapshot.providerID,
+          effect: effect,
+          action: action,
+          target: target
+        ) || payload.confirmed == true
       else { return }
       ruleID = nil
     }
@@ -155,7 +166,7 @@ extension BridgeDesktopCommandRouter {
     model: BridgeServiceAppModel
   ) -> (String, IPCAgentNativePermissionPolicyResponse)? {
     guard connected(model),
-      let installationID = antigravityInstallationID(payload.installationID, model: model),
+      let installationID = nativePermissionInstallationID(payload.installationID, model: model),
       let snapshot = model.nativePermissionPolicy(installationID: installationID),
       !model.isLoadingNativePermissionPolicy(installationID),
       !model.isSavingNativePermissionPolicy(installationID)
@@ -163,7 +174,7 @@ extension BridgeDesktopCommandRouter {
     return (installationID, snapshot)
   }
 
-  private static func antigravityInstallationID(
+  private static func nativePermissionInstallationID(
     _ requestedID: String?,
     model: BridgeServiceAppModel
   ) -> String? {
@@ -175,10 +186,13 @@ extension BridgeDesktopCommandRouter {
       requested = nil
     }
     return model.agentInstallations.first(where: {
-      $0.providerID == "antigravity" && $0.isEnabled && $0.availability == "available"
+      supportedProviders.contains($0.providerID)
+        && $0.isEnabled && $0.availability == "available"
         && (requested == nil || $0.installationID == requested)
     })?.installationID
   }
+
+  private static let supportedProviders: Set<String> = ["antigravity", "pi", "qoder"]
 
   private static func nativePermissionTarget(_ value: String?) -> String? {
     guard let value = validatedText(value, maximumBytes: 4 * 1_024) else { return nil }
@@ -189,8 +203,17 @@ extension BridgeDesktopCommandRouter {
     return target
   }
 
-  private static func requiresRuleConfirmation(action: String, target: String) -> Bool {
-    if action == "unsandboxed" || target.contains("*") { return true }
+  private static func requiresRuleConfirmation(
+    providerID: String,
+    effect: String,
+    action: String,
+    target: String
+  ) -> Bool {
+    guard effect == "allow" else { return false }
+    if target.contains("*") || action == "*" { return true }
+    if providerID == "pi" { return action == "bash" || action == "powershell" }
+    if providerID == "qoder" { return action == "Bash" || action == "MCP" }
+    if action == "unsandboxed" { return true }
     if action == "mcp", !target.contains("/") { return true }
     if action == "command", target.split(whereSeparator: \.isWhitespace).count <= 1 {
       return true

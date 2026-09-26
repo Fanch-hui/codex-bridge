@@ -159,7 +159,7 @@ final class ProductionArchitectureBoundaryTests: XCTestCase {
     XCTAssertTrue(project.contains(bundleName))
     XCTAssertTrue(stagingScript.contains("BUILT_PRODUCTS_DIR"))
     XCTAssertTrue(stagingScript.contains("UNLOCALIZED_RESOURCES_FOLDER_PATH"))
-    XCTAssertTrue(stagingScript.contains("Contents/Resources/cordis.yml"))
+    XCTAssertTrue(stagingScript.contains("BridgeCore_BridgeDeepSeekHarnessACP.bundle:cordis.yml"))
     XCTAssertTrue(
       releaseScript.contains("Archive did not contain the DeepSeek Harness resource bundle."))
   }

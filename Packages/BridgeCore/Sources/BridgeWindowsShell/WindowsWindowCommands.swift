@@ -1,6 +1,7 @@
 #if os(Windows)
   import BridgeDesktopUI
   import BridgeIPC
+  import BridgeMCP
   import Foundation
 
   /// Page vocabulary shared by the command bus and the rendered desktop surface.
@@ -115,13 +116,25 @@
     case stopTask(id: String)
     case deleteTask(id: String)
     case deleteSession(taskID: String)
+    case manageNativeAgentSession(MCPNativeSessionDirectoryRequest)
+    case continueNativeAgentSession(
+      projectID: String, providerID: String, installationID: String, sessionID: String,
+      prompt: String, requestID: String?
+    )
+    case closeNativeSessionDirectory
     case steerTask(id: String, input: String, mode: String, requestID: String? = nil)
-    case resumeTask(id: String, input: String?, requestID: String? = nil, queueIfBusy: Bool = false)
+    case resumeTask(
+      id: String, input: String?, requestID: String? = nil, queueIfBusy: Bool = false,
+      skillNames: [String]? = nil, attachmentPaths: [String] = []
+    )
     case handoffTask(
       id: String, providerID: String, prompt: String, requestID: String?,
       action: String? = nil, handoffID: String? = nil, revision: String? = nil
     )
-    case restartTask(id: String, requestID: String? = nil, queueIfBusy: Bool = false)
+    case restartTask(
+      id: String, requestID: String? = nil, queueIfBusy: Bool = false,
+      skillNames: [String]? = nil, attachmentPaths: [String] = []
+    )
     case rejectWorkbenchCommand(
       requestID: String,
       command: String,
@@ -174,25 +187,30 @@
     case copyLocalMCPEndpoint
     case rotateMCPClientCredential(id: String)
     case saveDeepSeekHarnessMCPServer(IPCDeepSeekHarnessMCPServerInput)
-    case deleteDeepSeekHarnessMCPServer(id: String)
-    case setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool)
+    case deleteDeepSeekHarnessMCPServer(id: String, scope: String)
+    case setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool, scope: String)
+    case selectAgentMCPScope(String)
     case selectAgent(id: String)
     case connectAgentFromDesktop(
       providerID: String,
       baseURL: String?,
       apiKey: String?,
-      alwaysProceedConfirmed: Bool
+      alwaysProceedConfirmed: Bool,
+      qoderDistribution: String?,
+      installationID: String?
     )
     case setAgentEnabled(id: String, enabled: Bool)
     case reprobeAgent(id: String, acceptReplacement: Bool)
     case removeAgent(id: String)
-    case beginAgentRegistration(providerID: String?)
+    case beginAgentRegistration(providerID: String?, qoderDistribution: String?)
     case registerAgentFromDesktop(
       providerID: String,
       displayName: String,
       executablePath: String,
-      configurationPath: String?
+      configurationPath: String?,
+      qoderDistribution: String?
     )
+    case setQoderRuntimeSettings(IPCAgentQoderRuntimeSettingsRequest)
     case refreshAgentModelsByID(providerID: String, installationID: String)
     case saveAgentDefault(
       providerID: String,

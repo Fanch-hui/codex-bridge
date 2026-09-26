@@ -35,6 +35,8 @@
         selectedTaskID: display.selectedTaskID,
         selectedTask: display.selectedTaskDetail,
         history: display.history,
+        nativeSessions: nativeSessionDirectory(
+          display.nativeSessions, installations: management.agent.installationItems),
         approvals: display.approvalItems,
         steerModes: steerModes(for: display),
         browser: browserSlot(
@@ -54,6 +56,28 @@
         modelError: display.modelError,
         commandReceipt: display.commandReceipt
       )
+    }
+
+    private static func nativeSessionDirectory(
+      _ prior: BridgeDesktopNativeSessionDirectoryState?,
+      installations: [BridgeDesktopAgentInstallationRow]
+    ) -> BridgeDesktopNativeSessionDirectoryState {
+      let choices = installations.compactMap { item -> BridgeDesktopNativeSessionInstallation? in
+        guard item.providerID == "pi" || item.providerID == "qoder", item.enabled,
+          item.availability == "available"
+        else { return nil }
+        return BridgeDesktopNativeSessionInstallation(
+          installationID: item.installationID, providerID: item.providerID,
+          displayName: item.displayName, region: item.distribution)
+      }
+      return BridgeDesktopNativeSessionDirectoryState(
+        installations: choices, projectID: prior?.projectID,
+        installationID: prior?.installationID, selectedSessionID: prior?.selectedSessionID,
+        sessions: prior?.sessions ?? [], transcript: prior?.transcript ?? [],
+        nextOffset: prior?.nextOffset, transcriptNextOffset: prior?.transcriptNextOffset,
+        isOpen: prior?.isOpen ?? false,
+        isLoading: prior?.isLoading ?? false, statusMessage: prior?.statusMessage,
+        errorMessage: prior?.errorMessage)
     }
 
     private static func projectStatus(

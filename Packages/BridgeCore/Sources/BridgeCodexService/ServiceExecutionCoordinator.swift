@@ -15,11 +15,18 @@ public actor ServiceExecutionCoordinator {
     let interruptAndSteer: (@Sendable (String) async throws -> Void)?
     let shutdown: @Sendable () async -> Void
     let resolveApproval: (@Sendable (String, String) async throws -> Void)?
+    let resolveUserInput: (@Sendable (String, AgentUserInputResponse) async throws -> Void)?
     var lastSequence: Int64? = nil
   }
 
   struct PendingAgentApproval: Sendable {
     let request: AgentApprovalRequest
+    let createdAt: Date
+  }
+
+  struct PendingAgentUserInput: Sendable {
+    let approvalID: String
+    let request: AgentUserInputRequest
     let createdAt: Date
   }
 
@@ -36,6 +43,8 @@ public actor ServiceExecutionCoordinator {
   var workspaceChangeTrackers: [TaskID: ServiceWorkspaceChangeTracker] = [:]
   var presentedCodexApprovals: [TaskID: Set<String>] = [:]
   var pendingAgentApprovals: [String: PendingAgentApproval] = [:]
+  var pendingAgentUserInputs: [String: PendingAgentUserInput] = [:]
+  var agentUserInputTimeouts: [String: Task<Void, Never>] = [:]
   var finishedRuns: Set<TaskID> = []
   private var startingTasks: Set<TaskID> = []
   var isShuttingDown = false
@@ -239,6 +248,7 @@ public actor ServiceExecutionCoordinator {
     let executionTasks = collectors.values
     collectors.removeAll(keepingCapacity: false)
     pendingAgentApprovals.removeAll(keepingCapacity: false)
+    clearAgentUserInputs()
     presentedCodexApprovals.removeAll(keepingCapacity: false)
     for task in executionTasks { task.cancel() }
     let shutdowns = activeAgentRuns.values.map(\.shutdown)
@@ -263,6 +273,7 @@ public actor ServiceExecutionCoordinator {
     finishedRuns.insert(taskID)
     workspaceChangeTrackers.removeValue(forKey: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
+    clearAgentUserInputs(taskID: taskID)
     if let run = activeAgentRuns.removeValue(forKey: taskID) {
       await run.shutdown()
     }

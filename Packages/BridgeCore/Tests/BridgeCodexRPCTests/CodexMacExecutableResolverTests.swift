@@ -5,6 +5,28 @@
   @testable import BridgeCodexRPC
 
   final class CodexMacExecutableResolverTests: XCTestCase {
+    func testNestedCLIAndLegacyBundleCandidatesRemainAvailable() throws {
+      let root = try makeTemporaryRoot()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let resources = root.appendingPathComponent("Applications/ChatGPT.app/Contents/Resources")
+      let current = resources.appendingPathComponent("codex-cli/CodexCLI.app/Contents/MacOS/codex")
+      let legacy = resources.appendingPathComponent("codex")
+      let candidates = CodexMacExecutableResolver.candidates(environment: ["HOME": root.path])
+      let currentIndex = try XCTUnwrap(candidates.firstIndex(of: current.path))
+      let legacyIndex = try XCTUnwrap(candidates.firstIndex(of: legacy.path))
+      XCTAssertLessThan(currentIndex, legacyIndex)
+      try makeExecutable(at: legacy)
+      XCTAssertEqual(
+        candidates.filter { $0.hasPrefix(root.path + "/") }
+          .first(where: FileManager.default.isExecutableFile(atPath:)), legacy.path
+      )
+      try makeExecutable(at: current)
+      XCTAssertEqual(
+        candidates.filter { $0.hasPrefix(root.path + "/") }
+          .first(where: FileManager.default.isExecutableFile(atPath:)), current.path
+      )
+    }
+
     func testResolvesUserCodexAppBundleBeforePackageManagers() throws {
       let root = try makeTemporaryRoot()
       defer { try? FileManager.default.removeItem(at: root) }

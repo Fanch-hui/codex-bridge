@@ -8,6 +8,8 @@ import BridgeDomain
 import BridgeLegacyImport
 import BridgeMCP
 import BridgeOpenCodeACP
+import BridgePiRPC
+import BridgeQoderSDK
 import BridgeSecurity
 import BridgeServiceApplication
 import BridgeServiceCore
@@ -19,6 +21,7 @@ public actor ServiceComposition {
   public let projects: ServiceProjectService
   public let tasks: ServiceTaskManager
   public let settings: ServiceSettings
+  public let agentMCP: [ServiceAgentMCPScope: ServiceDeepSeekHarnessMCPConfiguration]
   public let deepSeekHarnessMCP: ServiceDeepSeekHarnessMCPConfiguration
   public let agentRegistry: ServiceAgentRegistry
   let agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog
@@ -71,6 +74,16 @@ public actor ServiceComposition {
     let settings = ServiceSettings(store: store)
     let deepSeekHarnessMCP = ServiceDeepSeekHarnessMCPConfiguration(
       settings: settings, secretStore: secretStore)
+    let agentMCP = Dictionary(
+      uniqueKeysWithValues: ServiceAgentMCPScope.allCases.map { scope in
+        (
+          scope,
+          scope == .deepSeekHarness
+            ? deepSeekHarnessMCP
+            : ServiceDeepSeekHarnessMCPConfiguration(
+              settings: settings, secretStore: secretStore, scope: scope)
+        )
+      })
     let deepSeekBaseURL = try await settings.string(for: .deepSeekHarnessBaseURL)
     let deepSeekConfigurationPath = try await settings.string(
       for: .deepSeekHarnessManagedConfigurationPath
@@ -80,7 +93,67 @@ public actor ServiceComposition {
       deepSeekBaseURL: deepSeekBaseURL,
       managedDeepSeekConfigurationPath: deepSeekConfigurationPath
     )
+    let qoderEnvironment = ToolDiscoveryEnvironment.current()
+    let qoderDistribution: @Sendable (AgentInstallation) async throws -> QoderDistribution = {
+      [settings] installation in
+      if let configured = try await settings.qoderInstallationDistribution(
+        installationID: installation.id.rawValue)
+      {
+        return configured
+      }
+      if let configured = try await settings.qoderExecutableDistribution(
+        path: installation.executablePath)
+      {
+        return configured
+      }
+      if let executable = QoderDistribution.identify(executablePath: installation.executablePath) {
+        return executable
+      }
+      throw AgentRuntimeError.invalidRequest("qoder.distribution")
+    }
     let agentProviders: [any AgentProvider] = [
+      try QoderSDKProvider(
+        configuration: QoderSDKProviderConfiguration(
+          runtimeBaseDirectory: paths.agentStateURL
+            .appendingPathComponent("QoderSDK", isDirectory: true).path,
+          sourceEnvironment: qoderEnvironment,
+          runtimeConfiguration: { installation in
+            let distribution = try await qoderDistribution(installation)
+            let runtime = try await settings.qoderRuntimeSettings(distribution: distribution)
+            return QoderSDKRuntimeConfiguration(
+              distribution: distribution,
+              nodeExecutablePath: runtime.nodeExecutablePath,
+              sdkRoot: runtime.sdkRoot
+            )
+          },
+          resources: { [agentMCP] request, installation in
+            let distribution = try await qoderDistribution(installation)
+            return try await ServiceAgentMCPResources.qoder(
+              request: request,
+              installation: installation,
+              distribution: distribution,
+              configurations: agentMCP
+            )
+          },
+          configuredMCPServerCount: { [agentMCP] installation in
+            let distribution = try await qoderDistribution(installation)
+            let scope: ServiceAgentMCPScope = distribution == .cn ? .qoderCN : .qoderInternational
+            return try await agentMCP[scope]?.enabledServerCount() ?? 0
+          }
+        )
+      ),
+      try PiRPCProvider(
+        configuration: PiRPCProviderConfiguration(
+          runtimeBaseDirectory: paths.agentStateURL
+            .appendingPathComponent("PiRPC", isDirectory: true).path,
+          mcpServersProvider: { [agentMCP] in
+            guard let configuration = agentMCP[.pi] else {
+              throw AgentRuntimeError.invalidRequest("pi.mcp_scope")
+            }
+            return try await configuration.enabledRuntimeConfigurations()
+          }
+        )
+      ),
       try AntigravityCLIProvider(),
       try OpenCodeACPProvider(
         configuration: OpenCodeACPProviderConfiguration(
@@ -207,6 +280,7 @@ public actor ServiceComposition {
       tasks: tasks,
       settings: settings,
       deepSeekHarnessMCP: deepSeekHarnessMCP,
+      agentMCP: agentMCP,
       agentRegistry: agentRegistry,
       agentDiscoveryCatalog: agentDiscoveryCatalog,
       execution: execution,
@@ -257,6 +331,7 @@ public actor ServiceComposition {
     tasks: ServiceTaskManager,
     settings: ServiceSettings,
     deepSeekHarnessMCP: ServiceDeepSeekHarnessMCPConfiguration,
+    agentMCP: [ServiceAgentMCPScope: ServiceDeepSeekHarnessMCPConfiguration],
     agentRegistry: ServiceAgentRegistry,
     agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog,
     execution: ExecutionManager,
@@ -277,6 +352,7 @@ public actor ServiceComposition {
     self.tasks = tasks
     self.settings = settings
     self.deepSeekHarnessMCP = deepSeekHarnessMCP
+    self.agentMCP = agentMCP
     self.agentRegistry = agentRegistry
     self.agentDiscoveryCatalog = agentDiscoveryCatalog
     self.execution = execution

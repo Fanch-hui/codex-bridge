@@ -80,16 +80,26 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
 
     case .plan(let entries):
       let step =
-        entries.first(where: { $0.status == nil || $0.status == "pending" })?.content
+        entries.first(where: { $0.status == "in_progress" })?.content
+        ?? entries.first(where: { $0.status == nil || $0.status == "pending" })?.content
         ?? entries.last?.content
       if let currentStep = step.map(Self.boundedPlanStep) {
         _ = try await tasks.updatePlan(taskID: taskID, currentStep: currentStep)
       }
 
-    case .usage:
-      return
+    case .usage(let value):
+      try await tasks.recordUsage(
+        AgentUsageStatistics(
+          contextTokens: value.usedTokens, contextWindow: value.contextSize,
+          costAmount: value.costAmount, currency: value.currency), taskID: taskID)
+
+    case .usageStatistics(let value):
+      try await tasks.recordUsage(value, taskID: taskID)
 
     case .approvalRequested:
+      return
+
+    case .userInputRequested:
       return
 
     case .approvalAutomaticallyDenied(let itemID):

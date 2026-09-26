@@ -16,6 +16,8 @@
     var serviceStatus: IPCServiceStatusResponse?
     var clients: [IPCMCPClientStatus] = []
     var deepSeekHarnessMCPServers: [IPCDeepSeekHarnessMCPServerSummary] = []
+    var selectedAgentMCPScope = BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
+    private var pendingAgentMCPScopeRefresh = false
     var selectedClientID: String?
     var busy = false
     var statusText = "尚未读取 MCP 客户端状态。"
@@ -40,21 +42,34 @@
     }
 
     func refresh() async {
-      guard !busy else { return }
+      guard !busy else {
+        pendingAgentMCPScopeRefresh = true
+        return
+      }
       busy = true
+      pendingAgentMCPScopeRefresh = false
       statusText = "正在读取 MCP 客户端状态…"
       publishDisplay()
+      let requestedMCPScope = selectedAgentMCPScope
       defer {
         busy = false
         publishDisplay()
+        if pendingAgentMCPScopeRefresh {
+          pendingAgentMCPScopeRefresh = false
+          Task { @MainActor [weak self] in await self?.refresh() }
+        }
       }
       do {
         async let statusRequest = client.status()
         async let clientsRequest = client.mcpClients()
-        async let deepSeekHarnessMCPRequest = client.deepSeekHarnessMCPServers()
+        async let deepSeekHarnessMCPRequest = client.deepSeekHarnessMCPServers(
+          scope: requestedMCPScope
+        )
         serviceStatus = try await statusRequest
         clients = try await clientsRequest
-        if let deepSeekHarnessMCPResponse = try? await deepSeekHarnessMCPRequest {
+        if let deepSeekHarnessMCPResponse = try? await deepSeekHarnessMCPRequest,
+          selectedAgentMCPScope == requestedMCPScope
+        {
           deepSeekHarnessMCPServers = deepSeekHarnessMCPResponse.servers
         }
         connectionState = .connected
@@ -70,6 +85,19 @@
       guard clients.indices.contains(index) else { return }
       selectedClientID = clients[index].clientID
       publishDisplay()
+    }
+
+    func selectAgentMCPScope(_ scope: String) {
+      guard BridgeDesktopAgentMCPScope(rawValue: scope) != nil,
+        selectedAgentMCPScope != scope
+      else { return }
+      selectedAgentMCPScope = scope
+      deepSeekHarnessMCPServers = []
+      pendingAgentMCPScopeRefresh = true
+      publishDisplay()
+      if !busy {
+        Task { @MainActor [weak self] in await self?.refresh() }
+      }
     }
 
     func toggleSelectedClient(clientID: String? = nil) async {
@@ -154,18 +182,29 @@
     func saveDeepSeekHarnessMCPServer(
       _ request: IPCDeepSeekHarnessMCPServerInput
     ) async {
-      await mutate("正在保存 DSH MCP…", success: "DSH MCP 已保存。") {
+      let scope = request.scope ?? BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
+      guard scope == selectedAgentMCPScope,
+        let scopeValue = BridgeDesktopAgentMCPScope(rawValue: scope)
+      else { return }
+      await mutate(
+        "正在保存 Agent MCP…",
+        success: "\(scopeValue.displayName) MCP 已保存。"
+      ) {
         _ = try await self.client.saveDeepSeekHarnessMCPServer(request)
       }
     }
 
-    func deleteDeepSeekHarnessMCPServer(id: String) async {
-      await mutate("正在删除 DSH MCP…", success: "DSH MCP 已删除。") {
-        try await self.client.deleteDeepSeekHarnessMCPServer(id: id)
+    func deleteDeepSeekHarnessMCPServer(id: String, scope: String) async {
+      guard scope == selectedAgentMCPScope,
+        deepSeekHarnessMCPServers.contains(where: { $0.id == id })
+      else { return }
+      await mutate("正在删除 Agent MCP…", success: "Agent MCP 已删除。") {
+        try await self.client.deleteDeepSeekHarnessMCPServer(id: id, scope: scope)
       }
     }
 
-    func setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool) async {
+    func setDeepSeekHarnessMCPServerEnabled(id: String, enabled: Bool, scope: String) async {
+      guard scope == selectedAgentMCPScope else { return }
       guard let server = deepSeekHarnessMCPServers.first(where: { $0.id == id }) else { return }
       let request = IPCDeepSeekHarnessMCPServerInput(
         id: server.id,
@@ -176,7 +215,8 @@
         args: server.args,
         url: server.url,
         environment: server.environment.map { IPCDeepSeekHarnessMCPSecretInput(name: $0.name) },
-        headers: server.headers.map { IPCDeepSeekHarnessMCPSecretInput(name: $0.name) }
+        headers: server.headers.map { IPCDeepSeekHarnessMCPSecretInput(name: $0.name) },
+        scope: scope
       )
       await saveDeepSeekHarnessMCPServer(request)
     }
@@ -324,6 +364,8 @@
               canDelete: !busy
             )
           },
+          selectedAgentMCPScope: selectedAgentMCPScope,
+          agentMCPScopeOptions: BridgeDesktopAgentMCPScope.allCases.map(\.choice),
           tunnel: projectedTunnel,
           codexExecutablePath: serviceStatus?.status.codexExecutablePath,
           codexResolvedExecutablePath: serviceStatus?.status.codexResolvedExecutablePath

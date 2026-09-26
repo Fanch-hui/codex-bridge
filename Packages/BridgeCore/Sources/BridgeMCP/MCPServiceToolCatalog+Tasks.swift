@@ -45,7 +45,9 @@ extension MCPServiceToolCatalog {
       + "seconds when a long provider run has no recent activity. Do not poll before the returned "
       + "recommended_poll_after_seconds unless the user asks; a non-terminal status, unchanged "
       + "updated_at, or empty recent_activity is not a failure. Only a terminal status is "
-      + "authoritative; use diagnostic_after_quiet_seconds for a diagnostic check, not to infer failure.",
+      + "authoritative; use diagnostic_after_quiet_seconds for a diagnostic check, not to infer failure. "
+      + "When pending_user_input is present, use answer_user_input with its input_id and question IDs; "
+      + "this is a user answer channel, separate from tool permission approval.",
     inputSchema: objectSchema(
       properties: [
         "task_id": boundedStringSchema(maximum: 128),
@@ -58,6 +60,41 @@ extension MCPServiceToolCatalog {
       properties: ["task": taskSchema],
       required: ["task"]
     )
+  )
+
+  static let answerUserInput = Tool(
+    name: MCPServiceToolName.answerUserInput.rawValue,
+    title: "Answer agent question",
+    description:
+      "Answer one structured question currently pending on a provider task. get_task exposes the "
+      + "exact input_id, question IDs, answer choices and input kinds. Send answers as question ID "
+      + "to string-array mappings, or set cancelled=true with no answers. Cancellation reaches the "
+      + "provider as cancellation and never fabricates a default answer. This does not approve or "
+      + "deny a tool permission request.",
+    inputSchema: objectSchema(
+      properties: [
+        "task_id": boundedStringSchema(maximum: 128),
+        "input_id": boundedStringSchema(maximum: 128),
+        "answers": [
+          "type": ["object", "null"],
+          "maxProperties": 16,
+          "additionalProperties": [
+            "type": "array",
+            "maxItems": 32,
+            "items": boundedStringSchema(maximum: 4 * 1_024),
+          ],
+        ],
+        "cancelled": boolSchema,
+      ],
+      required: ["task_id", "input_id", "cancelled"]
+    ),
+    annotations: Tool.Annotations(
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    ),
+    outputSchema: mutationOutputSchema
   )
 
   static let submitTask = Tool(
@@ -85,7 +122,18 @@ extension MCPServiceToolCatalog {
       + "DeepSeek Harness, and Antigravity. A permission_mode value only replaces that default "
       + "when permission_mode_override=true and the user explicitly requested it. "
       + "Set provider_id to route the task to another registered agent provider (for example "
-      + "opencode or deepseek-harness). DeepSeek Harness supports "
+      + "opencode, deepseek-harness, pi, or qoder). Qoder uses its registered regional SDK and CLI. "
+      + "For an image-capable Pi or Qoder model, attachment_paths may list up to eight image paths "
+      + "relative to the selected project. Include only files the user explicitly chose; Bridge "
+      + "validates and binds their content before scheduling. Do not send image bytes or base64. "
+      + "Qoder sessions and defaults stay bound to the selected installation and region; never switch "
+      + "regions to recover a session. Its tool approvals use the local app and its follow-up input is queued. "
+      + "Pi uses an exact Bridge-bound session and native RPC. "
+      + "Pi steer_task queues a follow-up; model IDs and thinking levels must come from its model catalog. "
+      + "Pi file mutations and shell commands require local approval. Its managed read-only mode disables "
+      + "write and shell tools; shell execution requires workspace-write and network_access=true. "
+      + "These are extension tool controls, not an operating-system filesystem or network sandbox. "
+      + "DeepSeek Harness supports "
       + "provider-native read-only or workspace-write sandbox modes. To continue a completed session, "
       + "pass its provider_session_id as thread_id when lifecycle.session_continue is available. Use an explicitly requested model, effort, "
       + "permission mode, or Skill only when it is supported by the registered installation. "
@@ -129,11 +177,15 @@ extension MCPServiceToolCatalog {
         "project_id": optionalOpaqueProjectIDSchema,
         "prompt": boundedStringSchema(maximum: 32 * 1_024),
         "skill_name": nullableStringSchema(maximum: 128),
+        "skill_names": [
+          "type": "array", "maxItems": .int(16),
+          "items": boundedStringSchema(maximum: 128),
+        ],
         "thread_id": nullableStringSchema(maximum: 1_024),
         "provider_id": nullableStringSchema(
           maximum: 64,
           description:
-            "Omit for Codex. Set to opencode, deepseek-harness, or antigravity only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
+            "Omit for Codex. Set to opencode, deepseek-harness, antigravity, pi, or qoder only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
         ),
         "installation_id": nullableStringSchema(
           maximum: 256,
@@ -143,12 +195,12 @@ extension MCPServiceToolCatalog {
         "execution_model": nullableStringSchema(
           maximum: 256,
           description:
-            "Omit to use the Codex Bridge default or the selected provider default. For OpenCode, DeepSeek Harness, or Antigravity, use only a model advertised by the local Provider catalog when selection.model is effective."
+            "Omit to use the Codex Bridge default or the selected provider default. For registered external providers, use only a model advertised by the selected installation's catalog when selection.model is effective."
         ),
         "execution_effort": nullableStringSchema(
           maximum: 64,
           description:
-            "Omit to use the selected provider default effort. For OpenCode or DeepSeek Harness, set only a value advertised for the selected model when the user explicitly requests a per-task override and selection.effort is effective; external providers require model_override=true. Antigravity effort is part of the model ID, so omit this field."
+            "Omit to use the selected provider default effort. For OpenCode, DeepSeek Harness, or Pi, set only a value advertised for the selected model when the user explicitly requests a per-task override and selection.effort is effective; external providers require model_override=true. Antigravity effort is part of the model ID, so omit this field."
         ),
         "model_override": [
           "type": ["boolean", "null"],
@@ -181,6 +233,13 @@ extension MCPServiceToolCatalog {
           "type": "boolean",
           "description":
             "When true, a workspace-write task waits in the durable project queue if another write task is active. The default false preserves immediate busy responses.",
+        ],
+        "attachment_paths": [
+          "type": "array",
+          "maxItems": 8,
+          "description":
+            "Optional project-relative paths for images the user explicitly selected. Pi or Qoder accepts these only when the selected model explicitly advertises image input. Use paths such as assets/diagram.png; do not send file contents or base64.",
+          "items": boundedStringSchema(maximum: 2_048),
         ],
       ],
       required: ["prompt"]

@@ -35,13 +35,15 @@ actor ServiceAgentDiscoveryCatalog {
     existingInstallations: [ServiceAgentInstallationRecord],
     forceRefresh: Bool = false
   ) -> [AgentProviderID: ServiceAgentDiscoverySummary] {
-    if cached == nil || forceRefresh {
+    let missingProviders = providerIDs.filter { cached?[$0] == nil }
+    if cached == nil || forceRefresh || !missingProviders.isEmpty {
       let currentEnvironment = environment ?? ToolDiscoveryEnvironment.current()
-      cached = ServiceAgentAutoDiscovery.discoverySummaries(
-        providerIDs: providerIDs,
+      let discovered = ServiceAgentAutoDiscovery.discoverySummaries(
+        providerIDs: forceRefresh ? providerIDs : missingProviders,
         existingInstallations: existingInstallations,
         environment: currentEnvironment
       )
+      cached = (cached ?? [:]).merging(discovered) { _, new in new }
       if let cached, let cacheURL {
         try? ServiceAgentDiscoveryCache.save(cached, to: cacheURL)
       }
@@ -58,7 +60,8 @@ extension ServiceAgentAutoDiscovery {
   static func discoverySummaries(
     providerIDs: [AgentProviderID],
     existingInstallations: [ServiceAgentInstallationRecord],
-    environment: [String: String]
+    environment: [String: String],
+    qoderDistributionsByExecutablePath: [String: QoderDistribution] = [:]
   ) -> [AgentProviderID: ServiceAgentDiscoverySummary] {
     let recordsByProvider = Dictionary(grouping: existingInstallations, by: \.providerID)
     return Dictionary(
@@ -68,7 +71,8 @@ extension ServiceAgentAutoDiscovery {
           (try? discoverySummary(
             providerID: providerID,
             existingInstallations: records,
-            environment: environment
+            environment: environment,
+            qoderDistributionsByExecutablePath: qoderDistributionsByExecutablePath
           ))
           ?? ServiceAgentDiscoverySummary(
             state: "failed",
@@ -83,9 +87,31 @@ extension ServiceAgentAutoDiscovery {
   static func discoverySummary(
     providerID: AgentProviderID,
     existingInstallations: [ServiceAgentInstallationRecord],
-    environment: [String: String]
+    environment: [String: String],
+    qoderDistribution: QoderDistribution? = nil,
+    qoderDistributionsByExecutablePath: [String: QoderDistribution] = [:]
   ) throws -> ServiceAgentDiscoverySummary {
     switch providerID {
+    case .qoder:
+      return discoveredSummary(
+        from: try qoderRequests(
+          existingPaths: existingInstallations.map(\.executablePath),
+          environment: environment,
+          distribution: qoderDistribution,
+          distributionsByExecutablePath: qoderDistributionsByExecutablePath
+        )
+      )
+    case .pi:
+      let requests = try commandLineRequests(
+        providerID: providerID,
+        names: ["pi"],
+        displayName: "Pi",
+        trustProfile: .userTrusted,
+        securityProfileID: AgentProfileID(rawValue: "pi-managed"),
+        existingPaths: existingInstallations.map(\.executablePath),
+        environment: environment
+      )
+      return discoveredSummary(from: requests)
     case .openCode:
       let requests = try commandLineRequests(
         providerID: providerID,

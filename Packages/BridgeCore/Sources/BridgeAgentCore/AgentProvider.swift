@@ -149,6 +149,8 @@ public struct AgentProbeResult: Equatable, Sendable {
 }
 
 public struct AgentModelDescriptor: Codable, Equatable, Sendable {
+  public let contextWindowTokens: Int?
+  public let inputModalities: [AgentInputModality]?
   public let id: String
   public let displayName: String
   public let supportedReasoningEfforts: [String]
@@ -167,7 +169,9 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
     supportedReasoningEfforts: [String] = [],
     defaultReasoningEffort: String? = nil,
     reasoningCapabilitiesAvailable: Bool = true,
-    isDefaultModel: Bool? = nil
+    isDefaultModel: Bool? = nil,
+    contextWindowTokens: Int? = nil,
+    inputModalities: [AgentInputModality]? = nil
   ) throws {
     try AgentValidation.identifier(id, field: "model.id", maximumBytes: 256)
     try AgentValidation.text(displayName, field: "model.displayName", maximumBytes: 512)
@@ -189,6 +193,14 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
         throw AgentRuntimeError.invalidRequest("model.defaultReasoningEffort")
       }
     }
+    guard contextWindowTokens.map({ $0 > 0 }) ?? true else {
+      throw AgentRuntimeError.invalidRequest("model.contextWindowTokens")
+    }
+    guard inputModalities.map({ Set($0).count == $0.count }) ?? true else {
+      throw AgentRuntimeError.invalidRequest("model.inputModalities")
+    }
+    self.contextWindowTokens = contextWindowTokens
+    self.inputModalities = inputModalities
     self.id = id
     self.displayName = displayName
     self.supportedReasoningEfforts = supportedReasoningEfforts
@@ -198,6 +210,8 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
   }
 
   private enum CodingKeys: String, CodingKey {
+    case contextWindowTokens
+    case inputModalities
     case id
     case displayName
     case supportedReasoningEfforts
@@ -223,7 +237,12 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
         Bool.self,
         forKey: .reasoningCapabilitiesAvailable
       ) ?? true,
-      isDefaultModel: container.decodeIfPresent(Bool.self, forKey: .isDefaultModel)
+      isDefaultModel: container.decodeIfPresent(Bool.self, forKey: .isDefaultModel),
+      contextWindowTokens: container.decodeIfPresent(Int.self, forKey: .contextWindowTokens),
+      inputModalities: container.decodeIfPresent(
+        [AgentInputModality].self,
+        forKey: .inputModalities
+      )
     )
   }
 }

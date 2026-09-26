@@ -48,23 +48,34 @@ private actor ServiceDeepSeekHarnessMCPMutationGate {
 /// persisted in ServiceSettings; environment and header values remain in the
 /// platform SecretStore and are resolved only for an Agent launch.
 public actor ServiceDeepSeekHarnessMCPConfiguration {
+  let settingsKey: ServiceSettingKey
+  let secretNamespace: String
   let settings: ServiceSettings
   let secretStore: any SecretStore
   private let mutationGate = ServiceDeepSeekHarnessMCPMutationGate()
 
-  public init(settings: ServiceSettings, secretStore: any SecretStore) {
+  public init(
+    settings: ServiceSettings, secretStore: any SecretStore,
+    scope: ServiceAgentMCPScope = .deepSeekHarness
+  ) {
+    self.settingsKey = scope.settingsKey
+    self.secretNamespace = scope.secretNamespace
     self.settings = settings
     self.secretStore = secretStore
   }
 
   public func list() async throws -> [ServiceDeepSeekHarnessMCPServerSummary] {
-    let records = try await settings.deepSeekHarnessMCPServers()
+    let records = try await settings.deepSeekHarnessMCPServers(key: settingsKey)
     var result: [ServiceDeepSeekHarnessMCPServerSummary] = []
     result.reserveCapacity(records.count)
     for record in records {
       result.append(try summary(for: record))
     }
     return result
+  }
+
+  public func enabledServerCount() async throws -> Int {
+    try await settings.deepSeekHarnessMCPServers(key: settingsKey).filter(\.enabled).count
   }
 
   public func save(
@@ -84,7 +95,7 @@ public actor ServiceDeepSeekHarnessMCPConfiguration {
   private func saveUnlocked(
     _ input: ServiceDeepSeekHarnessMCPServerInput
   ) async throws -> ServiceDeepSeekHarnessMCPServerSummary {
-    let records = try await settings.deepSeekHarnessMCPServers()
+    let records = try await settings.deepSeekHarnessMCPServers(key: settingsKey)
     let existing = records.first(where: { $0.id == input.id })
     if existing == nil, records.count >= 32 {
       throw ServiceStoreError.invalidArgument("dsh.mcp.servers")
@@ -95,7 +106,7 @@ public actor ServiceDeepSeekHarnessMCPConfiguration {
     let record = try makeRecord(input, existingRecords: records)
     try storeProvidedSecrets(input)
     let updated = records.filter { $0.id != record.id } + [record]
-    try await settings.setDeepSeekHarnessMCPServers(updated)
+    try await settings.setDeepSeekHarnessMCPServers(updated, key: settingsKey)
     if let existing {
       try removeObsoleteSecrets(existing: existing, replacement: record)
     }
@@ -114,11 +125,12 @@ public actor ServiceDeepSeekHarnessMCPConfiguration {
   }
 
   private func deleteUnlocked(id: String) async throws {
-    let records = try await settings.deepSeekHarnessMCPServers()
+    let records = try await settings.deepSeekHarnessMCPServers(key: settingsKey)
     guard let record = records.first(where: { $0.id == id }) else {
       throw ServiceDeepSeekHarnessMCPError.serverNotFound
     }
-    try await settings.setDeepSeekHarnessMCPServers(records.filter { $0.id != id })
+    try await settings.setDeepSeekHarnessMCPServers(
+      records.filter { $0.id != id }, key: settingsKey)
     try removeSecrets(for: record)
   }
 
@@ -137,7 +149,7 @@ public actor ServiceDeepSeekHarnessMCPConfiguration {
   private func enabledRuntimeConfigurationsUnlocked() async throws
     -> [AgentMCPServerConfiguration]
   {
-    let records = try await settings.deepSeekHarnessMCPServers().filter(\.enabled)
+    let records = try await settings.deepSeekHarnessMCPServers(key: settingsKey).filter(\.enabled)
     var result: [AgentMCPServerConfiguration] = []
     result.reserveCapacity(records.count)
     for record in records {

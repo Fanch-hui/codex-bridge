@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import BridgeProjects
 import GRDB
@@ -6,7 +7,8 @@ extension SimpleServiceStore {
   public func createTask(
     _ task: ServiceTaskRecord,
     event: ServiceTaskEventDraft,
-    handoffID: String? = nil
+    handoffID: String? = nil,
+    attachments: [AgentImageAttachment] = []
   ) throws -> ServiceTaskCreationResult {
     guard event.kind == .taskCreated,
       event.createdAt == task.updatedAt,
@@ -14,6 +16,7 @@ extension SimpleServiceStore {
     else {
       throw ServiceStoreError.invalidArgument("task.creationEvent")
     }
+    try Self.validateTaskAttachments(attachments)
     do {
       return try database.write { db in
         guard try Self.projectRow(id: task.projectID, in: db) != nil else {
@@ -21,10 +24,16 @@ extension SimpleServiceStore {
         }
         if let handoffID { try Self.validateHandoffSubmission(handoffID, task: task, in: db) }
         if let existing = try Self.idempotentTask(for: task, in: db) {
+          guard try Self.taskAttachments(taskID: existing.id.rawValue, in: db) == attachments else {
+            throw ServiceStoreError.invalidArgument("task.attachments")
+          }
           if let handoffID { try Self.linkHandoff(handoffID, taskID: existing.id.rawValue, in: db) }
           return try Self.reusedResult(existing: existing, requested: task)
         }
         if let row = try Self.taskRow(id: task.id, in: db) {
+          guard try Self.taskAttachments(taskID: task.id.rawValue, in: db) == attachments else {
+            throw ServiceStoreError.invalidArgument("task.attachments")
+          }
           if let handoffID { try Self.linkHandoff(handoffID, taskID: task.id.rawValue, in: db) }
           return try Self.reusedResult(existing: Self.decodeTask(row), requested: task)
         }
@@ -35,6 +44,7 @@ extension SimpleServiceStore {
           throw ServiceStoreError.activeWriteTaskExists(task.projectID)
         }
         try insertTask(task, in: db)
+        try Self.insertTaskAttachments(attachments, taskID: task.id, in: db)
         if task.isQueued {
           try db.execute(
             sql: "INSERT INTO bridge_service_task_queue (task_id, enqueued_at) VALUES (?, ?)",

@@ -35,6 +35,14 @@ final class BridgeServiceAppModelTests: XCTestCase {
       warnings: []
     )
     await client.configureNativePermissionPolicy(policy)
+    await client.configureAgentInstallations([
+      IPCAgentInstallationSummary(
+        installationID: "ainst-agy", providerID: "antigravity", displayName: "Antigravity",
+        executablePath: "/tmp/agy", version: "1", protocolRevision: "1", adapterRevision: 1,
+        trustProfile: "user_trusted", securityProfileID: "antigravity-managed", isEnabled: true,
+        availability: "available", effectiveCapabilities: ["workspace.read"],
+        lastProbedAt: nil, updatedAt: "2026-09-26T00:00:00Z")
+    ])
     let model = BridgeServiceAppModel(
       registration: registration,
       clientFactory: { client },

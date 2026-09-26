@@ -83,6 +83,11 @@ public protocol BridgeMCPServiceAPI: Sendable {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPThreadReadPage
 
+  func serviceNativeSessionDirectory(
+    _ request: MCPNativeSessionDirectoryRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPNativeSessionDirectoryResponse
+
   func serviceModels(deadline: ContinuousClock.Instant) async throws -> MCPModelList
 
   func serviceListSkills(
@@ -111,6 +116,14 @@ public protocol BridgeMCPServiceAPI: Sendable {
     recentEventLimit: Int,
     deadline: ContinuousClock.Instant
   ) async throws -> MCPServiceTaskSnapshot
+
+  func serviceAnswerUserInput(
+    taskID: String,
+    inputID: String,
+    answers: [String: [String]]?,
+    cancelled: Bool,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPServiceTaskMutationReceipt
 
   func serviceSubmitTask(
     _ submission: MCPServiceTaskSubmission,
@@ -219,6 +232,23 @@ public protocol BridgeMCPServiceAPI: Sendable {
 }
 
 extension BridgeMCPServiceAPI {
+  public func serviceNativeSessionDirectory(
+    _ request: MCPNativeSessionDirectoryRequest,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPNativeSessionDirectoryResponse {
+    throw BridgeMCPQueryError.unavailable
+  }
+
+  public func serviceAnswerUserInput(
+    taskID: String,
+    inputID: String,
+    answers: [String: [String]]?,
+    cancelled: Bool,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPServiceTaskMutationReceipt {
+    throw BridgeMCPQueryError.unavailable
+  }
+
   public func serviceDirectPreviewMutation(
     _ request: MCPDirectMutationRequest,
     deadline: ContinuousClock.Instant

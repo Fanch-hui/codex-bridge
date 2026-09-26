@@ -240,4 +240,20 @@ extension BridgeServiceApplication {
       answers: answers
     )
   }
+
+  public func resolveUserInput(
+    taskID: TaskID,
+    inputID: String,
+    answers: [String: [String]]?,
+    cancelled: Bool
+  ) async throws {
+    guard cancelled ? answers == nil : answers != nil else {
+      throw ExecutionServiceError.invalidRequest("userInput.response")
+    }
+    try await coordinator.resolveUserInput(
+      taskID: taskID,
+      inputID: inputID,
+      response: cancelled ? .cancelled : .answers(answers ?? [:])
+    )
+  }
 }

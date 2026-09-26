@@ -187,23 +187,32 @@ public struct ExecutionUserInputQuestion: Codable, Equatable, Sendable {
   public let id: String
   public let header: String
   public let question: String
+  public let inputType: String?
   public let isOther: Bool
   public let isSecret: Bool
+  public let allowsMultiple: Bool?
+  public let isRequired: Bool?
   public let options: [ExecutionUserInputOption]
 
   public init(
     id: String,
     header: String,
     question: String,
+    inputType: String? = nil,
     isOther: Bool = false,
     isSecret: Bool = false,
+    allowsMultiple: Bool? = nil,
+    isRequired: Bool? = nil,
     options: [ExecutionUserInputOption] = []
   ) {
     self.id = id
     self.header = header
     self.question = question
+    self.inputType = inputType
     self.isOther = isOther
     self.isSecret = isSecret
+    self.allowsMultiple = allowsMultiple
+    self.isRequired = isRequired
     self.options = options
   }
 }
@@ -222,6 +231,7 @@ public struct ExecutionApprovalRequest: Codable, Equatable, Sendable {
   public let availableDecisions: [LocalApprovalDecision]
   public let questions: [ExecutionUserInputQuestion]
   public let isBlocking: Bool
+  public let userInputTimeoutSeconds: Int?
 
   public init(
     id: String,
@@ -236,7 +246,8 @@ public struct ExecutionApprovalRequest: Codable, Equatable, Sendable {
     reason: String? = nil,
     availableDecisions: [LocalApprovalDecision] = [.allow, .deny],
     questions: [ExecutionUserInputQuestion] = [],
-    isBlocking: Bool = true
+    isBlocking: Bool = true,
+    userInputTimeoutSeconds: Int? = nil
   ) throws {
     try ExecutionValidation.identifier(id, field: "approval.id", maximumBytes: 128)
     try ExecutionValidation.identifier(itemID, field: "approval.itemID", maximumBytes: 256)
@@ -256,6 +267,9 @@ public struct ExecutionApprovalRequest: Codable, Equatable, Sendable {
     else {
       throw ExecutionServiceError.invalidRequest("approval.availableDecisions")
     }
+    guard userInputTimeoutSeconds.map({ (1...3_600).contains($0) }) ?? true else {
+      throw ExecutionServiceError.invalidRequest("userInput.timeoutSeconds")
+    }
     self.id = id
     self.taskID = taskID
     self.binding = binding
@@ -269,6 +283,7 @@ public struct ExecutionApprovalRequest: Codable, Equatable, Sendable {
     self.availableDecisions = availableDecisions
     self.questions = questions
     self.isBlocking = isBlocking
+    self.userInputTimeoutSeconds = userInputTimeoutSeconds
   }
 }
 

@@ -276,8 +276,8 @@ final class BridgeServiceApplicationTests: XCTestCase {
     let readOnly = MCPServiceToolCatalog(exposureMode: .readOnly).definitions.map(\.name)
     let full = MCPServiceToolCatalog(exposureMode: .full).definitions.map(\.name)
 
-    XCTAssertEqual(readOnly.count, 17)
-    XCTAssertEqual(full.count, 34)
+    XCTAssertEqual(readOnly.count, 19)
+    XCTAssertEqual(full.count, 40)
     XCTAssertFalse(readOnly.contains(MCPServiceToolName.submitTask.rawValue))
     XCTAssertFalse(readOnly.contains(MCPServiceToolName.steerTask.rawValue))
     XCTAssertFalse(readOnly.contains(MCPServiceToolName.interruptTask.rawValue))

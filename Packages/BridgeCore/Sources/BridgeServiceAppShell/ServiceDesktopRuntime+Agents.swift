@@ -7,7 +7,8 @@ extension BridgeServiceAppModel {
     providerID: String,
     displayName: String,
     executableURL: URL,
-    configurationURL: URL? = nil
+    configurationURL: URL? = nil,
+    qoderDistribution: String? = nil
   ) {
     runAgentMutation(
       operation: { client in
@@ -16,7 +17,8 @@ extension BridgeServiceAppModel {
             providerID: providerID,
             displayName: displayName,
             executablePath: executableURL.standardizedFileURL.path,
-            configurationPath: configurationURL?.standardizedFileURL.path
+            configurationPath: configurationURL?.standardizedFileURL.path,
+            qoderDistribution: qoderDistribution
           )
         )
       },
@@ -33,7 +35,9 @@ extension BridgeServiceAppModel {
     providerID: String,
     baseURL: String? = nil,
     apiKey: String? = nil,
-    alwaysProceedConfirmed: Bool = false
+    alwaysProceedConfirmed: Bool = false,
+    qoderDistribution: String? = nil,
+    installationID: String? = nil
   ) {
     guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
       errorMessage = "未找到可连接的 Agent Provider。"
@@ -45,7 +49,9 @@ extension BridgeServiceAppModel {
           providerID: provider.providerID,
           baseURL: baseURL,
           apiKey: apiKey,
-          alwaysProceedConfirmed: alwaysProceedConfirmed
+          alwaysProceedConfirmed: alwaysProceedConfirmed,
+          qoderDistribution: qoderDistribution,
+          installationID: installationID
         )
       },
       successMessage: { installation in
@@ -54,6 +60,16 @@ extension BridgeServiceAppModel {
           ? "已连接并验证 \(installation.displayName)"
           : "已发现 \(installation.displayName)，但连接检查未通过"
       }
+    )
+  }
+
+  func setQoderRuntimeSettings(_ request: IPCAgentQoderRuntimeSettingsRequest) {
+    runAgentMutation(
+      operation: { client in
+        _ = try await client.setQoderRuntimeSettings(request)
+        return nil
+      },
+      successMessage: { _ in "Qoder 地区与运行时配置已保存" }
     )
   }
 

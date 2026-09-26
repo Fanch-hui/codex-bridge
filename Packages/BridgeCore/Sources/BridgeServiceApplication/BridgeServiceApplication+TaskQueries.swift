@@ -1,3 +1,5 @@
+import BridgeAgentCore
+import BridgeCodexService
 import BridgeDomain
 import BridgeMCP
 import BridgeSecurity
@@ -28,9 +30,14 @@ extension BridgeServiceApplication {
       recentActivityAvailable = false
     }
     let queueInfo = try await tasks.queueInfo(taskID: id)
+    let attachments = try await tasks.taskAttachments(taskID: id)
+    let pendingUserInput = await coordinator.pendingUserInputs(taskID: id).first
     return taskSnapshot(
       task: task, events: events, activityMessages: activityMessages,
-      recentActivityAvailable: recentActivityAvailable, queueInfo: queueInfo)
+      recentActivityAvailable: recentActivityAvailable, queueInfo: queueInfo,
+      attachmentPaths: attachments.map(\.relativePath),
+      usage: try await tasks.usage(taskID: id),
+      pendingUserInput: pendingUserInput.map(Self.taskUserInput))
   }
 
   func taskSnapshot(
@@ -38,7 +45,10 @@ extension BridgeServiceApplication {
     events: [ServiceTaskEventRecord],
     activityMessages: [ServiceTaskMessageRecord],
     recentActivityAvailable: Bool,
-    queueInfo: ServiceTaskQueueInfo? = nil
+    queueInfo: ServiceTaskQueueInfo? = nil,
+    attachmentPaths: [String] = [],
+    usage: AgentUsageStatistics? = nil,
+    pendingUserInput: MCPServiceTaskUserInput? = nil
   ) -> MCPServiceTaskSnapshot {
     let recentActivity = activityMessages.enumerated().compactMap {
       taskActivity($0.element, sequence: Int64($0.offset + 1))
@@ -71,6 +81,7 @@ extension BridgeServiceApplication {
         Self.safe($0, maximum: 2 * 1_024)
       },
       changedFiles: Self.boundedChangedFiles(task.state.changedFiles),
+      attachmentPaths: attachmentPaths,
       recentEvents: events.map {
         MCPServiceTaskEvent(
           sequence: $0.id,
@@ -87,7 +98,7 @@ extension BridgeServiceApplication {
       },
       localApprovalRequired: !task.isQueued
         && (task.state.status == .awaitingLocalApproval
-          || task.state.status == .waitingForCodexApproval),
+          || (task.state.status == .waitingForCodexApproval && pendingUserInput == nil)),
       resultSummary: task.state.resultSummary.map {
         Self.safe($0, maximum: 32 * 1_024)
       },
@@ -95,7 +106,35 @@ extension BridgeServiceApplication {
       updatedAt: iso8601.string(from: effectiveUpdatedAt),
       queuePosition: queueInfo?.position,
       queueOccupantTaskID: queueInfo?.occupyingTaskID?.rawValue,
-      queueRequestedAt: queueInfo.map { iso8601.string(from: $0.enqueuedAt) }
+      queueRequestedAt: queueInfo.map { iso8601.string(from: $0.enqueuedAt) },
+      usage: usage,
+      pendingUserInput: pendingUserInput
+    )
+  }
+
+  private static func taskUserInput(
+    _ approval: ExecutionApprovalRequest
+  ) -> MCPServiceTaskUserInput {
+    MCPServiceTaskUserInput(
+      inputID: approval.id,
+      title: approval.title,
+      summary: approval.summary,
+      questions: approval.questions.map { question in
+        MCPServiceTaskUserInputQuestion(
+          id: question.id,
+          header: question.header,
+          question: question.question,
+          inputType: question.inputType,
+          allowsMultiple: question.allowsMultiple,
+          allowsCustomText: question.isOther,
+          isSecret: question.isSecret,
+          isRequired: question.isRequired,
+          options: question.options.map {
+            MCPServiceTaskUserInputOption(label: $0.label, description: $0.description)
+          }
+        )
+      },
+      timeoutSeconds: approval.userInputTimeoutSeconds
     )
   }
 

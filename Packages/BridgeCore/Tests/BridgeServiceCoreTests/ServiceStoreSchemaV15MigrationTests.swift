@@ -44,7 +44,7 @@ final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
         sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
       )
     }
-    XCTAssertEqual(currentVersion, 18)
+    XCTAssertEqual(currentVersion, Int(ServiceStoreSchema.version))
   }
 
   func testVersionFourteenDatabaseMigratesPathsAndPreservesRows() async throws {
@@ -99,7 +99,7 @@ final class ServiceStoreSchemaV15MigrationTests: XCTestCase {
       return (version, rows, projectSQL, installationSQL, artifactSQL, message, artifactPath)
     }
 
-    XCTAssertEqual(migrated.0, 18)
+    XCTAssertEqual(migrated.0, Int(ServiceStoreSchema.version))
     XCTAssertEqual(migrated.1, [1, 1, 1, 1, 1, 1])
     XCTAssertTrue(migrated.2?.contains("GLOB '[A-Za-z]'") ?? false)
     XCTAssertTrue(migrated.3?.contains("GLOB '[A-Za-z]'") ?? false)

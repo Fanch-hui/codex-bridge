@@ -227,6 +227,7 @@ final class WorkbenchTaskRetryActionTests: XCTestCase {
       providerSessionID: "sess-dsh-old",
       permissionMode: "workspace-write",
       networkAccess: false,
+      attachmentPaths: ["assets/diagram.png"],
       supervisorStatus: "none",
       localApprovalRequired: false,
       failureCode: "process_terminated",
@@ -235,7 +236,7 @@ final class WorkbenchTaskRetryActionTests: XCTestCase {
 
     XCTAssertTrue(task.canRestart)
 
-    model.restartTask(task)
+    model.restartTask(task, attachmentPaths: task.attachmentPaths)
 
     try await Task.sleep(for: .milliseconds(50))
 
@@ -248,6 +249,40 @@ final class WorkbenchTaskRetryActionTests: XCTestCase {
     XCTAssertNil(submitted.threadID)
     XCTAssertEqual(submitted.model, "deepseek-chat")
     XCTAssertEqual(submitted.effort, "low")
+    XCTAssertEqual(submitted.attachmentPaths, ["assets/diagram.png"])
+    XCTAssertEqual(submitted.attachmentSourceTaskID, task.taskID)
+  }
+
+  func testRestartCodexTaskDoesNotUseExternalAttachmentSource() async throws {
+    let client = TestBridgeServiceClient()
+    let model = BridgeServiceAppModel(
+      registration: MockRegistration(),
+      clientFactory: { client },
+      pollInterval: nil,
+      connectionRetryDelay: .milliseconds(1),
+      maximumConnectionAttempts: 1
+    )
+    await model.startAsync()
+
+    let task = MCPServiceTaskSnapshot(
+      taskID: "codex-restart-1",
+      projectID: "proj-1",
+      prompt: "修复测试",
+      status: "failed",
+      providerID: "codex",
+      threadID: "thread-1",
+      supervisorStatus: "none",
+      localApprovalRequired: false,
+      updatedAt: "2026-09-03T10:00:00Z"
+    )
+    model.restartTask(task)
+
+    try await Task.sleep(for: .milliseconds(50))
+
+    let submissions = await client.submittedAgentTasksValue()
+    let submitted = try XCTUnwrap(submissions.first)
+    XCTAssertNil(submitted.attachmentSourceTaskID)
+    XCTAssertNil(submitted.attachmentPaths)
   }
 
   func testSteerableHelpersForRunningTasks() {

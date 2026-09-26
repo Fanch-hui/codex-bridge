@@ -78,7 +78,7 @@ final class MCPServiceExposureTests: XCTestCase {
   func testReadOnlyModeExposesCommandsAndObservationOnly() {
     let catalog = MCPServiceToolCatalog(exposureMode: .readOnly)
     let names = catalog.definitions.map(\.name)
-    XCTAssertEqual(names.count, 17)
+    XCTAssertEqual(names.count, 19)
     XCTAssertTrue(names.contains("list_agents"))
     XCTAssertTrue(names.contains("list_project_commands"))
     XCTAssertTrue(names.contains("get_project_changes"))
@@ -93,7 +93,7 @@ final class MCPServiceExposureTests: XCTestCase {
   func testFullModeExposesDirectAndCodexActions() {
     let catalog = MCPServiceToolCatalog(exposureMode: .full)
     let names = catalog.definitions.map(\.name)
-    XCTAssertEqual(names.count, 34)
+    XCTAssertEqual(names.count, 40)
     for name in directToolNames {
       XCTAssertTrue(names.contains(name), "full must expose \(name)")
     }
@@ -115,6 +115,8 @@ final class MCPServiceExposureTests: XCTestCase {
       "read_project_file",
       "list_threads",
       "read_thread",
+      "list_agent_native_sessions",
+      "read_agent_native_session",
       "list_models",
       "list_skills",
       "read_skill",
@@ -124,6 +126,10 @@ final class MCPServiceExposureTests: XCTestCase {
       "list_project_commands",
     ]
     let expectedFullOnly = [
+      "index_agent_native_session",
+      "rename_agent_native_session",
+      "delete_agent_native_session",
+      "answer_user_input",
       "submit_task",
       "run_skill_action",
       "steer_task",

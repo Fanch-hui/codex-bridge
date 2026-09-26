@@ -192,7 +192,14 @@ final class ServiceTaskHandoffTests: XCTestCase {
     let legacy = try DatabaseQueue(path: fixture.databasePath)
     try await legacy.write { db in
       try db.execute(sql: "DROP TABLE bridge_service_handoffs")
-      try db.execute(sql: "DELETE FROM grdb_migrations WHERE identifier = 'BridgeServiceCore.v18'")
+      try db.execute(sql: "DROP TABLE bridge_service_task_usage")
+      try db.execute(sql: "DROP TABLE bridge_service_task_attachments")
+      try db.execute(sql: "ALTER TABLE bridge_service_tasks DROP COLUMN selected_skills_json")
+      for version in 18...ServiceStoreSchema.version {
+        try db.execute(
+          sql: "DELETE FROM grdb_migrations WHERE identifier = ?",
+          arguments: ["BridgeServiceCore.v\(version)"])
+      }
       try db.execute(sql: "UPDATE bridge_service_meta SET schema_version = 17 WHERE singleton = 1")
     }
     let migrated = try SimpleServiceStore(path: fixture.databasePath)

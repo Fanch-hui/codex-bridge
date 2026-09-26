@@ -177,6 +177,25 @@ final class ServiceAgentAutoDiscoveryTests: XCTestCase {
     XCTAssertEqual(refreshed[.deepSeekHarness]?.state, "not_found")
   }
 
+  func testNewProviderIsIndexedWhenExistingProviderCacheIsRestored() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let bin = root.appendingPathComponent(".local/bin")
+    try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+    let executable = bin.appendingPathComponent("pi")
+    try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+    let cache = root.appendingPathComponent("discovery.json")
+    let environment = ["HOME": root.path, "PATH": bin.path]
+    let original = ServiceAgentDiscoveryCatalog(environment: environment, cacheURL: cache)
+    _ = await original.summaries(providerIDs: [.openCode], existingInstallations: [])
+    let upgraded = ServiceAgentDiscoveryCatalog(environment: environment, cacheURL: cache)
+    let values = await upgraded.summaries(providerIDs: [.openCode, .pi], existingInstallations: [])
+    XCTAssertEqual(values[.pi]?.state, "discovered")
+    XCTAssertEqual(values[.pi]?.executablePath, executable.resolvingSymlinksInPath().path)
+  }
+
   func testOpenCodeDiscoveryKeepsAnExistingCustomPathAheadOfSearch() throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "bridge-agent-discovery-\(UUID().uuidString)",

@@ -67,6 +67,7 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 - [Complete user guide (Chinese)](./docs/USER_GUIDE.md)
 - [ChatGPT / Tunnel / OpenAI Runtime API Key (Chinese)](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness installation and API configuration](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md)
+- [Pi and Qoder installation, regions, and connections](./docs/PI_QODER_CONNECTION_GUIDE_en.md)
 - [OpenCode (Chinese)](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
 - [MCPB client connection and Registry publishing (Chinese)](./docs/MCP_REGISTRY.md)
 

@@ -26,7 +26,10 @@ extension BridgeServiceApplication {
     guard submission.supervisorModel == nil && submission.supervisorEffort == nil else {
       throw BridgeMCPQueryError.contractRejected
     }
-    guard policy.supportsSkillSelection || submission.skillName == nil else {
+    guard
+      policy.supportsSkillSelection
+        || (submission.skillName == nil && submission.skillNames?.isEmpty != false)
+    else {
       throw BridgeMCPQueryError.contractRejected
     }
     guard policy.supportsSessionContinuation || submission.threadID == nil else {
@@ -52,29 +55,34 @@ extension BridgeServiceApplication {
     // override may replace persisted provider defaults. The nil case keeps
     // older in-process callers source-compatible; the MCP parser normalizes a
     // missing marker to false.
-    let configuredModel: String?
-    let configuredEffort: String?
-    let providerDefaultMode: ServicePermissionMode
-    if policy.providerID == .openCode {
-      configuredModel = try await settings.string(for: .openCodeDefaultModel)
-      configuredEffort = try await settings.openCodeDefaultEffort()
-      let configuredMode = try await settings.openCodeDefaultPermissionMode()
-      providerDefaultMode = configuredMode == "plan" ? .readOnly : .workspaceWrite
-    } else if policy.providerID == .deepSeekHarness {
-      configuredModel = try await settings.string(for: .deepSeekHarnessDefaultModel)
-      configuredEffort = try await settings.string(for: .deepSeekHarnessDefaultEffort)
-      let configuredMode = try await settings.deepSeekHarnessDefaultPermissionMode()
-      providerDefaultMode = configuredMode == "read-only" ? .readOnly : .workspaceWrite
-    } else if policy.providerID == .antigravity {
-      configuredModel = try await settings.antigravityDefaultModel()
-      configuredEffort = nil
-      let configuredMode = try await settings.antigravityDefaultPermissionMode()
-      providerDefaultMode = configuredMode == "read-only" ? .readOnly : .workspaceWrite
+    let registry = try requiredAgentRegistry()
+    let selectable =
+      try await registry.installations(providerID: providerID)
+      .filter { $0.isSelectable }
+      .sorted { $0.id.rawValue < $1.id.rawValue }
+    let record = try await selectAgentInstallation(
+      providerID: providerID,
+      requested: submission.installationID,
+      selectable: selectable,
+      deadline: deadline
+    )
+    let defaults: ServiceAgentDefaultSettings
+    if providerID == .qoder {
+      guard let distribution = try await qoderDistribution(for: record) else {
+        throw BridgeMCPQueryError.contractRejected
+      }
+      defaults = try ServiceAgentDefaultSettings.descriptor(
+        for: policy.providerID, distribution: distribution)
     } else {
-      configuredModel = nil
-      configuredEffort = nil
-      providerDefaultMode = policy.defaultPermissionMode
+      defaults = try ServiceAgentDefaultSettings.descriptor(for: policy.providerID)
     }
+    let configuredModel = try await settings.string(for: defaults.modelKey)
+    let configuredEffort =
+      policy.supportsEffortSelection
+      ? try await settings.string(for: defaults.effortKey) : nil
+    let configuredMode = try await defaults.permissionMode(from: settings)
+    let providerDefaultMode: ServicePermissionMode =
+      configuredMode == defaults.readMode ? .readOnly : .workspaceWrite
     let requestedPermissionMode = try Self.permissionModeRequest(
       submission.permissionMode,
       override: submission.permissionModeOverride,
@@ -98,18 +106,18 @@ extension BridgeServiceApplication {
       // the Bridge enforced it when the adapter has no task-level sandbox.
       throw BridgeMCPQueryError.unavailable
     }
-    let registry = try requiredAgentRegistry()
-    let selectable =
-      try await registry.installations(providerID: providerID)
-      .filter { $0.isSelectable }
-      .sorted { $0.id.rawValue < $1.id.rawValue }
-    let record = try Self.selectAgentInstallation(
-      requested: submission.installationID, from: selectable)
     let effectiveCapabilities = policy.effectiveCapabilities(
       record.capabilities.effective,
       projectAllowsWorkspaceWrite: project.accessPolicy.write != .denied
     )
     let supportsModelSelection = effectiveCapabilities.contains(.modelSelection)
+    let mutationIntent: AgentMutationIntent =
+      permission == .workspaceWrite ? .workspaceWrite : .readOnly
+    if providerID == .pi || providerID == .qoder,
+      !effectiveCapabilities.isSuperset(of: mutationIntent.requiredCapabilities(for: providerID))
+    {
+      throw BridgeMCPQueryError.unavailable
+    }
     if requestedModel != nil, !supportsModelSelection {
       throw BridgeMCPQueryError.unavailable
     }
@@ -125,20 +133,47 @@ extension BridgeServiceApplication {
     let resolvedModel = try Self.validatedAgentModel(
       supportsModelSelection ? (requestedModel ?? configuredModel) : nil
     )
+    var previousBridgeTask: ServiceTaskRecord?
     if policy.supportsSessionContinuation, let requestedSessionID = submission.threadID {
-      guard
-        let previous = try await tasks.task(
-          providerSessionID: requestedSessionID,
-          providerID: providerID.rawValue,
-          installationID: record.id.rawValue,
-          projectID: project.id
-        )
-      else {
-        throw BridgeMCPQueryError.taskNotFound
+      let previous = try await tasks.task(
+        providerSessionID: requestedSessionID,
+        providerID: providerID.rawValue,
+        installationID: record.id.rawValue,
+        projectID: project.id
+      )
+      previousBridgeTask = previous
+      if let previous {
+        guard previous.state.status.isTerminal else {
+          throw BridgeMCPQueryError.invalidTaskState
+        }
+      } else {
+        guard providerID == .pi || providerID == .qoder else {
+          throw BridgeMCPQueryError.taskNotFound
+        }
+        let (directory, installation, verifiedRecord) =
+          try await registry
+          .nativeSessionDirectoryManager(installationID: record.id)
+        let scope = try await nativeSessionScope(project: project, installation: verifiedRecord)
+        let active = try await tasks.nonterminalTasks().contains { task in
+          task.projectID == project.id && task.providerID == providerID.rawValue
+            && task.installationID == record.id.rawValue
+            && (task.state.providerSessionID ?? task.requestedThreadID) == requestedSessionID
+        }
+        guard !active,
+          try await directory.isIndexedNativeSession(
+            sessionID: requestedSessionID, scope: scope, installation: installation)
+        else { throw BridgeMCPQueryError.taskNotFound }
       }
-      guard previous.state.status.isTerminal else {
-        throw BridgeMCPQueryError.invalidTaskState
-      }
+    }
+    var attachmentSourceTask: ServiceTaskRecord?
+    if let sourceTaskID = submission.attachmentSourceTaskID {
+      guard source == .macOSApp, submission.threadID == nil, sourceTaskID.utf8.count <= 128,
+        let sourceTask = try await tasks.task(id: TaskID(rawValue: sourceTaskID)),
+        sourceTask.state.status.isTerminal, sourceTask.projectID == project.id,
+        sourceTask.providerID == providerID.rawValue,
+        sourceTask.installationID == record.id.rawValue
+      else { throw BridgeMCPQueryError.contractRejected }
+      attachmentSourceTask = sourceTask
     }
     let modelCatalog: [AgentModelDescriptor]?
     if supportsModelSelection {
@@ -161,6 +196,8 @@ extension BridgeServiceApplication {
             modelID: resolvedModel,
             catalog: modelCatalog
           )
+      } else if providerID == .qoder {
+        selectedDescriptor = modelCatalog.first(where: { $0.isDefaultModel == true })
       } else {
         selectedDescriptor = modelCatalog.first(where: {
           !$0.supportedReasoningEfforts.isEmpty
@@ -169,7 +206,7 @@ extension BridgeServiceApplication {
     } else {
       selectedDescriptor = nil
     }
-    if policy.providerID == .deepSeekHarness, resolvedModel != nil, selectedDescriptor == nil {
+    if defaults.requiresKnownModel, resolvedModel != nil, selectedDescriptor == nil {
       throw BridgeMCPQueryError.unavailable
     }
     let executionEffort: String
@@ -186,11 +223,41 @@ extension BridgeServiceApplication {
     } else {
       executionEffort = serviceDefaultProviderExecutionEffort
     }
-    let prompt = try await taskPrompt(
+    let selectedSkills = try await selectedSkillSnapshots(
       for: submission,
       project: project,
-      deadline: deadline
+      deadline: deadline,
+      previousTask: previousBridgeTask ?? attachmentSourceTask
     )
+    let prompt = try await taskPrompt(
+      for: submission,
+      deadline: deadline,
+      selectedSkills: selectedSkills
+    )
+    let attachments: [AgentImageAttachment]
+    if let sourceTask = attachmentSourceTask {
+      let originalAttachments = try await tasks.taskAttachments(taskID: sourceTask.id)
+      guard let confirmedSourceTask = try await tasks.task(id: sourceTask.id),
+        confirmedSourceTask.state.status.isTerminal,
+        confirmedSourceTask.projectID == project.id,
+        confirmedSourceTask.providerID == providerID.rawValue,
+        confirmedSourceTask.installationID == record.id.rawValue
+      else {
+        throw BridgeMCPQueryError.contractRejected
+      }
+      attachments = try ServiceAgentAttachments.captureForRestart(
+        relativePaths: submission.attachmentPaths ?? [],
+        originalAttachments: originalAttachments,
+        project: project,
+        model: selectedDescriptor
+      )
+    } else {
+      attachments = try ServiceAgentAttachments.capture(
+        relativePaths: submission.attachmentPaths ?? [],
+        project: project,
+        model: selectedDescriptor
+      )
+    }
     let executionModel =
       supportsModelSelection
       ? selectedDescriptor?.id ?? resolvedModel ?? serviceDefaultProviderExecutionModel
@@ -212,7 +279,9 @@ extension BridgeServiceApplication {
         permissionMode: permission,
         networkAllowed: submission.networkAccess,
         accessMode: .requestApproval,
-        queueIfBusy: submission.queueIfBusy == true
+        queueIfBusy: submission.queueIfBusy == true,
+        attachments: attachments,
+        selectedSkills: selectedSkills
       )
     )
   }

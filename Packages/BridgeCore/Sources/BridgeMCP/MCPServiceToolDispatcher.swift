@@ -127,6 +127,8 @@ public struct MCPServiceToolDispatcher: Sendable {
       return try await callTask(contract.name, arguments: arguments, sessionID: sessionID)
     case .direct:
       return try await callDirect(contract.name, arguments: arguments)
+    case .nativeSessionDirectory:
+      return try await callNativeSessionDirectory(contract.name, arguments: arguments)
     }
   }
 }

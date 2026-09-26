@@ -96,6 +96,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var projectDetails: [String: MCPProjectDetail] = [:]
   @Published public internal(set) var agentProviders: [IPCAgentProviderSummary] = []
   @Published public internal(set) var agentInstallations: [IPCAgentInstallationSummary] = []
+  @Published public internal(set) var nativeSessionDirectory:
+    BridgeDesktopNativeSessionDirectoryState?
+  var nativeSessionDirectoryGeneration: UInt64 = 0
   @Published public internal(set) var agentModelOptionsByProvider:
     [String: [IPCAgentModelSummary]] = [:]
   @Published public internal(set) var agentModelRefreshingProviders: Set<String> = []
@@ -137,6 +140,8 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var mcpClients: [IPCMCPClientStatus] = []
   @Published public internal(set) var deepSeekHarnessMCPServers:
     [IPCDeepSeekHarnessMCPServerSummary] = []
+  @Published public internal(set) var selectedAgentMCPScope =
+    BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
   @Published public internal(set) var models: [MCPModelSummary] = []
   @Published public internal(set) var modelPreferences: IPCModelPreferences?
   @Published public internal(set) var customInstructions: String?

@@ -106,7 +106,7 @@ final class AppUpdateClientTests: XCTestCase {
       architecture: architecture,
       kind: kind,
       url: URL(
-        string: "https://github.com/yeyuancc0-glitch/codex-bridge/releases/download/v1.0.0/\(name)")!,
+        string: "https://github.com/Fanch-hui/codex-bridge/releases/download/v1.0.0/\(name)")!,
       sha256: "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
       size: 7
     )

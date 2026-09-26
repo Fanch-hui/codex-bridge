@@ -33,6 +33,7 @@
         installationID: installation.installationID,
         providerID: installation.providerID,
         displayName: installation.displayName,
+        distribution: installation.distribution,
         executablePath: installation.executablePath,
         version: installation.version,
         protocolRevision: installation.protocolRevision,

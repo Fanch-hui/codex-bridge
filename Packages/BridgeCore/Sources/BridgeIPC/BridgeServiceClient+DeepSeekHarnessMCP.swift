@@ -1,12 +1,16 @@
 import Foundation
 
 extension BridgeServiceClient {
-  public func deepSeekHarnessMCPServers() async throws
+  public func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse {
+    try await deepSeekHarnessMCPServers(scope: nil)
+  }
+
+  public func deepSeekHarnessMCPServers(scope: String?) async throws
     -> IPCDeepSeekHarnessMCPListResponse
   {
     try await call(
       operation: .listDeepSeekHarnessMCPServers,
-      payload: Optional<IPCMutationResponse>.none
+      payload: IPCAgentMCPListRequest(scope: scope)
     )
   }
 
@@ -17,9 +21,13 @@ extension BridgeServiceClient {
   }
 
   public func deleteDeepSeekHarnessMCPServer(id: String) async throws {
+    try await deleteDeepSeekHarnessMCPServer(id: id, scope: nil)
+  }
+
+  public func deleteDeepSeekHarnessMCPServer(id: String, scope: String?) async throws {
     let _: IPCMutationResponse = try await call(
       operation: .deleteDeepSeekHarnessMCPServer,
-      payload: IPCDeepSeekHarnessMCPDeleteRequest(id: id)
+      payload: IPCDeepSeekHarnessMCPDeleteRequest(id: id, scope: scope)
     )
   }
 }

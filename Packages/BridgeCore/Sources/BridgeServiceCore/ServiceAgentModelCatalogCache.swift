@@ -253,7 +253,9 @@ extension ServiceAgentRegistry {
         supportedReasoningEfforts: incoming.supportedReasoningEfforts,
         defaultReasoningEffort: incoming.defaultReasoningEffort,
         reasoningCapabilitiesAvailable: incoming.reasoningCapabilitiesAvailable,
-        isDefaultModel: existingDefault
+        isDefaultModel: existingDefault,
+        contextWindowTokens: incoming.contextWindowTokens,
+        inputModalities: incoming.inputModalities
       )) ?? incoming
   }
 

@@ -192,7 +192,8 @@ final class ServiceAgentSubmissionTests: XCTestCase {
         },
         resolveApproval: { [weak self] approvalID, optionID in
           try self?.performResolve(approvalID: approvalID, optionID: optionID)
-        }
+        },
+        resolveUserInput: { _, _ in }
       )
       return AgentExecutionHandle(
         taskID: returnedTaskID ?? request.taskID,
@@ -231,6 +232,35 @@ final class ServiceAgentSubmissionTests: XCTestCase {
       let run = runs[envelope.taskID]
       lock.unlock()
       run?.continuation.yield(envelope)
+    }
+
+    func requestUserInput(taskID: TaskID) throws {
+      let request = try AgentUserInputRequest(
+        inputID: "provider-input-\(taskID.rawValue)",
+        taskID: taskID,
+        binding: AgentBinding(
+          providerID: providerID,
+          installationID: installationID,
+          providerSessionID: "sess-\(taskID.rawValue)",
+          providerRunID: "run-\(taskID.rawValue)"
+        ),
+        providerItemID: "question-\(taskID.rawValue)",
+        title: "Need input",
+        summary: "The provider needs a decision.",
+        questions: [
+          try AgentUserInputQuestion(
+            id: "choice", header: "Choice", question: "What should happen?", kind: .input)
+        ]
+      )
+      emit(
+        try AgentEventEnvelope(
+          taskID: taskID,
+          providerID: providerID,
+          providerSessionID: "sess-\(taskID.rawValue)",
+          providerRunID: "run-\(taskID.rawValue)",
+          providerSequence: 1,
+          event: .userInputRequested(request)
+        ))
     }
 
     func finish(taskID: TaskID) {
@@ -1551,6 +1581,105 @@ final class ServiceAgentSubmissionTests: XCTestCase {
     }
     XCTAssertEqual(interrupted.state.status, .interrupted)
     XCTAssertEqual(provider.interruptCount, 1)
+  }
+
+  func testWaitingAgentQuestionCanBeInterruptedOnlyForItsActiveRun() async throws {
+    let fixture = try await makeServiceApplicationFixture(self)
+    let provider = try ScriptedAgentProvider()
+    let registry = try await Self.makeRegistry(fixture: fixture, provider: provider, enabled: true)
+    let application = makeServiceApplication(
+      fixture: fixture,
+      catalogScript: serviceModelCatalogScript,
+      agentRegistry: registry,
+      agentRunner: ServiceAgentTaskRunner(
+        registry: registry,
+        providers: [.openCode: provider]
+      )
+    )
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+    let receipt = try await application.serviceSubmitTask(
+      MCPServiceTaskSubmission(
+        projectID: fixture.project.id.rawValue,
+        prompt: "Ask before making a decision.",
+        providerID: "opencode",
+        permissionMode: "read-only",
+        permissionModeOverride: true,
+        clientRequestID: "agent-question-interrupt"
+      ),
+      deadline: deadline
+    )
+    let taskID = TaskID(rawValue: receipt.taskID)
+    try await application.resolveTaskStartApproval(
+      taskID: taskID,
+      approvalID: BridgeServiceApplication.PendingTaskStartApproval.approvalID(for: taskID),
+      approved: true,
+      deadline: deadline
+    )
+    let running = try await waitForTask(fixture, taskID: receipt.taskID) {
+      $0.state.status == .running
+    }
+    let runID = try XCTUnwrap(running.state.providerRunID)
+    try provider.requestUserInput(taskID: taskID)
+    _ = try await waitForTask(fixture, taskID: receipt.taskID) {
+      $0.state.status == .waitingForCodexApproval
+    }
+    let pendingApprovals = await application.pendingCodexApprovals(taskID: taskID)
+    XCTAssertEqual(pendingApprovals.count, 1)
+    let questionSnapshot = try await application.serviceTask(
+      taskID: receipt.taskID,
+      recentEventLimit: 20,
+      deadline: deadline
+    )
+    XCTAssertNotNil(questionSnapshot.pendingUserInput)
+    XCTAssertFalse(questionSnapshot.localApprovalRequired)
+
+    do {
+      _ = try await application.serviceInterruptTask(
+        taskID: receipt.taskID,
+        expectedTurnID: "stale-run",
+        deadline: deadline
+      )
+      XCTFail("Expected an interrupt with a stale run ID to fail")
+    } catch {
+      XCTAssertEqual(error as? BridgeMCPQueryError, .turnMismatch)
+    }
+
+    _ = try await application.serviceInterruptTask(
+      taskID: receipt.taskID,
+      expectedTurnID: runID,
+      deadline: deadline
+    )
+    _ = try await waitForTask(fixture, taskID: receipt.taskID) {
+      $0.state.status == .interrupted
+    }
+    let remainingApprovals = await application.pendingCodexApprovals(taskID: taskID)
+    XCTAssertTrue(remainingApprovals.isEmpty)
+    XCTAssertEqual(provider.interruptCount, 1)
+
+    let legacyTaskID = TaskID(rawValue: "tsk-legacy-codex-approval")
+    _ = try await fixture.tasks.submit(
+      ServiceTaskRequest(
+        projectID: fixture.project.id,
+        source: .mcpClient,
+        sourceClientID: MCPClientID.chatGPT.rawValue,
+        prompt: "Wait for the Codex approval.",
+        executionModel: "test-model",
+        executionEffort: "medium",
+        permissionMode: .readOnly
+      ),
+      taskID: legacyTaskID
+    )
+    _ = try await fixture.tasks.approveAndBegin(taskID: legacyTaskID)
+    _ = try await fixture.tasks.markExecutionStarted(
+      taskID: legacyTaskID, threadID: "legacy-thread", turnID: "legacy-turn")
+    _ = try await fixture.tasks.markWaitingForCodexApproval(taskID: legacyTaskID)
+    let approvalSnapshot = try await application.serviceTask(
+      taskID: legacyTaskID.rawValue,
+      recentEventLimit: 20,
+      deadline: deadline
+    )
+    XCTAssertNil(approvalSnapshot.pendingUserInput)
+    XCTAssertTrue(approvalSnapshot.localApprovalRequired)
   }
 
   func testAgentStreamEndingWithoutTerminalEventFailsTask() async throws {

@@ -5,6 +5,19 @@ import PackageDescription
 
 var testTargets: [Target] = [
   .testTarget(
+    name: "BridgeQoderSDKTests",
+    dependencies: ["BridgeQoderSDK", "BridgeAgentCore", "BridgeACP", "BridgeDomain"],
+    exclude: ["QoderHostTests.mjs"]
+  ),
+  .testTarget(
+    name: "BridgePiRPCTests",
+    dependencies: ["BridgePiRPC", "BridgeAgentCore", "BridgeDomain"],
+    exclude: [
+      "PiExtensionPolicyTests.mjs", "PiNativeSessionHistoryTests.mjs", "PiAskUserToolTests.mjs",
+      "PiPlanToolTests.mjs", "PiSubtaskTests.mjs",
+    ]
+  ),
+  .testTarget(
     name: "BridgeDesktopUITests",
     dependencies: ["BridgeDesktopUI"]
   ),
@@ -400,6 +413,8 @@ let package = Package(
     .library(name: "BridgeOpenCodeACP", targets: ["BridgeOpenCodeACP"]),
     .library(name: "BridgeDeepSeekHarnessACP", targets: ["BridgeDeepSeekHarnessACP"]),
     .library(name: "BridgeAntigravityCLI", targets: ["BridgeAntigravityCLI"]),
+    .library(name: "BridgePiRPC", targets: ["BridgePiRPC"]),
+    .library(name: "BridgeQoderSDK", targets: ["BridgeQoderSDK"]),
     .library(name: "BridgeProcess", targets: ["BridgeProcess"]),
     .library(name: "BridgeServiceApplication", targets: ["BridgeServiceApplication"]),
     .library(name: "BridgeDirectCommand", targets: ["BridgeDirectCommand"]),
@@ -443,7 +458,7 @@ let package = Package(
   targets: [
     .target(
       name: "BridgeDesktopUI",
-      dependencies: ["BridgeServiceAppCore"],
+      dependencies: ["BridgeServiceAppCore", "BridgeAgentCore"],
       resources: [.process("Resources")]
     ),
     .target(name: "BridgeDomain"),
@@ -481,6 +496,7 @@ let package = Package(
     .target(
       name: "BridgeMCP",
       dependencies: [
+        "BridgeAgentCore",
         "BridgeDomain",
         "BridgeFiles",
         "BridgeSkills",
@@ -596,6 +612,16 @@ let package = Package(
     ),
     .target(name: "BridgeProcess"),
     .target(
+      name: "BridgePiRPC",
+      dependencies: ["BridgeAgentCore", "BridgeDomain", "BridgeProcess", "BridgeSecurity"],
+      resources: [.copy("Resources/PiBridgeExtension"), .copy("Resources/PiNativeHistory")]
+    ),
+    .target(
+      name: "BridgeQoderSDK",
+      dependencies: ["BridgeACP", "BridgeAgentCore", "BridgeDomain", "BridgeSecurity"],
+      resources: [.copy("Resources/QoderHost")]
+    ),
+    .target(
       name: "BridgeDirectCommand",
       dependencies: [
         "BridgeAgentCore",
@@ -616,6 +642,8 @@ let package = Package(
       dependencies: [
         "BridgeAgentCore",
         "BridgeAntigravityCLI",
+        "BridgePiRPC",
+        "BridgeQoderSDK",
         "BridgeCodexRPC",
         "BridgeCodexService",
         "BridgeDirectCommand",

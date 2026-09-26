@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import Foundation
 
@@ -204,11 +205,50 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
   public let accessMode: ServiceAccessMode
   public let fastMode: Bool
   public let queueIfBusy: Bool
+  public let selectedSkills: [AgentSelectedSkill]
   /// Queued tasks retain the normal awaiting-approval state until admitted.
   public let isQueued: Bool
   public let state: ServiceTaskState
   public let createdAt: Date
   public let updatedAt: Date
+
+  private enum CodingKeys: String, CodingKey {
+    case id, projectID, source, sourceClientID, clientRequestID, prompt, requestedThreadID
+    case providerID, installationID, selectionMode, executionModel, executionEffort
+    case supervisorModel, supervisorEffort, permissionMode, networkAllowed, accessMode
+    case fastMode, queueIfBusy, selectedSkills, isQueued, state, createdAt, updatedAt
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    self = try Self(
+      id: values.decode(TaskID.self, forKey: .id),
+      projectID: values.decode(ProjectID.self, forKey: .projectID),
+      source: values.decode(ServiceTaskSource.self, forKey: .source),
+      sourceClientID: values.decode(String.self, forKey: .sourceClientID),
+      clientRequestID: values.decodeIfPresent(String.self, forKey: .clientRequestID),
+      prompt: values.decode(String.self, forKey: .prompt),
+      requestedThreadID: values.decodeIfPresent(String.self, forKey: .requestedThreadID),
+      providerID: values.decode(String.self, forKey: .providerID),
+      installationID: values.decodeIfPresent(String.self, forKey: .installationID),
+      selectionMode: values.decode(ServiceAgentSelectionMode.self, forKey: .selectionMode),
+      executionModel: values.decode(String.self, forKey: .executionModel),
+      executionEffort: values.decode(String.self, forKey: .executionEffort),
+      supervisorModel: values.decodeIfPresent(String.self, forKey: .supervisorModel),
+      supervisorEffort: values.decodeIfPresent(String.self, forKey: .supervisorEffort),
+      permissionMode: values.decode(ServicePermissionMode.self, forKey: .permissionMode),
+      networkAllowed: values.decode(Bool.self, forKey: .networkAllowed),
+      accessMode: values.decode(ServiceAccessMode.self, forKey: .accessMode),
+      fastMode: values.decode(Bool.self, forKey: .fastMode),
+      queueIfBusy: values.decode(Bool.self, forKey: .queueIfBusy),
+      selectedSkills: values.decodeIfPresent([AgentSelectedSkill].self, forKey: .selectedSkills)
+        ?? [],
+      isQueued: values.decode(Bool.self, forKey: .isQueued),
+      state: values.decode(ServiceTaskState.self, forKey: .state),
+      createdAt: values.decode(Date.self, forKey: .createdAt),
+      updatedAt: values.decode(Date.self, forKey: .updatedAt)
+    )
+  }
 
   public var requiresLocalStartApproval: Bool {
     source.isRemoteMCPOrigin
@@ -238,6 +278,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
     accessMode: ServiceAccessMode = .requestApproval,
     fastMode: Bool = false,
     queueIfBusy: Bool = false,
+    selectedSkills: [AgentSelectedSkill] = [],
     isQueued: Bool = false,
     state: ServiceTaskState,
     createdAt: Date,
@@ -313,6 +354,16 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
     guard supervisorModel != nil || state.supervisorStatus == .disabled else {
       throw ServiceStoreError.invalidArgument("task.supervisorStatus")
     }
+    guard selectedSkills.count <= 16,
+      Set(selectedSkills.map(\.name)).count == selectedSkills.count,
+      selectedSkills.reduce(
+        0,
+        { total, skill in
+          total + skill.files.reduce(0, { $0 + $1.content.utf8.count })
+        }) <= 1_024 * 1_024
+    else {
+      throw ServiceStoreError.invalidArgument("task.selectedSkills")
+    }
     try ServiceValidation.date(createdAt, field: "task.createdAt")
     try ServiceValidation.date(updatedAt, field: "task.updatedAt")
     guard updatedAt >= createdAt else {
@@ -337,6 +388,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
     self.accessMode = accessMode
     self.fastMode = fastMode
     self.queueIfBusy = queueIfBusy
+    self.selectedSkills = selectedSkills
     self.isQueued = isQueued
     self.state = state
     self.createdAt = createdAt
@@ -367,6 +419,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
       accessMode: accessMode,
       fastMode: fastMode,
       queueIfBusy: queueIfBusy,
+      selectedSkills: selectedSkills,
       isQueued: isQueued,
       state: state,
       createdAt: createdAt,
@@ -398,6 +451,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
       accessMode: accessMode,
       fastMode: fastMode,
       queueIfBusy: queueIfBusy,
+      selectedSkills: selectedSkills,
       isQueued: isQueued,
       state: state,
       createdAt: createdAt,
@@ -424,6 +478,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
       && accessMode == other.accessMode
       && fastMode == other.fastMode
       && queueIfBusy == other.queueIfBusy
+      && selectedSkills == other.selectedSkills
   }
 
   func hasSameImmutableFields(as other: ServiceTaskRecord) -> Bool {

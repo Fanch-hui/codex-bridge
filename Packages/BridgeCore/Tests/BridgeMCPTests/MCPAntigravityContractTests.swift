@@ -18,7 +18,8 @@ final class MCPAntigravityContractTests: XCTestCase {
       [.string("string"), .string("null")]
     )
     XCTAssertTrue(
-      provider["description"]?.stringValue?.contains("opencode, deepseek-harness, or antigravity")
+      provider["description"]?.stringValue?.contains(
+        "opencode, deepseek-harness, antigravity, pi, or qoder")
         == true
     )
 
@@ -36,7 +37,7 @@ final class MCPAntigravityContractTests: XCTestCase {
     )
     XCTAssertTrue(
       properties["execution_model"]?.objectValue?["description"]?.stringValue?
-        .contains("Antigravity") == true
+        .contains("selected installation's catalog") == true
     )
     XCTAssertTrue(
       properties["execution_effort"]?.objectValue?["description"]?.stringValue?

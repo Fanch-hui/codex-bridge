@@ -102,7 +102,7 @@ public enum WorkbenchSessionCatalog {
     for session in sessions {
       byProvider[session.providerID, default: []].append(session)
     }
-    let preferredOrder = ["codex", "antigravity", "opencode", "deepseek-harness"]
+    let preferredOrder = ["codex", "antigravity", "opencode", "deepseek-harness", "pi", "qoder"]
     var result: [WorkbenchProviderSessionGroup] = []
     for providerID in preferredOrder {
       guard let values = byProvider.removeValue(forKey: providerID), !values.isEmpty else {
