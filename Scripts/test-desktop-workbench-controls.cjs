@@ -391,7 +391,7 @@ test("reply composer grows with wrapped content, caps height and shrinks after d
 
 test("failed task retries with original attachments without a resumable session", () => {
   const ui = runtime();
-  const state = page("failed-task", { status: "failed", canSteer: false,
+  const state = page("failed-task", { status: "失败", canSteer: false,
     canResume: false, canRestart: true, attachmentPaths: ["image.png"] });
   ui.render(state);
   assert.equal(ui.input(), null);
@@ -405,6 +405,13 @@ test("failed task retries with original attachments without a resumable session"
     requestID: ui.requests[0], command: "restartTask", taskID: "failed-task",
     input: null, accepted: false } });
   assert.equal(ui.button("失败重试").disabled, false);
-  ui.render({ ...state, selectedTask: { ...state.selectedTask, status: "completed" } });
+  ui.render({ ...state, selectedTask: { ...state.selectedTask, status: "已完成", canRestart: false } });
   assert.equal(ui.button("失败重试"), null);
+});
+
+test("localized failed session shows retry alongside continuation", () => {
+  const ui = runtime();
+  ui.render(page("failed-session", { status: "失败", canResume: true, canRestart: true }));
+  assert.ok(ui.button("插入对话"));
+  assert.ok(ui.button("失败重试"));
 });

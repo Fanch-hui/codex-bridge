@@ -28,7 +28,7 @@
     controls.__receiptID = page && page.commandReceipt ? page.commandReceipt.receiptID : null;
     acknowledgeSubmission(page);
     var modes = page ? S.safeArray(page.steerModes) : [];
-    var canRetry = !!(detail && detail.status === "failed" && detail.canRestart);
+    var canRetry = !!(detail && detail.canRestart);
     var kind = detail && detail.canSteer === true ? "steer" : detail && (detail.canResume || canRetry) ? "continue" : "";
     var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, canRetry, modes]) : "";
     if (key !== currentKey) {
