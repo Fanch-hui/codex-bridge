@@ -185,11 +185,17 @@ extension BridgeDesktopCommandRouter {
     } else {
       requested = nil
     }
-    return model.agentInstallations.first(where: {
+    let installations = model.agentInstallations.filter {
       supportedProviders.contains($0.providerID)
         && $0.isEnabled && $0.availability == "available"
-        && (requested == nil || $0.installationID == requested)
-    })?.installationID
+    }
+    if let requested {
+      return installations.first(where: { $0.installationID == requested })?.installationID
+    }
+    return installations.first(where: { $0.providerID == "qoder" && $0.isActive == true })?
+      .installationID
+      ?? installations.first(where: { $0.providerID == "qoder" })?.installationID
+      ?? installations.first?.installationID
   }
 
   private static let supportedProviders: Set<String> = ["antigravity", "pi", "qoder"]

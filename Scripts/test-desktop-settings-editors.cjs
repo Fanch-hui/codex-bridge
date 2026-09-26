@@ -6,7 +6,7 @@ function runtime() {
   const ui = createHarness([
     "pages-common.js", "pages-form-draft.js", "pages-native-permissions.js",
     "pages-settings-models.js", "pages-settings-agents.js", "pages-settings-instructions.js",
-    "pages-direct.js", "pages-settings.js"
+    "pages-direct.js", "pages-settings-qoder-permissions.js", "pages-settings.js"
   ], ["settings-content"]);
   const commands = [];
   const emit = (command, payload) => commands.push({ command, payload: JSON.parse(JSON.stringify(payload)) });
@@ -121,7 +121,7 @@ test("agent permission defaults remain editable without an installation", () => 
   };
   ui.render(page({ agentDefaults: [agent] }));
   const card = ui.section("Agent模型与权限");
-  const agentEditor = card.lastChild.lastChild;
+  const agentEditor = card.querySelector(".agent-preferences");
   assert.equal(agentEditor.querySelector(".hint").textContent.includes("自动获取模型"), true);
   const permission = Array.from(card.querySelectorAll("select")).slice(-1)[0];
   assert.equal(permission.disabled, false);

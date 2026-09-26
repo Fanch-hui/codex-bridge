@@ -170,6 +170,12 @@ public struct QoderSDKProvider: AgentProvider, AgentInstallationArtifactProvidin
       request: request, installation: installation, distribution: profile.distribution)
     let sessionID = request.requestedSessionID ?? UUID().uuidString.lowercased()
     let resources = try await configuration.resources(request, installation)
+    guard let nativePermissionPolicyManager else {
+      throw AgentRuntimeError.invalidRequest("qoder.permission_policy_unavailable")
+    }
+    let permissionMode =
+      try await nativePermissionPolicyManager
+      .snapshot(installation: installation).toolPermission
     let client = try profile.client(
       cwd: request.projectRoot, factory: configuration.transportFactory)
     do {
@@ -179,7 +185,8 @@ public struct QoderSDKProvider: AgentProvider, AgentInstallationArtifactProvidin
           cwd: request.projectRoot,
           sessionID: sessionID, request: request,
           resources: resources, proxy: configuration.proxy,
-          expectedAccountScope: previousBinding?.accountScope))
+          expectedAccountScope: previousBinding?.accountScope,
+          permissionMode: permissionMode))
       try Self.validate(metadata, distribution: profile.distribution)
       guard metadata["sessionID"]?.stringValue == sessionID,
         let accountScope = metadata["accountScopeDigest"]?.stringValue,

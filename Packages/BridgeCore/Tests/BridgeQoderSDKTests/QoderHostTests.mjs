@@ -10,7 +10,7 @@ import { createPolicy, toolSelection } from '../../Sources/BridgeQoderSDK/Resour
 import { QoderSession, validateConfiguration } from '../../Sources/BridgeQoderSDK/Resources/QoderHost/session.mjs';
 import { MessageProjection } from '../../Sources/BridgeQoderSDK/Resources/QoderHost/events.mjs';
 import { RPCPeer } from '../../Sources/BridgeQoderSDK/Resources/QoderHost/rpc.mjs';
-import { packageName, sdkBrand } from '../../Sources/BridgeQoderSDK/Resources/QoderHost/sdk.mjs';
+import { packageName, sdkBrand, sdkPermissionMode } from '../../Sources/BridgeQoderSDK/Resources/QoderHost/sdk.mjs';
 import { contained, digest, HostError } from '../../Sources/BridgeQoderSDK/Resources/QoderHost/validation.mjs';
 
 async function fixture(t, overrides = {}) {
@@ -447,4 +447,57 @@ test('SDK process owner confirms native child termination', async () => {
   await owner.close();
   assert.ok(child.exitCode !== null || child.signalCode !== null);
   assert.equal(owner.children.size, 0);
+});
+
+test('native permission callback owns the interactive decision after the pre-tool boundary check', async t => {
+  const config = await fixture(t);
+  let approve, requests = 0;
+  const policy = await createPolicy(config, request => {
+    requests += 1;
+    return new Promise(resolve => { approve = () => resolve({ option: 'allow_once', digest: request.digest }); });
+  });
+  const input = { url: 'https://example.com', prompt: 'Read title' };
+  const hook = await policy.preTool({ hook_event_name: 'PreToolUse', cwd: config.cwd,
+    tool_name: 'WebFetch', tool_input: input }, 'fetch-1', {});
+  assert.equal(hook.hookSpecificOutput.permissionDecision, 'ask');
+  assert.equal(requests, 0);
+  const response = policy.decide('WebFetch', input, { toolUseID: 'fetch-1' });
+  await until(() => requests === 1);
+  approve();
+  assert.equal((await response).behavior, 'allow');
+});
+test('native automatic modes preserve the project boundary without forcing a hook approval', async t => {
+  const config = await fixture(t, { permissionMode: 'bypass_permissions' });
+  const policy = await createPolicy(config, () => { throw new Error('unexpected approval'); });
+  assert.equal((await policy.decide('WebFetch', { url: 'https://example.com' }, { toolUseID: 'fetch' })).behavior, 'allow');
+  await assert.rejects(policy.decide('Read', { file_path: path.resolve(config.cwd, '../outside') }, { toolUseID: 'read' }));
+  const auto = await createPolicy({ ...config, permissionMode: 'auto' }, () => { throw new Error('unexpected hook approval'); });
+  assert.deepEqual(await auto.preTool({ hook_event_name: 'PreToolUse', cwd: config.cwd,
+    tool_name: 'WebFetch', tool_input: { url: 'https://example.com' } }, 'fetch', {}), {});
+});
+
+test('interactive RPC waits beyond the former approval deadline and remains cancellable', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const input = new PassThrough(), output = new PassThrough(), records = [];
+  output.on('data', bytes => records.push(JSON.parse(bytes.toString())));
+  const peer = new RPCPeer(input, output, async () => ({}));
+  const controller = new AbortController();
+  const first = peer.request('qoder/permission', {}, controller.signal, 0);
+  t.mock.timers.tick(600000);
+  assert.equal(peer.pending.size, 1);
+  input.write(JSON.stringify({ jsonrpc: '2.0', id: records[0].id, result: { option: 'allow_once' } }) + '\n');
+  assert.equal((await first).option, 'allow_once');
+  const second = peer.request('qoder/question', {}, controller.signal, 0);
+  controller.abort();
+  await assert.rejects(second, error => error.code === 'interaction_cancelled');
+  assert.equal(peer.pending.size, 0);
+  await peer.close(); input.destroy(); output.destroy();
+});
+
+test('native permission settings map to official SDK permission mode values', () => {
+  assert.equal(sdkPermissionMode('default'), 'default');
+  assert.equal(sdkPermissionMode('auto'), 'auto');
+  assert.equal(sdkPermissionMode('bypass_permissions'), 'bypassPermissions');
+  assert.equal(sdkPermissionMode('accept_edits'), 'acceptEdits');
+  assert.equal(sdkPermissionMode('dont_ask'), 'dontAsk');
 });

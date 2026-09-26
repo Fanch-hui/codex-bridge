@@ -53,31 +53,58 @@ final class AgentSteerTests: XCTestCase {
     XCTAssertEqual(steerInputs, [queuedText])
     XCTAssertEqual(immediateSteerInputs, [immediateText])
 
-    func persistedUserMessage(_ content: String) async throws -> Bool {
+    func persistedUserMessageCount(_ content: String) async throws -> Int {
       try await coordinator.conversationPage(taskID: taskID)
-        .contains { $0.role == .user && $0.content == content }
+        .filter { $0.role == .user && $0.content == content }
+        .count
     }
 
-    // An immediate steer reaches the agent at once, so its instruction is recorded
-    // immediately. A queued one only belongs to the turn it eventually starts.
-    let immediatePersisted = try await persistedUserMessage(immediateText)
-    XCTAssertTrue(immediatePersisted)
-    let queuedPersisted = try await persistedUserMessage(queuedText)
-    XCTAssertFalse(queuedPersisted)
+    // A steer is persisted once from the provider's dispatch event. Equal text
+    // from two accepted inputs remains two distinct conversation messages.
+    let immediatePersisted = try await waitForUserMessageCount(
+      immediateText, count: 1, coordinator: coordinator, taskID: taskID)
+    XCTAssertEqual(immediatePersisted, 1)
+    let queuedBeforeDispatch = try await persistedUserMessageCount(queuedText)
+    XCTAssertEqual(queuedBeforeDispatch, 0)
+
+    try await coordinator.steer(
+      taskID: taskID,
+      expectedTurnID: runID,
+      text: immediateText,
+      interruptCurrentPrompt: true
+    )
+    let repeatedImmediatePersisted = try await waitForUserMessageCount(
+      immediateText, count: 2, coordinator: coordinator, taskID: taskID)
+    XCTAssertEqual(repeatedImmediatePersisted, 2)
 
     try await runner.dispatchSteer(queuedText)
-    var dispatched = false
-    for _ in 0..<100 {
-      dispatched = try await persistedUserMessage(queuedText)
-      if dispatched { break }
-      try await Task.sleep(for: .milliseconds(10))
-    }
-    XCTAssertTrue(dispatched)
+    let queuedPersisted = try await waitForUserMessageCount(
+      queuedText, count: 1, coordinator: coordinator, taskID: taskID)
+    XCTAssertEqual(queuedPersisted, 1)
 
     let contents = try await coordinator.conversationPage(taskID: taskID)
       .filter { $0.role == .user }
       .map(\.content)
-    XCTAssertEqual(Array(contents.suffix(2)), [immediateText, queuedText])
+    XCTAssertEqual(
+      Array(contents.suffix(3)), [immediateText, immediateText, queuedText])
+  }
+
+  private func waitForUserMessageCount(
+    _ content: String,
+    count: Int,
+    coordinator: ServiceExecutionCoordinator,
+    taskID: TaskID
+  ) async throws -> Int {
+    for _ in 0..<100 {
+      let current = try await coordinator.conversationPage(taskID: taskID)
+        .filter { $0.role == .user && $0.content == content }
+        .count
+      if current >= count { return current }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    return try await coordinator.conversationPage(taskID: taskID)
+      .filter { $0.role == .user && $0.content == content }
+      .count
   }
 }
 
@@ -136,6 +163,7 @@ private actor SteerableAgentRunner: AgentTaskRunning {
 
   func recordImmediateSteer(_ text: String) {
     immediateSteerInputs.append(text)
+    try? dispatchSteer(text)
   }
 
   func finish() {

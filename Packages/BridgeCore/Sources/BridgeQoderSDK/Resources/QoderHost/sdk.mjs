@@ -57,3 +57,7 @@ export function validateSDKQuery(query) {
     if (typeof query[method] !== 'function') throw new HostError('sdk_query_contract_unavailable');
   }
 }
+
+export function sdkPermissionMode(mode = 'default') {
+  return { accept_edits: 'acceptEdits', bypass_permissions: 'bypassPermissions', dont_ask: 'dontAsk' }[mode] ?? mode;
+}

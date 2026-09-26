@@ -8,7 +8,7 @@ import { requireValue } from './validation.mjs';
 
 let peer;
 const session = new QoderSession(value => peer.notify('qoder/event', value),
-  (method, params, signal) => peer.request(method, params, signal));
+  (method, params, signal) => peer.request(method, params, signal, 0));
 const handlers = {
   'qoder/open': value => session.open(value),
   'qoder/account_scope': async value => {

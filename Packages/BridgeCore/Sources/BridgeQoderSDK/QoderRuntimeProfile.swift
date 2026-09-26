@@ -89,7 +89,8 @@ struct QoderRuntimeProfile {
   func parameters(
     cwd: String, sessionID: String, request: AgentExecutionRequest?,
     resources: QoderSessionResources,
-    proxy: String?, capabilityProbe: Bool = false, expectedAccountScope: String? = nil
+    proxy: String?, capabilityProbe: Bool = false, expectedAccountScope: String? = nil,
+    permissionMode: String = "default"
   ) -> QoderJSONValue {
     var values: [String: QoderJSONValue] = [
       "revision": .integer(1), "distribution": .string(distribution.rawValue), "cwd": .string(cwd),
@@ -100,6 +101,7 @@ struct QoderRuntimeProfile {
         request?.mutationIntent == .workspaceWrite || capabilityProbe
           ? "workspace-write" : "read-only"),
       "networkAllowed": .bool(request?.networkAccessRequested == true || capabilityProbe),
+      "permissionMode": .string(permissionMode),
       "skills": .array(resources.skills.map(QoderJSONValue.string)),
       "selectedSkills": .array(resources.selectedSkills.map(selectedSkillValue)),
       "mcpServers": .object(resources.mcpServers),

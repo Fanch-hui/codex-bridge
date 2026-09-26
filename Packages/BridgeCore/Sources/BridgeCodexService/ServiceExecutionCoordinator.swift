@@ -155,9 +155,6 @@ public actor ServiceExecutionCoordinator {
         throw ExecutionServiceError.sessionUnavailable(taskID)
       }
       try await steer(text)
-      if interruptCurrentPrompt {
-        await conversation.appendUserMessage(taskID: taskID, content: text)
-      }
       return
     }
     if interruptCurrentPrompt {

@@ -78,7 +78,7 @@ export async function createPolicy(config, requestPermission, requestUserInput, 
   async function decide(tool, input, options) {
     const checked = await check(tool, input);
     if (tool === userInput) return userAnswer(input, options, requestUserInput);
-    if (!checked.needsApproval) return { behavior: 'allow', updatedInput: input };
+    if (!checked.needsApproval || config.permissionMode === 'bypass_permissions') return { behavior: 'allow', updatedInput: input };
     const id = identifier(options.toolUseID, 200);
     const key = id + ':' + checked.digest;
     requireValue(decisions.size < 256 || decisions.has(key), 'too_many_pending_tools');
@@ -127,12 +127,11 @@ export async function createPolicy(config, requestPermission, requestUserInput, 
     try {
       requireValue(input.hook_event_name === 'PreToolUse' && samePath(root, absolute(input.cwd)), 'tool_workspace_mismatch');
       if (input.tool_name === userInput) return {};
-      const result = await decide(input.tool_name, object(input.tool_input), {
-        toolUseID: id ?? input.tool_use_id, signal: options.signal, agentID: input.agent_id,
-      });
-      if (result.behavior === 'allow') return {};
-      return { hookSpecificOutput: { hookEventName: 'PreToolUse',
-        permissionDecision: 'deny', permissionDecisionReason: result.message } };
+      const checked = await check(input.tool_name, object(input.tool_input));
+      if ((config.permissionMode ?? 'default') === 'default' && checked.needsApproval) {
+        return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' } };
+      }
+      return {};
     } catch { return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny',
       permissionDecisionReason: 'The operation is outside the approved task policy.' } }; }
   }
