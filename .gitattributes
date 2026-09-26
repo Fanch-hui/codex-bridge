@@ -1,0 +1,3 @@
+# Runtime resources are verified by their exact byte hashes.
+Packages/BridgeCore/Sources/BridgePiRPC/Resources/** -text
+Packages/BridgeCore/Sources/BridgeQoderSDK/Resources/** -text
