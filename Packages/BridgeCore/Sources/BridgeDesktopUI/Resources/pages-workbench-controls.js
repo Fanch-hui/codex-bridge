@@ -28,8 +28,9 @@
     controls.__receiptID = page && page.commandReceipt ? page.commandReceipt.receiptID : null;
     acknowledgeSubmission(page);
     var modes = page ? S.safeArray(page.steerModes) : [];
-    var kind = detail && detail.canSteer === true ? "steer" : detail && detail.canResume ? "continue" : "";
-    var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, modes]) : "";
+    var canRetry = !!(detail && detail.status === "failed" && detail.canRestart);
+    var kind = detail && detail.canSteer === true ? "steer" : detail && (detail.canResume || canRetry) ? "continue" : "";
+    var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, canRetry, modes]) : "";
     if (key !== currentKey) {
       var updateControls = function () {
         var focused = captureFocus();
@@ -40,7 +41,7 @@
           controls.appendChild(controls.__activeForm);
         }
         if (kind === "continue") {
-          controls.__activeForm = continuationForm(detail, emit, controls.__receiptID);
+          controls.__activeForm = continuationForm(detail, emit, controls.__receiptID, canRetry);
           controls.appendChild(controls.__activeForm);
         }
         currentKey = key;
@@ -240,42 +241,51 @@
     return form;
   }
 
-  function continuationForm(detail, emit, baselineReceiptID) {
-    var form = S.node("div", "workbench-continuation-form"), draft = draftFor(detail.taskID);
-    var actions = S.node("div", "form-actions");
-    var input = inputField(detail, "消息", "输入消息，续写当前会话");
-    var send = S.button("插入对话", null, {}, emit, "small primary", false);
-    form.appendChild(input.wrapper);
-    actions.appendChild(send);
-    send.addEventListener("click", insertMessage);
-    input.control.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-        event.preventDefault(); insertMessage();
-      }
-    });
-    function insertMessage() {
-      if (send.disabled) return;
-      var value = input.control.value;
+  function continuationForm(detail, emit, baselineReceiptID, canRetry) {
+    var form = S.node("div", "workbench-continuation-form");
+    var actions = S.node("div", "form-actions"), buttons = [];
+    var input = null;
+    if (detail.canResume) {
+      input = inputField(detail, "消息", "输入消息，续写当前会话");
+      form.appendChild(input.wrapper);
+      addAction("插入对话", "resumeTask", "small primary");
+      input.control.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+          event.preventDefault(); submit("resumeTask");
+        }
+      });
+    }
+    if (canRetry) addAction("失败重试", "restartTask", "small");
+    function addAction(title, command, style) {
+      var button = S.button(title, null, {}, emit, style, false);
+      button.addEventListener("click", function () { submit(command); });
+      buttons.push(button); actions.appendChild(button);
+    }
+    function submit(command) {
+      if (pendingSubmissions.has(detail.taskID)) return;
+      var value = command === "resumeTask" ? input.control.value || null : null;
       var requestID = newSubmissionRequestID();
       pendingSubmissions.set(detail.taskID, {
-        command: "resumeTask",
-        requestID: requestID,
-        baselineReceiptID: baselineReceiptID,
-        taskID: detail.taskID,
-        input: value || null
+        command: command, requestID: requestID, baselineReceiptID: baselineReceiptID,
+        taskID: detail.taskID, input: value
       });
       validate();
-      emit("resumeTask", { taskID: detail.taskID, input: value || null }, requestID);
+      var payload = { taskID: detail.taskID };
+      if (command === "resumeTask") payload.input = value;
+      else payload.attachmentPaths = S.safeArray(detail.attachmentPaths).slice();
+      emit(command, payload, requestID);
     }
     function validate() {
       var pending = pendingSubmissions.has(detail.taskID);
-      send.disabled = pending;
-      send.setAttribute("aria-busy", String(pending));
-      send.setAttribute("data-pending", String(pending));
+      buttons.forEach(function (button) {
+        button.disabled = pending;
+        button.setAttribute("aria-busy", String(pending));
+        button.setAttribute("data-pending", String(pending));
+      });
     }
     form.appendChild(actions);
     form.__taskID = detail.taskID;
-    form.__inputControl = input.control;
+    form.__inputControl = input && input.control;
     form.__validate = validate;
     validate();
     return form;

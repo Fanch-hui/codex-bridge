@@ -388,3 +388,23 @@ test("reply composer grows with wrapped content, caps height and shrinks after d
   assert.equal(input.style.height, "32px");
   assert.equal(input.style.overflowY, "hidden");
 });
+
+test("failed task retries with original attachments without a resumable session", () => {
+  const ui = runtime();
+  const state = page("failed-task", { status: "failed", canSteer: false,
+    canResume: false, canRestart: true, attachmentPaths: ["image.png"] });
+  ui.render(state);
+  assert.equal(ui.input(), null);
+  ui.button("失败重试").dispatch("click");
+  ui.button("失败重试").dispatch("click");
+  assert.deepEqual(ui.commands, [{ command: "restartTask", payload: {
+    taskID: "failed-task", attachmentPaths: ["image.png"]
+  } }]);
+  assert.equal(ui.button("失败重试").disabled, true);
+  ui.render({ ...state, commandReceipt: { receiptID: "retry-rejected",
+    requestID: ui.requests[0], command: "restartTask", taskID: "failed-task",
+    input: null, accepted: false } });
+  assert.equal(ui.button("失败重试").disabled, false);
+  ui.render({ ...state, selectedTask: { ...state.selectedTask, status: "completed" } });
+  assert.equal(ui.button("失败重试"), null);
+});

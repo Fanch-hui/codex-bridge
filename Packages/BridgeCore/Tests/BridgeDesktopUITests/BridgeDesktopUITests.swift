@@ -54,7 +54,7 @@ final class BridgeDesktopUITests: XCTestCase {
     XCTAssertTrue(workbenchControls.contains("detail.canResume"))
     XCTAssertTrue(workbenchControls.contains("resumeTask"))
     XCTAssertTrue(workbenchControls.contains("插入对话"))
-    XCTAssertFalse(workbenchControls.contains("restartTask"))
+    XCTAssertTrue(workbenchControls.contains("restartTask"))
     XCTAssertFalse(workbenchControls.contains("CodexBridgeDesktopWorkbenchSkills"))
     XCTAssertFalse(workbenchControls.contains("CodexBridgeDesktopWorkbenchAttachments"))
     XCTAssertTrue(
