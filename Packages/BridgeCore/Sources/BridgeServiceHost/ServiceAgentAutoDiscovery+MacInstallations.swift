@@ -11,6 +11,8 @@ extension ServiceAgentAutoDiscovery {
       guard let home = homeDirectory(environment: environment) else { return [] }
 
       var directories = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
         pathJoin(home, "bin"),
         pathJoin(home, ".local", "bin"),
         pathJoin(home, ".cargo", "bin"),
@@ -24,6 +26,7 @@ extension ServiceAgentAutoDiscovery {
         pathJoin(home, "Library", "pnpm"),
         pathJoin(home, ".local", "share", "pnpm"),
         pathJoin(home, ".npm-global", "bin"),
+        pathJoin(home, ".config", "npm", "bin"),
         pathJoin(home, "Library", "npm", "bin"),
         pathJoin(home, ".opencode", "bin"),
         pathJoin(home, ".antigravity", "bin"),

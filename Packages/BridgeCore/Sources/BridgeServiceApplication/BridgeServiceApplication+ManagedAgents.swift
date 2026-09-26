@@ -82,6 +82,28 @@ extension BridgeServiceApplication {
       enabled,
       installationID: installationID
     )
+    if record.providerID == .qoder,
+      let distribution = try await qoderDistribution(for: record)
+    {
+      try await settings.setQoderInstallationDistribution(
+        installationID: record.id.rawValue, distribution: distribution)
+      let current = try await settings.qoderRuntimeSettings(distribution: distribution)
+      let activeID =
+        enabled
+        ? record.id.rawValue
+        : (current.activeInstallationID == record.id.rawValue ? nil : current.activeInstallationID)
+      let updated = ServiceQoderRuntimeSettings(
+        distribution: distribution,
+        activeInstallationID: activeID,
+        nodeExecutablePath: current.nodeExecutablePath,
+        sdkRoot: current.sdkRoot
+      )
+      if enabled {
+        try await settings.setQoderRuntimeSettings(updated)
+      } else {
+        try await settings.setQoderRegionSettings(updated)
+      }
+    }
     try Self.checkDeadline(deadline)
     return record
   }
@@ -91,7 +113,24 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws {
     try Self.checkDeadline(deadline)
-    try await requiredAgentRegistry().remove(installationID: installationID)
+    let registry = try requiredAgentRegistry()
+    let existing = try await registry.installation(id: installationID)
+    try await registry.remove(installationID: installationID)
+    if let existing, existing.providerID == .qoder,
+      let distribution = try await qoderDistribution(for: existing)
+    {
+      let current = try await settings.qoderRuntimeSettings(distribution: distribution)
+      if current.activeInstallationID == existing.id.rawValue {
+        try await settings.setQoderRegionSettings(
+          ServiceQoderRuntimeSettings(
+            distribution: distribution,
+            activeInstallationID: nil,
+            nodeExecutablePath: current.nodeExecutablePath,
+            sdkRoot: current.sdkRoot
+          )
+        )
+      }
+    }
   }
 
   func requiredAgentRegistry() throws -> ServiceAgentRegistry {
@@ -114,11 +153,14 @@ extension BridgeServiceApplication {
     prompt: String,
     threadID: String? = nil,
     skillName: String? = nil,
+    skillNames: [String]? = nil,
     modelOverride: Bool? = nil,
     permissionModeOverride: Bool? = nil,
     acceptanceCriteria: [String] = [],
     clientRequestID: String? = nil,
     queueIfBusy: Bool = false,
+    attachmentPaths: [String]? = nil,
+    attachmentSourceTaskID: String? = nil,
     deadline: ContinuousClock.Instant
   ) async throws -> (taskID: String, status: String) {
     try Self.checkDeadline(deadline)
@@ -126,6 +168,7 @@ extension BridgeServiceApplication {
       projectID: projectID,
       prompt: prompt,
       skillName: skillName,
+      skillNames: skillNames,
       threadID: threadID,
       providerID: providerID,
       installationID: installationID,
@@ -137,7 +180,9 @@ extension BridgeServiceApplication {
       networkAccess: networkAccess,
       acceptanceCriteria: acceptanceCriteria,
       clientRequestID: clientRequestID ?? "app-\(UUID().uuidString.lowercased())",
-      queueIfBusy: queueIfBusy
+      queueIfBusy: queueIfBusy,
+      attachmentPaths: attachmentPaths,
+      attachmentSourceTaskID: attachmentSourceTaskID
     )
     let receipt = try await serviceSubmitTaskFromLocalApp(
       submission,
@@ -273,8 +318,16 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> (model: String?, permissionMode: String, effort: String?) {
     try Self.checkDeadline(deadline)
+    let descriptor = try await agentDefaultSettings(providerID: providerID, deadline: deadline)
+    return try await agentModelDefaults(providerID: providerID, descriptor: descriptor)
+  }
+
+  private func agentModelDefaults(
+    providerID: AgentProviderID,
+    descriptor: ServiceAgentDefaultSettings
+  ) async throws -> (model: String?, permissionMode: String, effort: String?) {
     var model = try await settings.string(
-      for: try Self.agentDefaultModelKey(providerID: providerID)
+      for: descriptor.modelKey
     )
     if providerID == .deepSeekHarness {
       model = try await migratedDeepSeekModelDefault(model)
@@ -283,18 +336,9 @@ extension BridgeServiceApplication {
     if providerID == .antigravity {
       effort = nil
     } else {
-      effort = try await settings.string(for: Self.agentDefaultEffortKey(providerID: providerID))
+      effort = try await settings.string(for: descriptor.effortKey)
     }
-    let permissionMode: String
-    if providerID == .openCode {
-      permissionMode = try await settings.openCodeDefaultPermissionMode()
-    } else if providerID == .deepSeekHarness {
-      permissionMode = try await settings.deepSeekHarnessDefaultPermissionMode()
-    } else if providerID == .antigravity {
-      permissionMode = try await settings.antigravityDefaultPermissionMode()
-    } else {
-      permissionMode = "read-only"
-    }
+    let permissionMode = try await descriptor.permissionMode(from: settings)
     return (model, permissionMode, effort)
   }
 
@@ -337,39 +381,12 @@ extension BridgeServiceApplication {
     else {
       throw BridgeMCPQueryError.contractRejected
     }
+    let descriptor = try await agentDefaultSettings(providerID: providerID, deadline: deadline)
     let validated = try Self.validatedAgentModel(model)
-    try await settings.set(
-      validated,
-      for: try Self.agentDefaultModelKey(providerID: providerID)
-    )
+    try await settings.set(validated, for: descriptor.modelKey)
     if let permissionMode {
-      if providerID == .openCode {
-        try await settings.setOpenCodeDefaultPermissionMode(permissionMode)
-      } else if providerID == .deepSeekHarness {
-        let normalized: String
-        switch permissionMode {
-        case "build", "workspace-write":
-          normalized = "workspace-write"
-        case "plan", "read-only":
-          normalized = "read-only"
-        default:
-          throw BridgeMCPQueryError.contractRejected
-        }
-        try await settings.setDeepSeekHarnessDefaultPermissionMode(normalized)
-      } else if providerID == .antigravity {
-        let normalized: String
-        switch permissionMode {
-        case "build", "workspace-write":
-          normalized = "workspace-write"
-        case "plan", "read-only":
-          normalized = "read-only"
-        default:
-          throw BridgeMCPQueryError.contractRejected
-        }
-        try await settings.setAntigravityDefaultPermissionMode(normalized)
-      } else {
-        throw BridgeMCPQueryError.contractRejected
-      }
+      try await settings.set(
+        descriptor.normalizedPermission(permissionMode), for: descriptor.permissionKey)
     }
     if providerID == .antigravity {
       try await settings.set(nil, for: .antigravityDefaultEffort)
@@ -382,10 +399,10 @@ extension BridgeServiceApplication {
       }
       try await settings.set(
         effort,
-        for: try Self.agentDefaultEffortKey(providerID: providerID)
+        for: descriptor.effortKey
       )
     }
-    return try await serviceAgentModelDefault(providerID: providerID, deadline: deadline)
+    return try await agentModelDefaults(providerID: providerID, descriptor: descriptor)
   }
 
   public func serviceOpenCodeDefaultModel(
@@ -437,18 +454,12 @@ extension BridgeServiceApplication {
   static func agentDefaultModelKey(providerID: AgentProviderID) throws
     -> ServiceSettingKey
   {
-    if providerID == .openCode { return .openCodeDefaultModel }
-    if providerID == .deepSeekHarness { return .deepSeekHarnessDefaultModel }
-    if providerID == .antigravity { return .antigravityDefaultModel }
-    throw BridgeMCPQueryError.contractRejected
+    try ServiceAgentDefaultSettings.descriptor(for: providerID).modelKey
   }
 
   static func agentDefaultEffortKey(providerID: AgentProviderID) throws
     -> ServiceSettingKey
   {
-    if providerID == .openCode { return .openCodeDefaultEffort }
-    if providerID == .deepSeekHarness { return .deepSeekHarnessDefaultEffort }
-    if providerID == .antigravity { return .antigravityDefaultEffort }
-    throw BridgeMCPQueryError.contractRejected
+    try ServiceAgentDefaultSettings.descriptor(for: providerID).effortKey
   }
 }

@@ -57,6 +57,8 @@
         clients: connections.clientItems,
         deepSeekHarnessMCPServers: connections.deepSeekHarnessMCPItems,
         canManageDeepSeekHarnessMCP: connections.connectionState == .connected,
+        selectedAgentMCPScope: connections.selectedAgentMCPScope,
+        agentMCPScopeOptions: connections.agentMCPScopeOptions,
         providers: management.agent.providerItems,
         installations: management.agent.installationItems,
         canRegisterAgent: management.agent.registerEnabled,

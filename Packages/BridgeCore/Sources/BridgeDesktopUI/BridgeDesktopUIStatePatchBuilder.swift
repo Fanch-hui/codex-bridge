@@ -73,7 +73,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       if let conversation = conversationPatch(from: oldTask, to: newTask) {
         changes.append(conversation)
       }
-    case (let _, let newTask?):
+    case (_, let newTask?):
       changes.append(.selectedTask(newTask))
     case (nil, nil):
       break
@@ -113,6 +113,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.permissionOptions == new.permissionOptions
       && old.selectedTaskID == new.selectedTaskID
       && old.history == new.history
+      && old.nativeSessions == new.nativeSessions
       && old.steerModes == new.steerModes
       && old.browser == new.browser
       && old.projectStatus == new.projectStatus
@@ -140,6 +141,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.model == new.model
       && old.permissionMode == new.permissionMode
       && old.currentStep == new.currentStep
+      && old.usage == new.usage
       && old.resultSummary == new.resultSummary
       && old.failureCode == new.failureCode
       && old.changedFiles == new.changedFiles

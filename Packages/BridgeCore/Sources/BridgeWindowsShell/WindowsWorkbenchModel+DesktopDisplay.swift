@@ -93,9 +93,11 @@
         model: taskModelLabel(task),
         permissionMode: task.permissionMode,
         currentStep: task.currentStep,
+        usage: task.usage,
         resultSummary: task.resultSummary,
         failureCode: task.failureCode,
         changedFiles: task.changedFiles,
+        attachmentPaths: task.attachmentPaths,
         activity: activity,
         conversation: entries,
         conversationState: BridgeDesktopConversationState(
@@ -191,8 +193,11 @@
               id: $0.id,
               header: $0.header,
               question: $0.question,
+              inputType: $0.inputType,
               isOther: $0.isOther,
               isSecret: $0.isSecret,
+              allowsMultiple: $0.allowsMultiple,
+              isRequired: $0.isRequired,
               options: $0.options.map {
                 BridgeDesktopApprovalOption(label: $0.label, description: $0.description)
               }

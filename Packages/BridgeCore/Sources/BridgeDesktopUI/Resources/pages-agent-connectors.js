@@ -9,9 +9,7 @@
       emit: emit,
       canConnect: false,
       busy: false,
-      acceptReplacement: true,
-      dshMCP: null,
-      dshMCPPage: null
+      acceptReplacement: true
     };
     var root = S.node("div", "agent-connectors");
     var rows = new Map();
@@ -27,8 +25,6 @@
         context.busy = !!settings.busy;
         context.revision = settings.revision;
         context.acceptReplacement = settings.acceptReplacement !== false;
-        context.dshMCP = settings.dshMCP || null;
-        context.dshMCPPage = settings.dshMCPPage || null;
         var visible = new Set();
         var position = 0;
         S.safeArray(providers).forEach(function (provider) {

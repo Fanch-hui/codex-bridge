@@ -8,6 +8,7 @@ extension BridgeServiceApplication {
   struct HandoffPreflight {
     let prepared: PreparedTaskSubmission
     let fingerprint: String
+    let contextWindowTokens: Int?
   }
 
   func handoffPreflight(
@@ -25,6 +26,7 @@ extension BridgeServiceApplication {
     let prepared = try await prepareTaskSubmission(
       submission, sourceClientID: "macos.app", source: .macOSApp, deadline: deadline)
     var capabilityFingerprint = "codex"
+    var contextWindowTokens: Int?
     if providerID == serviceCodexProviderID {
       let models = try await catalog.listModels(deadline: deadline).models
       guard models.contains(where: { $0.modelID == prepared.request.executionModel }) else {
@@ -37,10 +39,15 @@ extension BridgeServiceApplication {
       let installation = try await requiredAgentRegistry().validateForExecution(
         installationID: AgentInstallationID(rawValue: installationID))
       let capabilities = installation.capabilities.effective
+      let mutationIntent: AgentMutationIntent =
+        prepared.request.permissionMode == .workspaceWrite ? .workspaceWrite : .readOnly
       guard installation.isSelectable, capabilities.contains(.sessionCreate),
-        capabilities.contains(.workspaceRead)
+        capabilities.contains(.workspaceRead),
+        mutationIntent == .workspaceWrite
+          || capabilities.isSuperset(
+            of: mutationIntent.requiredCapabilities(for: installation.providerID))
       else {
-        throw TaskHandoffError.rejected("目标 Agent 无法创建会话或读取工作区。")
+        throw TaskHandoffError.rejected("目标 Agent 无法创建会话或不支持所选读写模式。")
       }
       if prepared.request.permissionMode == .workspaceWrite {
         guard
@@ -56,16 +63,21 @@ extension BridgeServiceApplication {
         let models = try await serviceAgentModelCatalog(
           registry: requiredAgentRegistry(), installationID: installation.id,
           projectRoot: project.root.canonicalPath, selectedModelID: prepared.request.executionModel)
-        guard models.contains(where: { $0.id == prepared.request.executionModel }) else {
+        guard let model = models.first(where: { $0.id == prepared.request.executionModel }) else {
           throw TaskHandoffError.rejected("目标 Agent 当前未提供所选模型，请刷新模型配置。")
         }
+        contextWindowTokens = model.contextWindowTokens
       }
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys]
+      let region =
+        installation.providerID == .qoder
+        ? try await qoderDistribution(for: installation)?.rawValue : nil
       capabilityFingerprint =
         capabilities.map(\.rawValue).sorted().joined(separator: ",")
         + "|" + (installation.version ?? "") + "|" + (installation.protocolRevision ?? "")
         + "|" + installation.executableIdentity.sha256
+        + "|" + (region ?? "")
         + "|" + (try encoder.encode(installation.artifacts)).base64EncodedString()
     }
     let value = prepared.request
@@ -75,8 +87,10 @@ extension BridgeServiceApplication {
       value.executionModel, value.executionEffort, value.permissionMode.rawValue,
       String(value.networkAllowed), value.accessMode.rawValue, String(value.fastMode),
       value.supervisorModel ?? "", value.supervisorEffort ?? "", capabilityFingerprint,
+      contextWindowTokens.map(String.init) ?? "",
     ])
-    return HandoffPreflight(prepared: prepared, fingerprint: fingerprint)
+    return HandoffPreflight(
+      prepared: prepared, fingerprint: fingerprint, contextWindowTokens: contextWindowTokens)
   }
 
   func handoffStatus(_ record: ServiceTaskHandoffRecord) async throws -> MCPTaskHandoffPreview {

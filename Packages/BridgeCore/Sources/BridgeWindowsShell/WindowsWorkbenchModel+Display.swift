@@ -169,6 +169,7 @@
           taskItems: taskItems,
           selectedTaskDetail: selectedTaskDetail,
           history: BridgeDesktopThreadHistoryState(),
+          nativeSessions: nativeSessionDirectory,
           approvalItems: typedApprovals,
           browserEnabled: isChatBrowserEnabled,
           supportsImmediateSteer: task?.installationID.flatMap { installationID in

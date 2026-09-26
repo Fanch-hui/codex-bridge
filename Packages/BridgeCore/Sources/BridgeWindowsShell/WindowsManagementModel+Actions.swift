@@ -96,7 +96,9 @@
       providerID: String,
       baseURL: String? = nil,
       apiKey: String? = nil,
-      alwaysProceedConfirmed: Bool = false
+      alwaysProceedConfirmed: Bool = false,
+      qoderDistribution: String? = nil,
+      installationID: String? = nil
     ) async {
       guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
         reportAgentFailure("未找到可连接的 Agent Provider。")
@@ -124,16 +126,18 @@
       guard !agentBusy else { return }
       setAgentBusy(true)
       setAgentStatus("正在自动发现并连接 Agent…")
-      defer { setAgentBusy(false) }
       do {
         let installation = try await client.connectAgentInstallation(
           providerID: provider.providerID,
           baseURL: AgentConnectionInput.baseURL(baseURL),
           apiKey: AgentConnectionInput.apiKey(apiKey),
-          alwaysProceedConfirmed: alwaysProceedConfirmed
+          alwaysProceedConfirmed: alwaysProceedConfirmed,
+          qoderDistribution: qoderDistribution,
+          installationID: installationID
         )
         selectedProviderID = provider.providerID
         selectedInstallationID = installation.installationID
+        setAgentBusy(false)
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
         if installation.availability == "available" {
@@ -145,6 +149,7 @@
           )
         }
       } catch {
+        setAgentBusy(false)
         reportAgentFailure("Agent 连接失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
@@ -153,7 +158,8 @@
       providerID: String,
       executablePath: String,
       configurationPath: String,
-      displayName: String? = nil
+      displayName: String? = nil,
+      qoderDistribution: String? = nil
     ) async {
       let executable = executablePath.trimmingCharacters(in: .whitespacesAndNewlines)
       let configuration = configurationPath.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -182,17 +188,18 @@
       guard !agentBusy else { return }
       setAgentBusy(true)
       setAgentStatus("正在添加并检查 Agent…")
-      defer { setAgentBusy(false) }
       do {
         let installation = try await client.registerAgentInstallation(
           IPCAgentRegistrationRequest(
             providerID: provider.providerID,
             displayName: effectiveName,
             executablePath: executable,
-            configurationPath: configuration.isEmpty ? nil : configuration
+            configurationPath: configuration.isEmpty ? nil : configuration,
+            qoderDistribution: qoderDistribution
           )
         )
         selectedInstallationID = installation.installationID
+        setAgentBusy(false)
         await refreshAgents()
         let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
         let successNote =
@@ -201,7 +208,26 @@
           : "Agent 已登记：\(installation.displayName)（\(state)）。"
         reportAgentSuccess(successNote)
       } catch {
+        setAgentBusy(false)
         reportAgentFailure("Agent 登记失败：\(BridgeServiceErrorMessage.message(error))")
+      }
+    }
+
+    func setQoderRuntimeSettings(_ request: IPCAgentQoderRuntimeSettingsRequest) async {
+      guard connectionState == .connected else {
+        reportAgentFailure("后台 Service 未连接，无法保存 Qoder 配置。")
+        return
+      }
+      guard !agentBusy else { return }
+      setAgentBusy(true)
+      do {
+        _ = try await client.setQoderRuntimeSettings(request)
+        setAgentBusy(false)
+        await refreshAgents()
+        reportAgentSuccess("Qoder 地区与 SDK 配置已保存。")
+      } catch {
+        setAgentBusy(false)
+        reportAgentFailure("Qoder 配置保存失败：\(BridgeServiceErrorMessage.message(error))")
       }
     }
 

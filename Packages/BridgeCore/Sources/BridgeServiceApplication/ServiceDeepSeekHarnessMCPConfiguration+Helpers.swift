@@ -243,9 +243,9 @@ extension ServiceDeepSeekHarnessMCPConfiguration {
   }
 
   func secretReference(serverID: String, kind: String, name: String) throws -> SecretReference {
-    let seed = Data("dsh-mcp\0\(serverID)\0\(kind)\0\(name)".utf8)
+    let seed = Data("\(secretNamespace)\0\(serverID)\0\(kind)\0\(name)".utf8)
     let digest = SHA256.hash(data: seed).map { String(format: "%02x", $0) }.joined()
-    return try SecretReference(validating: "dsh-mcp.\(digest)")
+    return try SecretReference(validating: "\(secretNamespace).\(digest)")
   }
 
   static func isUnsafeTextScalar(_ scalar: Unicode.Scalar) -> Bool {

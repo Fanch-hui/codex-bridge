@@ -192,6 +192,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleGetAgentModelDefault(request)
     case .setAgentModelDefault:
       return try await handleSetAgentModelDefault(request)
+    case .setQoderRuntimeSettings:
+      return try await handleSetQoderRuntimeSettings(request)
+    case .manageAgentNativeSessionDirectory:
+      return try await handleManageAgentNativeSessionDirectory(request)
     case .getAgentNativePermissionPolicy:
       return try await handleGetAgentNativePermissionPolicy(request)
     case .updateAgentNativePermissionPolicy:

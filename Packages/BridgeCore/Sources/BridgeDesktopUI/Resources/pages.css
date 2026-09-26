@@ -181,6 +181,7 @@
 .dsh-mcp-card > .section-heading-row { margin: 0; }
 .dsh-mcp-card > .section-heading-row h3 { margin: 0; }
 .dsh-mcp-card .dsh-mcp-summary { margin: 3px 0 0; }
+.dsh-mcp-card > .agent-mcp-scope { max-width: 360px; }
 .dsh-mcp-editor .dsh-mcp-transport-hint { margin-bottom: 12px; }
 .dsh-mcp-editor { padding-top: 12px; border-top: 1px solid var(--separator); }
 .dsh-mcp-editor .field.full { grid-column: 1 / -1; }
@@ -271,6 +272,9 @@
 .workbench-controls .form-grid { gap: 8px; }
 .workbench-controls .form-actions { margin-top: 8px; }
 .workbench-controls .retry-form { margin: 0; padding: 0; background: transparent; }
+.workbench-attachments { grid-column: 1 / -1; min-width: 0; }
+.workbench-attachment-actions { margin-top: 0; }
+.workbench-attachment-actions .hint { min-width: 0; overflow-wrap: anywhere; }
 .workbench-handoff { margin-top: 4px; }
 .workbench-handoff-details { border-top: 1px solid var(--separator); padding-top: 5px; }
 .workbench-handoff-details > summary { cursor: pointer; color: var(--text-secondary); font-size: 11px; font-weight: 600; }
@@ -299,3 +303,16 @@
   .conversation-state-spinner { animation: none; }
   .entry-disclosure-chevron { transition: none; }
 }
+.inspector-native-sessions { padding: 12px; border-top: 1px solid var(--separator); background: var(--surface); }
+.native-session-header, .native-session-controls, .native-session-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.native-session-header { justify-content: space-between; }
+.native-session-header h3, .native-session-row h4, .native-session-transcript h4 { margin: 0; }
+.native-session-controls { margin: 8px 0; }
+.native-session-installation { min-width: 0; flex: 1; }
+.native-session-row, .native-session-transcript { padding: 10px; margin: 8px 0; border: 1px solid var(--separator); border-radius: 10px; }
+.native-session-prompt, .native-session-meta, .native-session-message p { margin: 5px 0; overflow-wrap: anywhere; }
+.native-session-prompt, .native-session-meta { color: var(--text-secondary); font-size: 12px; }
+.native-session-actions { margin-top: 8px; }
+.native-session-status { color: var(--success); }
+.native-session-error { color: var(--error); }
+.native-session-message { padding: 8px 0; border-bottom: 1px solid var(--separator); }

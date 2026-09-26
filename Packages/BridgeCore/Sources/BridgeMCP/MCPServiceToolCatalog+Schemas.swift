@@ -33,7 +33,7 @@ extension MCPServiceToolCatalog {
       "provider_id": [
         "type": "string",
         "description":
-          "Provider identifier. Omit for Codex. Set to opencode, deepseek-harness, or antigravity only when the user explicitly selected a registered installation; list_agents is authoritative for effective capabilities and enforcement. Antigravity supports native plan/accept-edits modes: Plan/read-only (agy mode: plan) and Accept Edits/workspace-write (agy mode: accept-edits), plus exact session continuation, model/effort selection, and queued steer when those capabilities are effective.",
+          "Provider identifier. Omit for Codex. Set to opencode, deepseek-harness, antigravity, pi, or qoder only when the user explicitly selected a registered installation; list_agents is authoritative for effective capabilities and enforcement. Qoder regional installations share one provider with separate native sessions and model defaults. Pi uses native RPC with a Bridge-managed extension.",
       ],
       "installation_id": stringSchema,
       "display_name": stringSchema,
@@ -224,6 +224,25 @@ extension MCPServiceToolCatalog {
     required: ["seq", "kind", "summary", "occurred_at"]
   )
 
+  private static let taskUsageProperties: [String: Value] = [
+    "inputTokens": integerSchema(minimum: 0),
+    "outputTokens": integerSchema(minimum: 0),
+    "cacheReadTokens": integerSchema(minimum: 0),
+    "cacheWriteTokens": integerSchema(minimum: 0),
+    "totalTokens": integerSchema(minimum: 0),
+    "contextTokens": integerSchema(minimum: 0),
+    "contextWindow": integerSchema(minimum: 0),
+    "contextUsedPercentage": ["type": ["number", "null"], "minimum": 0, "maximum": 100],
+    "costAmount": ["type": ["number", "null"], "minimum": 0],
+    "currency": nullableStringSchema(maximum: 16),
+  ]
+
+  private static let taskUsageSchema: Value = [
+    "type": ["object", "null"],
+    "properties": .object(taskUsageProperties),
+    "additionalProperties": false,
+  ]
+
   static let taskWaitPolicySchema = objectSchema(
     properties: [
       "wait_profile": [
@@ -236,7 +255,7 @@ extension MCPServiceToolCatalog {
       "next_action": [
         "type": "string",
         "enum": [
-          "await_local_approval", "poll_get_task", "read_final_report",
+          "await_local_approval", "answer_user_input", "poll_get_task", "read_final_report",
           "inspect_terminal_state", "inspect_task",
         ],
       ],
@@ -246,6 +265,42 @@ extension MCPServiceToolCatalog {
       "wait_profile", "recommended_poll_after_seconds", "diagnostic_after_quiet_seconds",
       "terminal", "next_action", "do_not_infer_failure",
     ]
+  )
+
+  private static let taskUserInputProperties: [String: Value] = [
+    "input_id": stringSchema,
+    "title": stringSchema,
+    "summary": stringSchema,
+    "timeout_seconds": integerSchema(minimum: 1, maximum: 3_600),
+    "questions": arraySchema(taskUserInputQuestionSchema),
+  ]
+
+  static let taskUserInputSchema = objectSchema(
+    properties: taskUserInputProperties,
+    required: ["input_id", "title", "summary", "questions"]
+  )
+
+  private static let taskUserInputQuestionSchema = objectSchema(
+    properties: [
+      "id": stringSchema,
+      "header": stringSchema,
+      "question": stringSchema,
+      "input_type": [
+        "type": ["string", "null"],
+        "enum": ["select", "confirm", "input", "editor", .null],
+      ],
+      "allows_multiple": boolSchema,
+      "allows_custom_text": boolSchema,
+      "is_secret": boolSchema,
+      "is_required": boolSchema,
+      "options": arraySchema(
+        objectSchema(
+          properties: ["label": stringSchema, "description": stringSchema],
+          required: ["label", "description"]
+        )
+      ),
+    ],
+    required: ["id", "header", "question", "allows_custom_text", "is_secret", "options"]
   )
 
   static let taskSchema = objectSchema(
@@ -268,22 +323,29 @@ extension MCPServiceToolCatalog {
       "provider_run_id": stringSchema,
       "current_step": stringSchema,
       "changed_files": arraySchema(stringSchema),
+      "attachment_paths": arraySchema(stringSchema),
       "recent_events": arraySchema(taskEventSchema),
       "recent_activity": arraySchema(taskActivitySchema),
       "recent_activity_available": boolSchema,
       "supervisor_status": stringSchema,
       "supervisor_summary": stringSchema,
       "local_approval_required": boolSchema,
+      "pending_user_input": [
+        "type": ["object", "null"],
+        "properties": .object(taskUserInputProperties),
+        "required": ["input_id", "title", "summary", "questions"],
+      ],
       "result_summary": stringSchema,
       "failure_code": stringSchema,
       "updated_at": stringSchema,
       "queue_position": integerSchema(minimum: 1),
       "queue_occupant_task_id": stringSchema,
       "queue_requested_at": stringSchema,
+      "usage": taskUsageSchema,
       "wait_policy": taskWaitPolicySchema,
     ],
     required: [
-      "task_id", "project_id", "status", "changed_files", "recent_events",
+      "task_id", "project_id", "status", "changed_files", "attachment_paths", "recent_events",
       "recent_activity_available",
       "network_access",
       "supervisor_status",

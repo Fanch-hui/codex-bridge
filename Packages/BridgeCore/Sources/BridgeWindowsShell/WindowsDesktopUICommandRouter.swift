@@ -1,6 +1,7 @@
 #if os(Windows)
   import BridgeDesktopUI
   import BridgeIPC
+  import BridgeMCP
   import BridgeServiceAppCore
   import Foundation
 
@@ -77,6 +78,33 @@
         return nonEmpty(payload.taskID).map(MainWindowCommand.deleteTask)
       case .deleteSession:
         return nonEmpty(payload.taskID).map { .deleteSession(taskID: $0) }
+      case .manageNativeAgentSession:
+        guard let rawOperation = nonEmpty(payload.action) else { return nil }
+        if rawOperation == "close" { return .closeNativeSessionDirectory }
+        guard let operation = MCPNativeSessionDirectoryOperation(rawValue: rawOperation),
+          let projectID = nonEmpty(payload.projectID),
+          let installationID = nonEmpty(payload.installationID)
+        else { return nil }
+        let sessionID = nonEmpty(payload.sessionID)
+        if operation != .list && sessionID == nil { return nil }
+        return .manageNativeAgentSession(
+          MCPNativeSessionDirectoryRequest(
+            operation: operation, projectID: projectID, installationID: installationID,
+            sessionID: sessionID, offset: max(0, payload.offset ?? 0),
+            limit: min(max(1, payload.limit ?? 50), 100), title: payload.name,
+            confirmed: payload.confirmed ?? false))
+      case .continueNativeAgentSession:
+        guard let projectID = nonEmpty(payload.projectID),
+          let providerID = nonEmpty(payload.providerID), ["pi", "qoder"].contains(providerID),
+          let installationID = nonEmpty(payload.installationID),
+          let sessionID = nonEmpty(payload.sessionID),
+          let prompt = payload.input,
+          !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          prompt.utf8.count <= 32 * 1_024, !prompt.contains("\0")
+        else { return rejectWorkbenchCommand(envelope) }
+        return .continueNativeAgentSession(
+          projectID: projectID, providerID: providerID, installationID: installationID,
+          sessionID: sessionID, prompt: prompt, requestID: envelope.requestID)
       case .steerTask:
         guard let taskID = nonEmpty(payload.taskID), let input = payload.input,
           let mode = nonEmpty(payload.mode),
@@ -93,7 +121,8 @@
         }
         return .resumeTask(
           id: taskID, input: payload.input, requestID: envelope.requestID,
-          queueIfBusy: payload.queueIfBusy ?? false
+          queueIfBusy: payload.queueIfBusy ?? false,
+          skillNames: payload.skillNames, attachmentPaths: payload.attachmentPaths ?? []
         )
       case .handoffTask:
         guard let taskID = nonEmpty(payload.taskID),
@@ -114,7 +143,8 @@
           return rejectWorkbenchCommand(envelope)
         }
         return .restartTask(
-          id: taskID, requestID: envelope.requestID, queueIfBusy: payload.queueIfBusy ?? false)
+          id: taskID, requestID: envelope.requestID, queueIfBusy: payload.queueIfBusy ?? false,
+          skillNames: payload.skillNames, attachmentPaths: payload.attachmentPaths ?? [])
       case .resolveApproval, .resolveDirectApproval:
         return approvalCommand(envelope.command, payload: payload)
       case .selectProject:
@@ -214,12 +244,18 @@
       case .saveDeepSeekHarnessMCPServer:
         return saveDeepSeekHarnessMCPServer(payload)
       case .deleteDeepSeekHarnessMCPServer:
-        return nonEmpty(payload.mcpServerID).map(MainWindowCommand.deleteDeepSeekHarnessMCPServer)
+        guard let id = nonEmpty(payload.mcpServerID), let scope = mcpScope(payload) else {
+          return nil
+        }
+        return .deleteDeepSeekHarnessMCPServer(id: id, scope: scope)
       case .setDeepSeekHarnessMCPServerEnabled:
         guard let id = nonEmpty(payload.mcpServerID), let enabled = payload.enabled else {
           return nil
         }
-        return .setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled)
+        guard let scope = mcpScope(payload) else { return nil }
+        return .setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled, scope: scope)
+      case .setAgentMCPScope:
+        return mcpScope(payload).map(MainWindowCommand.selectAgentMCPScope)
       case .rotateLocalMCPEndpoint:
         return .rotateLocalMCPEndpoint
       case .configureTunnel:
@@ -234,26 +270,48 @@
       case .clearTunnel:
         return .clearTunnel
       case .connectAgent:
-        guard let providerID = nonEmpty(payload.providerID) else { return nil }
+        guard let providerID = nonEmpty(payload.providerID),
+          providerID != "qoder" || validQoderDistribution(payload.qoderDistribution) != nil
+        else { return nil }
         return .connectAgentFromDesktop(
           providerID: providerID,
           baseURL: AgentConnectionInput.baseURL(payload.baseURL),
           apiKey: AgentConnectionInput.apiKey(payload.apiKey),
-          alwaysProceedConfirmed: payload.confirmed == true
+          alwaysProceedConfirmed: payload.confirmed == true,
+          qoderDistribution: validQoderDistribution(payload.qoderDistribution),
+          installationID: providerID == "qoder" ? optionalValue(payload.installationID) : nil
         )
       case .registerAgent:
         guard let providerID = nonEmpty(payload.providerID),
           let executable = nonEmpty(payload.executable),
-          let displayName = nonEmpty(payload.displayName) ?? nonEmpty(payload.name)
+          let displayName = nonEmpty(payload.displayName) ?? nonEmpty(payload.name),
+          providerID != "qoder" || validQoderDistribution(payload.qoderDistribution) != nil
         else { return nil }
         return .registerAgentFromDesktop(
           providerID: providerID,
           displayName: displayName,
           executablePath: executable,
-          configurationPath: optionalValue(payload.configurationPath)
+          configurationPath: optionalValue(payload.configurationPath),
+          qoderDistribution: validQoderDistribution(payload.qoderDistribution)
         )
       case .beginAgentRegistration:
-        return .beginAgentRegistration(providerID: optionalValue(payload.providerID))
+        let providerID = optionalValue(payload.providerID)
+        let distribution = validQoderDistribution(payload.qoderDistribution)
+        guard providerID != "qoder" || distribution != nil else { return nil }
+        return .beginAgentRegistration(
+          providerID: providerID, qoderDistribution: distribution)
+      case .saveQoderRuntimeSettings:
+        guard let distribution = validQoderDistribution(payload.qoderDistribution) else {
+          return nil
+        }
+        return .setQoderRuntimeSettings(
+          IPCAgentQoderRuntimeSettingsRequest(
+            distribution: distribution,
+            activeInstallationID: optionalValue(payload.installationID),
+            nodeExecutablePath: payload.nodeExecutablePath,
+            sdkRoot: payload.sdkRoot
+          )
+        )
       case .selectAgent:
         return nonEmpty(payload.installationID ?? payload.providerID).map(
           MainWindowCommand.selectAgent(id:))
@@ -359,7 +417,8 @@
     ) -> MainWindowCommand? {
       guard let name = nonEmpty(payload.name),
         let transport = nonEmpty(payload.mcpTransport),
-        transport == "stdio" || transport == "http"
+        transport == "stdio" || transport == "http",
+        let scope = mcpScope(payload)
       else { return nil }
       let command = nonEmpty(payload.mcpCommand)
       let url = nonEmpty(payload.mcpURL)
@@ -382,15 +441,30 @@
           args: transport == "stdio" ? payload.arguments ?? [] : [],
           url: transport == "http" ? url : nil,
           environment: environment,
-          headers: headers
+          headers: headers,
+          scope: scope
         )
       )
+    }
+
+    private static func mcpScope(_ payload: BridgeDesktopCommandPayload) -> String? {
+      let rawValue =
+        nonEmpty(payload.mcpServerScope)
+        ?? BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
+      return BridgeDesktopAgentMCPScope(rawValue: rawValue)?.rawValue
     }
 
     private static func nonEmpty(_ value: String?) -> String? {
       guard let value else { return nil }
       let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
       return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func validQoderDistribution(_ value: String?) -> String? {
+      guard let value = nonEmpty(value), value == "cn" || value == "international" else {
+        return nil
+      }
+      return value
     }
 
     private static func optionalValue(_ value: String?) -> String? {

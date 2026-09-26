@@ -7,7 +7,10 @@ extension BridgeServiceRequestController {
   func handleListDeepSeekHarnessMCPServers(
     _ request: BridgeServiceIPCRequest
   ) async throws -> Data {
-    let servers = try await composition.deepSeekHarnessMCP.list()
+    let payload = try BridgeServiceIPCCodec.optionalPayload(
+      IPCAgentMCPListRequest.self, from: request)
+    let configuration = try await agentMCPConfiguration(scope: payload?.scope)
+    let servers = try await configuration.list()
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
       payload: IPCDeepSeekHarnessMCPListResponse(servers: servers.map(Self.mcpSummary))
@@ -24,7 +27,8 @@ extension BridgeServiceRequestController {
     guard let transport = ServiceDeepSeekHarnessMCPTransport(rawValue: payload.transport) else {
       throw ServiceStoreError.invalidArgument("dsh.mcp.transport")
     }
-    let saved = try await composition.deepSeekHarnessMCP.save(
+    let configuration = try await agentMCPConfiguration(scope: payload.scope)
+    let saved = try await configuration.save(
       ServiceDeepSeekHarnessMCPServerInput(
         id: payload.id,
         name: payload.name,
@@ -54,8 +58,18 @@ extension BridgeServiceRequestController {
       IPCDeepSeekHarnessMCPDeleteRequest.self,
       from: request
     )
-    try await composition.deepSeekHarnessMCP.delete(id: payload.id)
+    let configuration = try await agentMCPConfiguration(scope: payload.scope)
+    try await configuration.delete(id: payload.id)
     return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
+  }
+
+  private func agentMCPConfiguration(scope: String?) async throws
+    -> ServiceDeepSeekHarnessMCPConfiguration
+  {
+    guard let key = ServiceAgentMCPScope(rawValue: scope ?? "deepseek-harness"),
+      let configuration = composition.agentMCP[key]
+    else { throw ServiceStoreError.invalidArgument("agent.mcp.scope") }
+    return configuration
   }
 
   private static func mcpSummary(

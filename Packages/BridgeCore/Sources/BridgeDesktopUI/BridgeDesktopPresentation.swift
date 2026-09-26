@@ -4,6 +4,7 @@ public enum BridgeDesktopPresentation {
   public static func reasoningTitle(_ value: String) -> String {
     switch value.lowercased() {
     case "minimal": "最低"
+    case "off": "关闭"
     case "low": "低"
     case "medium": "中"
     case "high": "高"

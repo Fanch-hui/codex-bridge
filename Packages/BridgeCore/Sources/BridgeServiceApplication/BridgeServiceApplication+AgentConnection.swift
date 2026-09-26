@@ -23,6 +23,7 @@ extension BridgeServiceApplication {
     baseURL: String?,
     apiKey: String?,
     candidates: [ServiceAgentRegistrationRequest],
+    qoderDistribution: QoderDistribution? = nil,
     alwaysProceedConfirmed: Bool = false,
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
@@ -32,7 +33,16 @@ extension BridgeServiceApplication {
       providerID: providerID,
       confirmed: alwaysProceedConfirmed
     )
-    let matchingCandidates = candidates.filter { $0.providerID == providerID }
+    let matchingCandidates = candidates.filter { candidate in
+      guard candidate.providerID == providerID else { return false }
+      guard providerID == .qoder else { return true }
+      return qoderDistribution.map {
+        QoderDistribution.identify(executablePath: candidate.executablePath) == $0
+      } ?? false
+    }
+    if providerID == .qoder, qoderDistribution == nil {
+      throw BridgeMCPQueryError.contractRejected
+    }
     guard !matchingCandidates.isEmpty else {
       throw ServiceAgentConnectionError.installationNotFound
     }
@@ -62,6 +72,19 @@ extension BridgeServiceApplication {
               _ = try? await registry.setEnabled(false, installationID: record.id)
             }
             throw error
+          }
+          if providerID == .qoder, let qoderDistribution {
+            try await settings.setQoderInstallationDistribution(
+              installationID: record.id.rawValue, distribution: qoderDistribution)
+            let current = try await settings.qoderRuntimeSettings(distribution: qoderDistribution)
+            try await settings.setQoderRuntimeSettings(
+              ServiceQoderRuntimeSettings(
+                distribution: qoderDistribution,
+                activeInstallationID: record.id.rawValue,
+                nodeExecutablePath: current.nodeExecutablePath,
+                sdkRoot: current.sdkRoot
+              )
+            )
           }
           return record
         }

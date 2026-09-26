@@ -6,6 +6,43 @@ import BridgeServiceCore
 import Foundation
 
 extension BridgeServiceApplication {
+  public func serviceAnswerUserInput(
+    taskID: String,
+    inputID: String,
+    answers: [String: [String]]?,
+    cancelled: Bool,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPServiceTaskMutationReceipt {
+    try Self.checkDeadline(deadline)
+    let id = TaskID(rawValue: taskID)
+    guard let task = try await tasks.task(id: id) else {
+      throw BridgeMCPQueryError.taskNotFound
+    }
+    guard task.state.status == .waitingForCodexApproval,
+      cancelled ? answers == nil : answers != nil
+    else {
+      throw BridgeMCPQueryError.turnMismatch
+    }
+    let response: AgentUserInputResponse =
+      cancelled
+      ? .cancelled : .answers(answers ?? [:])
+    do {
+      try await coordinator.resolveUserInput(
+        taskID: id,
+        inputID: inputID,
+        response: response
+      )
+    } catch {
+      throw Self.publicExecutionError(error)
+    }
+    let updated = try await tasks.task(id: id)
+    return MCPServiceTaskMutationReceipt(
+      taskID: taskID,
+      status: updated?.state.status.rawValue ?? "running",
+      accepted: true
+    )
+  }
+
   public func serviceSteerTask(
     taskID: String,
     expectedTurnID: String,
@@ -18,7 +55,11 @@ extension BridgeServiceApplication {
     guard let task = try await tasks.task(id: id) else {
       throw BridgeMCPQueryError.taskNotFound
     }
-    guard task.state.status == .running else {
+    let canInterrupt =
+      task.state.status == .running
+      || (task.providerID != serviceCodexProviderID
+        && task.state.status == .waitingForCodexApproval)
+    guard canInterrupt else {
       throw BridgeMCPQueryError.turnMismatch
     }
     if task.providerID != serviceCodexProviderID {
@@ -83,9 +124,11 @@ extension BridgeServiceApplication {
         throw Self.publicExecutionError(error)
       }
     }
-    guard task.state.status == .running else {
-      throw BridgeMCPQueryError.turnMismatch
-    }
+    guard
+      task.state.status == .running
+        || (task.providerID != serviceCodexProviderID
+          && task.state.status == .waitingForCodexApproval)
+    else { throw BridgeMCPQueryError.turnMismatch }
     if task.providerID != serviceCodexProviderID {
       guard let runID = task.state.providerRunID, runID == expectedTurnID else {
         throw BridgeMCPQueryError.turnMismatch

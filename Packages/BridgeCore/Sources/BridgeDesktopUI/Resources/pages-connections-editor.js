@@ -184,11 +184,13 @@
     var wrapper = S.node("div", "page-message");
     wrapper.appendChild(S.node("h4", null, "登记 Agent"));
     var provider = S.selectField("Provider", "", [], function () {}, "");
+    var qoderDistribution = S.selectField("Qoder 地区", "cn", [], function () {}, "");
     var name = S.textField("显示名称", "", "Agent 名称");
     var executable = S.textField("可执行路径", "", "由系统弹窗选取，或手动输入绝对路径");
     var configuration = S.textField("配置路径", "", "需要配置时填写（如 cordis.yml）");
     var draft = D.bind({
       providerID: provider.control,
+      qoderDistribution: qoderDistribution.control,
       displayName: name.control,
       executable: executable.control,
       configurationPath: configuration.control
@@ -200,6 +202,12 @@
     function guideText(item) {
       if (!item) return "请选择要登记的 Agent Provider。";
       var id = (item.providerID || "").toLowerCase();
+      if (id === "qoder") {
+        return "Qoder SDK 引擎。选择 CLI 所属地区；认证、模型偏好和原生会话严格按地区隔离。CN 使用 qodercn / qoderclicn，国际版使用 qoder / qodercli。";
+      }
+      if (id === "pi") {
+        return "Pi RPC 引擎。选择已安装的 pi 命令，Windows 可选择 pi.cmd。需要 Node.js 22.19+；模型认证沿用本机 Pi 配置。只读模式关闭写入及 Shell，Write 模式的工具操作通过本机审批。";
+      }
       if (id.indexOf("opencode") >= 0) {
         return "OpenCode CLI 引擎。无需配置文件。点击“弹窗选择文件登记…”选中 opencode.exe（npm 全局安装通常位于 %APPDATA%\\npm\\opencode.cmd）。";
       }
@@ -217,6 +225,7 @@
     var guide = S.node("div", "form-guide-note");
     var grid = S.node("div", "form-grid");
     grid.appendChild(provider.wrapper);
+    grid.appendChild(qoderDistribution.wrapper);
     grid.appendChild(name.wrapper);
     grid.appendChild(executable.wrapper);
     grid.appendChild(configuration.wrapper);
@@ -225,6 +234,7 @@
     function updateProviderPresentation() {
       var selected = getProvider(provider.control.value);
       guide.textContent = guideText(selected);
+      qoderDistribution.wrapper.hidden = !selected || selected.providerID !== "qoder";
       var requiresConfiguration = !!(selected && selected.requiresConfiguration);
       configuration.control.disabled = !requiresConfiguration;
       configuration.control.placeholder = requiresConfiguration
@@ -235,6 +245,8 @@
       if (selected) {
         draft.reset({
           providerID: selected.providerID,
+          qoderDistribution: selected.providerID === "qoder"
+            ? selected.qoderDistribution || "cn" : "",
           displayName: selected.displayName,
           executable: "",
           configurationPath: ""
@@ -245,14 +257,21 @@
     var actions = S.node("div", "form-actions");
     var quickSelect = S.button("弹窗选择文件登记…", null, {}, null, "small primary", true);
     quickSelect.addEventListener("click", function () {
-      context.emit("beginAgentRegistration", { providerID: provider.control.value || null });
+      context.emit("beginAgentRegistration", {
+        providerID: provider.control.value || null,
+        qoderDistribution: provider.control.value === "qoder"
+          ? qoderDistribution.control.value : null
+      });
     });
     actions.appendChild(quickSelect);
     var register = S.button("按上方路径登记", null, {}, null, "small", true);
     register.addEventListener("click", function () {
       var values = draft.values();
       if (!values.executable) {
-        context.emit("beginAgentRegistration", { providerID: values.providerID || null });
+        context.emit("beginAgentRegistration", {
+          providerID: values.providerID || null,
+          qoderDistribution: values.providerID === "qoder" ? values.qoderDistribution : null
+        });
         return;
       }
       var selected = getProvider(values.providerID);
@@ -261,7 +280,8 @@
         displayName: values.displayName,
         executable: values.executable,
         configurationPath: selected && selected.requiresConfiguration
-          ? values.configurationPath || null : null
+          ? values.configurationPath || null : null,
+        qoderDistribution: values.providerID === "qoder" ? values.qoderDistribution : null
       });
     });
     actions.appendChild(register);
@@ -275,16 +295,25 @@
         D.selectOptions(provider.control, context.providers.map(function (item) {
           return { id: item.providerID, title: item.displayName, detail: item.detail };
         }));
+        D.selectOptions(qoderDistribution.control, [
+          { id: "cn", title: "中国版 CN" },
+          { id: "international", title: "国际版" }
+        ], false);
         var selected = getProvider(provider.control.value);
         if (!selected) {
           provider.control.value = "";
-          draft.reset({ providerID: "", displayName: "", executable: "", configurationPath: "" });
+          draft.reset({
+            providerID: "", qoderDistribution: "cn", displayName: "", executable: "",
+            configurationPath: ""
+          });
         } else {
           var providerChanged = provider.control.value !== selected.providerID;
           if (providerChanged) {
             provider.control.value = selected.providerID;
             draft.reset({
               providerID: selected.providerID,
+              qoderDistribution: selected.providerID === "qoder"
+                ? selected.qoderDistribution || "cn" : "",
               displayName: selected.displayName,
               executable: "",
               configurationPath: ""
@@ -292,6 +321,8 @@
           } else {
             draft.update({
               providerID: selected.providerID,
+              qoderDistribution: selected.providerID === "qoder"
+                ? selected.qoderDistribution || "cn" : "",
               displayName: selected.displayName,
               executable: "",
               configurationPath: ""

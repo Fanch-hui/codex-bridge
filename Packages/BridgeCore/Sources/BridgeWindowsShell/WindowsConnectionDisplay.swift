@@ -19,6 +19,8 @@
     let statusText: String
     var clientItems: [BridgeDesktopMCPClientRow] = []
     var deepSeekHarnessMCPItems: [BridgeDesktopDeepSeekHarnessMCPRow] = []
+    var selectedAgentMCPScope: String? = nil
+    var agentMCPScopeOptions: [BridgeDesktopChoice]? = nil
     var tunnel: BridgeDesktopTunnelState? = nil
     var codexExecutablePath: String? = nil
     var codexResolvedExecutablePath: String? = nil

@@ -59,8 +59,13 @@ extension ServiceAgentRegistry {
       return record
     }
     let candidate: RefreshCandidate
+    let currentArtifacts: [ServiceAgentInstallationArtifact]
     do {
       candidate = try refreshCandidate(record)
+      currentArtifacts = try await runtimeArtifacts(
+        provider: provider, installationID: record.id,
+        executablePath: candidate.identity.canonicalPath, existing: candidate.artifacts, at: now()
+      )
     } catch {
       return try await persistStateIfNeeded(
         record,
@@ -69,7 +74,6 @@ extension ServiceAgentRegistry {
       )
     }
     let current = candidate.identity
-    let currentArtifacts = candidate.artifacts
     guard launchConfigurationUnchanged(candidate, from: record) else {
       return try await persistStateIfNeeded(
         record,

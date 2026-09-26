@@ -274,7 +274,9 @@
     }
 
     public func resumeTask(
-      id taskID: String, input: String?, requestID: String? = nil, queueIfBusy: Bool = false
+      id taskID: String, input: String?, requestID: String? = nil, queueIfBusy: Bool = false,
+      skillNames: [String]? = nil,
+      attachmentPaths: [String] = []
     ) async {
       guard connectionState == .connected, let task = task(id: taskID),
         TaskInspectorPresentation.canResume(
@@ -299,13 +301,18 @@
         success: "已续接任务。",
         requestID: requestID,
         command: "resumeTask",
-        receiptInput: input ?? "", queueIfBusy: queueIfBusy
+        receiptInput: input ?? "", queueIfBusy: queueIfBusy,
+        skillNames: skillNames,
+        attachmentPaths: attachmentPaths,
+        attachmentSourceTaskID: nil
       )
     }
 
-    public func restartTask(id taskID: String, requestID: String? = nil, queueIfBusy: Bool = false)
-      async
-    {
+    public func restartTask(
+      id taskID: String, requestID: String? = nil, queueIfBusy: Bool = false,
+      skillNames: [String]? = nil,
+      attachmentPaths: [String] = []
+    ) async {
       guard connectionState == .connected, let task = task(id: taskID), task.canRestart,
         let prompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
         !prompt.isEmpty
@@ -325,7 +332,10 @@
         success: "已重新开始任务。",
         requestID: requestID,
         command: "restartTask",
-        receiptInput: nil, queueIfBusy: queueIfBusy
+        receiptInput: nil, queueIfBusy: queueIfBusy,
+        skillNames: skillNames,
+        attachmentPaths: attachmentPaths,
+        attachmentSourceTaskID: task.isCodexTask ? nil : task.taskID
       )
     }
 
@@ -367,7 +377,8 @@
       success: String,
       requestID: String?,
       command: String,
-      receiptInput: String?, queueIfBusy: Bool
+      receiptInput: String?, queueIfBusy: Bool, skillNames: [String]?, attachmentPaths: [String],
+      attachmentSourceTaskID: String?
     ) async {
       let request = IPCAgentSubmitRequest(
         projectID: task.projectID,
@@ -378,10 +389,14 @@
         permissionMode: task.permissionMode,
         prompt: prompt,
         threadID: threadID,
+        skillNames: skillNames,
         networkAccess: task.networkAccess,
         modelOverride: TaskRetrySubmission.modelOverride(for: task),
         permissionModeOverride: task.permissionMode != nil,
-        clientRequestID: requestID, queueIfBusy: queueIfBusy
+        clientRequestID: requestID, queueIfBusy: queueIfBusy,
+        attachmentPaths: attachmentSourceTaskID == nil && attachmentPaths.isEmpty
+          ? nil : attachmentPaths,
+        attachmentSourceTaskID: attachmentSourceTaskID
       )
       setActionTextIfSelected(progress, taskID: task.taskID)
       do {

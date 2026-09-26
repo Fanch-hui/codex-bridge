@@ -43,9 +43,31 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessBaseURL = "agent.deepseek-harness.base_url"
   case deepSeekHarnessManagedConfigurationPath = "agent.deepseek-harness.managed_configuration_path"
   case deepSeekHarnessMCPServers = "agent.deepseek-harness.mcp.servers"
+  case piMCPServers = "agent.pi.mcp.servers"
+  case qoderCNMCPServers = "agent.qoder.cn.mcp.servers"
+  case qoderInternationalMCPServers = "agent.qoder.international.mcp.servers"
   case antigravityDefaultModel = "agent.antigravity.default_model"
   case antigravityDefaultPermissionMode = "agent.antigravity.default_permission_mode"
   case antigravityDefaultEffort = "agent.antigravity.default_effort"
+  case piDefaultModel = "agent.pi.default_model"
+  case piDefaultPermissionMode = "agent.pi.default_permission_mode"
+  case piDefaultEffort = "agent.pi.default_effort"
+  case qoderCNDefaultModel = "agent.qoder.cn.default_model"
+  case qoderCNDefaultPermissionMode = "agent.qoder.cn.default_permission_mode"
+  case qoderCNDefaultEffort = "agent.qoder.cn.default_effort"
+  case qoderCNActiveInstallationID = "agent.qoder.cn.active_installation_id"
+  case qoderCNNodeExecutablePath = "agent.qoder.cn.node_executable_path"
+  case qoderCNSDKRoot = "agent.qoder.cn.sdk_root"
+  case qoderInternationalDefaultModel = "agent.qoder.international.default_model"
+  case qoderInternationalDefaultPermissionMode = "agent.qoder.international.default_permission_mode"
+  case qoderInternationalDefaultEffort = "agent.qoder.international.default_effort"
+  case qoderInternationalActiveInstallationID = "agent.qoder.international.active_installation_id"
+  case qoderInternationalNodeExecutablePath = "agent.qoder.international.node_executable_path"
+  case qoderInternationalSDKRoot = "agent.qoder.international.sdk_root"
+  case qoderDistribution = "agent.qoder.distribution"
+  case qoderInstallationDistributions = "agent.qoder.installation_distributions"
+  case qoderExecutableDistributions = "agent.qoder.executable_distributions"
+  case qoderRuntimeState = "agent.qoder.runtime_state"
   case tunnelID = "tunnel.id"
   case tunnelEnabled = "tunnel.enabled"
 }
@@ -113,10 +135,12 @@ public actor ServiceSettings {
     try await set(instructions, for: .customInstructions)
   }
 
-  public func deepSeekHarnessMCPServers() async throws
+  public func deepSeekHarnessMCPServers(
+    key: ServiceSettingKey = .deepSeekHarnessMCPServers
+  ) async throws
     -> [ServiceDeepSeekHarnessMCPServerRecord]
   {
-    guard let value = try await string(for: .deepSeekHarnessMCPServers) else { return [] }
+    guard let value = try await string(for: key) else { return [] }
     guard let data = value.data(using: .utf8) else { throw ServiceStoreError.corruptRecord }
     do {
       return try JSONDecoder().decode([ServiceDeepSeekHarnessMCPServerRecord].self, from: data)
@@ -126,7 +150,8 @@ public actor ServiceSettings {
   }
 
   public func setDeepSeekHarnessMCPServers(
-    _ servers: [ServiceDeepSeekHarnessMCPServerRecord]
+    _ servers: [ServiceDeepSeekHarnessMCPServerRecord],
+    key: ServiceSettingKey = .deepSeekHarnessMCPServers
   ) async throws {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
@@ -134,7 +159,7 @@ public actor ServiceSettings {
     else {
       throw ServiceStoreError.invalidArgument("dsh.mcp.servers")
     }
-    try await set(value, for: .deepSeekHarnessMCPServers)
+    try await set(value, for: key)
   }
 
   public func setExposureMode(_ mode: ServiceMCPExposureMode) async throws {
@@ -402,5 +427,17 @@ public actor ServiceSettings {
         updatedAt: now()
       )
     )
+  }
+
+  func qoderSettingsSnapshot(keys: [ServiceSettingKey]) async throws -> [String: String] {
+    try await store.settingValues(keys: keys.map(\.rawValue))
+  }
+
+  func updateQoderSettingsAtomically(
+    keys: [ServiceSettingKey],
+    transform: @Sendable ([String: String]) throws -> [String: String]
+  ) async throws {
+    try await store.updateSettingsAtomically(
+      keys: keys.map(\.rawValue), updatedAt: now(), transform: transform)
   }
 }

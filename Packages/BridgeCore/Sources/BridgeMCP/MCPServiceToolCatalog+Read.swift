@@ -75,7 +75,11 @@ extension MCPServiceToolCatalog {
       + "permission policy. The local user still approves each task before execution, while "
       + "DeepSeek execution-time permission requests are surfaced for local approval; "
       + "steer input for ACP and Antigravity providers is queued as a follow-up on the same session. "
-      + "Inspect network_enforcement to see whether Bridge or the Provider owns network policy.",
+      + "Pi installations use native RPC with a managed extension, exact session binding, queued follow-up "
+      + "and local tool approval. Pi read-only disables file mutations and shell; shell requires Write mode "
+      + "and network_access=true. Inspect network_enforcement to see the policy owner; extension controls "
+      + "do not imply operating-system isolation. Qoder uses one provider for regional installations; "
+      + "models, native authentication and sessions remain bound to the selected region and installation.",
     inputSchema: objectSchema(
       properties: ["project_id": optionalOpaqueProjectIDSchema]
     ),

@@ -24,6 +24,11 @@ extension BridgeServiceAppModel {
         installationID: installationID
       )
       guard agentNativePermissionGenerations[installationID] == generation else { return }
+      guard nativePermissionSnapshotMatchesInstallation(snapshot, installationID: installationID)
+      else {
+        agentNativePermissionErrors[installationID] = "原生权限策略响应与所选安装不匹配。"
+        return
+      }
       agentNativePermissionPolicies[installationID] = snapshot
     } catch {
       guard agentNativePermissionGenerations[installationID] == generation else { return }
@@ -51,8 +56,14 @@ extension BridgeServiceAppModel {
         let client = try self.currentClient()
         let snapshot = try await client.updateAgentNativePermissionPolicy(request)
         guard self.agentNativePermissionGenerations[installationID] == generation else { return }
+        guard
+          self.nativePermissionSnapshotMatchesInstallation(snapshot, installationID: installationID)
+        else {
+          self.agentNativePermissionErrors[installationID] = "原生权限策略响应与所选安装不匹配。"
+          return
+        }
         self.agentNativePermissionPolicies[installationID] = snapshot
-        self.postToast("AGY Global 权限已更新", symbol: "checkmark.shield.fill", tone: .success)
+        self.postToast("原生权限规则已更新", symbol: "checkmark.shield.fill", tone: .success)
       } catch {
         guard self.agentNativePermissionGenerations[installationID] == generation else { return }
         self.agentNativePermissionErrors[installationID] = Self.message(error)
@@ -204,9 +215,19 @@ extension BridgeServiceAppModel {
       let snapshot = try? await client.agentNativePermissionPolicy(
         installationID: installationID
       ),
-      agentNativePermissionGenerations[installationID] == generation
+      agentNativePermissionGenerations[installationID] == generation,
+      nativePermissionSnapshotMatchesInstallation(snapshot, installationID: installationID)
     else { return }
     agentNativePermissionPolicies[installationID] = snapshot
+  }
+
+  private func nativePermissionSnapshotMatchesInstallation(
+    _ snapshot: IPCAgentNativePermissionPolicyResponse,
+    installationID: String
+  ) -> Bool {
+    snapshot.installationID == installationID
+      && agentInstallations.first(where: { $0.installationID == installationID })?.providerID
+        == snapshot.providerID
   }
 
   @discardableResult

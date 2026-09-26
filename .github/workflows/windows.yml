@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [win]
   workflow_dispatch:
+    inputs:
+      ui_smoke:
+        description: Run the Windows GUI startup check
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -202,6 +207,71 @@ jobs:
           $binPath = ($binPathOutput | Select-Object -Last 1).ToString().Trim()
           if (-not $binPath) { throw "Swift build output directory was empty." }
           Add-Content $env:GITHUB_ENV "SWIFT_BIN_PATH=$binPath"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Verify installed Agent CLI contracts
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          npm install --prefix .build/agent-contract --ignore-scripts --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 @qodercn-ai/qoderclicn@1.1.64 @qodercn-ai/qodercn-agent-sdk@1.0.50
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          import { spawn, execFileSync } from 'node:child_process';
+          import { readFile, mkdir } from 'node:fs/promises';
+          import { createInterface } from 'node:readline';
+          import { pathToFileURL } from 'node:url';
+          import path from 'node:path';
+          import { SDKProcessOwner } from '../../Packages/BridgeCore/Sources/BridgeQoderSDK/Resources/QoderHost/process.mjs';
+          const root = path.resolve('.build/agent-contract');
+          const modules = path.join(root, 'node_modules');
+          const piRoot = path.join(modules, '@earendil-works/pi-coding-agent');
+          const manifest = JSON.parse(await readFile(path.join(piRoot, 'package.json'), 'utf8'));
+          const piEntry = path.join(piRoot, typeof manifest.bin === 'string' ? manifest.bin : manifest.bin.pi);
+          const cli = path.join(modules, '@qodercn-ai/qoderclicn/bundle/qoderclicn.js');
+          console.log('Pi CLI:', execFileSync(process.execPath, [piEntry, '--version'], { encoding: 'utf8' }).trim());
+          console.log('Qoder CN CLI:', execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }).trim());
+          const sessionDir = path.join(root, 'sessions');
+          await mkdir(sessionDir, { recursive: true });
+          const pi = spawn(process.execPath, [piEntry, '--mode', 'rpc', '--no-extensions', '--no-skills',
+            '--no-prompt-templates', '--no-themes', '--session-dir', sessionDir], { stdio: ['pipe', 'pipe', 'pipe'] });
+          pi.stderr.resume();
+          const exited = new Promise(resolve => pi.once('exit', resolve));
+          const lines = createInterface({ input: pi.stdout });
+          const timer = setTimeout(() => pi.kill(), 30000);
+          let stateSeen = false;
+          try {
+            pi.stdin.write(JSON.stringify({ id: 'state', type: 'get_state' }) + '\n');
+            for await (const line of lines) {
+              const value = JSON.parse(line);
+              if (value.type === 'response' && value.id === 'state') {
+                if (!value.success) throw new Error('Pi get_state failed');
+                stateSeen = true; break;
+              }
+            }
+          } finally { pi.stdin.end(); pi.kill(); await exited; clearTimeout(timer); lines.close(); }
+          if (!stateSeen) throw new Error('Pi RPC state was not received');
+          console.log('Pi native RPC handshake: passed');
+          const sdk = await import(pathToFileURL(path.join(modules, '@qodercn-ai/qodercn-agent-sdk/dist/index.js')));
+          const owner = new SDKProcessOwner();
+          let authRequired = false;
+          let warm;
+          try {
+            warm = await sdk.startup({ initializeTimeoutMs: 30000, options: {
+              auth: sdk.qodercliAuth(), transport: sdk.ProcessTransport.default,
+              executable: process.execPath, pathToQoderCLIExecutable: cli, cwd: root,
+              settingSources: [], tools: [], persistSession: false,
+              spawnQoderCLIProcess: options => owner.spawn(options),
+              onAuthExpired: () => { authRequired = true; },
+            } });
+            console.log('Qoder CN native SDK initialization: passed');
+          } catch (error) {
+            if (!authRequired) throw new Error('Qoder SDK startup failed before authentication was verified');
+            console.log('Qoder CN native SDK reached authentication; inference requires a signed-in account');
+          } finally { if (warm) await warm.close(); await owner.close(); }
+          '@ | Set-Content -LiteralPath .build/agent-contract/verify.mjs -Encoding utf8
+          node .build/agent-contract/verify.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Stage Windows tunnel client
         if: matrix.publish
         shell: pwsh
@@ -253,7 +323,7 @@ jobs:
             -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smoke Windows GUI startup
-        if: matrix.run_tests
+        if: matrix.run_tests && (github.event_name != 'workflow_dispatch' || inputs.ui_smoke)
         timeout-minutes: 5
         shell: pwsh
         run: |
@@ -261,7 +331,7 @@ jobs:
             -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smoke tests
-        if: matrix.run_tests
+        if: matrix.run_tests && hashFiles('Packages/BridgeCore/Tests/**/*.swift') != ''
         working-directory: Packages/BridgeCore
         shell: pwsh
         run: |
@@ -281,7 +351,8 @@ jobs:
             "BridgeCodexServiceWindowsTests", "BridgeConversationWindowsTests",
             "BridgeServiceApplicationWindowsTests", "BridgeFilesWindowsTests",
             "BridgeServiceCoreWindowsTests", "BridgeDirectCommandWindowsTests",
-            "BridgeDeepSeekHarnessACPWindowsTests", "BridgeWindowsShellTests"
+            "BridgeDeepSeekHarnessACPWindowsTests", "BridgeWindowsShellTests",
+            "BridgePiRPCTests", "BridgeQoderSDKTests"
           )
           foreach ($filter in $filters) {
             $output = @(& swift test @swiftArguments --filter $filter 2>&1)

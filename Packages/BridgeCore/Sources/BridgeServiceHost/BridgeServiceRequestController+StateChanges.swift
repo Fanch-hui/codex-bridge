@@ -7,7 +7,7 @@ extension BridgeServiceRequestController {
     await conversationStreamGate.acquire()
     defer { conversationStreamGate.release() }
     guard !streamingStopped, stateChangeForwarder == nil else { return }
-    let tasks = await composition.tasks.changes.subscribe()
+    let tasks = composition.tasks.changes.subscribe()
     let approvals = await composition.application.approvals.changes.subscribe()
     stateChangeForwarder = Task {
       await withTaskGroup(of: Void.self) { group in

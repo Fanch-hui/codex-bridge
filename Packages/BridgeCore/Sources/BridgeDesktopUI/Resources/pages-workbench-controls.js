@@ -93,6 +93,20 @@
           S.autoGrowTextArea(form.__inputControl);
         }
       }
+      var attachmentField = pending.attachmentField || "attachmentPaths";
+      var attachmentErrorField = attachmentField === "attachmentPaths"
+        ? "attachmentError" : attachmentField + "Error";
+      if (receipt.accepted === true && Array.isArray(pending.attachmentPaths)
+        && JSON.stringify(draft[attachmentField]) === JSON.stringify(pending.attachmentPaths)) {
+        draft[attachmentField] = [];
+        draft[attachmentErrorField] = "";
+        var attachmentForm = controls && controls.__activeForm;
+        var attachmentUpdate = attachmentForm && attachmentForm.__attachmentUpdates
+          && attachmentForm.__attachmentUpdates[attachmentField];
+        if (attachmentForm && attachmentForm.__taskID === taskID && attachmentUpdate) {
+          attachmentUpdate();
+        }
+      }
       var activeForm = controls && controls.__activeForm;
       if (activeForm && activeForm.__validate) activeForm.__validate();
     });
@@ -116,7 +130,8 @@
       var stored = readPersistedDrafts()[taskID];
       drafts.set(taskID, {
         input: stored && typeof stored.input === "string" ? stored.input : "",
-        mode: stored && typeof stored.mode === "string" ? stored.mode : "queued"
+        mode: stored && typeof stored.mode === "string" ? stored.mode : "queued",
+        attachmentPaths: [], attachmentError: "", restartAttachmentPaths: null
       });
     }
     return drafts.get(taskID);
@@ -242,6 +257,10 @@
 
   function retryForm(detail, emit, baselineReceiptID) {
     var form = S.node("div", "retry-form"), draft = draftFor(detail.taskID);
+    if (!Array.isArray(draft.restartAttachmentPaths)) {
+      draft.restartAttachmentPaths = Array.isArray(detail.attachmentPaths)
+        ? detail.attachmentPaths.slice() : [];
+    }
     var actions = S.node("div", "form-actions");
     var resumeButton = null, restartButton = null;
     var queueLabel = S.node("label", "checkbox-row");
@@ -251,7 +270,17 @@
     queueLabel.appendChild(queueInput);
     queueLabel.appendChild(S.node("span", null, "项目忙时排队"));
     form.appendChild(queueLabel);
+    var skills = global.CodexBridgeDesktopWorkbenchSkills.create(detail, draft);
+    if (skills) form.appendChild(skills.wrapper);
+    var attachmentUpdates = {};
     if (detail.canResume) {
+      var resumeAttachments = global.CodexBridgeDesktopWorkbenchAttachments.create(
+        detail, draft, validate, "attachmentPaths", "选择续写图片"
+      );
+      if (resumeAttachments) {
+        form.appendChild(resumeAttachments.wrapper);
+        attachmentUpdates.attachmentPaths = resumeAttachments.update;
+      }
       var input = inputField(detail, "消息", "输入下一条指令，沿用当前会话上下文");
       form.appendChild(input.wrapper);
       function resume() {
@@ -263,10 +292,17 @@
           requestID: requestID,
           baselineReceiptID: baselineReceiptID,
           taskID: detail.taskID,
-          input: value
+          input: value,
+          attachmentPaths: draft.attachmentPaths.slice(),
+          attachmentField: "attachmentPaths"
         });
         validate();
-        emit("resumeTask", { taskID: detail.taskID, input: value || null, ...(queueInput.checked ? { queueIfBusy: true } : {}) }, requestID);
+        emit("resumeTask", {
+          taskID: detail.taskID, input: value || null,
+          ...(skills ? skills.payload() : {}),
+          ...(queueInput.checked ? { queueIfBusy: true } : {}),
+          ...(draft.attachmentPaths.length ? { attachmentPaths: draft.attachmentPaths.slice() } : {})
+        }, requestID);
       }
       resumeButton = S.button("发送", null, {}, emit, "small primary", false);
       resumeButton.addEventListener("click", resume);
@@ -280,33 +316,47 @@
       actions.appendChild(resumeButton);
     }
     if (detail.canRestart) {
+      var restartAttachments = global.CodexBridgeDesktopWorkbenchAttachments.create(
+        detail, draft, validate, "restartAttachmentPaths", "选择重开图片"
+      );
+      if (restartAttachments) {
+        form.appendChild(restartAttachments.wrapper);
+        attachmentUpdates.restartAttachmentPaths = restartAttachments.update;
+      }
       restartButton = S.button("重新开始", null, {}, emit, "small", false);
       restartButton.addEventListener("click", function () {
         if (restartButton.disabled) return;
-        if (!global.confirm("使用原始指令在当前项目开启全新会话？")) return;
+        if (!global.confirm("使用原始指令和当前图片路径在当前项目开启全新会话？")) return;
         var requestID = newSubmissionRequestID();
         pendingSubmissions.set(detail.taskID, {
           command: "restartTask",
           requestID: requestID,
           baselineReceiptID: baselineReceiptID,
           taskID: detail.taskID,
-          input: null
+          input: null,
+          attachmentPaths: draft.restartAttachmentPaths.slice(),
+          attachmentField: "restartAttachmentPaths"
         });
         validate();
-        emit("restartTask", { taskID: detail.taskID, ...(queueInput.checked ? { queueIfBusy: true } : {}) }, requestID);
+        emit("restartTask", {
+          taskID: detail.taskID,
+          ...(queueInput.checked ? { queueIfBusy: true } : {}),
+          attachmentPaths: draft.restartAttachmentPaths.slice(),
+          ...(skills ? skills.payload() : {})
+        }, requestID);
       });
       actions.appendChild(restartButton);
     }
     function validate() {
       var pending = pendingSubmissions.has(detail.taskID);
       if (resumeButton) {
-        resumeButton.disabled = pending;
+        resumeButton.disabled = pending || !!draft.attachmentError;
         resumeButton.textContent = "发送";
         resumeButton.setAttribute("aria-busy", String(pending));
         resumeButton.setAttribute("data-pending", String(pending));
       }
       if (restartButton) {
-        restartButton.disabled = pending;
+        restartButton.disabled = pending || !!draft.restartAttachmentPathsError;
         restartButton.textContent = "重新开始";
         restartButton.setAttribute("aria-busy", String(pending));
         restartButton.setAttribute("data-pending", String(pending));
@@ -314,6 +364,7 @@
     }
     form.appendChild(actions);
     form.__validate = validate;
+    form.__attachmentUpdates = attachmentUpdates;
     validate();
     return form;
   }

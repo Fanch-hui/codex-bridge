@@ -230,6 +230,7 @@ public struct BridgeDesktopAgentInstallationRow: Codable, Equatable, Sendable {
   public let installationID: String
   public let providerID: String
   public let displayName: String
+  public let distribution: String?
   public let executablePath: String
   public let version: String?
   public let protocolRevision: String?
@@ -250,6 +251,7 @@ public struct BridgeDesktopAgentInstallationRow: Codable, Equatable, Sendable {
     installationID: String,
     providerID: String,
     displayName: String,
+    distribution: String? = nil,
     executablePath: String,
     version: String? = nil,
     protocolRevision: String? = nil,
@@ -269,6 +271,7 @@ public struct BridgeDesktopAgentInstallationRow: Codable, Equatable, Sendable {
     self.installationID = installationID
     self.providerID = providerID
     self.displayName = displayName
+    self.distribution = distribution
     self.executablePath = executablePath
     self.version = version
     self.protocolRevision = protocolRevision
@@ -299,6 +302,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let clients: [BridgeDesktopMCPClientRow]
   public let deepSeekHarnessMCPServers: [BridgeDesktopDeepSeekHarnessMCPRow]
   public let canManageDeepSeekHarnessMCP: Bool
+  public let selectedAgentMCPScope: String?
+  public let agentMCPScopeOptions: [BridgeDesktopChoice]?
   public let providers: [BridgeDesktopAgentProviderRow]
   public let installations: [BridgeDesktopAgentInstallationRow]
   public let canRegisterAgent: Bool
@@ -319,6 +324,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     clients: [BridgeDesktopMCPClientRow] = [],
     deepSeekHarnessMCPServers: [BridgeDesktopDeepSeekHarnessMCPRow] = [],
     canManageDeepSeekHarnessMCP: Bool = false,
+    selectedAgentMCPScope: String? = nil,
+    agentMCPScopeOptions: [BridgeDesktopChoice]? = nil,
     providers: [BridgeDesktopAgentProviderRow] = [],
     installations: [BridgeDesktopAgentInstallationRow] = [],
     canRegisterAgent: Bool = true,
@@ -338,6 +345,8 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.clients = clients
     self.deepSeekHarnessMCPServers = deepSeekHarnessMCPServers
     self.canManageDeepSeekHarnessMCP = canManageDeepSeekHarnessMCP
+    self.selectedAgentMCPScope = selectedAgentMCPScope
+    self.agentMCPScopeOptions = agentMCPScopeOptions
     self.providers = providers
     self.installations = installations
     self.canRegisterAgent = canRegisterAgent

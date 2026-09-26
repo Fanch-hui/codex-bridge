@@ -62,20 +62,26 @@
           pathJoin(appData, "npm"),
           pathJoin(appData, "pnpm"),
           pathJoin(appData, "Yarn", "bin"),
+          pathJoin(appData, "fnm"),
+          pathJoin(appData, "nvm"),
         ]
       }
       if let local = environmentValue("LOCALAPPDATA", environment: environment) {
         directories += [
           pathJoin(local, "npm"),
           pathJoin(local, "pnpm"),
+          pathJoin(local, "Yarn", "bin"),
           pathJoin(local, "Programs", "nodejs"),
           pathJoin(local, "Programs", "Yarn", "bin"),
           pathJoin(local, "Programs", "Git", "cmd"),
           pathJoin(local, "Microsoft", "WinGet", "Links"),
           pathJoin(local, "Microsoft", "WindowsApps"),
           pathJoin(local, "Volta", "bin"),
+          pathJoin(local, "fnm"),
         ]
       }
+
+      appendNodeManagerDirectories(home: home, environment: environment, to: &directories)
 
       for key in [
         "PNPM_HOME", "NPM_CONFIG_PREFIX", "YARN_GLOBAL_FOLDER", "COREPACK_HOME",
@@ -115,6 +121,38 @@
         directories += installationDirectories(roots: [pathJoin(appData)], names: names)
       }
       return directories
+    }
+
+    private static func appendNodeManagerDirectories(
+      home: String,
+      environment: [String: String],
+      to directories: inout [String]
+    ) {
+      let nvmRoots = uniquePaths(
+        [
+          environmentValue("NVM_HOME", environment: environment),
+          environmentValue("NVM_SYMLINK", environment: environment),
+          environmentValue("APPDATA", environment: environment).map { pathJoin($0, "nvm") },
+          pathJoin(home, "AppData", "Roaming", "nvm"),
+        ].compactMap { $0 })
+      for root in nvmRoots {
+        directories.append(contentsOf: [root, pathJoin(root, "current"), pathJoin(root, "bin")])
+        directories.append(contentsOf: immediateDirectories(at: root))
+      }
+
+      let fnmRoots = uniquePaths(
+        [
+          environmentValue("FNM_DIR", environment: environment),
+          environmentValue("LOCALAPPDATA", environment: environment).map { pathJoin($0, "fnm") },
+          environmentValue("APPDATA", environment: environment).map { pathJoin($0, "fnm") },
+        ].compactMap { $0 })
+      for root in fnmRoots {
+        let versions = pathJoin(root, "node-versions")
+        for version in immediateDirectories(at: versions) {
+          let installation = pathJoin(version, "installation")
+          directories += [installation, pathJoin(installation, "bin")]
+        }
+      }
     }
 
     private static func installationDirectories(roots: [String], names: [String]) -> [String] {
@@ -171,6 +209,23 @@
         value.append(component.replacingOccurrences(of: "/", with: "\\"))
       }
       return value
+    }
+
+    private static func immediateDirectories(at path: String) -> [String] {
+      let url = URL(fileURLWithPath: path, isDirectory: true)
+      guard
+        let entries = try? FileManager.default.contentsOfDirectory(
+          at: url,
+          includingPropertiesForKeys: [.isDirectoryKey],
+          options: []
+        )
+      else { return [] }
+      return entries.compactMap { entry in
+        guard (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+          return nil
+        }
+        return entry.path
+      }
     }
 
     private static func uniquePaths(_ values: [String]) -> [String] {

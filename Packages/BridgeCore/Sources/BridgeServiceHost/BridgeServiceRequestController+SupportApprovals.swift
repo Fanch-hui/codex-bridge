@@ -26,7 +26,9 @@ extension BridgeServiceRequestController {
         : approval.questions.map { question in
           IPCUserInputQuestion(
             id: question.id, header: question.header, question: question.question,
+            inputType: question.inputType,
             isOther: question.isOther, isSecret: question.isSecret,
+            allowsMultiple: question.allowsMultiple, isRequired: question.isRequired,
             options: question.options.map {
               IPCUserInputOption(label: $0.label, description: $0.description)
             }

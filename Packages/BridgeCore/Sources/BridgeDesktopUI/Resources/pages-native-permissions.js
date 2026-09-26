@@ -33,7 +33,7 @@
       });
       if (!option || value === policy.toolPermission) return;
       var confirmed = !option.requiresConfirmation || global.confirm(
-        "启用 “" + option.displayName + "”？\n\n这会修改当前用户的 AGY Global 配置，并影响使用同一 HOME 的其他 AGY CLI 任务。Bridge 的项目 Read Only/Write 硬策略保持不变。"
+        "启用 “" + option.displayName + "”？\n\n" + providerScope(policy) + " Bridge 的项目 Read Only/Write 硬策略保持不变。"
       );
       if (!confirmed) {
         field.control.value = policy.toolPermission;
@@ -74,9 +74,10 @@
       return;
     }
     var action = editor.action.value;
-    var risky = (rule && rule.requiresConfirmation) || requiresRuleConfirmation(action, target);
+    var risky = (rule && rule.requiresConfirmation)
+      || requiresRuleConfirmation(policy, editor.effect.value, action, target);
     if (risky && !global.confirm(
-      "保存高风险 AGY Global 规则？\n\n该规则会影响使用同一 HOME 的其他 AGY CLI 任务。Bridge 的项目 Read Only/Write 硬策略保持不变。"
+      "保存高风险原生权限规则？\n\n" + providerScope(policy) + " Bridge 的项目 Read Only/Write 硬策略保持不变。"
     )) return;
     emit(command, {
       installationID: policy.installationID,
@@ -163,14 +164,28 @@
 
   function defaultAction(policy) { return S.safeArray(policy.availableActions)[0] || "command"; }
 
-  function requiresRuleConfirmation(action, target) {
-    if (action === "unsandboxed" || target.indexOf("*") >= 0) return true;
+  function requiresRuleConfirmation(policy, effect, action, target) {
+    if (effect !== "allow") return false;
+    if (target.indexOf("*") >= 0 || action === "*") return true;
+    if (policy.providerID === "pi") return action === "bash" || action === "powershell";
+    if (policy.providerID === "qoder") return action === "Bash" || action === "MCP";
+    if (action === "unsandboxed") return true;
     if (action === "mcp" && target.indexOf("/") < 0) return true;
     if (action === "command" && target.trim().split(/\s+/).length <= 1) return true;
     if (action === "read_url" || action === "execute_url") {
       return target.split(":", 1)[0].indexOf(".") < 0;
     }
     return false;
+  }
+
+  function providerScope(policy) {
+    if (policy.providerID === "pi") {
+      return "Pi 规则保存在 Bridge 服务数据中，并应用于所选 Pi 安装。";
+    }
+    if (policy.providerID === "qoder") {
+      return "这会修改所选地区的 Qoder 用户级 settings.json，并影响使用该地区同一配置目录的其他 Qoder CLI 任务。";
+    }
+    return "这会修改当前用户的 AGY Global 配置，并影响使用同一 HOME 的其他 AGY CLI 任务。";
   }
 
   function actionTitle(value) {

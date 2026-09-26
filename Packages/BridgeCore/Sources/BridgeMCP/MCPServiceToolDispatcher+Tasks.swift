@@ -16,6 +16,8 @@ extension MCPServiceToolDispatcher {
       return try await callListTasks(arguments)
     case .getTask:
       return try await callGetTask(arguments)
+    case .answerUserInput:
+      return try await callAnswerUserInput(arguments)
     case .submitTask:
       return try await callSubmitTask(arguments, sessionID: sessionID)
     case .steerTask:
@@ -65,6 +67,37 @@ extension MCPServiceToolDispatcher {
     try validate(snapshot, requestedTaskID: taskID, eventLimit: eventLimit)
     return try resultEncoder.encode(ServiceGetTaskOutput(task: snapshot))
 
+  }
+
+  private func callAnswerUserInput(_ arguments: [String: Value]?) async throws -> CallTool.Result {
+    let values = try StrictToolArguments(
+      arguments,
+      allowed: ["task_id", "input_id", "answers", "cancelled"],
+      required: ["task_id", "input_id", "cancelled"]
+    )
+    let taskID = try values.requiredIdentifier("task_id", maximumUTF8Bytes: 128)
+    let inputID = try values.requiredIdentifier("input_id", maximumUTF8Bytes: 128)
+    let cancelled = try values.requiredBoolean("cancelled")
+    let answers = try values.optionalStringArrayMap(
+      "answers",
+      maximumKeys: 16,
+      maximumValues: 32,
+      maximumValueUTF8Bytes: 4 * 1_024
+    )
+    guard cancelled ? answers == nil : answers != nil else {
+      throw MCPError.invalidParams("Set cancelled=true without answers, or provide answers.")
+    }
+    let deadline = clock.now.advanced(by: deadlines.mutation)
+    let receipt = try await withToolDeadline(until: deadline) {
+      try await service.serviceAnswerUserInput(
+        taskID: taskID,
+        inputID: inputID,
+        answers: answers,
+        cancelled: cancelled,
+        deadline: deadline
+      )
+    }
+    return try resultEncoder.encode(ServiceMutateTaskOutput(receipt: receipt))
   }
 
   private func callSubmitTask(

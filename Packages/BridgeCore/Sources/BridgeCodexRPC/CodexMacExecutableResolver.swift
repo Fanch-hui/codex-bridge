@@ -57,6 +57,8 @@
 
     private static func bundleCandidates(home: String?) -> [String] {
       var values = [
+        "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        "/Applications/Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
         "/Applications/ChatGPT.app/Contents/Resources/codex",
         "/Applications/Codex.app/Contents/Resources/codex",
         "/Applications/ChatGPT.app/Contents/Resources/bin/codex",
@@ -64,6 +66,14 @@
       ]
       if let home {
         values += [
+          join(
+            home, "Applications", "ChatGPT.app", "Contents", "Resources", "codex-cli",
+            "CodexCLI.app", "Contents", "MacOS", "codex"
+          ),
+          join(
+            home, "Applications", "Codex.app", "Contents", "Resources", "codex-cli",
+            "CodexCLI.app", "Contents", "MacOS", "codex"
+          ),
           join(home, "Applications", "ChatGPT.app", "Contents", "Resources", "codex"),
           join(home, "Applications", "Codex.app", "Contents", "Resources", "codex"),
           join(home, "Applications", "ChatGPT.app", "Contents", "Resources", "bin", "codex"),

@@ -162,10 +162,24 @@ extension BridgeServiceRequestController {
       IPCApprovalResolutionRequest.self,
       from: request
     )
+    let taskID = TaskID(rawValue: payload.taskID)
+    if payload.decision == "cancel" {
+      guard payload.answers == nil,
+        !payload.approvalID.hasPrefix("bridge-task-start:")
+      else {
+        throw ServiceStoreError.invalidArgument("userInput.response")
+      }
+      try await composition.application.resolveUserInput(
+        taskID: taskID,
+        inputID: payload.approvalID,
+        answers: nil,
+        cancelled: true
+      )
+      return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
+    }
     guard let decision = LocalApprovalDecision(rawValue: payload.decision) else {
       throw ServiceStoreError.invalidArgument("approval.decision")
     }
-    let taskID = TaskID(rawValue: payload.taskID)
     if payload.approvalID.hasPrefix("bridge-task-start:") {
       guard payload.answers == nil, decision == .allow || decision == .deny else {
         throw ServiceStoreError.invalidArgument("approval.decision")

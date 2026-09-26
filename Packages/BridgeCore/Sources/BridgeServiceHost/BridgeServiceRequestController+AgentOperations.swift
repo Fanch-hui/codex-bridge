@@ -1,6 +1,7 @@
 import BridgeAgentCore
 import BridgeDeepSeekHarnessACP
 import BridgeIPC
+import BridgeMCP
 import BridgeServiceApplication
 import BridgeServiceCore
 import Foundation
@@ -18,12 +19,28 @@ extension BridgeServiceRequestController {
     let installations = try await composition.application.serviceManagedAgentInstallations(
       deadline: deadline
     )
+    _ = try await composition.application.serviceQoderRuntimeSettings(deadline: deadline)
+    let qoderSnapshot = try await composition.settings.qoderRuntimeSettingsSnapshot()
+    let selectedDistribution = qoderSnapshot.selectedDistribution ?? .cn
+    let selectedQoderSettings = qoderSnapshot.regions[selectedDistribution]!
+    let qoderRegionSettings = QoderDistribution.allCases.compactMap {
+      qoderSnapshot.regions[$0]
+    }
     let configuredDeepSeekBaseURL = try? await composition.application
       .serviceDeepSeekHarnessBaseURL(deadline: deadline)
-    let discovery = await composition.agentDiscoveryCatalog.summaries(
+    let installationDistributionsByPath = try await qoderDistributionsByExecutablePath(
+      for: installations)
+    var discovery = await composition.agentDiscoveryCatalog.summaries(
       providerIDs: providers.map(\.providerID),
       existingInstallations: installations,
       forceRefresh: catalogRequest?.forceRefresh ?? false
+    )
+    discovery[.qoder] = try ServiceAgentAutoDiscovery.discoverySummary(
+      providerID: .qoder,
+      existingInstallations: installations,
+      environment: ToolDiscoveryEnvironment.current(),
+      qoderDistribution: selectedQoderSettings.distribution,
+      qoderDistributionsByExecutablePath: installationDistributionsByPath
     )
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
@@ -33,82 +50,29 @@ extension BridgeServiceRequestController {
             provider,
             discovery: discovery[provider.providerID],
             configuredBaseURL: provider.providerID == .deepSeekHarness
-              ? configuredDeepSeekBaseURL : nil
+              ? configuredDeepSeekBaseURL : nil,
+            qoderDistribution: provider.providerID == .qoder
+              ? selectedQoderSettings.distribution.rawValue : nil,
+            qoderRegionSettings: provider.providerID == .qoder
+              ? qoderRegionSettings.map(Self.qoderRegionSummary) : nil
           )
         },
-        installations: installations.map(Self.agentInstallationSummary)
+        installations: installations.map { installation in
+          let distribution = installationDistributionsByPath[installation.executablePath]
+          let activeID = distribution.flatMap { region in
+            qoderRegionSettings.first(where: { $0.distribution == region })?.activeInstallationID
+          }
+          return Self.agentInstallationSummary(
+            installation,
+            distribution: distribution?.rawValue,
+            isActive: activeID == installation.id.rawValue
+          )
+        }
       )
     )
   }
 
-  func handleRegisterAgentInstallation(_ request: BridgeServiceIPCRequest) async throws -> Data {
-    let payload = try BridgeServiceIPCCodec.payload(
-      IPCAgentRegistrationRequest.self,
-      from: request
-    )
-    let providerID = AgentProviderID(rawValue: payload.providerID)
-    let policy = ServiceAgentProviderPolicyRegistry.policy(for: providerID)
-    let artifacts = try Self.registrationArtifacts(
-      providerID: providerID,
-      executablePath: payload.executablePath,
-      configurationPath: payload.configurationPath
-    )
-    let record = try await composition.application.serviceRegisterManagedAgent(
-      try ServiceAgentRegistrationRequest(
-        providerID: providerID,
-        displayName: payload.displayName,
-        executablePath: payload.executablePath,
-        trustProfile: policy?.registrationTrustProfile ?? .managed,
-        securityProfileID: policy?.registrationSecurityProfileID,
-        enableOnSuccess: false,
-        configurationPath: payload.configurationPath,
-        artifacts: artifacts
-      ),
-      deadline: Self.deadline()
-    )
-    return try BridgeServiceIPCCodec.success(
-      requestID: request.requestID,
-      payload: Self.agentInstallationSummary(record)
-    )
-  }
-
-  func handleConnectAgentInstallation(_ request: BridgeServiceIPCRequest) async throws -> Data {
-    let payload = try BridgeServiceIPCCodec.payload(
-      IPCAgentConnectRequest.self,
-      from: request
-    )
-    let providerID = AgentProviderID(rawValue: payload.providerID)
-    let existingInstallations = try await composition.agentRegistry.installations(
-      providerID: providerID
-    )
-    let discovery = await composition.agentDiscoveryCatalog.summaries(
-      providerIDs: [providerID], existingInstallations: existingInstallations
-    )
-    let discoveredPath = discovery[providerID]?.executablePath
-    let environment = ToolDiscoveryEnvironment.current()
-    let candidates = try ServiceAgentAutoDiscovery.registrationRequests(
-      providerID: providerID,
-      dataPaths: composition.paths,
-      existingInstallations: existingInstallations,
-      credentialsProvided: payload.baseURL != nil || payload.apiKey != nil,
-      environment: environment,
-      discoveredExecutablePath: discoveredPath
-    )
-    let record = try await composition.application.serviceConnectManagedAgent(
-      providerID: providerID,
-      baseURL: payload.baseURL,
-      apiKey: payload.apiKey,
-      candidates: candidates,
-      alwaysProceedConfirmed: payload.alwaysProceedConfirmed,
-      deadline: Self.deadline()
-    )
-    return try BridgeServiceIPCCodec.success(
-      requestID: request.requestID,
-      payload: Self.agentInstallationSummary(record)
-    )
-  }
-
-  private static func registrationArtifacts(
+  static func registrationArtifacts(
     providerID: AgentProviderID,
     executablePath: String,
     configurationPath: String?
@@ -181,7 +145,9 @@ extension BridgeServiceRequestController {
   private static func agentProviderSummary(
     _ descriptor: AgentProviderDescriptor,
     discovery: ServiceAgentDiscoverySummary?,
-    configuredBaseURL: String?
+    configuredBaseURL: String?,
+    qoderDistribution: String?,
+    qoderRegionSettings: [IPCAgentQoderRegionSettings]?
   ) -> IPCAgentProviderSummary {
     let policy = ServiceAgentProviderPolicyRegistry.policy(for: descriptor.providerID)
     return IPCAgentProviderSummary(
@@ -205,12 +171,27 @@ extension BridgeServiceRequestController {
       supportsSupervisor: policy?.supportsSupervisor ?? false,
       workspaceEnforcement: policy?.workspaceEnforcement ?? "legacy",
       approvalEnforcement: policy?.approvalEnforcement ?? "legacy",
-      networkEnforcement: policy?.networkEnforcement ?? "legacy"
+      networkEnforcement: policy?.networkEnforcement ?? "legacy",
+      qoderDistribution: qoderDistribution,
+      qoderRegionSettings: qoderRegionSettings
     )
   }
 
-  private static func agentInstallationSummary(
-    _ record: ServiceAgentInstallationRecord
+  private static func qoderRegionSummary(
+    _ value: ServiceQoderRuntimeSettings
+  ) -> IPCAgentQoderRegionSettings {
+    IPCAgentQoderRegionSettings(
+      distribution: value.distribution.rawValue,
+      activeInstallationID: value.activeInstallationID,
+      nodeExecutablePath: value.nodeExecutablePath,
+      sdkRoot: value.sdkRoot
+    )
+  }
+
+  static func agentInstallationSummary(
+    _ record: ServiceAgentInstallationRecord,
+    distribution: String? = nil,
+    isActive: Bool? = nil
   ) -> IPCAgentInstallationSummary {
     let formatter = ISO8601DateFormatter()
     return IPCAgentInstallationSummary(
@@ -230,7 +211,10 @@ extension BridgeServiceRequestController {
         .sorted(),
       lastProbeError: record.lastProbeError,
       lastProbedAt: record.lastProbedAt.map(formatter.string(from:)),
-      updatedAt: formatter.string(from: record.updatedAt)
+      updatedAt: formatter.string(from: record.updatedAt),
+      distribution: distribution
+        ?? QoderDistribution.identify(executablePath: record.executablePath)?.rawValue,
+      isActive: isActive
     )
   }
 }
@@ -250,11 +234,14 @@ extension BridgeServiceRequestController {
       prompt: payload.prompt,
       threadID: payload.threadID,
       skillName: payload.skillName,
+      skillNames: payload.skillNames,
       modelOverride: payload.modelOverride,
       permissionModeOverride: payload.permissionModeOverride,
       acceptanceCriteria: payload.acceptanceCriteria ?? [],
       clientRequestID: payload.clientRequestID,
       queueIfBusy: payload.queueIfBusy ?? false,
+      attachmentPaths: payload.attachmentPaths,
+      attachmentSourceTaskID: payload.attachmentSourceTaskID,
       deadline: deadline
     )
     return try BridgeServiceIPCCodec.success(
@@ -339,4 +326,5 @@ extension BridgeServiceRequestController {
       )
     )
   }
+
 }

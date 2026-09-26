@@ -58,6 +58,8 @@
       let tunnel: BridgeDesktopTunnelState?
       let clientItems: [BridgeDesktopMCPClientRow]
       let deepSeekHarnessMCPItems: [BridgeDesktopDeepSeekHarnessMCPRow]
+      let selectedAgentMCPScope: String?
+      let agentMCPScopeOptions: [BridgeDesktopChoice]?
       let statusText: String
       let codexExecutablePath: String?
       let codexResolvedExecutablePath: String?
@@ -69,6 +71,8 @@
         tunnel = display.tunnel
         clientItems = display.clientItems
         deepSeekHarnessMCPItems = display.deepSeekHarnessMCPItems
+        selectedAgentMCPScope = display.selectedAgentMCPScope
+        agentMCPScopeOptions = display.agentMCPScopeOptions
         statusText = display.statusText
         codexExecutablePath = display.codexExecutablePath
         codexResolvedExecutablePath = display.codexResolvedExecutablePath

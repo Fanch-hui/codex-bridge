@@ -35,7 +35,11 @@ extension ServiceAgentRegistry {
       )
     }
 
-    let artifacts = try captureArtifacts(request.artifactRequests, at: now())
+    let artifacts = try await runtimeArtifacts(
+      provider: provider, installationID: existing.id,
+      executablePath: identity.canonicalPath,
+      existing: captureArtifacts(request.artifactRequests, at: now()), at: now()
+    )
     let candidate = try await probeRecord(
       id: existing.id,
       provider: provider,

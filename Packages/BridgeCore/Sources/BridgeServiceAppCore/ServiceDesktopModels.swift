@@ -122,6 +122,8 @@ public enum AgentProviderPresentation {
     case "opencode": return "OpenCode"
     case "deepseek-harness": return "DeepSeek Harness"
     case "antigravity": return "Antigravity"
+    case "pi": return "Pi"
+    case "qoder": return "Qoder"
     default:
       let value = providerID.trimmingCharacters(in: .whitespacesAndNewlines)
       return value.isEmpty ? "Codex" : value
@@ -134,6 +136,8 @@ public enum AgentProviderPresentation {
     case "opencode": return "chevron.left.forwardslash.chevron.right"
     case "deepseek-harness": return "gearshape.2.fill"
     case "antigravity": return "sparkles"
+    case "pi": return "terminal.fill"
+    case "qoder": return "chevron.left.forwardslash.chevron.right"
     default: return "point.3.connected.trianglepath.dotted"
     }
   }

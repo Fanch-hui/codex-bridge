@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import Foundation
 
@@ -51,6 +52,7 @@ public actor ServiceTaskManager {
       accessMode: request.accessMode,
       fastMode: request.fastMode,
       queueIfBusy: request.queueIfBusy,
+      selectedSkills: request.selectedSkills,
       isQueued: queued,
       state: state,
       createdAt: date,
@@ -63,7 +65,8 @@ public actor ServiceTaskManager {
         summary: "The task was accepted.",
         createdAt: date
       ),
-      handoffID: handoffID
+      handoffID: handoffID,
+      attachments: request.attachments
     )
     changes.publish()
     return result
@@ -215,6 +218,39 @@ public actor ServiceTaskManager {
       patch: StatePatch(status: .waitingForCodexApproval),
       eventKind: .approvalRequested,
       summary: "The provider is waiting for a local approval decision."
+    )
+  }
+
+  @discardableResult
+  public func markWaitingForAgentUserInput(
+    taskID: TaskID,
+    questionCount: Int,
+    details: String
+  ) async throws -> ServiceTaskRecord {
+    guard (1...16).contains(questionCount) else {
+      throw ServiceStoreError.invalidArgument("userInput.questionCount")
+    }
+    return try await mutate(
+      taskID: taskID,
+      patch: StatePatch(status: .waitingForCodexApproval),
+      eventKind: .userInputRequested,
+      summary: "The provider requested answers to \(questionCount) structured question(s).",
+      details: details
+    )
+  }
+
+  @discardableResult
+  public func resumeAfterAgentUserInput(
+    taskID: TaskID,
+    cancelled: Bool
+  ) async throws -> ServiceTaskRecord {
+    try await mutate(
+      taskID: taskID,
+      patch: StatePatch(status: .running),
+      eventKind: .userInputResolved,
+      summary: cancelled
+        ? "The user cancelled the provider question."
+        : "The user answered the provider question."
     )
   }
 
@@ -430,6 +466,14 @@ public actor ServiceTaskManager {
     try await store.taskQueueInfo(id: taskID)
   }
 
+  public func taskAttachments(taskID: TaskID) async throws -> [AgentImageAttachment] {
+    try await store.taskAttachments(taskID: taskID)
+  }
+
+  public func taskAttachments(taskIDs: [TaskID]) async throws -> [TaskID: [AgentImageAttachment]] {
+    try await store.taskAttachments(taskIDs: taskIDs)
+  }
+
   @discardableResult
   public func promoteQueued(taskID: TaskID) async throws -> ServiceTaskRecord? {
     let date = now()
@@ -451,6 +495,7 @@ public actor ServiceTaskManager {
     patch: StatePatch,
     eventKind: ServiceTaskEventKind,
     summary: String,
+    details: String? = nil,
     expectedStatus: ServiceTaskStatus? = nil
   ) async throws -> ServiceTaskRecord {
     try await beginMutation(taskID: taskID)
@@ -465,6 +510,7 @@ public actor ServiceTaskManager {
       event: ServiceTaskEventDraft(
         kind: eventKind,
         summary: summary,
+        details: details,
         createdAt: date
       ),
       expectedStatus: expectedStatus

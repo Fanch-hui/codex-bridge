@@ -236,6 +236,39 @@ try {
   Assert-Directory $resourceCandidates[0].FullName | Out-Null
   Copy-Item -LiteralPath $resourceCandidates[0].FullName -Destination (Join-Path $outFull $resourceCandidates[0].Name) -Recurse -Force
 
+  $agentResourceSpecs = @(
+    @{ Name = "BridgeCore_BridgePiRPC"; Entry = "PiBridgeExtension/index.mjs" },
+    @{ Name = "BridgeCore_BridgeQoderSDK"; Entry = "QoderHost/index.mjs" }
+  )
+  foreach ($spec in $agentResourceSpecs) {
+    $candidates = @(Get-ChildItem -LiteralPath $binFull -Directory -Recurse |
+        Where-Object { $_.Name -in @("$($spec.Name).bundle", "$($spec.Name).resources") })
+    if ($candidates.Count -ne 1) {
+      throw "Expected exactly one production $($spec.Name) resource directory."
+    }
+    $sourceDirectory = $candidates[0].FullName
+    Assert-Directory $sourceDirectory | Out-Null
+    Assert-RegularFile (Join-Path $sourceDirectory $spec.Entry) | Out-Null
+    $reparseItems = @(Get-ChildItem -LiteralPath $sourceDirectory -Force -Recurse |
+        Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 })
+    if ($reparseItems.Count -ne 0) {
+      throw "Agent resources cannot contain reparse points: $($spec.Name)"
+    }
+    $destinationDirectory = Join-Path $outFull $candidates[0].Name
+    Copy-Item -LiteralPath $sourceDirectory -Destination $destinationDirectory -Recurse -Force
+    Assert-RegularFile (Join-Path $destinationDirectory $spec.Entry) | Out-Null
+    $moduleName = $spec.Name -replace '^BridgeCore_', ''
+    $moduleResources = Join-Path $repoRoot "Packages\BridgeCore\Sources\$moduleName\Resources"
+    foreach ($resourceFile in (Get-ChildItem -LiteralPath $moduleResources -File -Recurse)) {
+      $relativeResource = [IO.Path]::GetRelativePath($moduleResources, $resourceFile.FullName)
+      $packagedResource = Join-Path $destinationDirectory $relativeResource
+      Assert-RegularFile $packagedResource | Out-Null
+      if ((Get-Sha256 $resourceFile.FullName) -ne (Get-Sha256 $packagedResource)) {
+        throw "Packaged Agent resource differs from its source: $relativeResource"
+      }
+    }
+  }
+
   $desktopUIResourceCandidates = @(Get-ChildItem -LiteralPath $binFull -Directory -Recurse |
       Where-Object { $_.Name -in @("BridgeCore_BridgeDesktopUI.bundle", "BridgeCore_BridgeDesktopUI.resources") })
   if ($desktopUIResourceCandidates.Count -ne 1) {

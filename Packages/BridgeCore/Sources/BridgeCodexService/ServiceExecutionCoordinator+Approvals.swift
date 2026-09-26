@@ -15,7 +15,8 @@ extension ServiceExecutionCoordinator {
     let agents = pendingAgentApprovals.values
       .filter { taskID == nil || $0.request.taskID == taskID }
       .compactMap { try? executionApproval(from: $0.request) }
-    return (codex + agents).sorted { lhs, rhs in
+    let userInputs = await pendingAgentUserInputApprovals(taskID: taskID)
+    return (codex + agents + userInputs).sorted { lhs, rhs in
       if lhs.taskID.rawValue == rhs.taskID.rawValue {
         return lhs.id < rhs.id
       }
@@ -28,6 +29,22 @@ extension ServiceExecutionCoordinator {
     decision: LocalApprovalDecision,
     answers: [String: [String]]? = nil
   ) async throws {
+    if let pending = pendingAgentUserInputs[approvalID] {
+      guard pending.request.taskID == taskID else {
+        throw ExecutionServiceError.bindingMismatch
+      }
+      let response: AgentUserInputResponse
+      switch (decision, answers) {
+      case (.allow, .some(let values)):
+        response = .answers(values)
+      case (.deny, .none):
+        response = .cancelled
+      default:
+        throw ExecutionServiceError.invalidRequest("userInput.response")
+      }
+      try await resolveAgentUserInput(pending, response: response)
+      return
+    }
     if let pending = pendingAgentApprovals[approvalID] {
       guard pending.request.taskID == taskID else {
         throw ExecutionServiceError.bindingMismatch

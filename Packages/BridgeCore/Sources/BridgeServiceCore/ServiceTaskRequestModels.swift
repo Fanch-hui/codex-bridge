@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import Foundation
 
@@ -30,6 +31,8 @@ public struct ServiceTaskRequest: Equatable, Sendable {
   public let accessMode: ServiceAccessMode
   public let fastMode: Bool
   public let queueIfBusy: Bool
+  public let attachments: [AgentImageAttachment]
+  public let selectedSkills: [AgentSelectedSkill]
 
   public init(
     projectID: ProjectID,
@@ -49,7 +52,9 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     networkAllowed: Bool = false,
     accessMode: ServiceAccessMode = .requestApproval,
     fastMode: Bool = false,
-    queueIfBusy: Bool = false
+    queueIfBusy: Bool = false,
+    attachments: [AgentImageAttachment] = [],
+    selectedSkills: [AgentSelectedSkill] = []
   ) {
     self.projectID = projectID
     self.source = source
@@ -69,5 +74,7 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     self.accessMode = accessMode
     self.fastMode = fastMode
     self.queueIfBusy = queueIfBusy
+    self.attachments = attachments
+    self.selectedSkills = selectedSkills
   }
 }

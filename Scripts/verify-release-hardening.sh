@@ -25,6 +25,15 @@ for path in "${app}" "${service}" "${helper}" "${deepseek_bundle}" "${deepseek_t
 done
 
 /usr/bin/codesign --verify --deep --strict --verbose=2 "${app}"
+for spec in "BridgeCore_BridgePiRPC.bundle:PiBridgeExtension/index.mjs" \
+  "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs"; do
+  bundle="${app}/Contents/Resources/${spec%%:*}"
+  entry="${bundle}/Contents/Resources/${spec#*:}"
+  [[ -d "${bundle}" && ! -L "${bundle}" && -f "${entry}" && ! -L "${entry}" ]] || {
+    print -u2 "Release Agent resources are missing or unsafe: ${spec%%:*}"
+    exit 66
+  }
+done
 readonly details="$(/usr/bin/codesign -dvv "${app}" 2>&1)"
 if (( allow_ad_hoc == 0 )); then
   [[ "${details}" == *"TeamIdentifier="* && "${details}" != *"TeamIdentifier=not set"* ]] || {

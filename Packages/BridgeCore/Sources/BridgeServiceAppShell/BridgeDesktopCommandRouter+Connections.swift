@@ -43,15 +43,21 @@ extension BridgeDesktopCommandRouter {
     case .saveDeepSeekHarnessMCPServer:
       saveDeepSeekHarnessMCPServer(payload, model: model)
     case .deleteDeepSeekHarnessMCPServer:
-      guard connected(model), let id = validatedID(payload.mcpServerID, maximumBytes: 128) else {
+      guard connected(model), let id = validatedID(payload.mcpServerID, maximumBytes: 128),
+        let scope = mcpScope(payload), model.selectedAgentMCPScope == scope.rawValue
+      else {
         return
       }
-      model.deleteDeepSeekHarnessMCPServer(id: id)
+      model.deleteDeepSeekHarnessMCPServer(id: id, scope: scope.rawValue)
     case .setDeepSeekHarnessMCPServerEnabled:
       guard connected(model), let id = validatedID(payload.mcpServerID, maximumBytes: 128),
-        let enabled = payload.enabled
+        let enabled = payload.enabled, let scope = mcpScope(payload),
+        model.selectedAgentMCPScope == scope.rawValue
       else { return }
-      model.setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled)
+      model.setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled, scope: scope.rawValue)
+    case .setAgentMCPScope:
+      guard connected(model), let scope = mcpScope(payload) else { return }
+      model.setAgentMCPScope(scope.rawValue)
     case .rotateLocalMCPEndpoint:
       guard connected(model) else { return }
       model.rotateLocalMCPEndpoint()
@@ -72,6 +78,8 @@ extension BridgeDesktopCommandRouter {
       registerAgent(payload, model: model)
     case .beginAgentRegistration:
       beginAgentRegistration(payload, model: model)
+    case .saveQoderRuntimeSettings:
+      saveQoderRuntimeSettings(payload, model: model)
     case .selectAgent:
       return
     case .setAgentEnabled:
@@ -124,7 +132,8 @@ extension BridgeDesktopCommandRouter {
   ) {
     guard connected(model), let name = validatedID(payload.name, maximumBytes: 256),
       let transport = validatedID(payload.mcpTransport, maximumBytes: 16),
-      transport == "stdio" || transport == "http"
+      transport == "stdio" || transport == "http",
+      let scope = mcpScope(payload), model.selectedAgentMCPScope == scope.rawValue
     else { return }
     let command = payload.mcpCommand.flatMap { validatedText($0, maximumBytes: 8 * 1_024) }
     let url = payload.mcpURL.flatMap { validatedText($0, maximumBytes: 4 * 1_024) }
@@ -142,8 +151,18 @@ extension BridgeDesktopCommandRouter {
       arguments: transport == "stdio" ? payload.arguments ?? [] : [],
       url: transport == "http" ? url : nil,
       environment: environment,
-      headers: headers
+      headers: headers,
+      scope: scope.rawValue
     )
+  }
+
+  private static func mcpScope(
+    _ payload: BridgeDesktopCommandPayload
+  ) -> BridgeDesktopAgentMCPScope? {
+    let rawValue =
+      validatedID(payload.mcpServerScope, maximumBytes: 64)
+      ?? BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
+    return BridgeDesktopAgentMCPScope(rawValue: rawValue)
   }
 
   private static func validSecret(_ input: BridgeDesktopSecretInput) -> Bool {
@@ -161,12 +180,15 @@ extension BridgeDesktopCommandRouter {
       let displayName = validatedID(payload.displayName, maximumBytes: 256),
       let executableURL = panelURL(payload.executable ?? payload.path)
     else { return }
+    let distribution = qoderDistribution(payload, providerID: providerID)
+    if providerID == "qoder", distribution == nil { return }
     let configurationURL = payload.configurationPath.flatMap { panelURL($0) }
     model.registerAgentInstallation(
       providerID: providerID,
       displayName: displayName,
       executableURL: executableURL,
-      configurationURL: configurationURL
+      configurationURL: configurationURL,
+      qoderDistribution: distribution
     )
   }
 
@@ -198,7 +220,38 @@ extension BridgeDesktopCommandRouter {
       providerID: providerID,
       baseURL: baseURL,
       apiKey: apiKey,
-      alwaysProceedConfirmed: payload.confirmed == true
+      alwaysProceedConfirmed: payload.confirmed == true,
+      qoderDistribution: qoderDistribution(payload, providerID: providerID),
+      installationID: providerID == "qoder"
+        ? validatedID(payload.installationID, maximumBytes: 256) : nil
+    )
+  }
+
+  private static func qoderDistribution(
+    _ payload: BridgeDesktopCommandPayload,
+    providerID: String
+  ) -> String? {
+    guard providerID == "qoder",
+      let value = validatedID(payload.qoderDistribution, maximumBytes: 32),
+      value == "cn" || value == "international"
+    else { return nil }
+    return value
+  }
+
+  private static func saveQoderRuntimeSettings(
+    _ payload: BridgeDesktopCommandPayload,
+    model: BridgeServiceAppModel
+  ) {
+    guard connected(model),
+      let distribution = qoderDistribution(payload, providerID: "qoder")
+    else { return }
+    model.setQoderRuntimeSettings(
+      IPCAgentQoderRuntimeSettingsRequest(
+        distribution: distribution,
+        activeInstallationID: validatedID(payload.installationID, maximumBytes: 256),
+        nodeExecutablePath: validatedText(payload.nodeExecutablePath, maximumBytes: 4_096),
+        sdkRoot: validatedText(payload.sdkRoot, maximumBytes: 4_096)
+      )
     )
   }
 
@@ -268,11 +321,14 @@ extension BridgeDesktopCommandRouter {
     } else {
       configurationURL = nil
     }
+    let distribution = qoderDistribution(payload, providerID: provider.providerID)
+    if provider.providerID == "qoder", distribution == nil { return }
     model.registerAgentInstallation(
       providerID: provider.providerID,
       displayName: provider.displayName,
       executableURL: url,
-      configurationURL: configurationURL
+      configurationURL: configurationURL,
+      qoderDistribution: distribution
     )
   }
 }

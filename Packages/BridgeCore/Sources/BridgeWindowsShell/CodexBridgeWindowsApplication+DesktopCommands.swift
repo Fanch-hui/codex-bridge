@@ -68,6 +68,21 @@
       case .deleteSession(let taskID):
         Task { @MainActor in await model.deleteSession(containingTaskID: taskID) }
         return true
+      case .manageNativeAgentSession(let request):
+        Task { @MainActor in await model.manageNativeSessionDirectory(request) }
+        return true
+      case .closeNativeSessionDirectory:
+        model.closeNativeSessionDirectory()
+        return true
+      case .continueNativeAgentSession(
+        let projectID, let providerID, let installationID, let sessionID, let prompt, _
+      ):
+        Task { @MainActor in
+          await model.continueNativeAgentSession(
+            projectID: projectID, providerID: providerID, installationID: installationID,
+            sessionID: sessionID, prompt: prompt)
+        }
+        return true
       case .steerTask(let taskID, let input, let mode, let requestID):
         guard let steerMode = MCPTaskSteerMode(rawValue: mode) else { return true }
         Task { @MainActor in
@@ -76,10 +91,12 @@
           )
         }
         return true
-      case .resumeTask(let taskID, let input, let requestID, let queueIfBusy):
+      case .resumeTask(
+        let taskID, let input, let requestID, let queueIfBusy, let skillNames, let attachmentPaths):
         Task { @MainActor in
           await model.resumeTask(
-            id: taskID, input: input, requestID: requestID, queueIfBusy: queueIfBusy)
+            id: taskID, input: input, requestID: requestID, queueIfBusy: queueIfBusy,
+            skillNames: skillNames, attachmentPaths: attachmentPaths)
         }
         return true
       case .handoffTask(
@@ -91,9 +108,12 @@
             action: action, handoffID: handoffID, revision: revision)
         }
         return true
-      case .restartTask(let taskID, let requestID, let queueIfBusy):
+      case .restartTask(
+        let taskID, let requestID, let queueIfBusy, let skillNames, let attachmentPaths):
         Task { @MainActor in
-          await model.restartTask(id: taskID, requestID: requestID, queueIfBusy: queueIfBusy)
+          await model.restartTask(
+            id: taskID, requestID: requestID, queueIfBusy: queueIfBusy,
+            skillNames: skillNames, attachmentPaths: attachmentPaths)
         }
         return true
       case .rejectWorkbenchCommand(let requestID, let command, let taskID, let input):
@@ -194,14 +214,24 @@
       case .saveDeepSeekHarnessMCPServer(let request):
         Task { @MainActor in await auxiliary.connections.saveDeepSeekHarnessMCPServer(request) }
         return true
-      case .deleteDeepSeekHarnessMCPServer(let id):
-        Task { @MainActor in await auxiliary.connections.deleteDeepSeekHarnessMCPServer(id: id) }
-        return true
-      case .setDeepSeekHarnessMCPServerEnabled(let id, let enabled):
+      case .deleteDeepSeekHarnessMCPServer(let id, let scope):
         Task {
           @MainActor in
-          await auxiliary.connections.setDeepSeekHarnessMCPServerEnabled(id: id, enabled: enabled)
+          await auxiliary.connections.deleteDeepSeekHarnessMCPServer(id: id, scope: scope)
         }
+        return true
+      case .setDeepSeekHarnessMCPServerEnabled(let id, let enabled, let scope):
+        Task {
+          @MainActor in
+          await auxiliary.connections.setDeepSeekHarnessMCPServerEnabled(
+            id: id,
+            enabled: enabled,
+            scope: scope
+          )
+        }
+        return true
+      case .selectAgentMCPScope(let scope):
+        auxiliary.connections.selectAgentMCPScope(scope)
         return true
       case .configureTunnel, .connectTunnel, .disconnectTunnel, .clearTunnel:
         return runTunnelCommand(command, connections: auxiliary.connections)
@@ -217,14 +247,18 @@
         let providerID,
         let baseURL,
         let apiKey,
-        let alwaysProceedConfirmed
+        let alwaysProceedConfirmed,
+        let qoderDistribution,
+        let installationID
       ):
         Task { @MainActor in
           await management.connectAgent(
             providerID: providerID,
             baseURL: baseURL,
             apiKey: apiKey,
-            alwaysProceedConfirmed: alwaysProceedConfirmed
+            alwaysProceedConfirmed: alwaysProceedConfirmed,
+            qoderDistribution: qoderDistribution,
+            installationID: installationID
           )
           await auxiliary.agentDefaults.refresh()
         }
@@ -266,7 +300,7 @@
           await auxiliary.agentDefaults.refresh()
         }
         return true
-      case .beginAgentRegistration(let providerID):
+      case .beginAgentRegistration(let providerID, let qoderDistribution):
         let targetProvider: IPCAgentProviderSummary? = {
           if let providerID {
             return management.agentProviders.first(where: { $0.providerID == providerID })
@@ -292,7 +326,8 @@
                   providerID: provider.providerID,
                   displayName: provider.displayName,
                   executablePath: executablePath,
-                  configurationPath: configPath
+                  configurationPath: configPath,
+                  qoderDistribution: qoderDistribution
                 )
               )
             }
@@ -302,22 +337,30 @@
                 providerID: provider.providerID,
                 displayName: provider.displayName,
                 executablePath: executablePath,
-                configurationPath: nil
+                configurationPath: nil,
+                qoderDistribution: qoderDistribution
               )
             )
           }
         }
         return true
       case .registerAgentFromDesktop(
-        let providerID, let displayName, let executablePath, let configurationPath):
+        let providerID, let displayName, let executablePath, let configurationPath,
+        let qoderDistribution):
         Task { @MainActor in
           await management.registerAgent(
             providerID: providerID,
             executablePath: executablePath,
             configurationPath: configurationPath ?? "",
-            displayName: displayName
+            displayName: displayName,
+            qoderDistribution: qoderDistribution
           )
           await auxiliary.agentDefaults.refresh()
+        }
+        return true
+      case .setQoderRuntimeSettings(let settings):
+        Task { @MainActor in
+          await management.setQoderRuntimeSettings(settings)
         }
         return true
       case .refreshAgentModelsByID(let providerID, let installationID):
@@ -388,8 +431,11 @@
       else { return true }
       let requiresAnswers =
         model.approvals.first { $0.approvalID == approvalID }?.kind == "user_input"
+      let cancellingInput = requiresAnswers && decision == "cancel"
       let answers = decodeAnswers(answersJSON)
-      guard !requiresAnswers || answers != nil else { return true }
+      guard cancellingInput ? answersJSON == nil : !requiresAnswers || answers != nil else {
+        return true
+      }
       model.selectApproval(at: index)
       Task { @MainActor in
         await model.resolveApproval(

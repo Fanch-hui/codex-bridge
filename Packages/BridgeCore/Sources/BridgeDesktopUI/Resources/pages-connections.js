@@ -47,7 +47,7 @@
     var clientsSection = S.section(content, "ChatGPT / Qwen 客户端工具权限");
     var clientsEditor = E.createClients(emit);
     clientsSection.appendChild(clientsEditor.root);
-    var dshMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
+    var agentMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
     var agentsSection = S.section(content, "本机 Agent 引擎连接");
     var agentsCard = S.node("div", "page-card connection-card");
     var agentHeading = S.node("div", "section-heading-row");
@@ -67,6 +67,7 @@
     ));
     var agentConnectors = global.CodexBridgeDesktopAgentConnectors.create(emit);
     agentsCard.appendChild(agentConnectors.root);
+    agentsCard.appendChild(agentMCP.root);
     var agentEditor = E.createAgentRegistration(emit);
     var manual = S.node("details", "agent-manual-registration");
     manual.appendChild(S.node("summary", null, "高级：按路径登记已有安装"));
@@ -110,7 +111,7 @@
           context
         );
         clientsEditor.update(S.safeArray(page.clients), nextEmit);
-        renderAgents(agentConnectors, agentEditor, dshMCP, page, nextEmit);
+        renderAgents(agentConnectors, agentEditor, agentMCP, page, nextEmit);
         scanAgents.disabled = !page.canScanAgents || !!page.isManagingAgents;
         status.textContent = page.statusMessage || "";
         status.hidden = !page.statusMessage;
@@ -215,17 +216,16 @@
     if (stable) stable(actions, signature, renderActions); else renderActions();
   }
 
-  function renderAgents(connectors, editor, dshMCP, page, emit) {
+  function renderAgents(connectors, editor, agentMCP, page, emit) {
     var providers = S.safeArray(page.providers).filter(function (provider) { return provider.providerID !== "codex"; });
     connectors.update(providers, page.installations, {
       canConnect: page.canRegisterAgent,
       busy: page.isManagingAgents === true,
       revision: page.agentOperationRevision,
-      acceptReplacement: true,
-      dshMCP: dshMCP,
-      dshMCPPage: page
+      acceptReplacement: true
     }, emit);
     editor.update(providers, page.canRegisterAgent, emit);
+    agentMCP.update(page, emit);
   }
 
   function addFact(container, title, value) {

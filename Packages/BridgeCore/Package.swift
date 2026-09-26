@@ -48,6 +48,8 @@ let package = Package(
     .library(name: "BridgeOpenCodeACP", targets: ["BridgeOpenCodeACP"]),
     .library(name: "BridgeDeepSeekHarnessACP", targets: ["BridgeDeepSeekHarnessACP"]),
     .library(name: "BridgeAntigravityCLI", targets: ["BridgeAntigravityCLI"]),
+    .library(name: "BridgePiRPC", targets: ["BridgePiRPC"]),
+    .library(name: "BridgeQoderSDK", targets: ["BridgeQoderSDK"]),
     .library(name: "BridgeProcess", targets: ["BridgeProcess"]),
     .library(name: "BridgeServiceApplication", targets: ["BridgeServiceApplication"]),
     .library(name: "BridgeDirectCommand", targets: ["BridgeDirectCommand"]),
@@ -60,7 +62,6 @@ let package = Package(
       name: "codex-bridge-windows-app",
       targets: ["CodexBridgeWindowsApp"]
     ),
-
   ] + macOSOnlyProducts,
   dependencies: [
     // Vendored MCP swift-sdk 0.12.1: upstream excludes the EventSource
@@ -91,7 +92,7 @@ let package = Package(
   targets: [
     .target(
       name: "BridgeDesktopUI",
-      dependencies: ["BridgeServiceAppCore"],
+      dependencies: ["BridgeServiceAppCore", "BridgeAgentCore"],
       resources: [.process("Resources")]
     ),
     .target(name: "BridgeDomain"),
@@ -129,6 +130,7 @@ let package = Package(
     .target(
       name: "BridgeMCP",
       dependencies: [
+        "BridgeAgentCore",
         "BridgeDomain",
         "BridgeFiles",
         "BridgeSkills",
@@ -244,6 +246,16 @@ let package = Package(
     ),
     .target(name: "BridgeProcess"),
     .target(
+      name: "BridgePiRPC",
+      dependencies: ["BridgeAgentCore", "BridgeDomain", "BridgeProcess", "BridgeSecurity"],
+      resources: [.copy("Resources/PiBridgeExtension"), .copy("Resources/PiNativeHistory")]
+    ),
+    .target(
+      name: "BridgeQoderSDK",
+      dependencies: ["BridgeACP", "BridgeAgentCore", "BridgeDomain", "BridgeSecurity"],
+      resources: [.copy("Resources/QoderHost")]
+    ),
+    .target(
       name: "BridgeDirectCommand",
       dependencies: [
         "BridgeAgentCore",
@@ -264,6 +276,8 @@ let package = Package(
       dependencies: [
         "BridgeAgentCore",
         "BridgeAntigravityCLI",
+        "BridgePiRPC",
+        "BridgeQoderSDK",
         "BridgeCodexRPC",
         "BridgeCodexService",
         "BridgeDirectCommand",
@@ -316,6 +330,5 @@ let package = Package(
         )
       ]
     ),
-
   ] + macOSOnlyTargets
 )

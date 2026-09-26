@@ -22,6 +22,8 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
   public let workspaceEnforcement: String
   public let approvalEnforcement: String
   public let networkEnforcement: String
+  public let qoderDistribution: String?
+  public let qoderRegionSettings: [IPCAgentQoderRegionSettings]?
 
   public init(
     providerID: String,
@@ -44,7 +46,9 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     supportsSupervisor: Bool = false,
     workspaceEnforcement: String = "legacy",
     approvalEnforcement: String = "legacy",
-    networkEnforcement: String = "legacy"
+    networkEnforcement: String = "legacy",
+    qoderDistribution: String? = nil,
+    qoderRegionSettings: [IPCAgentQoderRegionSettings]? = nil
   ) {
     self.providerID = providerID
     self.displayName = displayName
@@ -67,6 +71,8 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     self.workspaceEnforcement = workspaceEnforcement
     self.approvalEnforcement = approvalEnforcement
     self.networkEnforcement = networkEnforcement
+    self.qoderDistribution = qoderDistribution
+    self.qoderRegionSettings = qoderRegionSettings
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -91,6 +97,8 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     case workspaceEnforcement = "workspace_enforcement"
     case approvalEnforcement = "approval_enforcement"
     case networkEnforcement = "network_enforcement"
+    case qoderDistribution = "qoder_distribution"
+    case qoderRegionSettings = "qoder_region_settings"
   }
 
   public init(from decoder: Decoder) throws {
@@ -164,8 +172,39 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
       networkEnforcement: try container.decodeIfPresent(
         String.self,
         forKey: .networkEnforcement
-      ) ?? "legacy"
+      ) ?? "legacy",
+      qoderDistribution: try container.decodeIfPresent(String.self, forKey: .qoderDistribution),
+      qoderRegionSettings: try container.decodeIfPresent(
+        [IPCAgentQoderRegionSettings].self,
+        forKey: .qoderRegionSettings
+      )
     )
+  }
+}
+
+public struct IPCAgentQoderRegionSettings: Codable, Equatable, Sendable {
+  public let distribution: String
+  public let activeInstallationID: String?
+  public let nodeExecutablePath: String?
+  public let sdkRoot: String?
+
+  public init(
+    distribution: String,
+    activeInstallationID: String? = nil,
+    nodeExecutablePath: String? = nil,
+    sdkRoot: String? = nil
+  ) {
+    self.distribution = distribution
+    self.activeInstallationID = activeInstallationID
+    self.nodeExecutablePath = nodeExecutablePath
+    self.sdkRoot = sdkRoot
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case distribution
+    case activeInstallationID = "active_installation_id"
+    case nodeExecutablePath = "node_executable_path"
+    case sdkRoot = "sdk_root"
   }
 }
 
@@ -185,6 +224,8 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
   public let lastProbeError: String?
   public let lastProbedAt: String?
   public let updatedAt: String
+  public let distribution: String?
+  public let isActive: Bool?
 
   public init(
     installationID: String,
@@ -201,7 +242,9 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
     effectiveCapabilities: [String],
     lastProbeError: String? = nil,
     lastProbedAt: String? = nil,
-    updatedAt: String
+    updatedAt: String,
+    distribution: String? = nil,
+    isActive: Bool? = nil
   ) {
     self.installationID = installationID
     self.providerID = providerID
@@ -218,6 +261,8 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
     self.lastProbeError = lastProbeError
     self.lastProbedAt = lastProbedAt
     self.updatedAt = updatedAt
+    self.distribution = distribution
+    self.isActive = isActive
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -236,6 +281,8 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
     case lastProbeError = "last_probe_error"
     case lastProbedAt = "last_probed_at"
     case updatedAt = "updated_at"
+    case distribution
+    case isActive = "is_active"
   }
 }
 
@@ -269,17 +316,20 @@ public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
   public let displayName: String
   public let executablePath: String
   public let configurationPath: String?
+  public let qoderDistribution: String?
 
   public init(
     providerID: String,
     displayName: String,
     executablePath: String,
-    configurationPath: String? = nil
+    configurationPath: String? = nil,
+    qoderDistribution: String? = nil
   ) {
     self.providerID = providerID
     self.displayName = displayName
     self.executablePath = executablePath
     self.configurationPath = configurationPath
+    self.qoderDistribution = qoderDistribution
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -287,6 +337,7 @@ public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
     case displayName = "display_name"
     case executablePath = "executable_path"
     case configurationPath = "configuration_path"
+    case qoderDistribution = "qoder_distribution"
   }
 }
 
@@ -295,17 +346,23 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
   public let baseURL: String?
   public let apiKey: String?
   public let alwaysProceedConfirmed: Bool
+  public let qoderDistribution: String?
+  public let installationID: String?
 
   public init(
     providerID: String,
     baseURL: String? = nil,
     apiKey: String? = nil,
-    alwaysProceedConfirmed: Bool = false
+    alwaysProceedConfirmed: Bool = false,
+    qoderDistribution: String? = nil,
+    installationID: String? = nil
   ) {
     self.providerID = providerID
     self.baseURL = baseURL
     self.apiKey = apiKey
     self.alwaysProceedConfirmed = alwaysProceedConfirmed
+    self.qoderDistribution = qoderDistribution
+    self.installationID = installationID
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -313,6 +370,8 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
     case baseURL = "base_url"
     case apiKey = "api_key"
     case alwaysProceedConfirmed = "always_proceed_confirmed"
+    case qoderDistribution = "qoder_distribution"
+    case installationID = "installation_id"
   }
 
   public init(from decoder: Decoder) throws {
@@ -324,7 +383,9 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
       alwaysProceedConfirmed: try container.decodeIfPresent(
         Bool.self,
         forKey: .alwaysProceedConfirmed
-      ) ?? false
+      ) ?? false,
+      qoderDistribution: try container.decodeIfPresent(String.self, forKey: .qoderDistribution),
+      installationID: try container.decodeIfPresent(String.self, forKey: .installationID)
     )
   }
 }
@@ -381,12 +442,15 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
   public let prompt: String
   public let threadID: String?
   public let skillName: String?
+  public let skillNames: [String]?
   public let networkAccess: Bool?
   public let modelOverride: Bool?
   public let permissionModeOverride: Bool?
   public let acceptanceCriteria: [String]?
   public let clientRequestID: String?
   public let queueIfBusy: Bool?
+  public let attachmentPaths: [String]?
+  public let attachmentSourceTaskID: String?
 
   public init(
     projectID: String,
@@ -398,12 +462,15 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     prompt: String,
     threadID: String? = nil,
     skillName: String? = nil,
+    skillNames: [String]? = nil,
     networkAccess: Bool? = nil,
     modelOverride: Bool? = nil,
     permissionModeOverride: Bool? = nil,
     acceptanceCriteria: [String]? = nil,
     clientRequestID: String? = nil,
-    queueIfBusy: Bool? = nil
+    queueIfBusy: Bool? = nil,
+    attachmentPaths: [String]? = nil,
+    attachmentSourceTaskID: String? = nil
   ) {
     self.projectID = projectID
     self.providerID = providerID
@@ -414,12 +481,15 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     self.prompt = prompt
     self.threadID = threadID
     self.skillName = skillName
+    self.skillNames = skillNames
     self.networkAccess = networkAccess
     self.modelOverride = modelOverride
     self.permissionModeOverride = permissionModeOverride
     self.acceptanceCriteria = acceptanceCriteria
     self.clientRequestID = clientRequestID
     self.queueIfBusy = queueIfBusy
+    self.attachmentPaths = attachmentPaths
+    self.attachmentSourceTaskID = attachmentSourceTaskID
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -432,12 +502,15 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     case prompt
     case threadID = "thread_id"
     case skillName = "skill_name"
+    case skillNames = "skill_names"
     case networkAccess = "network_access"
     case modelOverride = "model_override"
     case permissionModeOverride = "permission_mode_override"
     case acceptanceCriteria = "acceptance_criteria"
     case clientRequestID = "client_request_id"
     case queueIfBusy = "queue_if_busy"
+    case attachmentPaths = "attachment_paths"
+    case attachmentSourceTaskID = "attachment_source_task_id"
   }
 }
 
@@ -609,5 +682,31 @@ public struct IPCAgentModelDefaultRequest: Codable, Equatable, Sendable {
     case model
     case permissionMode = "permission_mode"
     case effort
+  }
+}
+
+public struct IPCAgentQoderRuntimeSettingsRequest: Codable, Equatable, Sendable {
+  public let distribution: String
+  public let activeInstallationID: String?
+  public let nodeExecutablePath: String?
+  public let sdkRoot: String?
+
+  public init(
+    distribution: String,
+    activeInstallationID: String?,
+    nodeExecutablePath: String?,
+    sdkRoot: String?
+  ) {
+    self.distribution = distribution
+    self.activeInstallationID = activeInstallationID
+    self.nodeExecutablePath = nodeExecutablePath
+    self.sdkRoot = sdkRoot
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case distribution
+    case activeInstallationID = "active_installation_id"
+    case nodeExecutablePath = "node_executable_path"
+    case sdkRoot = "sdk_root"
   }
 }

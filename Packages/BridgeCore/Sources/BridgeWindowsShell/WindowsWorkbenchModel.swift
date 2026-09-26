@@ -75,6 +75,7 @@
     public var taskItems: [BridgeDesktopTaskRow] = []
     public var selectedTaskDetail: BridgeDesktopTaskDetail?
     public var history: BridgeDesktopThreadHistoryState = .init()
+    public var nativeSessions: BridgeDesktopNativeSessionDirectoryState? = nil
     public var approvalItems: [BridgeDesktopApprovalRow] = []
     public var browserEnabled: Bool = true
     public var supportsImmediateSteer: Bool = false
@@ -184,6 +185,8 @@
     var isChatBrowserEnabled = true
     var selectedTaskID: String?
     var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+    var nativeSessionDirectory: BridgeDesktopNativeSessionDirectoryState?
+    var nativeSessionDirectoryGeneration: UInt64 = 0
     var conversation: TaskConversationModel?
     var conversationPresentationCache = TaskConversationPresentationCache()
     var windowsConversationPresentationCache = WindowsConversationPresentationCache()

@@ -29,6 +29,7 @@ extension BridgeDesktopUIStateBuilder {
       selectedTaskID: model.selectedTaskID,
       selectedTask: selectedTask(from: model),
       history: threadHistory(from: model),
+      nativeSessions: nativeSessions(from: model),
       approvals: approvals(from: model),
       steerModes: steerModes(from: model),
       browser: browserSlot(from: model),
@@ -41,6 +42,29 @@ extension BridgeDesktopUIStateBuilder {
       modelError: model.modelCatalogError,
       commandReceipt: model.workbenchCommandReceipt
     )
+  }
+
+  private static func nativeSessions(
+    from model: BridgeServiceAppModel
+  ) -> BridgeDesktopNativeSessionDirectoryState {
+    let installations = model.agentInstallations.compactMap {
+      item -> BridgeDesktopNativeSessionInstallation? in
+      guard item.providerID == "pi" || item.providerID == "qoder", item.isEnabled,
+        item.availability == "available"
+      else { return nil }
+      return BridgeDesktopNativeSessionInstallation(
+        installationID: item.installationID, providerID: item.providerID,
+        displayName: item.displayName, region: item.distribution)
+    }
+    let prior = model.nativeSessionDirectory
+    return BridgeDesktopNativeSessionDirectoryState(
+      installations: installations, projectID: prior?.projectID,
+      installationID: prior?.installationID, selectedSessionID: prior?.selectedSessionID,
+      sessions: prior?.sessions ?? [], transcript: prior?.transcript ?? [],
+      nextOffset: prior?.nextOffset, transcriptNextOffset: prior?.transcriptNextOffset,
+      isOpen: prior?.isOpen ?? false,
+      isLoading: prior?.isLoading ?? false, statusMessage: prior?.statusMessage,
+      errorMessage: prior?.errorMessage)
   }
 
   private static func projectStatus(
@@ -234,8 +258,11 @@ extension BridgeDesktopUIStateBuilder {
       id: question.id,
       header: question.header,
       question: question.question,
+      inputType: question.inputType,
       isOther: question.isOther,
       isSecret: question.isSecret,
+      allowsMultiple: question.allowsMultiple,
+      isRequired: question.isRequired,
       options: question.options.map {
         BridgeDesktopApprovalOption(label: $0.label, description: $0.description)
       }

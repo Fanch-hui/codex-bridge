@@ -14,23 +14,32 @@ public struct BridgeDesktopApprovalQuestion: Codable, Equatable, Sendable {
   public let id: String
   public let header: String
   public let question: String
+  public let inputType: String?
   public let isOther: Bool
   public let isSecret: Bool
+  public let allowsMultiple: Bool?
+  public let isRequired: Bool?
   public let options: [BridgeDesktopApprovalOption]
 
   public init(
     id: String,
     header: String,
     question: String,
+    inputType: String? = nil,
     isOther: Bool,
     isSecret: Bool,
+    allowsMultiple: Bool? = nil,
+    isRequired: Bool? = nil,
     options: [BridgeDesktopApprovalOption]
   ) {
     self.id = id
     self.header = header
     self.question = question
+    self.inputType = inputType
     self.isOther = isOther
     self.isSecret = isSecret
+    self.allowsMultiple = allowsMultiple
+    self.isRequired = isRequired
     self.options = options
   }
 }

@@ -104,14 +104,16 @@
     root.appendChild(actions);
     var draft = null;
     var draftID = null;
+    var draftsByScope = new Map();
     var editingID = null;
+    var editingScope = "deepseek-harness";
     var editingEnabled = true;
     var canManage = false;
     var context = { emit: emit };
+    var visibilityChange = function () {};
 
-    function bindDraft(id) {
-      if (draftID === id) return;
-      draftID = id;
+    function bindDraft() {
+      if (draft) return;
       draft = D.bind({
         name: name.control,
         transport: transport.control,
@@ -144,6 +146,11 @@
       save.disabled = !canManage || !validName || !validTransport;
     }
 
+    function saveDraft() {
+      if (!draft || !draftID) return;
+      draftsByScope.set(draftID, { id: editingID, values: draft.values() });
+    }
+
     function absoluteCommand(value) {
       return value.charAt(0) === "/" || /^[A-Za-z]:[\\/]/.test(value)
         || value.indexOf("\\\\") === 0;
@@ -157,8 +164,10 @@
     save.addEventListener("click", function () {
       if (save.disabled) return;
       var values = draft.values();
+      saveDraft();
       context.emit("saveDeepSeekHarnessMCPServer", {
         mcpServerID: editingID,
+        mcpServerScope: editingScope,
         name: values.name.trim(),
         mcpTransport: values.transport,
         mcpCommand: values.transport === "stdio" ? values.command.trim() : null,
@@ -174,9 +183,11 @@
       headers.clearValues();
     });
     cancel.addEventListener("click", function () {
+      saveDraft();
       environment.clearValues();
       headers.clearValues();
       root.hidden = true;
+      visibilityChange(false);
     });
 
     return {
@@ -185,22 +196,39 @@
         canManage = !!value;
         validate();
       },
-      begin: function (server, nextEmit) {
+      setVisibilityChange: function (handler) {
+        visibilityChange = handler;
+      },
+      isOpen: function () { return !root.hidden; },
+      begin: function (server, nextEmit, scope) {
         context.emit = nextEmit;
-        editingID = server ? server.id : "new-" + Date.now().toString(36) + "-" + (++newID);
-        editingEnabled = server ? server.enabled !== false : true;
-        bindDraft(editingID);
         var source = server || {};
-        draft.update({
+        var nextScope = scope || "deepseek-harness";
+        var nextDraftID = nextScope + "\u001f" + (server ? "server:" + server.id : "new");
+        var previousDraftID = draftID;
+        saveDraft();
+        bindDraft();
+        var savedDraft = draftsByScope.get(nextDraftID);
+        editingID = savedDraft ? savedDraft.id : server
+          ? server.id : "new-" + Date.now().toString(36) + "-" + (++newID);
+        editingScope = nextScope;
+        editingEnabled = server ? server.enabled !== false : true;
+        draftID = nextDraftID;
+        var values = {
           name: source.name || "",
           transport: source.transport || "stdio",
           command: source.command || "",
           url: source.url || "",
           args: S.safeArray(source.arguments).join("\n")
-        });
+        };
+        if (savedDraft && nextDraftID === previousDraftID) draft.update(values);
+        else if (savedDraft) draft.reset(savedDraft.values);
+        else draft.reset(values);
+        draftsByScope.set(draftID, { id: editingID, values: draft.values() });
         environment.reset(source.environment || []);
         headers.reset(source.headers || []);
         root.hidden = false;
+        visibilityChange(true);
         updateTransport();
         validate();
         name.control.focus();

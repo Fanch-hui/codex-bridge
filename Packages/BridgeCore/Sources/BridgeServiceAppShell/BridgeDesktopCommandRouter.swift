@@ -38,6 +38,10 @@ enum BridgeDesktopCommandRouter {
       model.setCodexExecutablePath(path.trimmingCharacters(in: .whitespacesAndNewlines))
     case .scanAgents:
       model.scanAgents()
+    case .manageNativeAgentSession:
+      handleNativeSessionDirectory(envelope.payload, model: model)
+    case .continueNativeAgentSession:
+      handleNativeSessionContinuation(envelope, model: model)
     case .selectPage:
       guard let navigation = envelope.payload.navigation else { return }
       select(navigation, model: model)
@@ -77,9 +81,9 @@ enum BridgeDesktopCommandRouter {
       .copyLocalMCPEndpoint,
       .rotateMCPClientCredential, .rotateLocalMCPEndpoint,
       .saveDeepSeekHarnessMCPServer, .deleteDeepSeekHarnessMCPServer,
-      .setDeepSeekHarnessMCPServerEnabled, .configureTunnel,
+      .setDeepSeekHarnessMCPServerEnabled, .setAgentMCPScope, .configureTunnel,
       .connectTunnel, .disconnectTunnel, .clearTunnel, .connectAgent, .registerAgent,
-      .beginAgentRegistration,
+      .beginAgentRegistration, .saveQoderRuntimeSettings,
       .selectAgent,
       .setAgentEnabled, .reprobeAgent, .removeAgent, .refreshAgentModels:
       handleConnections(envelope, model: model)

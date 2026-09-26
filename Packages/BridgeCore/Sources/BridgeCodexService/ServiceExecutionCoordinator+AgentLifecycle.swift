@@ -50,7 +50,9 @@ extension ServiceExecutionCoordinator {
         || task.executionEffort == serviceDefaultProviderExecutionEffort
         ? nil : task.executionEffort,
       permissionMode: task.permissionMode,
-      networkAllowed: task.networkAllowed
+      networkAllowed: task.networkAllowed,
+      attachments: try await tasks.taskAttachments(taskID: task.id),
+      selectedSkills: task.selectedSkills
     )
     let workspaceChangeTracker = ServiceWorkspaceChangeTracker(
       projectRoot: project.root.canonicalPath
@@ -96,7 +98,8 @@ extension ServiceExecutionCoordinator {
         steer: handle.steer,
         interruptAndSteer: handle.interruptAndSteer,
         shutdown: handle.shutdown,
-        resolveApproval: handle.resolveApproval
+        resolveApproval: handle.resolveApproval,
+        resolveUserInput: handle.resolveUserInput
       )
       if let workspaceChangeTracker {
         workspaceChangeTrackers[task.id] = workspaceChangeTracker
@@ -140,11 +143,15 @@ extension ServiceExecutionCoordinator {
     do {
       try validateAgentEnvelope(envelope, taskID: taskID)
       switch envelope.event {
-      case .content, .steerDispatched, .tool, .plan, .usage, .approvalAutomaticallyDenied:
+      case .content, .steerDispatched, .tool, .plan, .usage, .usageStatistics,
+        .approvalAutomaticallyDenied:
         try await agentEventProcessor.process(envelope.event, taskID: taskID)
 
       case .approvalRequested(let approval):
         _ = try await registerAgentApproval(approval, taskID: taskID)
+
+      case .userInputRequested(let request):
+        _ = try await registerAgentUserInput(request, taskID: taskID)
 
       case .completed(let summary, let stopReason):
         try await finishAgentRun(taskID: taskID) {
@@ -185,6 +192,7 @@ extension ServiceExecutionCoordinator {
       finishedRuns.insert(taskID)
       workspaceChangeTrackers.removeValue(forKey: taskID)
       pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
+      clearAgentUserInputs(taskID: taskID)
       if let run = activeAgentRuns.removeValue(forKey: taskID) {
         await run.shutdown()
       }
@@ -204,6 +212,7 @@ extension ServiceExecutionCoordinator {
     guard !finishedRuns.contains(taskID) else { return }
     finishedRuns.insert(taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
+    clearAgentUserInputs(taskID: taskID)
     let run = activeAgentRuns.removeValue(forKey: taskID)
     do {
       _ = try await transition()
@@ -217,6 +226,7 @@ extension ServiceExecutionCoordinator {
   private func agentStreamFinished(_ taskID: TaskID, failure: (any Error)?) async {
     collectors.removeValue(forKey: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
+    clearAgentUserInputs(taskID: taskID)
     guard finishedRuns.remove(taskID) == nil else { return }
     if let run = activeAgentRuns.removeValue(forKey: taskID) {
       await run.shutdown()
