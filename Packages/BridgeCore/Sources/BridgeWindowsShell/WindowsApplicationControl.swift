@@ -5,11 +5,29 @@
   enum WindowsApplicationIdentity {
     static let mainWindowClassName = "CodexBridgeMainWindow"
     static let explicitCloseRequest = WPARAM(1)
+    static let restoreRequest = UINT(WM_APP + 42)
   }
 
   public enum WindowsApplicationControl {
     public static func ensureServiceRunning() -> Bool {
       WindowsServiceLauncher.ensureServiceRunning()
+    }
+
+    /// Returns false when another copy already owns the session; that copy is restored.
+    public static func claimInstanceOrActivateExisting() -> Bool {
+      let mutexName = "Local\\CodexBridge.WindowsApp.SingleInstance"
+      SetLastError(0)
+      let created = mutexName.withCString(encodedAs: UTF16.self) {
+        CreateMutexW(nil, true, $0)
+      }
+      guard let created else { return true }
+      if GetLastError() == DWORD(ERROR_ALREADY_EXISTS) {
+        _ = CloseHandle(created)
+        activateExistingMainWindow()
+        return false
+      }
+      instanceMutex = created
+      return true
     }
 
     public static func shutdownRunningApplication() -> Bool {
@@ -55,6 +73,24 @@
           previous = window
         }
         return nil
+      }
+    }
+
+    nonisolated(unsafe) private static var instanceMutex: HANDLE?
+
+    private static func activateExistingMainWindow() {
+      guard let expectedPath = currentExecutablePath() else { return }
+      for _ in 0..<30 {
+        if let window = findMainWindow(for: expectedPath) {
+          var processID: DWORD = 0
+          _ = GetWindowThreadProcessId(window, &processID)
+          if processID > 0 {
+            _ = AllowSetForegroundWindow(processID)
+          }
+          _ = PostMessageW(window, WindowsApplicationIdentity.restoreRequest, 0, 0)
+          return
+        }
+        Sleep(100)
       }
     }
 

@@ -30,8 +30,9 @@
 
     static func handleTrayMessage(_ lParam: LPARAM, window: HWND?) -> Bool {
       switch lParam {
-      case LPARAM(WM_LBUTTONDBLCLK):
-        activate(window)
+      case LPARAM(WM_LBUTTONUP), LPARAM(WM_LBUTTONDBLCLK), LPARAM(WM_USER),
+        LPARAM(WM_USER + 1):
+        restore(window)
         return true
       case LPARAM(WM_RBUTTONUP), LPARAM(WM_CONTEXTMENU):
         showContextMenu(for: window)
@@ -127,6 +128,10 @@
       title.withCString(encodedAs: UTF16.self) { titlePointer in
         _ = AppendMenuW(menu, UINT(MF_STRING), UINT_PTR(id), titlePointer)
       }
+    }
+
+    static func restore(_ window: HWND?) {
+      activate(window)
     }
 
     private static func activate(_ window: HWND?) {
