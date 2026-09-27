@@ -318,7 +318,9 @@
           providerID: "deepseek-harness",
           baseURL: "https://api.example.test",
           apiKey: "secret",
-          alwaysProceedConfirmed: false
+          alwaysProceedConfirmed: false,
+          qoderDistribution: nil,
+          installationID: nil
         )
       )
 
