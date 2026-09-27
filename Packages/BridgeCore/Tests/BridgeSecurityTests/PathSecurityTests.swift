@@ -346,7 +346,11 @@ final class PathSecurityTests: XCTestCase {
 
     let resolved = try resolver.resolve(SecureRelativePath("Sources/App.swift"))
 
-    XCTAssertEqual(resolved.canonicalURL.path, file.path)
+    XCTAssertEqual(
+      resolved.canonicalURL.path,
+      file.standardizedFileURL.resolvingSymlinksInPath().path
+    )
+    XCTAssertEqual(resolved.identity, try RegisteredRoot.readIdentity(atPath: file.path))
   }
 
   func testBlocksSymlinkEscapeAndSensitiveAlias() throws {
