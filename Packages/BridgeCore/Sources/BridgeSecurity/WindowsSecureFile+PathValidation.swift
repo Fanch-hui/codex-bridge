@@ -5,7 +5,7 @@
   extension WindowsSecureFile {
     /// Rejects reparse points on every intermediate component, mirroring the
     /// POSIX O_NOFOLLOW traversal guarantee.
-    static func validateComponents(
+    package static func validateComponents(
       rootPath: String,
       components: [String],
       includingFinal: Bool

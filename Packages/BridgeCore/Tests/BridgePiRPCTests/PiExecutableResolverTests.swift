@@ -28,7 +28,8 @@ struct PiExecutableResolverTests {
     #expect(result.executableArgv == [nodePath, executable.canonicalPath])
     #expect(result.artifacts.map(\.role) == [.runtimeManifest, .dependencyLock])
     #expect(
-      result.artifacts.last?.canonicalPath == package.appendingPathComponent("package.json").path)
+      result.artifacts.last?.canonicalPath
+        == resolvedPath(package.appendingPathComponent("package.json")))
   }
 
   @Test func resolvesPNPMGlobalVersionPackageFromItsShimDirectory() throws {
@@ -56,8 +57,13 @@ struct PiExecutableResolverTests {
       modificationTimeNanoseconds: 0, sha256: String(repeating: "a", count: 64))
     let result = try PiExecutableResolver.resolve(executable: executable, node: node)
 
-    #expect(result.executableArgv == [nodePath, entry.path])
+    #expect(result.executableArgv == [nodePath, resolvedPath(entry)])
     #expect(
-      result.artifacts.last?.canonicalPath == package.appendingPathComponent("package.json").path)
+      result.artifacts.last?.canonicalPath
+        == resolvedPath(package.appendingPathComponent("package.json")))
+  }
+
+  private func resolvedPath(_ url: URL) -> String {
+    url.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL.path
   }
 }
