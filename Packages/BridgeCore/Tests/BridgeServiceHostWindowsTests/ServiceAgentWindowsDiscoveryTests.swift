@@ -35,7 +35,7 @@
 
       XCTAssertEqual(
         requests.map(\.executablePath),
-        [try XCTUnwrap(AgentPathSemantics.canonicalPath(launcher.standardizedFileURL.path))])
+        [try canonicalExecutablePath(of: launcher)])
     }
 
     func testPackageManagerHomeFindsAntigravityLauncherWithoutPATH() throws {
@@ -63,7 +63,7 @@
 
       XCTAssertEqual(
         requests.map(\.executablePath),
-        [try XCTUnwrap(AgentPathSemantics.canonicalPath(launcher.standardizedFileURL.path))])
+        [try canonicalExecutablePath(of: launcher)])
     }
 
     func testExplicitPathSkipsInstallationSearch() throws {
@@ -101,7 +101,7 @@
 
       XCTAssertEqual(
         requests.map(\.executablePath),
-        [try XCTUnwrap(AgentPathSemantics.canonicalPath(explicitLauncher.standardizedFileURL.path))]
+        [try canonicalExecutablePath(of: explicitLauncher)]
       )
     }
 
@@ -123,6 +123,11 @@
         path: "bridge-agent-windows-discovery-\(UUID().uuidString)",
         directoryHint: .isDirectory
       )
+    }
+
+    private func canonicalExecutablePath(of url: URL) throws -> String {
+      let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+      return try XCTUnwrap(AgentPathSemantics.canonicalPath(path))
     }
   }
 #endif
