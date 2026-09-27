@@ -24,6 +24,8 @@ Select the China region on the Qoder connection card, scan local installations, 
 
 Changing regions affects defaults for new tasks. Continuing an existing session uses its original region and installation binding.
 
+In **Settings → Agent Models and Permissions → Qoder Execution Permissions**, choose **Request approval**, **Approve for me**, or **Allow full access** for the selected region. Qoder decides whether to allow each operation in the second mode; the third skips Qoder's per-operation permission prompts. Bridge project read/write and network restrictions still apply. The latter two modes require the project directory to be trusted by Qoder. Permission settings are stored separately for each region.
+
 ## Installation discovery and runtime paths
 
 Bridge scans and saves installations on first initialization. An upgrade that adds an agent fills in missing catalog entries. After installing or moving an agent, click **Scan Agents**. Discovery covers PATH, user installation locations, and common Node package manager directories.

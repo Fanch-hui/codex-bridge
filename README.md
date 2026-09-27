@@ -4,20 +4,20 @@
 
 [Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/latest)
 
-Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness 与 Antigravity 的任务、审批和会话。
+Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
 
 macOS 与 Windows 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 `v1.2.0`。
+当前版本为 `v1.3.0`。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v1.2.0 安装包 | 安装方式 |
+| 平台 | v1.3.0 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-1.2.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.2.0-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-1.3.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.3.0-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64，便携运行 | `codex-bridge-windows-x64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
@@ -86,11 +86,13 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 | 模块 | 功能 |
 | --- | --- |
-| Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断 |
+| Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断；macOS 同时识别新版与旧版 App 内置 CLI 路径 |
 | OpenCode | ACP 连接、模型与推理选项、权限回传、会话继续 |
 | DeepSeek Harness | ACP 入口与能力探测、真实模型目录、搜索配置、MCP 服务配置与会话持久化 |
 | Antigravity | CLI 接入、原生权限策略、执行过程与会话继续 |
-| 工作台 | 按 Agent 分组的项目会话、历史分页、工具卡片、任务控制和审批 |
+| Pi | 原生 CLI 与会话接入、模型目录、MCP、Skills 与任务续写 |
+| Qoder | CN/国际版原生 CLI 与 SDK 接入、地区隔离、权限模式、工具审批与会话续写 |
+| 工作台 | 按 Agent 分组的项目会话、历史分页、工具卡片、审批、失败任务重试与跨 Agent 交接 |
 | Direct Workspace | 受控文件读写、Patch、命令执行与 Git 操作 |
 | Skills | 本机技能发现、只读查看与显式 Action 调用 |
 
@@ -116,7 +118,7 @@ ChatGPT Web ── Secure MCP Tunnel ─┐
 Qwen Studio ── localhost MCP ────┼─► Codex Bridge Service
 Desktop App ── local IPC ────────┘   ├─ 项目权限与审批
                                     ├─ 任务、会话与 SQLite
-                                    ├─ Codex / OpenCode / DSH / AGY
+                                    ├─ Codex / OpenCode / DSH / AGY / Pi / Qoder
                                     └─ Direct Workspace / Skills
 ```
 
