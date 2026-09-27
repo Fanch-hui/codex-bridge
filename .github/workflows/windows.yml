@@ -23,6 +23,8 @@ jobs:
   build:
     name: build (${{ matrix.architecture }})
     runs-on: windows-latest
+    env:
+      SWIFT_VERSION: 6.3.3
     strategy:
       fail-fast: false
       matrix:
@@ -46,54 +48,15 @@ jobs:
           Add-MpPreference -ExclusionProcess "swift.exe"
           Add-MpPreference -ExclusionProcess "clang.exe"
           Add-MpPreference -ExclusionProcess "lld-link.exe"
-      - name: Install Swift 6.3.3 toolchain
+      - name: Restore Swift installer cache
+        id: swift-installer-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/swift-downloads
+          key: windows-swift-installer-v1-${{ env.SWIFT_VERSION }}-${{ runner.arch }}
+      - name: Install Swift toolchain
         shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://download.swift.org/swift-6.3.3-release/windows10/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE-windows10.exe" -OutFile swift-installer.exe
-          $proc = Start-Process -Wait -PassThru -FilePath .\swift-installer.exe `
-            -ArgumentList "/quiet", "/norestart", "InstallPerMachine=1"
-          Remove-Item .\swift-installer.exe
-          if ($proc.ExitCode -notin @(0, 3010)) { throw "Swift installer failed: $($proc.ExitCode)" }
-          $roots = @(
-            "$env:ProgramFiles\Swift",
-            "$env:LOCALAPPDATA\Programs\Swift",
-            "C:\Library\Developer\Toolchains"
-          )
-          $candidates = Get-ChildItem $roots -Recurse -Filter swift.exe `
-            -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-          # Prefer the standard toolchain over the +Asserts variant.
-          $swiftExe = ($candidates | Where-Object { $_ -notmatch '\+Asserts' } |
-            Select-Object -First 1)
-          if (-not $swiftExe) { $swiftExe = $candidates | Select-Object -First 1 }
-          if (-not $swiftExe) { throw "swift.exe not found after install" }
-          Write-Host "found swift at $swiftExe"
-          $swiftBin = Split-Path $swiftExe
-          Add-Content $env:GITHUB_PATH $swiftBin
-          $toolchainVersionDirectory = (Get-Item $swiftBin).Parent.Parent
-          if (-not $toolchainVersionDirectory -or
-              -not $toolchainVersionDirectory.Parent.Name.Equals("Toolchains", [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Swift toolchain version directory was not found."
-          }
-          $swiftRoot = $toolchainVersionDirectory.Parent.Parent.FullName
-          $sdkVersion = $toolchainVersionDirectory.Name -replace "\+.*$", ""
-          if ($sdkVersion -ne "6.3.3") { throw "Expected Swift 6.3.3, found $sdkVersion" }
-          # The host runtime is separate from the toolchain and must be on PATH.
-          $runtimeBin = Join-Path $swiftRoot "Runtimes\$sdkVersion\usr\bin"
-          if (-not (Test-Path (Join-Path $runtimeBin "swiftCore.dll"))) {
-            throw "Version-matching swiftCore.dll was not found after install."
-          }
-          Write-Host "found runtime at $runtimeBin"
-          Add-Content $env:GITHUB_PATH $runtimeBin
-          # The installer ships a version-matched Windows SDK separately from
-          # the toolchain. Installer environment changes do not reach an
-          # already-running job, so forward the exact SDK explicitly.
-          $platformDir = Join-Path $swiftRoot "Platforms\$sdkVersion\Windows.platform"
-          $sdkRoot = Join-Path $platformDir "Developer\SDKs\Windows.sdk"
-          if (-not (Test-Path -LiteralPath $sdkRoot -PathType Container)) {
-            throw "Version-matching Swift Windows SDK was not found."
-          }
-          Write-Host "SDKROOT=$sdkRoot"
-          Add-Content $env:GITHUB_ENV "SDKROOT=$sdkRoot"
+        run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-swift.ps1" -Version $env:SWIFT_VERSION'
       - name: Validate Swift portable runtime
         shell: pwsh
         run: |
@@ -116,6 +79,29 @@ jobs:
               Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
             }
           }
+      - name: Save Swift installer cache
+        if: steps.swift-installer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/swift-downloads
+          key: ${{ steps.swift-installer-cache.outputs.cache-primary-key }}
+      - name: Identify vcpkg cache
+        id: vcpkg-cache-key
+        shell: pwsh
+        run: |
+          $revision = & git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content $env:GITHUB_OUTPUT "revision=$revision"
+          Add-Content $env:GITHUB_OUTPUT "image=$env:ImageVersion"
+          $cachePath = Join-Path $env:GITHUB_WORKSPACE ".build\ci-cache\vcpkg"
+          New-Item -ItemType Directory -Path $cachePath -Force | Out-Null
+          Add-Content $env:GITHUB_ENV "VCPKG_BINARY_SOURCES=clear;files,$cachePath,readwrite"
+      - name: Restore vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .build/ci-cache/vcpkg
+          key: windows-vcpkg-v1-${{ matrix.triplet }}-${{ steps.vcpkg-cache-key.outputs.image }}-${{ steps.vcpkg-cache-key.outputs.revision }}
       - name: Install SQLite via vcpkg (for GRDB)
         shell: pwsh
         run: |
@@ -179,6 +165,12 @@ jobs:
             }
             Add-Content $env:GITHUB_PATH $vcpkgBin
           }
+      - name: Save vcpkg binary cache
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .build/ci-cache/vcpkg
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
       - name: Compile Windows application resources
         shell: pwsh
         run: |
@@ -186,6 +178,24 @@ jobs:
           & "$env:GITHUB_WORKSPACE\Scripts\compile-windows-resources.ps1" -OutputPath $resourceOutput
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Add-Content $env:GITHUB_ENV "CODEX_BRIDGE_WINDOWS_RESOURCE=$resourceOutput"
+      - name: Restore SwiftPM dependency repositories
+        id: swift-dependencies-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: Packages/BridgeCore/.build/repositories
+          key: windows-swift-repositories-v1-${{ hashFiles('Packages/BridgeCore/Package.resolved', 'Vendor/swift-sdk/Package.resolved') }}
+          restore-keys: windows-swift-repositories-v1-
+      - name: Resolve SwiftPM dependencies
+        shell: pwsh
+        run: |
+          swift package --package-path Packages/BridgeCore resolve
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Save SwiftPM dependency repositories
+        if: steps.swift-dependencies-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: Packages/BridgeCore/.build/repositories
+          key: ${{ steps.swift-dependencies-cache.outputs.cache-primary-key }}
       - name: Build service and Windows shell
         working-directory: Packages/BridgeCore
         shell: pwsh
@@ -276,6 +286,13 @@ jobs:
           '@ | Set-Content -LiteralPath .build/agent-contract/verify.mjs -Encoding utf8
           node .build/agent-contract/verify.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Restore Tunnel helper cache
+        if: matrix.publish
+        id: tunnel-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .build/tunnel-client/${{ matrix.architecture }}
+          key: windows-tunnel-v1-${{ matrix.architecture }}-${{ hashFiles('Scripts/stage-windows-tunnel-client.ps1') }}
       - name: Stage Windows tunnel client
         if: matrix.publish
         shell: pwsh
@@ -285,6 +302,12 @@ jobs:
             -Architecture "${{ matrix.architecture }}" `
             -Destination $tunnelClientDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Save Tunnel helper cache
+        if: matrix.publish && steps.tunnel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .build/tunnel-client/${{ matrix.architecture }}
+          key: ${{ steps.tunnel-cache.outputs.cache-primary-key }}
       - name: Stage Windows portable package
         if: matrix.publish
         shell: pwsh
