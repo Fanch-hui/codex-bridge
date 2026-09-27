@@ -4,20 +4,20 @@
 
 [Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/latest)
 
-Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, and Antigravity.
+Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, Antigravity, Pi, and Qoder.
 
 macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.2.0`.
+The current release is `v1.3.0`.
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest).
 
-| Platform | v1.2.0 package | Installation |
+| Platform | v1.3.0 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.2.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.2.0-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-1.3.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.3.0-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
@@ -84,11 +84,13 @@ Credentials are managed through the operating system credential store. Remove cr
 
 ## Capabilities
 
-- **Codex:** Thread/Turn, streaming output, approvals, structured questions, steer, and interrupt.
+- **Codex:** Thread/Turn, streaming output, approvals, structured questions, steer, and interrupt; macOS recognizes both current and legacy bundled CLI layouts.
 - **OpenCode:** ACP, model and reasoning options, permissions, and conversation continuation.
 - **DeepSeek Harness:** ACP capability probing, live model catalogs, search configuration, MCP servers, and persistent sessions.
 - **Antigravity:** CLI integration, native permission policies, execution progress, and conversation continuation.
-- **Workbench:** project sessions grouped by agent, history paging, tool cards, task controls, and approvals.
+- **Pi:** native CLI and sessions, model catalog, MCP, Skills, and task continuation.
+- **Qoder:** native CN/international CLI and SDK integration, region isolation, permission modes, tool approvals, and session continuation.
+- **Workbench:** project sessions grouped by agent, history paging, tool cards, approvals, failed-task retries, and cross-agent handoff.
 - **Direct Workspace:** controlled file access, patches, command execution, and Git operations.
 - **Skills:** local discovery, read-only inspection, and explicit actions.
 
@@ -114,7 +116,7 @@ ChatGPT Web ── Secure MCP Tunnel ─┐
 Qwen Studio ── localhost MCP ────┼─► Codex Bridge Service
 Desktop App ── local IPC ────────┘   ├─ Project policy and approvals
                                     ├─ Tasks, conversations, SQLite
-                                    ├─ Codex / OpenCode / DSH / AGY
+                                    ├─ Codex / OpenCode / DSH / AGY / Pi / Qoder
                                     └─ Direct Workspace / Skills
 ```
 
