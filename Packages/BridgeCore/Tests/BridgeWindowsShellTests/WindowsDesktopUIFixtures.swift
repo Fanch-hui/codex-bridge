@@ -46,7 +46,8 @@
   func makeManagement(
     availableAgentCount: Int = 0,
     installationCount: Int = 0,
-    installationItems: [BridgeDesktopAgentInstallationRow] = []
+    installationItems: [BridgeDesktopAgentInstallationRow] = [],
+    projectItems: [BridgeDesktopProjectRow] = []
   ) -> WindowsManagementDisplay {
     WindowsManagementDisplay(
       connectionState: .connected,
@@ -59,7 +60,8 @@
         registerEnabled: false,
         removeEnabled: false,
         savePolicyEnabled: false,
-        statusText: ""
+        statusText: "",
+        projectItems: projectItems
       ),
       agent: WindowsAgentManagementDisplay(
         providerRows: [],

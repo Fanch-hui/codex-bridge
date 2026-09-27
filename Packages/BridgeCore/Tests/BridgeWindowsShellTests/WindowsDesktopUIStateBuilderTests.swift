@@ -141,14 +141,28 @@
 
     func testWorkbenchShowsProjectQueryFailureWithoutReplacingProjectContext() {
       var workbench = makeWorkbench(projectRows: ["Bridge"])
+      workbench.selectedProjectID = "project-bridge"
       workbench.projectLoadError = "项目查询失败：后台忙"
+      let management = makeManagement(
+        projectItems: [
+          BridgeDesktopProjectRow(
+            projectID: "project-bridge",
+            name: "Bridge",
+            readPermission: "allowed",
+            writePermission: "denied",
+            networkPermission: "denied",
+            selected: true
+          )
+        ]
+      )
 
       let state = WindowsDesktopUIStateBuilder.build(
         workbench: workbench,
-        management: makeManagement()
+        management: management
       )
 
       XCTAssertEqual(state.workbench?.projects.map(\.title), ["Bridge"])
+      XCTAssertEqual(state.workbench?.selectedProjectID, "project-bridge")
       XCTAssertEqual(state.workbench?.projectStatus, "项目查询失败")
       XCTAssertEqual(state.workbench?.projectStatusTone, "error")
     }
