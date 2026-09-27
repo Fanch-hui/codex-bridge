@@ -4,7 +4,7 @@ export { validateConfiguration } from './configuration.mjs';
 import { createPolicy } from './policy.mjs';
 import { MessageProjection, stopChildren } from './events.mjs';
 import { catalog, modelPolicy, validateSelection } from './models.mjs';
-import { loadSDK, authentication, validateSDKQuery } from './sdk.mjs';
+import { loadSDK, authentication, validateSDKQuery, sdkPermissionMode } from './sdk.mjs';
 import { SDKProcessOwner } from './process.mjs';
 import { queryAccountScope } from './account-scope.mjs';
 import { stageSelectedSkills } from './skill-resources.mjs';
@@ -93,7 +93,7 @@ export class QoderSession {
       ...(this.skillStage ? { additionalDirectories: this.skillStage.additionalDirectories } : {}),
       extraArgs: { 'replay-user-messages': null }, settingSources: ['user'],
       settings: {}, tools: this.policy.tools, skills: config.skills, mcpServers: config.mcpServers,
-      strictMcpConfig: true, permissionMode: 'default', maxTurns: 100,
+      strictMcpConfig: true, permissionMode: sdkPermissionMode(config.permissionMode), maxTurns: 100,
       ...(config.proxy ? { proxy: config.proxy } : {}),
       hooks: { PreToolUse: [{ hooks: [async (input, id, options) => {
         if (input.tool_input?.run_in_background && !this.nativeCapabilities.has('background_tasks_v1')) {
@@ -139,7 +139,7 @@ export class QoderSession {
           this.nativeSkills = Array.isArray(message.skills) ? message.skills.filter(skill => typeof skill === 'string') : [];
           this.mcpServers = Array.isArray(message.mcp_servers) ? message.mcp_servers.filter(server =>
             server && typeof server.name === 'string' && typeof server.status === 'string') : [];
-          this.resolveNativeInitialization(); this.resolveNativeInitialization = null;
+          this.resolveNativeInitialization?.(); this.resolveNativeInitialization = null;
         }
         await this.projection.message(message);
         if (message.type === 'result') await this.result(message);

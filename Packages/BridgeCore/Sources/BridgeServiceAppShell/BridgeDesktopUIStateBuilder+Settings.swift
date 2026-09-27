@@ -171,7 +171,11 @@ extension BridgeDesktopUIStateBuilder {
     let installation =
       model.focusedAgentNativePermissionInstallationID.flatMap { focused in
         installations.first(where: { $0.installationID == focused })
-      } ?? installations[0]
+      } ?? installations.first(where: { $0.providerID == "qoder" && $0.isActive == true })
+      ?? installations.first(where: { $0.providerID == "qoder" }) ?? installations[0]
+    let permissionInstallations =
+      installation.providerID == "qoder"
+      ? installations.filter { $0.providerID == "qoder" } : installations
     let snapshot = model.nativePermissionPolicy(installationID: installation.installationID)
     let isLoading = model.isLoadingNativePermissionPolicy(installation.installationID)
     let isSaving = model.isSavingNativePermissionPolicy(installation.installationID)
@@ -181,7 +185,7 @@ extension BridgeDesktopUIStateBuilder {
         .displayName ?? installation.providerID,
       installationID: installation.installationID,
       installationName: installation.displayName,
-      installations: installations.map {
+      installations: permissionInstallations.map {
         BridgeDesktopChoice(id: $0.installationID, title: $0.displayName)
       },
       toolPermission: snapshot?.toolPermission,

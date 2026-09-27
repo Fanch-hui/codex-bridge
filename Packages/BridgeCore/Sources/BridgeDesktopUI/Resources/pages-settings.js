@@ -24,8 +24,10 @@
     var models = group(content, "Agent模型与权限", "page-card settings-card");
     var preferences = M.preferences(page, emit, true);
     var agents = global.CodexBridgeDesktopSettingsAgents.create(page, emit, true);
+    var qoderPermissions = global.CodexBridgeDesktopSettingsQoderPermissions.create();
     models.appendChild(preferences.root);
     models.appendChild(agents.root);
+    models.appendChild(qoderPermissions.root);
     var direct = global.CodexBridgeDesktopDirect.create();
     content.appendChild(direct.root);
     var safety = group(content, "GPT/Qwen的mcp插件权限与指令");
@@ -53,6 +55,7 @@
         direct.update(next.direct, nextEmit);
         preferences.update(next, nextEmit);
         agents.update(next, nextEmit);
+        qoderPermissions.update(next, nextEmit);
         instructions.update(next, nextEmit);
         approvalEditor.update(next, nextEmit);
         serviceEditor.update(next, nextEmit);

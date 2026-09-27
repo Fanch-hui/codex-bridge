@@ -5,11 +5,14 @@ export function validateConfiguration(raw) {
   const config = { revision: 1, distribution: distribution(raw.distribution), cwd: absolute(raw.cwd),
     cliPath: absolute(raw.cliPath), nodePath: absolute(raw.nodePath), sdkRoot: absolute(raw.sdkRoot), sessionID: uuid(raw.sessionID),
     resume: raw.resume === true, persist: raw.persist === true, mode: raw.mode, networkAllowed: raw.networkAllowed === true,
+    permissionMode: raw.permissionMode ?? 'default',
     model: raw.model ? identifier(raw.model) : null, effort: raw.effort ? identifier(raw.effort, 64) : null,
     expectedAccountScope: raw.expectedAccountScope ?? null,
     skills: raw.skills ?? [], selectedSkills: raw.selectedSkills ?? [],
     mcpServers: object(raw.mcpServers ?? {}), proxy: raw.proxy ?? null };
   requireValue(['read-only', 'workspace-write'].includes(config.mode), 'unsupported_task_mode');
+  requireValue(['default', 'accept_edits', 'plan', 'auto', 'bypass_permissions', 'dont_ask'].includes(config.permissionMode),
+    'unsupported_permission_mode');
   requireValue(Array.isArray(config.skills) && config.skills.length <= 128); config.skills.forEach(value => identifier(value));
   validateSelectedSkills(config.selectedSkills);
   requireValue(config.selectedSkills.length === 0 || (config.skills.length === config.selectedSkills.length

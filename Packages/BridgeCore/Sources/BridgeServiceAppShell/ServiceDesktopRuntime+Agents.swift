@@ -26,7 +26,8 @@ extension BridgeServiceAppModel {
         let name = installation?.displayName ?? displayName
         return installation?.availability == "available"
           ? "已登记并验证 \(name)，点击连接后即可使用"
-          : "已登记 \(name)，但连接检查未通过"
+          : installation.map { AgentConnectionFailurePresentation.message(for: $0) }
+            ?? "已登记 \(name)，但连接检查未通过"
       }
     )
   }
@@ -58,7 +59,7 @@ extension BridgeServiceAppModel {
         guard let installation else { return "Agent 连接请求已完成" }
         return installation.availability == "available"
           ? "已连接并验证 \(installation.displayName)"
-          : "已发现 \(installation.displayName)，但连接检查未通过"
+          : AgentConnectionFailurePresentation.message(for: installation)
       }
     )
   }
@@ -87,7 +88,8 @@ extension BridgeServiceAppModel {
       successMessage: { installation in
         installation?.availability == "available"
           ? "Agent 检查通过"
-          : "Agent 检查未通过，请查看原因"
+          : installation.map { AgentConnectionFailurePresentation.message(for: $0) }
+            ?? "Agent 检查未通过，请查看原因"
       }
     )
   }

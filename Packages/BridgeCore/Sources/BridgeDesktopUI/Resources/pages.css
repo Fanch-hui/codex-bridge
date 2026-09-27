@@ -271,7 +271,7 @@
 .workbench-controls:empty { display: none; }
 .workbench-controls .form-grid { gap: 8px; }
 .workbench-controls .form-actions { margin-top: 8px; }
-.workbench-controls .retry-form { margin: 0; padding: 0; background: transparent; }
+.workbench-controls .workbench-continuation-form { margin: 0; padding: 0; background: transparent; }
 .workbench-attachments { grid-column: 1 / -1; min-width: 0; }
 .workbench-attachment-actions { margin-top: 0; }
 .workbench-attachment-actions .hint { min-width: 0; overflow-wrap: anywhere; }

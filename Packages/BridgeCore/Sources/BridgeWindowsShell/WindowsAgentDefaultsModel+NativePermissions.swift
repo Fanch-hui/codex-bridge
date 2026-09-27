@@ -185,16 +185,22 @@
       let snapshot = nativePermissionPolicy.flatMap {
         $0.installationID == installation.installationID ? $0 : nil
       }
+      let policyInstallations =
+        installation.providerID == "qoder"
+        ? installations.filter {
+          $0.providerID == "qoder" && $0.isEnabled && $0.availability == "available"
+        }
+        : installations.filter {
+          Self.supportedProviders.contains($0.providerID)
+            && $0.isEnabled && $0.availability == "available"
+        }
       return BridgeDesktopNativePermissionState(
         providerID: installation.providerID,
         providerName: providers.first(where: { $0.providerID == installation.providerID })?
           .displayName ?? installation.providerID,
         installationID: installation.installationID,
         installationName: installation.displayName,
-        installations: installations.filter {
-          Self.supportedProviders.contains($0.providerID)
-            && $0.isEnabled && $0.availability == "available"
-        }.map {
+        installations: policyInstallations.map {
           BridgeDesktopChoice(id: $0.installationID, title: $0.displayName)
         },
         toolPermission: snapshot?.toolPermission,
@@ -229,11 +235,15 @@
     private func nativePermissionInstallation(
       _ requestedID: String?
     ) -> IPCAgentInstallationSummary? {
-      installations.first {
+      let supported = installations.filter {
         Self.supportedProviders.contains($0.providerID)
           && $0.isEnabled && $0.availability == "available"
-          && (requestedID == nil || $0.installationID == requestedID)
       }
+      if let requestedID {
+        return supported.first(where: { $0.installationID == requestedID })
+      }
+      return supported.first(where: { $0.providerID == "qoder" && $0.isActive == true })
+        ?? supported.first(where: { $0.providerID == "qoder" }) ?? supported.first
     }
 
     private func nativePermissionMutationContext(

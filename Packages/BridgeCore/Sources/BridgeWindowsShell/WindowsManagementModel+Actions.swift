@@ -139,12 +139,11 @@
         selectedInstallationID = installation.installationID
         setAgentBusy(false)
         await refreshAgents()
-        let state = ProjectAgentPresentation.availabilityLabel(installation.availability)
         if installation.availability == "available" {
           reportAgentSuccess("已连接并验证 \(installation.displayName)。")
         } else {
           reportAgentFailure(
-            "Agent 已发现，但检查状态为 \(state)。",
+            AgentConnectionFailurePresentation.message(for: installation),
             installationID: installation.installationID
           )
         }

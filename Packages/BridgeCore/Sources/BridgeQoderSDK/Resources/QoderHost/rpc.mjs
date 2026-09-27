@@ -29,7 +29,7 @@ export class RPCPeer {
         this.pending.delete(id); clearTimeout(timer); signal?.removeEventListener('abort', abort);
         reject(new HostError('interaction_cancelled'));
       };
-      const timer = setTimeout(abort, timeout);
+      const timer = timeout > 0 ? setTimeout(abort, timeout) : null;
       const finish = (error, result) => {
         clearTimeout(timer); signal?.removeEventListener('abort', abort);
         if (error) reject(error); else resolve(result);
