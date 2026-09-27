@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeSecurity
 import Foundation
 import Testing
@@ -64,6 +65,11 @@ struct PiExecutableResolverTests {
   }
 
   private func resolvedPath(_ url: URL) -> String {
-    url.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL.path
+    let path = url.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL.path
+    #if os(Windows)
+      return AgentPathSemantics.canonicalPath(path, style: .windows) ?? path
+    #else
+      return path
+    #endif
   }
 }

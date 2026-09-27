@@ -45,7 +45,7 @@ struct PiNativeSessionStoreTests {
       sessionID: sessionID,
       sessionFile: nativeFile.path)
 
-    try store.saveNativeIndex(binding)
+    #expect(throws: Never.self) { try store.saveNativeIndex(binding) }
     #expect(
       try store.load(sessionID: sessionID, request: request, installation: installation) == binding)
   }
