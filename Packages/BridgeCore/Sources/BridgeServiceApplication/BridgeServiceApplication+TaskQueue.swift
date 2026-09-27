@@ -3,6 +3,12 @@ import BridgeMCP
 import BridgeServiceCore
 import Foundation
 
+private enum QueuedModelAvailability: Sendable {
+  case available
+  case unavailable
+  case invalid
+}
+
 extension BridgeServiceApplication {
   public func startTaskQueueProcessor() {
     guard taskQueueProcessor == nil else { return }
@@ -94,7 +100,12 @@ extension BridgeServiceApplication {
       )
       return false
     }
-    guard await recheckQueuedModel(task, project: project) else {
+    switch await recheckQueuedModel(task, project: project) {
+    case .available:
+      break
+    case .unavailable:
+      return false
+    case .invalid:
       _ = try? await tasks.fail(
         taskID: task.id,
         failureCode: "queued_model_unavailable",
@@ -130,28 +141,28 @@ extension BridgeServiceApplication {
   private func recheckQueuedModel(
     _ task: ServiceTaskRecord,
     project: ServiceProjectRecord
-  ) async -> Bool {
+  ) async -> QueuedModelAvailability {
     let usesExplicitSelection =
       task.executionModel != serviceDefaultProviderExecutionModel
       || task.executionEffort != serviceDefaultProviderExecutionEffort
       || task.fastMode
-    guard usesExplicitSelection else { return true }
+    guard usesExplicitSelection else { return .available }
     do {
       let deadline = ContinuousClock.now.advanced(by: .seconds(30))
       if task.providerID == serviceCodexProviderID {
         let models = try await catalog.listModels(deadline: deadline).models
         guard let model = models.first(where: { $0.modelID == task.executionModel }) else {
-          return false
+          return .invalid
         }
         guard
           task.executionEffort == serviceDefaultProviderExecutionEffort
             || model.reasoningEfforts.contains(task.executionEffort),
           !task.fastMode || model.supportsFastMode
-        else { return false }
-        return true
+        else { return .invalid }
+        return .available
       }
       guard let installationID = task.installationID, let registry = agentRegistry else {
-        return false
+        return .invalid
       }
       let models = try await serviceAgentModelCatalog(
         registry: registry,
@@ -160,12 +171,15 @@ extension BridgeServiceApplication {
         selectedModelID: nil
       )
       guard let model = models.first(where: { $0.id == task.executionModel }) else {
-        return false
+        return .invalid
       }
-      return task.executionEffort == serviceDefaultProviderExecutionEffort
-        || model.supportedReasoningEfforts.contains(task.executionEffort)
+      guard
+        task.executionEffort == serviceDefaultProviderExecutionEffort
+          || model.supportedReasoningEfforts.contains(task.executionEffort)
+      else { return .invalid }
+      return .available
     } catch {
-      return false
+      return .unavailable
     }
   }
 

@@ -566,7 +566,12 @@ final class SimpleServiceStoreTests: XCTestCase {
     let disabled = try await reopenedSettings.isSupervisorEnabled()
     XCTAssertEqual(disabled, false)
 
-    try await reopenedSettings.setSupervisorEnabled(true)
+    do {
+      try await reopenedSettings.setSupervisorEnabled(true)
+      XCTFail("Expected enabling the Supervisor to be rejected")
+    } catch let error as ServiceStoreError {
+      XCTAssertEqual(error, .invalidArgument("supervisor.enabled"))
+    }
     let reenabled = try await reopenedSettings.isSupervisorEnabled()
     XCTAssertEqual(reenabled, false)
   }

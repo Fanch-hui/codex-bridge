@@ -75,9 +75,11 @@ jobs:
 
       - name: Verify Registry entry
         run: |
+          registry_name="$(jq -r .name server.json)"
+          encoded_name="$(jq -rn --arg name "$registry_name" '$name | @uri')"
           curl --fail --silent --show-error --retry 3 \
-            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/$(jq -r .version server.json)" \
+            "https://registry.modelcontextprotocol.io/v0.1/servers/${encoded_name}/versions/$(jq -r .version server.json)" \
             -o "$RUNNER_TEMP/registry-result.json"
-          jq --exit-status --arg version "$(jq -r .version server.json)" \
-            '.server.name == "io.github.yeyuancc0-glitch/codex-bridge" and .server.version == $version' \
+          jq --exit-status --arg name "$registry_name" --arg version "$(jq -r .version server.json)" \
+            '.server.name == $name and .server.version == $version' \
             "$RUNNER_TEMP/registry-result.json"

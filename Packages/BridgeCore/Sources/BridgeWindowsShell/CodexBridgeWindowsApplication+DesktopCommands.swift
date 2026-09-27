@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -45,10 +46,10 @@
         model.refreshDisplaySnapshot()
         return true
       case .setWorkbenchPermissionMode(let mode):
-        guard let index = ["read-only", "workspace-write"].firstIndex(of: mode) else {
+        guard let permissionMode = BridgeDesktopWorkbenchPermissionMode(rawValue: mode) else {
           return true
         }
-        Task { @MainActor in await model.selectWorkbenchPermission(at: index) }
+        Task { @MainActor in await model.selectWorkbenchPermission(permissionMode) }
         return true
       case .selectTaskByID(id: let taskID):
         model.selectTask(id: taskID)

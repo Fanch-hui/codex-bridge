@@ -62,12 +62,12 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-"${REPOSITORY_ROOT}/Scripts/with-xcode.sh" swift build \
+"${REPOSITORY_ROOT}/Scripts/with-xcode.sh" swift build --build-system swiftbuild \
   --package-path "${PACKAGE_PATH}" \
   --product mcp-inspector-fixture
 
 binary_directory="$(
-  "${REPOSITORY_ROOT}/Scripts/with-xcode.sh" swift build \
+  "${REPOSITORY_ROOT}/Scripts/with-xcode.sh" swift build --build-system swiftbuild \
     --package-path "${PACKAGE_PATH}" \
     --show-bin-path
 )"

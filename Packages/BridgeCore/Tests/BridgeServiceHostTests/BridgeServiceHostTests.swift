@@ -920,9 +920,14 @@ final class BridgeServiceHostTests: XCTestCase {
 
     do {
       try await client.setSupervisorEnabled(true)
-      XCTFail("Expected Supervisor enablement to be unavailable")
+      XCTFail("Expected Supervisor enablement to be unsupported")
+    } catch let error as BridgeServiceIPCCodecError {
+      guard case .remoteError(let remote) = error else {
+        return XCTFail("Expected a remote unsupported_operation response")
+      }
+      XCTAssertEqual(remote.code, "unsupported_operation")
     } catch {
-      XCTAssertTrue(error is BridgeServiceIPCCodecError)
+      XCTFail("Unexpected error: \(error)")
     }
     let remainsDisabled = try await client.modelCatalog()
     XCTAssertEqual(remainsDisabled.preferences.supervisorEnabled, false)

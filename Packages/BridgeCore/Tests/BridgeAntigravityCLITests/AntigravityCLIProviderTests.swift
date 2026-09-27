@@ -72,6 +72,53 @@ final class AntigravityCLIProviderTests: XCTestCase {
     XCTAssertNil(calls[0].environment["UNRELATED_SETTING"])
   }
 
+  func testModelsRejectsIncompleteTailEvenWhenCollectionLimitWasNotExceeded() async throws {
+    let projectRoot = try AntigravityCLITestSupport.temporaryDirectory(prefix: "agy-model-tail")
+    let home = try AntigravityCLITestSupport.temporaryDirectory(prefix: "agy-model-tail-home")
+    defer {
+      try? FileManager.default.removeItem(atPath: projectRoot)
+      try? FileManager.default.removeItem(atPath: home)
+    }
+    let collector = BoundedProcessOutputCollector()
+    collector.append(
+      Data((String(repeating: "banner\n", count: 5_000) + "phantom-model Ghost\n").utf8)
+    )
+    let output = collector.snapshot()
+    XCTAssertFalse(output.truncated)
+    XCTAssertGreaterThan(output.byteCount, output.tail.utf8.count)
+    let commandRunner = RecordingAntigravityCommandRunner(
+      result: AntigravityCLICommandResult(
+        standardOutput: output,
+        standardError: BoundedProcessOutput(
+          head: "",
+          tail: "",
+          byteCount: 0,
+          truncated: false
+        ),
+        termination: .exited(0),
+        timedOut: false
+      )
+    )
+    let provider = try AntigravityCLIProvider(
+      configuration: AntigravityCLIProviderConfiguration(
+        commandRunner: commandRunner,
+        sourceEnvironment: ["HOME": home, "TMPDIR": projectRoot]
+      )
+    )
+    let installation = try AgentInstallation(
+      id: AgentInstallationID(rawValue: "agy-model-tail"),
+      providerID: .antigravity,
+      executablePath: "/bin/echo"
+    )
+
+    do {
+      _ = try await provider.models(installation: installation, projectRoot: projectRoot)
+      XCTFail("Expected incomplete model output to be rejected")
+    } catch let error as AgentRuntimeError {
+      XCTAssertEqual(error, .capabilityUnavailable(.modelSelection))
+    }
+  }
+
   func testStartBuildsWorkspaceWriteWithProviderNativeNetworkAccess() async throws {
     let projectRoot = try AntigravityCLITestSupport.temporaryDirectory(
       prefix: "agy-admission-project")

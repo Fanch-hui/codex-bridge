@@ -475,6 +475,10 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
     )
   }
 
+  func agentCatalog(forceRefresh _: Bool) async throws -> IPCAgentCatalogResponse {
+    return try await agentCatalog()
+  }
+
   func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
   ) async throws -> IPCAgentInstallationSummary {
@@ -586,6 +590,21 @@ actor TestBridgeServiceClient: BridgeServiceClientProtocol {
     return IPCAgentModelsResponse(
       models: modelID.flatMap { agentModelOptionsByModel[$0] } ?? agentModelOptionsByInstallation[
         installationID] ?? agentModelOptionsValue
+    )
+  }
+
+  func agentModels(
+    installationID: String,
+    projectID: String?,
+    modelID: String?,
+    useStoredDefault: Bool,
+    forceRefresh _: Bool
+  ) async throws -> IPCAgentModelsResponse {
+    return try await agentModels(
+      installationID: installationID,
+      projectID: projectID,
+      modelID: modelID,
+      useStoredDefault: useStoredDefault
     )
   }
 

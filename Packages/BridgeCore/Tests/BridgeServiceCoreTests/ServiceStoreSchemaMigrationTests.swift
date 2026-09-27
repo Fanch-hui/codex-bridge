@@ -553,6 +553,49 @@ final class ServiceStoreSchemaMigrationTests: XCTestCase {
     XCTAssertEqual(backupVersion, 7)
   }
 
+  func testLatestPredecessorCreatesAndRetainsMigrationBackup() async throws {
+    let directory = FileManager.default.temporaryDirectory.appending(
+      path: "bridge-schema-latest-backup-\(UUID().uuidString)",
+      directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+    let path = directory.appending(path: "service.sqlite").path
+    let previous = try DatabaseQueue(path: path)
+    let previousMigration =
+      "\(ServiceStoreSchema.migrationPrefix)v\(ServiceStoreSchema.version - 1)"
+    try ServiceStoreSchema.makeMigrator().migrate(previous, upTo: previousMigration)
+
+    let migrated = try SimpleServiceStore(path: path)
+    let backupPath = path + ".pre-v\(ServiceStoreSchema.version)"
+    XCTAssertTrue(FileManager.default.fileExists(atPath: backupPath))
+    let backup = try DatabaseQueue(path: backupPath)
+    let backupVersion = try await backup.read { db in
+      try Int64.fetchOne(
+        db,
+        sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
+      )
+    }
+    XCTAssertEqual(backupVersion, ServiceStoreSchema.version - 1)
+    let migratedVersion = try await migrated.database.read { db in
+      try Int64.fetchOne(
+        db,
+        sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
+      )
+    }
+    XCTAssertEqual(migratedVersion, ServiceStoreSchema.version)
+
+    _ = try SimpleServiceStore(path: path)
+    let retainedBackup = try DatabaseQueue(path: backupPath)
+    let retainedVersion = try await retainedBackup.read { db in
+      try Int64.fetchOne(
+        db,
+        sql: "SELECT schema_version FROM bridge_service_meta WHERE singleton = 1"
+      )
+    }
+    XCTAssertEqual(retainedVersion, ServiceStoreSchema.version - 1)
+  }
+
   func testVersionEightIdempotencyIsScopedByMCPClient() async throws {
     let store = try SimpleServiceStore.inMemory()
     let root = FileManager.default.temporaryDirectory.appending(

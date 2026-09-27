@@ -92,12 +92,8 @@ extension BridgeServiceRequestController {
     if let error = error as? ServiceTunnelError {
       return mapTunnelError(error)
     }
-    if error is ExecutionServiceError {
-      return .init(
-        code: "execution_failed",
-        message: "The provider operation failed.",
-        retryable: true
-      )
+    if let error = error as? ExecutionServiceError {
+      return mapMCPQueryError(BridgeServiceApplication.publicExecutionError(error))
     }
     return .init(
       code: "internal_error",

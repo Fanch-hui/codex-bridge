@@ -222,8 +222,9 @@ extension BridgeServiceClientProtocol {
     -> IPCDirectConfiguration
   { throw BridgeServiceClientError.unavailable }
 
-  public func modelCatalog(forceRefresh _: Bool) async throws -> IPCModelCatalogResponse {
-    try await modelCatalog()
+  public func modelCatalog(forceRefresh: Bool) async throws -> IPCModelCatalogResponse {
+    guard !forceRefresh else { throw BridgeServiceClientError.unavailable }
+    return try await modelCatalog()
   }
 
   public func agentNativePermissionPolicy(
@@ -251,7 +252,8 @@ extension BridgeServiceClientProtocol {
   }
 
   public func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse {
-    try await agentCatalog()
+    guard !forceRefresh else { throw BridgeServiceClientError.unavailable }
+    return try await agentCatalog()
   }
 
   public func agentCatalog() async throws -> IPCAgentCatalogResponse {
@@ -276,9 +278,10 @@ extension BridgeServiceClientProtocol {
     providerID: String,
     baseURL: String?,
     apiKey: String?,
-    alwaysProceedConfirmed _: Bool
+    alwaysProceedConfirmed: Bool
   ) async throws -> IPCAgentInstallationSummary {
-    try await connectAgentInstallation(
+    guard !alwaysProceedConfirmed else { throw BridgeServiceClientError.unavailable }
+    return try await connectAgentInstallation(
       providerID: providerID,
       baseURL: baseURL,
       apiKey: apiKey
@@ -292,7 +295,8 @@ extension BridgeServiceClientProtocol {
     alwaysProceedConfirmed: Bool,
     qoderDistribution: String?
   ) async throws -> IPCAgentInstallationSummary {
-    try await connectAgentInstallation(
+    guard qoderDistribution == nil else { throw BridgeServiceClientError.unavailable }
+    return try await connectAgentInstallation(
       providerID: providerID,
       baseURL: baseURL,
       apiKey: apiKey,
@@ -307,10 +311,13 @@ extension BridgeServiceClientProtocol {
     baseURL: String?,
     apiKey: String?,
     alwaysProceedConfirmed: Bool,
-    qoderDistribution _: String?,
-    installationID _: String?
+    qoderDistribution: String?,
+    installationID: String?
   ) async throws -> IPCAgentInstallationSummary {
-    try await connectAgentInstallation(
+    guard qoderDistribution == nil, installationID == nil else {
+      throw BridgeServiceClientError.unavailable
+    }
+    return try await connectAgentInstallation(
       providerID: providerID,
       baseURL: baseURL,
       apiKey: apiKey,
@@ -364,26 +371,29 @@ extension BridgeServiceClientProtocol {
 
   public func agentModels(
     installationID: String,
-    projectID _: String?
+    projectID: String?
   ) async throws -> IPCAgentModelsResponse {
-    try await agentModels(installationID: installationID)
+    guard projectID == nil else { throw BridgeServiceClientError.unavailable }
+    return try await agentModels(installationID: installationID)
   }
 
   public func agentModels(
     installationID: String,
     projectID: String?,
-    modelID _: String?
+    modelID: String?
   ) async throws -> IPCAgentModelsResponse {
-    try await agentModels(installationID: installationID, projectID: projectID)
+    guard modelID == nil else { throw BridgeServiceClientError.unavailable }
+    return try await agentModels(installationID: installationID, projectID: projectID)
   }
 
   public func agentModels(
     installationID: String,
     projectID: String?,
     modelID: String?,
-    useStoredDefault _: Bool
+    useStoredDefault: Bool
   ) async throws -> IPCAgentModelsResponse {
-    try await agentModels(
+    guard useStoredDefault else { throw BridgeServiceClientError.unavailable }
+    return try await agentModels(
       installationID: installationID,
       projectID: projectID,
       modelID: modelID
@@ -395,9 +405,10 @@ extension BridgeServiceClientProtocol {
     projectID: String?,
     modelID: String?,
     useStoredDefault: Bool,
-    forceRefresh _: Bool
+    forceRefresh: Bool
   ) async throws -> IPCAgentModelsResponse {
-    try await agentModels(
+    guard !forceRefresh else { throw BridgeServiceClientError.unavailable }
+    return try await agentModels(
       installationID: installationID,
       projectID: projectID,
       modelID: modelID,
@@ -419,16 +430,11 @@ extension BridgeServiceClientProtocol {
   }
 
   public func setOpenCodeDefaults(
-    model: String?,
-    permissionMode: String?,
-    effort: String?
+    model _: String?,
+    permissionMode _: String?,
+    effort _: String?
   ) async throws -> IPCAgentModelDefaultResponse {
-    try await setAgentModelDefault(model)
-    return IPCAgentModelDefaultResponse(
-      model: model,
-      permissionMode: permissionMode ?? "build",
-      effort: effort
-    )
+    throw BridgeServiceClientError.unavailable
   }
 
   public func setAgentDefaults(
@@ -471,10 +477,11 @@ extension BridgeServiceClientProtocol {
     throw BridgeServiceClientError.unavailable
   }
 
-  public func deepSeekHarnessMCPServers(scope _: String?) async throws
+  public func deepSeekHarnessMCPServers(scope: String?) async throws
     -> IPCDeepSeekHarnessMCPListResponse
   {
-    try await deepSeekHarnessMCPServers()
+    guard scope == nil else { throw BridgeServiceClientError.unavailable }
+    return try await deepSeekHarnessMCPServers()
   }
 
   public func saveDeepSeekHarnessMCPServer(
@@ -487,7 +494,8 @@ extension BridgeServiceClientProtocol {
     throw BridgeServiceClientError.unavailable
   }
 
-  public func deleteDeepSeekHarnessMCPServer(id: String, scope _: String?) async throws {
+  public func deleteDeepSeekHarnessMCPServer(id: String, scope: String?) async throws {
+    guard scope == nil else { throw BridgeServiceClientError.unavailable }
     try await deleteDeepSeekHarnessMCPServer(id: id)
   }
 

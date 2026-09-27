@@ -31,11 +31,11 @@ extension BridgeDesktopCommandRouter {
     case .refreshConversation:
       refreshConversation(payload.taskID, model: model)
     case .setWorkbenchPermissionMode:
-      guard let mode = validatedID(payload.mode, maximumBytes: 64),
-        mode == "read-only" || mode == "workspace-write",
+      guard let rawMode = validatedID(payload.mode, maximumBytes: 64),
+        let mode = BridgeDesktopWorkbenchPermissionMode(rawValue: rawMode),
         connected(model)
       else { return }
-      model.setWorkbenchPermissionMode(mode)
+      model.setWorkbenchPermissionMode(mode.rawValue)
     case .selectTask:
       guard let taskID = validatedID(payload.taskID),
         model.tasks.contains(where: { $0.taskID == taskID })

@@ -143,6 +143,15 @@ extension BridgeServiceRequestController {
       IPCSupervisorEnabledRequest.self,
       from: request
     )
+    guard !payload.enabled else {
+      return try BridgeServiceIPCCodec.failure(
+        requestID: request.requestID,
+        error: .init(
+          code: "unsupported_operation",
+          message: "Supervisor execution is unavailable."
+        )
+      )
+    }
     try await composition.application.setSupervisorEnabled(payload.enabled)
     return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
   }

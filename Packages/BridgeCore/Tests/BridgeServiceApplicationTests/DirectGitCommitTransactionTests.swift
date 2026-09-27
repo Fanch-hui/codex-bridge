@@ -6,6 +6,46 @@ import XCTest
 @testable import BridgeServiceApplication
 
 final class DirectGitCommitTransactionTests: XCTestCase {
+  func testChangedFileParsingUsesCompleteOutputBeyondDisplayTail() throws {
+    let paths = (0..<1_500).map { index in
+      "Sources/file-\(String(format: "%04d", index))-\(String(repeating: "x", count: 32)).swift"
+    }
+    let completeOutput = Data(paths.joined(separator: "\0").utf8) + Data([0])
+    XCTAssertGreaterThan(completeOutput.count, 32 * 1_024)
+    let displayTail = String(
+      decoding: completeOutput.suffix(32 * 1_024),
+      as: UTF8.self
+    )
+    let result = DirectGitResult(
+      exitCode: 0,
+      output: DirectCommandOutputBuffer(
+        head: "",
+        tail: displayTail,
+        byteCount: completeOutput.count,
+        truncated: false
+      ),
+      completeOutput: completeOutput
+    )
+
+    XCTAssertEqual(try BridgeServiceApplication.parseChangedFiles(result), paths)
+  }
+
+  func testChangedFileParsingRejectsOutputBeyondCollectionLimit() {
+    let result = DirectGitResult(
+      exitCode: 0,
+      output: DirectCommandOutputBuffer(
+        head: "",
+        tail: "file-fragment.swift",
+        byteCount: 256 * 1_024,
+        truncated: true
+      )
+    )
+
+    XCTAssertThrowsError(try BridgeServiceApplication.parseChangedFiles(result)) { error in
+      XCTAssertEqual(error as? DirectGitCommitError, .outputTruncated)
+    }
+  }
+
   func testLegacyReceiptDecodingDefaultsIndexSynchronizationToSuccess() throws {
     let data = Data(
       #"{"commit_hash":null,"changed_files":[],"summary":"clean","exit_code":0}"#.utf8

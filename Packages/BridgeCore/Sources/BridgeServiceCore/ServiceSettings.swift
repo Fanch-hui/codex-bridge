@@ -339,7 +339,8 @@ public actor ServiceSettings {
     false
   }
 
-  public func setSupervisorEnabled(_ _: Bool) async throws {
+  public func setSupervisorEnabled(_ enabled: Bool) async throws {
+    guard !enabled else { throw ServiceStoreError.invalidArgument("supervisor.enabled") }
     try await set("false", for: .supervisorEnabled)
   }
 

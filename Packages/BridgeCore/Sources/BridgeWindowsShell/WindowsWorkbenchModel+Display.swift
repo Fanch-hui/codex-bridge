@@ -5,8 +5,6 @@
   import BridgeServiceAppCore
 
   extension WindowsWorkbenchModel {
-    static let permissionModes = ["read-only", "workspace-write"]
-
     var workbenchDisplaySnapshot: WindowsWorkbenchPresentationSnapshot {
       workbenchDisplayCache.snapshot(
         tasks: tasks,
@@ -130,7 +128,9 @@
           },
           selectedProjectID: selectedProjectID,
           permissionRows: ["只读", "可写"],
-          selectedPermissionIndex: Self.permissionModes.firstIndex(of: workbenchPermissionMode),
+          selectedPermissionIndex: BridgeDesktopWorkbenchPermissionMode.allCases.firstIndex {
+            $0.rawValue == workbenchPermissionMode
+          },
           permissionMode: workbenchPermissionMode,
           taskRows: workbenchRows,
           recentTaskRows: recentSessions.map(Self.sessionRowText),

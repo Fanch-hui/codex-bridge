@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -54,8 +55,16 @@
     }
 
     public func selectWorkbenchPermission(at index: Int) async {
-      guard Self.permissionModes.indices.contains(index) else { return }
-      let mode = Self.permissionModes[index]
+      guard BridgeDesktopWorkbenchPermissionMode.allCases.indices.contains(index) else {
+        return
+      }
+      await selectWorkbenchPermission(BridgeDesktopWorkbenchPermissionMode.allCases[index])
+    }
+
+    public func selectWorkbenchPermission(
+      _ permissionMode: BridgeDesktopWorkbenchPermissionMode
+    ) async {
+      let mode = permissionMode.rawValue
       guard mode != workbenchPermissionMode else { return }
       let previous = workbenchPermissionMode
       workbenchPermissionMode = mode

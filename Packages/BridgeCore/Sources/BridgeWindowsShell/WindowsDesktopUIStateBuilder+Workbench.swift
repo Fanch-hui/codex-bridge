@@ -16,10 +16,6 @@
       let projects = management.project.projectItems.map {
         choice($0.projectID, $0.name, detail: $0.detail)
       }
-      let permissions = [
-        choice("read-only", "只读"),
-        choice("workspace-write", "工作区可写"),
-      ]
       let (projectStatus, projectStatusTone) = projectStatus(for: display)
       return BridgeDesktopWorkbenchState(
         header: header(
@@ -30,7 +26,7 @@
         projects: projects,
         selectedProjectID: display.selectedProjectID,
         permissionMode: display.permissionMode,
-        permissionOptions: permissions,
+        permissionOptions: BridgeDesktopWorkbenchPermissionMode.choices,
         tasks: display.taskItems,
         selectedTaskID: display.selectedTaskID,
         selectedTask: display.selectedTaskDetail,
@@ -90,22 +86,15 @@
         if detail.status == "运行中" || detail.status == "正在启动" {
           return ("运行中", "running")
         }
-        return (detail.status, tone(for: detail.status))
+        return (
+          detail.status,
+          BridgeDesktopWorkbenchPresentation.statusTone(for: detail.status)
+        )
       }
       if display.runningTaskCount > 0 {
         return ("运行中", "running")
       }
       return ("就绪", "success")
-    }
-
-    private static func tone(for status: String) -> String {
-      switch status {
-      case "运行中", "正在启动": "running"
-      case "已完成": "success"
-      case "失败": "error"
-      case "等待回答", "等待本机批准", "等待 Codex 审批": "warning"
-      default: "neutral"
-      }
     }
 
     private static func engineStatus(for display: WindowsWorkbenchDisplay) -> String {
@@ -139,11 +128,9 @@
     private static func steerModes(
       for display: WindowsWorkbenchDisplay
     ) -> [BridgeDesktopChoice] {
-      var modes = [choice("queued", "当前轮结束后继续")]
-      if display.supportsImmediateSteer {
-        modes.append(choice("interrupt-current-then-continue", "中断当前轮并继续"))
-      }
-      return modes
+      BridgeDesktopWorkbenchPresentation.steerModes(
+        supportsImmediateSteer: display.supportsImmediateSteer
+      )
     }
 
     private static func browserSlot(

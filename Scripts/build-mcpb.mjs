@@ -9,9 +9,20 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const source = join(root, 'Integrations', 'MCPB');
 const output = resolve(process.argv[2] ?? join(root, '.build', 'mcp-registry'));
 const manifest = JSON.parse(await readFile(join(source, 'manifest.json'), 'utf8'));
+const repository = manifest.repository.url.replace(/\.git$/, '');
+const repositoryPath = new URL(repository).pathname.slice(1);
+const registryName = `io.github.${repositoryPath}`;
+const packageMetadata = JSON.parse(await readFile(join(source, 'package.json'), 'utf8'));
+const lock = JSON.parse(await readFile(join(source, 'package-lock.json'), 'utf8'));
+if ([packageMetadata.version, lock.version, lock.packages[''].version]
+  .some(version => version !== manifest.version)) {
+  throw new Error('MCPB manifest, package and lockfile versions must match');
+}
+if (manifest.repository.url !== `${repository}.git` ||
+    manifest.homepage !== repository || manifest.support !== `${repository}/issues`) {
+  throw new Error('MCPB repository links must match the manifest repository');
+}
 const stage = await mkdtemp(join(tmpdir(), 'codex-bridge-mcpb-'));
-const registryName = 'io.github.Fanch-hui/codex-bridge';
-const repository = 'https://github.com/Fanch-hui/codex-bridge';
 
 function run(command, args) {
   const result = spawnSync(command, args, {

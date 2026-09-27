@@ -66,14 +66,14 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 /bin/mkdir -m 0700 "${runtime_directory}"
-"${script_directory}/with-xcode.sh" swift build \
+"${script_directory}/with-xcode.sh" swift build --build-system swiftbuild \
   --package-path "${repository_root}/Packages/BridgeCore" \
   --product mcp-inspector-fixture >/dev/null
-"${script_directory}/with-xcode.sh" swift build \
+"${script_directory}/with-xcode.sh" swift build --build-system swiftbuild \
   --package-path "${repository_root}/Packages/BridgeCore" \
   --product bridge-tunnel-acceptance-fixture >/dev/null
 readonly fixture_directory="$(
-  "${script_directory}/with-xcode.sh" swift build \
+  "${script_directory}/with-xcode.sh" swift build --build-system swiftbuild \
     --package-path "${repository_root}/Packages/BridgeCore" \
     --show-bin-path
 )"

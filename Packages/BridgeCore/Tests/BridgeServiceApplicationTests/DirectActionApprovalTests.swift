@@ -9,23 +9,26 @@ import XCTest
 final class DirectActionApprovalCenterTests: XCTestCase {
   func testRequestReturnsApprovalIDAndApproveConsumesGrantOnce() async {
     let center = DirectActionApprovalCenter()
-    let id = await center.request(
+    let result = await center.requestApproval(
       projectID: "prj-1",
       kind: .fileWrite,
       summary: "Write README.md",
       payloadDigest: "digest-a",
       clientRequestID: "req-1"
     )
-    XCTAssertTrue(id.hasPrefix("appr-"))
+    guard case .pending(let approvalID) = result else {
+      return XCTFail("Expected a pending approval")
+    }
+    XCTAssertTrue(approvalID.hasPrefix("appr-"))
 
     let pending = await center.pendingApprovals()
     XCTAssertEqual(pending.count, 1)
-    XCTAssertEqual(pending[0].approvalID, id)
+    XCTAssertEqual(pending[0].approvalID, approvalID)
 
     let consumedBeforeApprove = await center.consume(
       payloadDigest: "digest-a", clientRequestID: "req-1")
     XCTAssertFalse(consumedBeforeApprove)
-    let approved = await center.approve(approvalID: id)
+    let approved = await center.approve(approvalID: approvalID)
     XCTAssertTrue(approved)
     let consumedOnce = await center.consume(
       payloadDigest: "digest-a", clientRequestID: "req-1")
@@ -37,14 +40,17 @@ final class DirectActionApprovalCenterTests: XCTestCase {
 
   func testPayloadDigestBindsApprovalToExactRequest() async {
     let center = DirectActionApprovalCenter()
-    let id = await center.request(
+    let result = await center.requestApproval(
       projectID: "prj-1",
       kind: .command,
       summary: "Run test",
       payloadDigest: "digest-a",
       clientRequestID: nil
     )
-    let approved = await center.approve(approvalID: id)
+    guard case .pending(let approvalID) = result else {
+      return XCTFail("Expected a pending approval")
+    }
+    let approved = await center.approve(approvalID: approvalID)
     XCTAssertTrue(approved)
     let consumed = await center.consume(payloadDigest: "digest-a", clientRequestID: nil)
     XCTAssertTrue(consumed)
@@ -54,48 +60,48 @@ final class DirectActionApprovalCenterTests: XCTestCase {
 
   func testDenySurfacesDenialOnRetry() async {
     let center = DirectActionApprovalCenter(denyLifetime: 30)
-    let id = await center.request(
+    let result = await center.requestApproval(
       projectID: "prj-1",
       kind: .fileWrite,
       summary: "Write",
       payloadDigest: "digest-a",
       clientRequestID: "req-1"
     )
-    let denied = await center.deny(approvalID: id)
+    guard case .pending(let approvalID) = result else {
+      return XCTFail("Expected a pending approval")
+    }
+    let denied = await center.deny(approvalID: approvalID)
     XCTAssertTrue(denied)
     let retryConsumed = await center.consume(payloadDigest: "digest-a", clientRequestID: "req-1")
     XCTAssertFalse(retryConsumed)
-    let retryID = await center.request(
+    let retryResult = await center.requestApproval(
       projectID: "prj-1",
       kind: .fileWrite,
       summary: "Write",
       payloadDigest: "digest-a",
       clientRequestID: "req-1"
     )
-    XCTAssertNotEqual(retryID, id)
-    XCTAssertTrue(retryID.hasPrefix("denied-"))
-    let approved = await center.approve(approvalID: retryID)
+    XCTAssertEqual(retryResult, .denied)
     let pending = await center.pendingApprovals()
-    let consumedAfterRetry = await center.consume(
-      payloadDigest: "digest-a", clientRequestID: "req-1")
     let denialActive = await center.denialIsActive(
       payloadDigest: "digest-a", clientRequestID: "req-1")
-    XCTAssertFalse(approved)
     XCTAssertTrue(pending.isEmpty)
-    XCTAssertFalse(consumedAfterRetry)
     XCTAssertTrue(denialActive)
   }
 
   func testApprovedGrantExpiresWithoutBeingConsumed() async {
     let center = DirectActionApprovalCenter(approvalLifetime: 0.1)
-    let id = await center.request(
+    let result = await center.requestApproval(
       projectID: "prj-1",
       kind: .command,
       summary: "Run",
       payloadDigest: "digest-grant",
       clientRequestID: nil
     )
-    let approved = await center.approve(approvalID: id)
+    guard case .pending(let approvalID) = result else {
+      return XCTFail("Expected a pending approval")
+    }
+    let approved = await center.approve(approvalID: approvalID)
     try? await Task.sleep(for: .milliseconds(150))
     let consumed = await center.consume(payloadDigest: "digest-grant", clientRequestID: nil)
     XCTAssertTrue(approved)
@@ -104,7 +110,7 @@ final class DirectActionApprovalCenterTests: XCTestCase {
 
   func testExpiryInvalidatesPendingApprovals() async {
     let center = DirectActionApprovalCenter(approvalLifetime: 0.1)
-    _ = await center.request(
+    _ = await center.requestApproval(
       projectID: "prj-1",
       kind: .command,
       summary: "Run",
@@ -118,19 +124,22 @@ final class DirectActionApprovalCenterTests: XCTestCase {
 
   func testRestartInvalidatesAllPendingApprovals() async {
     let first = DirectActionApprovalCenter()
-    let id = await first.request(
+    let result = await first.requestApproval(
       projectID: "prj-1",
       kind: .command,
       summary: "Run",
       payloadDigest: "digest-a",
       clientRequestID: "req-1"
     )
+    guard case .pending(let approvalID) = result else {
+      return XCTFail("Expected a pending approval")
+    }
     let restarted = DirectActionApprovalCenter()
     let restartedPending = await restarted.pendingApprovals()
     XCTAssertTrue(restartedPending.isEmpty)
     let consumed = await restarted.consume(payloadDigest: "digest-a", clientRequestID: "req-1")
     XCTAssertFalse(consumed)
-    let approved = await restarted.approve(approvalID: id)
+    let approved = await restarted.approve(approvalID: approvalID)
     XCTAssertFalse(approved)
   }
 
@@ -230,6 +239,8 @@ final class DirectApprovalFlowTests: XCTestCase {
     } catch let error as BridgeMCPQueryError {
       XCTAssertEqual(error, .approvalDenied)
     }
+    let pendingAfterDenial = await application.approvals.pendingApprovals()
+    XCTAssertTrue(pendingAfterDenial.isEmpty)
     let target = fixture.root.appending(path: "DeniedFile.txt")
     XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
   }

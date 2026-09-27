@@ -41,7 +41,7 @@ jobs:
           Packages/BridgeCore/Sources Packages/BridgeCore/Tests App Service UITests
 
       - name: Test Swift package
-        run: Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore
+        run: Scripts/with-xcode.sh swift test --build-system swiftbuild --package-path Packages/BridgeCore
 
       - name: Test shared desktop UI logic
         run: |
