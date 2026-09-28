@@ -96,6 +96,14 @@ jobs:
       - name: Verify dependency resolution is unchanged
         run: git diff --exit-code -- Packages/BridgeCore/Package.resolved CodexBridge.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
+      - name: Verify MCPB release metadata
+        run: node --test Scripts/test-mcpb-release.mjs
+
+      - name: Verify public source export
+        run: |
+          python3 -B Scripts/test_public_source_export.py
+          python3 -B Scripts/export-public-source.py export --ref "$GITHUB_SHA" --output "$RUNNER_TEMP/public-source"
+
       - name: Verify release candidate gate wiring
         run: Scripts/test-release-contract.sh
 

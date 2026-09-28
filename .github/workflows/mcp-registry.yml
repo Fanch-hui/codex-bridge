@@ -29,28 +29,24 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ inputs.release_tag || github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
 
       - name: Verify release package and metadata
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync } from 'node:fs';
-          const server = JSON.parse(readFileSync('server.json', 'utf8'));
-          const expected = `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/${process.env.RELEASE_TAG}/codex-bridge-${server.version}.mcpb`;
-          if (`v${server.version}` !== process.env.RELEASE_TAG ||
-              server.name !== `io.github.${process.env.GITHUB_REPOSITORY}` ||
-              server.packages.length !== 1 ||
-              server.packages[0].identifier !== expected) {
-            throw new Error('Registry metadata must match this repository and release');
-          }
-          NODE
           mkdir -p "$RUNNER_TEMP/mcp-package"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --pattern "codex-bridge-$(jq -r .version server.json).mcpb" --dir "$RUNNER_TEMP/mcp-package"
-          printf '%s  %s\n' "$(jq -r '.packages[0].fileSha256' server.json)" \
-            "$RUNNER_TEMP/mcp-package/codex-bridge-$(jq -r .version server.json).mcpb" | sha256sum --check
+            --pattern "codex-bridge-${RELEASE_TAG#v}.mcpb" --pattern server.json \
+            --dir "$RUNNER_TEMP/mcp-package"
+          node Scripts/verify-mcpb-release.mjs \
+            "$RUNNER_TEMP/mcp-package/codex-bridge-${RELEASE_TAG#v}.mcpb" \
+            "$RUNNER_TEMP/mcp-package/server.json" "$RELEASE_TAG" "$GITHUB_REPOSITORY"
 
       - name: Install official publisher
         working-directory: ${{ runner.temp }}
@@ -65,15 +61,19 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       - name: Validate Registry metadata
+        working-directory: ${{ runner.temp }}/mcp-package
         run: mcp-publisher validate
 
       - name: Authenticate with GitHub OIDC
+        working-directory: ${{ runner.temp }}/mcp-package
         run: mcp-publisher login github-oidc
 
       - name: Publish to the official MCP Registry
+        working-directory: ${{ runner.temp }}/mcp-package
         run: mcp-publisher publish
 
       - name: Verify Registry entry
+        working-directory: ${{ runner.temp }}/mcp-package
         run: |
           registry_name="$(jq -r .name server.json)"
           encoded_name="$(jq -rn --arg name "$registry_name" '$name | @uri')"

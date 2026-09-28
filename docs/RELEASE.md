@@ -30,6 +30,33 @@ GitHub 下载地址、完整文件大小与 SHA-256，客户端仅选择精确�
 本地验证覆盖版本和安装包校验、更新等待门禁、程序替换及编译；发布验收使用旧版本
 带项目、会话和浏览器 profile 升级，手动确认重启后的版本与原数据。
 
+## Public source archive
+
+`Scripts/export-public-source.py` exports a production-only source tree from a committed Git
+ref. It reads tracked blobs and modes from that ref, so uncommitted changes are not included.
+The output directory must not already exist. The export retains runtime sources, build and
+release tooling, required documentation, MCPB files, and `.gitattributes`; it omits tests,
+fixtures, examples, schemas, prototypes, review reports, plans, and memory files. It also
+removes test and fixture targets from both SwiftPM manifests, removes Xcode test target
+references and scheme entries, and strips Windows workflow smoke steps while retaining
+production build and packaging steps. The exported Windows build script keeps its build and
+installer modes without test-only switches.
+
+Commit the intended source first, then export and verify the same immutable ref:
+
+```bash
+ref="$(git rev-parse HEAD)"
+output=".build/public-source-$(git rev-parse --short "$ref")"
+python3 Scripts/export-public-source.py export --ref "$ref" --output "$output"
+python3 Scripts/export-public-source.py verify --ref "$ref" --output "$output"
+```
+
+The verifier compares every untransformed exported file byte-for-byte with the selected Git
+tree, checks tracked file modes and required runtime resources, and rejects excluded paths,
+missing SwiftPM targets, dangling target references, stale Xcode test references, or Windows
+workflow references to omitted smoke assets. Review and publish the verified output directory;
+do not create a release archive from the mutable working tree.
+
 macOS 公开包使用 ad-hoc 签名。下载者首次打开 App 时需要手动确认 Gatekeeper 提示。配置 Developer ID 后可使用下方的证书签名流程。
 
 ## 1. Prepare and verify the pinned helper
