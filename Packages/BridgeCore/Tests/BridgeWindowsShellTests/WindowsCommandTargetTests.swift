@@ -24,7 +24,7 @@
         let auxiliary = WindowsAuxiliaryRuntime(client: client, feedback: feedback)
         model.approvals = ["a", "b"].map {
           IPCApprovalSummary(
-            taskID: "task-\($0)", approvalID: $0, threadID: "thread-\($0)",
+            approvalID: $0, taskID: "task-\($0)", threadID: "thread-\($0)",
             turnID: "turn-\($0)", itemID: "item-\($0)", kind: "command", title: $0, summary: $0
           )
         }
@@ -36,8 +36,8 @@
                   requestID: "approval-\(id)",
                   command: .resolveApproval,
                   payload: BridgeDesktopCommandPayload(
-                    approvalID: id,
                     taskID: "task-\(id)",
+                    approvalID: id,
                     decision: "deny"
                   )
                 )
