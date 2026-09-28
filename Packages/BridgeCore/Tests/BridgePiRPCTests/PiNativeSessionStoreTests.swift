@@ -8,7 +8,7 @@ import Testing
 struct PiNativeSessionStoreTests {
   @Test func indexedNativeSessionCanContinueOutsideBridgeRuntimeDirectory() throws {
     let root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("pi-native-session-store-\(UUID().uuidString)", isDirectory: true)
+      .appendingPathComponent("pi-\(UUID().uuidString.prefix(8))", isDirectory: true)
     let projectRoot = root.appendingPathComponent("project", isDirectory: true)
     let bridgeRoot = root.appendingPathComponent("bridge-data", isDirectory: true)
     let nativeFile = root.appendingPathComponent("pi/sessions/native.jsonl")
