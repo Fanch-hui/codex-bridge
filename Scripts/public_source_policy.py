@@ -38,7 +38,7 @@ def is_public_path(path):
     if parts[0] in {"App", "Service", "Config", "Windows", "CodexBridge.xcodeproj"}:
         return True
     if parts[0] == "docs":
-        return pure.suffix.lower() in {".md", ".png", ".jpg", ".jpeg", ".svg", ".webp"}
+        return pure.suffix.lower() in {".md", ".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif"}
     if parts[0] == "Scripts":
         return not (
             pure.name.lower().startswith("test-")
@@ -57,7 +57,9 @@ def is_public_path(path):
         return (
             len(parts) == 3
             and parts[:2] == ("Vendor", "swift-sdk")
-            and pure.name in {"Package.swift", "Package.resolved", "LICENSE", "NOTICE"}
+            and pure.name in {
+                "Package.swift", "Package@swift-6.0.swift", "Package.resolved", "LICENSE", "NOTICE"
+            }
         )
     if parts[:2] == ("Integrations", "MCPB"):
         return True

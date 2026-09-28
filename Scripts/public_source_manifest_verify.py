@@ -20,12 +20,16 @@ def _array_value(value):
 
 def verify_manifests(root, source_manifests=None):
     root = Path(root)
-    package_roots = [root / "Packages/BridgeCore", root / "Vendor/swift-sdk"]
+    manifests = [
+        root / "Packages/BridgeCore/Package.swift",
+        root / "Vendor/swift-sdk/Package.swift",
+        root / "Vendor/swift-sdk/Package@swift-6.0.swift",
+    ]
     target_kinds = {"target", "executableTarget", "systemLibrary", "binaryTarget", "plugin"}
-    for package_root in package_roots:
-        manifest = package_root / "Package.swift"
+    for manifest in manifests:
         if not manifest.is_file():
             continue
+        package_root = manifest.parent
         source = manifest.read_text()
         if ".testTarget(" in source or "testTargets" in source:
             raise ValueError(f"Test target remains in {manifest.relative_to(root)}")

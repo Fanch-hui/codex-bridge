@@ -32,7 +32,11 @@ class PublicSourceTransformTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source_manifests = {}
-            for relative in ("Packages/BridgeCore/Package.swift", "Vendor/swift-sdk/Package.swift"):
+            for relative in (
+                "Packages/BridgeCore/Package.swift",
+                "Vendor/swift-sdk/Package.swift",
+                "Vendor/swift-sdk/Package@swift-6.0.swift",
+            ):
                 source_path = REPO / relative
                 exported_path = root / relative
                 exported_path.parent.mkdir(parents=True, exist_ok=True)
@@ -41,8 +45,9 @@ class PublicSourceTransformTests(unittest.TestCase):
                 source_package_root = source_path.parent
                 for directory in ("Sources", "Windows"):
                     candidate = source_package_root / directory
-                    if candidate.exists():
-                        (exported_path.parent / directory).symlink_to(candidate, target_is_directory=True)
+                    destination = exported_path.parent / directory
+                    if candidate.exists() and not destination.exists():
+                        destination.symlink_to(candidate, target_is_directory=True)
                 transform_manifest(exported_path)
             verify_manifests(root, source_manifests)
             bridge_manifest = (root / "Packages/BridgeCore/Package.swift").read_text()
@@ -54,6 +59,14 @@ class PublicSourceTransformTests(unittest.TestCase):
             sdk_manifest = (root / "Vendor/swift-sdk/Package.swift").read_text()
             self.assertIn(".library(\n            name: \"MCP\"", sdk_manifest)
             self.assertNotIn("MCPConformance", sdk_manifest)
+            sdk_swift_6_manifest = (root / "Vendor/swift-sdk/Package@swift-6.0.swift").read_text()
+            self.assertNotIn(".testTarget(", sdk_swift_6_manifest)
+            self.assertNotIn("MCPTests", sdk_swift_6_manifest)
+            self.assertIn('.library(\n            name: "MCP"', sdk_swift_6_manifest)
+            self.assertIn('dependencies: targetDependencies', sdk_swift_6_manifest)
+            self.assertIn('.product(name: "SystemPackage", package: "swift-system")', sdk_swift_6_manifest)
+            self.assertIn('.product(name: "Logging", package: "swift-log")', sdk_swift_6_manifest)
+            self.assertIn('.product(\n        name: "EventSource", package: "eventsource"', sdk_swift_6_manifest)
 
     def test_xcode_test_objects_and_scheme_are_removed_without_dangling_ids(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -117,6 +130,8 @@ class PublicSourceTransformTests(unittest.TestCase):
             "Scripts/export-public-source.py",
             "Scripts/mcpb-release-metadata.mjs",
             "Integrations/MCPB/manifest.json",
+            "docs/assets/workbench-demo.gif",
+            "Vendor/swift-sdk/Package@swift-6.0.swift",
             ".gitattributes",
         ):
             self.assertTrue(is_public_path(path), path)
@@ -129,10 +144,13 @@ class PublicSourceExportTests(unittest.TestCase):
             root.mkdir()
             (root / "Scripts").mkdir()
             (root / ".github/workflows").mkdir(parents=True)
+            (root / "docs/assets").mkdir(parents=True)
             (root / "Integrations/MCPB").mkdir(parents=True)
             (root / "Prototypes").mkdir()
             (root / "Schemas").mkdir()
             (root / ".gitattributes").write_bytes(b"runtime/** -text\n")
+            (root / "README.md").write_text('<img src="./docs/assets/workbench-demo.gif">\n')
+            (root / "docs/assets/workbench-demo.gif").write_bytes(b"GIF89a")
             (root / ".github/workflows/mcp-registry.yml").write_text(
                 'gh release download --pattern server.json\n'
                 'node Scripts/verify-mcpb-release.mjs "$RUNNER_TEMP/mcp-package/server.json"\n'
@@ -160,11 +178,13 @@ class PublicSourceExportTests(unittest.TestCase):
             source_file.write_bytes(b"untracked edit\n")
             output = root / ".build/public"
             commit, count = export_source(root, "HEAD", output)
-            self.assertEqual(count, 7)
+            self.assertEqual(count, 9)
             self.assertEqual(source_file.read_bytes(), b"untracked edit\n")
             self.assertEqual((output / "Scripts/runtime.py").read_bytes(), b"print('tracked')\n")
             self.assertEqual(output.joinpath("Scripts/runtime.py").stat().st_mode & 0o777, 0o755)
             self.assertTrue((output / ".gitattributes").is_file())
+            self.assertTrue((output / "docs/assets/workbench-demo.gif").is_file())
+            self.assertIn("docs/assets/workbench-demo.gif", (output / "README.md").read_text())
             self.assertTrue((output / ".github/workflows/mcp-registry.yml").is_file())
             self.assertTrue((output / "Scripts/mcpb-release-metadata.mjs").is_file())
             self.assertTrue((output / "Scripts/verify-mcpb-release.mjs").is_file())
@@ -172,7 +192,7 @@ class PublicSourceExportTests(unittest.TestCase):
             self.assertFalse((output / "Scripts/test_private.py").exists())
             self.assertFalse((output / "Scripts/test-mcpb-release.mjs").exists())
             self.assertFalse((output / "server.json").exists())
-            self.assertEqual(verify_source(root, commit, output), 7)
+            self.assertEqual(verify_source(root, commit, output), 9)
             with self.assertRaises(FileExistsError):
                 export_source(root, "HEAD", output)
 

@@ -37,7 +37,8 @@ ref. It reads tracked blobs and modes from that ref, so uncommitted changes are 
 The output directory must not already exist. The export retains runtime sources, build and
 release tooling, required documentation, MCPB files, and `.gitattributes`; it omits tests,
 fixtures, examples, schemas, prototypes, review reports, plans, and memory files. It also
-removes test and fixture targets from both SwiftPM manifests, removes Xcode test target
+retains documentation images used by the README and the Swift 6 compatibility manifest, removes
+test and fixture targets from every included SwiftPM manifest, removes Xcode test target
 references and scheme entries, and strips Windows workflow smoke steps while retaining
 production build and packaging steps. The exported Windows build script keeps its build and
 installer modes without test-only switches.

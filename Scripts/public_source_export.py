@@ -24,6 +24,7 @@ from public_source_policy import is_public_path
 TRANSFORMED_FILES = {
     "Packages/BridgeCore/Package.swift",
     "Vendor/swift-sdk/Package.swift",
+    "Vendor/swift-sdk/Package@swift-6.0.swift",
     "CodexBridge.xcodeproj/project.pbxproj",
     "CodexBridge.xcodeproj/xcshareddata/xcschemes/CodexBridge.xcscheme",
     ".github/workflows/windows.yml",
@@ -114,12 +115,14 @@ def _write_entry(output, entry, source):
 
 
 def _transform_export(output):
-    package = output / "Packages/BridgeCore/Package.swift"
-    sdk = output / "Vendor/swift-sdk/Package.swift"
-    if package.is_file():
-        transform_manifest(package)
-    if sdk.is_file():
-        transform_manifest(sdk)
+    manifests = (
+        output / "Packages/BridgeCore/Package.swift",
+        output / "Vendor/swift-sdk/Package.swift",
+        output / "Vendor/swift-sdk/Package@swift-6.0.swift",
+    )
+    for manifest in manifests:
+        if manifest.is_file():
+            transform_manifest(manifest)
     project = output / "CodexBridge.xcodeproj/project.pbxproj"
     scheme = output / "CodexBridge.xcodeproj/xcshareddata/xcschemes/CodexBridge.xcscheme"
     if project.is_file():
@@ -183,7 +186,11 @@ def _check_exclusions(files):
 def _source_manifests(entries, blobs):
     values = {}
     for path, entry in entries.items():
-        if path in {"Packages/BridgeCore/Package.swift", "Vendor/swift-sdk/Package.swift"}:
+        if path in {
+            "Packages/BridgeCore/Package.swift",
+            "Vendor/swift-sdk/Package.swift",
+            "Vendor/swift-sdk/Package@swift-6.0.swift",
+        }:
             values[path] = blobs[entry.object_id].decode("utf-8")
     return values
 
