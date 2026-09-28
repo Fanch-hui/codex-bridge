@@ -220,7 +220,7 @@
       return true
     }
 
-    private static func enqueueAgentRegistration(
+    nonisolated private static func enqueueAgentRegistration(
       provider: IPCAgentProviderSummary,
       executablePath: String,
       configurationPath: String?,

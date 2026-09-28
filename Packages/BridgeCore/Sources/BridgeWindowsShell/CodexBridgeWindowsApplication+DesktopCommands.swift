@@ -86,12 +86,12 @@
         Task { @MainActor in await auxiliary.refreshModels(model: model) }
       case .setCodexExecutable:
         guard
-          let path = BridgeDesktopCommandValue.pathText(
+          let rawPath = BridgeDesktopCommandValue.pathText(
             payload.path,
             maximumUTF8Bytes: BridgeDesktopCommandValue.maximumExecutablePathBytes
           )
         else { return true }
-        let path = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        let path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
         Task { @MainActor in
           await auxiliary.connections.setCodexExecutablePath(path)
           await auxiliary.refreshModels(model: model)
