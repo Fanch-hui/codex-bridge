@@ -24,7 +24,7 @@
         let auxiliary = WindowsAuxiliaryRuntime(client: client, feedback: feedback)
         model.approvals = ["a", "b"].map {
           IPCApprovalSummary(
-            approvalID: $0, taskID: "task-\($0)", threadID: "thread-\($0)",
+            taskID: "task-\($0)", approvalID: $0, threadID: "thread-\($0)",
             turnID: "turn-\($0)", itemID: "item-\($0)", kind: "command", title: $0, summary: $0
           )
         }
