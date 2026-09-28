@@ -170,9 +170,43 @@ struct PiSessionStore: Sendable {
     guard AgentPathSemantics.isAbsolute(path), !path.contains("\0"),
       URL(fileURLWithPath: path).pathExtension.lowercased() == "jsonl"
     else { return false }
-    let url = URL(fileURLWithPath: path).standardizedFileURL
-    return url.path == url.resolvingSymlinksInPath().standardizedFileURL.path
+    #if os(Windows)
+      guard let components = windowsPathComponents(path) else { return false }
+      do {
+        try WindowsSecureFile.validateComponents(
+          rootPath: components.root, components: components.tail, includingFinal: true)
+        return true
+      } catch {
+        return false
+      }
+    #else
+      let url = URL(fileURLWithPath: path).standardizedFileURL
+      return url.path == url.resolvingSymlinksInPath().standardizedFileURL.path
+    #endif
   }
+
+  #if os(Windows)
+    private static func windowsPathComponents(_ path: String) -> (root: String, tail: [String])? {
+      guard let canonical = AgentPathSemantics.canonicalPath(path, style: .windows) else {
+        return nil
+      }
+      if canonical.hasPrefix("\\\\") {
+        let components = canonical.dropFirst(2).split(separator: "\\")
+        guard components.count >= 2 else { return nil }
+        return (
+          root: "\\\\\(components[0])\\\(components[1])",
+          tail: components.dropFirst(2).map(String.init)
+        )
+      }
+      guard canonical.count >= 3, canonical[canonical.index(after: canonical.startIndex)] == ":",
+        canonical[canonical.index(canonical.startIndex, offsetBy: 2)] == "\\"
+      else { return nil }
+      return (
+        root: String(canonical.prefix(2)),
+        tail: canonical.dropFirst(3).split(separator: "\\").map(String.init)
+      )
+    }
+  #endif
 
   static func samePath(_ lhs: String, _ rhs: String) -> Bool {
     AgentPathSemantics.isContained(lhs, in: rhs) && AgentPathSemantics.isContained(rhs, in: lhs)

@@ -47,24 +47,20 @@ extension BridgeDesktopUIStateBuilder {
   private static func nativeSessions(
     from model: BridgeServiceAppModel
   ) -> BridgeDesktopNativeSessionDirectoryState {
-    let installations = model.agentInstallations.compactMap {
-      item -> BridgeDesktopNativeSessionInstallation? in
-      guard item.providerID == "pi" || item.providerID == "qoder", item.isEnabled,
-        item.availability == "available"
-      else { return nil }
-      return BridgeDesktopNativeSessionInstallation(
-        installationID: item.installationID, providerID: item.providerID,
-        displayName: item.displayName, region: item.distribution)
+    let candidates = model.agentInstallations.map { item in
+      BridgeDesktopNativeSessionInstallationCandidate(
+        installationID: item.installationID,
+        providerID: item.providerID,
+        displayName: item.displayName,
+        region: item.distribution,
+        isEnabled: item.isEnabled,
+        availability: item.availability
+      )
     }
-    let prior = model.nativeSessionDirectory
-    return BridgeDesktopNativeSessionDirectoryState(
-      installations: installations, projectID: prior?.projectID,
-      installationID: prior?.installationID, selectedSessionID: prior?.selectedSessionID,
-      sessions: prior?.sessions ?? [], transcript: prior?.transcript ?? [],
-      nextOffset: prior?.nextOffset, transcriptNextOffset: prior?.transcriptNextOffset,
-      isOpen: prior?.isOpen ?? false,
-      isLoading: prior?.isLoading ?? false, statusMessage: prior?.statusMessage,
-      errorMessage: prior?.errorMessage)
+    return BridgeDesktopNativeSessionDirectoryPresentation.state(
+      candidates: candidates,
+      prior: model.nativeSessionDirectory
+    )
   }
 
   private static func projectStatus(
@@ -73,30 +69,23 @@ extension BridgeDesktopUIStateBuilder {
     if let taskID = model.selectedTaskID,
       let task = model.tasks.first(where: { $0.taskID == taskID })
     {
-      if hasPendingUserInput(task, model: model) {
+      let pendingUserInput = hasPendingUserInput(task, model: model)
+      if pendingUserInput {
         return ("等待回答", "warning")
       }
       if task.isRunning {
         return ("运行中", "running")
       }
       let status = displayStatus(task, model: model)
-      let tone = hasPendingUserInput(task, model: model) ? "warning" : statusTone(task.status)
+      let tone =
+        pendingUserInput
+        ? "warning" : BridgeDesktopWorkbenchPresentation.statusTone(for: task.status)
       return (status, tone)
     }
     if model.runningTaskCount > 0 {
       return ("运行中", "running")
     }
     return ("就绪", "success")
-  }
-
-  private static func statusTone(_ status: String) -> String {
-    switch status {
-    case "running", "starting": "running"
-    case "completed": "success"
-    case "failed": "error"
-    case "等待回答", "awaiting_local_approval", "waiting_for_codex_approval": "warning"
-    default: "neutral"
-    }
   }
 
   private static func engineStatus(from model: BridgeServiceAppModel) -> String {
@@ -114,27 +103,29 @@ extension BridgeDesktopUIStateBuilder {
     ).statusText
   }
 
-  private static let permissionOptions = [
-    BridgeDesktopChoice(id: "read-only", title: "只读", detail: "不写入项目文件"),
-    BridgeDesktopChoice(id: "workspace-write", title: "工作区可写", detail: "遵循项目权限与本机批准"),
-  ]
-
   private static func steerModes(
     from model: BridgeServiceAppModel
   ) -> [BridgeDesktopChoice] {
-    var result = [BridgeDesktopChoice(id: "queued", title: "当前轮结束后继续")]
-    guard let taskID = model.selectedTaskID,
+    return BridgeDesktopWorkbenchPresentation.steerModes(
+      supportsImmediateSteer: canSteerImmediately(
+        taskID: model.selectedTaskID, model: model
+      )
+    )
+  }
+
+  private static var permissionOptions: [BridgeDesktopChoice] {
+    BridgeDesktopWorkbenchPermissionMode.choices
+  }
+
+  private static func canSteerImmediately(
+    taskID: String?, model: BridgeServiceAppModel
+  ) -> Bool {
+    guard let taskID,
       let installationID = model.tasks.first(where: { $0.taskID == taskID })?.installationID,
       model.agentInstallations.first(where: { $0.installationID == installationID })?
         .effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
-    else { return result }
-    result.append(
-      BridgeDesktopChoice(
-        id: "interrupt-current-then-continue",
-        title: "立即纠偏当前轮"
-      )
-    )
-    return result
+    else { return false }
+    return true
   }
 
   private static func taskRow(

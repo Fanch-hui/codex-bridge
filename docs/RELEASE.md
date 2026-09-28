@@ -1,0 +1,134 @@
+# Release Process
+
+## App 更新清单
+
+桌面 App 每次进程启动读取一次 GitHub Release 的 `latest.json`，设置页支持手动检查。
+macOS 自动更新使用根目录包含 `CodexBridge.app` 的 ZIP；Windows 安装版使用 EXE，
+portable 使用 ZIP。安装前等待任务与 Direct 操作结束，并由 Service 暂停新任务进入。
+
+`Scripts/build-release-candidate.sh` 从 `Config/Base.xcconfig` 读取版本，并生成 macOS
+产物的清单。收齐本次发布的 Windows 与 macOS 产物后，用同一脚本生成最终合并清单，例如：
+
+```bash
+python3 Scripts/generate-update-manifest.py \
+  --output /absolute/release/latest.json \
+  --version 1.0.1 --tag v1.0.1 \
+  --notes-file /absolute/release/notes.md \
+  --asset macos arm64 app /absolute/release/CodexBridge-1.0.1-macos-arm64.zip \
+  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-1.0.1-Setup.exe \
+  --asset windows x64 portable /absolute/release/codex-bridge-windows-x64.zip
+```
+
+当前发布架构为 macOS `arm64` 与 Windows `x64`。每个清单条目包含固定版本的
+GitHub 下载地址、完整文件大小与 SHA-256，客户端仅选择精确匹配的条目。
+安装包、App 运行版本与 Release tag 必须一致。
+
+在 GitHub 草稿 Release 中上传全部安装包与最终清单，再发布为稳定版。已有 Release
+补齐产物时，最后上传 `latest.json`。清单生成后保持对应安装包内容不变。
+首次启用内置更新需要用户手动安装一次含更新模块的版本。
+
+本地验证覆盖版本和安装包校验、更新等待门禁、程序替换及编译；发布验收使用旧版本
+带项目、会话和浏览器 profile 升级，手动确认重启后的版本与原数据。
+
+## Public source archive
+
+`Scripts/export-public-source.py` exports a production-only source tree from a committed Git
+ref. It reads tracked blobs and modes from that ref, so uncommitted changes are not included.
+The output directory must not already exist. The export retains runtime sources, build and
+release tooling, required documentation, MCPB files, and `.gitattributes`; it omits tests,
+fixtures, examples, schemas, prototypes, review reports, plans, and memory files. It also
+retains documentation images used by the README and the Swift 6 compatibility manifest, removes
+test and fixture targets from every included SwiftPM manifest, removes Xcode test target
+references and scheme entries, and strips Windows workflow smoke steps while retaining
+production build and packaging steps. The exported Windows build script keeps its build and
+installer modes without test-only switches.
+
+Commit the intended source first, then export and verify the same immutable ref:
+
+```bash
+ref="$(git rev-parse HEAD)"
+output=".build/public-source-$(git rev-parse --short "$ref")"
+python3 Scripts/export-public-source.py export --ref "$ref" --output "$output"
+python3 Scripts/export-public-source.py verify --ref "$ref" --output "$output"
+```
+
+The verifier compares every untransformed exported file byte-for-byte with the selected Git
+tree, checks tracked file modes and required runtime resources, and rejects excluded paths,
+missing SwiftPM targets, dangling target references, stale Xcode test references, or Windows
+workflow references to omitted smoke assets. Review and publish the verified output directory;
+do not create a release archive from the mutable working tree.
+
+macOS 公开包使用 ad-hoc 签名。下载者首次打开 App 时需要手动确认 Gatekeeper 提示。配置 Developer ID 后可使用下方的证书签名流程。
+
+## 1. Prepare and verify the pinned helper
+
+Use a new output directory. The script downloads only the pinned OpenAI v0.0.10 archives, verifies their external SHA-256 values, produces a Universal 2 helper and records its unsigned digest. Before every public release, recheck the OpenAI Platform Tunnels page because control-plane support may move beyond this repository pin.
+
+```bash
+helper_root="$(mktemp -d)"
+Scripts/build-tunnel-helper.sh "$helper_root/tunnel"
+helper_sha="$(shasum -a 256 "$helper_root/tunnel/tunnel-client" | awk '{print $1}')"
+Scripts/verify-tunnel-helper.sh "$helper_root/tunnel" "$helper_sha"
+```
+
+Do not derive the trusted digest from the helper manifest inside an untrusted input directory. The separate value is part of the supply-chain boundary.
+
+## 2. Build Apple Silicon release candidates
+
+The output path must not exist. This command creates ad-hoc-signed `arm64` ZIP/DMG packages containing the App, Service and helper slice. It also generates an SPDX 2.3 dependency SBOM and SHA-256 files.
+
+```bash
+Scripts/build-release-candidate.sh \
+  /absolute/output/CodexBridge-candidate \
+  "$helper_root/tunnel" \
+  "$helper_sha" \
+  arm64
+```
+
+The generated filenames use the product version. Release assets include the DMG, ZIP, SBOM and `SHA256SUMS`.
+
+OpenCode、DeepSeek Harness 与 Antigravity 是用户安装或构建的外部运行时。App 包含对应适配器、共用的一键连接 UI 和 DSH `cordis.yml` 模板。DSH 一键配置将用户输入的 API key 保存到系统凭据存储，运行时经环境注入；高级手动 Profile 的 `.env` 由 Harness 自行加载。
+
+## 3. Optional Developer ID signing (not used for v0.4.0)
+
+Copy `Config/Signing.xcconfig.example` to an ignored local signing configuration or provide the equivalent values from the release environment. Never commit certificate material, private keys, notary credentials or Keychain profiles.
+
+For a future signed archive:
+
+1. stage and sign `Contents/Helpers/tunnel-client` first with the same Developer ID Application identity and Hardened Runtime options used for the App;
+2. compute `Contents/Helpers/tunnel-client.sha256` after helper signing;
+3. sign the outer App through Xcode;
+4. verify with `codesign --verify --deep --strict --verbose=2` and inspect the helper/App Team identifiers;
+5. run `Scripts/verify-release-hardening.sh /path/to/CodexBridge.app`;
+6. create ZIP and DMG from the signed App.
+
+The Xcode helper build phase performs steps 1–2 when a real expanded signing identity is present. `REQUIRE_TUNNEL_HELPER=YES`, `TUNNEL_HELPER_DIRECTORY` and `TUNNEL_HELPER_UNSIGNED_SHA256` must be supplied for a release archive. The hardening verifier is a final-artifact gate and must run after the App, embedded Service and helper have all been signed.
+
+## 4. Optional notarization and Gatekeeper (not used for v0.4.0)
+
+Submit only a signed artifact using a release-owned `notarytool` Keychain profile. After success, staple the App or DMG and verify:
+
+```bash
+xcrun notarytool submit CodexBridge-0.4.0-macos-arm64.dmg \
+  --keychain-profile PROFILE_NAME --wait
+xcrun stapler staple CodexBridge-0.4.0-macos-arm64.dmg
+xcrun stapler validate CodexBridge-0.4.0-macos-arm64.dmg
+spctl --assess --type open --context context:primary-signature --verbose=2 \
+  CodexBridge-0.4.0-macos-arm64.dmg
+```
+
+Recompute published checksums after stapling. Save notary output, `codesign` verification, `spctl` results, SBOM and checksums with the release record.
+
+## 5. Clean-machine acceptance
+
+Test both Apple Silicon and Intel when available:
+
+- drag-install, launch, quit and relaunch;
+- three-step Service, connection and project setup plus Keychain permission behavior;
+- background Service registration, App quit/relaunch and XPC reconnection without task shutdown;
+- local project registration, Thread reads, read-only tools and a locally approved write task;
+- bundled helper slices and Secure Tunnel connection with user-provided credentials;
+- sleep/wake, Tunnel reconnect, explicit background-Service disable and uninstall;
+- Gatekeeper assessment with no quarantine bypass.
+
+For the unsigned v0.4.0 packages, record each package architecture, helper digest, archive checksums, clean launch path and the user-owned ChatGPT/Tunnel acceptance separately. A local build or CI result does not claim a signed/notarized Gatekeeper result.

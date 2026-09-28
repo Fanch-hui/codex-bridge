@@ -73,13 +73,12 @@
           key: WindowsDesktopWorkbenchCacheKey(
             workbench: workbench,
             management: management,
+            settings: settings,
             browserAvailable: browserAvailable,
             browserURL: browserURL,
             browserStatus: browserStatus,
             browserCanGoBack: browserCanGoBack,
-            browserCanGoForward: browserCanGoForward,
-            modelRefreshInProgress: modelRefreshInProgress,
-            canRefreshModels: canRefreshModels
+            browserCanGoForward: browserCanGoForward
           )
         ) {
           workbenchPage(

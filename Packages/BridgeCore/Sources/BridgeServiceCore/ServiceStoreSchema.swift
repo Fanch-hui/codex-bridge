@@ -51,12 +51,7 @@ enum ServiceStoreSchema {
   static let migrationV20 = "BridgeServiceCore.v20"
   static let migrationV21 = "BridgeServiceCore.v21"
   static let migrationV22 = "BridgeServiceCore.v22"
-  static let knownMigrations: Set<String> = [
-    migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7,
-    migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13,
-    migrationV14, migrationV15, migrationV16, migrationV17, migrationV18, migrationV19,
-    migrationV20, migrationV21, migrationV22,
-  ]
+  static let knownMigrations = Set((1...version).map { "\(migrationPrefix)v\($0)" })
 
   static func prepare(_ database: DatabaseQueue) throws {
     do {
@@ -93,26 +88,9 @@ enum ServiceStoreSchema {
         )
       })
     else { return }
-    let backupSuffix: String
-    switch sourceVersion {
-    case 7: backupSuffix = ".pre-v8"
-    case 8: backupSuffix = ".pre-v9"
-    case 9: backupSuffix = ".pre-v10"
-    case 10: backupSuffix = ".pre-v11"
-    case 11: backupSuffix = ".pre-v12"
-    case 12: backupSuffix = ".pre-v13"
-    case 13: backupSuffix = ".pre-v14"
-    case 14: backupSuffix = ".pre-v15"
-    case 15: backupSuffix = ".pre-v16"
-    case 16: backupSuffix = ".pre-v17"
-    case 17: backupSuffix = ".pre-v18"
-    case 18: backupSuffix = ".pre-v19"
-    case 19: backupSuffix = ".pre-v20"
-    case 20: backupSuffix = ".pre-v21"
-    case 21: backupSuffix = ".pre-v22"
-    default: return
-    }
-    let backupPath = sourcePath + backupSuffix
+    guard sourceVersion >= 7, sourceVersion < version else { return }
+    let targetVersion = min(sourceVersion + 1, version)
+    let backupPath = sourcePath + ".pre-v\(targetVersion)"
     if FileManager.default.fileExists(atPath: backupPath) {
       do {
         try validatePrivateBackup(at: backupPath, expectedSchemaVersion: sourceVersion)
@@ -218,7 +196,8 @@ enum ServiceStoreSchema {
     let candidates = names.compactMap { name -> (path: String, version: Int64)? in
       guard name.hasPrefix(prefix),
         let targetVersion = Int64(name.dropFirst(prefix.count)),
-        (8...22).contains(targetVersion)
+        targetVersion >= 8,
+        targetVersion <= version
       else { return nil }
       return (
         URL(fileURLWithPath: directory).appendingPathComponent(name).path,

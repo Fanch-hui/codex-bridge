@@ -14,17 +14,17 @@ MCPB 客户端可使用其运行时。API key 由客户端的敏感配置管理�
 ## 发布
 
 1. 更新 `Integrations/MCPB/manifest.json`、`package.json` 与锁文件中的版本，
-   保持与目标 App Release 一致。
+   保持与 `Config/Base.xcconfig` 的 `MARKETING_VERSION` 一致；构建器会在打包前校验四处版本。
 2. 执行 `node Scripts/build-mcpb.mjs`。脚本在临时目录安装精确锁定的依赖，使用
    MCPB 官方打包工具生成 `.build/mcp-registry/codex-bridge-<version>.mcpb`
    和对应的 `server.json`。
-3. 将生成的 `server.json` 更新到仓库根目录。把 MCPB 文件上传到同版本的 GitHub
-   Release，与完整 App 安装包一起发布；已发布的 MCPB 版本保持不可变。
-4. 执行 `mcp-publisher validate`。本地发布使用 `mcp-publisher login github`
+3. 将生成的 MCPB 与 `server.json` 一起上传到同版本 GitHub Release，
+   与完整 App 安装包一起发布。已发布的 MCPB 版本保持不可变。
+4. 在生成的输出目录执行 `mcp-publisher validate`。本地发布使用 `mcp-publisher login github`
    完成人工设备授权，再执行 `mcp-publisher publish`。不要提交 publisher 凭据。
 5. `Publish MCP Registry` workflow 在正式 Release 发布后运行，也可通过
-   `workflow_dispatch` 指定版本。它下载 Release 中的 MCPB、核对根目录
-   `server.json` 的 SHA-256，使用 GitHub OIDC 认证并发布 Registry 元数据。
+   `workflow_dispatch` 指定版本。它检出目标 tag，下载该 Release 的 MCPB 与 `server.json`，
+   校验应用版本、包内 manifest、仓库身份与 SHA-256，再使用 GitHub OIDC 发布。
 
 MCPB 的官方验证方式为 GitHub/GitLab Release 下载地址与 `fileSha256`。
 仓库所有者由 Registry 的 GitHub 身份认证验证；本项目的下载地址使用同一 owner。
@@ -33,7 +33,7 @@ MCPB 的官方验证方式为 GitHub/GitLab Release 下载地址与 `fileSha256`
 发布后查询：
 
 ```sh
-curl --fail 'https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/latest'
+curl --fail 'https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Fanch-hui%2Fcodex-bridge/versions/latest'
 ```
 
 ## 官方规范

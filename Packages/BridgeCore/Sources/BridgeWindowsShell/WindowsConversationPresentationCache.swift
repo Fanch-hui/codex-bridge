@@ -36,24 +36,26 @@
         return presentations
       }
 
-      if entries.count >= sourceEntries.count,
-        Self.hasSameKeys(sourceEntries, entries)
-      {
+      let updatePlan = TaskConversationPresentationUpdatePlan(
+        previous: sourceEntries,
+        next: entries
+      )
+      if !updatePlan.needsFullRebuild {
         var next = presentations
         var nextLegacyTexts = legacyTexts
-        for index in sourceEntries.indices where sourceEntries[index] != entries[index] {
+        for index in updatePlan.changedEntryIndices {
           next[index] = WindowsConversationEntryPresenter.make(
             entries[index], providerID: providerID
           )
           nextLegacyTexts[index] = WindowsConversationEntryPresenter.legacyText(entries[index])
         }
-        if entries.count > sourceEntries.count {
+        if let appendedRange = updatePlan.appendedEntryRange {
           next.append(
-            contentsOf: entries.dropFirst(sourceEntries.count).map {
+            contentsOf: entries[appendedRange].map {
               WindowsConversationEntryPresenter.make($0, providerID: providerID)
             })
           nextLegacyTexts.append(
-            contentsOf: entries.dropFirst(sourceEntries.count).map(
+            contentsOf: entries[appendedRange].map(
               WindowsConversationEntryPresenter.legacyText
             ))
         }
@@ -90,17 +92,6 @@
       sourceEntries.removeAll(keepingCapacity: false)
       presentations.removeAll(keepingCapacity: false)
       legacyTexts.removeAll(keepingCapacity: false)
-    }
-
-    private static func hasSameKeys(
-      _ old: [TaskConversationModel.Entry],
-      _ new: [TaskConversationModel.Entry]
-    ) -> Bool {
-      guard new.count >= old.count else { return false }
-      for index in old.indices where old[index].key != new[index].key {
-        return false
-      }
-      return true
     }
   }
 

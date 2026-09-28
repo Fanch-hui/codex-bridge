@@ -189,20 +189,40 @@ extension BridgeServiceApplication {
     }
 
     let changedResult = try await runner.run(
-      argv: [git, "-C", root, "diff", "--cached", "--name-only"],
+      argv: [git, "-C", root, "diff", "--cached", "--name-only", "-z"],
       workingDirectory: root,
       environment: environment
     )
     guard changedResult.exitCode == 0 else {
       throw DirectGitCommitError.gitFailed(Self.gitSummary(changedResult.output))
     }
-    let changedFiles = changedResult.output.tail
-      .split(separator: "\n")
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
+    let changedFiles = try Self.parseChangedFiles(changedResult)
     guard !changedFiles.isEmpty else { return [] }
     try validateGitRelativePaths(changedFiles, root: root)
     return changedFiles
+  }
+
+  static func parseChangedFiles(_ result: DirectGitResult) throws -> [String] {
+    guard !result.output.truncated, let completeOutput = result.completeOutput else {
+      throw DirectGitCommitError.outputTruncated
+    }
+    guard completeOutput.count == result.output.byteCount else {
+      throw DirectGitCommitError.outputTruncated
+    }
+    guard !completeOutput.isEmpty else { return [] }
+    guard completeOutput.last == 0 else { throw DirectGitCommitError.malformedOutput }
+    let records = completeOutput.split(separator: 0, omittingEmptySubsequences: false)
+    guard records.last?.isEmpty == true,
+      records.dropLast().allSatisfy({ !$0.isEmpty })
+    else {
+      throw DirectGitCommitError.malformedOutput
+    }
+    return try records.dropLast().map { record in
+      guard let path = String(data: Data(record), encoding: .utf8) else {
+        throw DirectGitCommitError.malformedOutput
+      }
+      return path
+    }
   }
 
   private static func createCommit(
@@ -373,6 +393,12 @@ extension BridgeServiceApplication {
       return .commandTimeout
     case DirectGitCommitError.gitFailed(let summary):
       return .gitOperationFailed(summary)
+    case DirectGitCommitError.outputTruncated:
+      return .gitOperationFailed(
+        "Git's changed-file output exceeded the safe limit; no commit was created."
+      )
+    case DirectGitCommitError.malformedOutput:
+      return .gitOperationFailed("Git returned an invalid changed-file list.")
     default:
       return .unavailable
     }

@@ -1,17 +1,16 @@
-import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readReleaseConfiguration, registryMetadata } from './mcpb-release-metadata.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const source = join(root, 'Integrations', 'MCPB');
 const output = resolve(process.argv[2] ?? join(root, '.build', 'mcp-registry'));
-const manifest = JSON.parse(await readFile(join(source, 'manifest.json'), 'utf8'));
+const configuration = await readReleaseConfiguration(root);
+const { manifest } = configuration;
 const stage = await mkdtemp(join(tmpdir(), 'codex-bridge-mcpb-'));
-const registryName = 'io.github.Fanch-hui/codex-bridge';
-const repository = 'https://github.com/Fanch-hui/codex-bridge';
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -34,22 +33,8 @@ try {
   const artifactName = `codex-bridge-${manifest.version}.mcpb`;
   const artifact = join(output, artifactName);
   run('npx', ['--yes', '@anthropic-ai/mcpb@2.1.2', 'pack', stage, artifact]);
-  const digest = createHash('sha256').update(await readFile(artifact)).digest('hex');
-  const server = {
-    $schema: 'https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json',
-    name: registryName,
-    title: 'Codex Bridge',
-    description: 'Connect MCP clients to local Codex Bridge agents, projects, approvals and workspace tools.',
-    repository: { url: repository, source: 'github' },
-    websiteUrl: `${repository}#readme`,
-    version: manifest.version,
-    packages: [{
-      registryType: 'mcpb',
-      identifier: `${repository}/releases/download/v${manifest.version}/${artifactName}`,
-      fileSha256: digest,
-      transport: { type: 'stdio' },
-    }],
-  };
+  const server = await registryMetadata(configuration, artifact);
+  const digest = server.packages[0].fileSha256;
   await writeFile(join(output, 'server.json'), `${JSON.stringify(server, null, 2)}\n`);
   console.log(`MCPB: ${artifactName}\nSHA-256: ${digest}`);
 } finally {

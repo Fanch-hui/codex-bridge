@@ -10,6 +10,8 @@ public enum DirectGitError: Error, Equatable, Sendable {
 
 public enum DirectGitCommitError: Error, Equatable, Sendable {
   case gitFailed(String)
+  case outputTruncated
+  case malformedOutput
 }
 
 public struct DirectGitResult: Equatable, Sendable {

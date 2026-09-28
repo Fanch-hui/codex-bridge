@@ -1,3 +1,4 @@
+import BridgeDesktopUI
 import BridgeIPC
 import BridgeMCP
 import BridgeServiceAppCore
@@ -142,9 +143,10 @@ extension BridgeServiceAppModel {
   }
 
   func setWorkbenchPermissionMode(_ mode: String) {
-    guard mode == "read-only" || mode == "workspace-write",
-      mode != workbenchPermissionMode
+    guard let permissionMode = BridgeDesktopWorkbenchPermissionMode(rawValue: mode),
+      permissionMode.rawValue != workbenchPermissionMode
     else { return }
+    let mode = permissionMode.rawValue
     workbenchPermissionMode = mode
     updateWorkbenchPermissionModeState(mode)
     errorMessage = nil

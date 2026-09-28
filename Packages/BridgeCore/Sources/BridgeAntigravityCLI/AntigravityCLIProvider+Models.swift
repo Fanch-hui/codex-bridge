@@ -36,6 +36,11 @@ extension AntigravityCLIProvider {
     guard Self.succeeded(result.termination) else {
       throw Self.runtimeError(Self.processError(result.termination))
     }
+    guard !result.standardOutput.truncated,
+      result.standardOutput.byteCount == result.standardOutput.tail.utf8.count
+    else {
+      throw AgentRuntimeError.capabilityUnavailable(.modelSelection)
+    }
     let models = Self.parseModels(result.standardOutput.tail)
     guard !models.isEmpty else {
       throw AgentRuntimeError.capabilityUnavailable(.modelSelection)

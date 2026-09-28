@@ -2,22 +2,22 @@
 
 [简体中文](./README.md) · [English](./README_en.md)
 
-[Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/latest)
+[Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Fanch-hui%2Fcodex-bridge/versions/latest)
 
 Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, Antigravity, Pi, and Qoder.
 
 macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.3.0`.
+The current release is `v1.3.1`.
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest).
 
-| Platform | v1.3.0 package | Installation |
+| Platform | v1.3.1 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.3.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.3.0-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-1.3.1-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.3.1-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.

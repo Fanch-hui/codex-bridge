@@ -120,8 +120,10 @@ extension BridgeDesktopCommandRouter {
   ) {
     guard connected(model), tunnel(model)?.helperAvailable == true,
       let tunnelID = validatedID(payload.tunnelID, maximumBytes: 256),
-      let runtimeKey = validatedText(payload.runtimeKey, maximumBytes: 8 * 1_024),
-      !runtimeKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      let runtimeKey = BridgeDesktopCommandValue.nonBlankText(
+        payload.runtimeKey,
+        maximumUTF8Bytes: 8 * 1_024
+      )
     else { return }
     model.configureTunnel(tunnelID: tunnelID, runtimeKey: runtimeKey)
   }
@@ -231,11 +233,8 @@ extension BridgeDesktopCommandRouter {
     _ payload: BridgeDesktopCommandPayload,
     providerID: String
   ) -> String? {
-    guard providerID == "qoder",
-      let value = validatedID(payload.qoderDistribution, maximumBytes: 32),
-      value == "cn" || value == "international"
-    else { return nil }
-    return value
+    guard providerID == "qoder" else { return nil }
+    return BridgeDesktopCommandValue.qoderDistribution(payload.qoderDistribution)
   }
 
   private static func saveQoderRuntimeSettings(

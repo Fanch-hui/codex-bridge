@@ -1,9 +1,12 @@
 // swift-tools-version: 6.1
+
 import Foundation
 import PackageDescription
 
+
 var macOSOnlyProducts: [Product] = []
 var macOSOnlyTargets: [Target] = []
+
 var windowsApplicationLinkerFlags = [
   "-Xlinker", "/SUBSYSTEM:WINDOWS",
   "-Xlinker", "/ENTRY:mainCRTStartup",
@@ -19,12 +22,30 @@ var windowsApplicationLinkerFlags = [
 #endif
 
 #if !os(Windows)
-  macOSOnlyProducts = [.library(name: "BridgeServiceAppShell", targets: ["BridgeServiceAppShell"])]
+  macOSOnlyProducts = [
+    .library(name: "BridgeServiceAppShell", targets: ["BridgeServiceAppShell"]),
+    
+    
+    
+  ]
   macOSOnlyTargets = [
     .target(
       name: "BridgeServiceAppShell",
-      dependencies: ["BridgeDesktopUI", "BridgeIPC", "BridgeMCP", "BridgeServiceAppCore"])
+      dependencies: [
+        "BridgeAgentCore",
+        "BridgeDesktopUI",
+        "BridgeIPC",
+        "BridgeMCP",
+        "BridgeServiceAppCore",
+      ]
+    ),
+    
+    
+    
   ]
+#endif
+
+#if os(Windows)
 #endif
 
 let package = Package(
@@ -62,6 +83,7 @@ let package = Package(
       name: "codex-bridge-windows-app",
       targets: ["CodexBridgeWindowsApp"]
     ),
+    
   ] + macOSOnlyProducts,
   dependencies: [
     // Vendored MCP swift-sdk 0.12.1: upstream excludes the EventSource
@@ -330,5 +352,6 @@ let package = Package(
         )
       ]
     ),
+    
   ] + macOSOnlyTargets
 )

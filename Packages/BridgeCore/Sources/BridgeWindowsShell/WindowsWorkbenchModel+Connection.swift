@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -59,10 +60,11 @@
           ?? projects.first?.projectID
         try await synchronizeWorkbenchProject()
         guard isCurrentConnection(requestGeneration) else { return }
-        workbenchPermissionMode =
-          Self.permissionModes.contains(status.workbenchPermissionMode ?? "")
-          ? status.workbenchPermissionMode!
-          : workbenchPermissionMode
+        if let mode = status.workbenchPermissionMode,
+          BridgeDesktopWorkbenchPermissionMode(rawValue: mode) != nil
+        {
+          workbenchPermissionMode = mode
+        }
         errorMessage = nil
         await refreshTasks()
         guard isCurrentConnection(requestGeneration), connectionState == .connected else { return }
@@ -266,7 +268,8 @@
         var changed = serviceStatus != status
         serviceStatus = status
         if let mode = status.workbenchPermissionMode,
-          Self.permissionModes.contains(mode), workbenchPermissionMode != mode
+          BridgeDesktopWorkbenchPermissionMode(rawValue: mode) != nil,
+          workbenchPermissionMode != mode
         {
           workbenchPermissionMode = mode
           changed = true

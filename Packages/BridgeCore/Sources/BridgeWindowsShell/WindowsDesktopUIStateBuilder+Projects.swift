@@ -19,9 +19,9 @@
         workspaceState = BridgeDesktopWorkspaceState(
           fileWritePermission: workspace.fileWritePermission,
           commandMode: workspace.commandMode,
-          commandModeOptions: workspace.commandModeValues.map {
-            choice($0, workspaceModeLabel($0))
-          },
+          commandModeOptions: workspace.commandModeValues.map(
+            BridgeDesktopProjectPresentation.workspaceCommandModeChoice
+          ),
           commands: workspace.commands,
           blacklist: workspace.blacklist,
           canSaveMode: workspace.saveModeEnabled,
@@ -43,18 +43,10 @@
         rows: projectRows,
         selectedProjectID: selectedProjectID,
         selectedProjectDetail: selectedProject.map { _ in management.project.detailText },
-        policyOptions: policyOptions,
-        readOptions: [choice("denied", "拒绝"), choice("allowed", "允许")],
-        writeOptions: [
-          choice("denied", "拒绝"),
-          choice("requiresLocalApproval", "需要本机批准"),
-          choice("allowed", "允许"),
-        ],
-        networkOptions: [
-          choice("denied", "拒绝"),
-          choice("requiresLocalApproval", "需要本机批准"),
-          choice("allowed", "允许"),
-        ],
+        policyOptions: BridgeDesktopProjectPresentation.policyOptions,
+        readOptions: BridgeDesktopProjectPresentation.readPermissionOptions,
+        writeOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
+        networkOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
         workspace: workspaceState,
         verificationCommands: workspace?.verificationCommands ?? [],
         threadCount: workspace?.threadCount,
@@ -70,19 +62,5 @@
       )
     }
 
-    private static let policyOptions = [
-      choice("denied", "拒绝"),
-      choice("requiresLocalApproval", "需要本机批准"),
-      choice("allowed", "允许"),
-    ]
-
-    private static func workspaceModeLabel(_ mode: String) -> String {
-      switch mode {
-      case "denied": "禁止直接执行"
-      case "safe": "安全模式"
-      case "full": "完全模式"
-      default: mode
-      }
-    }
   }
 #endif

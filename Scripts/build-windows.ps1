@@ -1,9 +1,7 @@
 # Builds the Windows targets (service daemon and desktop shell) for the host
 # architecture. Run on a Windows machine with the Swift 6.3.3 toolchain:
-#   powershell -File Scripts\build-windows.ps1 [-Test] [-Installer] [-OutDir path]
+#   powershell -File Scripts\build-windows.ps1 [-Installer] [-OutDir path]
 param(
-  [switch]$Test,
-  [string]$TestFilter = "",
   [switch]$Installer,
   [string]$OutDir = ".build\windows-dist",
   [string]$VcpkgRoot = "",
@@ -128,26 +126,6 @@ $env:INCLUDE = (@($vcpkgIncludeDirectory, $originalInclude) |
 $env:LIB = (@($vcpkgLibraryDirectory, $originalLib) |
     Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ";"
 
-if ($Test -or -not [string]::IsNullOrWhiteSpace($TestFilter)) {
-  $sqliteRuntimeDirectory = Join-Path $vcpkgRootValue "installed\$vcpkgTriplet\bin"
-  if (-not (Test-Path (Join-Path $sqliteRuntimeDirectory "sqlite3.dll"))) {
-    throw "SQLite runtime is unavailable: $sqliteRuntimeDirectory\sqlite3.dll"
-  }
-  $testPaths = @($sqliteRuntimeDirectory)
-  if (-not [string]::IsNullOrWhiteSpace($env:SDKROOT)) {
-    $archSubdir = if ($architecture -eq "arm64") { "bin64a" } else { "bin64" }
-    $devLibraryRoot = Join-Path (Split-Path -Parent (Split-Path -Parent ([IO.Path]::GetFullPath($env:SDKROOT)))) "Library"
-    if (Test-Path $devLibraryRoot) {
-      Get-ChildItem -LiteralPath $devLibraryRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        $candidate = Join-Path $_.FullName "usr\$archSubdir"
-        if (Test-Path $candidate) {
-          $testPaths += $candidate
-        }
-      }
-    }
-  }
-  $env:PATH = (@($testPaths) + @($originalPath)) -join ";"
-}
 
 Push-Location $packagePath
 try {
@@ -167,78 +145,40 @@ try {
     throw "Swift build output directory was empty."
   }
 
-  if ($Test -or -not [string]::IsNullOrWhiteSpace($TestFilter)) {
-    $filters = if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-      @($TestFilter)
-    } else {
-      @(
-        "BridgeDomainTests",
-        "BridgeAgentCoreTests",
-        "BridgeSecurityTests",
-        "BridgeFilesWindowsTests",
-        "BridgeCodexRPCTests",
-        "BridgeProcessWindowsTests",
-        "BridgeDesktopUITests",
-        "BridgeServiceAppCoreTests",
-        "BridgeServiceHostWindowsTests",
-        "BridgeTunnelWindowsTests",
-        "BridgeCodexServiceWindowsTests",
-        "BridgeConversationWindowsTests",
-        "BridgeServiceApplicationWindowsTests",
-        "BridgeServiceCoreWindowsTests",
-        "BridgeDirectCommandWindowsTests",
-        "BridgeDirectCommandPolicyWindowsTests",
-        "BridgeDeepSeekHarnessACPWindowsTests",
-        "BridgeWindowsShellTests"
-      )
-    }
-    foreach ($testFilter in $filters) {
-      $testArgs = @("test") + $swiftArguments + @("--filter", $testFilter)
-      if ($testFilter -eq "BridgeSecurityTests") {
-        $testArgs += @("--skip", "WindowsCredentialStoreTests")
-      }
-      swift @testArgs
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-  }
 
-  # Test-only runs stop here: packaging needs the Tunnel helper, which may have
-  # to be downloaded, and tests do not consume the portable package.
-  if (-not $Test -or $Installer -or -not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
-    $portableDir = Join-Path $resolvedOutDir $architecture
-    $stageScript = Join-Path $repoRoot "Scripts\stage-windows-portable.ps1"
-    $stageArguments = @{
-      BinPath = $binPath
-      OutDir = $portableDir
-      Architecture = $architecture
-      VcpkgTriplet = $vcpkgTriplet
-    }
-    if ($targetTriple) {
-      $stageArguments["TargetTriple"] = $targetTriple
-    }
-    if ($resolvedVcpkgRoot) {
-      $stageArguments["VcpkgRoot"] = $resolvedVcpkgRoot
-    }
-    if ($resolvedVCRedistRoot) {
-      $stageArguments["VCRedistRoot"] = $resolvedVCRedistRoot
-    }
-    if (-not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
-      $resolvedTunnelClientDir = if ([IO.Path]::IsPathRooted($TunnelClientDir)) {
-        [IO.Path]::GetFullPath($TunnelClientDir)
-      } else {
-        [IO.Path]::GetFullPath((Join-Path $repoRoot $TunnelClientDir))
-      }
-      $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
-    } else {
-      $resolvedTunnelClientDir = Join-Path $resolvedOutDir "tunnel-client"
-      & (Join-Path $repoRoot "Scripts\stage-windows-tunnel-client.ps1") `
-        -Architecture $architecture -Destination $resolvedTunnelClientDir
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
-    }
-    & $stageScript @stageArguments
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  $portableDir = Join-Path $resolvedOutDir $architecture
+  $stageScript = Join-Path $repoRoot "Scripts\stage-windows-portable.ps1"
+  $stageArguments = @{
+    BinPath = $binPath
+    OutDir = $portableDir
+    Architecture = $architecture
+    VcpkgTriplet = $vcpkgTriplet
   }
+  if ($targetTriple) {
+    $stageArguments["TargetTriple"] = $targetTriple
+  }
+  if ($resolvedVcpkgRoot) {
+    $stageArguments["VcpkgRoot"] = $resolvedVcpkgRoot
+  }
+  if ($resolvedVCRedistRoot) {
+    $stageArguments["VCRedistRoot"] = $resolvedVCRedistRoot
+  }
+  if (-not [string]::IsNullOrWhiteSpace($TunnelClientDir)) {
+    $resolvedTunnelClientDir = if ([IO.Path]::IsPathRooted($TunnelClientDir)) {
+      [IO.Path]::GetFullPath($TunnelClientDir)
+    } else {
+      [IO.Path]::GetFullPath((Join-Path $repoRoot $TunnelClientDir))
+    }
+    $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
+  } else {
+    $resolvedTunnelClientDir = Join-Path $resolvedOutDir "tunnel-client"
+    & (Join-Path $repoRoot "Scripts\stage-windows-tunnel-client.ps1") `
+      -Architecture $architecture -Destination $resolvedTunnelClientDir
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
+  }
+  & $stageScript @stageArguments
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   if ($Installer) {
     $installerOutDir = Join-Path $repoRoot ".build\windows-installer\$architecture"
