@@ -57,7 +57,6 @@
 .detail-item { min-width: 0; }
 .detail-item dt { color: var(--text-secondary); font-size: 11px; }
 .detail-item dd { margin: 3px 0 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.task-list { display: grid; gap: 4px; }
 .task-row { align-items: flex-start; padding: 9px; }
 .task-row .status-badge { flex: 0 0 auto; }
 .task-row .row-detail { white-space: normal; }
@@ -146,7 +145,6 @@
 .project-session-list .list-row, .project-thread-list .list-row { padding: 9px 8px; }
 .project-session-list .list-row.selected { background: var(--accent-soft); }
 .project-thread-list { padding-top: 2px; }
-.project-thread-row .row-detail { white-space: normal; overflow-wrap: anywhere; }
 .project-skill-list { padding-top: 2px; }
 .skill-row { display: grid; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--separator); border-radius: 8px; background: var(--surface-muted); }
 .skill-heading { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }

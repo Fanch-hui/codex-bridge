@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDesktopUI
 import BridgeIPC
 import Foundation

@@ -54,4 +54,24 @@ final class WorkbenchConversationPresentationTests: XCTestCase {
     XCTAssertEqual(selected?.taskID, task.taskID)
     XCTAssertTrue(selected?.isCodexTask == true)
   }
+
+  @MainActor
+  func testDesktopConversationCacheReusesStableEntriesDuringStreaming() {
+    let first = TaskConversationModel.Entry(
+      key: "first", role: "agent", kind: "agent", content: "ready", isFinal: true
+    )
+    let streaming = TaskConversationModel.Entry(
+      key: "second", role: "agent", kind: "agent", content: "part", isFinal: false
+    )
+    var cache = BridgeDesktopConversationPresentationCache()
+    let initial = cache.update(taskID: "task", providerID: "codex", entries: [first, streaming])
+
+    var completed = streaming
+    completed.content = "complete"
+    completed.isFinal = true
+    let updated = cache.update(taskID: "task", providerID: "codex", entries: [first, completed])
+
+    XCTAssertEqual(updated[0], initial[0])
+    XCTAssertNotEqual(updated[1], initial[1])
+  }
 }

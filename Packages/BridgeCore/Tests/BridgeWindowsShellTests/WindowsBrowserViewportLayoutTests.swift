@@ -109,26 +109,6 @@
       XCTAssertEqual(rect.bottom, 600)
     }
 
-    func testViewportCommandPreservesReportedGeometry() {
-      let viewport = BridgeDesktopBrowserViewport(
-        x: 120,
-        y: 48,
-        width: 640,
-        height: 420,
-        visible: true
-      )
-      let envelope = BridgeDesktopCommandEnvelope(
-        requestID: "viewport-1",
-        command: .updateBrowserViewport,
-        payload: BridgeDesktopCommandPayload(viewport: viewport)
-      )
-
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: envelope),
-        .updateBrowserViewport(viewport: viewport)
-      )
-    }
-
     func testWebViewThreadRoutesOnlyWindowMessagesToDispatch() {
       var threadMessage = MSG()
       threadMessage.message = UINT(WM_APP + 4)

@@ -101,6 +101,27 @@
       XCTAssertEqual(appended[2].text, "next")
     }
 
+    func testConversationCacheRebuildsWhenTheStablePrefixChanges() {
+      let first = TaskConversationModel.Entry(
+        key: "first", role: "agent", kind: "agent", content: "one", isFinal: true
+      )
+      let second = TaskConversationModel.Entry(
+        key: "second", role: "agent", kind: "agent", content: "two", isFinal: true
+      )
+      var cache = WindowsConversationPresentationCache()
+      _ = cache.update(taskID: "task", providerID: "codex", entries: [first, second])
+
+      let reordered = cache.update(
+        taskID: "task",
+        providerID: "codex",
+        entries: [second, first]
+      )
+
+      XCTAssertEqual(reordered.map(\.id), ["second", "first"])
+      XCTAssertEqual(
+        cache.text(isStreaming: false, errorMessage: nil), "Agent：two\r\n\r\nAgent：one")
+    }
+
     private func makeTask(
       id: String,
       projectID: String,

@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeDesktopUI
   import BridgeIPC
   import BridgeMCP
   import BridgeServiceAppCore
@@ -30,10 +31,20 @@
         for id in ["a", "b"] {
           XCTAssertTrue(
             CodexBridgeWindowsApplication.runDesktopCommand(
-              .resolveTaskApproval(
-                approvalID: id, taskID: "task-\(id)", decision: "deny",
-                oneTimeToolAutoApproval: false
-              ), model: model, management: management, auxiliary: auxiliary
+              .desktopCommand(
+                BridgeDesktopCommandEnvelope(
+                  requestID: "approval-\(id)",
+                  command: .resolveApproval,
+                  payload: BridgeDesktopCommandPayload(
+                    approvalID: id,
+                    taskID: "task-\(id)",
+                    decision: "deny"
+                  )
+                )
+              ),
+              model: model,
+              management: management,
+              auxiliary: auxiliary
             )
           )
         }

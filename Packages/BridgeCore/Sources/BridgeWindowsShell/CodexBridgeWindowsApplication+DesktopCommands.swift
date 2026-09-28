@@ -1,8 +1,5 @@
 #if os(Windows)
   import BridgeDesktopUI
-  import BridgeIPC
-  import BridgeMCP
-  import BridgeServiceAppCore
   import Foundation
 
   extension CodexBridgeWindowsApplication {
@@ -13,466 +10,141 @@
       auxiliary: WindowsAuxiliaryRuntime
     ) -> Bool {
       switch command {
-      case .setBrowserEnabled(let enabled):
-        model.setChatBrowserEnabled(enabled)
-        updateBrowserMemoryPolicy(model: model)
-        return true
-      case .scanAgents:
-        Task { @MainActor in await management.refreshAgents(forceRefresh: true) }
-        return true
-      case .refreshModels:
-        Task { @MainActor in await auxiliary.refreshModels(model: model) }
-        return true
-      case .setCodexExecutablePath(let path):
-        Task { @MainActor in
-          await auxiliary.connections.setCodexExecutablePath(path)
-          await auxiliary.refreshModels(model: model)
-        }
-        return true
-      case .loadEarlierConversation(let taskID):
-        guard model.selectedTaskID == taskID,
-          let conversation = model.conversation,
-          conversation.taskID == taskID
-        else { return true }
-        Task { @MainActor in
-          await conversation.loadEarlier()
-          guard model.selectedTaskID == taskID, model.conversation === conversation else { return }
-          model.refreshDisplaySnapshot()
-        }
-        return true
-      case .refreshConversation(let taskID):
-        guard model.selectedTaskID == taskID, let task = model.selectedTask else { return true }
-        model.openConversation(for: task)
-        model.refreshDisplaySnapshot()
-        return true
-      case .setWorkbenchPermissionMode(let mode):
-        guard let permissionMode = BridgeDesktopWorkbenchPermissionMode(rawValue: mode) else {
-          return true
-        }
-        Task { @MainActor in await model.selectWorkbenchPermission(permissionMode) }
-        return true
-      case .selectTaskByID(id: let taskID):
-        model.selectTask(id: taskID)
-        synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
-        selectedPage = .workbench
-        onUI { WindowsMainWindow.selectPage(.workbench) }
-        return true
-      case .interruptTask(let taskID):
-        Task { @MainActor in await model.interruptTask(id: taskID) }
-        return true
-      case .stopTask(let taskID):
-        Task { @MainActor in await model.stopTask(id: taskID) }
-        return true
-      case .deleteTask(let taskID):
-        Task { @MainActor in await model.deleteTask(id: taskID) }
-        return true
-      case .deleteSession(let taskID):
-        Task { @MainActor in await model.deleteSession(containingTaskID: taskID) }
-        return true
-      case .manageNativeAgentSession(let request):
-        Task { @MainActor in await model.manageNativeSessionDirectory(request) }
-        return true
-      case .closeNativeSessionDirectory:
-        model.closeNativeSessionDirectory()
-        return true
-      case .continueNativeAgentSession(
-        let projectID, let providerID, let installationID, let sessionID, let prompt, _
-      ):
-        Task { @MainActor in
-          await model.continueNativeAgentSession(
-            projectID: projectID, providerID: providerID, installationID: installationID,
-            sessionID: sessionID, prompt: prompt)
-        }
-        return true
-      case .steerTask(let taskID, let input, let mode, let requestID):
-        guard let steerMode = MCPTaskSteerMode(rawValue: mode) else { return true }
-        Task { @MainActor in
-          _ = await model.submitSteer(
-            taskID: taskID, input: input, mode: steerMode, requestID: requestID
-          )
-        }
-        return true
-      case .resumeTask(
-        let taskID, let input, let requestID, let queueIfBusy, let skillNames, let attachmentPaths):
-        Task { @MainActor in
-          await model.resumeTask(
-            id: taskID, input: input, requestID: requestID, queueIfBusy: queueIfBusy,
-            skillNames: skillNames, attachmentPaths: attachmentPaths)
-        }
-        return true
-      case .handoffTask(
-        let taskID, let providerID, let prompt, let requestID, let action, let handoffID,
-        let revision):
-        Task { @MainActor in
-          await model.handoffTask(
-            id: taskID, providerID: providerID, prompt: prompt, requestID: requestID,
-            action: action, handoffID: handoffID, revision: revision)
-        }
-        return true
-      case .restartTask(
-        let taskID, let requestID, let queueIfBusy, let skillNames, let attachmentPaths):
-        Task { @MainActor in
-          await model.restartTask(
-            id: taskID, requestID: requestID, queueIfBusy: queueIfBusy,
-            skillNames: skillNames, attachmentPaths: attachmentPaths)
-        }
-        return true
-      case .rejectWorkbenchCommand(let requestID, let command, let taskID, let input):
-        model.rejectWorkbenchCommand(
-          requestID: requestID,
-          command: command,
-          taskID: taskID,
-          input: input,
-          message: "工作台命令无法执行。"
-        )
-        return true
-      case .resolveTaskApproval(
-        let approvalID,
-        let taskID,
-        let decision,
-        let oneTimeToolAutoApproval,
-        let answersJSON):
-        return resolveTaskApproval(
-          approvalID: approvalID,
-          taskID: taskID,
-          decision: decision,
-          oneTimeToolAutoApproval: oneTimeToolAutoApproval,
-          answersJSON: answersJSON,
-          model: model
-        )
-      case .resolveDirectApproval(let approvalID, let decision):
-        return resolveDirectApproval(
-          approvalID: approvalID,
-          decision: decision,
-          model: model
-        )
-      case .selectProjectByID, .beginProjectRegistration, .removeProject, .saveProjectPolicyByID,
-        .setProjectCommandMode, .saveProjectCommand, .removeProjectCommand,
-        .saveProjectBlacklist, .removeProjectBlacklist, .openThread:
-        return runDesktopProjectCommand(
-          command,
+      case .desktopCommand(let envelope):
+        return runDesktopUICommand(
+          envelope,
           model: model,
           management: management,
           auxiliary: auxiliary
         )
-      case .selectLogByID(let id, let taskID):
-        guard
-          let index = auxiliary.logs.displayBox.current().rowsTyped.firstIndex(where: {
-            $0.id == id && (taskID == nil || $0.taskID == taskID)
-          })
-        else { return true }
-        auxiliary.logs.selectItem(at: index)
-        return true
-      case .setLogProjectFilterByID(let projectID):
-        let display = auxiliary.logs.displayBox.current()
-        let target = projectID ?? "all"
-        guard let index = display.projectOptions.firstIndex(where: { $0.id == target }) else {
-          return true
-        }
-        auxiliary.logs.setProjectFilter(index)
-        return true
-      case .setLogKindFilterByID(let kind):
-        guard let index = ["all", "command", "file", "other"].firstIndex(of: kind) else {
-          return true
-        }
-        auxiliary.logs.setKindFilter(index)
-        return true
-      case .setMCPClientEnabled(let id, let enabled):
-        guard let index = auxiliary.connections.clients.firstIndex(where: { $0.clientID == id })
-        else {
-          return true
-        }
-        auxiliary.connections.selectClient(at: index)
-        guard auxiliary.connections.clients[index].enabled != enabled else { return true }
-        Task { @MainActor in await auxiliary.connections.toggleSelectedClient(clientID: id) }
-        return true
-      case .setMCPClientExposure(let id, let exposureMode):
-        guard
-          let clientIndex = auxiliary.connections.clients.firstIndex(where: { $0.clientID == id }),
-          let modeIndex = ["read-only", "full"].firstIndex(of: exposureMode)
-        else { return true }
-        auxiliary.connections.selectClient(at: clientIndex)
-        Task { @MainActor in
-          await auxiliary.connections.setSelectedExposure(at: modeIndex, clientID: id)
-        }
-        return true
-      case .copyMCPClientConfiguration(let id):
-        guard let index = auxiliary.connections.clients.firstIndex(where: { $0.clientID == id })
-        else {
-          return true
-        }
-        auxiliary.connections.selectClient(at: index)
-        auxiliary.run(.copySelectedMCPConfiguration)
-        return true
-      case .rotateMCPClientCredential(let id):
-        guard let index = auxiliary.connections.clients.firstIndex(where: { $0.clientID == id })
-        else {
-          return true
-        }
-        auxiliary.connections.selectClient(at: index)
-        Task { @MainActor in await auxiliary.connections.rotateSelectedCredential(clientID: id) }
-        return true
-      case .saveDeepSeekHarnessMCPServer(let request):
-        Task { @MainActor in await auxiliary.connections.saveDeepSeekHarnessMCPServer(request) }
-        return true
-      case .deleteDeepSeekHarnessMCPServer(let id, let scope):
-        Task {
-          @MainActor in
-          await auxiliary.connections.deleteDeepSeekHarnessMCPServer(id: id, scope: scope)
-        }
-        return true
-      case .setDeepSeekHarnessMCPServerEnabled(let id, let enabled, let scope):
-        Task {
-          @MainActor in
-          await auxiliary.connections.setDeepSeekHarnessMCPServerEnabled(
-            id: id,
-            enabled: enabled,
-            scope: scope
-          )
-        }
-        return true
-      case .selectAgentMCPScope(let scope):
-        auxiliary.connections.selectAgentMCPScope(scope)
-        return true
-      case .configureTunnel, .connectTunnel, .disconnectTunnel, .clearTunnel:
-        return runTunnelCommand(command, connections: auxiliary.connections)
-      case .selectAgent(let id):
-        if let index = management.agentInstallations.firstIndex(where: { $0.installationID == id })
-        {
-          management.selectInstallation(at: index)
-        } else if let index = management.agentProviders.firstIndex(where: { $0.providerID == id }) {
-          management.selectProvider(at: index)
-        }
-        return true
-      case .connectAgentFromDesktop(
-        let providerID,
-        let baseURL,
-        let apiKey,
-        let alwaysProceedConfirmed,
-        let qoderDistribution,
-        let installationID
-      ):
-        Task { @MainActor in
-          await management.connectAgent(
-            providerID: providerID,
-            baseURL: baseURL,
-            apiKey: apiKey,
-            alwaysProceedConfirmed: alwaysProceedConfirmed,
-            qoderDistribution: qoderDistribution,
-            installationID: installationID
-          )
-          await auxiliary.agentDefaults.refresh()
-        }
-        return true
-      case .setAgentEnabled(let id, let enabled):
-        guard
-          let index = management.agentInstallations.firstIndex(where: { $0.installationID == id })
-        else {
-          return true
-        }
-        management.selectInstallation(at: index)
-        Task { @MainActor in
-          await management.setSelectedAgentEnabled(enabled, installationID: id)
-          await auxiliary.agentDefaults.refresh()
-        }
-        return true
-      case .reprobeAgent(let id, let acceptReplacement):
-        guard
-          let index = management.agentInstallations.firstIndex(where: { $0.installationID == id })
-        else {
-          return true
-        }
-        management.selectInstallation(at: index)
-        Task { @MainActor in
-          await management.reprobeSelectedAgent(
-            acceptReplacement: acceptReplacement, installationID: id)
-          await auxiliary.agentDefaults.refresh()
-        }
-        return true
-      case .removeAgent(let id):
-        guard
-          let index = management.agentInstallations.firstIndex(where: { $0.installationID == id })
-        else {
-          return true
-        }
-        management.selectInstallation(at: index)
-        Task { @MainActor in
-          await management.removeSelectedAgent(installationID: id)
-          await auxiliary.agentDefaults.refresh()
-        }
-        return true
-      case .beginAgentRegistration(let providerID, let qoderDistribution):
-        let targetProvider: IPCAgentProviderSummary? = {
-          if let providerID {
-            return management.agentProviders.first(where: { $0.providerID == providerID })
-          }
-          return management.agentProviders.first
-        }()
-        guard let provider = targetProvider else { return true }
-        let dialogTitle: String = {
-          if provider.providerID == "opencode" {
-            return "选择 OpenCode 命令行工具 (opencode.cmd 或 opencode.exe)"
-          }
-          return "选择 \(provider.displayName) 命令行可执行文件"
-        }()
-        WindowsDesktopUIHostActions.chooseExecutableFile(
-          title: dialogTitle
-        ) { executablePath in
-          if provider.requiresConfiguration {
-            WindowsDesktopUIHostActions.chooseConfigFile(
-              title: "选择 \(provider.displayName) 配置文件 (cordis.yml)"
-            ) { configPath in
-              WindowsMainWindow.enqueue(
-                .registerAgentFromDesktop(
-                  providerID: provider.providerID,
-                  displayName: provider.displayName,
-                  executablePath: executablePath,
-                  configurationPath: configPath,
-                  qoderDistribution: qoderDistribution
-                )
-              )
-            }
-          } else {
-            WindowsMainWindow.enqueue(
-              .registerAgentFromDesktop(
-                providerID: provider.providerID,
-                displayName: provider.displayName,
-                executablePath: executablePath,
-                configurationPath: nil,
-                qoderDistribution: qoderDistribution
-              )
-            )
-          }
-        }
-        return true
       case .registerAgentFromDesktop(
-        let providerID, let displayName, let executablePath, let configurationPath,
+        let providerID,
+        let displayName,
+        let executablePath,
+        let configurationPath,
         let qoderDistribution):
-        Task { @MainActor in
-          await management.registerAgent(
-            providerID: providerID,
-            executablePath: executablePath,
-            configurationPath: configurationPath ?? "",
-            displayName: displayName,
-            qoderDistribution: qoderDistribution
-          )
-          await auxiliary.agentDefaults.refresh()
-        }
-        return true
-      case .setQoderRuntimeSettings(let settings):
-        Task { @MainActor in
-          await management.setQoderRuntimeSettings(settings)
-        }
-        return true
-      case .refreshAgentModelsByID(let providerID, let installationID):
-        Task { @MainActor in
-          await auxiliary.agentDefaults.refreshModels(
-            providerID: providerID,
-            installationID: installationID,
-            forceRefresh: true
-          )
-        }
-        return true
-      case .saveAgentDefault(
-        let providerID, let installationID, let modelID, let permissionMode, let effort):
-        Task { @MainActor in
-          await auxiliary.agentDefaults.saveDefaults(
-            providerID: providerID,
-            installationID: installationID,
-            model: modelID,
-            permissionMode: permissionMode,
-            effort: effort ?? ""
-          )
-        }
-        return true
-      case .refreshAgentNativePermission, .setAgentNativePermissionMode,
-        .addAgentNativePermissionRule, .replaceAgentNativePermissionRule,
-        .removeAgentNativePermissionRule, .prepareAgentPermissionRemediation,
-        .applyAgentPermissionRemediation:
-        return runNativePermissionCommand(
-          command,
-          model: model,
-          agentDefaults: auxiliary.agentDefaults
+        return registerAgentFromDesktop(
+          providerID: providerID,
+          displayName: displayName,
+          executablePath: executablePath,
+          configurationPath: configurationPath,
+          qoderDistribution: qoderDistribution,
+          management: management,
+          auxiliary: auxiliary
         )
-      case .patchSettings(let patch):
-        Task { @MainActor in await auxiliary.settings.applyPreferencesPatch(patch) }
-        return true
-      case .registerService:
-        Task { @MainActor in await auxiliary.settings.registerService() }
-        return true
-      case .unregisterService:
-        Task { @MainActor in await auxiliary.settings.unregisterService() }
-        return true
-      case .setKeepServiceRunning(let keep):
-        auxiliary.settings.setKeepServiceRunningAfterExit(keep)
-        return true
-      case .dismissFeedback(let id):
-        model.feedback.dismiss(id: id)
-        return true
-      case .updateBrowserViewport(let viewport):
-        WindowsMainWindow.applyBrowserViewport(viewport)
-        return true
       default:
         return false
       }
     }
 
-    private static func resolveTaskApproval(
-      approvalID: String,
-      taskID: String,
-      decision: String,
-      oneTimeToolAutoApproval: Bool,
-      answersJSON: String?,
-      model: WindowsWorkbenchModel
+    private static func runDesktopUICommand(
+      _ envelope: BridgeDesktopCommandEnvelope,
+      model: WindowsWorkbenchModel,
+      management: WindowsManagementModel,
+      auxiliary: WindowsAuxiliaryRuntime
     ) -> Bool {
-      guard
-        let index = model.approvalPresentationItems().firstIndex(where: { item in
-          item.id == .task(approvalID)
-        }), model.approvals.contains(where: { $0.approvalID == approvalID && $0.taskID == taskID })
-      else { return true }
-      let requiresAnswers =
-        model.approvals.first { $0.approvalID == approvalID }?.kind == "user_input"
-      let cancellingInput = requiresAnswers && decision == "cancel"
-      let answers = decodeAnswers(answersJSON)
-      guard cancellingInput ? answersJSON == nil : !requiresAnswers || answers != nil else {
-        return true
-      }
-      model.selectApproval(at: index)
-      Task { @MainActor in
-        await model.resolveApproval(
-          .task(approvalID),
-          decision: decision,
-          oneTimeToolAutoApproval: oneTimeToolAutoApproval,
-          answers: answers
+      runDesktopWindowCommand(envelope, model: model, management: management, auxiliary: auxiliary)
+        || runDesktopWorkbenchCommand(
+          envelope,
+          model: model,
+          management: management,
+          auxiliary: auxiliary
         )
+        || runDesktopProjectCommand(
+          envelope,
+          model: model,
+          management: management,
+          auxiliary: auxiliary
+        )
+        || runDesktopConnectionCommand(envelope, management: management, auxiliary: auxiliary)
+        || runDesktopNativePermissionCommand(
+          envelope,
+          model: model,
+          agentDefaults: auxiliary.agentDefaults
+        )
+        || runDesktopSettingsCommand(envelope, auxiliary: auxiliary)
+        || runDesktopLogCommand(envelope, auxiliary: auxiliary)
+    }
+
+    private static func runDesktopWindowCommand(
+      _ envelope: BridgeDesktopCommandEnvelope,
+      model: WindowsWorkbenchModel,
+      management: WindowsManagementModel,
+      auxiliary: WindowsAuxiliaryRuntime
+    ) -> Bool {
+      let payload = envelope.payload
+      switch envelope.command {
+      case .refresh:
+        refreshAll(model: model, management: management, auxiliary: auxiliary)
+      case .checkAppUpdate:
+        appUpdater?.check()
+      case .installAppUpdate:
+        appUpdater?.install()
+      case .deferAppUpdate:
+        appUpdater?.deferUpdate()
+      case .refreshModels:
+        Task { @MainActor in await auxiliary.refreshModels(model: model) }
+      case .setCodexExecutable:
+        guard
+          let path = BridgeDesktopCommandValue.pathText(
+            payload.path,
+            maximumUTF8Bytes: BridgeDesktopCommandValue.maximumExecutablePathBytes
+          )
+        else { return true }
+        let path = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task { @MainActor in
+          await auxiliary.connections.setCodexExecutablePath(path)
+          await auxiliary.refreshModels(model: model)
+        }
+      case .scanAgents:
+        Task { @MainActor in await management.refreshAgents(forceRefresh: true) }
+      case .selectPage:
+        guard let navigation = payload.navigation else { return true }
+        selectPage(
+          WindowsMainPage(navigation), model: model, management: management, auxiliary: auxiliary)
+      case .openWorkbench:
+        selectPage(.workbench, model: model, management: management, auxiliary: auxiliary)
+      case .openProjects:
+        selectPage(.projects, model: model, management: management, auxiliary: auxiliary)
+      case .openConnections:
+        selectPage(.connections, model: model, management: management, auxiliary: auxiliary)
+      case .openSettings:
+        selectPage(.settings, model: model, management: management, auxiliary: auxiliary)
+      case .openLogs:
+        selectPage(.logs, model: model, management: management, auxiliary: auxiliary)
+      case .openExternalURL:
+        guard let url = BridgeDesktopExternalURL.resolve(payload.value) else { return true }
+        onUI { openExternalURL(url.absoluteString) }
+      case .copyTunnelID:
+        guard let id = model.serviceStatus?.tunnel.tunnelID, !id.isEmpty else { return true }
+        if WindowsClipboard.write(id, owner: WindowsMainWindow.currentWindow()) {
+          management.feedback.postToast("已复制 Tunnel ID")
+        } else {
+          management.feedback.postAlert("无法复制 Tunnel ID")
+        }
+      case .updateBrowserViewport:
+        guard let viewport = payload.viewport else { return true }
+        WindowsMainWindow.applyBrowserViewport(viewport)
+      case .dismissFeedback:
+        guard let feedbackID = BridgeDesktopCommandValue.nonEmpty(payload.feedbackID) else {
+          return true
+        }
+        model.feedback.dismiss(id: feedbackID)
+      default:
+        return false
       }
       return true
     }
 
-    private static func decodeAnswers(_ rawValue: String?) -> [String: [String]]? {
-      guard let rawValue else { return nil }
-      guard rawValue.utf8.count <= 64 * 1_024,
-        let data = rawValue.data(using: .utf8),
-        let answers = try? JSONDecoder().decode([String: [String]].self, from: data),
-        !answers.isEmpty
-      else { return nil }
-      return answers
+    static func selectPage(
+      _ page: WindowsMainPage,
+      model: WindowsWorkbenchModel,
+      management: WindowsManagementModel,
+      auxiliary: WindowsAuxiliaryRuntime
+    ) {
+      selectedPage = page
+      onUI { WindowsMainWindow.selectPage(page) }
+      refresh(page: page, model: model, management: management, auxiliary: auxiliary)
     }
-
-    private static func resolveDirectApproval(
-      approvalID: String,
-      decision: String,
-      model: WindowsWorkbenchModel
-    ) -> Bool {
-      guard
-        let index = model.approvalPresentationItems().firstIndex(where: { item in
-          item.id == .direct(approvalID)
-        })
-      else { return true }
-      model.selectApproval(at: index)
-      Task { @MainActor in await model.resolveApproval(.direct(approvalID), decision: decision) }
-      return true
-    }
-
   }
 #endif

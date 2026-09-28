@@ -1,11 +1,8 @@
-import Foundation
+import BridgeAgentCore
 
-public enum BridgeDesktopAgentMCPScope: String, CaseIterable, Codable, Sendable {
-  case deepSeekHarness = "deepseek-harness"
-  case pi
-  case qoderCN = "qoder.cn"
-  case qoderInternational = "qoder.international"
+public typealias BridgeDesktopAgentMCPScope = AgentMCPScope
 
+extension AgentMCPScope {
   public var displayName: String {
     switch self {
     case .deepSeekHarness: "DeepSeek Harness"

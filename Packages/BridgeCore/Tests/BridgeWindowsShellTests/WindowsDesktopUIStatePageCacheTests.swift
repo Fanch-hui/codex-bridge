@@ -70,13 +70,12 @@
       let baseWorkbench = WindowsDesktopWorkbenchCacheKey(
         workbench: workbench,
         management: management,
+        settings: nil,
         browserAvailable: true,
         browserURL: nil,
         browserStatus: nil,
         browserCanGoBack: false,
-        browserCanGoForward: false,
-        modelRefreshInProgress: false,
-        canRefreshModels: true
+        browserCanGoForward: false
       )
 
       workbench.history = BridgeDesktopThreadHistoryState(
@@ -112,13 +111,12 @@
         WindowsDesktopWorkbenchCacheKey(
           workbench: workbench,
           management: management,
+          settings: nil,
           browserAvailable: true,
           browserURL: nil,
           browserStatus: nil,
           browserCanGoBack: false,
-          browserCanGoForward: false,
-          modelRefreshInProgress: false,
-          canRefreshModels: true
+          browserCanGoForward: false
         )
       )
     }

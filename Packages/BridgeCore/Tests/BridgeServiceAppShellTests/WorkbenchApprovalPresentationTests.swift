@@ -3,39 +3,6 @@ import XCTest
 @testable import BridgeServiceAppShell
 
 final class WorkbenchApprovalPresentationTests: XCTestCase {
-  func testFirstPendingApprovalRequestsReveal() {
-    XCTAssertTrue(
-      WorkbenchApprovalPresentation.shouldReveal(
-        previous: [],
-        current: ["codex:approval-1"]
-      )
-    )
-  }
-
-  func testAdditionalPendingApprovalRequestsReveal() {
-    XCTAssertTrue(
-      WorkbenchApprovalPresentation.shouldReveal(
-        previous: ["codex:approval-1"],
-        current: ["codex:approval-1", "direct:approval-1"]
-      )
-    )
-  }
-
-  func testUnchangedOrResolvedApprovalsDoNotRequestReveal() {
-    XCTAssertFalse(
-      WorkbenchApprovalPresentation.shouldReveal(
-        previous: ["codex:approval-1"],
-        current: ["codex:approval-1"]
-      )
-    )
-    XCTAssertFalse(
-      WorkbenchApprovalPresentation.shouldReveal(
-        previous: ["codex:approval-1"],
-        current: []
-      )
-    )
-  }
-
   func testTranscriptToolPresentationUsesCodexStyleActivityLabels() {
     XCTAssertEqual(
       CodexTranscriptPresentation.tool(name: "read_files", status: "completed"),
@@ -48,71 +15,6 @@ final class WorkbenchApprovalPresentationTests: XCTestCase {
     XCTAssertEqual(
       CodexTranscriptPresentation.tool(name: "command_execution", status: "failed"),
       CodexTranscriptToolPresentation(title: "运行命令", systemImage: "terminal")
-    )
-  }
-
-  func testTaskModelPresentationUsesActualTaskValues() {
-    XCTAssertEqual(
-      WorkbenchTaskModelPresentation.label(
-        modelID: "gpt-5.6-luna",
-        effort: "max",
-        displayName: "Luna"
-      ),
-      "Luna · Max"
-    )
-    XCTAssertEqual(
-      WorkbenchTaskModelPresentation.label(
-        modelID: "gpt-5.6-sol",
-        effort: "high",
-        displayName: nil
-      ),
-      "gpt-5.6-sol · High"
-    )
-    XCTAssertEqual(
-      WorkbenchTaskModelPresentation.label(
-        modelID: "deepseek-chat",
-        effort: nil,
-        displayName: "DeepSeek Chat"
-      ),
-      "DeepSeek Chat"
-    )
-    XCTAssertEqual(
-      WorkbenchTaskModelPresentation.label(
-        modelID: "gemini-3.7-flash-high",
-        effort: "provider-default",
-        displayName: nil
-      ),
-      "gemini-3.7-flash-high"
-    )
-    XCTAssertEqual(
-      WorkbenchTaskModelPresentation.label(
-        modelID: "provider-default",
-        effort: "provider-default",
-        displayName: nil
-      ),
-      "Provider 默认（未报告具体模型）"
-    )
-    XCTAssertNil(
-      WorkbenchTaskModelPresentation.label(
-        modelID: nil,
-        effort: "high",
-        displayName: nil
-      )
-    )
-  }
-
-  func testOpenCodePermissionPresentationUsesNativePlanAndBuild() {
-    XCTAssertEqual(
-      WorkbenchAgentPermissionPresentation.title("workspace-write"),
-      "Build（工作区可写）"
-    )
-    XCTAssertEqual(
-      WorkbenchAgentPermissionPresentation.title("read-only"),
-      "Plan（只读）"
-    )
-    XCTAssertEqual(
-      WorkbenchAgentPermissionPresentation.title(nil),
-      "权限未记录"
     )
   }
 

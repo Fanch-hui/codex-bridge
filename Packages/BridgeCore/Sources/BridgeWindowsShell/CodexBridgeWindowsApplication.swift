@@ -81,147 +81,17 @@
         updateWindowVisibility(visible, model: model)
       case .selectPage(let index):
         guard let page = WindowsMainPage(rawValue: index) else { return }
-        selectedPage = page
-        onUI { WindowsMainWindow.selectPage(page) }
-        refresh(page: page, model: model, management: management, auxiliary: auxiliary)
+        selectPage(page, model: model, management: management, auxiliary: auxiliary)
       case .refreshAll:
         refreshAll(model: model, management: management, auxiliary: auxiliary)
-      case .checkAppUpdate:
-        appUpdater?.check()
-      case .installAppUpdate:
-        appUpdater?.install()
-      case .deferAppUpdate:
-        appUpdater?.deferUpdate()
-      case .openTask(let id):
-        model.selectTask(id: id)
-        synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
-        selectedPage = .workbench
-        onUI { WindowsMainWindow.selectPage(.workbench) }
-      case .browserBack:
-        onUI { WindowsMainWindow.chat?.goBack() }
-      case .browserForward:
-        onUI { WindowsMainWindow.chat?.goForward() }
-      case .browserReload:
-        onUI { WindowsMainWindow.chat?.reload() }
-      case .openExternalURL(let value):
-        onUI { openExternalURL(value) }
-      case .copyTunnelID:
-        guard let id = model.serviceStatus?.tunnel.tunnelID, !id.isEmpty else { return }
-        if WindowsClipboard.write(id, owner: WindowsMainWindow.currentWindow()) {
-          management.feedback.postToast("已复制 Tunnel ID")
-        } else {
-          management.feedback.postAlert("无法复制 Tunnel ID")
-        }
-      case .openChatExternally:
-        onUI { openChatExternally() }
-      case .refreshTasks:
-        Task { await model.refreshSelectedTask() }
-      case .startService:
-        Task {
-          await model.startServiceAndConnect()
-          await management.refresh()
-        }
-      case .selectTask(let index):
-        model.selectTask(at: index)
-        synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
-      case .selectWorkbenchProject(let index):
-        management.selectProject(at: index)
-        auxiliary.run(.selectWorkspaceProject(index: index))
-        Task { await model.selectWorkbenchProject(at: index) }
-      case .selectWorkbenchPermission(let index):
-        Task { await model.selectWorkbenchPermission(at: index) }
-      case .selectWorkbenchItem(let index):
-        Task { await model.selectWorkbenchItem(at: index) }
-      case .interruptSelectedTask:
-        Task { await model.interruptSelectedTask() }
-      case .stopSelectedTask:
-        Task { await model.stopSelectedTask() }
-      case .deleteSelectedTask:
-        Task { await model.deleteSelectedTask() }
-      case .submitSteer(let input):
-        Task { await model.submitSteer(input: input) }
-      case .selectApproval(let index):
-        model.selectApproval(at: index)
-      case .refreshApprovals:
-        Task { await model.refreshApprovals() }
-      case .resolveApproval(let decision):
-        guard let approvalID = model.selectedApprovalID else { return }
-        Task { await model.resolveApproval(approvalID, decision: decision) }
-      case .selectProject(let index):
-        management.selectProject(at: index)
-        auxiliary.run(.selectWorkspaceProject(index: index))
-        Task { await model.selectWorkbenchProject(at: index) }
-      case .selectWorkspaceProject(let index):
-        auxiliary.run(.selectWorkspaceProject(index: index))
-        management.selectProject(at: index)
-        Task { await model.selectWorkbenchProject(at: index) }
-      case .refreshProjects:
-        Task { await management.refreshProjects() }
       case .registerProject(let name, let path):
         Task {
           await management.registerProject(name: name, path: path)
           await model.connectAndRefresh()
-          auxiliary.run(.refreshWorkspace)
+          await auxiliary.workspace.refreshSelected()
         }
-      case .removeSelectedProject:
-        guard let projectID = management.selectedProjectID else { return }
-        Task {
-          await management.removeSelectedProject(projectID: projectID)
-          await model.connectAndRefresh()
-          auxiliary.run(.refreshWorkspace)
-        }
-      case .saveProjectPolicy(let read, let write, let network):
-        guard let projectID = management.selectedProjectID else { return }
-        Task {
-          await management.saveSelectedProjectPolicy(
-            read: read,
-            write: write,
-            network: network,
-            projectID: projectID
-          )
-        }
-      case .selectAgentProvider(let index):
-        management.selectProvider(at: index)
-      case .selectAgentInstallation(let index):
-        management.selectInstallation(at: index)
-      case .refreshAgents:
-        Task { await management.refreshAgents() }
-      case .registerAgent(let providerID, let executablePath, let configurationPath):
-        Task {
-          await management.registerAgent(
-            providerID: providerID,
-            executablePath: executablePath,
-            configurationPath: configurationPath
-          )
-          await auxiliary.agentDefaults.refresh()
-        }
-      case .enableSelectedAgent:
-        guard let id = management.selectedInstallationID else { return }
-        Task {
-          await management.setSelectedAgentEnabled(true, installationID: id)
-          await auxiliary.agentDefaults.refresh()
-        }
-      case .disableSelectedAgent:
-        guard let id = management.selectedInstallationID else { return }
-        Task {
-          await management.setSelectedAgentEnabled(false, installationID: id)
-          await auxiliary.agentDefaults.refresh()
-        }
-      case .reprobeSelectedAgent(let acceptReplacement):
-        guard let id = management.selectedInstallationID else { return }
-        Task {
-          await management.reprobeSelectedAgent(
-            acceptReplacement: acceptReplacement, installationID: id)
-          await auxiliary.agentDefaults.refresh()
-        }
-      case .removeSelectedAgent:
-        guard let id = management.selectedInstallationID else { return }
-        Task {
-          await management.removeSelectedAgent(installationID: id)
-          await auxiliary.agentDefaults.refresh()
-        }
-      default:
-        auxiliary.run(command)
+      case .desktopCommand, .registerAgentFromDesktop:
+        return
       }
     }
 
@@ -229,7 +99,7 @@
       WindowsUIThread.shared.enqueue(action)
     }
 
-    private static func refresh(
+    static func refresh(
       page: WindowsMainPage,
       model: WindowsWorkbenchModel,
       management: WindowsManagementModel,
@@ -247,20 +117,22 @@
         Task { await management.refreshProjects() }
         Task { await auxiliary.workspace.refresh() }
       case .logs:
-        auxiliary.run(.refreshLogs)
+        Task { await auxiliary.logs.refresh() }
       case .connections:
-        auxiliary.run(.refreshMCPConnections)
         Task {
+          await auxiliary.connections.refresh()
           await management.refreshAgents()
           await auxiliary.agentDefaults.refresh()
         }
       case .settings:
-        auxiliary.run(.refreshSettings)
-        auxiliary.run(.refreshAgentDefaults)
+        Task {
+          await auxiliary.settings.refresh()
+          await auxiliary.agentDefaults.refresh()
+        }
       }
     }
 
-    private static func refreshAll(
+    static func refreshAll(
       model: WindowsWorkbenchModel,
       management: WindowsManagementModel,
       auxiliary: WindowsAuxiliaryRuntime

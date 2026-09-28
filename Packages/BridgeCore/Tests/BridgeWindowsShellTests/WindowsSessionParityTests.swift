@@ -5,28 +5,6 @@
   @testable import BridgeWindowsShell
 
   final class WindowsSessionParityTests: XCTestCase {
-    func testRetryCommandsRouteWithStableTaskIdentity() {
-      let resume = BridgeDesktopCommandEnvelope(
-        requestID: "resume-1",
-        command: .resumeTask,
-        payload: .init(taskID: "task-1", input: "继续完成剩余测试")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: resume),
-        .resumeTask(id: "task-1", input: "继续完成剩余测试", requestID: "resume-1")
-      )
-
-      let restart = BridgeDesktopCommandEnvelope(
-        requestID: "restart-1",
-        command: .restartTask,
-        payload: .init(taskID: "task-1")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: restart),
-        .restartTask(id: "task-1", requestID: "restart-1")
-      )
-    }
-
     func testSessionRowCarriesLatestTaskAndWholeSessionCapabilities() {
       let row = BridgeDesktopTaskRow(
         taskID: "task-2",

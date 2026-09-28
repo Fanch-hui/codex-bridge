@@ -47,24 +47,20 @@ extension BridgeDesktopUIStateBuilder {
   private static func nativeSessions(
     from model: BridgeServiceAppModel
   ) -> BridgeDesktopNativeSessionDirectoryState {
-    let installations = model.agentInstallations.compactMap {
-      item -> BridgeDesktopNativeSessionInstallation? in
-      guard item.providerID == "pi" || item.providerID == "qoder", item.isEnabled,
-        item.availability == "available"
-      else { return nil }
-      return BridgeDesktopNativeSessionInstallation(
-        installationID: item.installationID, providerID: item.providerID,
-        displayName: item.displayName, region: item.distribution)
+    let candidates = model.agentInstallations.map { item in
+      BridgeDesktopNativeSessionInstallationCandidate(
+        installationID: item.installationID,
+        providerID: item.providerID,
+        displayName: item.displayName,
+        region: item.distribution,
+        isEnabled: item.isEnabled,
+        availability: item.availability
+      )
     }
-    let prior = model.nativeSessionDirectory
-    return BridgeDesktopNativeSessionDirectoryState(
-      installations: installations, projectID: prior?.projectID,
-      installationID: prior?.installationID, selectedSessionID: prior?.selectedSessionID,
-      sessions: prior?.sessions ?? [], transcript: prior?.transcript ?? [],
-      nextOffset: prior?.nextOffset, transcriptNextOffset: prior?.transcriptNextOffset,
-      isOpen: prior?.isOpen ?? false,
-      isLoading: prior?.isLoading ?? false, statusMessage: prior?.statusMessage,
-      errorMessage: prior?.errorMessage)
+    return BridgeDesktopNativeSessionDirectoryPresentation.state(
+      candidates: candidates,
+      prior: model.nativeSessionDirectory
+    )
   }
 
   private static func projectStatus(

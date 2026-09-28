@@ -37,7 +37,10 @@ extension BridgeDesktopCommandRouter {
       providerID == "pi" || providerID == "qoder",
       let installationID = validatedID(payload.installationID, maximumBytes: 256),
       let sessionID = validatedID(payload.sessionID, maximumBytes: 256),
-      let prompt = validatedText(payload.input, maximumBytes: 32 * 1_024)
+      let prompt = BridgeDesktopCommandValue.nonBlankText(
+        payload.input,
+        maximumUTF8Bytes: BridgeDesktopCommandValue.maximumWorkbenchPromptBytes
+      )
     else { return }
     model.continueNativeAgentSession(
       projectID: projectID, providerID: providerID, installationID: installationID,

@@ -91,46 +91,6 @@ final class WindowsServiceRegistrationTests: XCTestCase {
   }
 
   #if os(Windows)
-    func testCommandRouterRoutesServiceCommands() {
-      let registerEnvelope = BridgeDesktopCommandEnvelope(
-        requestID: "req-1",
-        command: .registerService
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: registerEnvelope),
-        .registerService
-      )
-
-      let unregisterEnvelope = BridgeDesktopCommandEnvelope(
-        requestID: "req-2",
-        command: .unregisterService
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: unregisterEnvelope),
-        .unregisterService
-      )
-
-      let keepRunningEnvelope = BridgeDesktopCommandEnvelope(
-        requestID: "req-3",
-        command: .setKeepServiceRunning,
-        payload: BridgeDesktopCommandPayload(keepServiceRunningAfterExit: true)
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: keepRunningEnvelope),
-        .setKeepServiceRunning(true)
-      )
-
-      let stopRunningEnvelope = BridgeDesktopCommandEnvelope(
-        requestID: "req-4",
-        command: .setKeepServiceRunning,
-        payload: BridgeDesktopCommandPayload(keepServiceRunningAfterExit: false)
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: stopRunningEnvelope),
-        .setKeepServiceRunning(false)
-      )
-    }
-
     func testStateBuilderReflectsServiceRegistration() {
       let settingsRegistered = makeSettings(
         keepServiceRunningAfterExit: true,

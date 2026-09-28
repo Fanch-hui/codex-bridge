@@ -177,196 +177,26 @@
       XCTAssertEqual(state.workbench?.browser.url, "https://chatgpt.com/c/example")
     }
 
-    func testSharedCommandsRouteToStablePageAndTaskIdentifiers() {
-      let refresh = BridgeDesktopCommandEnvelope(
-        requestID: "refresh-1",
-        command: .refresh
-      )
-      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: refresh), .refreshAll)
-
-      let refreshModels = BridgeDesktopCommandEnvelope(
-        requestID: "refresh-models-1",
-        command: .refreshModels
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: refreshModels),
-        .refreshModels
-      )
-
-      let page = BridgeDesktopCommandEnvelope(
-        requestID: "page-1",
-        command: .selectPage,
-        payload: .init(navigation: .projects)
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: page),
-        .selectPage(index: WindowsMainPage.projects.rawValue)
-      )
-
-      let task = BridgeDesktopCommandEnvelope(
-        requestID: "task-1",
-        command: .openTask,
-        payload: .init(taskID: "task-42")
-      )
-      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: task), .openTask(id: "task-42"))
-
-      let endpoint = BridgeDesktopCommandEnvelope(
-        requestID: "endpoint-1",
-        command: .copyLocalMCPEndpoint
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: endpoint),
-        .copyLocalMCPEndpoint
-      )
-
-      let browser = BridgeDesktopCommandEnvelope(
-        requestID: "browser-1",
-        command: .setBrowserEnabled,
-        payload: .init(enabled: false)
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: browser),
-        .setBrowserEnabled(enabled: false)
-      )
-
-      let immediateSteer = BridgeDesktopCommandEnvelope(
-        requestID: "steer-1",
-        command: .steerTask,
-        payload: .init(
-          taskID: "task-42",
-          input: "修正方向",
-          mode: "interrupt-current-then-continue"
+    func testDesktopCommandsStayTypedOnTheWindowQueue() {
+      let envelopes = [
+        BridgeDesktopCommandEnvelope(requestID: "refresh-1", command: .refresh),
+        BridgeDesktopCommandEnvelope(
+          requestID: "page-1", command: .selectPage, payload: .init(navigation: .projects)),
+        BridgeDesktopCommandEnvelope(
+          requestID: "task-1", command: .openTask, payload: .init(taskID: "task-42")),
+        BridgeDesktopCommandEnvelope(
+          requestID: "settings-1", command: .setExecutionModel,
+          payload: .init(modelID: "gpt-5.6")),
+        BridgeDesktopCommandEnvelope(
+          requestID: "tunnel-1", command: .configureTunnel,
+          payload: .init(tunnelID: "tunnel-9", runtimeKey: "runtime-key")),
+      ]
+      for envelope in envelopes {
+        XCTAssertEqual(
+          WindowsDesktopUICommandRouter.command(for: envelope),
+          .desktopCommand(envelope)
         )
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: immediateSteer),
-        .steerTask(
-          id: "task-42",
-          input: "修正方向",
-          mode: "interrupt-current-then-continue",
-          requestID: "steer-1"
-        )
-      )
-
-      let resume = BridgeDesktopCommandEnvelope(
-        requestID: "resume-1",
-        command: .resumeTask,
-        payload: .init(taskID: "task-42", input: "继续完成")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: resume),
-        .resumeTask(id: "task-42", input: "继续完成", requestID: "resume-1")
-      )
-
-      let restart = BridgeDesktopCommandEnvelope(
-        requestID: "restart-1",
-        command: .restartTask,
-        payload: .init(taskID: "task-42")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: restart),
-        .restartTask(id: "task-42", requestID: "restart-1")
-      )
-
-      let deleteSession = BridgeDesktopCommandEnvelope(
-        requestID: "delete-session-1",
-        command: .deleteSession,
-        payload: .init(taskID: "task-42", sessionID: "session-9")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: deleteSession),
-        .deleteSession(taskID: "task-42")
-      )
-
-      let providerDefault = BridgeDesktopCommandEnvelope(
-        requestID: "agent-default-1",
-        command: .saveAgentDefault,
-        payload: .init(
-          providerID: "opencode",
-          installationID: "installation-1",
-          modelID: nil,
-          permissionMode: "build"
-        )
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: providerDefault),
-        .saveAgentDefault(
-          providerID: "opencode",
-          installationID: "installation-1",
-          modelID: nil,
-          permissionMode: "build",
-          effort: nil
-        )
-      )
-      let providerPermissionOnly = BridgeDesktopCommandEnvelope(
-        requestID: "agent-permission-only-1",
-        command: .saveAgentDefault,
-        payload: .init(
-          providerID: "antigravity",
-          permissionMode: "workspace-write"
-        )
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: providerPermissionOnly),
-        .saveAgentDefault(
-          providerID: "antigravity",
-          installationID: nil,
-          modelID: nil,
-          permissionMode: "workspace-write",
-          effort: nil
-        )
-      )
-
-      let agentConnection = BridgeDesktopCommandEnvelope(
-        requestID: "agent-connect-1",
-        command: .connectAgent,
-        payload: .init(
-          providerID: "deepseek-harness",
-          baseURL: "https://api.example.test",
-          apiKey: "secret"
-        )
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: agentConnection),
-        .connectAgentFromDesktop(
-          providerID: "deepseek-harness",
-          baseURL: "https://api.example.test",
-          apiKey: "secret",
-          alwaysProceedConfirmed: false,
-          qoderDistribution: nil,
-          installationID: nil
-        )
-      )
-
-      let executionModel = BridgeDesktopCommandEnvelope(
-        requestID: "settings-1",
-        command: .setExecutionModel,
-        payload: .init(modelID: "gpt-5.6")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: executionModel),
-        .patchSettings(BridgeDesktopSettingsPatch(executionModel: "gpt-5.6"))
-      )
-
-      let fastMode = BridgeDesktopCommandEnvelope(
-        requestID: "settings-2",
-        command: .setFastMode,
-        payload: .init(fastModeEnabled: true)
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: fastMode),
-        .patchSettings(BridgeDesktopSettingsPatch(fastModeEnabled: true))
-      )
-
-      let dismiss = BridgeDesktopCommandEnvelope(
-        requestID: "feedback-1",
-        command: .dismissFeedback,
-        payload: .init(feedbackID: "windows-feedback-7")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: dismiss),
-        .dismissFeedback(id: "windows-feedback-7")
-      )
+      }
     }
 
     func testWindowsUsesSharedAgentPermissions() {
@@ -393,52 +223,6 @@
 
       XCTAssertEqual(option.reasoningCapabilitiesAvailable, false)
       XCTAssertEqual(option.isDefaultModel, true)
-    }
-
-    func testTunnelCommandsRouteToServiceBackedWindowCommands() {
-      let connect = BridgeDesktopCommandEnvelope(
-        requestID: "tunnel-1",
-        command: .connectTunnel
-      )
-      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: connect), .connectTunnel)
-
-      let disconnect = BridgeDesktopCommandEnvelope(
-        requestID: "tunnel-2",
-        command: .disconnectTunnel
-      )
-      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: disconnect), .disconnectTunnel)
-
-      let clear = BridgeDesktopCommandEnvelope(
-        requestID: "tunnel-3",
-        command: .clearTunnel
-      )
-      XCTAssertEqual(WindowsDesktopUICommandRouter.command(for: clear), .clearTunnel)
-
-      let configure = BridgeDesktopCommandEnvelope(
-        requestID: "tunnel-4",
-        command: .configureTunnel,
-        payload: .init(tunnelID: " tunnel-9 ", runtimeKey: "runtime-key")
-      )
-      XCTAssertEqual(
-        WindowsDesktopUICommandRouter.command(for: configure),
-        .configureTunnel(tunnelID: "tunnel-9", runtimeKey: "runtime-key")
-      )
-    }
-
-    func testConfigureTunnelWithoutUsablePayloadIsDropped() {
-      for payload in [
-        BridgeDesktopCommandPayload(),
-        BridgeDesktopCommandPayload(tunnelID: "tunnel-9"),
-        BridgeDesktopCommandPayload(tunnelID: "tunnel-9", runtimeKey: "   "),
-        BridgeDesktopCommandPayload(runtimeKey: "runtime-key"),
-      ] {
-        let envelope = BridgeDesktopCommandEnvelope(
-          requestID: "tunnel-5",
-          command: .configureTunnel,
-          payload: payload
-        )
-        XCTAssertNil(WindowsDesktopUICommandRouter.command(for: envelope))
-      }
     }
 
   }

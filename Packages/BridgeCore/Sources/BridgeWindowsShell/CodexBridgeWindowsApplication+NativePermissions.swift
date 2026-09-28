@@ -1,45 +1,53 @@
 #if os(Windows)
+  import BridgeDesktopUI
+
   extension CodexBridgeWindowsApplication {
-    static func runNativePermissionCommand(
-      _ command: MainWindowCommand,
+    static func runDesktopNativePermissionCommand(
+      _ envelope: BridgeDesktopCommandEnvelope,
       model: WindowsWorkbenchModel,
       agentDefaults: WindowsAgentDefaultsModel
     ) -> Bool {
-      switch command {
-      case .refreshAgentNativePermission(let installationID):
+      let payload = envelope.payload
+      switch envelope.command {
+      case .refreshAgentNativePermission:
+        guard let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID)
+        else { return true }
         Task { @MainActor in
           await agentDefaults.refreshNativePermissionPolicy(installationID: installationID)
         }
-      case .setAgentNativePermissionMode(let installationID, let mode, let confirmed):
+      case .setAgentNativePermissionMode:
+        guard let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID),
+          let mode = BridgeDesktopCommandValue.nonEmpty(payload.toolPermission)
+        else { return true }
         Task { @MainActor in
           await agentDefaults.setNativePermissionMode(
             installationID: installationID,
             mode: mode,
-            confirmed: confirmed
+            confirmed: payload.confirmed == true
           )
         }
-      case .addAgentNativePermissionRule(
-        let installationID,
-        let effect,
-        let action,
-        let target,
-        let confirmed):
+      case .addAgentNativePermissionRule:
+        guard let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID),
+          let effect = BridgeDesktopCommandValue.nonEmpty(payload.effect),
+          let action = BridgeDesktopCommandValue.nonEmpty(payload.action),
+          let target = BridgeDesktopCommandValue.nonEmpty(payload.target)
+        else { return true }
         Task { @MainActor in
           await agentDefaults.addNativePermissionRule(
             installationID: installationID,
             effect: effect,
             action: action,
             target: target,
-            confirmed: confirmed
+            confirmed: payload.confirmed == true
           )
         }
-      case .replaceAgentNativePermissionRule(
-        let installationID,
-        let ruleID,
-        let effect,
-        let action,
-        let target,
-        let confirmed):
+      case .replaceAgentNativePermissionRule:
+        guard let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID),
+          let ruleID = BridgeDesktopCommandValue.nonEmpty(payload.ruleID),
+          let effect = BridgeDesktopCommandValue.nonEmpty(payload.effect),
+          let action = BridgeDesktopCommandValue.nonEmpty(payload.action),
+          let target = BridgeDesktopCommandValue.nonEmpty(payload.target)
+        else { return true }
         Task { @MainActor in
           await agentDefaults.replaceNativePermissionRule(
             installationID: installationID,
@@ -47,22 +55,31 @@
             effect: effect,
             action: action,
             target: target,
-            confirmed: confirmed
+            confirmed: payload.confirmed == true
           )
         }
-      case .removeAgentNativePermissionRule(let installationID, let ruleID):
+      case .removeAgentNativePermissionRule:
+        guard let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID),
+          let ruleID = BridgeDesktopCommandValue.nonEmpty(payload.ruleID)
+        else { return true }
         Task { @MainActor in
           await agentDefaults.removeNativePermissionRule(
             installationID: installationID,
             ruleID: ruleID
           )
         }
-      case .prepareAgentPermissionRemediation(let taskID, let messageKey):
+      case .prepareAgentPermissionRemediation:
+        guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID),
+          let messageKey = BridgeDesktopCommandValue.nonEmpty(payload.messageKey)
+        else { return true }
         Task { @MainActor in
           await model.preparePermissionRemediation(taskID: taskID, messageKey: messageKey)
         }
-      case .applyAgentPermissionRemediation(let taskID, let messageKey, let confirmed):
-        guard confirmed else { return true }
+      case .applyAgentPermissionRemediation:
+        guard payload.confirmed == true,
+          let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID),
+          let messageKey = BridgeDesktopCommandValue.nonEmpty(payload.messageKey)
+        else { return true }
         Task { @MainActor in
           let result = await model.applyPermissionRemediation(
             taskID: taskID,

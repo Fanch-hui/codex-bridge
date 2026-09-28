@@ -1,11 +1,9 @@
+import BridgeAgentCore
 import BridgeServiceCore
 
-public enum ServiceAgentMCPScope: String, CaseIterable, Sendable {
-  case deepSeekHarness = "deepseek-harness"
-  case pi
-  case qoderCN = "qoder.cn"
-  case qoderInternational = "qoder.international"
+public typealias ServiceAgentMCPScope = AgentMCPScope
 
+extension AgentMCPScope {
   var settingsKey: ServiceSettingKey {
     switch self {
     case .deepSeekHarness: .deepSeekHarnessMCPServers

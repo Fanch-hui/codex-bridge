@@ -1,3 +1,4 @@
+import BridgeACP
 import BridgeAgentCore
 import BridgeDomain
 import Foundation
@@ -309,13 +310,14 @@ public actor OpenCodeACPEventNormalizer {
     ]
     .compactMap { object[$0]?.stringValue }
     .first
-    .flatMap(safeText)
+    .flatMap(ACPApprovalSanitizer.safeText)
     guard let id else { return [] }
     let name =
       ["name", "role", "agent"].compactMap { object[$0]?.stringValue }
-      .first.flatMap(safeText) ?? title.flatMap(safeText)
+      .first.flatMap(ACPApprovalSanitizer.safeText)
+      ?? title.flatMap(ACPApprovalSanitizer.safeText)
     let summary = ["summary", "result", "description"].compactMap { object[$0]?.stringValue }
-      .first.flatMap(safeText)
+      .first.flatMap(ACPApprovalSanitizer.safeText)
     guard
       let child = try? AgentChildRun(
         id: id,
@@ -363,7 +365,7 @@ public actor OpenCodeACPEventNormalizer {
     _ request: OpenCodeACPPermissionRequest
   ) throws -> AgentEventEnvelope {
     let title = request.title.trimmingCharacters(in: .whitespacesAndNewlines)
-    let safeTitle = Self.safeText(title) ?? "OpenCode permission request"
+    let safeTitle = ACPApprovalSanitizer.safeText(title) ?? "OpenCode permission request"
     let input = request.rawInput?.objectValue ?? [:]
     let relativePaths = Self.relativePaths(from: input, projectRoot: projectRoot)
     let approval = try AgentApprovalRequest(
@@ -374,8 +376,8 @@ public actor OpenCodeACPEventNormalizer {
       kind: Self.approvalKind(request.kind),
       title: safeTitle,
       relativePaths: relativePaths,
-      normalizedCommand: Self.safeCommand(input["command"]?.stringValue),
-      networkTarget: Self.safeNetworkTarget(
+      normalizedCommand: ACPApprovalSanitizer.safeCommand(input["command"]?.stringValue),
+      networkTarget: ACPApprovalSanitizer.safeNetworkTarget(
         input["url"]?.stringValue
           ?? input["uri"]?.stringValue
           ?? input["target"]?.stringValue
@@ -443,19 +445,6 @@ public actor OpenCodeACPEventNormalizer {
     }
   }
 
-  private static func safeText(_ value: String) -> String? {
-    guard !value.isEmpty, value.utf8.count <= 8 * 1_024,
-      !value.contains("\0"), value.rangeOfCharacter(from: .controlCharacters) == nil,
-      !containsSensitiveMarker(value.lowercased())
-    else { return nil }
-    return value
-  }
-
-  private static func safeCommand(_ value: String?) -> String? {
-    guard let value else { return nil }
-    return safeText(value)
-  }
-
   private static func relativePaths(
     from input: [String: ACPJSONValue],
     projectRoot: String?
@@ -495,33 +484,9 @@ public actor OpenCodeACPEventNormalizer {
       relative = value
     }
     guard AgentPathSemantics.relativeComponents(relative) != nil,
-      !containsSensitiveMarker(relative.lowercased())
+      !ACPApprovalSanitizer.containsSensitiveMarker(relative.lowercased())
     else { return nil }
     return relative
-  }
-
-  private static func safeNetworkTarget(_ value: String?) -> String? {
-    guard let value, value.utf8.count <= 4 * 1_024,
-      !value.contains("\0"), value.rangeOfCharacter(from: .controlCharacters) == nil,
-      let url = URLComponents(string: value),
-      let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
-      url.host != nil,
-      !containsSensitiveMarker(value.lowercased())
-    else { return nil }
-    var sanitized = url
-    sanitized.user = nil
-    sanitized.password = nil
-    sanitized.query = nil
-    sanitized.fragment = nil
-    guard let result = sanitized.string, result.utf8.count <= 4 * 1_024 else { return nil }
-    return result
-  }
-
-  private static func containsSensitiveMarker(_ value: String) -> Bool {
-    [
-      "token", "secret", "password", "passwd", "api_key", "apikey", "authorization",
-      "cookie", "private_key", ".env", ".ssh",
-    ].contains { value.contains($0) }
   }
 
   private static func toolOutput(_ value: ACPJSONValue?) -> String? {

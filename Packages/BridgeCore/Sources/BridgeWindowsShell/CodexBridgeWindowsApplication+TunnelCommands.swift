@@ -1,11 +1,19 @@
 #if os(Windows)
+  import BridgeDesktopUI
+
   extension CodexBridgeWindowsApplication {
-    static func runTunnelCommand(
-      _ command: MainWindowCommand,
+    static func runDesktopTunnelCommand(
+      _ envelope: BridgeDesktopCommandEnvelope,
       connections: WindowsConnectionModel
     ) -> Bool {
-      switch command {
-      case .configureTunnel(let tunnelID, let runtimeKey):
+      switch envelope.command {
+      case .configureTunnel:
+        guard let tunnelID = BridgeDesktopCommandValue.nonEmpty(envelope.payload.tunnelID),
+          let runtimeKey = BridgeDesktopCommandValue.nonBlankText(
+            envelope.payload.runtimeKey,
+            maximumUTF8Bytes: 8 * 1_024
+          )
+        else { return true }
         Task { @MainActor in
           await connections.configureTunnel(tunnelID: tunnelID, runtimeKey: runtimeKey)
         }
