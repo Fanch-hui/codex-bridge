@@ -1,9 +1,6 @@
 import BridgeAgentCore
+import BridgeSecurity
 import Foundation
-
-#if canImport(Darwin)
-  import Darwin
-#endif
 
 #if os(Windows)
   import WinSDK
@@ -103,8 +100,8 @@ enum ServiceAgentDeepSeekSourceSearch {
     results: inout [String],
     seenRoots: inout Set<String>
   ) {
-    guard safeDirectory(anchor, fileManager: fileManager) else { return }
-    if isDeepSeekSourceRoot(anchor, fileManager: fileManager),
+    guard safeDirectory(anchor) else { return }
+    if isDeepSeekSourceRoot(anchor),
       seenRoots.insert(
         pathKey(anchor)
       ).inserted
@@ -121,17 +118,17 @@ enum ServiceAgentDeepSeekSourceSearch {
       guard
         let enumerator = fileManager.enumerator(
           at: parent,
-          includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+          includingPropertiesForKeys: [],
           options: [.skipsHiddenFiles, .skipsPackageDescendants, .skipsSubdirectoryDescendants]
         )
       else { continue }
       while let item = enumerator.nextObject() as? URL {
         guard directoriesVisited < limits.maximumDirectories, now() < deadline else { return }
         let path = item.standardizedFileURL.path
-        guard safeDirectory(path, fileManager: fileManager) else { continue }
+        guard safeDirectory(path) else { continue }
         directoriesVisited += 1
         let depth = parentDepth + 1
-        if isDeepSeekSourceRoot(path, fileManager: fileManager),
+        if isDeepSeekSourceRoot(path),
           seenRoots.insert(pathKey(path)).inserted
         {
           results.append(path)
@@ -249,18 +246,15 @@ enum ServiceAgentDeepSeekSourceSearch {
     return false
   }
 
-  private static func isDeepSeekSourceRoot(_ path: String, fileManager: FileManager) -> Bool {
+  private static func isDeepSeekSourceRoot(_ path: String) -> Bool {
     let entry = ServiceAgentAutoDiscovery.pathJoin(path, "apps", "cli", "lib", "bin.js")
-    guard regularFileWithoutLink(entry, fileManager: fileManager) else { return false }
+    guard regularFileWithoutLink(entry) else { return false }
     let manifest = ServiceAgentAutoDiscovery.pathJoin(path, "package.json")
-    guard regularFileWithoutLink(manifest, fileManager: fileManager),
+    guard regularFileWithoutLink(manifest),
       manifestIdentifiesDeepSeek(manifest)
     else { return false }
     return ["pnpm-lock.yaml", "package-lock.json", "npm-shrinkwrap.json"].contains {
-      regularFileWithoutLink(
-        ServiceAgentAutoDiscovery.pathJoin(path, $0),
-        fileManager: fileManager
-      )
+      regularFileWithoutLink(ServiceAgentAutoDiscovery.pathJoin(path, $0))
     }
   }
 
@@ -300,39 +294,19 @@ enum ServiceAgentDeepSeekSourceSearch {
     return ""
   }
 
-  private static func regularFileWithoutLink(_ path: String, fileManager: FileManager) -> Bool {
-    guard !isLinkOrReparsePoint(path),
-      let values = try? URL(fileURLWithPath: path)
-        .resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+  private static func regularFileWithoutLink(_ path: String) -> Bool {
+    guard let metadata = try? FileSystemEntryMetadata(at: URL(fileURLWithPath: path))
     else { return false }
-    return values.isRegularFile == true && values.isSymbolicLink != true
+    return metadata.isRegularFile && !metadata.isSymbolicLink
   }
 
-  private static func safeDirectory(_ path: String, fileManager: FileManager) -> Bool {
-    guard !isLinkOrReparsePoint(path),
-      let values = try? URL(fileURLWithPath: path)
-        .resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+  private static func safeDirectory(_ path: String) -> Bool {
+    guard let metadata = try? FileSystemEntryMetadata(at: URL(fileURLWithPath: path))
     else { return false }
-    return values.isDirectory == true && values.isSymbolicLink != true
+    return metadata.isDirectory && !metadata.isSymbolicLink
   }
 
   private static func pathKey(_ path: String) -> String {
     AgentPathStyle.current == .windows ? path.lowercased() : path
-  }
-
-  private static func isLinkOrReparsePoint(_ path: String) -> Bool {
-    #if os(Windows)
-      let attributes = path.withCString(encodedAs: UTF16.self) { GetFileAttributesW($0) }
-      return attributes != INVALID_FILE_ATTRIBUTES
-        && attributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) != 0
-    #elseif canImport(Darwin)
-      var metadata = stat()
-      return lstat(path, &metadata) == 0 && metadata.st_mode & S_IFMT == S_IFLNK
-    #else
-      return
-        (try? URL(fileURLWithPath: path).resourceValues(
-          forKeys: [.isSymbolicLinkKey]
-        ).isSymbolicLink) == true
-    #endif
   }
 }

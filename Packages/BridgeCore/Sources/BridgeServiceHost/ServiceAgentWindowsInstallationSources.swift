@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeAgentCore
+  import BridgeSecurity
   import Foundation
   import WinSDK
 
@@ -216,12 +217,12 @@
       guard
         let entries = try? FileManager.default.contentsOfDirectory(
           at: url,
-          includingPropertiesForKeys: [.isDirectoryKey],
+          includingPropertiesForKeys: [],
           options: []
         )
       else { return [] }
       return entries.compactMap { entry in
-        guard (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+        guard (try? FileSystemEntryMetadata(at: entry).isDirectory) == true else {
           return nil
         }
         return entry.path

@@ -127,15 +127,14 @@ enum SkillActionCatalog {
     guard
       let entries = try? fileManager.contentsOfDirectory(
         at: scripts,
-        includingPropertiesForKeys: [.isDirectoryKey],
+        includingPropertiesForKeys: [],
         options: [.skipsHiddenFiles]
       )
     else { return [] }
     var result: [SkillAction] = []
     var names = Set<String>()
     for entry in entries {
-      guard let isDirectory = try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory,
-        isDirectory != true
+      guard let metadata = try? FileSystemEntryMetadata(at: entry), !metadata.isDirectory
       else { continue }
       let fileName = entry.lastPathComponent
       guard !fileName.hasPrefix(".") else { continue }

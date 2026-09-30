@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "codex-bridge",
   "display_name": "Codex Bridge",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Connect MCP clients to a local Codex Bridge desktop app and its authorized workspace tools.",
   "long_description": "Install and configure Codex Bridge before installing this bundle. In Codex Bridge, open Connections and copy the Qwen local HTTP MCP endpoint and token. This bundle forwards MCP requests to that local endpoint and inherits the Qwen Studio client tool permission configured in Codex Bridge.",
   "author": {

@@ -94,21 +94,20 @@ extension BridgeServiceApplication {
     paths: inout [String]
   ) throws {
     guard depth <= 8, visitedEntries <= 256 else { throw BridgeMCPQueryError.contractRejected }
-    let keys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
     let entries = try FileManager.default.contentsOfDirectory(
       at: directory,
-      includingPropertiesForKeys: Array(keys),
+      includingPropertiesForKeys: [],
       options: []
     )
     for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
       visitedEntries += 1
       guard visitedEntries <= 256 else { throw BridgeMCPQueryError.contractRejected }
-      let values = try entry.resourceValues(forKeys: keys)
-      guard values.isSymbolicLink != true else { continue }
-      if values.isDirectory == true {
+      let metadata = try FileSystemEntryMetadata(at: entry)
+      guard !metadata.isSymbolicLink else { continue }
+      if metadata.isDirectory {
         try enumerateSkillDirectory(
           entry, root: root, depth: depth + 1, visitedEntries: &visitedEntries, paths: &paths)
-      } else if values.isRegularFile == true,
+      } else if metadata.isRegularFile,
         let path = AgentPathSemantics.relativePath(
           entry.resolvingSymlinksInPath().standardizedFileURL.path, from: root.path
         ), !path.isEmpty
