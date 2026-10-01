@@ -165,7 +165,8 @@ extension BridgeServiceApplication {
     _ taskID: TaskID,
     automatically: Bool = false,
     authorization: ServiceTaskExecutionAuthorization? = nil,
-    summary: String? = nil
+    summary: String? = nil,
+    startInBackground: Bool = false
   ) async throws {
     let started: ServiceTaskRecord
     do {
@@ -187,7 +188,11 @@ extension BridgeServiceApplication {
       throw error
     }
     do {
-      try await coordinator.start(taskID: started.id)
+      if startInBackground {
+        try await coordinator.scheduleStart(taskID: started.id)
+      } else {
+        try await coordinator.start(taskID: started.id)
+      }
     } catch {
       throw Self.publicExecutionError(error)
     }

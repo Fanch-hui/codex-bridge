@@ -3,6 +3,7 @@
 
   var S = global.CodexBridgeDesktopPageSupport;
   var N = global.CodexBridgeDesktopNativePermissions;
+  var P = global.CodexBridgeDesktopWorkbenchSubmissions;
 
   function renderApprovals(page, emit) {
     var container = document.getElementById("workbench-inspector-approvals");
@@ -219,7 +220,7 @@
 
   function renderContent(page, emit) {
     var content = document.getElementById("workbench-inspector-content");
-    renderStable(content, JSON.stringify(page), function () {
+    renderStable(content, JSON.stringify([page, P.revision()]), function () {
       var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
       try { renderContentBody(content, page, emit); } finally { restore(); }
     });
@@ -229,7 +230,7 @@
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
     var detail = page.selectedTask;
     var keepConversation = incremental && detail
-      && ((detail.conversation && detail.conversation.length) || detail.conversationState);
+      && ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page));
     var stableCard = keepConversation && content.__windowsDetailCard;
     if (stableCard) {
       Array.from(content.children).forEach(function (child) {
@@ -312,7 +313,7 @@
     if (row.canDelete) {
       var rm = S.button("删除会话", null, {}, emit, "small danger", false);
       rm.addEventListener("click", function () {
-        if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部轮次任务、事件和对话记录，无法撤销。")) emit("deleteSession", { taskID: detail.taskID, sessionID: detail.sessionID });
+        if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部任务、事件和对话记录，无法撤销。")) emit("deleteSession", { taskID: detail.taskID, sessionID: detail.sessionID });
       });
       actions.appendChild(rm);
     }
@@ -322,7 +323,7 @@
     sections.header.appendChild(actions);
 
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(sections.header, "变更文件", detail.changedFiles);
-    if ((detail.conversation && detail.conversation.length) || detail.conversationState) {
+    if ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page)) {
       global.CodexBridgeDesktopWorkbenchConversation.render(
         sections.conversation, detail.conversation || [], page, emit, { owner: content });
     }
@@ -351,6 +352,13 @@
   }
 
   function render(page, emit) {
+    P.bind(page, function (follow) {
+      renderContent(page, emit);
+      if (!follow) return;
+      var content = document.getElementById("workbench-inspector-content");
+      content.scrollTop = content.scrollHeight;
+      if (content.__conversationFollow) content.__conversationFollow.following = true;
+    });
     if (!page) {
       global.CodexBridgeDesktopWorkbenchHeader.reset();
       global.CodexBridgeDesktopWorkbenchControls.render(null, emit);

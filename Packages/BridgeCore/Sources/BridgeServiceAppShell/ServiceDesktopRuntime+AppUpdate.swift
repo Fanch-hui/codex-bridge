@@ -17,7 +17,7 @@ extension BridgeServiceAppModel {
     #endif
     let updater = AppUpdateController(
       currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
-        as? String ?? "1.3.2",
+        as? String ?? "1.3.3",
       platform: "macos", architecture: architecture, kind: "app",
       preparePackage: { archive, release in try await installer.prepare(archive, release: release)
       },
@@ -62,16 +62,18 @@ extension BridgeServiceAppModel {
       try? FileManager.default.removeItem(at: MacAppUpdateHelper.failureURL)
     }
     let currentVersion =
-      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3.2"
+      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3.3"
     let lastSeenVersionKey = "CodexBridgeLastSeenVersion"
     let justUpdatedKey = "CodexBridgeJustUpdated"
     let previousVersion = userDefaults.string(forKey: lastSeenVersionKey)
     let justUpdated = userDefaults.bool(forKey: justUpdatedKey)
     if justUpdated || (previousVersion != nil && previousVersion != currentVersion) {
       postToast(
-        "应用已更新，请在 ChatGPT 刷新一次插件以防保留旧版缓存",
+        "在 ChatGPT 的插件设置中找到 Codex Bridge，点击刷新，让新工具和模型列表生效。",
         symbol: "arrow.clockwise.circle.fill",
-        tone: .success
+        tone: .warning,
+        title: "应用已更新，请刷新 ChatGPT 插件",
+        duration: .seconds(10)
       )
       userDefaults.removeObject(forKey: justUpdatedKey)
     }

@@ -17,6 +17,7 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case renameAgentNativeSession = "rename_agent_native_session"
   case deleteAgentNativeSession = "delete_agent_native_session"
   case listModels = "list_models"
+  case listAgentModels = "list_agent_models"
   case listSkills = "list_skills"
   case readSkill = "read_skill"
   case runSkillAction = "run_skill_action"
@@ -62,7 +63,7 @@ struct MCPServiceToolContract: Sendable {
 }
 
 public struct MCPServiceToolCatalog: Sendable {
-  public static let contractVersion = "1.3.2"
+  public static let contractVersion = "1.3.3"
 
   public let definitions: [Tool]
 
@@ -99,6 +100,7 @@ public struct MCPServiceToolCatalog: Sendable {
     contract(
       .readAgentNativeSession, readAgentNativeSession, exposure: .readOnly, route: .readOnly),
     contract(.listModels, listModels, exposure: .readOnly, route: .readOnly),
+    contract(.listAgentModels, listAgentModels, exposure: .readOnly, route: .readOnly),
     contract(.listSkills, listSkills, exposure: .readOnly, route: .readOnly),
     contract(.readSkill, readSkill, exposure: .readOnly, route: .readOnly),
     contract(.listTasks, listTasks, exposure: .readOnly, route: .task),

@@ -53,6 +53,8 @@
   }
 
   function addConversationBlock(container, values, page, emit, options) {
+    var submissions = global.CodexBridgeDesktopWorkbenchSubmissions;
+    if (submissions) values = submissions.entries(values, page);
     var process = global.CodexBridgeDesktopWorkbenchProcess;
     if (process) values = process.entries(values, page);
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
@@ -112,6 +114,17 @@
       item.appendChild(item.__text);
     } else {
       updateTextNode(item.__text, entry.text, entry.markdownHTML);
+    }
+    if (entry.deliveryState && !item.__delivery) {
+      item.__delivery = S.node("div", "message-delivery");
+      item.__delivery.setAttribute("role", "status");
+      item.__delivery.setAttribute("aria-live", "polite");
+      item.appendChild(item.__delivery);
+    }
+    if (item.__delivery) {
+      item.__delivery.hidden = !entry.deliveryState;
+      item.__delivery.textContent = entry.deliveryMessage || "";
+      item.__delivery.className = "message-delivery" + (entry.deliveryState === "failed" ? " error-text" : "");
     }
   }
 

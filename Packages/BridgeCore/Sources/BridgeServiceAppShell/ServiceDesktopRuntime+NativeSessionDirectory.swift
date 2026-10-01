@@ -22,12 +22,12 @@ extension BridgeServiceAppModel {
       requestID: requestID, command: BridgeDesktopCommand.continueNativeAgentSession.rawValue,
       taskID: nil, input: prompt
     ) { [weak self] client in
-      guard let self else { return false }
+      guard let self else { return (false, nil) }
       let response = try await client.submitAgentTask(request)
       await self.refresh(silent: true, includeCatalog: false)
       self.openTask(response.taskID)
       self.postToast("已续写原生会话")
-      return true
+      return (true, response.taskID)
     }
   }
 

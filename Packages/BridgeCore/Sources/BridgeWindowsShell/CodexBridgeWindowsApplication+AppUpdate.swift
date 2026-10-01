@@ -57,9 +57,9 @@
         previousVersion != nil && previousVersion != currentVersion && currentVersion != "0.0.0"
       if justUpdated || isNewVersion {
         model.feedback.postToast(
-          "请在 ChatGPT 刷新一次插件，以防保留旧版缓存",
-          title: "应用已更新",
-          tone: .success
+          "在 ChatGPT 的插件设置中找到 Codex Bridge，点击刷新，让新工具和模型列表生效。",
+          title: "应用已更新，请刷新 ChatGPT 插件",
+          tone: .warning
         )
         UserDefaults.standard.removeObject(forKey: justUpdatedKey)
       }

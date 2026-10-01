@@ -57,6 +57,8 @@ extension BridgeServiceRequestController {
       switch error {
       case .invalidRequest:
         return .init(code: "invalid_request", message: error.localizedDescription)
+      case .unsupported:
+        return .init(code: "agent_history_unsupported", message: error.localizedDescription)
       case .unavailable:
         return .init(code: "agent_history_unavailable", message: error.localizedDescription)
       case .sessionNotFound:

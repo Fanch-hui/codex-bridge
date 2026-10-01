@@ -46,6 +46,7 @@ public actor ServiceExecutionCoordinator {
   var pendingAgentUserInputs: [String: PendingAgentUserInput] = [:]
   var agentUserInputTimeouts: [String: Task<Void, Never>] = [:]
   var finishedRuns: Set<TaskID> = []
+  var scheduledStarts: [TaskID: Task<Void, Never>] = [:]
   private var startingTasks: Set<TaskID> = []
   var isShuttingDown = false
   let agentApprovalLifetime: TimeInterval = 5 * 60
@@ -154,7 +155,17 @@ public actor ServiceExecutionCoordinator {
       guard let steer else {
         throw ExecutionServiceError.sessionUnavailable(taskID)
       }
-      try await steer(text)
+      let immediateReceipt =
+        interruptCurrentPrompt
+        ? await conversation.presentImmediateSteer(taskID: taskID, content: text) : nil
+      do {
+        try await steer(text)
+      } catch {
+        if let immediateReceipt {
+          await conversation.discardImmediateSteerReceipt(taskID: taskID, id: immediateReceipt)
+        }
+        throw error
+      }
       return
     }
     if interruptCurrentPrompt {
@@ -219,6 +230,7 @@ public actor ServiceExecutionCoordinator {
     taskID: TaskID,
     summary: String = "The local service stopped the task."
   ) async {
+    scheduledStarts.removeValue(forKey: taskID)?.cancel()
     startingTasks.remove(taskID)
     presentedCodexApprovals.removeValue(forKey: taskID)
     finishedRuns.insert(taskID)
@@ -239,8 +251,12 @@ public actor ServiceExecutionCoordinator {
 
   public func shutdown() async {
     isShuttingDown = true
+    finishedRuns.formUnion(scheduledStarts.keys)
     finishedRuns.formUnion(startingTasks)
     finishedRuns.formUnion(activeAgentRuns.keys)
+    let scheduledTasks = Array(scheduledStarts.values)
+    scheduledStarts.removeAll(keepingCapacity: false)
+    for task in scheduledTasks { task.cancel() }
     startingTasks.removeAll(keepingCapacity: false)
     let executionTasks = collectors.values
     collectors.removeAll(keepingCapacity: false)
@@ -255,6 +271,7 @@ public actor ServiceExecutionCoordinator {
       await shutdown()
     }
     await execution.shutdown()
+    for task in scheduledTasks { await task.value }
     let failedConversationTasks = await conversation.closeAll()
     for taskID in failedConversationTasks {
       _ = try? await tasks.fail(

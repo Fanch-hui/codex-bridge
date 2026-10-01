@@ -29,12 +29,12 @@ public enum BridgeDesktopWorkbenchPermissionMode: String, CaseIterable, Equatabl
 
 public enum BridgeDesktopWorkbenchPresentation {
   public static func steerModes(supportsImmediateSteer: Bool) -> [BridgeDesktopChoice] {
-    var modes = [BridgeDesktopChoice(id: "queued", title: "当前轮结束后继续")]
+    var modes = [BridgeDesktopChoice(id: "queued", title: "当前任务结束后继续")]
     if supportsImmediateSteer {
       modes.append(
         BridgeDesktopChoice(
           id: "interrupt-current-then-continue",
-          title: "中断当前轮并继续"
+          title: "中断当前任务并继续"
         )
       )
     }
@@ -45,7 +45,7 @@ public enum BridgeDesktopWorkbenchPresentation {
     switch status {
     case "running", "starting", "运行中", "正在启动":
       BridgeDesktopStatusTone.running.rawValue
-    case "completed", "已完成": BridgeDesktopStatusTone.success.rawValue
+    case "completed", "已完成", "已创建": BridgeDesktopStatusTone.success.rawValue
     case "failed", "失败": BridgeDesktopStatusTone.error.rawValue
     case "awaiting_local_approval", "waiting_for_codex_approval", "等待回答",
       "等待本机批准", "等待 Codex 审批":

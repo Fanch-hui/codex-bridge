@@ -10,7 +10,8 @@ extension BridgeServiceAppModel {
     input: String?,
     accepted: Bool,
     message: String? = nil,
-    handoff: WorkbenchHandoffPreview? = nil
+    handoff: WorkbenchHandoffPreview? = nil,
+    resultingTaskID: String? = nil
   ) {
     guard let requestID, !requestID.isEmpty else { return }
     if !accepted { errorMessage = message }
@@ -21,7 +22,8 @@ extension BridgeServiceAppModel {
       input: input,
       accepted: accepted,
       message: message,
-      handoff: handoff
+      handoff: handoff,
+      resultingTaskID: resultingTaskID
     )
   }
 
@@ -47,7 +49,10 @@ extension BridgeServiceAppModel {
     command: String,
     taskID: String?,
     input: String?,
-    operation: @escaping @MainActor @Sendable (any BridgeServiceClientProtocol) async throws -> Bool
+    operation:
+      @escaping @MainActor @Sendable (any BridgeServiceClientProtocol) async throws -> (
+        accepted: Bool, resultingTaskID: String?
+      )
   ) {
     guard let requestID, !requestID.isEmpty else {
       runMutation { client in _ = try await operation(client) }
@@ -57,15 +62,16 @@ extension BridgeServiceAppModel {
     Task { [weak self] in
       guard let self else { return }
       do {
-        let accepted = try await operation(try self.currentClient())
-        let message = accepted ? nil : "本机 Service 未接受这次任务操作。"
+        let result = try await operation(try self.currentClient())
+        let message = result.accepted ? nil : "本机 Service 未接受这次任务操作。"
         self.recordWorkbenchCommandReceipt(
           requestID: requestID,
           command: command,
           taskID: taskID,
           input: input,
-          accepted: accepted,
-          message: message
+          accepted: result.accepted,
+          message: message,
+          resultingTaskID: result.resultingTaskID
         )
       } catch {
         let message = Self.message(error)

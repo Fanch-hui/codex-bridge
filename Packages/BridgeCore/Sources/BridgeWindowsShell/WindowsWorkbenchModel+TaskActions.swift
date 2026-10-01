@@ -408,7 +408,8 @@
           command: command,
           taskID: task.taskID,
           input: receiptInput,
-          accepted: true
+          accepted: true,
+          resultingTaskID: response.taskID
         )
         reportSuccess(success, taskID: response.taskID)
       } catch {

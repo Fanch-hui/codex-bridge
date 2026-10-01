@@ -47,7 +47,7 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
       }
 
     case .steerDispatched(let text):
-      await conversation.appendUserMessage(taskID: taskID, content: text)
+      await conversation.recordDispatchedSteer(taskID: taskID, content: text)
 
     case .tool(let update):
       let itemID = Self.agentToolItemID(update.key)

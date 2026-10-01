@@ -86,6 +86,8 @@ extension BridgeMCPQueryError {
         "unavailable", .infrastructureFailure, true, "retry_or_check_bridge_status",
         "A required local Bridge component is unavailable."
       )
+    case .nativeSessionDirectory(let error):
+      return error.nativeSessionToolError
     case .codexAppServerUnavailable:
       return error(
         "codex_app_server_unavailable", .infrastructureFailure, true,

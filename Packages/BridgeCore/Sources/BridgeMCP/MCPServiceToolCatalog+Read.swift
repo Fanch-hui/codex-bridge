@@ -63,6 +63,7 @@ extension MCPServiceToolCatalog {
     title: "List registered Agent installations",
     description:
       "List user-registered Agent installations and their persisted Probe results. "
+      + "Use each installation_id with list_agent_models to query its native model catalog. "
       + "A selectable OpenCode installation can receive tasks through submit_task; DeepSeek "
       + "Harness supports fresh sessions with provider-native read-only or "
       + "workspace-write modes. Selectable OpenCode and Antigravity installations can receive "
@@ -317,7 +318,8 @@ extension MCPServiceToolCatalog {
   static let listModels = Tool(
     name: MCPServiceToolName.listModels.rawValue,
     title: "List Codex models",
-    description: "List current Codex models and advertised reasoning efforts.",
+    description:
+      "List current Codex models and advertised reasoning efforts. For other registered Agents, use list_agent_models with installation_id from list_agents.",
     inputSchema: objectSchema(properties: [:]),
     annotations: readAnnotations,
     outputSchema: outputSchema(

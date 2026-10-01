@@ -26,7 +26,9 @@
         source: task.sourceDisplayName,
         provider: task.providerDisplayName,
         providerID: task.providerIdentifier,
-        status: desktopStatusLabel(task, pendingUserInput: pendingUserInput),
+        status: desktopStatusLabel(
+          task, canContinue: canResume, pendingUserInput: pendingUserInput
+        ),
         updatedAt: task.updatedAt,
         turnCount: session.turnCount,
         selected: session.tasks.contains(where: { $0.taskID == selectedTaskID }),
@@ -86,7 +88,9 @@
           turnCount: resolvedSession.turnCount
         ),
         projectName: projectName,
-        status: desktopStatusLabel(task, pendingUserInput: pendingUserInput),
+        status: desktopStatusLabel(
+          task, canContinue: canResume, pendingUserInput: pendingUserInput
+        ),
         isTerminal: task.isTerminal,
         provider: task.providerDisplayName,
         providerID: task.providerIdentifier,
@@ -105,7 +109,8 @@
           activity: CodexActivityPresentation(
             task: task,
             activity: conversation?.activity ?? .idle,
-            pendingUserInput: pendingUserInput
+            pendingUserInput: pendingUserInput,
+            canContinue: canResume
           )
         ),
         canInterrupt: TaskInspectorPresentation.canInterrupt(task),
@@ -242,10 +247,13 @@
 
     private static func desktopStatusLabel(
       _ task: MCPServiceTaskSnapshot,
+      canContinue: Bool,
       pendingUserInput: Bool = false
     ) -> String {
       if pendingUserInput { return "等待回答" }
-      return WorkbenchTaskTextPresentation.statusLabel(task.status)
+      return WorkbenchTaskTextPresentation.sessionStatusLabel(
+        task.status, canContinue: canContinue
+      )
     }
   }
 #endif

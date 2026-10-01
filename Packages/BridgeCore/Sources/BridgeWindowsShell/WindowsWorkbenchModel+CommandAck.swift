@@ -10,7 +10,8 @@
       input: String?,
       accepted: Bool,
       message: String? = nil,
-      handoff: WorkbenchHandoffPreview? = nil
+      handoff: WorkbenchHandoffPreview? = nil,
+      resultingTaskID: String? = nil
     ) {
       guard let requestID, !requestID.isEmpty else { return }
       if !accepted { errorMessage = message }
@@ -21,7 +22,8 @@
         input: input,
         accepted: accepted,
         message: message,
-        handoff: handoff
+        handoff: handoff,
+        resultingTaskID: resultingTaskID
       )
       publishDisplay()
     }

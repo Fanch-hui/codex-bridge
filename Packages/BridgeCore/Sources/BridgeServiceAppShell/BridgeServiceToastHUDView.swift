@@ -11,14 +11,22 @@ public struct ToastHUDView: View {
   }
 
   public var body: some View {
-    HStack(spacing: 10) {
+    HStack(alignment: .top, spacing: 12) {
       Image(systemName: toast.symbol)
-        .font(.system(size: 14, weight: .bold))
+        .font(.system(size: toast.title == nil ? 14 : 22, weight: .bold))
         .foregroundStyle(toast.tone.foregroundColor)
 
-      Text(toast.message)
-        .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(.primary)
+      VStack(alignment: .leading, spacing: 6) {
+        if let title = toast.title {
+          Text(title)
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(.primary)
+        }
+        Text(toast.message)
+          .font(.system(size: toast.title == nil ? 13 : 14, weight: .medium))
+          .foregroundStyle(.primary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
 
       if let onDismiss {
         Button {
@@ -29,16 +37,21 @@ public struct ToastHUDView: View {
             .foregroundStyle(.secondary)
         }
         .buttonStyle(.borderless)
+        .accessibilityLabel("关闭提示")
         .padding(.leading, 4)
       }
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 10)
+    .frame(maxWidth: toast.title == nil ? nil : 500, alignment: .leading)
+    .padding(.horizontal, toast.title == nil ? 14 : 18)
+    .padding(.vertical, toast.title == nil ? 10 : 16)
+    .background(toast.title == nil ? Color.clear : toast.tone.backgroundColor)
     .background(.regularMaterial)
-    .clipShape(Capsule())
+    .clipShape(RoundedRectangle(cornerRadius: toast.title == nil ? 24 : 12))
     .overlay(
-      Capsule()
-        .strokeBorder(toast.tone.borderColor, lineWidth: 1)
+      RoundedRectangle(cornerRadius: toast.title == nil ? 24 : 12)
+        .strokeBorder(
+          toast.title == nil ? toast.tone.borderColor : toast.tone.foregroundColor,
+          lineWidth: toast.title == nil ? 1 : 2)
     )
     .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
     .transition(

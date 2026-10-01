@@ -12,13 +12,12 @@ extension BridgeServiceApplication {
     try Self.checkDeadline(deadline)
     let project = try await readableProject(request.projectID)
     let registry = try requiredAgentRegistry()
-    let installationID = AgentInstallationID(rawValue: request.installationID)
-    let (manager, installation, record) = try await registry.nativeSessionDirectoryManager(
-      installationID: installationID)
-    let scope = try await nativeSessionScope(project: project, installation: record)
-    let page = try AgentNativeSessionPageRequest(offset: request.offset, limit: request.limit)
-
     do {
+      let installationID = AgentInstallationID(rawValue: request.installationID)
+      let (manager, installation, record) = try await registry.nativeSessionDirectoryManager(
+        installationID: installationID)
+      let scope = try await nativeSessionScope(project: project, installation: record)
+      let page = try AgentNativeSessionPageRequest(offset: request.offset, limit: request.limit)
       switch request.operation {
       case .list:
         let result = try await manager.listNativeSessions(
@@ -51,13 +50,7 @@ extension BridgeServiceApplication {
         return MCPNativeSessionDirectoryResponse(deleted: true)
       }
     } catch let error as AgentNativeSessionDirectoryError {
-      switch error {
-      case .invalidRequest: throw BridgeMCPQueryError.contractRejected
-      case .unavailable, .runtimeFailure: throw BridgeMCPQueryError.unavailable
-      case .sessionNotFound: throw BridgeMCPQueryError.taskNotFound
-      case .activeSession: throw BridgeMCPQueryError.invalidTaskState
-      case .scopeMismatch: throw BridgeMCPQueryError.pathDenied
-      }
+      throw BridgeMCPQueryError.nativeSessionDirectory(error)
     }
   }
 

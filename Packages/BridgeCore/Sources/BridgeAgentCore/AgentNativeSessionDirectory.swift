@@ -170,6 +170,7 @@ public struct AgentNativeSessionIndexReceipt: Codable, Equatable, Sendable {
 
 public enum AgentNativeSessionDirectoryError: Error, Equatable, LocalizedError, Sendable {
   case invalidRequest
+  case unsupported
   case unavailable
   case sessionNotFound
   case activeSession
@@ -179,6 +180,8 @@ public enum AgentNativeSessionDirectoryError: Error, Equatable, LocalizedError, 
   public var errorDescription: String? {
     switch self {
     case .invalidRequest: "The native session request is invalid."
+    case .unsupported:
+      "This Agent provider does not support native session browsing in Codex Bridge. Use list_tasks and get_task to read Bridge task history."
     case .unavailable: "Native session management is unavailable for this Agent installation."
     case .sessionNotFound: "The native Agent session no longer exists in this project."
     case .activeSession: "The native Agent session is currently active."

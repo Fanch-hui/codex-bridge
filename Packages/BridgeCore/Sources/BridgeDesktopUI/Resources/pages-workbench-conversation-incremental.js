@@ -162,6 +162,7 @@
       && previous.displayTitle === entry.displayTitle && previous.displayStatus === entry.displayStatus
       && previous.symbol === entry.symbol && previous.isFinal === entry.isFinal
       && previous.status === entry.status && previous.markdownHTML === entry.markdownHTML
+      && previous.deliveryState === entry.deliveryState && previous.deliveryMessage === entry.deliveryMessage
       && JSON.stringify(previous.childRuns || []) === JSON.stringify(entry.childRuns || []);
   }
 

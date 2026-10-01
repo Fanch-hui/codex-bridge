@@ -387,14 +387,16 @@ public final class BridgeServiceAppModel: ObservableObject {
   public func postToast(
     _ message: String,
     symbol: String = "checkmark.circle.fill",
-    tone: StatusTone = .success
+    tone: StatusTone = .success,
+    title: String? = nil,
+    duration: Duration = .seconds(2.5)
   ) {
     toastDismissTask?.cancel()
     withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-      toast = ToastNotice(message: message, symbol: symbol, tone: tone)
+      toast = ToastNotice(message: message, symbol: symbol, tone: tone, title: title)
     }
     toastDismissTask = Task { [weak self] in
-      try? await Task.sleep(for: .seconds(2.5))
+      try? await Task.sleep(for: duration)
       guard !Task.isCancelled else { return }
       withAnimation(.easeInOut(duration: 0.25)) {
         self?.toast = nil
@@ -434,16 +436,19 @@ public struct ToastNotice: Identifiable, Equatable, Sendable {
   public let message: String
   public let symbol: String
   public let tone: StatusTone
+  public let title: String?
 
   public init(
     id: UUID = UUID(),
     message: String,
     symbol: String = "checkmark.circle.fill",
-    tone: StatusTone = .success
+    tone: StatusTone = .success,
+    title: String? = nil
   ) {
     self.id = id
     self.message = message
     self.symbol = symbol
     self.tone = tone
+    self.title = title
   }
 }

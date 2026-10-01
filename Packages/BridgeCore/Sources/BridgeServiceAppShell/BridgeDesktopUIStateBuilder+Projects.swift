@@ -49,7 +49,9 @@ extension BridgeDesktopUIStateBuilder {
           source: task.sourceDisplayName,
           provider: task.providerDisplayName,
           providerID: task.providerIdentifier,
-          status: taskStatusLabel(task.status),
+          status: WorkbenchTaskTextPresentation.sessionStatusLabel(
+            task.status, canContinue: canResume(task, model: model)
+          ),
           updatedAt: task.updatedAt,
           turnCount: session.turnCount,
           selected: session.tasks.contains(where: { $0.taskID == model.selectedTaskID }),

@@ -99,7 +99,8 @@ extension BridgeDesktopUIStateBuilder {
     return CodexActivityPresentation(
       task: task,
       activity: model.conversation?.activity ?? .idle,
-      pendingUserInput: task.map { hasPendingUserInput($0, model: model) } ?? false
+      pendingUserInput: task.map { hasPendingUserInput($0, model: model) } ?? false,
+      canContinue: task.map { canResume($0, model: model) } ?? false
     ).statusText
   }
 
@@ -239,7 +240,11 @@ extension BridgeDesktopUIStateBuilder {
     _ task: MCPServiceTaskSnapshot,
     model: BridgeServiceAppModel
   ) -> String {
-    hasPendingUserInput(task, model: model) ? "等待回答" : taskStatusLabel(task.status)
+    hasPendingUserInput(task, model: model)
+      ? "等待回答"
+      : WorkbenchTaskTextPresentation.sessionStatusLabel(
+        task.status, canContinue: canResume(task, model: model)
+      )
   }
 
   private static func desktopQuestion(

@@ -6,6 +6,7 @@ public struct BridgeDesktopWorkbenchCommandReceipt: Codable, Equatable, Sendable
   public let requestID: String
   public let command: String
   public let taskID: String?
+  public let resultingTaskID: String?
   public let input: String?
   public let accepted: Bool
   public let message: String?
@@ -19,12 +20,14 @@ public struct BridgeDesktopWorkbenchCommandReceipt: Codable, Equatable, Sendable
     accepted: Bool,
     message: String? = nil,
     handoff: WorkbenchHandoffPreview? = nil,
+    resultingTaskID: String? = nil,
     receiptID: String = UUID().uuidString
   ) {
     self.receiptID = receiptID
     self.requestID = requestID
     self.command = command
     self.taskID = taskID
+    self.resultingTaskID = resultingTaskID
     self.input = input
     self.accepted = accepted
     self.message = message
@@ -40,7 +43,8 @@ public enum BridgeDesktopWorkbenchCommandAck {
     input: String?,
     accepted: Bool,
     message: String? = nil,
-    handoff: WorkbenchHandoffPreview? = nil
+    handoff: WorkbenchHandoffPreview? = nil,
+    resultingTaskID: String? = nil
   ) -> BridgeDesktopWorkbenchCommandReceipt {
     BridgeDesktopWorkbenchCommandReceipt(
       requestID: requestID,
@@ -49,7 +53,8 @@ public enum BridgeDesktopWorkbenchCommandAck {
       input: input,
       accepted: accepted,
       message: message,
-      handoff: handoff
+      handoff: handoff,
+      resultingTaskID: resultingTaskID
     )
   }
 }

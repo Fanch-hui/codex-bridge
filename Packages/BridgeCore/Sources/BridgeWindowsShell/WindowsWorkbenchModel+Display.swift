@@ -36,7 +36,20 @@
       let selectedSessionIndex = selectedSession.flatMap { selected in
         cached.visibleSessions.firstIndex { $0.id == selected.id }
       }
-      let workbenchRows = cached.visibleSessions.map(Self.sessionRowText)
+      let sessionStatus: (WorkbenchSessionItem) -> String = { session in
+        let task = session.latestTask
+        return WorkbenchTaskTextPresentation.sessionStatusLabel(
+          task.status,
+          canContinue: TaskInspectorPresentation.canResume(
+            task,
+            providerSupportsSessionContinuation: cached.providerSupportsSessionContinuation(
+              for: task)
+          )
+        )
+      }
+      let workbenchRows = cached.visibleSessions.map {
+        Self.sessionRowText($0, status: sessionStatus($0))
+      }
       let selectedIndex = selectedSessionIndex
       var conversationEntries: [BridgeDesktopConversationEntry]?
       if let task {
@@ -133,9 +146,13 @@
           },
           permissionMode: workbenchPermissionMode,
           taskRows: workbenchRows,
-          recentTaskRows: recentSessions.map(Self.sessionRowText),
+          recentTaskRows: recentSessions.map {
+            Self.sessionRowText($0, status: sessionStatus($0))
+          },
           recentTasks: recentSessions.map {
-            Self.recentTaskPresentation($0, projectName: cached.projectName(for: $0.projectID))
+            Self.recentTaskPresentation(
+              $0, projectName: cached.projectName(for: $0.projectID), status: sessionStatus($0)
+            )
           },
           selectedTaskID: selectedTaskID,
           selectedTaskIndex: selectedIndex,
@@ -230,22 +247,23 @@
       }
     }
 
-    private static func sessionRowText(_ session: WorkbenchSessionItem) -> String {
-      let task = session.latestTask
-      let state = WorkbenchTaskTextPresentation.statusLabel(task.status)
+    private static func sessionRowText(
+      _ session: WorkbenchSessionItem,
+      status: String
+    ) -> String {
       let title = WorkbenchTaskTextPresentation.sessionMenuTitle(
         title: session.title,
         turnCount: session.turnCount
       )
-      return "\(session.providerDisplayName) · \(title) — \(state)"
+      return "\(session.providerDisplayName) · \(title) — \(status)"
     }
 
     private static func recentTaskPresentation(
       _ session: WorkbenchSessionItem,
-      projectName: String
+      projectName: String,
+      status: String
     ) -> WindowsRecentTaskPresentation {
       let task = session.latestTask
-      let status = WorkbenchTaskTextPresentation.statusLabel(task.status)
       return WindowsRecentTaskPresentation(
         taskID: task.taskID,
         title: WorkbenchTaskTextPresentation.sessionMenuTitle(

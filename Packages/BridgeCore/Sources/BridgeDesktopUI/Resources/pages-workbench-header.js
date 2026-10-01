@@ -4,7 +4,7 @@
 
   function toneForStatus(status) {
     if (status === "running" || status === "starting" || status === "运行中" || status === "正在启动") return "running";
-    if (status === "completed" || status === "已完成" || status === "就绪") return "success";
+    if (status === "completed" || status === "已完成" || status === "已创建" || status === "就绪") return "success";
     if (status === "failed" || status === "失败") return "error";
     return (status && status.indexOf("approval") >= 0) ? "warning" : "neutral";
   }

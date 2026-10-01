@@ -19,7 +19,8 @@
         if response.targetTaskID != nil { await refreshTasks() }
         recordWorkbenchCommandReceipt(
           requestID: requestID, command: "handoffTask", taskID: id, input: prompt,
-          accepted: true, message: response.message, handoff: response)
+          accepted: true, message: response.message, handoff: response,
+          resultingTaskID: response.targetTaskID)
       } catch {
         rejectWorkbenchCommand(
           requestID: requestID, command: "handoffTask", taskID: id, input: prompt,

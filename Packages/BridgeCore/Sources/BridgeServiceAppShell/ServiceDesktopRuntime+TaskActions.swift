@@ -51,7 +51,7 @@ extension BridgeServiceAppModel {
       taskID: task.taskID,
       input: input
     ) { [weak self] client in
-      guard let self else { return false }
+      guard let self else { return (false, nil) }
       let receipt = try await client.steerTask(
         taskID: task.taskID,
         expectedTurnID: expectedTurnID,
@@ -59,7 +59,7 @@ extension BridgeServiceAppModel {
         mode: mode
       )
       await self.refresh(silent: true, includeCatalog: false)
-      return receipt.accepted
+      return (receipt.accepted, nil)
     }
   }
 
@@ -175,12 +175,12 @@ extension BridgeServiceAppModel {
       taskID: task.taskID,
       input: receiptInput
     ) { [weak self] client in
-      guard let self else { return false }
+      guard let self else { return (false, nil) }
       let response = try await client.submitAgentTask(request)
       await self.refresh(silent: true, includeCatalog: false)
       self.openTask(response.taskID)
       self.postToast(successMessage)
-      return true
+      return (true, response.taskID)
     }
   }
 

@@ -168,7 +168,8 @@ public struct CodexActivityPresentation: Equatable {
   public init(
     task: MCPServiceTaskSnapshot?,
     activity: TaskConversationModel.Activity,
-    pendingUserInput: Bool = false
+    pendingUserInput: Bool = false,
+    canContinue: Bool = false
   ) {
     guard let task else {
       statusText = "已连接本机 Codex 引擎"
@@ -211,7 +212,10 @@ public struct CodexActivityPresentation: Equatable {
       isActive = true
       showsBubble = true
     case "completed":
-      statusText = "\(providerName) 已完成"
+      let status = WorkbenchTaskTextPresentation.sessionStatusLabel(
+        task.status, canContinue: canContinue
+      )
+      statusText = "\(providerName) \(status)"
       isActive = false
       showsBubble = false
     case "failed":

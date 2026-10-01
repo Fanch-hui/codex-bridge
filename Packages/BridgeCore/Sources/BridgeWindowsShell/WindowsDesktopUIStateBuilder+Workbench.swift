@@ -99,7 +99,9 @@
       if display.connectionState != .connected {
         return "等待连接本机 Service"
       }
-      if let detail = display.selectedTaskDetail, let step = detail.currentStep, !step.isEmpty {
+      if let detail = display.selectedTaskDetail, !detail.isTerminal,
+        let step = detail.currentStep, !step.isEmpty
+      {
         return "\(detail.provider) \(step)"
       }
       if let detail = display.selectedTaskDetail {
@@ -110,8 +112,8 @@
           return "\(detail.provider) 正在处理任务…"
         case "正在启动":
           return "\(detail.provider) 正在启动…"
-        case "已完成":
-          return "\(detail.provider) 已完成"
+        case "已完成", "已创建":
+          return "\(detail.provider) \(detail.status)"
         case "失败":
           return "\(detail.provider) 执行失败"
         case "已中断":

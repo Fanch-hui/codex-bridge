@@ -90,6 +90,14 @@ public protocol BridgeMCPServiceAPI: Sendable {
 
   func serviceModels(deadline: ContinuousClock.Instant) async throws -> MCPModelList
 
+  func serviceAgentModels(
+    installationID: String,
+    projectID: String?,
+    modelID: String?,
+    forceRefresh: Bool,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPAgentModelList
+
   func serviceListSkills(
     projectID: String?,
     deadline: ContinuousClock.Instant
@@ -318,6 +326,16 @@ extension BridgeMCPServiceAPI {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPAgentList {
     MCPAgentList(agents: [])
+  }
+
+  public func serviceAgentModels(
+    installationID: String,
+    projectID: String?,
+    modelID: String?,
+    forceRefresh: Bool,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPAgentModelList {
+    throw BridgeMCPQueryError.unavailable
   }
 
   public func serviceCustomInstructions(

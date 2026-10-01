@@ -26,7 +26,7 @@ extension MCPServiceToolCatalog {
       title: "List Agent native sessions",
       description:
         "List provider-native sessions for one approved project and exact Agent installation. "
-        + "Use installation_id from list_agents; Qoder sessions stay bound to their CN or international region.",
+        + "Use installation_id from list_agents. Native session browsing is supported by Pi and Qoder; other providers return agent_history_unsupported. Qoder sessions stay bound to their CN or international region.",
       inputSchema: nativeSessionPageInput(required: ["project_id", "installation_id"]),
       annotations: readAnnotations,
       outputSchema: outputSchema(
@@ -43,7 +43,8 @@ extension MCPServiceToolCatalog {
     Tool(
       name: MCPServiceToolName.readAgentNativeSession.rawValue,
       title: "Read Agent native session",
-      description: "Read one provider-native session transcript page without changing the session.",
+      description:
+        "Read one provider-native session transcript page without changing the session. Supported by Pi and Qoder; other providers return agent_history_unsupported. Use list_tasks and get_task for Bridge task history.",
       inputSchema: nativeSessionPageInput(
         required: ["project_id", "installation_id", "session_id"]),
       annotations: readAnnotations,

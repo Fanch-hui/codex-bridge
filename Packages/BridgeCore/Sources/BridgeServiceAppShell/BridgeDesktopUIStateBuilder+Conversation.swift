@@ -47,7 +47,9 @@ extension BridgeDesktopUIStateBuilder {
           activity: model.conversation?.activity ?? .idle,
           pendingUserInput: model.approvals.contains {
             $0.taskID == task.taskID && $0.kind == "user_input"
-          })
+          },
+          canContinue: canResume(task, model: model)
+        )
       ),
       canInterrupt: TaskInspectorPresentation.canInterrupt(task),
       canStop: task.isActive,

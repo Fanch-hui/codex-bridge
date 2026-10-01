@@ -220,6 +220,28 @@
   white-space: nowrap;
 }
 
+:root[data-platform="windows"] .feedback-toast.tone-warning {
+  width: min(500px, calc(100vw - 48px));
+  padding: 16px 18px;
+  border: 2px solid var(--warning);
+  border-left-width: 6px;
+  background: var(--warning-soft);
+}
+
+:root[data-platform="windows"] .feedback-toast.tone-warning strong {
+  color: var(--warning-strong);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+:root[data-platform="windows"] .feedback-toast.tone-warning span {
+  margin-top: 5px;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: normal;
+}
+
 :root[data-platform="windows"] .feedback-dismiss {
   width: 24px;
   height: 24px;
