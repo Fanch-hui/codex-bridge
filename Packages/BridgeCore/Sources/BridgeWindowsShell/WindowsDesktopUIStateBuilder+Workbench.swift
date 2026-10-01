@@ -99,7 +99,7 @@
       if display.connectionState != .connected {
         return "等待连接本机 Service"
       }
-      if let detail = display.selectedTaskDetail, !detail.isTerminal,
+      if let detail = display.selectedTaskDetail, detail.isTerminal != true,
         let step = detail.currentStep, !step.isEmpty
       {
         return "\(detail.provider) \(step)"
