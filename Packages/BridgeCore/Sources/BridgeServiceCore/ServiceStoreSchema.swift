@@ -27,7 +27,7 @@ private struct LegacyWorkspaceCommand: Codable {
 }
 
 enum ServiceStoreSchema {
-  static let version: Int64 = 22
+  static let version: Int64 = 23
   static let migrationPrefix = "BridgeServiceCore."
   static let migrationV1 = "BridgeServiceCore.v1"
   static let migrationV2 = "BridgeServiceCore.v2"
@@ -51,6 +51,7 @@ enum ServiceStoreSchema {
   static let migrationV20 = "BridgeServiceCore.v20"
   static let migrationV21 = "BridgeServiceCore.v21"
   static let migrationV22 = "BridgeServiceCore.v22"
+  static let migrationV23 = "BridgeServiceCore.v23"
   static let knownMigrations = Set((1...version).map { "\(migrationPrefix)v\($0)" })
 
   static func prepare(_ database: DatabaseQueue) throws {
@@ -295,6 +296,9 @@ enum ServiceStoreSchema {
     }
     migrator.registerMigration(migrationV22) { db in
       try createVersionTwentyTwo(in: db)
+    }
+    migrator.registerMigration(migrationV23) { db in
+      try createVersionTwentyThree(in: db)
     }
     return migrator
   }
@@ -1182,6 +1186,7 @@ enum ServiceStoreSchema {
           "direct_command_mode", "workspace_commands_json",
           "direct_blacklist_json",
         ],
+        "bridge_service_agent_runtime_artifacts": ["installation_id", "artifacts_json"],
         "bridge_service_settings": ["setting_key", "setting_value", "updated_at"],
         "bridge_service_agent_installations": [
           "installation_id", "provider_id", "display_name", "executable_path",

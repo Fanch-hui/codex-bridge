@@ -9,6 +9,8 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
   public let discoveredExecutablePath: String?
   public let discoveredConfigurationPath: String?
   public let configuredBaseURL: String?
+  public let configuredInferenceProtocol: String?
+  public let configuredCatalogBaseURL: String?
   public let requiresConfiguration: Bool
   public let requiresHeadlessAlwaysProceed: Bool
   public let registrationTrustProfile: String
@@ -34,6 +36,8 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     discoveredExecutablePath: String? = nil,
     discoveredConfigurationPath: String? = nil,
     configuredBaseURL: String? = nil,
+    configuredInferenceProtocol: String? = nil,
+    configuredCatalogBaseURL: String? = nil,
     requiresConfiguration: Bool = false,
     requiresHeadlessAlwaysProceed: Bool = false,
     registrationTrustProfile: String = "managed",
@@ -58,6 +62,8 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     self.discoveredExecutablePath = discoveredExecutablePath
     self.discoveredConfigurationPath = discoveredConfigurationPath
     self.configuredBaseURL = configuredBaseURL
+    self.configuredInferenceProtocol = configuredInferenceProtocol
+    self.configuredCatalogBaseURL = configuredCatalogBaseURL
     self.requiresConfiguration = requiresConfiguration
     self.requiresHeadlessAlwaysProceed = requiresHeadlessAlwaysProceed
     self.registrationTrustProfile = registrationTrustProfile
@@ -84,6 +90,8 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
     case discoveredExecutablePath = "discovered_executable_path"
     case discoveredConfigurationPath = "discovered_configuration_path"
     case configuredBaseURL = "configured_base_url"
+    case configuredInferenceProtocol = "configured_inference_protocol"
+    case configuredCatalogBaseURL = "configured_catalog_base_url"
     case requiresConfiguration = "requires_configuration"
     case requiresHeadlessAlwaysProceed = "requires_headless_always_proceed"
     case registrationTrustProfile = "registration_trust_profile"
@@ -121,6 +129,10 @@ public struct IPCAgentProviderSummary: Codable, Equatable, Sendable {
         String.self,
         forKey: .configuredBaseURL
       ),
+      configuredInferenceProtocol: try container.decodeIfPresent(
+        String.self, forKey: .configuredInferenceProtocol),
+      configuredCatalogBaseURL: try container.decodeIfPresent(
+        String.self, forKey: .configuredCatalogBaseURL),
       requiresConfiguration: try container.decodeIfPresent(
         Bool.self,
         forKey: .requiresConfiguration
@@ -344,6 +356,8 @@ public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
 public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
   public let providerID: String
   public let baseURL: String?
+  public let inferenceProtocol: String?
+  public let catalogBaseURL: String?
   public let apiKey: String?
   public let alwaysProceedConfirmed: Bool
   public let qoderDistribution: String?
@@ -352,6 +366,8 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
   public init(
     providerID: String,
     baseURL: String? = nil,
+    inferenceProtocol: String? = nil,
+    catalogBaseURL: String? = nil,
     apiKey: String? = nil,
     alwaysProceedConfirmed: Bool = false,
     qoderDistribution: String? = nil,
@@ -359,6 +375,8 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
   ) {
     self.providerID = providerID
     self.baseURL = baseURL
+    self.inferenceProtocol = inferenceProtocol
+    self.catalogBaseURL = catalogBaseURL
     self.apiKey = apiKey
     self.alwaysProceedConfirmed = alwaysProceedConfirmed
     self.qoderDistribution = qoderDistribution
@@ -368,6 +386,8 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
   private enum CodingKeys: String, CodingKey {
     case providerID = "provider_id"
     case baseURL = "base_url"
+    case inferenceProtocol = "inference_protocol"
+    case catalogBaseURL = "catalog_base_url"
     case apiKey = "api_key"
     case alwaysProceedConfirmed = "always_proceed_confirmed"
     case qoderDistribution = "qoder_distribution"
@@ -379,6 +399,8 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
     self.init(
       providerID: try container.decode(String.self, forKey: .providerID),
       baseURL: try container.decodeIfPresent(String.self, forKey: .baseURL),
+      inferenceProtocol: try container.decodeIfPresent(String.self, forKey: .inferenceProtocol),
+      catalogBaseURL: try container.decodeIfPresent(String.self, forKey: .catalogBaseURL),
       apiKey: try container.decodeIfPresent(String.self, forKey: .apiKey),
       alwaysProceedConfirmed: try container.decodeIfPresent(
         Bool.self,

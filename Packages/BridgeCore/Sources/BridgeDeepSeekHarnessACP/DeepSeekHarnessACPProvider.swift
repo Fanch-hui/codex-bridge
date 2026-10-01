@@ -69,6 +69,7 @@ public struct DeepSeekHarnessACPProviderConfiguration: Sendable {
 public struct DeepSeekHarnessACPProvider: AgentProvider, Sendable {
   public let descriptor: AgentProviderDescriptor
 
+  let remoteCatalogCache = DeepSeekHarnessACPRemoteCatalogCache()
   let configuration: DeepSeekHarnessACPProviderConfiguration
 
   public init(configuration: DeepSeekHarnessACPProviderConfiguration? = nil) throws {
@@ -76,7 +77,7 @@ public struct DeepSeekHarnessACPProvider: AgentProvider, Sendable {
     descriptor = try AgentProviderDescriptor(
       providerID: .deepSeekHarness,
       displayName: "DeepSeek Harness",
-      adapterRevision: 8
+      adapterRevision: 9
     )
   }
 

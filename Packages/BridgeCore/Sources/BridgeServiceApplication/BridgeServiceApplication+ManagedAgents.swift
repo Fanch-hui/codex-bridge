@@ -264,6 +264,9 @@ extension BridgeServiceApplication {
       requireSelectedModel: modelID != nil
     )
     try Self.checkDeadline(deadline)
+    if installation.providerID == .deepSeekHarness {
+      try await reconcileDeepSeekHarnessModelDefaults(models: models, deadline: deadline)
+    }
     return models.map {
       ServiceAgentModelListItem(
         modelID: $0.id,

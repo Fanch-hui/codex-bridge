@@ -30,9 +30,16 @@
     var fields = S.node("div", "form-grid agent-connect-fields");
     var baseURL = S.textField("Base URL", "", "https://api.example.com"),
       apiKey = S.textField("API key", "", "输入 API key");
+    var inferenceProtocol = S.selectField("推理协议", "deepseek-messages", [
+      { id: "deepseek-messages", title: "DeepSeek Messages" },
+      { id: "openai-completions", title: "OpenAI Chat Completions" }
+    ], refreshAction);
+    var catalogBaseURL = S.textField("模型目录 Base URL（可选）", "", "留空时按推理协议解析");
     apiKey.control.type = "password";
     apiKey.control.autocomplete = "off";
+    fields.appendChild(inferenceProtocol.wrapper);
     fields.appendChild(baseURL.wrapper);
+    fields.appendChild(catalogBaseURL.wrapper);
     fields.appendChild(apiKey.wrapper);
     var configPanel = S.node("div", "agent-config-panel"); configPanel.appendChild(fields);
     var configSave = S.button("更新配置", null, {}, null, "small", true); configPanel.appendChild(configSave);
@@ -65,7 +72,8 @@
     details.appendChild(detailsBody);
     row.appendChild(details);
 
-    var draft = D.bind({ baseURL: baseURL.control, apiKey: apiKey.control });
+    var draft = D.bind({ baseURL: baseURL.control, apiKey: apiKey.control,
+      inferenceProtocol: inferenceProtocol.control, catalogBaseURL: catalogBaseURL.control });
 
     function scopedInstallations() {
       if (currentProvider.providerID !== "qoder") return currentInstallations;
@@ -79,6 +87,7 @@
       if (!currentProvider.requiresConfiguration) return true;
       var base = hasValue(baseURL.control.value);
       var key = hasValue(apiKey.control.value);
+      if (currentProvider.configuredBaseURL) return base || !key;
       if (base || key) return base && key;
       return currentInstallations.length > 0 || !!currentProvider.discoveredConfigurationPath;
     }
@@ -89,7 +98,10 @@
       var isConnectedValue = scoped.some(isConnected);
       var review = primary && primary.availability === "needs_review";
       var ready = context.canConnect && !context.busy && configurationValid();
-      var hasConfigurationInput = hasValue(baseURL.control.value) || hasValue(apiKey.control.value);
+      var hasConfigurationInput = baseURL.control.value !== (currentProvider.configuredBaseURL || "")
+        || hasValue(apiKey.control.value)
+        || inferenceProtocol.control.value !== (currentProvider.configuredInferenceProtocol || "deepseek-messages")
+        || catalogBaseURL.control.value !== (currentProvider.configuredCatalogBaseURL || "");
       var noCandidate = !primary && discoveryState(currentProvider) === "not_found";
       actionMode = null;
       actionBar.hidden = isConnectedValue;
@@ -139,6 +151,8 @@
         providerID: currentProvider.providerID,
         baseURL: currentProvider.requiresConfiguration ? values.baseURL : null,
         apiKey: currentProvider.requiresConfiguration ? values.apiKey : null,
+        inferenceProtocol: currentProvider.providerID === "deepseek-harness" && hasValue(values.baseURL) ? values.inferenceProtocol : null,
+        catalogBaseURL: currentProvider.providerID === "deepseek-harness" && hasValue(values.baseURL) ? values.catalogBaseURL : null,
         confirmed: !!alwaysProceedConfirmed,
         qoderDistribution: currentProvider.providerID === "qoder"
           ? qoderSettings.distribution() : null,
@@ -146,7 +160,8 @@
           ? qoderSettings.installationID() : null
       });
       apiKey.control.value = "";
-      draft.update({ baseURL: baseURL.control.value, apiKey: "" });
+      draft.update({ baseURL: baseURL.control.value, apiKey: "",
+        inferenceProtocol: inferenceProtocol.control.value, catalogBaseURL: catalogBaseURL.control.value });
     }
 
     function sendReprobe(installation, acceptReplacement) {
@@ -207,9 +222,13 @@
         row.insertBefore(configPanel, actionBar);
       }
       updateDetails(nextProvider, scoped, primary);
+      inferenceProtocol.wrapper.hidden = nextProvider.providerID !== "deepseek-harness";
+      catalogBaseURL.wrapper.hidden = nextProvider.providerID !== "deepseek-harness";
       draft.update({
         baseURL: nextProvider.configuredBaseURL || "",
-        apiKey: ""
+        apiKey: "",
+        inferenceProtocol: nextProvider.configuredInferenceProtocol || "deepseek-messages",
+        catalogBaseURL: nextProvider.configuredCatalogBaseURL || ""
       });
       refreshAction();
     }
@@ -265,7 +284,7 @@
       }
     }
 
-    [baseURL.control, apiKey.control].forEach(function (control) {
+    [baseURL.control, apiKey.control, catalogBaseURL.control, inferenceProtocol.control].forEach(function (control) {
       control.addEventListener("input", refreshAction);
       control.addEventListener("compositionend", refreshAction);
     });

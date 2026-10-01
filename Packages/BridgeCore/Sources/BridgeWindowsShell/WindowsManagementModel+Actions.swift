@@ -98,7 +98,9 @@
       apiKey: String? = nil,
       alwaysProceedConfirmed: Bool = false,
       qoderDistribution: String? = nil,
-      installationID: String? = nil
+      installationID: String? = nil,
+      inferenceProtocol: String? = nil,
+      catalogBaseURL: String? = nil
     ) async {
       guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
         reportAgentFailure("未找到可连接的 Agent Provider。")
@@ -113,7 +115,8 @@
           hasExistingInstallation: hasExistingInstallation,
           baseURL: baseURL,
           apiKey: apiKey,
-          hasExistingConfiguration: provider.discoveredConfigurationPath != nil
+          hasExistingConfiguration: provider.discoveredConfigurationPath != nil,
+          hasStoredCredentials: provider.configuredBaseURL != nil
         )
       else {
         reportAgentFailure("请填写 \(provider.displayName) 的 Base URL 和 API key。")
@@ -133,7 +136,8 @@
           apiKey: AgentConnectionInput.apiKey(apiKey),
           alwaysProceedConfirmed: alwaysProceedConfirmed,
           qoderDistribution: qoderDistribution,
-          installationID: installationID
+          installationID: installationID,
+          inferenceProtocol: inferenceProtocol, catalogBaseURL: catalogBaseURL
         )
         selectedProviderID = provider.providerID
         selectedInstallationID = installation.installationID

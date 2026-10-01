@@ -140,6 +140,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let displayName: String?
   public let configurationPath: String?
   public let baseURL: String?
+  public let inferenceProtocol: String?
+  public let catalogBaseURL: String?
   public let apiKey: String?
   public let mcpTransport: String?
   public let mcpCommand: String?
@@ -212,6 +214,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     displayName: String? = nil,
     configurationPath: String? = nil,
     baseURL: String? = nil,
+    inferenceProtocol: String? = nil,
+    catalogBaseURL: String? = nil,
     apiKey: String? = nil,
     mcpTransport: String? = nil,
     mcpCommand: String? = nil,
@@ -283,6 +287,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.displayName = displayName
     self.configurationPath = configurationPath
     self.baseURL = baseURL
+    self.inferenceProtocol = inferenceProtocol
+    self.catalogBaseURL = catalogBaseURL
     self.apiKey = apiKey
     self.mcpTransport = mcpTransport
     self.mcpCommand = mcpCommand

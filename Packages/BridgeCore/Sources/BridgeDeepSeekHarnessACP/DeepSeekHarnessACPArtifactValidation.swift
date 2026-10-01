@@ -25,6 +25,9 @@ enum DeepSeekHarnessACPArtifactValidator {
       configuration: configurationData,
       template: configurationTemplate
     )
+    if let layout = DeepSeekHarnessACPRuntimeLayout.desktop(at: executable) {
+      return [.launchConfiguration: configuration, .nodeInterpreter: layout.runtimePath]
+    }
     let sourceRoot = try DeepSeekHarnessACPArtifactRuntime.findSourceRoot(
       startingAt: executable
     )
@@ -37,58 +40,28 @@ enum DeepSeekHarnessACPArtifactValidator {
       executablePath: executable,
       sourceEnvironment: sourceEnvironment
     )
-    let artifacts = try [
-      makeArtifact(
-        role: .launchConfiguration,
-        snapshot: DeepSeekHarnessACPFileSnapshot(
-          capturing: configuration,
-          requiresExecutable: false
-        )
-      ),
-      makeArtifact(
-        role: .runtimeManifest,
-        snapshot: DeepSeekHarnessACPFileSnapshot(
-          capturing: try DeepSeekHarnessACPPathSupport.append(
-            "package.json",
-            to: sourceRoot
-          ),
-          requiresExecutable: false
-        )
-      ),
-      makeArtifact(
-        role: .dependencyLock,
-        snapshot: DeepSeekHarnessACPFileSnapshot(
-          capturing: try DeepSeekHarnessACPArtifactRuntime.dependencyLockPath(in: sourceRoot),
-          requiresExecutable: false
-        )
-      ),
-      makeArtifact(
-        role: .nodeInterpreter,
-        snapshot: DeepSeekHarnessACPFileSnapshot(
-          capturing: node,
-          requiresExecutable: true
-        )
-      ),
+    var paths: [AgentInstallationArtifactRole: String] = [
+      .launchConfiguration: configuration,
+      .runtimeManifest: try DeepSeekHarnessACPPathSupport.append("package.json", to: sourceRoot),
+      .nodeInterpreter: node,
     ]
+    if let lock = try? DeepSeekHarnessACPArtifactRuntime.dependencyLockPath(in: sourceRoot) {
+      paths[.dependencyLock] = lock
+    } else if !DeepSeekHarnessACPArtifactRuntime.isPublishedPackage(executable) {
+      throw DeepSeekHarnessACPError.artifactInvalid("dependency_lock")
+    }
+    let artifacts = try paths.map { role, path in
+      makeArtifact(
+        role: role,
+        snapshot: try DeepSeekHarnessACPFileSnapshot(
+          capturing: path,
+          requiresExecutable: role.requiresExecutable))
+    }
     let installation = try AgentInstallation(
       id: AgentInstallationID(rawValue: "deepseek-registration-probe"),
-      providerID: .deepSeekHarness,
-      executablePath: executable,
-      artifacts: artifacts
-    )
+      providerID: .deepSeekHarness, executablePath: executable, artifacts: artifacts)
     _ = try validate(installation, configurationTemplate: configurationTemplate)
-    return Dictionary(uniqueKeysWithValues: [
-      (.launchConfiguration, configuration),
-      (
-        .runtimeManifest,
-        try DeepSeekHarnessACPPathSupport.append("package.json", to: sourceRoot)
-      ),
-      (
-        .dependencyLock,
-        try DeepSeekHarnessACPArtifactRuntime.dependencyLockPath(in: sourceRoot)
-      ),
-      (.nodeInterpreter, node),
-    ])
+    return paths
   }
 
   static func validate(
@@ -97,6 +70,11 @@ enum DeepSeekHarnessACPArtifactValidator {
   ) throws -> DeepSeekHarnessACPValidatedInstallation {
     guard installation.providerID == .deepSeekHarness else {
       throw AgentRuntimeError.providerUnavailable(installation.providerID)
+    }
+    if let layout = DeepSeekHarnessACPRuntimeLayout.desktop(at: installation.executablePath) {
+      return try DeepSeekHarnessACPDesktopArtifacts.validate(
+        installation,
+        configurationTemplate: configurationTemplate, layout: layout)
     }
     let artifacts = try requiredArtifacts(from: installation)
     let configuration = try validateArtifact(
@@ -120,12 +98,22 @@ enum DeepSeekHarnessACPArtifactValidator {
       artifacts[.runtimeManifest]!,
       role: .runtimeManifest
     )
-    let lock = try validateArtifact(artifacts[.dependencyLock]!, role: .dependencyLock)
+    let lock = try artifacts[.dependencyLock].map {
+      try validateArtifact($0, role: .dependencyLock)
+    }
     let node = try validateArtifact(artifacts[.nodeInterpreter]!, role: .nodeInterpreter)
-    let sourceRoot = try DeepSeekHarnessACPArtifactRuntime.commonSourceRoot(
-      manifest.path,
-      lock.path
-    )
+    let sourceRoot: String
+    if let lock {
+      sourceRoot = try DeepSeekHarnessACPArtifactRuntime.commonSourceRoot(manifest.path, lock.path)
+    } else {
+      sourceRoot = URL(fileURLWithPath: manifest.path).deletingLastPathComponent().path
+      let packageEntry = URL(fileURLWithPath: sourceRoot).appendingPathComponent("lib/bin.js").path
+      guard DeepSeekHarnessACPArtifactRuntime.isPublishedPackage(packageEntry),
+        DeepSeekHarnessACPPathSupport.samePath(packageEntry, installation.executablePath)
+      else {
+        throw DeepSeekHarnessACPError.artifactInvalid("dependency_lock")
+      }
+    }
     guard let configurationRoot = AgentPathSemantics.directoryPath(of: configuration.path),
       !AgentPathSemantics.isContained(configurationRoot, in: sourceRoot)
     else {
@@ -159,7 +147,10 @@ enum DeepSeekHarnessACPArtifactValidator {
     guard installation.providerID == .deepSeekHarness else {
       throw AgentRuntimeError.providerUnavailable(installation.providerID)
     }
-    let artifacts = try requiredArtifacts(from: installation)
+    let artifacts = Dictionary(uniqueKeysWithValues: installation.artifacts.map { ($0.role, $0) })
+    guard artifacts[.launchConfiguration] != nil else {
+      throw DeepSeekHarnessACPError.artifactInvalid("launch_configuration")
+    }
     let configuration = try validateArtifact(
       artifacts[.launchConfiguration]!,
       role: .launchConfiguration
@@ -182,7 +173,10 @@ enum DeepSeekHarnessACPArtifactValidator {
   private static func requiredArtifacts(
     from installation: AgentInstallation
   ) throws -> [AgentInstallationArtifactRole: AgentInstallationArtifact] {
-    let expected = Set(AgentInstallationArtifactRole.allCases)
+    let expected =
+      DeepSeekHarnessACPArtifactRuntime.isPublishedPackage(installation.executablePath)
+      ? Set([AgentInstallationArtifactRole.launchConfiguration, .runtimeManifest, .nodeInterpreter])
+      : Set(AgentInstallationArtifactRole.allCases)
     let actual = Set(installation.artifacts.map(\.role))
     guard expected.isSubset(of: actual), actual.count == installation.artifacts.count else {
       throw DeepSeekHarnessACPError.artifactInvalid("required_roles")
@@ -190,7 +184,7 @@ enum DeepSeekHarnessACPArtifactValidator {
     return Dictionary(uniqueKeysWithValues: installation.artifacts.map { ($0.role, $0) })
   }
 
-  private static func validateArtifact(
+  static func validateArtifact(
     _ artifact: AgentInstallationArtifact,
     role: AgentInstallationArtifactRole
   ) throws -> DeepSeekHarnessACPFileSnapshot {

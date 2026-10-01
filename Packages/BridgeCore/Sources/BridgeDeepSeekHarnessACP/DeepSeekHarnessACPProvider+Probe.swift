@@ -30,10 +30,13 @@ extension DeepSeekHarnessACPProvider {
         for: request.installation
       )
       resolvingCredentials = false
+      let catalog = try await executionCatalog(
+        installation: request.installation, environment: sourceEnvironment)
       let launch = try configuration.launchBuilder.make(
         installation: request.installation,
         projectRoot: probeRoot.path,
         runDirectory: runDirectory,
+        catalogModelIDs: catalog,
         networkAllowed: false,
         sourceEnvironment: sourceEnvironment
       )
@@ -56,13 +59,14 @@ extension DeepSeekHarnessACPProvider {
           }
           ?? initialization.agentVersion,
         protocolRevision: String(DeepSeekHarnessACPConstants.acpProtocolVersion),
-        artifacts: request.installation.artifacts
+        artifacts: request.installation.artifacts,
+        runtimeArtifacts: request.installation.runtimeArtifacts
       )
       return AgentProbeResult(
         installation: installation,
         available: true,
         capabilities: Self.capabilities(
-          executablePath: launch.resolvedExecutablePath,
+          installation: installation,
           initialization: initialization,
           persistenceAvailable: configuration.persistentStateBaseDirectory != nil
         )

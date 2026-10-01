@@ -60,8 +60,12 @@ extension ServiceAgentRegistry {
     }
     let candidate: RefreshCandidate
     let currentArtifacts: [ServiceAgentInstallationArtifact]
+    let currentArchives: [AgentInstallationRuntimeArtifact]
     do {
       candidate = try refreshCandidate(record)
+      currentArchives = try await archiveArtifacts(
+        provider: provider, installationID: record.id,
+        executablePath: candidate.identity.canonicalPath)
       currentArtifacts = try await runtimeArtifacts(
         provider: provider, installationID: record.id,
         executablePath: candidate.identity.canonicalPath, existing: candidate.artifacts, at: now()
@@ -84,6 +88,7 @@ extension ServiceAgentRegistry {
     let contentChanged =
       !current.hasSameContent(as: record.executableIdentity)
       || !artifactsHaveSameContent(currentArtifacts, record.artifacts)
+      || !archivesHaveSameContent(currentArchives, record.runtimeArtifacts)
     if contentChanged, !record.isEnabled {
       return try await persistStateIfNeeded(
         record,
@@ -94,6 +99,7 @@ extension ServiceAgentRegistry {
     let metadataChanged =
       current != record.executableIdentity
       || !artifactsHaveSameIdentity(currentArtifacts, record.artifacts)
+      || currentArchives != record.runtimeArtifacts
     if provider.descriptor.adapterRevision != record.adapterRevision
       || metadataChanged || contentChanged || record.hasRecoverableIdentityReview
       || (record.isEnabled && record.availability == .unavailable)

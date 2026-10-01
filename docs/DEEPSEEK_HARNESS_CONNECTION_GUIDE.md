@@ -2,7 +2,7 @@
 
 本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、自动发现并一键连接并从 ChatGPT/Qwen 提交任务。
 
-最短路径是：从官方仓库构建 DSH → 在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key → 点击“连接” → 在设置中刷新模型。Mac 与 Windows 共用这套流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
+最短路径是：安装官方 DSH 桌面版、npm 包或源码构建 → 在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key → 点击“连接” → 在设置中刷新模型。Mac 与 Windows 共用这套流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
 DSH 的 Provider ID 固定为：
 
@@ -44,7 +44,7 @@ git clone https://github.com/deepseek-ai/deepseek-harness.git deepseek-harness
 cd deepseek-harness
 ```
 
-不要把第三方重新打包的同名脚本、全局 `dsh` 命令或源码 TypeScript 文件当作 Bridge 的 ACP 入口。
+Bridge 识别官方 npm/pnpm 的 `dsh` 包启动器、已构建源码入口和官方桌面内置 CLI；源码 TypeScript 文件不能直接作为 ACP 入口。
 
 ## 3. 准备 Node 和 pnpm
 
@@ -137,6 +137,12 @@ Bridge 实际执行语义是：
 
 不需要先启动 `pnpm dsh web`，也不需要保持终端或浏览器中的 DSH UI 打开。
 
+### npm 与官方桌面安装
+
+npm/pnpm 安装采用官方 `@deepseek-ai/dsh` 包，Bridge 解析启动器对应的 `lib/bin.js` 与 Node。官方桌面安装使用同一安装包中的 Electron 与 `app.asar` 内 `dsh-desktop-host/lib/cli.js`，不依赖外部 Node。扫描后也可在高级路径登记中选择桌面程序。
+
+桌面入口使用 `ELECTRON_RUN_AS_NODE=1` 与 `--expose-internals`；Bridge 为运行分配独立 `DSH_HOME` 和工作目录，API key 从 Bridge 的正常连接配置注入。Electron、归档与实际使用的解包工件参与身份校验，更新后重新 Probe。桌面账号登录态与 Bridge 的 API key 连接分别管理。
+
 ## 5. 为什么 Bridge 需要完整源码树
 
 虽然文件选择器只选择 `apps/cli/lib/bin.js`，Bridge 还会从它向上定位唯一 DSH 源根，并检查：
@@ -155,7 +161,7 @@ Bridge 实际执行语义是：
 
 1. 登录 [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys)，创建一个新的 API key，并在页面显示时立即复制。
 2. 进入 `连接 → 本机 Agent 引擎连接`，找到 DeepSeek Harness。
-3. 在连接行填写主模型 Base URL（默认 `https://api.deepseek.com`）和 API key。
+3. 在连接行填写协议、主模型 Base URL 和 API key；官方 API 选择 DeepSeek Messages，可继续填写 `https://api.deepseek.com`，Bridge 在新版运行时归一化为 Messages 地址。
 4. 点击“连接”，等待自动发现、配置和 Probe；Probe 成功后安装会启用。
 5. 进入设置刷新模型目录并选择当前账号实际返回的模型。
 
@@ -252,65 +258,21 @@ chmod 600 /path/to/dsh-profile/.env
 
 若使用手动 Profile，API key 留在配置目录的 `.env`，App 中可不重复填写。
 
-## 8. 正确理解两个 Base URL
+## 8. 推理、模型目录与搜索地址
 
-### 8.1 主模型：`DEEPSEEK_BASE_URL`
+连接页提供两种协议，并允许单独填写模型目录地址。现有官方根地址在新版 Messages 运行时自动迁移；自定义网关地址保持原输入，旧自定义连接按 OpenAI Chat Completions 继续使用。明确选择的协议与目录地址随连接保存，API key 仍保存在系统凭据存储中。
 
-该值是 DeepSeek-compatible Chat Completions 的**基础 URL**，不要带 `/chat/completions`。DSH 会自己追加请求路径。
+| 连接 | 推理 Base URL | 模型目录 Base URL | 实际请求 |
+| --- | --- | --- | --- |
+| DeepSeek 官方 Messages | `https://api.deepseek.com/anthropic` | `https://api.deepseek.com` | 推理 `/v1/messages`；目录 `/models` |
+| 自定义 Messages | 网关给出的 Messages 根 | 显式填写目录根 | 推理由 DSH 追加 `/v1/messages`；目录追加 `/models` |
+| OpenAI Chat Completions | `https://gateway.example/v1` | 留空沿用推理根，或显式填写 | 推理 `/chat/completions`；目录 `/models` |
 
-现代入口刷新模型时，Bridge 会用 Bearer API key 请求：
+新版原生 DeepSeek provider 只使用 Messages；OpenAI 网关由 DSH `llm-pi-ai` 的独立 `bridge-openai-gateway` 路由承载。运行 patch 保存 `apiKeyEnv: DEEPSEEK_API_KEY` 凭据引用，使用目录真实返回的模型 ID。旧源码 provider 继续使用原有启动和配置合同。
 
-```text
-GET <DEEPSEEK_BASE_URL>/models
-```
+模型目录使用 Bearer API key，请求成功且返回非空 `data` 模型列表后才作为远端目录。目录可见与模型实际可调用分别判断。选择模型后，推理强度以 ACP 返回的该模型选项为准；同名模型来自多个路由时，Bridge 保留可唯一映射的标识。
 
-因此自定义网关必须同时提供可用的 OpenAI-compatible `/models` 响应和 Chat Completions 接口。返回应包含类似 `{"data":[{"id":"..."}]}` 的模型列表；Bridge 只使用返回的模型 ID，不把本地静态示例当作真实套餐目录。
-
-```text
-完整接口：https://gateway.example/v1/chat/completions
-应填写：  DEEPSEEK_BASE_URL=https://gateway.example/v1
-```
-
-```text
-完整接口：https://gateway.example/chat/completions
-应填写：  DEEPSEEK_BASE_URL=https://gateway.example
-```
-
-当前 DSH 主模型适配器使用 Chat Completions 协议。把 URL 改成 `/v1/responses` 不会自动变成 Responses API。
-
-### 8.2 Web Search：`DEEPSEEK_SEARCH_BASE_URL`
-
-该值独立于主模型 URL，并且不要带 `/messages`。DSH 会追加：
-
-```text
-/messages
-```
-
-Search endpoint 必须同时满足：
-
-1. 接受 Anthropic Messages-compatible 请求；
-2. 支持原生 `web_search_20250305` server tool；
-3. 接受当前模板使用的 `DEEPSEEK_API_KEY`。
-
-“主模型能回答”“网关支持 `/messages`”或“认证成功”都不能单独证明 Web Search 可用。自定义网关若用不同的搜索凭据，而当前模板只配置 `DEEPSEEK_API_KEY`，需要先确认该 Key 对两个端点都有效；不要让 Bridge 读取或转换凭据来弥补网关配置差异。
-
-### 8.3 Clash / Mihomo TUN 与 Fake-IP
-
-DSH 的网页抓取会拒绝解析到非公网地址的目标。TUN 的 Fake-IP（例如 `198.18.x.x`）因此可能触发 `WEB_BLOCKED_URL`，即使浏览器和普通 HTTPS 请求正常。这是抓取前的地址校验，不代表整台机器断网。
-
-推荐只为 DSH 指定 Clash 的 HTTP 或 mixed 代理端口，保留 TUN 和 Fake-IP。在登记的外部 `cordis.yml` 同目录 `.env` 中添加以下项（`7897` 只是示例，请使用 Clash 显示的实际 HTTP/mixed 端口）：
-
-```dotenv
-HTTP_PROXY=http://127.0.0.1:7897
-HTTPS_PROXY=http://127.0.0.1:7897
-NO_PROXY=localhost,127.0.0.1,::1
-```
-
-保留文件里已有的配置，避免重复定义同名变量。新任务启动时生效；已有运行中的任务保持原环境。Bridge 会把这些值在 DSH 启动前传入，启动进程已有的同类代理变量优先。也支持标准 `ALL_PROXY` 和小写代理变量；DSH 的该代理实现要求 HTTP(S) 地址，不能填 SOCKS 或 PAC 地址。通过代理时由代理解析域名，DSH 继续保留非公网 IP 字面量校验。
-
-另一种方式是调整 Clash DNS。若当前 `fake-ip-filter-mode` 为 `blacklist`，可在原 `fake-ip-filter` 列表追加需要抓取的域名（例如 `+.x.com`、`+.ycombinator.com`），让它们返回真实 IP；保留现有条目，并重载配置、清理 DNS 缓存。其他过滤模式需按该模式的规则配置，不能直接覆盖原列表。
-
-这只解决网页抓取。`web_search` 若提示没有 `web_search_tool_result`，仍需按 8.2 检查搜索网关的原生搜索能力；HTTP 200 或普通聊天成功不能替代该能力。不要将带密钥的请求自动改发到其他服务商。
+网页搜索独立使用 `DEEPSEEK_SEARCH_BASE_URL`，显式值优先。新版不会把主模型地址复制成搜索地址；未配置时采用 DSH 的官方默认搜索根 `https://api.deepseek.com/anthropic/v1`。搜索 provider 追加 `/messages`，端点还须支持 `web_search_20250305`。自定义推理网关并不自动拥有搜索能力。
 
 ## 9. 检查连接结果与手动登记
 
@@ -333,7 +295,7 @@ Probe 验证本地安装、协议和基础 ACP Session。模型刷新还会访�
 现代 DSH 的模型目录按以下顺序获得：
 
 ```text
-GET <DEEPSEEK_BASE_URL>/models
+GET <模型目录 Base URL>/models
         ↓
 ACP session/new → configOptions
 ```
@@ -531,7 +493,7 @@ waiting_for_codex_approval
 
 ### 13.3 读取结果
 
-按 `get_task.wait_policy` 轮询 `get_task`。不要因为 DSH 暂时没有文本输出或 `updated_at` 未变化就判断失败。终态的 `next_action=read_final_report` 只是提示字符串，不是另一个 MCP 工具；进入终态后，从同一任务快照读取：
+通过 `get_task` 查看任务状态与保存的结果。不要因为 DSH 暂时没有文本输出或 `updated_at` 未变化就判断失败。终态的 `next_action=read_final_report` 只是提示字符串，不是另一个 MCP 工具；进入终态后，从同一任务快照读取：
 
 - `result_summary`
 - `failure_code`

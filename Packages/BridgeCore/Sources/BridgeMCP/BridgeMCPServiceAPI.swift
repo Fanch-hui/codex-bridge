@@ -125,6 +125,13 @@ public protocol BridgeMCPServiceAPI: Sendable {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPServiceTaskSnapshot
 
+  func serviceWaitTask(
+    taskID: String,
+    timeoutSeconds: Int,
+    recentEventLimit: Int,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPServiceTaskWaitResult
+
   func serviceAnswerUserInput(
     taskID: String,
     inputID: String,
@@ -240,6 +247,15 @@ public protocol BridgeMCPServiceAPI: Sendable {
 }
 
 extension BridgeMCPServiceAPI {
+  public func serviceWaitTask(
+    taskID: String,
+    timeoutSeconds: Int,
+    recentEventLimit: Int,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPServiceTaskWaitResult {
+    throw BridgeMCPQueryError.unavailable
+  }
+
   public func serviceNativeSessionDirectory(
     _ request: MCPNativeSessionDirectoryRequest,
     deadline: ContinuousClock.Instant

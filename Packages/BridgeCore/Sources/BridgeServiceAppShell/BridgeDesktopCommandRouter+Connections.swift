@@ -212,7 +212,8 @@ extension BridgeDesktopCommandRouter {
         hasExistingInstallation: hasExistingInstallation,
         baseURL: baseURL,
         apiKey: apiKey,
-        hasExistingConfiguration: provider.discoveredConfigurationPath != nil
+        hasExistingConfiguration: provider.discoveredConfigurationPath != nil,
+        hasStoredCredentials: provider.configuredBaseURL != nil
       )
     else {
       model.errorMessage = "请填写 \(provider.displayName) 的 Base URL 和 API key。"
@@ -225,7 +226,9 @@ extension BridgeDesktopCommandRouter {
       alwaysProceedConfirmed: payload.confirmed == true,
       qoderDistribution: qoderDistribution(payload, providerID: providerID),
       installationID: providerID == "qoder"
-        ? validatedID(payload.installationID, maximumBytes: 256) : nil
+        ? validatedID(payload.installationID, maximumBytes: 256) : nil,
+      inferenceProtocol: payload.inferenceProtocol,
+      catalogBaseURL: AgentConnectionInput.baseURL(payload.catalogBaseURL)
     )
   }
 

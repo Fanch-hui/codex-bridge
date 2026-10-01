@@ -65,6 +65,11 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     qoderDistribution: String?,
     installationID: String?
   ) async throws -> IPCAgentInstallationSummary
+  func connectAgentInstallation(
+    providerID: String, baseURL: String?, apiKey: String?,
+    alwaysProceedConfirmed: Bool, qoderDistribution: String?, installationID: String?,
+    inferenceProtocol: String?, catalogBaseURL: String?
+  ) async throws -> IPCAgentInstallationSummary
   func reprobeAgentInstallation(
     installationID: String,
     acceptReplacement: Bool

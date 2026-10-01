@@ -38,7 +38,9 @@ extension BridgeServiceAppModel {
     apiKey: String? = nil,
     alwaysProceedConfirmed: Bool = false,
     qoderDistribution: String? = nil,
-    installationID: String? = nil
+    installationID: String? = nil,
+    inferenceProtocol: String? = nil,
+    catalogBaseURL: String? = nil
   ) {
     guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
       errorMessage = "未找到可连接的 Agent Provider。"
@@ -52,7 +54,8 @@ extension BridgeServiceAppModel {
           apiKey: apiKey,
           alwaysProceedConfirmed: alwaysProceedConfirmed,
           qoderDistribution: qoderDistribution,
-          installationID: installationID
+          installationID: installationID,
+          inferenceProtocol: inferenceProtocol, catalogBaseURL: catalogBaseURL
         )
       },
       successMessage: { installation in

@@ -84,13 +84,13 @@ public actor ServiceComposition {
               settings: settings, secretStore: secretStore, scope: scope)
         )
       })
-    let deepSeekBaseURL = try await settings.string(for: .deepSeekHarnessBaseURL)
+    let deepSeekConnection = try await settings.deepSeekHarnessConnectionConfiguration()
     let deepSeekConfigurationPath = try await settings.string(
       for: .deepSeekHarnessManagedConfigurationPath
     )
     let agentCredentials = ServiceAgentCredentialEnvironment(
       secretStore: secretStore,
-      deepSeekBaseURL: deepSeekBaseURL,
+      deepSeekConnection: deepSeekConnection,
       managedDeepSeekConfigurationPath: deepSeekConfigurationPath
     )
     let qoderEnvironment = ToolDiscoveryEnvironment.current()

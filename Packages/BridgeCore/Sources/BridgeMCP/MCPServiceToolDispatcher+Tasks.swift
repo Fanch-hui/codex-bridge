@@ -16,6 +16,8 @@ extension MCPServiceToolDispatcher {
       return try await callListTasks(arguments)
     case .getTask:
       return try await callGetTask(arguments)
+    case .waitTask:
+      return try await callWaitTask(arguments)
     case .answerUserInput:
       return try await callAnswerUserInput(arguments)
     case .submitTask:

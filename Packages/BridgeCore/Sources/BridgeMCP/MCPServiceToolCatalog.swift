@@ -23,6 +23,7 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case runSkillAction = "run_skill_action"
   case listTasks = "list_tasks"
   case getTask = "get_task"
+  case waitTask = "wait_task"
   case answerUserInput = "answer_user_input"
   case submitTask = "submit_task"
   case steerTask = "steer_task"
@@ -63,7 +64,7 @@ struct MCPServiceToolContract: Sendable {
 }
 
 public struct MCPServiceToolCatalog: Sendable {
-  public static let contractVersion = "1.3.3"
+  public static let contractVersion = "1.3.4"
 
   public let definitions: [Tool]
 
@@ -105,6 +106,7 @@ public struct MCPServiceToolCatalog: Sendable {
     contract(.readSkill, readSkill, exposure: .readOnly, route: .readOnly),
     contract(.listTasks, listTasks, exposure: .readOnly, route: .task),
     contract(.getTask, getTask, exposure: .readOnly, route: .task),
+    contract(.waitTask, waitTask, exposure: .readOnly, route: .task),
     contract(.getProjectChanges, getProjectChanges, exposure: .readOnly, route: .readOnly),
     contract(.listProjectCommands, listProjectCommands, exposure: .readOnly, route: .readOnly),
     contract(

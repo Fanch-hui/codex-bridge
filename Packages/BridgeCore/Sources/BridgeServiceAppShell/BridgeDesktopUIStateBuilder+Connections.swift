@@ -220,6 +220,8 @@ extension BridgeDesktopUIStateBuilder {
       discoveredExecutablePath: provider.discoveredExecutablePath,
       discoveredConfigurationPath: provider.discoveredConfigurationPath,
       configuredBaseURL: provider.configuredBaseURL,
+      configuredInferenceProtocol: provider.configuredInferenceProtocol,
+      configuredCatalogBaseURL: provider.configuredCatalogBaseURL,
       requiresConfiguration: provider.requiresConfiguration,
       requiresHeadlessAlwaysProceed: provider.requiresHeadlessAlwaysProceed,
       supportsModelSelection: provider.supportsModelSelection,

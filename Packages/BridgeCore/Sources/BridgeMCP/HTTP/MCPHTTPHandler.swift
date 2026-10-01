@@ -199,7 +199,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
       let channel = context.channel
       let eventLoop = context.eventLoop
       activeResponseSessionID = request.sessionID
-      scheduleResponseTimeout(channel: channel, eventLoop: eventLoop)
+      scheduleResponseTimeout(channel: channel, eventLoop: eventLoop, request: request)
       let lease = requestLease
       requestLease = nil
       guard let lease else {
@@ -587,10 +587,17 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
 
   private func scheduleResponseTimeout(
     channel: any Channel,
-    eventLoop: any EventLoop
+    eventLoop: any EventLoop,
+    request: RequestState
   ) {
     responseTimeout?.cancel()
-    let delay = TimeAmount(configuration.responseDeadline)
+    let body = Data(request.body.readableBytesView)
+    let duration =
+      request.head.method == .POST
+      ? MCPHTTPResponseDeadline.duration(
+        body: body, defaultDuration: configuration.responseDeadline)
+      : configuration.responseDeadline
+    let delay = TimeAmount(duration)
     responseTimeout = eventLoop.scheduleTask(in: delay) { [weak self] in
       guard let self, case .responding = self.inputState else { return }
       let sessionID = self.activeResponseSessionID

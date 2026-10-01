@@ -40,7 +40,7 @@ git clone https://github.com/deepseek-ai/deepseek-harness.git deepseek-harness
 cd deepseek-harness
 ```
 
-Do not use a third-party repackaged script, a global `dsh` command, or source TypeScript as Bridge's ACP entry.
+Bridge resolves official npm/pnpm launchers, built source entries, and the official desktop CLI. Source TypeScript cannot serve directly as the ACP entry.
 
 ## 3. Prepare Node, pnpm, and the ACP entry
 
@@ -121,6 +121,12 @@ Most users do not need an external profile or `.env` file. After building DSH, c
 
 Bridge stores the key in macOS Keychain or Windows Credential Manager, clears the field after submission, and injects it only when starting the DSH child process. Read the advanced sections below only for manual registration, an independent Web Search endpoint, or a fixed local profile.
 
+## npm and official desktop installations
+
+Bridge resolves official `@deepseek-ai/dsh` npm/pnpm launchers to their `lib/bin.js` and Node runtime. Official desktop installations pair the bundled Electron executable with `app.asar` and its `dsh-desktop-host/lib/cli.js`. Use Agent discovery or explicitly register the desktop executable.
+
+Desktop execution uses `ELECTRON_RUN_AS_NODE=1`, `--expose-internals`, and isolated `DSH_HOME` and work directories. Electron, the archive, and used unpacked artifacts participate in replacement detection. Bridge API key authentication remains separate from desktop account login.
+
 ## 4. Advanced optional: external profile
 
 This section is only for manual registration, a fixed profile, or a separate search endpoint. Users following the recommended one-click flow can skip this section and the next one.
@@ -177,7 +183,7 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_SEARCH_BASE_URL=https://api.deepseek.com/anthropic/v1
 ```
 
-`DEEPSEEK_BASE_URL` is the Chat Completions base URL. Do not include `/chat/completions`; DSH appends it.
+`DEEPSEEK_BASE_URL` is the inference root for the selected protocol; DSH appends its request path. Official new providers use Messages.
 
 `DEEPSEEK_SEARCH_BASE_URL` is independent. Do not include `/messages`; DSH appends it. The endpoint must accept Anthropic Messages-compatible requests and support the native `web_search_20250305` server tool. A working main model or a generic `/messages` endpoint does not prove that Web Search works.
 
@@ -195,7 +201,7 @@ If DSH is not discovered, expand `Advanced: Register an existing installation`, 
 
 macOS and Windows share this flow. The external profile and `.env` instructions above apply to advanced manual registration and to an independent search endpoint.
 
-Probe validates the local installation, protocol, and basic ACP session. Model refresh also reads `/models` from the main Base URL; API quota, model execution, and Web Search are verified when running a task.
+Probe validates the local installation, protocol, and basic ACP session. Model refresh reads `/models` from the resolved catalog Base URL; API quota, model execution, and Web Search are verified when running a task.
 
 ## 7. Refresh models and defaults
 
@@ -208,16 +214,32 @@ Probe validates the local installation, protocol, and basic ACP session. Model r
 For the modern entry, Bridge obtains the catalog in two stages:
 
 ```text
-GET <DEEPSEEK_BASE_URL>/models
+GET <resolved catalog Base URL>/models
         ↓
 ACP session/new → configOptions
 ```
 
-The main endpoint therefore needs a Bearer-authenticated OpenAI-compatible `/models` response and Chat Completions support. A typical response contains `{"data":[{"id":"..."}]}`. Bridge uses provider-returned IDs and does not treat the bundled `deepseek-v4-pro` example as proof that your account can use that model.
+The catalog endpoint needs a Bearer-authenticated OpenAI-compatible `/models` response; inference follows the separately selected protocol. A typical response contains `{"data":[{"id":"..."}]}`. Bridge uses provider-returned IDs and does not treat the bundled `deepseek-v4-pro` example as proof that your account can use that model.
 
 Do not copy model IDs or effort values from Codex, OpenCode, or Antigravity. Without an explicit user override, Bridge preserves the provider/profile current value or a saved default that remains valid.
 
 ChatGPT/Qwen permission defaults come from `Workbench → Read Only / Write`. Project hard policy still outranks the Workbench setting and every task override.
+
+## Protocol and endpoints, model catalog, and search endpoints
+
+The connection form offers DeepSeek Messages and OpenAI Chat Completions, with an optional independent model catalog base URL. Existing official roots normalize to Messages for the new provider; custom URLs retain their paths. Existing custom connections keep Chat Completions semantics. Saved credentials remain in the system secret store.
+
+| Connection | Inference base URL | Catalog base URL | Requests |
+| --- | --- | --- | --- |
+| Official Messages | `https://api.deepseek.com/anthropic` | `https://api.deepseek.com` | `/v1/messages`; `/models` |
+| Custom Messages | Gateway Messages root | Explicit catalog root | `/v1/messages`; catalog `/models` |
+| OpenAI Chat Completions | `https://gateway.example/v1` | Same root by default, or an explicit root | `/chat/completions`; `/models` |
+
+New DSH native DeepSeek providers use Messages. OpenAI gateways use the `llm-pi-ai` `bridge-openai-gateway` route with `api: openai-completions` and `apiKeyEnv: DEEPSEEK_API_KEY`; generated files contain a credential reference. Legacy providers retain their launch contract.
+
+Bridge requests real model IDs from the catalog using Bearer authentication. The catalog does not prove inference access. ACP model selection supplies the actual reasoning options, and identical names on different routes retain unique mappings.
+
+Web search independently uses `DEEPSEEK_SEARCH_BASE_URL`. An explicit value wins; new providers use their official default `https://api.deepseek.com/anthropic/v1` when absent. Search appends `/messages` and requires `web_search_20250305` support. An inference gateway does not automatically provide web search.
 
 ## 8. Configure permissions for normal use
 
@@ -248,7 +270,7 @@ For Web Search:
 2. Set the project network intent consistently and send `network_access=true`.
 3. Approve the start and any runtime Web-tool permission.
 
-The search endpoint defaults to the main Base URL and key. If it is different, set `DEEPSEEK_SEARCH_BASE_URL` in the external profile's `.env`; the App Base URL field configures the main model endpoint only. Do not include `/messages`; DSH appends it. The endpoint must accept Anthropic Messages-compatible requests and the native `web_search_20250305` server tool.
+New providers use the official search default independently from inference. To choose another endpoint, set `DEEPSEEK_SEARCH_BASE_URL` in the external profile's `.env`; the App Base URL field configures the main model endpoint only. Do not include `/messages`; DSH appends it. The endpoint must accept Anthropic Messages-compatible requests and the native `web_search_20250305` server tool.
 
 The project network selector is not a packet-level firewall for external providers. The current DSH launcher does not rewrite its profile from `network_access`; actual model and Web access remain governed by DSH's profile, endpoints, and native tools.
 
@@ -282,7 +304,7 @@ Remote submissions normally enter `awaiting_local_approval`. Review project, pro
 
 When DSH requests a runtime tool, the persisted task state uses `waiting_for_codex_approval` for compatibility even though the provider remains DSH. In Workbench, inspect the approval card and choose one-shot allow or deny. There is currently no session-wide allow choice for DSH.
 
-Follow `get_task.wait_policy` and read terminal results from the same `get_task` snapshot: `result_summary`, `failure_code`, `changed_files`, activity, model/effort, and provider bindings. Terminal `next_action=read_final_report` is a hint string, not another MCP tool.
+Use `get_task` to inspect status and read terminal results from the same `get_task` snapshot: `result_summary`, `failure_code`, `changed_files`, activity, model/effort, and provider bindings. Terminal `next_action=read_final_report` is a hint string, not another MCP tool.
 
 Queued steer sends a second prompt after the current prompt finishes. DSH also supports interrupt-current-then-continue for the active session. Neither is Codex in-flight steer.
 

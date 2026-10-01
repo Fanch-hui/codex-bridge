@@ -150,7 +150,9 @@
           alwaysProceedConfirmed: payload.confirmed == true,
           qoderDistribution: distribution,
           installationID: providerID == "qoder"
-            ? BridgeDesktopCommandValue.nonEmpty(payload.installationID) : nil
+            ? BridgeDesktopCommandValue.nonEmpty(payload.installationID) : nil,
+          inferenceProtocol: payload.inferenceProtocol,
+          catalogBaseURL: AgentConnectionInput.baseURL(payload.catalogBaseURL)
         )
         await auxiliary.agentDefaults.refresh()
       }

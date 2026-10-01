@@ -88,7 +88,11 @@ extension ServiceAgentRegistry {
     }
 
     let currentArtifacts: [ServiceAgentInstallationArtifact]
+    let currentArchives: [AgentInstallationRuntimeArtifact]
     do {
+      currentArchives = try await archiveArtifacts(
+        provider: provider, installationID: existing.id,
+        executablePath: currentIdentity.canonicalPath)
       currentArtifacts = try await runtimeArtifacts(
         provider: provider, installationID: existing.id,
         executablePath: currentIdentity.canonicalPath,
@@ -107,7 +111,9 @@ extension ServiceAgentRegistry {
       try await store.updateAgentInstallation(review)
       return review
     }
-    let artifactsChanged = !artifactsHaveSameContent(currentArtifacts, existing.artifacts)
+    let artifactsChanged =
+      !artifactsHaveSameContent(currentArtifacts, existing.artifacts)
+      || !archivesHaveSameContent(currentArchives, existing.runtimeArtifacts)
     if artifactsChanged, !acceptReplacement {
       let review = try unavailableRecord(
         existing,

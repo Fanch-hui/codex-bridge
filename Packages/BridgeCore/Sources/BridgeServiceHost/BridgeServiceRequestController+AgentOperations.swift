@@ -26,8 +26,7 @@ extension BridgeServiceRequestController {
     let qoderRegionSettings = QoderDistribution.allCases.compactMap {
       qoderSnapshot.regions[$0]
     }
-    let configuredDeepSeekBaseURL = try? await composition.application
-      .serviceDeepSeekHarnessBaseURL(deadline: deadline)
+    let deepSeekConnection = try await composition.settings.deepSeekHarnessConnectionConfiguration()
     let installationDistributionsByPath = try await qoderDistributionsByExecutablePath(
       for: installations)
     var discovery = await composition.agentDiscoveryCatalog.summaries(
@@ -50,7 +49,8 @@ extension BridgeServiceRequestController {
             provider,
             discovery: discovery[provider.providerID],
             configuredBaseURL: provider.providerID == .deepSeekHarness
-              ? configuredDeepSeekBaseURL : nil,
+              ? deepSeekConnection?.baseURL : nil,
+            deepSeekConnection: provider.providerID == .deepSeekHarness ? deepSeekConnection : nil,
             qoderDistribution: provider.providerID == .qoder
               ? selectedQoderSettings.distribution.rawValue : nil,
             qoderRegionSettings: provider.providerID == .qoder
@@ -146,6 +146,7 @@ extension BridgeServiceRequestController {
     _ descriptor: AgentProviderDescriptor,
     discovery: ServiceAgentDiscoverySummary?,
     configuredBaseURL: String?,
+    deepSeekConnection: DeepSeekHarnessConnectionConfiguration?,
     qoderDistribution: String?,
     qoderRegionSettings: [IPCAgentQoderRegionSettings]?
   ) -> IPCAgentProviderSummary {
@@ -159,6 +160,8 @@ extension BridgeServiceRequestController {
       discoveredExecutablePath: discovery?.executablePath,
       discoveredConfigurationPath: discovery?.configurationPath,
       configuredBaseURL: configuredBaseURL,
+      configuredInferenceProtocol: deepSeekConnection?.inferenceProtocol.rawValue,
+      configuredCatalogBaseURL: deepSeekConnection?.catalogBaseURL,
       requiresConfiguration: policy?.requiresConfiguration ?? false,
       requiresHeadlessAlwaysProceed: policy?.requiresHeadlessAlwaysProceed ?? false,
       registrationTrustProfile: policy?.registrationTrustProfile.rawValue ?? "managed",

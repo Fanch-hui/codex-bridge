@@ -7,13 +7,17 @@ public final class ServiceStateChangeHub: @unchecked Sendable {
   public init() {}
 
   public func subscribe() -> AsyncStream<Void> {
+    subscription().stream
+  }
+
+  public func subscription() -> (stream: AsyncStream<Void>, cancel: @Sendable () -> Void) {
     let id = UUID()
     let pair = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
     lock.lock()
     continuations[id] = pair.continuation
     lock.unlock()
     pair.continuation.onTermination = { [weak self] _ in self?.remove(id) }
-    return pair.stream
+    return (pair.stream, { pair.continuation.finish() })
   }
 
   public func publish() {

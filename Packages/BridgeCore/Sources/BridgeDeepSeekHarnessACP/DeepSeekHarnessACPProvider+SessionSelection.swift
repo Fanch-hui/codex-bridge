@@ -7,8 +7,12 @@ extension DeepSeekHarnessACPProvider {
     session: DeepSeekHarnessACPSession,
     client: DeepSeekHarnessACPClient
   ) async throws {
-    guard request.requestedSessionID != nil else { return }
     var options = session.configOptions
+    if request.requestedSessionID == nil
+      && !options.contains(where: { $0.id == "model" || $0.category == "model" })
+    {
+      return
+    }
     if let requestedModel = request.model {
       let modelOption = try modelOption(in: options)
       let wireValue = try modelWireValue(for: requestedModel, option: modelOption)
@@ -61,20 +65,6 @@ extension DeepSeekHarnessACPProvider {
     for requestedModel: String,
     option: DeepSeekHarnessACPConfigOption
   ) throws -> String {
-    let normalized =
-      requestedModel.hasPrefix("opencode-go/")
-      ? String(requestedModel.dropFirst("opencode-go/".count))
-      : requestedModel
-    if let value = option.values.first(where: { $0.value == requestedModel }) {
-      return value.value
-    }
-    if let value = option.values.first(where: {
-      guard let route = try? JSONDecoder().decode([String].self, from: Data($0.value.utf8))
-      else { return false }
-      return route.count == 2 && route.last == normalized
-    }) {
-      return value.value
-    }
-    throw AgentRuntimeError.modelUnavailable(requestedModel)
+    try DeepSeekHarnessACPModelRoutes.wireValue(for: requestedModel, option: option)
   }
 }

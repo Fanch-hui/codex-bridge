@@ -259,6 +259,7 @@ public struct DeepSeekHarnessACPValidatedInstallation: Equatable, Sendable {
   public let configurationData: Data
   public let sourceRoot: String
   public let nodeVersion: String
+  public let runtimeLayout: DeepSeekHarnessACPRuntimeLayout
 
   public init(
     installation: AgentInstallation,
@@ -267,7 +268,8 @@ public struct DeepSeekHarnessACPValidatedInstallation: Equatable, Sendable {
     configurationPath: String,
     configurationData: Data,
     sourceRoot: String,
-    nodeVersion: String
+    nodeVersion: String,
+    runtimeLayout: DeepSeekHarnessACPRuntimeLayout? = nil
   ) {
     self.installation = installation
     self.nodeInterpreterPath = nodeInterpreterPath
@@ -276,6 +278,8 @@ public struct DeepSeekHarnessACPValidatedInstallation: Equatable, Sendable {
     self.configurationData = configurationData
     self.sourceRoot = sourceRoot
     self.nodeVersion = nodeVersion
+    self.runtimeLayout =
+      runtimeLayout ?? .node(runtimePath: nodeInterpreterPath, entryPath: executablePath)
   }
 }
 

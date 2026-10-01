@@ -28,6 +28,7 @@ public struct AgentInstallation: Codable, Equatable, Sendable {
   public let version: String?
   public let protocolRevision: String?
   public let artifacts: [AgentInstallationArtifact]
+  public let runtimeArtifacts: [AgentInstallationRuntimeArtifact]
 
   public init(
     id: AgentInstallationID,
@@ -35,7 +36,8 @@ public struct AgentInstallation: Codable, Equatable, Sendable {
     executablePath: String,
     version: String? = nil,
     protocolRevision: String? = nil,
-    artifacts: [AgentInstallationArtifact] = []
+    artifacts: [AgentInstallationArtifact] = [],
+    runtimeArtifacts: [AgentInstallationRuntimeArtifact] = []
   ) throws {
     try AgentValidation.identifier(id.rawValue, field: "installation.id", maximumBytes: 256)
     try AgentValidation.identifier(
@@ -76,7 +78,9 @@ public struct AgentInstallation: Codable, Equatable, Sendable {
     self.executablePath = executablePath
     self.version = version
     self.protocolRevision = protocolRevision
+    try AgentInstallationRuntimeArtifact.validate(runtimeArtifacts)
     self.artifacts = artifacts
+    self.runtimeArtifacts = runtimeArtifacts
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -86,6 +90,7 @@ public struct AgentInstallation: Codable, Equatable, Sendable {
     case version
     case protocolRevision
     case artifacts
+    case runtimeArtifacts
   }
 
   public init(from decoder: Decoder) throws {
@@ -99,7 +104,9 @@ public struct AgentInstallation: Codable, Equatable, Sendable {
       artifacts: container.decodeIfPresent(
         [AgentInstallationArtifact].self,
         forKey: .artifacts
-      ) ?? []
+      ) ?? [],
+      runtimeArtifacts: container.decodeIfPresent(
+        [AgentInstallationRuntimeArtifact].self, forKey: .runtimeArtifacts) ?? []
     )
   }
 }

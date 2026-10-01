@@ -53,6 +53,10 @@ extension BridgeServiceRequestController {
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
     }
+    if let error = error as? AgentModelCatalogError {
+      return .init(
+        code: error.code, message: error.localizedDescription, retryable: error.retryable)
+    }
     if let error = error as? AgentNativeSessionDirectoryError {
       switch error {
       case .invalidRequest:

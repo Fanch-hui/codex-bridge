@@ -100,11 +100,19 @@ extension BridgeServiceRequestController {
     if let selectedInstallation {
       candidates = candidates.filter { $0.executablePath == selectedInstallation.executablePath }
     }
+    if let value = payload.inferenceProtocol,
+      DeepSeekHarnessConnectionProtocol(rawValue: value) == nil
+    {
+      throw BridgeMCPQueryError.contractRejected
+    }
     let record = try await composition.application.serviceConnectManagedAgent(
       providerID: providerID,
       baseURL: payload.baseURL,
       apiKey: payload.apiKey,
       candidates: candidates,
+      inferenceProtocol: payload.inferenceProtocol.flatMap(
+        DeepSeekHarnessConnectionProtocol.init(rawValue:)),
+      catalogBaseURL: payload.catalogBaseURL,
       qoderDistribution: distribution,
       alwaysProceedConfirmed: payload.alwaysProceedConfirmed,
       deadline: Self.deadline()

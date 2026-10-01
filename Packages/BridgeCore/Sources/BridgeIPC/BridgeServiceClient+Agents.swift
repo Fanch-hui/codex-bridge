@@ -65,6 +65,25 @@ extension BridgeServiceClient {
     )
   }
 
+  public func connectAgentInstallation(
+    providerID: String,
+    baseURL: String?,
+    apiKey: String?,
+    alwaysProceedConfirmed: Bool,
+    qoderDistribution: String?,
+    installationID: String?,
+    inferenceProtocol: String?,
+    catalogBaseURL: String?
+  ) async throws -> IPCAgentInstallationSummary {
+    try await call(
+      operation: .connectAgentInstallation,
+      payload: IPCAgentConnectRequest(
+        providerID: providerID, baseURL: baseURL,
+        inferenceProtocol: inferenceProtocol, catalogBaseURL: catalogBaseURL,
+        apiKey: apiKey, alwaysProceedConfirmed: alwaysProceedConfirmed,
+        qoderDistribution: qoderDistribution, installationID: installationID))
+  }
+
   public func reprobeAgentInstallation(
     installationID: String,
     acceptReplacement: Bool
