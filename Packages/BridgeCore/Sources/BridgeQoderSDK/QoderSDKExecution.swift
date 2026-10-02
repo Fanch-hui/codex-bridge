@@ -147,7 +147,7 @@ actor QoderSDKExecution {
       ]))
   }
 
-  private func consume(_ event: QoderHostEvent) async throws {
+  func consume(_ event: QoderHostEvent) async throws {
     guard !terminal else { return }
     switch event {
     case .permission(let id, let value): try await permission(id, value: value)
@@ -177,9 +177,7 @@ actor QoderSDKExecution {
       if let normalized = try normalizer.normalize(value) {
         switch normalized {
         case .completed, .failed, .interrupted:
-          terminal = true
-          try emit(normalized)
-          continuation.finish()
+          await finish(with: normalized)
         default: try emit(normalized)
         }
       }
@@ -263,20 +261,30 @@ actor QoderSDKExecution {
   }
 
   private func fail() async {
-    guard !terminal else { return }
-    terminal = true
-    await client.shutdown()
-    try? emit(.failed(code: "qoder_transport_failed", summary: "Qoder 执行通道关闭，任务结果未确认。"))
-    continuation.finish()
+    await finish(
+      with: .failed(code: "qoder_transport_failed", summary: "Qoder 执行通道关闭，任务结果未确认。"))
   }
 
-  func shutdown() async {
+  private func finish(with event: AgentEvent? = nil) async {
+    guard !terminal else {
+      await client.shutdown()
+      return
+    }
     terminal = true
-    await client.shutdown()
     collector?.cancel()
     permissions.removeAll()
     userInputs.removeAll()
     inputs.removeAll()
-    continuation.finish()
+    do {
+      if let event { try emit(event) }
+      continuation.finish()
+    } catch {
+      continuation.finish(throwing: error)
+    }
+    await client.shutdown()
+  }
+
+  func shutdown() async {
+    await finish()
   }
 }

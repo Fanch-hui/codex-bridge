@@ -1,8 +1,12 @@
 import BridgeSecurity
 import Foundation
 
-#if canImport(Darwin)
-  import Darwin
+#if canImport(Darwin) || canImport(Glibc)
+  #if canImport(Darwin)
+    import Darwin
+  #else
+    import Glibc
+  #endif
 #elseif os(Windows)
   import WinSDK
 #endif
@@ -34,20 +38,20 @@ struct DescriptorCandidateEnumerator {
   }
 
   mutating func candidates(scope: SecureRelativePath?) async throws -> ProjectFileCandidates {
-    #if canImport(Darwin)
-      let rootDescriptor = Darwin.open(
+    #if canImport(Darwin) || canImport(Glibc)
+      let rootDescriptor = POSIXSystem.open(
         root.canonicalPath,
         O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
       )
       guard rootDescriptor >= 0 else { throw ProjectFileError.unsafeFilesystemState }
-      defer { Darwin.close(rootDescriptor) }
+      defer { POSIXSystem.close(rootDescriptor) }
       try validateRootDescriptor(rootDescriptor)
 
       let trackedPaths = try await GitIndexPathReader(limits: limits).read(
         rootDescriptor: rootDescriptor
       )
       let scopeDescriptor = try openScope(scope, rootDescriptor: rootDescriptor)
-      defer { Darwin.close(scopeDescriptor) }
+      defer { POSIXSystem.close(scopeDescriptor) }
       try await scanDirectory(
         descriptor: scopeDescriptor,
         relativeDirectory: scope?.value ?? "",
@@ -75,7 +79,7 @@ struct DescriptorCandidateEnumerator {
     #endif
   }
 
-  #if canImport(Darwin)
+  #if canImport(Darwin) || canImport(Glibc)
     private mutating func scanDirectory(
       descriptor: Int32,
       relativeDirectory: String,
@@ -156,7 +160,7 @@ struct DescriptorCandidateEnumerator {
         openat(descriptor, $0, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
       }
       guard child >= 0 else { throw ProjectFileError.unsafeFilesystemState }
-      defer { Darwin.close(child) }
+      defer { POSIXSystem.close(child) }
       try validateDirectoryDescriptor(child)
       try await scanDirectory(descriptor: child, relativeDirectory: relativePath, depth: depth + 1)
     }
@@ -164,7 +168,7 @@ struct DescriptorCandidateEnumerator {
     private mutating func directoryEntries(_ descriptor: Int32) throws -> [String] {
       let duplicate = dup(descriptor)
       guard duplicate >= 0, let directory = fdopendir(duplicate) else {
-        if duplicate >= 0 { Darwin.close(duplicate) }
+        if duplicate >= 0 { POSIXSystem.close(duplicate) }
         throw ProjectFileError.unsafeFilesystemState
       }
       defer { closedir(directory) }
@@ -196,15 +200,15 @@ struct DescriptorCandidateEnumerator {
         }
         let openError = errno
         guard next >= 0 else {
-          Darwin.close(descriptor)
+          POSIXSystem.close(descriptor)
           throw PathSecurityError.readFailed(openError)
         }
-        Darwin.close(descriptor)
+        POSIXSystem.close(descriptor)
         descriptor = next
         do {
           try validateDirectoryDescriptor(descriptor)
         } catch {
-          Darwin.close(descriptor)
+          POSIXSystem.close(descriptor)
           throw error
         }
       }
@@ -435,7 +439,7 @@ struct DescriptorCandidateEnumerator {
     return path.hasPrefix(scope.value + "/")
   }
 
-  #if canImport(Darwin)
+  #if canImport(Darwin) || canImport(Glibc)
     private func validateRootDescriptor(_ descriptor: Int32) throws {
       var metadata = stat()
       guard fstat(descriptor, &metadata) == 0 else {
@@ -461,7 +465,9 @@ struct DescriptorCandidateEnumerator {
 
     private static func entryName(_ entry: UnsafeMutablePointer<dirent>) -> String {
       withUnsafePointer(to: &entry.pointee.d_name) { name in
-        name.withMemoryRebound(to: CChar.self, capacity: Int(MAXNAMLEN) + 1) {
+        name.withMemoryRebound(
+          to: CChar.self, capacity: MemoryLayout.size(ofValue: entry.pointee.d_name)
+        ) {
           String(cString: $0)
         }
       }
@@ -534,18 +540,18 @@ private struct GitIndexPathReader {
         openat(rootDescriptor, $0, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
       }
       guard gitDescriptor >= 0, device(of: gitDescriptor) == rootDevice else {
-        if gitDescriptor >= 0 { Darwin.close(gitDescriptor) }
+        if gitDescriptor >= 0 { POSIXSystem.close(gitDescriptor) }
         return nil
       }
-      defer { Darwin.close(gitDescriptor) }
+      defer { POSIXSystem.close(gitDescriptor) }
       let indexDescriptor = "index".withCString {
         openat(gitDescriptor, $0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
       }
       guard indexDescriptor >= 0, device(of: indexDescriptor) == rootDevice else {
-        if indexDescriptor >= 0 { Darwin.close(indexDescriptor) }
+        if indexDescriptor >= 0 { POSIXSystem.close(indexDescriptor) }
         return nil
       }
-      defer { Darwin.close(indexDescriptor) }
+      defer { POSIXSystem.close(indexDescriptor) }
       guard let data = try await boundedData(indexDescriptor) else { return nil }
       return try await parse(data)
     }
@@ -569,7 +575,7 @@ private struct GitIndexPathReader {
       while data.count <= Self.maximumIndexBytes {
         try Task.checkCancellation()
         await Task.yield()
-        let count = Darwin.read(descriptor, &buffer, buffer.count)
+        let count = POSIXSystem.read(descriptor, &buffer, buffer.count)
         if count == 0 { return data }
         if count > 0 {
           data.append(contentsOf: buffer.prefix(count))

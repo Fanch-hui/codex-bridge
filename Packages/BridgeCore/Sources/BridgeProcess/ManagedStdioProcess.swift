@@ -27,6 +27,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   private var handlesClosed = false
   #if os(Windows)
     private var windowsProcessHandle: HANDLE?
+    private var windowsProcessJob: ManagedWindowsProcessJob?
   #endif
 
   public var identity: ManagedProcessIdentity? {
@@ -67,7 +68,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       let inputPipe = Pipe()
       let outputPipe = Pipe()
       let errorPipe = mergeStandardError ? nil : Pipe()
-      let launched: (pid: Int32, handle: HANDLE)
+      let launched: (pid: Int32, handle: HANDLE, job: ManagedWindowsProcessJob)
       do {
         launched = try Self.spawnWindows(
           argv: argv,
@@ -96,6 +97,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       standardOutputHandle = outputPipe.fileHandleForReading
       standardErrorHandle = errorPipe?.fileHandleForReading
       windowsProcessHandle = launched.handle
+      windowsProcessJob = launched.job
       identityStorage = Self.identity(of: pid)
     #else
       guard let executable = argv.first,
@@ -116,6 +118,19 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       let errorPipe = mergeStandardError ? nil : Pipe()
       let processID: pid_t
       do {
+        #if os(Linux)
+          let handles =
+            [
+              inputPipe.fileHandleForReading, inputPipe.fileHandleForWriting,
+              outputPipe.fileHandleForReading, outputPipe.fileHandleForWriting,
+            ]
+            + (errorPipe.map { [$0.fileHandleForReading, $0.fileHandleForWriting] } ?? [])
+          for handle in handles {
+            guard fcntl(handle.fileDescriptor, F_SETFD, FD_CLOEXEC) == 0 else {
+              throw ManagedProcessError.processLaunchFailed(errno)
+            }
+          }
+        #endif
         processID = try Self.spawn(
           argv: argv,
           workingDirectory: workingDirectory,
@@ -257,7 +272,6 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   public func terminateGroup() {
     guard isRunning else { return }
     #if os(Windows)
-      // Windows has no process groups; terminate the process itself.
       terminateWindowsProcess()
     #else
       _ = systemKill(-pid, SIGTERM)
@@ -371,6 +385,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       if terminationStorage != nil, let handle = windowsProcessHandle {
         _ = CloseHandle(handle)
         windowsProcessHandle = nil
+        windowsProcessJob = nil
       }
       lock.unlock()
     #endif
@@ -466,8 +481,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     fileprivate func terminateWindowsProcess() -> Bool {
       lock.lock()
       defer { lock.unlock() }
-      guard let handle = windowsProcessHandle else { return false }
-      return TerminateProcess(handle, 1)
+      return windowsProcessJob?.terminate() ?? false
     }
   }
 #endif

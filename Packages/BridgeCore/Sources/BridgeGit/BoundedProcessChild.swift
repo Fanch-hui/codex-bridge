@@ -157,11 +157,11 @@ struct BoundedProcessChild {
     }
 
     func requestTermination() {
-      _ = Darwin.kill(pid, SIGTERM)
+      _ = POSIXSystem.kill(pid, SIGTERM)
     }
 
     func forceTermination() {
-      _ = Darwin.kill(pid, SIGKILL)
+      _ = POSIXSystem.kill(pid, SIGKILL)
     }
 
     mutating func pollExit() throws -> Int32? {
@@ -195,28 +195,28 @@ struct BoundedProcessChild {
       var bytes = [UInt8](repeating: 0, count: 16 * 1_024)
       var chunks = 0
       while chunks < maximumChunks {
-        let count = Darwin.read(descriptor, &bytes, bytes.count)
+        let count = POSIXSystem.read(descriptor, &bytes, bytes.count)
         if count > 0 {
           buffer.append(Data(bytes.prefix(count)))
           chunks += 1
           continue
         }
         if count == 0 {
-          Darwin.close(descriptor)
+          POSIXSystem.close(descriptor)
           descriptor = -1
           return
         }
         if errno == EINTR { continue }
         if errno == EAGAIN || errno == EWOULDBLOCK { return }
-        Darwin.close(descriptor)
+        POSIXSystem.close(descriptor)
         descriptor = -1
         return
       }
     }
 
     private mutating func closeDescriptors() {
-      if outputDescriptor >= 0 { Darwin.close(outputDescriptor) }
-      if errorDescriptor >= 0 { Darwin.close(errorDescriptor) }
+      if outputDescriptor >= 0 { POSIXSystem.close(outputDescriptor) }
+      if errorDescriptor >= 0 { POSIXSystem.close(errorDescriptor) }
       outputDescriptor = -1
       errorDescriptor = -1
     }

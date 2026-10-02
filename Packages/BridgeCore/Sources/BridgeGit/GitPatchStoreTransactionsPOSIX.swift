@@ -1,6 +1,10 @@
 #if !os(Windows)
   import Foundation
-  import Darwin
+  #if canImport(Darwin)
+    import Darwin
+  #else
+    import Glibc
+  #endif
 
   enum GitPatchStoreTransactionsPOSIX {
     static func withExclusiveLock<Result>(
@@ -59,7 +63,6 @@
       _ victims: [(String, GitPatchStoreDocument)],
       descriptor: Int32
     ) throws {
-      let immutableFlags = UInt32(UF_IMMUTABLE | UF_APPEND | SF_IMMUTABLE | SF_APPEND)
       for (identifier, document) in victims {
         let file = openat(descriptor, identifier, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
         guard file >= 0 else { throw GitEvidenceError.patchStoreCapacityExceeded }
@@ -67,9 +70,14 @@
         var metadata = stat()
         guard fstat(file, &metadata) == 0, metadata.st_uid == getuid(),
           metadata.st_mode & S_IFMT == S_IFREG, metadata.st_mode & 0o777 == 0o600,
-          metadata.st_size == document.byteCount,
-          metadata.st_flags & immutableFlags == 0
+          metadata.st_size == document.byteCount
         else { throw GitEvidenceError.patchStoreCapacityExceeded }
+        #if canImport(Darwin)
+          let immutableFlags = UInt32(UF_IMMUTABLE | UF_APPEND | SF_IMMUTABLE | SF_APPEND)
+          guard metadata.st_flags & immutableFlags == 0 else {
+            throw GitEvidenceError.patchStoreCapacityExceeded
+          }
+        #endif
       }
     }
     static func removeTransaction(

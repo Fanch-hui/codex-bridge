@@ -47,11 +47,6 @@ extension MCPSessionRegistry {
     return clientAdmission.isCurrent(token, for: clientID)
   }
 
-  func isClientAdmitted(_ clientID: MCPClientID) -> Bool {
-    guard let clientAdmission else { return true }
-    return clientAdmission.isEnabled(clientID)
-  }
-
   func makeUniqueSessionID() -> String {
     while true {
       let candidate = UUID().uuidString.lowercased()

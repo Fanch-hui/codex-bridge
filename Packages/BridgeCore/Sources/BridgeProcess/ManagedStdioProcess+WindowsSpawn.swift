@@ -19,7 +19,7 @@
       standardInput: Pipe,
       standardOutput: Pipe,
       standardError: Pipe?
-    ) throws -> (pid: Int32, handle: HANDLE) {
+    ) throws -> (pid: Int32, handle: HANDLE, job: ManagedWindowsProcessJob) {
       let launch = try windowsLaunch(argv: argv, environment: environment)
       let stdinRead = standardInput.fileHandleForReading._handle
       let stdinWrite = standardInput.fileHandleForWriting._handle
@@ -102,7 +102,8 @@
       stdinRead: HANDLE,
       stdoutWrite: HANDLE,
       stderrWrite: HANDLE
-    ) throws -> (pid: Int32, handle: HANDLE) {
+    ) throws -> (pid: Int32, handle: HANDLE, job: ManagedWindowsProcessJob) {
+      let job = try ManagedWindowsProcessJob()
       var processInformation = PROCESS_INFORMATION()
       var commandLine =
         Array(
@@ -126,11 +127,22 @@
       guard result.success else {
         throw ManagedProcessError.processLaunchFailed(Int32(result.error))
       }
-      _ = CloseHandle(processInformation.hThread)
+      defer { _ = CloseHandle(processInformation.hThread) }
       guard let processHandle = processInformation.hProcess else {
         throw ManagedProcessError.processLaunchFailed(Int32(ERROR_INVALID_HANDLE))
       }
-      return (pid: Int32(bitPattern: processInformation.dwProcessId), handle: processHandle)
+      do {
+        // The suspended process cannot spawn children before joining its job.
+        try job.assignAndResume(process: processHandle, thread: processInformation.hThread)
+      } catch {
+        _ = TerminateProcess(processHandle, 1)
+        _ = WaitForSingleObject(processHandle, 1_000)
+        _ = CloseHandle(processHandle)
+        throw error
+      }
+      return (
+        pid: Int32(bitPattern: processInformation.dwProcessId), handle: processHandle, job: job
+      )
     }
 
     private static func withStartupInfo<Result>(
@@ -215,6 +227,7 @@
             let flags =
               DWORD(EXTENDED_STARTUPINFO_PRESENT)
               | DWORD(CREATE_UNICODE_ENVIRONMENT) | DWORD(CREATE_NO_WINDOW)
+              | DWORD(CREATE_SUSPENDED)
             let success = CreateProcessW(
               applicationName, commandLine.baseAddress, nil, nil, true, flags,
               UnsafeMutableRawPointer(mutating: environment), directory,

@@ -1,7 +1,9 @@
-# Builds the Windows targets (service daemon and desktop shell) for the host
-# architecture. Run on a Windows machine with the Swift 6.3.3 toolchain:
+# Builds the Windows targets (service daemon and desktop shell) for x64 or ARM64.
+# Run on a Windows machine with the Swift 6.3.3 toolchain:
 #   powershell -File Scripts\build-windows.ps1 [-Installer] [-OutDir path]
 param(
+  [ValidateSet("x64", "arm64")]
+  [string]$Architecture = "",
   [switch]$Installer,
   [string]$OutDir = ".build\windows-dist",
   [string]$VcpkgRoot = "",
@@ -38,13 +40,20 @@ try {
 } catch {
   $hostArchitecture = $env:PROCESSOR_ARCHITECTURE
 }
-switch ($hostArchitecture.ToUpperInvariant()) {
-  "X64" { $architecture = "x64" }
-  "ARM64" { $architecture = "arm64" }
-  default { throw "Unsupported Windows host architecture: $hostArchitecture" }
+if (-not $Architecture) {
+  switch ($hostArchitecture.ToUpperInvariant()) {
+    "X64" { $Architecture = "x64" }
+    "ARM64" { $Architecture = "arm64" }
+    default { throw "Unsupported Windows host architecture: $hostArchitecture" }
+  }
 }
+$architecture = $Architecture.ToLowerInvariant()
 $vcpkgTriplet = "$architecture-windows"
-$targetTriple = if ($architecture -eq "arm64") { "aarch64-unknown-windows-msvc" } else { "" }
+$targetTriple = if ($architecture -eq "arm64") {
+  "aarch64-unknown-windows-msvc"
+} else {
+  "x86_64-unknown-windows-msvc"
+}
 $vcpkgRootValue = if ($resolvedVcpkgRoot) {
   $resolvedVcpkgRoot
 } elseif (Test-Path Env:VCPKG_INSTALLATION_ROOT) {
@@ -62,38 +71,8 @@ $resourceOutput = Join-Path $resolvedOutDir "CodexBridgeWindowsApp.res"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $env:CODEX_BRIDGE_WINDOWS_RESOURCE = [IO.Path]::GetFullPath($resourceOutput)
 
-if ([string]::IsNullOrWhiteSpace($originalInclude) -or [string]::IsNullOrWhiteSpace($originalLib)) {
-  $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-  if (Test-Path $vswhere) {
-    $vsRoot = & $vswhere -latest -property installationPath | Select-Object -First 1
-    if ($vsRoot) {
-      $msvcRoot = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-      $kitsInc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-      $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-
-      if ($msvcRoot -and $kitsInc -and [string]::IsNullOrWhiteSpace($originalInclude)) {
-        $originalInclude = @(
-          "$msvcRoot\include",
-          "$kitsInc\ucrt",
-          "$kitsInc\um",
-          "$kitsInc\shared",
-          "$kitsInc\winrt"
-        ) -join ";"
-      }
-      if ($msvcRoot -and $kitsLib -and [string]::IsNullOrWhiteSpace($originalLib)) {
-        $archDir = if ($architecture -eq "arm64") { "arm64" } else { "x64" }
-        $originalLib = @(
-          "$msvcRoot\lib\$archDir",
-          "$kitsLib\um\$archDir",
-          "$kitsLib\ucrt\$archDir"
-        ) -join ";"
-      }
-    }
-  }
-}
+. (Join-Path $PSScriptRoot "windows-build-environment.ps1")
+$buildEnvironment = Get-WindowsBuildEnvironment -Architecture $architecture
 
 $cleanSdkCandidates = @(
   "C:\Program Files\Swift\Platforms\6.3.3\Windows.platform\Developer\SDKs\Windows.sdk",
@@ -121,17 +100,22 @@ foreach ($requiredPath in @($sqliteHeader, $sqliteLibrary)) {
     throw "Vcpkg SQLite development file is unavailable: $requiredPath"
   }
 }
-$env:INCLUDE = (@($vcpkgIncludeDirectory, $originalInclude) |
-    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ";"
-$env:LIB = (@($vcpkgLibraryDirectory, $originalLib) |
-    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ";"
+$env:INCLUDE = (@($vcpkgIncludeDirectory) + $buildEnvironment.IncludePaths) -join ";"
+$env:LIB = (@($vcpkgLibraryDirectory) + $buildEnvironment.LibraryPaths) -join ";"
+. (Join-Path $PSScriptRoot "windows-portable-support.ps1")
+$sqliteRuntime = Join-Path $vcpkgInstalledRoot "bin\sqlite3.dll"
+$expectedMachine = if ($architecture -eq "arm64") { [UInt16]0xAA64 } else { [UInt16]0x8664 }
+if ((Get-PEMachine $sqliteRuntime) -ne $expectedMachine) {
+  throw "SQLite runtime does not match the $architecture target: $sqliteRuntime"
+}
 
 
 Push-Location $packagePath
 try {
   . (Join-Path $PSScriptRoot "windows-swift-arguments.ps1")
   $swiftArguments = @(Get-WindowsSwiftArguments `
-    -VcpkgInstalledRoot $vcpkgInstalledRoot -TargetTriple $targetTriple)
+    -VcpkgInstalledRoot $vcpkgInstalledRoot -TargetTriple $targetTriple `
+    -LibraryPaths $buildEnvironment.LibraryPaths)
   $buildArguments = @($swiftArguments) + @("-c", "release")
   swift build @buildArguments --product codex-bridge-service
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

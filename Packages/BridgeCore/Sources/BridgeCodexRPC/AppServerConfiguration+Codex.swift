@@ -46,13 +46,15 @@ extension AppServerConfiguration {
         }
         return AppServerConfiguration(
           executableURL: URL(fileURLWithPath: resolved),
-          arguments: ["app-server", "--stdio"]
+          arguments: ["app-server", "--stdio"],
+          environment: posixCodexEnvironment(executablePath: resolved)
         )
       }
       if let discovered = defaultCodexExecutableURL() {
         return AppServerConfiguration(
           executableURL: discovered,
-          arguments: ["app-server", "--stdio"]
+          arguments: ["app-server", "--stdio"],
+          environment: posixCodexEnvironment(executablePath: discovered.path)
         )
       }
       return AppServerConfiguration(
@@ -77,6 +79,8 @@ extension AppServerConfiguration {
         return nil
       }
       return normalized
+    #elseif os(Linux)
+      return CodexLinuxExecutableResolver.resolve(configuredPath: trimmed)?.path
     #else
       return CodexMacExecutableResolver.resolve(configuredPath: trimmed)?.path
     #endif
@@ -91,6 +95,8 @@ extension AppServerConfiguration {
         return URL(fileURLWithPath: cmd)
       }
       return nil
+    #elseif os(Linux)
+      return CodexLinuxExecutableResolver.resolve()
     #else
       return CodexMacExecutableResolver.resolve()
     #endif
@@ -154,6 +160,20 @@ extension AppServerConfiguration {
       unavailableCodexConfiguration(reason: reason)
     }
   #endif
+
+  private static func posixCodexEnvironment(executablePath: String) -> [String: String]? {
+    #if os(Linux)
+      var environment = ProcessInfo.processInfo.environment
+      let runtime =
+        AgentNodeExecutableResolver.resolve(near: executablePath, environment: environment)
+        ?? executablePath
+      environment["PATH"] = AgentProviderEnvironment.executableSearchPath(
+        executablePath: runtime, source: environment)
+      return environment
+    #else
+      return nil
+    #endif
+  }
 
   private static func unavailableCodexConfiguration(reason: String) -> AppServerConfiguration {
     #if os(Windows)

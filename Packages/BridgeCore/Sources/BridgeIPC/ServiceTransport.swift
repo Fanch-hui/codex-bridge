@@ -23,6 +23,8 @@ public enum ServiceTransportFactory {
       return XPCServiceTransport(machServiceName: BridgeServiceIPC.machServiceName)
     #elseif os(Windows)
       return NamedPipeServiceTransport(pipeName: BridgeServiceIPC.windowsPipeName)
+    #elseif os(Linux)
+      return LinuxSocketServiceTransport()
     #else
       fatalError("Service transport is unavailable on this platform.")
     #endif

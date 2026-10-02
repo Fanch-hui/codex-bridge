@@ -190,13 +190,15 @@ public actor MCPSessionRegistry {
     guard !isStopped else {
       return .error(statusCode: 503, .internalError("MCP service unavailable"))
     }
-    await expireSessions()
     let request = authenticatedRequest.request
     let clientID = authenticatedRequest.clientID
+    let admissionToken =
+      authenticatedRequest.admissionToken ?? clientAdmission?.token(for: clientID)
+    await expireSessions()
     if let rejection = validateAuthorityAndOrigin(request, clientID: clientID) {
       return rejection
     }
-    guard isClientAdmitted(clientID) else {
+    guard isAdmissionCurrent(admissionToken, for: clientID) else {
       return .error(statusCode: 503, .internalError("MCP client unavailable"))
     }
 
@@ -208,10 +210,10 @@ public actor MCPSessionRegistry {
       return await handleDiscover(for: request, clientID: clientID)
     }
     if isInitialize(request) {
-      return await createSession(for: request, clientID: clientID)
+      return await createSession(for: request, clientID: clientID, admissionToken: admissionToken)
     }
     if isModernRequest(request) {
-      return await handleModernRequest(request, clientID: clientID)
+      return await handleModernRequest(request, clientID: clientID, admissionToken: admissionToken)
     }
     if request.body == nil || request.body?.isEmpty == true {
       return .data(Data("{}".utf8), headers: [HTTPHeaderName.contentType: "application/json"])

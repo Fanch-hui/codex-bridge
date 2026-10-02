@@ -1,0 +1,65 @@
+name: macOS
+
+on:
+  push:
+    branches:
+      - win
+      - 'codex/platform-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CODEX_BRIDGE_XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+jobs:
+  package:
+    name: Build macOS ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: arm64
+            runner: macos-26
+          - architecture: x86_64
+            runner: macos-26-intel
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Record native toolchain
+        run: |
+          test "$(uname -m)" = '${{ matrix.architecture }}'
+          Scripts/with-xcode.sh xcodebuild -version
+          Scripts/with-xcode.sh swift --version
+
+      - name: Prepare Tunnel helper
+        run: Scripts/build-tunnel-helper.sh "$RUNNER_TEMP/tunnel-helper"
+
+      - name: Build release packages
+        shell: bash
+        run: |
+          helper="$RUNNER_TEMP/tunnel-helper"
+          digest="$(shasum -a 256 "$helper/tunnel-client")"
+          Scripts/build-release-candidate.sh \
+            "$RUNNER_TEMP/macos-package" \
+            "$helper" "${digest%% *}" '${{ matrix.architecture }}'
+
+      - name: Verify dependency resolution is unchanged
+        run: git diff --exit-code -- Packages/BridgeCore/Package.resolved CodexBridge.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+      - name: Upload release packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/macos-package/*
+          if-no-files-found: error

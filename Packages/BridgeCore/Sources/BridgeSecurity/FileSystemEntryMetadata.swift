@@ -2,6 +2,8 @@ import Foundation
 
 #if os(Windows)
   import WinSDK
+#elseif canImport(Glibc)
+  import Glibc
 #endif
 
 public struct FileSystemEntryMetadata: Sendable {
@@ -28,6 +30,16 @@ public struct FileSystemEntryMetadata: Sendable {
       isRegularFile = !isDirectory && !isSymbolicLink
       fileSize = Int(
         exactly: (UInt64(attributes.nFileSizeHigh) << 32) | UInt64(attributes.nFileSizeLow))
+    #elseif os(Linux)
+      var metadata = stat()
+      guard url.path.withCString({ Glibc.lstat($0, &metadata) }) == 0 else {
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+      }
+      let type = metadata.st_mode & S_IFMT
+      isDirectory = type == S_IFDIR
+      isRegularFile = type == S_IFREG
+      isSymbolicLink = type == S_IFLNK
+      fileSize = Int(exactly: metadata.st_size)
     #else
       let values = try url.resourceValues(forKeys: [
         .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey,

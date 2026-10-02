@@ -6,29 +6,34 @@
 
 Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
 
-macOS 与 Windows 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
+macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 `v1.3.4`。
+当前版本为 `v1.3.5`。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v1.3.4 安装包 | 安装方式 |
+| 平台 | v1.3.5 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-1.3.4-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.3.4-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows x64，便携运行 | `codex-bridge-windows-x64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
+| macOS 14+，Apple Silicon | `CodexBridge-1.3.5-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-1.3.5-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.3.5-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-1.3.5-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.3.5.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.3.5.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.3.5.tar.gz` / `codex-bridge-linux-arm64-1.3.5.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
 升级时沿用现有应用数据和内置浏览器登录态。Windows 关闭主窗口后保留托盘，使用托盘菜单退出。
 
-带内置更新功能的版本会在每次启动时后台检查 GitHub 更新，发现新版后在首页提示。点击“立即更新”即可下载并安装；有任务正在执行时，等待任务结束后安装并重新启动。每次更新完成后请在 ChatGPT 中刷新一次插件以清除旧版缓存（参见 [配置指南](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)）。设置页可手动检查更新。旧版本需先手动安装一次带更新功能的版本。
+带内置更新功能的版本会在每次启动时后台检查 GitHub 更新，发现新版后在首页提示。点击“立即更新”即可下载并安装；有任务正在执行时，等待任务结束后安装并重新启动。每次更新完成后请在 ChatGPT 中刷新一次插件以清除旧版缓存（参见 [配置指南](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)）。Linux 的更新入口提供对应架构的 `.deb` 下载，下载后通过系统包管理器安装并重新启动 App。设置页可手动检查更新。旧版本需先手动安装一次带更新功能的版本。
 
 ## 实际界面与任务演示
 
-以下页面为 macOS 实录，Windows 共用同一套产品界面。约 15 秒演示：ChatGPT 提交“你好” → 本机批准 → Codex 执行 → 工作台显示回复。
+以下页面为 macOS 实录，Windows 与 Linux 共用同一套产品界面。约 15 秒演示：ChatGPT 提交“你好” → 本机批准 → Codex 执行 → 工作台显示回复。
 
 <img src="./docs/assets/workbench-demo.gif" width="640" alt="ChatGPT 提交任务、本机批准与 Codex 执行回复的完整动态演示">
 
@@ -100,7 +105,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 ## 任务并发限制
 
-macOS 与 Windows 使用相同的任务并发规则：
+macOS、Windows 与 Linux 使用相同的任务并发规则：
 
 | 范围 | 限制 |
 | --- | --- |
@@ -122,7 +127,7 @@ Desktop App ── local IPC ────────┘   ├─ 项目权限�
                                     └─ Direct Workspace / Skills
 ```
 
-macOS 使用 WKWebView 和 XPC；Windows 使用 WebView2 和命名管道。两平台共用 `BridgeDesktopUI` 与 `BridgeServiceAppCore`。Windows 展示采用状态版本检查、页面缓存和增量消息更新；活动会话继续通过独立订阅接收实时输出。
+macOS 使用 WKWebView 和 XPC；Windows 使用 WebView2 和命名管道；Linux 使用 GTK 3 / WebKitGTK 4.1 和 Unix domain socket。三平台共用 `BridgeDesktopUI` 与 `BridgeServiceAppCore`，Windows 与 Linux 还共用 `BridgeDesktopShell` 的桌面状态和命令适配。活动会话通过独立订阅接收实时输出。
 
 ## 从源码构建
 
@@ -133,7 +138,7 @@ git clone --branch win https://github.com/Fanch-hui/codex-bridge.git
 cd codex-bridge
 ```
 
-### macOS Apple Silicon
+### macOS Apple Silicon / Intel
 
 需要 Xcode 与可编译项目的 Swift 工具链。
 
@@ -146,7 +151,9 @@ Scripts/with-xcode.sh xcodebuild \
 
 普通源码构建可使用本地 MCP。ChatGPT Secure Tunnel 还需要经过摘要校验的 `tunnel-client`；正式安装包已包含该组件。
 
-### Windows x64
+Intel Mac 构建将 `arch=arm64` 替换为 `arch=x86_64`。发布脚本的架构参数同样支持 `arm64` 与 `x86_64`。
+
+### Windows x64 / ARM64
 
 需要 Swift 6.3.3、Visual Studio C++ 工具链、Windows SDK、vcpkg SQLite，以及生成安装器所需的 Inno Setup 7.1.0。
 
@@ -156,7 +163,13 @@ pwsh -File Scripts/build-windows.ps1 `
   -Installer -ISCCPath 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe'
 ```
 
+构建脚本默认使用本机架构，也可通过 `-Architecture x64` 或 `-Architecture arm64` 指定目标。SQLite 的 vcpkg triplet 需分别使用 `x64-windows` 或 `arm64-windows`。
+
 构建脚本使用 `swiftbuild`，输出 portable ZIP 和 EXE 安装器到 `.build`。
+
+### Ubuntu 24.04 x64 / ARM64
+
+Linux 桌面版使用 GTK 3 与 WebKitGTK，共用工作台与项目管理界面，提供 `.deb` 和便携包。系统依赖、构建命令与数据目录见 [Linux 指南](./docs/LINUX.md)。
 
 ## 许可与隐私
 

@@ -17,7 +17,7 @@ extension BridgeServiceAppModel {
     #endif
     let updater = AppUpdateController(
       currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
-        as? String ?? "1.3.4",
+        as? String ?? "1.3.5",
       platform: "macos", architecture: architecture, kind: "app",
       preparePackage: { archive, release in try await installer.prepare(archive, release: release)
       },
@@ -62,7 +62,7 @@ extension BridgeServiceAppModel {
       try? FileManager.default.removeItem(at: MacAppUpdateHelper.failureURL)
     }
     let currentVersion =
-      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3.4"
+      Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3.5"
     let lastSeenVersionKey = "CodexBridgeLastSeenVersion"
     let justUpdatedKey = "CodexBridgeJustUpdated"
     let previousVersion = userDefaults.string(forKey: lastSeenVersionKey)

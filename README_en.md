@@ -6,29 +6,34 @@
 
 Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, Antigravity, Pi, and Qoder.
 
-macOS and Windows share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
+macOS, Windows, and Linux share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.3.4`.
+The current release is `v1.3.5`.
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest).
 
-| Platform | v1.3.4 package | Installation |
+| Platform | v1.3.5 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.3.4-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.3.4-Setup.exe` | Run the installer and choose an installation folder |
-| Windows x64, portable | `codex-bridge-windows-x64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
+| macOS 14+, Apple Silicon | `CodexBridge-1.3.5-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| macOS 14+, Intel | `CodexBridge-1.3.5-macos-x86_64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.3.5-Setup.exe` | Run the installer and choose an installation folder |
+| Windows ARM64 | `CodexBridge-Windows-arm64-1.3.5-Setup.exe` | Run the installer and choose an installation folder |
+| Windows x64 / ARM64, portable | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.3.5.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.3.5.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64, portable | `codex-bridge-linux-x64-1.3.5.tar.gz` / `codex-bridge-linux-arm64-1.3.5.tar.gz` | Extract the complete archive and run `./codex-bridge` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
 
 Upgrades preserve application data and the embedded browser profile. Closing the Windows main window keeps the tray icon; use the tray menu to exit.
 
-Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. After every update, refresh the plugin in ChatGPT to prevent stale caches (see [ChatGPT Guide](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)). Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
+Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. After every update, refresh the plugin in ChatGPT to prevent stale caches (see [ChatGPT Guide](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)). On Linux, the update action opens the matching `.deb` download; install it with the system package manager and restart the app. Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
 
 ## Screenshots and task demo
 
-Recorded on macOS; Windows uses the same shared product UI. This 15-second demo follows ChatGPT submitting “你好” → local approval → Codex execution → the response in the workbench.
+Recorded on macOS; Windows and Linux use the same shared product UI. This 15-second demo follows ChatGPT submitting “你好” → local approval → Codex execution → the response in the workbench.
 
 <img src="./docs/assets/workbench-demo.gif" width="640" alt="Full animated demo: ChatGPT submission, local approval, and the Codex response">
 
@@ -98,7 +103,7 @@ Effective capabilities depend on the agent, its connection probe, and project pe
 
 ## Task concurrency limits
 
-macOS and Windows use the same task concurrency rules:
+macOS, Windows, and Linux use the same task concurrency rules:
 
 | Scope | Limit |
 | --- | --- |
@@ -120,7 +125,7 @@ Desktop App ── local IPC ────────┘   ├─ Project policy
                                     └─ Direct Workspace / Skills
 ```
 
-macOS uses WKWebView and XPC; Windows uses WebView2 and named pipes. Both use `BridgeDesktopUI` and `BridgeServiceAppCore`. Windows uses state revisions, page caches, and incremental message rendering while active conversations retain their independent streaming subscriptions.
+macOS uses WKWebView and XPC; Windows uses WebView2 and named pipes; Linux uses GTK 3 / WebKitGTK 4.1 and Unix domain sockets. All three use `BridgeDesktopUI` and `BridgeServiceAppCore`; Windows and Linux also share desktop state and command adapters in `BridgeDesktopShell`. Active conversations retain independent streaming subscriptions.
 
 ## Build from source
 
@@ -131,7 +136,7 @@ git clone --branch win https://github.com/Fanch-hui/codex-bridge.git
 cd codex-bridge
 ```
 
-### macOS Apple Silicon
+### macOS Apple Silicon / Intel
 
 Install Xcode and a compatible Swift toolchain.
 
@@ -144,7 +149,9 @@ Scripts/with-xcode.sh xcodebuild \
 
 A standard source build supports local MCP. ChatGPT Secure Tunnel also requires a verified `tunnel-client`; release packages include it.
 
-### Windows x64
+For Intel Macs, replace `arch=arm64` with `arch=x86_64`. The release script also accepts either architecture.
+
+### Windows x64 / ARM64
 
 Install Swift 6.3.3, Visual Studio C++ tools, Windows SDK, SQLite through vcpkg, and Inno Setup 7.1.0 for installer generation.
 
@@ -155,6 +162,12 @@ pwsh -File Scripts/build-windows.ps1 `
 ```
 
 The script uses `swiftbuild` and writes the portable ZIP and EXE installer under `.build`.
+
+The build script defaults to the host architecture. Use `-Architecture x64` or `-Architecture arm64` to select a target, with the matching `x64-windows` or `arm64-windows` vcpkg SQLite triplet.
+
+### Ubuntu 24.04 x64 / ARM64
+
+The Linux desktop uses GTK 3 and WebKitGTK with the shared workbench and project interface. Builds produce `.deb` and portable archives. See the [Linux guide](./docs/LINUX.md) for dependencies, build commands, and data locations.
 
 ## License and privacy
 

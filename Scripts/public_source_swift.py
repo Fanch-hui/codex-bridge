@@ -155,7 +155,9 @@ def _array_variables(source, name):
 def _manifest_entries(source, field, variable):
     package = _package_arguments(source)
     arrays = [package[field]] if field in package else []
-    arrays.extend(_array_variables(source, variable))
+    variables = dict.fromkeys([variable] + re.findall(r"\+\s*(\w+)", package.get(field, "")))
+    for name in variables:
+        arrays.extend(_array_variables(source, name))
     entries = []
     for array in arrays:
         entries.extend(_call_entries(array))

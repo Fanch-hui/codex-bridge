@@ -121,11 +121,11 @@ public struct PiRPCProvider: AgentProvider, Sendable {
       guard let sessionID = state["sessionId"]?.stringValue, sessionID == profile.sessionID,
         let sessionFile = state["sessionFile"]?.stringValue, let store = profile.store
       else { throw AgentRuntimeError.sessionMismatch }
-      try store.save(
+      try store.confirm(
         PiSessionBinding(
           projectID: request.projectID.rawValue,
           projectRoot: request.projectRoot, installationID: installation.id.rawValue,
-          sessionID: sessionID, sessionFile: sessionFile))
+          sessionID: sessionID, sessionFile: sessionFile), continuation: profile.continuation)
       let binding = try AgentBinding(
         providerID: .pi, installationID: installation.id,
         providerSessionID: sessionID, providerRunID: UUID().uuidString.lowercased())

@@ -1,0 +1,4 @@
+module CWebKitGTK [system] {
+  header "shim.h"
+  export *
+}

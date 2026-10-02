@@ -17,6 +17,7 @@ extension BridgeServiceApplication {
     guard let task = try await tasks.task(id: id) else {
       throw BridgeMCPQueryError.taskNotFound
     }
+    _ = try await readableProject(task.projectID.rawValue)
     let eventLimit = min(max(recentEventLimit, 1), 6)
     let events = try await tasks.events(taskID: id, limit: eventLimit)
     let activityLimit = min(max(recentEventLimit, 1), 8)

@@ -24,7 +24,7 @@
     var root = document.documentElement;
     if (context && context.platform) {
       root.dataset.platform = context.platform;
-    } else if (root.dataset.platform !== "windows") {
+    } else if (root.dataset.platform !== "windows" && root.dataset.platform !== "linux") {
       root.removeAttribute("data-platform");
     }
   }

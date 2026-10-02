@@ -6,11 +6,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+$platform = switch ($architecture) {
+  "X64" { "windows10" }
+  "Arm64" { "windows10-arm64" }
+  default { throw "Unsupported Swift host architecture: $architecture" }
+}
 $downloadDirectory = Join-Path $env:RUNNER_TEMP "swift-downloads"
-$installer = Join-Path $downloadDirectory "swift-$Version-windows.exe"
+$installer = Join-Path $downloadDirectory "swift-$Version-$platform.exe"
 New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
-  $uri = "https://download.swift.org/swift-$Version-release/windows10/swift-$Version-RELEASE/swift-$Version-RELEASE-windows10.exe"
+  $uri = "https://download.swift.org/swift-$Version-release/$platform/swift-$Version-RELEASE/swift-$Version-RELEASE-$platform.exe"
   Invoke-WebRequest -Uri $uri -OutFile $installer
 }
 $process = Start-Process -Wait -PassThru -FilePath $installer `

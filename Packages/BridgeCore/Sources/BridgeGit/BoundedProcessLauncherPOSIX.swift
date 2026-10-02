@@ -2,6 +2,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+  private typealias SpawnFileActions = posix_spawn_file_actions_t?
+  private typealias SpawnAttributes = posix_spawnattr_t?
   @_silgen_name("posix_spawn_file_actions_addfchdir_np")
   private func bridgeSpawnFileActionsAddFchdir(
     _ actions: UnsafeMutablePointer<posix_spawn_file_actions_t?>,
@@ -9,6 +11,13 @@ import Foundation
   ) -> Int32
 #elseif canImport(Glibc)
   import Glibc
+  private typealias SpawnFileActions = posix_spawn_file_actions_t
+  private typealias SpawnAttributes = posix_spawnattr_t
+  @_silgen_name("posix_spawn_file_actions_addfchdir_np")
+  private func bridgeSpawnFileActionsAddFchdir(
+    _ actions: UnsafeMutablePointer<posix_spawn_file_actions_t>,
+    _ descriptor: Int32
+  ) -> Int32
 #endif
 
 #if !os(Windows)
@@ -18,8 +27,13 @@ import Foundation
       defer { outputPipe.closeBoth() }
       var errorPipe = try DescriptorPipe()
       defer { errorPipe.closeBoth() }
-      var actions: posix_spawn_file_actions_t?
-      var attributes: posix_spawnattr_t?
+      #if canImport(Darwin)
+        var actions: SpawnFileActions = nil
+        var attributes: SpawnAttributes = nil
+      #else
+        var actions = SpawnFileActions()
+        var attributes = SpawnAttributes()
+      #endif
       guard posix_spawn_file_actions_init(&actions) == 0 else {
         throw BoundedProcessError.launchFailed
       }
@@ -37,6 +51,16 @@ import Foundation
         outputPipe: outputPipe,
         errorPipe: errorPipe
       )
+      #if os(Linux)
+        for descriptor in [
+          outputPipe.readDescriptor, errorPipe.readDescriptor,
+          outputPipe.writeDescriptor, errorPipe.writeDescriptor,
+        ] {
+          guard posix_spawn_file_actions_addclose(&actions, descriptor) == 0 else {
+            throw BoundedProcessError.launchFailed
+          }
+        }
+      #endif
       try Self.configureSpawnAttributes(&attributes)
       var pid: pid_t = 0
       let status = Self.spawn(
@@ -60,7 +84,7 @@ import Foundation
     }
 
     private static func configureFileActions(
-      _ actions: inout posix_spawn_file_actions_t?,
+      _ actions: inout SpawnFileActions,
       currentDirectoryDescriptor: Int32,
       outputPipe: DescriptorPipe,
       errorPipe: DescriptorPipe
@@ -90,7 +114,7 @@ import Foundation
     }
 
     private static func configureSpawnAttributes(
-      _ attributes: inout posix_spawnattr_t?
+      _ attributes: inout SpawnAttributes
     ) throws {
       var defaults = sigset_t()
       sigemptyset(&defaults)
@@ -99,9 +123,13 @@ import Foundation
       }
       var mask = sigset_t()
       sigemptyset(&mask)
-      let flags = Int16(
-        POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK
-      )
+      #if canImport(Darwin)
+        let flags = Int16(
+          POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK
+        )
+      #else
+        let flags = Int16(POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
+      #endif
       guard posix_spawnattr_setsigdefault(&attributes, &defaults) == 0,
         posix_spawnattr_setsigmask(&attributes, &mask) == 0,
         posix_spawnattr_setflags(&attributes, flags) == 0
@@ -115,8 +143,8 @@ import Foundation
       executable: String,
       arguments: [String],
       environment: [String],
-      actions: inout posix_spawn_file_actions_t?,
-      attributes: inout posix_spawnattr_t?
+      actions: inout SpawnFileActions,
+      attributes: inout SpawnAttributes
     ) -> Int32 {
       let ownedArguments = arguments.compactMap { strdup($0) }
       guard ownedArguments.count == arguments.count else { return ENOMEM }
@@ -138,8 +166,8 @@ import Foundation
             executable,
             &actions,
             &attributes,
-            argvBuffer.baseAddress,
-            environmentBuffer.baseAddress
+            argvBuffer.baseAddress!,
+            environmentBuffer.baseAddress!
           )
         }
       }
@@ -159,8 +187,8 @@ import Foundation
         guard Self.setCloseOnExec(readDescriptor), Self.setCloseOnExec(writeDescriptor),
           Self.setNonBlocking(readDescriptor)
         else {
-          Darwin.close(readDescriptor)
-          Darwin.close(writeDescriptor)
+          POSIXSystem.close(readDescriptor)
+          POSIXSystem.close(writeDescriptor)
           throw BoundedProcessError.launchFailed
         }
       }
@@ -173,13 +201,13 @@ import Foundation
 
       mutating func closeWrite() {
         guard writeDescriptor >= 0 else { return }
-        Darwin.close(writeDescriptor)
+        POSIXSystem.close(writeDescriptor)
         writeDescriptor = -1
       }
 
       mutating func closeBoth() {
-        if readDescriptor >= 0 { Darwin.close(readDescriptor) }
-        if writeDescriptor >= 0 { Darwin.close(writeDescriptor) }
+        if readDescriptor >= 0 { POSIXSystem.close(readDescriptor) }
+        if writeDescriptor >= 0 { POSIXSystem.close(writeDescriptor) }
         readDescriptor = -1
         writeDescriptor = -1
       }

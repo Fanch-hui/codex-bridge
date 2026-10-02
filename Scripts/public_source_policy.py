@@ -35,7 +35,7 @@ def is_public_path(path):
         return False
     if parts[0] in ROOT_FILES:
         return True
-    if parts[0] in {"App", "Service", "Config", "Windows", "CodexBridge.xcodeproj"}:
+    if parts[0] in {"App", "Service", "Config", "Windows", "Linux", "CodexBridge.xcodeproj"}:
         return True
     if parts[0] == "docs":
         return pure.suffix.lower() in {".md", ".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif"}
@@ -64,7 +64,7 @@ def is_public_path(path):
     if parts[:2] == ("Integrations", "MCPB"):
         return True
     if parts[:2] == (".github", "workflows"):
-        return pure.name in {"windows.yml", "mcp-registry.yml"}
+        return pure.name in {"windows.yml", "macos.yml", "linux.yml", "mcp-registry.yml"}
     if parts[:2] == (".github", "scripts"):
         return not pure.name.lower().startswith("test-")
     return False

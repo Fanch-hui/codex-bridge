@@ -34,6 +34,12 @@ final class MacAppUpdateInstaller {
       let architecture = "x86_64"
     #endif
     try await Self.run("/usr/bin/lipo", [executable.path, "-verify_arch", architecture])
+    try await Self.run(
+      "/usr/bin/lipo",
+      [
+        app.appendingPathComponent("Contents/Resources/CodexBridgeService").path,
+        "-verify_arch", architecture,
+      ])
     try await Self.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path])
     let staged = destination.deletingLastPathComponent()
       .appendingPathComponent(".CodexBridge-update-\(UUID().uuidString).app")

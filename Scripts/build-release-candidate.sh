@@ -20,7 +20,7 @@ readonly product_version="$(
 }
 
 if (( $# < 3 || $# > 4 )); then
-  print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64]"
+  print -u2 "Usage: ${0:t} OUTPUT_DIRECTORY HELPER_DIRECTORY TRUSTED_UNSIGNED_SHA256 [arm64|x86_64]"
   print -u2 "Builds architecture-specific ad-hoc-signed release packages."
   exit 64
 fi
@@ -46,9 +46,9 @@ readonly output_parent="${output_directory:h}"
 readonly helper_directory="${requested_helper_directory:A}"
 readonly requested_architecture="${4:-arm64}"
 case "${requested_architecture}" in
-  arm64) architectures=(arm64) ;;
+  arm64|x86_64) architectures=("${requested_architecture}") ;;
   *)
-    print -u2 "Architecture must be arm64."
+    print -u2 "Architecture must be arm64 or x86_64."
     exit 64
     ;;
 esac

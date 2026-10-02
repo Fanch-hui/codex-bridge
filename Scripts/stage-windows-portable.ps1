@@ -35,9 +35,14 @@ $scriptDirectory = Split-Path -Parent $PSCommandPath
 . (Join-Path $scriptDirectory "windows-portable-runtime.ps1")
 $repoRoot = [IO.Path]::GetFullPath((Split-Path -Parent $scriptDirectory))
 $expectedMachine = if ($Architecture -eq "x64") { [UInt16]0x8664 } else { [UInt16]0xAA64 }
-$effectiveTargetTriple = if ([string]::IsNullOrWhiteSpace($TargetTriple)) {
-  if ($Architecture -eq "x64") { "x86_64-unknown-windows-msvc" } else { "aarch64-unknown-windows-msvc" }
-} else { $TargetTriple }
+$effectiveTargetTriple = if ($Architecture -eq "x64") {
+  "x86_64-unknown-windows-msvc"
+} else {
+  "aarch64-unknown-windows-msvc"
+}
+if ($TargetTriple -and $TargetTriple -ne $effectiveTargetTriple) {
+  throw "TargetTriple must match the requested architecture: $effectiveTargetTriple"
+}
 $expectedVcpkgTriplet = "$Architecture-windows"
 if (-not $VcpkgTriplet.Equals($expectedVcpkgTriplet, [StringComparison]::OrdinalIgnoreCase)) {
   throw "VcpkgTriplet must match the requested architecture: $expectedVcpkgTriplet"

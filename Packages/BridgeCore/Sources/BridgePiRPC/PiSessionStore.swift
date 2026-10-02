@@ -10,6 +10,11 @@ struct PiSessionBinding: Codable, Equatable, Sendable {
   let sessionFile: String
 }
 
+struct PiSessionContinuation: Sendable {
+  let binding: PiSessionBinding
+  let isNative: Bool
+}
+
 struct PiSessionStore: Sendable {
   let resolver: ProjectPathResolver
   let sessionsDirectory: String
@@ -42,6 +47,12 @@ struct PiSessionStore: Sendable {
   func load(sessionID: String, request: AgentExecutionRequest, installation: AgentInstallation)
     throws -> PiSessionBinding
   {
+    try loadContinuation(sessionID: sessionID, request: request, installation: installation).binding
+  }
+
+  func loadContinuation(
+    sessionID: String, request: AgentExecutionRequest, installation: AgentInstallation
+  ) throws -> PiSessionContinuation {
     let reader = SecureFileReader(maximumBytes: 32 * 1_024, maximumLines: 100)
     let writer = SecureProjectFileWriter(maximumBytes: 32 * 1_024)
     let localPath = try bindingPath(sessionID)
@@ -76,7 +87,7 @@ struct PiSessionStore: Sendable {
       else { throw AgentRuntimeError.sessionMismatch }
       _ = try resolver.resolve(SecureRelativePath(relative))
     }
-    return binding
+    return PiSessionContinuation(binding: binding, isNative: isNative)
   }
 
   func saveNativeIndex(_ binding: PiSessionBinding) throws {
@@ -127,6 +138,22 @@ struct PiSessionStore: Sendable {
     _ = try mutation.apply(
       action: .deleteFile(expectedSHA256: text.sha256), relativePath: path,
       destinationRelativePath: nil, through: resolver)
+  }
+
+  func confirm(_ binding: PiSessionBinding, continuation: PiSessionContinuation?) throws {
+    guard let continuation, continuation.isNative else {
+      try save(binding)
+      return
+    }
+    let previous = continuation.binding
+    guard binding.projectID == previous.projectID,
+      binding.installationID == previous.installationID,
+      binding.sessionID == previous.sessionID,
+      Self.samePath(binding.projectRoot, previous.projectRoot),
+      Self.samePath(binding.sessionFile, previous.sessionFile),
+      Self.isNativeSessionFile(binding.sessionFile),
+      try isIndexed(sessionID: previous.sessionID, expected: previous)
+    else { throw AgentRuntimeError.sessionMismatch }
   }
 
   func save(_ binding: PiSessionBinding) throws {

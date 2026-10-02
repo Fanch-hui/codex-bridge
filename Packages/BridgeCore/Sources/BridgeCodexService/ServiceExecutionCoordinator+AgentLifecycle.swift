@@ -59,6 +59,12 @@ extension ServiceExecutionCoordinator {
     )
     let handle: AgentTaskRunHandle
     do {
+      guard project.accessPolicy.read != .denied,
+        task.permissionMode != .workspaceWrite || project.accessPolicy.write != .denied,
+        !task.networkAllowed || project.accessPolicy.network != .denied
+      else {
+        throw ExecutionServiceError.projectPermissionDenied(project.id)
+      }
       handle = try await runner.start(brief)
     } catch {
       if !finishedRuns.contains(task.id), !isShuttingDown {

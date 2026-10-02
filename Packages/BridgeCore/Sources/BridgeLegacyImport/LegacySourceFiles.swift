@@ -709,10 +709,10 @@ final class LegacyVerifiedSourceFile {
       mode = metadata.st_mode
       linkCount = metadata.st_nlink
       size = metadata.st_size
-      modifiedSeconds = Int64(metadata.st_mtimespec.tv_sec)
-      modifiedNanoseconds = Int64(metadata.st_mtimespec.tv_nsec)
-      changedSeconds = Int64(metadata.st_ctimespec.tv_sec)
-      changedNanoseconds = Int64(metadata.st_ctimespec.tv_nsec)
+      modifiedSeconds = Int64(metadata.modificationTime.tv_sec)
+      modifiedNanoseconds = Int64(metadata.modificationTime.tv_nsec)
+      changedSeconds = Int64(metadata.changeTime.tv_sec)
+      changedNanoseconds = Int64(metadata.changeTime.tv_nsec)
       self.maximumBytes = maximumBytes
     }
   }

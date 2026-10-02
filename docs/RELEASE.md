@@ -4,22 +4,32 @@
 
 桌面 App 每次进程启动读取一次 GitHub Release 的 `latest.json`，设置页支持手动检查。
 macOS 自动更新使用根目录包含 `CodexBridge.app` 的 ZIP；Windows 安装版使用 EXE，
-portable 使用 ZIP。安装前等待任务与 Direct 操作结束，并由 Service 暂停新任务进入。
+portable 使用 ZIP；Linux 更新入口提供对应架构的 `.deb`，由系统包管理器安装。
+macOS 与 Windows 安装前等待任务与 Direct 操作结束，并由 Service 暂停新任务进入。
 
 `Scripts/build-release-candidate.sh` 从 `Config/Base.xcconfig` 读取版本，并生成 macOS
-产物的清单。收齐本次发布的 Windows 与 macOS 产物后，用同一脚本生成最终合并清单，例如：
+产物的清单。收齐本次发布的 macOS、Windows 与 Linux 产物后，用清单生成脚本生成最终合并清单，例如：
 
 ```bash
 python3 Scripts/generate-update-manifest.py \
   --output /absolute/release/latest.json \
-  --version 1.0.1 --tag v1.0.1 \
-  --notes-file /absolute/release/notes.md \
-  --asset macos arm64 app /absolute/release/CodexBridge-1.0.1-macos-arm64.zip \
-  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-1.0.1-Setup.exe \
-  --asset windows x64 portable /absolute/release/codex-bridge-windows-x64.zip
+  --version 1.3.5 --tag v1.3.5 \
+  --notes-file docs/RELEASE_NOTES_v1.3.5.md \
+  --asset macos arm64 app /absolute/release/CodexBridge-1.3.5-macos-arm64.zip \
+  --asset macos x64 app /absolute/release/CodexBridge-1.3.5-macos-x86_64.zip \
+  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-1.3.5-Setup.exe \
+  --asset windows arm64 installer /absolute/release/CodexBridge-Windows-arm64-1.3.5-Setup.exe \
+  --asset windows x64 portable /absolute/release/codex-bridge-windows-x64.zip \
+  --asset windows arm64 portable /absolute/release/codex-bridge-windows-arm64.zip \
+  --asset linux x64 installer /absolute/release/CodexBridge-Linux-x64-1.3.5.deb \
+  --asset linux arm64 installer /absolute/release/CodexBridge-Linux-arm64-1.3.5.deb \
+  --asset linux x64 portable /absolute/release/codex-bridge-linux-x64-1.3.5.tar.gz \
+  --asset linux arm64 portable /absolute/release/codex-bridge-linux-arm64-1.3.5.tar.gz
 ```
 
-当前发布架构为 macOS `arm64` 与 Windows `x64`。每个清单条目包含固定版本的
+当前发布架构为 macOS `arm64` / `x86_64`、Windows `x64` / `arm64`
+与 Ubuntu 24.04 `x64` / `arm64`。macOS 构建参数与文件名使用 `x86_64`，
+更新清单中 Intel 架构使用 `x64`。每个清单条目包含固定版本的
 GitHub 下载地址、完整文件大小与 SHA-256，客户端仅选择精确匹配的条目。
 安装包、App 运行版本与 Release tag 必须一致。
 
@@ -73,9 +83,9 @@ Scripts/verify-tunnel-helper.sh "$helper_root/tunnel" "$helper_sha"
 
 Do not derive the trusted digest from the helper manifest inside an untrusted input directory. The separate value is part of the supply-chain boundary.
 
-## 2. Build Apple Silicon release candidates
+## 2. Build macOS release candidates
 
-The output path must not exist. This command creates ad-hoc-signed `arm64` ZIP/DMG packages containing the App, Service and helper slice. It also generates an SPDX 2.3 dependency SBOM and SHA-256 files.
+The output path must not exist. This command creates ad-hoc-signed ZIP/DMG packages containing the App, Service and helper slice. Use `arm64` for Apple Silicon or `x86_64` for Intel. It also generates an SPDX 2.3 dependency SBOM and SHA-256 files.
 
 ```bash
 Scripts/build-release-candidate.sh \

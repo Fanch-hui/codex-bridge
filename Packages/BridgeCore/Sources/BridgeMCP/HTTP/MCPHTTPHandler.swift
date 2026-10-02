@@ -9,7 +9,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
 
   private struct RequestState {
     let head: HTTPRequestHead
-    let clientID: MCPClientID
+    let authentication: MCPClientAuthentication
     let sessionID: String?
     var body: ByteBuffer
     var byteCount: Int
@@ -23,6 +23,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
   }
 
   private let configuration: MCPHTTPConfiguration
+  private let clientAdmission: MCPClientAdmissionGate?
   private let routeBytes: [UInt8]
   private let handler: MCPAuthenticatedHTTPRequestHandler
   private let emissionObserver: MCPHTTPEmissionObserver?
@@ -41,10 +42,12 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
   package init(
     configuration: MCPHTTPConfiguration,
     authenticatedHandler: @escaping MCPAuthenticatedHTTPRequestHandler,
+    clientAdmission: MCPClientAdmissionGate? = nil,
     emissionObserver: MCPHTTPEmissionObserver?,
     admission: MCPHTTPAdmission
   ) {
     self.configuration = configuration
+    self.clientAdmission = clientAdmission
     routeBytes = configuration.routeBytes
     self.handler = authenticatedHandler
     self.emissionObserver = emissionObserver
@@ -123,17 +126,17 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
       return
     }
     let isOAuth = head.method == .GET && isOAuthProtectedResourceRoute(head.uri)
-    let clientID: MCPClientID
+    let authentication: MCPClientAuthentication
     if !isOAuth {
       guard isExactRoute(head.uri) else {
         reject(status: .notFound, context: context)
         return
       }
-      guard let authenticatedClientID = authenticate(head.headers) else {
+      guard let authenticatedClient = authenticate(head.headers) else {
         reject(status: .notFound, context: context)
         return
       }
-      clientID = authenticatedClientID
+      authentication = authenticatedClient
       guard isAllowedMethod(head.method) else {
         reject(status: .methodNotAllowed, allow: "POST, GET, DELETE", context: context)
         return
@@ -143,7 +146,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
         reject(status: .forbidden, context: context)
         return
       }
-      clientID = .chatGPT
+      authentication = MCPClientAuthentication(clientID: .chatGPT, admissionToken: nil)
     }
     guard aggregateHeaderBytes(head.headers) <= configuration.maximumHeaderBytes else {
       reject(status: .requestHeaderFieldsTooLarge, context: context)
@@ -168,7 +171,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
     inputState = .receiving(
       RequestState(
         head: head,
-        clientID: clientID,
+        authentication: authentication,
         sessionID: head.headers.first(name: HTTPHeaderName.sessionID),
         body: context.channel.allocator.buffer(capacity: capacity),
         byteCount: 0
@@ -428,7 +431,8 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
         body: body?.isEmpty == true ? nil : body,
         path: state.head.uri
       ),
-      clientID: state.clientID
+      clientID: state.authentication.clientID,
+      admissionToken: state.authentication.admissionToken
     )
   }
 
@@ -535,12 +539,14 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
     return difference == 0
   }
 
-  private func authenticate(_ headers: HTTPHeaders) -> MCPClientID? {
+  private func authenticate(_ headers: HTTPHeaders) -> MCPClientAuthentication? {
     guard let authenticator = configuration.clientAuthenticator else {
-      return .chatGPT
+      let token = clientAdmission?.token(for: .chatGPT)
+      guard clientAdmission == nil || token != nil else { return nil }
+      return MCPClientAuthentication(clientID: .chatGPT, admissionToken: token)
     }
     let values = headers[canonicalForm: MCPHTTPConfiguration.tunnelAuthenticationHeader]
-    return authenticator.authenticate(values.map(String.init))
+    return authenticator.authenticate(values.map(String.init), admission: clientAdmission)
   }
 
   private func isAllowedMethod(_ method: HTTPMethod) -> Bool {

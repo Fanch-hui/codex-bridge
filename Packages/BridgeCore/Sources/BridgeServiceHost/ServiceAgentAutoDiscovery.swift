@@ -5,6 +5,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #endif
 
 enum ServiceAgentAutoDiscovery {
@@ -172,6 +174,9 @@ enum ServiceAgentAutoDiscovery {
       if let local = environmentValue("LOCALAPPDATA", environment: environment) {
         directories.append(pathJoin(local, "Programs", "nodejs"))
       }
+    #elseif os(Linux)
+      directories.append(
+        contentsOf: LinuxAgentInstallationDirectories.search(environment: environment))
     #else
       directories.append(contentsOf: macOSAgentSearchDirectories(environment: environment))
     #endif
@@ -208,7 +213,7 @@ enum ServiceAgentAutoDiscovery {
       path.rangeOfCharacter(from: .controlCharacters) == nil
     else { return nil }
     let canonical = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
-    #if canImport(Darwin)
+    #if canImport(Darwin) || canImport(Glibc)
       var metadata = stat()
       guard stat(canonical, &metadata) == 0,
         metadata.st_mode & S_IFMT == S_IFREG

@@ -2,33 +2,34 @@ name: windows
 
 on:
   push:
-    branches: [win]
+    branches: [win, 'codex/platform-*']
   pull_request:
     branches: [win]
   workflow_dispatch:
     inputs:
+      architecture:
+        description: Target architecture
+        type: choice
+        options: [all, x64, arm64]
+        default: all
 permissions:
   contents: read
 
 concurrency:
-  group: windows-${{ github.ref }}
+  group: windows-${{ github.ref }}-${{ inputs.architecture || 'all' }}
   cancel-in-progress: true
 
 jobs:
   build:
     name: build (${{ matrix.architecture }})
-    runs-on: windows-latest
+    runs-on: ${{ matrix.architecture == 'arm64' && 'windows-11-arm' || 'windows-latest' }}
     env:
       SWIFT_VERSION: 6.3.3
+      TARGET_TRIPLE: ${{ matrix.architecture == 'arm64' && 'aarch64-unknown-windows-msvc' || 'x86_64-unknown-windows-msvc' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - architecture: x64
-            triplet: x64-windows
-            library_architecture: x64
-            target_triple: ""
-            publish: true
+        architecture: ${{ fromJSON(inputs.architecture == 'arm64' && '["arm64"]' || inputs.architecture == 'x64' && '["x64"]' || '["x64","arm64"]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,10 +48,19 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/swift-downloads
-          key: windows-swift-installer-v1-${{ env.SWIFT_VERSION }}-${{ runner.arch }}
+          key: windows-swift-installer-v2-${{ env.SWIFT_VERSION }}-${{ runner.arch }}
       - name: Install Swift toolchain
         shell: pwsh
         run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-swift.ps1" -Version $env:SWIFT_VERSION'
+      - name: Save Swift installer cache
+        if: steps.swift-installer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/swift-downloads
+          key: ${{ steps.swift-installer-cache.outputs.cache-primary-key }}
+      - name: Prepare WiX runtime extraction tools
+        shell: pwsh
+        run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-wix.ps1"'
       - name: Validate Swift portable runtime
         shell: pwsh
         run: |
@@ -73,12 +83,6 @@ jobs:
               Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
             }
           }
-      - name: Save Swift installer cache
-        if: steps.swift-installer-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}/swift-downloads
-          key: ${{ steps.swift-installer-cache.outputs.cache-primary-key }}
       - name: Identify vcpkg cache
         id: vcpkg-cache-key
         shell: pwsh
@@ -95,70 +99,41 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .build/ci-cache/vcpkg
-          key: windows-vcpkg-v1-${{ matrix.triplet }}-${{ steps.vcpkg-cache-key.outputs.image }}-${{ steps.vcpkg-cache-key.outputs.revision }}
+          key: windows-vcpkg-v1-${{ matrix.architecture }}-windows-${{ steps.vcpkg-cache-key.outputs.image }}-${{ steps.vcpkg-cache-key.outputs.revision }}
       - name: Install SQLite via vcpkg (for GRDB)
         shell: pwsh
         run: |
-          $triplet = "${{ matrix.triplet }}"
+          $triplet = "${{ matrix.architecture }}-windows"
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "sqlite3:$triplet"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $archDir = "${{ matrix.library_architecture }}"
+          $archDir = "${{ matrix.architecture }}"
           $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -property installationPath | Select-Object -First 1
-          $msvcRoot = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory |
-            Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $kitsInc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $inc = @(
-            "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\include",
-            "$msvcRoot\include",
-            "$kitsInc\ucrt",
-            "$kitsInc\um",
-            "$kitsInc\shared",
-            "$kitsInc\winrt"
-          ) -join ";"
-          Add-Content $env:GITHUB_ENV "INCLUDE=$inc"
-          $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -property installationPath | Select-Object -First 1
-          $msvcLib = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory |
-            Sort-Object Name -Descending | ForEach-Object { "$($_.FullName)\lib\$archDir" } |
-            Where-Object { Test-Path $_ } | Select-Object -First 1
-          $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $vcpkgLib = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\lib"
-          $vcpkgBin = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\bin"
-          $sdkUM = "$kitsLib\um\$archDir"
-          $sdkUCRT = "$kitsLib\ucrt\$archDir"
-          $requiredLibraries = @(
-            "$vcpkgLib\sqlite3.lib",
-            "$msvcLib\libcmt.lib",
-            "$sdkUM\kernel32.lib",
-            "$sdkUM\runtimeobject.lib",
-            "$sdkUCRT\ucrt.lib"
-          )
-          foreach ($library in $requiredLibraries) {
-            if (-not (Test-Path $library)) {
-              throw "Required $archDir library is unavailable: $library"
-            }
-          }
-          $targetLibraryPaths = @($vcpkgLib, $msvcLib, $sdkUM, $sdkUCRT) -join ";"
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-build-environment.ps1"
+          $buildEnvironment = Get-WindowsBuildEnvironment -Architecture $archDir
+          $vcpkgRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet"
+          $vcpkgBin = Join-Path $vcpkgRoot "bin"
+          $includePaths = @((Join-Path $vcpkgRoot "include")) + $buildEnvironment.IncludePaths
+          Add-Content $env:GITHUB_ENV "INCLUDE=$($includePaths -join ';')"
+          $targetLibraryPaths = (@((Join-Path $vcpkgRoot "lib")) + $buildEnvironment.LibraryPaths) -join ";"
           Add-Content $env:GITHUB_ENV "TARGET_LIBRARY_PATHS=$targetLibraryPaths"
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-portable-support.ps1"
+          $expectedMachine = if ($archDir -eq "arm64") { [UInt16]0xAA64 } else { [UInt16]0x8664 }
+          if ((Get-PEMachine (Join-Path $vcpkgBin "sqlite3.dll")) -ne $expectedMachine) {
+            throw "SQLite runtime architecture does not match $archDir."
+          }
           $vcRedistRoot = Get-ChildItem "$vsRoot\VC\Redist\MSVC" -Directory |
             Where-Object { $_.Name -match "^[0-9]+(?:\.[0-9]+)+$" } |
             Sort-Object { [version]$_.Name } -Descending |
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $vcRedistRoot) { throw "Visual C++ Redistributable files are unavailable." }
           Add-Content $env:GITHUB_ENV "CODEX_BRIDGE_VC_REDIST_ROOT=$vcRedistRoot"
-          if ($archDir -eq "x64") {
-            Write-Host "LIB=$targetLibraryPaths"
-            Add-Content $env:GITHUB_ENV "LIB=$targetLibraryPaths"
-            if (-not (Test-Path (Join-Path $vcpkgBin "sqlite3.dll"))) {
-              throw "SQLite runtime is unavailable: $vcpkgBin\sqlite3.dll"
-            }
-            Add-Content $env:GITHUB_PATH $vcpkgBin
+          Write-Host "LIB=$targetLibraryPaths"
+          Add-Content $env:GITHUB_ENV "LIB=$targetLibraryPaths"
+          if (-not (Test-Path (Join-Path $vcpkgBin "sqlite3.dll"))) {
+            throw "SQLite runtime is unavailable: $vcpkgBin\sqlite3.dll"
           }
+          Add-Content $env:GITHUB_PATH $vcpkgBin
       - name: Save vcpkg binary cache
         if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
@@ -196,10 +171,10 @@ jobs:
         run: |
           swift --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $targetTriple = "${{ matrix.target_triple }}"
+          $targetTriple = $env:TARGET_TRIPLE
           . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
           $swiftArguments = @(Get-WindowsSwiftArguments `
-            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.architecture }}-windows" `
             -TargetTriple $targetTriple -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
           $buildArguments = @($swiftArguments) + @("-c", "release")
           swift build @buildArguments --product codex-bridge-windows-app
@@ -281,14 +256,12 @@ jobs:
           node .build/agent-contract/verify.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Restore Tunnel helper cache
-        if: matrix.publish
         id: tunnel-cache
         uses: actions/cache/restore@v6
         with:
           path: .build/tunnel-client/${{ matrix.architecture }}
           key: windows-tunnel-v1-${{ matrix.architecture }}-${{ hashFiles('Scripts/stage-windows-tunnel-client.ps1') }}
       - name: Stage Windows tunnel client
-        if: matrix.publish
         shell: pwsh
         run: |
           $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
@@ -297,16 +270,15 @@ jobs:
             -Destination $tunnelClientDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Save Tunnel helper cache
-        if: matrix.publish && steps.tunnel-cache.outputs.cache-hit != 'true'
+        if: steps.tunnel-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: .build/tunnel-client/${{ matrix.architecture }}
           key: ${{ steps.tunnel-cache.outputs.cache-primary-key }}
       - name: Stage Windows portable package
-        if: matrix.publish
         shell: pwsh
         run: |
-          $targetTriple = "${{ matrix.target_triple }}"
+          $targetTriple = $env:TARGET_TRIPLE
           $portableDir = Join-Path $env:GITHUB_WORKSPACE ".build\windows-dist\${{ matrix.architecture }}"
           # The helper directory is derived here instead of being forwarded
           # through GITHUB_ENV, so a package can never be staged without it.
@@ -320,7 +292,7 @@ jobs:
             BinPath = $env:SWIFT_BIN_PATH
             OutDir = $portableDir
             Architecture = "${{ matrix.architecture }}"
-            VcpkgTriplet = "${{ matrix.triplet }}"
+            VcpkgTriplet = "${{ matrix.architecture }}-windows"
             TunnelClientDir = $tunnelClientDir
           }
           if ($targetTriple) {
@@ -329,13 +301,11 @@ jobs:
           & "$env:GITHUB_WORKSPACE\Scripts\stage-windows-portable.ps1" @stageArguments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install pinned Inno Setup 7.1.0
-        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\.github\scripts\install-inno-setup.ps1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build Windows EXE installer
-        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\Scripts\build-windows-installer.ps1" `
@@ -344,14 +314,12 @@ jobs:
             -OutputDir "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows portable ZIP
-        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}
           path: .build/windows-dist/codex-bridge-windows-${{ matrix.architecture }}.zip
           if-no-files-found: error
       - name: Upload Windows EXE installer
-        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}-installer
