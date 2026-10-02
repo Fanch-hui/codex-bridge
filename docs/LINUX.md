@@ -30,7 +30,7 @@ Direct 命令的禁网模式使用 bubblewrap 创建独立网络命名空间。�
 
 ```bash
 sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev \
-  libsqlite3-dev libsecret-tools gnome-keyring bubblewrap dbus-x11 python3 unzip
+  libsqlite3-dev libsecret-tools gnome-keyring bubblewrap dbus-x11 python3 unzip curl
 Scripts/build-linux.sh
 ```
 
