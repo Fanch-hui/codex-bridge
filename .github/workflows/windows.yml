@@ -7,35 +7,29 @@ on:
     branches: [win]
   workflow_dispatch:
     inputs:
+      architecture:
+        description: Target architecture
+        type: choice
+        options: [all, x64, arm64]
+        default: all
 permissions:
   contents: read
 
 concurrency:
-  group: windows-${{ github.ref }}
+  group: windows-${{ github.ref }}-${{ inputs.architecture || 'all' }}
   cancel-in-progress: true
 
 jobs:
   build:
     name: build (${{ matrix.architecture }})
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.architecture == 'arm64' && 'windows-11-arm' || 'windows-latest' }}
     env:
       SWIFT_VERSION: 6.3.3
+      TARGET_TRIPLE: ${{ matrix.architecture == 'arm64' && 'aarch64-unknown-windows-msvc' || 'x86_64-unknown-windows-msvc' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - architecture: x64
-            runner: windows-latest
-            triplet: x64-windows
-            library_architecture: x64
-            target_triple: x86_64-unknown-windows-msvc
-            publish: true
-          - architecture: arm64
-            runner: windows-11-arm
-            triplet: arm64-windows
-            library_architecture: arm64
-            target_triple: aarch64-unknown-windows-msvc
-            publish: true
+        architecture: ${{ fromJSON(inputs.architecture == 'arm64' && '["arm64"]' || inputs.architecture == 'x64' && '["x64"]' || '["x64","arm64"]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,6 +52,15 @@ jobs:
       - name: Install Swift toolchain
         shell: pwsh
         run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-swift.ps1" -Version $env:SWIFT_VERSION'
+      - name: Save Swift installer cache
+        if: steps.swift-installer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/swift-downloads
+          key: ${{ steps.swift-installer-cache.outputs.cache-primary-key }}
+      - name: Prepare WiX runtime extraction tools
+        shell: pwsh
+        run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-wix.ps1"'
       - name: Validate Swift portable runtime
         shell: pwsh
         run: |
@@ -80,12 +83,6 @@ jobs:
               Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
             }
           }
-      - name: Save Swift installer cache
-        if: steps.swift-installer-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}/swift-downloads
-          key: ${{ steps.swift-installer-cache.outputs.cache-primary-key }}
       - name: Identify vcpkg cache
         id: vcpkg-cache-key
         shell: pwsh
@@ -102,14 +99,14 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .build/ci-cache/vcpkg
-          key: windows-vcpkg-v1-${{ matrix.triplet }}-${{ steps.vcpkg-cache-key.outputs.image }}-${{ steps.vcpkg-cache-key.outputs.revision }}
+          key: windows-vcpkg-v1-${{ matrix.architecture }}-windows-${{ steps.vcpkg-cache-key.outputs.image }}-${{ steps.vcpkg-cache-key.outputs.revision }}
       - name: Install SQLite via vcpkg (for GRDB)
         shell: pwsh
         run: |
-          $triplet = "${{ matrix.triplet }}"
+          $triplet = "${{ matrix.architecture }}-windows"
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "sqlite3:$triplet"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $archDir = "${{ matrix.library_architecture }}"
+          $archDir = "${{ matrix.architecture }}"
           $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -property installationPath | Select-Object -First 1
           . "$env:GITHUB_WORKSPACE\Scripts\windows-build-environment.ps1"
@@ -174,10 +171,10 @@ jobs:
         run: |
           swift --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $targetTriple = "${{ matrix.target_triple }}"
+          $targetTriple = $env:TARGET_TRIPLE
           . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
           $swiftArguments = @(Get-WindowsSwiftArguments `
-            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.architecture }}-windows" `
             -TargetTriple $targetTriple -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
           $buildArguments = @($swiftArguments) + @("-c", "release")
           swift build @buildArguments --product codex-bridge-windows-app
@@ -259,14 +256,12 @@ jobs:
           node .build/agent-contract/verify.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Restore Tunnel helper cache
-        if: matrix.publish
         id: tunnel-cache
         uses: actions/cache/restore@v6
         with:
           path: .build/tunnel-client/${{ matrix.architecture }}
           key: windows-tunnel-v1-${{ matrix.architecture }}-${{ hashFiles('Scripts/stage-windows-tunnel-client.ps1') }}
       - name: Stage Windows tunnel client
-        if: matrix.publish
         shell: pwsh
         run: |
           $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
@@ -275,16 +270,15 @@ jobs:
             -Destination $tunnelClientDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Save Tunnel helper cache
-        if: matrix.publish && steps.tunnel-cache.outputs.cache-hit != 'true'
+        if: steps.tunnel-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: .build/tunnel-client/${{ matrix.architecture }}
           key: ${{ steps.tunnel-cache.outputs.cache-primary-key }}
       - name: Stage Windows portable package
-        if: matrix.publish
         shell: pwsh
         run: |
-          $targetTriple = "${{ matrix.target_triple }}"
+          $targetTriple = $env:TARGET_TRIPLE
           $portableDir = Join-Path $env:GITHUB_WORKSPACE ".build\windows-dist\${{ matrix.architecture }}"
           # The helper directory is derived here instead of being forwarded
           # through GITHUB_ENV, so a package can never be staged without it.
@@ -298,7 +292,7 @@ jobs:
             BinPath = $env:SWIFT_BIN_PATH
             OutDir = $portableDir
             Architecture = "${{ matrix.architecture }}"
-            VcpkgTriplet = "${{ matrix.triplet }}"
+            VcpkgTriplet = "${{ matrix.architecture }}-windows"
             TunnelClientDir = $tunnelClientDir
           }
           if ($targetTriple) {
@@ -307,13 +301,11 @@ jobs:
           & "$env:GITHUB_WORKSPACE\Scripts\stage-windows-portable.ps1" @stageArguments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install pinned Inno Setup 7.1.0
-        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\.github\scripts\install-inno-setup.ps1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build Windows EXE installer
-        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\Scripts\build-windows-installer.ps1" `
@@ -322,14 +314,12 @@ jobs:
             -OutputDir "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows portable ZIP
-        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}
           path: .build/windows-dist/codex-bridge-windows-${{ matrix.architecture }}.zip
           if-no-files-found: error
       - name: Upload Windows EXE installer
-        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}-installer
