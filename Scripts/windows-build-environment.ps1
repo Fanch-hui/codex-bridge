@@ -12,6 +12,7 @@ function Get-WindowsBuildEnvironment {
     throw "Visual Studio installation was not found."
   }
   $msvcRoot = Get-ChildItem (Join-Path $vsRoot "VC\Tools\MSVC") -Directory |
+    Where-Object { $_.Name -match '^\d+\.\d+\.\d+(\.\d+)?$' } |
     Sort-Object { [version]$_.Name } -Descending |
     Where-Object { Test-Path (Join-Path $_.FullName "lib\$Architecture\libcmt.lib") } |
     Select-Object -First 1 -ExpandProperty FullName
@@ -21,6 +22,7 @@ function Get-WindowsBuildEnvironment {
 
   $kitsRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10"
   $sdkVersion = Get-ChildItem (Join-Path $kitsRoot "Lib") -Directory |
+    Where-Object { $_.Name -match '^\d+\.\d+\.\d+(\.\d+)?$' } |
     Sort-Object { [version]$_.Name } -Descending |
     Where-Object {
       (Test-Path (Join-Path $_.FullName "um\$Architecture\kernel32.lib")) -and
