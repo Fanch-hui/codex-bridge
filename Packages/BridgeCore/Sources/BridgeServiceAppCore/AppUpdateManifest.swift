@@ -39,6 +39,32 @@ public struct AppUpdateManifest: Codable, Equatable, Sendable {
     self.notes = notes
     self.assets = assets
   }
+
+  private enum CodingKeys: String, CodingKey {
+    case version, notes, assets, additionalAssets
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    version = try values.decode(String.self, forKey: .version)
+    notes = try values.decode(String.self, forKey: .notes)
+    let primary = try values.decode([AppUpdateAsset].self, forKey: .assets)
+    let additional = try values.decodeIfPresent([AppUpdateAsset].self, forKey: .additionalAssets)
+    assets = primary + (additional ?? [])
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    try values.encode(version, forKey: .version)
+    try values.encode(notes, forKey: .notes)
+    // Existing clients validate every primary asset against the original platform set.
+    let primaryPlatforms = ["macos", "windows"]
+    try values.encode(assets.filter { primaryPlatforms.contains($0.platform) }, forKey: .assets)
+    let additional = assets.filter { !primaryPlatforms.contains($0.platform) }
+    if !additional.isEmpty {
+      try values.encode(additional, forKey: .additionalAssets)
+    }
+  }
 }
 
 public struct AppUpdateRelease: Equatable, Sendable {

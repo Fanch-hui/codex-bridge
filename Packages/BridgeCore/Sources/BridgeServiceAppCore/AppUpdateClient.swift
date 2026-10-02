@@ -110,6 +110,7 @@ public final class AppUpdateClient: AppUpdateClientProtocol, @unchecked Sendable
     guard matches.count == 1, let asset = matches.first else {
       throw AppUpdateError.ambiguousAssets
     }
+    try validateAsset(asset)
     return AppUpdateRelease(manifest: manifest, asset: asset)
   }
 
@@ -133,9 +134,6 @@ public final class AppUpdateClient: AppUpdateClientProtocol, @unchecked Sendable
   static func validateManifest(_ manifest: AppUpdateManifest) throws {
     _ = try AppUpdateVersion(manifest.version)
     guard !manifest.assets.isEmpty else { throw AppUpdateError.invalidManifest }
-    for asset in manifest.assets {
-      try validateAsset(asset)
-    }
   }
 
   static func validateAsset(_ asset: AppUpdateAsset) throws {

@@ -33,6 +33,11 @@ python3 Scripts/generate-update-manifest.py \
 GitHub 下载地址、完整文件大小与 SHA-256，客户端仅选择精确匹配的条目。
 安装包、App 运行版本与 Release tag 必须一致。
 
+`assets` 保持 macOS/Windows 的历史格式，Linux 条目写入 `additionalAssets`；
+支持扩展字段的客户端合并两组条目后按平台、架构和安装类型选择。
+发布前使用旧版解析器读取合并清单，验证 macOS/Windows 仍能发现更新。
+Linux 1.3.5 的首次升级需从 Release 手动下载安装包，以取得扩展清单支持。
+
 在 GitHub 草稿 Release 中上传全部安装包与最终清单，再发布为稳定版。已有 Release
 补齐产物时，最后上传 `latest.json`。清单生成后保持对应安装包内容不变。
 首次启用内置更新需要用户手动安装一次含更新模块的版本。
