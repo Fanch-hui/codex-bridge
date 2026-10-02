@@ -52,7 +52,8 @@ extension MCPSessionRegistry {
 
   func handleModernRequest(
     _ request: HTTPRequest,
-    clientID: MCPClientID
+    clientID: MCPClientID,
+    admissionToken: MCPClientAdmissionGate.Token?
   ) async -> HTTPResponse {
     if let rejection = validateModernRoutingHeaders(request) { return rejection }
     guard let statelessServerFactory else {
@@ -65,7 +66,6 @@ extension MCPSessionRegistry {
         ContentTypeValidator(),
       ])
     )
-    let admissionToken = clientAdmission?.token(for: clientID)
     var server: Server?
     do {
       let createdServer = try await statelessServerFactory(clientID)

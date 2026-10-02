@@ -59,6 +59,7 @@ enum ServiceStoreSchema {
       try preflight(database)
       try makeMigrator().migrate(database)
       try ensureTaskMessageActivityIndex(database)
+      try ensureTaskEventRetentionIndex(database)
       try validate(database)
     } catch let error as ServiceStoreError {
       throw error

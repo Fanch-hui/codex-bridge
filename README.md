@@ -133,7 +133,7 @@ git clone --branch win https://github.com/Fanch-hui/codex-bridge.git
 cd codex-bridge
 ```
 
-### macOS Apple Silicon
+### macOS Apple Silicon / Intel
 
 需要 Xcode 与可编译项目的 Swift 工具链。
 
@@ -146,7 +146,9 @@ Scripts/with-xcode.sh xcodebuild \
 
 普通源码构建可使用本地 MCP。ChatGPT Secure Tunnel 还需要经过摘要校验的 `tunnel-client`；正式安装包已包含该组件。
 
-### Windows x64
+Intel Mac 构建将 `arch=arm64` 替换为 `arch=x86_64`。发布脚本的架构参数同样支持 `arm64` 与 `x86_64`。
+
+### Windows x64 / ARM64
 
 需要 Swift 6.3.3、Visual Studio C++ 工具链、Windows SDK、vcpkg SQLite，以及生成安装器所需的 Inno Setup 7.1.0。
 
@@ -155,6 +157,8 @@ pwsh -File Scripts/build-windows.ps1 `
   -VcpkgRoot 'D:\Dev\Tools\vcpkg' `
   -Installer -ISCCPath 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe'
 ```
+
+构建脚本默认使用本机架构，也可通过 `-Architecture x64` 或 `-Architecture arm64` 指定目标。SQLite 的 vcpkg triplet 需分别使用 `x64-windows` 或 `arm64-windows`。
 
 构建脚本使用 `swiftbuild`，输出 portable ZIP 和 EXE 安装器到 `.build`。
 

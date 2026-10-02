@@ -57,7 +57,7 @@ extension BridgeServiceApplication {
         continue
       }
       guard await recheckQueuedTask(task) else { continue }
-      guard let admitted = try? await tasks.promoteQueued(taskID: task.id) else {
+      guard let admitted = await promoteQueuedTask(task) else {
         continue
       }
       do {
@@ -81,6 +81,15 @@ extension BridgeServiceApplication {
     }
   }
 
+  private func promoteQueuedTask(_ task: ServiceTaskRecord) async -> ServiceTaskRecord? {
+    guard let token = try? await workspaceGate.beginCodexAdmission(projectID: task.projectID) else {
+      return nil
+    }
+    let admitted = try? await tasks.promoteQueued(taskID: task.id)
+    await workspaceGate.endCodexAdmission(projectID: task.projectID, token: token)
+    return admitted
+  }
+
   private func recheckQueuedTask(_ task: ServiceTaskRecord) async -> Bool {
     guard let project = try? await projects.project(id: task.projectID) else {
       _ = try? await tasks.fail(
@@ -90,7 +99,8 @@ extension BridgeServiceApplication {
       )
       return false
     }
-    guard project.accessPolicy.write != .denied,
+    guard project.accessPolicy.read != .denied,
+      project.accessPolicy.write != .denied,
       !task.networkAllowed || project.accessPolicy.network != .denied
     else {
       _ = try? await tasks.fail(

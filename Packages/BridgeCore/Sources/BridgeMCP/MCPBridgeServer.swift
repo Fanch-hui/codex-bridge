@@ -118,6 +118,7 @@ public actor MCPBridgeServer {
     let listener = MCPHTTPListener(
       configuration: httpConfiguration,
       authenticatedHandler: { request in await router.handle(request) },
+      clientAdmission: clientAdmission,
       emissionObserver: { emission in await router.record(emission) }
     )
     lifecycle = .starting(identifier, listener, router)

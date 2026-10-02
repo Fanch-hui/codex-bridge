@@ -67,9 +67,11 @@
     }
 
     public static var architecture: String {
-      let environment = ProcessInfo.processInfo.environment
-      let value = environment["PROCESSOR_ARCHITEW6432"] ?? environment["PROCESSOR_ARCHITECTURE"]
-      return value?.caseInsensitiveCompare("ARM64") == .orderedSame ? "arm64" : "x64"
+      #if arch(arm64)
+        return "arm64"
+      #else
+        return "x64"
+      #endif
     }
 
     public static var currentVersion: String {

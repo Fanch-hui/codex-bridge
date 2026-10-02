@@ -101,6 +101,9 @@ extension BridgeServiceApplication {
     guard policy.supportsWorkspaceWrite || permission != .workspaceWrite else {
       throw BridgeMCPQueryError.contractRejected
     }
+    guard !submission.networkAccess || project.accessPolicy.network != .denied else {
+      throw BridgeMCPQueryError.contractRejected
+    }
     guard !submission.networkAccess || policy.allowsNetworkAccess else {
       // Provider policies never persist a requested network grant as though
       // the Bridge enforced it when the adapter has no task-level sandbox.

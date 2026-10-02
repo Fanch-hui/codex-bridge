@@ -5,6 +5,7 @@ import Foundation
 
 public actor MCPHTTPListener {
   private let configuration: MCPHTTPConfiguration
+  private let clientAdmission: MCPClientAdmissionGate?
   private let handler: MCPAuthenticatedHTTPRequestHandler
   private let emissionObserver: MCPHTTPEmissionObserver?
   private let admission: MCPHTTPAdmission
@@ -17,9 +18,11 @@ public actor MCPHTTPListener {
   public init(
     configuration: MCPHTTPConfiguration,
     handler: @escaping MCPHTTPRequestHandler,
+    clientAdmission: MCPClientAdmissionGate? = nil,
     emissionObserver: MCPHTTPEmissionObserver? = nil
   ) {
     self.configuration = configuration
+    self.clientAdmission = clientAdmission
     self.handler = { request in await handler(request.request) }
     self.emissionObserver = emissionObserver
     admission = MCPHTTPAdmission(
@@ -31,9 +34,11 @@ public actor MCPHTTPListener {
   public init(
     configuration: MCPHTTPConfiguration,
     authenticatedHandler: @escaping MCPAuthenticatedHTTPRequestHandler,
+    clientAdmission: MCPClientAdmissionGate? = nil,
     emissionObserver: MCPHTTPEmissionObserver? = nil
   ) {
     self.configuration = configuration
+    self.clientAdmission = clientAdmission
     self.handler = authenticatedHandler
     self.emissionObserver = emissionObserver
     admission = MCPHTTPAdmission(
@@ -63,6 +68,7 @@ public actor MCPHTTPListener {
     let decoderLimits = mutableDecoderLimits
 
     let configuration = self.configuration
+    let clientAdmission = self.clientAdmission
     let handler = self.handler
     let emissionObserver = self.emissionObserver
     let admission = self.admission
@@ -93,6 +99,7 @@ public actor MCPHTTPListener {
             MCPHTTPHandler(
               configuration: configuration,
               authenticatedHandler: handler,
+              clientAdmission: clientAdmission,
               emissionObserver: emissionObserver,
               admission: admission
             )

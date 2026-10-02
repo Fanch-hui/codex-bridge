@@ -2,7 +2,7 @@ name: windows
 
 on:
   push:
-    branches: [win]
+    branches: [win, 'codex/platform-*']
   pull_request:
     branches: [win]
   workflow_dispatch:
@@ -17,7 +17,7 @@ concurrency:
 jobs:
   build:
     name: build (${{ matrix.architecture }})
-    runs-on: windows-latest
+    runs-on: ${{ matrix.runner }}
     env:
       SWIFT_VERSION: 6.3.3
     strategy:
@@ -25,9 +25,16 @@ jobs:
       matrix:
         include:
           - architecture: x64
+            runner: windows-latest
             triplet: x64-windows
             library_architecture: x64
-            target_triple: ""
+            target_triple: x86_64-unknown-windows-msvc
+            publish: true
+          - architecture: arm64
+            runner: windows-11-arm
+            triplet: arm64-windows
+            library_architecture: arm64
+            target_triple: aarch64-unknown-windows-msvc
             publish: true
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +54,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/swift-downloads
-          key: windows-swift-installer-v1-${{ env.SWIFT_VERSION }}-${{ runner.arch }}
+          key: windows-swift-installer-v2-${{ env.SWIFT_VERSION }}-${{ runner.arch }}
       - name: Install Swift toolchain
         shell: pwsh
         run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-swift.ps1" -Version $env:SWIFT_VERSION'
@@ -105,60 +112,31 @@ jobs:
           $archDir = "${{ matrix.library_architecture }}"
           $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -property installationPath | Select-Object -First 1
-          $msvcRoot = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory |
-            Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $kitsInc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $inc = @(
-            "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\include",
-            "$msvcRoot\include",
-            "$kitsInc\ucrt",
-            "$kitsInc\um",
-            "$kitsInc\shared",
-            "$kitsInc\winrt"
-          ) -join ";"
-          Add-Content $env:GITHUB_ENV "INCLUDE=$inc"
-          $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -property installationPath | Select-Object -First 1
-          $msvcLib = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory |
-            Sort-Object Name -Descending | ForEach-Object { "$($_.FullName)\lib\$archDir" } |
-            Where-Object { Test-Path $_ } | Select-Object -First 1
-          $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $vcpkgLib = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\lib"
-          $vcpkgBin = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\bin"
-          $sdkUM = "$kitsLib\um\$archDir"
-          $sdkUCRT = "$kitsLib\ucrt\$archDir"
-          $requiredLibraries = @(
-            "$vcpkgLib\sqlite3.lib",
-            "$msvcLib\libcmt.lib",
-            "$sdkUM\kernel32.lib",
-            "$sdkUM\runtimeobject.lib",
-            "$sdkUCRT\ucrt.lib"
-          )
-          foreach ($library in $requiredLibraries) {
-            if (-not (Test-Path $library)) {
-              throw "Required $archDir library is unavailable: $library"
-            }
-          }
-          $targetLibraryPaths = @($vcpkgLib, $msvcLib, $sdkUM, $sdkUCRT) -join ";"
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-build-environment.ps1"
+          $buildEnvironment = Get-WindowsBuildEnvironment -Architecture $archDir
+          $vcpkgRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet"
+          $vcpkgBin = Join-Path $vcpkgRoot "bin"
+          $includePaths = @((Join-Path $vcpkgRoot "include")) + $buildEnvironment.IncludePaths
+          Add-Content $env:GITHUB_ENV "INCLUDE=$($includePaths -join ';')"
+          $targetLibraryPaths = (@((Join-Path $vcpkgRoot "lib")) + $buildEnvironment.LibraryPaths) -join ";"
           Add-Content $env:GITHUB_ENV "TARGET_LIBRARY_PATHS=$targetLibraryPaths"
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-portable-support.ps1"
+          $expectedMachine = if ($archDir -eq "arm64") { [UInt16]0xAA64 } else { [UInt16]0x8664 }
+          if ((Get-PEMachine (Join-Path $vcpkgBin "sqlite3.dll")) -ne $expectedMachine) {
+            throw "SQLite runtime architecture does not match $archDir."
+          }
           $vcRedistRoot = Get-ChildItem "$vsRoot\VC\Redist\MSVC" -Directory |
             Where-Object { $_.Name -match "^[0-9]+(?:\.[0-9]+)+$" } |
             Sort-Object { [version]$_.Name } -Descending |
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $vcRedistRoot) { throw "Visual C++ Redistributable files are unavailable." }
           Add-Content $env:GITHUB_ENV "CODEX_BRIDGE_VC_REDIST_ROOT=$vcRedistRoot"
-          if ($archDir -eq "x64") {
-            Write-Host "LIB=$targetLibraryPaths"
-            Add-Content $env:GITHUB_ENV "LIB=$targetLibraryPaths"
-            if (-not (Test-Path (Join-Path $vcpkgBin "sqlite3.dll"))) {
-              throw "SQLite runtime is unavailable: $vcpkgBin\sqlite3.dll"
-            }
-            Add-Content $env:GITHUB_PATH $vcpkgBin
+          Write-Host "LIB=$targetLibraryPaths"
+          Add-Content $env:GITHUB_ENV "LIB=$targetLibraryPaths"
+          if (-not (Test-Path (Join-Path $vcpkgBin "sqlite3.dll"))) {
+            throw "SQLite runtime is unavailable: $vcpkgBin\sqlite3.dll"
           }
+          Add-Content $env:GITHUB_PATH $vcpkgBin
       - name: Save vcpkg binary cache
         if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6

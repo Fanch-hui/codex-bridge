@@ -209,31 +209,35 @@ public struct PiNativeSessionDirectoryManager: AgentNativeSessionDirectoryManagi
       process.closeStdin()
       let result = await ManagedProcessRunner(defaultTimeout: .seconds(30)).monitor(
         process: process)
-      guard result.termination == .exited(0), !result.timedOut else {
-        throw AgentNativeSessionDirectoryError.runtimeFailure
-      }
-      guard let data = output.snapshot(),
-        let frame = try? JSONDecoder().decode(PiJSONValue.self, from: data),
-        let value = frame.objectValue
-      else { throw AgentNativeSessionDirectoryError.runtimeFailure }
-      if let error = value["error"]?.stringValue {
-        switch error {
-        case "native_session_not_found": throw AgentNativeSessionDirectoryError.sessionNotFound
-        case "ambiguous_native_session", "native_session_path_changed",
-          "native_session_not_regular_file":
-          throw AgentNativeSessionDirectoryError.scopeMismatch
-        default: throw AgentNativeSessionDirectoryError.runtimeFailure
-        }
-      }
-      guard let result = value["result"] else {
-        throw AgentNativeSessionDirectoryError.runtimeFailure
-      }
-      return result
+      return try Self.historyResult(output.snapshot(), processResult: result)
     } catch {
       process.terminateGroup()
       process.close()
       throw error
     }
+  }
+
+  static func historyResult(_ data: Data?, processResult: ManagedProcessResult) throws
+    -> PiJSONValue
+  {
+    guard !processResult.timedOut,
+      processResult.termination == .exited(0) || processResult.termination == .exited(1),
+      let data, let frame = try? JSONDecoder().decode(PiJSONValue.self, from: data),
+      let value = frame.objectValue
+    else { throw AgentNativeSessionDirectoryError.runtimeFailure }
+    if let error = value["error"]?.stringValue {
+      switch error {
+      case "native_session_not_found": throw AgentNativeSessionDirectoryError.sessionNotFound
+      case "ambiguous_native_session", "native_session_path_changed",
+        "native_session_not_regular_file":
+        throw AgentNativeSessionDirectoryError.scopeMismatch
+      default: throw AgentNativeSessionDirectoryError.runtimeFailure
+      }
+    }
+    guard processResult.termination == .exited(0), let result = value["result"] else {
+      throw AgentNativeSessionDirectoryError.runtimeFailure
+    }
+    return result
   }
 
   private func binding(

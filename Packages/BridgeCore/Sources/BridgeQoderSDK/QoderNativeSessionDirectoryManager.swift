@@ -15,22 +15,23 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
     installation: AgentInstallation,
     page: AgentNativeSessionPageRequest
   ) async throws -> AgentNativeSessionPage {
-    let context = try await context(scope: scope, installation: installation)
-    let value = try await request("list", scope: scope, context: context, page: page)
-    guard let records = value["sessions"]?.arrayValue else {
-      throw AgentNativeSessionDirectoryError.runtimeFailure
+    return try await withContext(scope: scope, installation: installation) { context in
+      let value = try await request("list", scope: scope, context: context, page: page)
+      guard let records = value["sessions"]?.arrayValue else {
+        throw AgentNativeSessionDirectoryError.runtimeFailure
+      }
+      let sessions = try records.compactMap { record -> AgentNativeSessionSummary? in
+        guard let record = record.objectValue else { return nil }
+        let sessionID = try requiredString("sessionID", in: record)
+        let state = try context.store.indexState(
+          binding(
+            sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
+            accountScope: context.accountScope))
+        guard state == .missing || state == .current else { return nil }
+        return try summary(record, isIndexed: state == .current)
+      }
+      return AgentNativeSessionPage(sessions: sessions, nextOffset: value["nextOffset"]?.intValue)
     }
-    let sessions = try records.compactMap { record -> AgentNativeSessionSummary? in
-      guard let record = record.objectValue else { return nil }
-      let sessionID = try requiredString("sessionID", in: record)
-      let state = try context.store.indexState(
-        binding(
-          sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
-          accountScope: context.accountScope))
-      guard state == .missing || state == .current else { return nil }
-      return try summary(record, isIndexed: state == .current)
-    }
-    return AgentNativeSessionPage(sessions: sessions, nextOffset: value["nextOffset"]?.intValue)
   }
 
   public func readNativeSession(
@@ -39,23 +40,24 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
     installation: AgentInstallation,
     page: AgentNativeSessionPageRequest
   ) async throws -> AgentNativeSessionTranscriptPage {
-    let context = try await context(scope: scope, installation: installation)
-    try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
-    let value = try await request(
-      "read", scope: scope, context: context, page: page, sessionID: sessionID)
-    guard value["sessionID"]?.stringValue == sessionID,
-      let values = value["messages"]?.arrayValue
-    else { throw AgentNativeSessionDirectoryError.scopeMismatch }
-    let messages = try values.compactMap { item -> AgentNativeSessionMessage? in
-      guard let item = item.objectValue else { return nil }
-      return try AgentNativeSessionMessage(
-        messageID: requiredString("messageID", in: item),
-        role: requiredString("role", in: item),
-        content: requiredString("content", in: item),
-        createdAt: parseDate(item["createdAt"]?.stringValue))
+    return try await withContext(scope: scope, installation: installation) { context in
+      try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
+      let value = try await request(
+        "read", scope: scope, context: context, page: page, sessionID: sessionID)
+      guard value["sessionID"]?.stringValue == sessionID,
+        let values = value["messages"]?.arrayValue
+      else { throw AgentNativeSessionDirectoryError.scopeMismatch }
+      let messages = try values.compactMap { item -> AgentNativeSessionMessage? in
+        guard let item = item.objectValue else { return nil }
+        return try AgentNativeSessionMessage(
+          messageID: requiredString("messageID", in: item),
+          role: requiredString("role", in: item),
+          content: requiredString("content", in: item),
+          createdAt: parseDate(item["createdAt"]?.stringValue))
+      }
+      return AgentNativeSessionTranscriptPage(
+        sessionID: sessionID, messages: messages, nextOffset: value["nextOffset"]?.intValue)
     }
-    return AgentNativeSessionTranscriptPage(
-      sessionID: sessionID, messages: messages, nextOffset: value["nextOffset"]?.intValue)
   }
 
   public func renameNativeSession(
@@ -64,15 +66,16 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
     scope: AgentNativeSessionDirectoryScope,
     installation: AgentInstallation
   ) async throws -> AgentNativeSessionSummary {
-    let context = try await context(scope: scope, installation: installation)
-    try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
-    let value = try await request(
-      "rename", scope: scope, context: context, sessionID: sessionID, title: title)
-    let indexed = try context.store.containsIndex(
-      binding(
-        sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
-        accountScope: context.accountScope))
-    return try summary(value.objectValue ?? [:], isIndexed: indexed)
+    return try await withContext(scope: scope, installation: installation) { context in
+      try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
+      let value = try await request(
+        "rename", scope: scope, context: context, sessionID: sessionID, title: title)
+      let indexed = try context.store.containsIndex(
+        binding(
+          sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
+          accountScope: context.accountScope))
+      return try summary(value.objectValue ?? [:], isIndexed: indexed)
+    }
   }
 
   public func deleteNativeSession(
@@ -80,13 +83,14 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
     scope: AgentNativeSessionDirectoryScope,
     installation: AgentInstallation
   ) async throws {
-    let context = try await context(scope: scope, installation: installation)
-    try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
-    _ = try await request("delete", scope: scope, context: context, sessionID: sessionID)
-    try context.store.removeIndex(
-      binding(
-        sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
-        accountScope: context.accountScope))
+    return try await withContext(scope: scope, installation: installation) { context in
+      try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
+      _ = try await request("delete", scope: scope, context: context, sessionID: sessionID)
+      try context.store.removeIndex(
+        binding(
+          sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
+          accountScope: context.accountScope))
+    }
   }
 
   public func indexNativeSession(
@@ -94,14 +98,15 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
     scope: AgentNativeSessionDirectoryScope,
     installation: AgentInstallation
   ) async throws -> AgentNativeSessionIndexReceipt {
-    let context = try await context(scope: scope, installation: installation)
-    try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
-    _ = try await request("verify", scope: scope, context: context, sessionID: sessionID)
-    let binding = binding(
-      sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
-      accountScope: context.accountScope)
-    try context.store.save(binding)
-    return AgentNativeSessionIndexReceipt(scope: scope, sessionID: sessionID)
+    return try await withContext(scope: scope, installation: installation) { context in
+      try requireCurrentOrMissingIndex(sessionID: sessionID, scope: scope, context: context)
+      _ = try await request("verify", scope: scope, context: context, sessionID: sessionID)
+      let binding = binding(
+        sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
+        accountScope: context.accountScope)
+      try context.store.save(binding)
+      return AgentNativeSessionIndexReceipt(scope: scope, sessionID: sessionID)
+    }
   }
 
   public func isIndexedNativeSession(
@@ -109,25 +114,40 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
     scope: AgentNativeSessionDirectoryScope,
     installation: AgentInstallation
   ) async throws -> Bool {
+    return try await withContext(scope: scope, installation: installation) { context in
+      let binding = binding(
+        sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
+        accountScope: context.accountScope)
+      guard try context.store.indexState(binding) == .current else { return false }
+      _ = try await request("verify", scope: scope, context: context, sessionID: sessionID)
+      return true
+    }
+  }
+
+  private typealias Context = (
+    profile: QoderRuntimeProfile, store: QoderSessionStore, projectRoot: String,
+    accountScope: String, client: QoderSDKClient
+  )
+
+  private func withContext<Result>(
+    scope: AgentNativeSessionDirectoryScope, installation: AgentInstallation,
+    operation: (Context) async throws -> Result
+  ) async throws -> Result {
     let context = try await context(scope: scope, installation: installation)
-    let binding = binding(
-      sessionID: sessionID, scope: scope, distribution: context.profile.distribution,
-      accountScope: context.accountScope)
-    guard try context.store.indexState(binding) == .current else { return false }
-    _ = try await request("verify", scope: scope, context: context, sessionID: sessionID)
-    return true
+    do {
+      let result = try await operation(context)
+      await context.client.shutdown()
+      return result
+    } catch {
+      await context.client.shutdown()
+      throw error
+    }
   }
 
   private func requireCurrentOrMissingIndex(
     sessionID: String,
     scope: AgentNativeSessionDirectoryScope,
-    context: (
-      profile: QoderRuntimeProfile,
-      store: QoderSessionStore,
-      projectRoot: String,
-      accountScope: String,
-      client: QoderSDKClient
-    )
+    context: Context
   ) throws {
     do {
       try context.store.requireCurrentOrMissing(
@@ -141,13 +161,7 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
 
   private func context(scope: AgentNativeSessionDirectoryScope, installation: AgentInstallation)
     async throws
-    -> (
-      profile: QoderRuntimeProfile,
-      store: QoderSessionStore,
-      projectRoot: String,
-      accountScope: String,
-      client: QoderSDKClient
-    )
+    -> Context
   {
     guard scope.providerID == .qoder, scope.installationID == installation.id,
       installation.providerID == .qoder
@@ -188,13 +202,7 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
   private func request(
     _ operation: String,
     scope: AgentNativeSessionDirectoryScope,
-    context: (
-      profile: QoderRuntimeProfile,
-      store: QoderSessionStore,
-      projectRoot: String,
-      accountScope: String,
-      client: QoderSDKClient
-    ),
+    context: Context,
     page: AgentNativeSessionPageRequest? = nil,
     sessionID: String? = nil,
     title: String? = nil
@@ -213,12 +221,20 @@ public struct QoderNativeSessionDirectoryManager: AgentNativeSessionDirectoryMan
     if let sessionID { params["sessionID"] = .string(sessionID) }
     if let title { params["title"] = .string(title) }
     do {
-      let result = try await context.client.request("qoder/native_history", params: .object(params))
-      await context.client.shutdown()
-      return result
+      return try await context.client.request("qoder/native_history", params: .object(params))
     } catch {
-      await context.client.shutdown()
-      throw AgentNativeSessionDirectoryError.runtimeFailure
+      throw Self.historyError(error)
+    }
+  }
+
+  static func historyError(_ error: any Error) -> AgentNativeSessionDirectoryError {
+    guard case ACPError.remote(code: -32000, message: let message) = error else {
+      return .runtimeFailure
+    }
+    switch message {
+    case "native_session_not_found": return .sessionNotFound
+    case "session_account_mismatch": return .scopeMismatch
+    default: return .runtimeFailure
     }
   }
 

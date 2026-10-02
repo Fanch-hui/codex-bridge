@@ -46,7 +46,7 @@ export async function loadSDK(config) {
     maxBuffer: 16384, windowsHide: true, env: process.env });
   const match = output.stdout.trim().match(/(?:^|\s)v?(\d+\.\d+\.\d+(?:[-+][0-9a-z.-]+)?)(?:\s|$)/iu);
   requireValue(match, 'cli_version_unavailable');
-  requireValue(manifest.qoderCliVersion === match[1], 'sdk_cli_version_mismatch');
+  // The SDK validates wire protocol compatibility during initialization.
   return { sdk, sdkVersion: manifest.version, cliVersion: match[1] };
 }
 export function authentication(sdk) {

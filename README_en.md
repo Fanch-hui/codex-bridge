@@ -131,7 +131,7 @@ git clone --branch win https://github.com/Fanch-hui/codex-bridge.git
 cd codex-bridge
 ```
 
-### macOS Apple Silicon
+### macOS Apple Silicon / Intel
 
 Install Xcode and a compatible Swift toolchain.
 
@@ -144,7 +144,9 @@ Scripts/with-xcode.sh xcodebuild \
 
 A standard source build supports local MCP. ChatGPT Secure Tunnel also requires a verified `tunnel-client`; release packages include it.
 
-### Windows x64
+For Intel Macs, replace `arch=arm64` with `arch=x86_64`. The release script also accepts either architecture.
+
+### Windows x64 / ARM64
 
 Install Swift 6.3.3, Visual Studio C++ tools, Windows SDK, SQLite through vcpkg, and Inno Setup 7.1.0 for installer generation.
 
@@ -155,6 +157,8 @@ pwsh -File Scripts/build-windows.ps1 `
 ```
 
 The script uses `swiftbuild` and writes the portable ZIP and EXE installer under `.build`.
+
+The build script defaults to the host architecture. Use `-Architecture x64` or `-Architecture arm64` to select a target, with the matching `x64-windows` or `arm64-windows` vcpkg SQLite triplet.
 
 ## License and privacy
 

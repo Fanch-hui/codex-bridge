@@ -182,7 +182,7 @@
     });
   }
 
-  function renderStable(container, signature, render) {
+  function renderStable(container, signature, render, preservesButtons) {
     if (!container.__renderState) {
       var state = container.__renderState = { pressed: false, signature: null, pending: null };
       container.addEventListener("pointerdown", function () { state.pressed = true; });
@@ -209,8 +209,9 @@
     var active = document && document.activeElement;
     var focusedControl = active && container.contains(active)
       && /^(SELECT|INPUT|TEXTAREA|BUTTON)$/.test(String(active.tagName || "").toUpperCase());
-    if (state.pressed || focusedControl) {
-      state.pending = function () { renderStable(container, signature, render); };
+    var focusedButton = active && String(active.tagName || "").toUpperCase() === "BUTTON";
+    if (state.pressed || (focusedControl && !(preservesButtons && focusedButton))) {
+      state.pending = function () { renderStable(container, signature, render, preservesButtons); };
       return;
     }
     if (state.signature === signature) return;
@@ -223,7 +224,7 @@
     renderStable(content, JSON.stringify([page, P.revision()]), function () {
       var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
       try { renderContentBody(content, page, emit); } finally { restore(); }
-    });
+    }, true);
   }
 
   function prepareContentCard(content, page) {
@@ -255,7 +256,13 @@
     if (conversation.parentNode !== card) card.appendChild(conversation);
     if (card.firstChild !== header) card.insertBefore(header, card.firstChild);
     if (card.lastChild !== conversation) card.appendChild(conversation);
-    return { header: header, conversation: conversation };
+    var summary = header.__summary || (header.__summary = S.node("div", "task-detail-summary"));
+    var actions = header.__actions || (header.__actions = S.node("div", "form-actions"));
+    var files = header.__files || (header.__files = S.node("div", "task-detail-files"));
+    [summary, actions, files].forEach(function (node) {
+      if (node.parentNode !== header) header.appendChild(node);
+    });
+    return { header: header, summary: summary, actions: actions, files: files, conversation: conversation };
   }
 
   function renderContentBody(content, page, emit) {
@@ -286,10 +293,11 @@
     if (remediationCard) content.appendChild(remediationCard);
     var card = retained.card || S.node("div", "page-card task-detail-card");
     var sections = detailCardSections(card);
-    S.clear(sections.header);
+    S.clear(sections.summary);
+    S.clear(sections.files);
     if (retained.keep) content.__windowsDetailCard = card;
-    sections.header.appendChild(S.node("h3", "detail-title", detail.title));
-    sections.header.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));
+    sections.summary.appendChild(S.node("h3", "detail-title", detail.title));
+    sections.summary.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));
     var grid = S.node("dl", "detail-grid");
     addDetail(grid, "状态", detail.status); addDetail(grid, "更新时间", detail.updatedAt);
     addDetail(grid, "模型", detail.model || "未记录"); addDetail(grid, "权限", detail.permissionMode || "未记录");
@@ -305,30 +313,55 @@
       if (usage.costAmount != null) addDetail(grid, usage.currency ? "费用" : "原生费用值", String(usage.costAmount) + (usage.currency ? " " + usage.currency : "（单位未提供）"));
     }
     if (detail.failureCode) addDetail(grid, "失败代码", detail.failureCode);
-    sections.header.appendChild(grid);
+    sections.summary.appendChild(grid);
 
-    var actions = S.node("div", "form-actions");
-    if (detail.canInterrupt) actions.appendChild(S.button("中断", "interruptTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (detail.canStop) actions.appendChild(S.button("停止", "stopTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (row.canDelete) {
-      var rm = S.button("删除会话", null, {}, emit, "small danger", false);
-      rm.addEventListener("click", function () {
-        if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部任务、事件和对话记录，无法撤销。")) emit("deleteSession", { taskID: detail.taskID, sessionID: detail.sessionID });
-      });
-      actions.appendChild(rm);
-    }
-    actions.appendChild(S.button(
-      "刷新当前对话", "refreshConversation", { taskID: detail.taskID }, emit, "small", false
-    ));
-    sections.header.appendChild(actions);
+    updateDetailActions(sections.actions, detail, row, emit);
+    if (detail.changedFiles && detail.changedFiles.length) addListBlock(sections.files, "变更文件", detail.changedFiles);
 
-    if (detail.changedFiles && detail.changedFiles.length) addListBlock(sections.header, "变更文件", detail.changedFiles);
     if ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page)) {
       global.CodexBridgeDesktopWorkbenchConversation.render(
         sections.conversation, detail.conversation || [], page, emit, { owner: content });
     }
     if (card.parentNode !== content) content.appendChild(card);
     else if (content.lastChild !== card) content.appendChild(card);
+  }
+
+  function updateDetailActions(actions, detail, row, emit) {
+    actions.__detail = detail;
+    actions.__emit = emit;
+    if (actions.__taskID !== detail.taskID) {
+      S.clear(actions);
+      actions.__buttons = Object.create(null);
+      actions.__taskID = detail.taskID;
+    }
+    var buttons = actions.__buttons, specs = [];
+    if (detail.canInterrupt) specs.push(["interruptTask", "中断", "small danger"]);
+    if (detail.canStop) specs.push(["stopTask", "停止", "small danger"]);
+    if (row.canDelete) specs.push(["deleteSession", "删除会话", "small danger"]);
+    specs.push(["refreshConversation", "刷新当前对话", "small"]);
+    var active = Object.create(null);
+    specs.forEach(function (spec, index) {
+      var command = spec[0], button = buttons[command];
+      active[command] = true;
+      if (!button) {
+        button = buttons[command] = S.button(spec[1], null, {}, emit, spec[2], false);
+        button.addEventListener("click", function () {
+          var current = actions.__detail;
+          if (command === "deleteSession" && !global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部任务、事件和对话记录，无法撤销。")) return;
+          var payload = { taskID: current.taskID };
+          if (command === "deleteSession") payload.sessionID = current.sessionID;
+          actions.__emit(command, payload);
+        });
+      }
+      var atIndex = actions.children[index];
+      if (atIndex !== button) {
+        if (atIndex) actions.insertBefore(button, atIndex);
+        else actions.appendChild(button);
+      }
+    });
+    Object.keys(buttons).forEach(function (command) {
+      if (!active[command]) { buttons[command].remove(); delete buttons[command]; }
+    });
   }
 
   function decisionLabel(approval, decision) {

@@ -39,22 +39,14 @@
         }
       }
       guard installationID == nil || installation != nil else { return }
-      let hasCachedCatalog =
-        !forceRefresh
-        && cachedCatalog(providerID: providerID, installationID: installation?.installationID)
-          != nil
-      let locksModelSelection = forceRefresh || !hasCachedCatalog
 
       modelRefreshGenerations[providerID, default: 0] &+= 1
       let generation = modelRefreshGenerations[providerID, default: 0]
-      if locksModelSelection {
-        refreshingProviderIDs.insert(providerID)
-      }
+      var locksModelSelection = true
+      refreshingProviderIDs.insert(providerID)
       providerErrors[providerID] = nil
-      if locksModelSelection {
-        statusText = "正在读取 \(provider.displayName) 模型…"
-        publishDisplay()
-      }
+      statusText = "正在读取 \(provider.displayName) 模型…"
+      publishDisplay()
       defer {
         if locksModelSelection, modelRefreshGenerations[providerID] == generation {
           refreshingProviderIDs.remove(providerID)
@@ -64,21 +56,27 @@
 
       do {
         let status = try await client.status()
-        workbenchProjectID = status.workbenchProjectID
+        guard modelRefreshGenerations[providerID] == generation else { return }
+        let projectID = status.workbenchProjectID
+        workbenchProjectID = projectID
+        let cached =
+          forceRefresh
+          ? nil
+          : cachedCatalog(
+            providerID: providerID, installationID: installation?.installationID,
+            projectID: projectID)
+        locksModelSelection = forceRefresh || cached == nil
+        if !locksModelSelection { refreshingProviderIDs.remove(providerID) }
         let persistedDefault = try await client.agentModelDefault(providerID: providerID)
         guard modelRefreshGenerations[providerID] == generation else { return }
         let catalogResponse: IPCAgentModelsResponse
-        if hasCachedCatalog,
-          let cached = cachedCatalog(
-            providerID: providerID,
-            installationID: installation?.installationID
-          )
-        {
+        if let cached {
           catalogResponse = IPCAgentModelsResponse(models: cached)
         } else {
           catalogResponse = try await loadModels(
             provider: provider,
             installation: installation,
+            projectID: projectID,
             modelID: nil,
             forceRefresh: forceRefresh
           )
@@ -91,6 +89,7 @@
         let response = try await modelSpecificResponse(
           provider: provider,
           installation: installation,
+          projectID: projectID,
           persistedDefault: persistedDefault,
           catalogResponse: catalogResponse,
           defaultWasRemoved: defaultWasRemoved
@@ -119,7 +118,8 @@
           defaults: finalDefault,
           catalog: resolution.response.models
         )
-        catalogInstallationIDs[providerID] = installation?.installationID ?? ""
+        catalogScopes[providerID] = ModelCatalogScope(
+          installationID: installation?.installationID, projectID: projectID)
         providerErrors[providerID] = nil
         if resolution.addedCount == 0, resolution.removedCount == 0 {
           statusText = "已加载 \(provider.displayName) 的 \(resolution.response.models.count) 个模型。"
@@ -142,6 +142,7 @@
     private func modelSpecificResponse(
       provider: IPCAgentProviderSummary,
       installation: IPCAgentInstallationSummary?,
+      projectID: String?,
       persistedDefault: IPCAgentModelDefaultResponse,
       catalogResponse: IPCAgentModelsResponse,
       defaultWasRemoved: Bool
@@ -154,6 +155,7 @@
       let detailed = try await loadModels(
         provider: provider,
         installation: installation,
+        projectID: projectID,
         modelID: modelID,
         forceRefresh: false
       )
@@ -181,6 +183,7 @@
     func loadModels(
       provider: IPCAgentProviderSummary,
       installation: IPCAgentInstallationSummary?,
+      projectID: String?,
       modelID: String?,
       forceRefresh: Bool = false
     ) async throws -> IPCAgentModelsResponse {
@@ -189,15 +192,21 @@
       }
       return try await client.agentModels(
         installationID: installation.installationID,
-        projectID: workbenchProjectID,
+        projectID: projectID,
         modelID: modelID,
         useStoredDefault: false,
         forceRefresh: forceRefresh && modelID == nil
       )
     }
 
-    func cachedCatalog(providerID: String, installationID: String?) -> [IPCAgentModelSummary]? {
-      guard catalogInstallationIDs[providerID] == (installationID ?? "") else { return nil }
+    func cachedCatalog(
+      providerID: String, installationID: String?, projectID: String?
+    ) -> [IPCAgentModelSummary]? {
+      guard
+        catalogScopes[providerID]
+          == ModelCatalogScope(
+            installationID: installationID, projectID: projectID)
+      else { return nil }
       return modelCatalogs[providerID]
     }
 

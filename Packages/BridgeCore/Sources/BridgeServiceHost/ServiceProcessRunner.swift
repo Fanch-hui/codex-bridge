@@ -121,6 +121,8 @@ public enum ServiceProcessRunner {
         legacyDataRootURL: LegacyConfigurationImporter.defaultSourceRoot()
       )
     )
+    let logMaintenance = await ServiceLogMaintenance.start(store: composition.store)
+    defer { logMaintenance.cancel() }
     let listener: (any ServiceRequestListener)?
     if options.foreground {
       listener = nil

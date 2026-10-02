@@ -103,39 +103,61 @@
         }
       }
 
+      let projectID = workbenchProjectID
+      let persisted: IPCAgentModelDefaultResponse
       do {
-        let persisted = try await client.setAgentDefaults(
+        persisted = try await client.setAgentDefaults(
           providerID: providerID,
           model: defaults.model,
           permissionMode: defaults.permissionMode,
           effort: defaults.effort
         )
-        let catalog = try await catalogAfterSave(
-          providerID: providerID,
-          provider: providers.first(where: { $0.providerID == providerID }),
-          installation: installation,
-          persistedDefault: persisted
-        )
         guard isCurrentSave(providerID: providerID, generation: generation) else { return }
         persistedDefaults[providerID] = persisted
         pendingDefaults.removeValue(forKey: providerID)
-        modelCatalogs[providerID] = catalog
-        catalogInstallationIDs[providerID] = installation?.installationID ?? ""
         providerErrors[providerID] = nil
         applySelectedProvider(
-          providerID: providerID,
-          installation: installation,
-          defaults: persisted,
-          catalog: catalog
-        )
+          providerID: providerID, installation: installation, defaults: persisted,
+          catalog: modelCatalogs[providerID] ?? [])
         statusText = "\(providerName(providerID)) 默认设置已保存。"
         feedback.postToast(statusText)
+        publishDisplay()
       } catch {
         guard isCurrentSave(providerID: providerID, generation: generation) else { return }
         pendingDefaults.removeValue(forKey: providerID)
+        if let previous = persistedDefaults[providerID] {
+          applySelectedProvider(
+            providerID: providerID, installation: installation, defaults: previous,
+            catalog: modelCatalogs[providerID] ?? [])
+        }
         statusText = "Agent 默认设置保存失败：\(BridgeServiceErrorMessage.message(error))"
         providerErrors[providerID] = statusText
         feedback.postAlert(statusText)
+        return
+      }
+
+      do {
+        guard
+          let catalog = try await catalogAfterSave(
+            providerID: providerID,
+            provider: providers.first(where: { $0.providerID == providerID }),
+            installation: installation, projectID: projectID,
+            persistedDefault: persisted
+          )
+        else { return }
+        guard isCurrentSave(providerID: providerID, generation: generation),
+          catalogScopes[providerID]
+            == ModelCatalogScope(
+              installationID: installation?.installationID, projectID: projectID)
+        else { return }
+        modelCatalogs[providerID] = catalog
+        providerErrors[providerID] = nil
+        applySelectedProvider(
+          providerID: providerID, installation: installation, defaults: persisted, catalog: catalog)
+      } catch {
+        guard isCurrentSave(providerID: providerID, generation: generation) else { return }
+        statusText = "默认设置已保存；模型能力读取失败：\(BridgeServiceErrorMessage.message(error))"
+        providerErrors[providerID] = statusText
       }
     }
 
@@ -143,9 +165,14 @@
       providerID: String,
       provider: IPCAgentProviderSummary?,
       installation: IPCAgentInstallationSummary?,
+      projectID: String?,
       persistedDefault: IPCAgentModelDefaultResponse
-    ) async throws -> [IPCAgentModelSummary] {
-      let catalog = modelCatalogs[providerID] ?? []
+    ) async throws -> [IPCAgentModelSummary]? {
+      guard
+        let catalog = cachedCatalog(
+          providerID: providerID, installationID: installation?.installationID, projectID: projectID
+        )
+      else { return nil }
       guard let provider, provider.supportsModelSelection else { return catalog }
       guard let modelID = persistedDefault.model,
         catalog.first(where: { $0.modelID == modelID })?
@@ -154,7 +181,7 @@
       let detailed = try await loadModels(
         provider: provider,
         installation: installation,
-        modelID: modelID
+        projectID: projectID, modelID: modelID
       )
       return mergedCatalog(catalog, with: detailed.models)
     }

@@ -19,7 +19,11 @@
     var selectedEffort = ""
     var selectedPermissionMode: String = "build"
     var modelCatalogs: [String: [IPCAgentModelSummary]] = [:]
-    var catalogInstallationIDs: [String: String] = [:]
+    struct ModelCatalogScope: Equatable {
+      let installationID: String?
+      let projectID: String?
+    }
+    var catalogScopes: [String: ModelCatalogScope] = [:]
     var persistedDefaults: [String: IPCAgentModelDefaultResponse] = [:]
     var pendingDefaults: [String: IPCAgentModelDefaultResponse] = [:]
     var providerErrors: [String: String] = [:]

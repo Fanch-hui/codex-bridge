@@ -37,7 +37,7 @@ enum QoderRuntimeResources {
     "models.mjs": "44442327ff6a9d555993b0d6645abfb4aae97876b380884f7c9a7af7395cf877",
     "policy.mjs": "68e5c786b61d8774a92cdf9041c207152d5220496824a84f67a01340a66ed8ba",
     "rpc.mjs": "3de8b0274634185bf88789fe5670afca5a1d9d01c7c8e7617697a48fe4a9292b",
-    "sdk.mjs": "ab9e45ff53bcdb80722c1d5b9935c6229193c39ff475afbb2d9c1f88ed430b81",
+    "sdk.mjs": "0bb18e5aca146bf1b93a9d3aee2bd7e5fdf60946fec9a0a8daf9b5214d715b87",
     "session.mjs": "359024ac46d2f2af95ef29a6586b30be00bbd7dec1f0cd6681444beeb9b3b6bc",
     "skill-resources.mjs": "bc72e4bb849050ff2093d054c910b75c4097c06631aad44ddd70824b4e14524c",
     "usage.mjs": "ccb9b84eea18c2721793e8770627b3a501ab834ddf89a565184a6f6a66ff65e3",

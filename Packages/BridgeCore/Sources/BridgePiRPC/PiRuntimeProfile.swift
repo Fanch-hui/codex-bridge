@@ -6,6 +6,7 @@ struct PiRuntimeProfile: Sendable {
   let launch: PiRPCLaunch
   let nonce: String
   let sessionID: String?
+  let continuation: PiSessionContinuation?
   let store: PiSessionStore?
   let tools: [String]
   let mcpServerIDs: [String]
@@ -56,6 +57,7 @@ struct PiRuntimeProfile: Sendable {
         installationID: installation.id.rawValue, projectID: $0.projectID.rawValue)
     }
     let sessionID: String?
+    let continuation: PiSessionContinuation?
     var argv =
       invocation.executableArgv + [
         "--mode", "rpc", "--no-extensions",
@@ -65,17 +67,20 @@ struct PiRuntimeProfile: Sendable {
     if let request, let store {
       argv += ["--session-dir", store.sessionsDirectory]
       if let previousID = request.requestedSessionID {
-        let previous = try store.load(
+        let previous = try store.loadContinuation(
           sessionID: previousID, request: request, installation: installation)
-        sessionID = previous.sessionID
-        argv += ["--session", previous.sessionFile]
+        continuation = previous
+        sessionID = previous.binding.sessionID
+        argv += ["--session", previous.binding.sessionFile]
       } else {
+        continuation = nil
         let newSessionID = UUID().uuidString.lowercased()
         sessionID = newSessionID
         argv += ["--session-id", newSessionID]
       }
     } else {
       sessionID = nil
+      continuation = nil
       argv.append("--no-session")
     }
     var environment = try processEnvironment(executable: node, source: environmentSource)
@@ -109,7 +114,7 @@ struct PiRuntimeProfile: Sendable {
       launch: PiRPCLaunch(
         argv: argv, executableArgv: invocation.executableArgv,
         workingDirectory: project.canonicalPath, environment: environment),
-      nonce: nonce, sessionID: sessionID, store: store, tools: tools,
+      nonce: nonce, sessionID: sessionID, continuation: continuation, store: store, tools: tools,
       mcpServerIDs: activeMCPServers.map(\.id),
       selectedSkillStage: selectedSkillStage,
       artifacts: [artifact(resource.entry, role: .launchConfiguration)] + invocation.artifacts + [

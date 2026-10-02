@@ -102,6 +102,7 @@ extension MCPServiceToolCatalog {
       + "must contain the user's concrete task, not the global custom instructions that guide "
       + "ChatGPT or Qwen. Do not copy or paraphrase those instructions into the Agent prompt "
       + "unless the user's current request explicitly asks for that content. "
+      + "Built-in Bridge instructions stay with the MCP client and must never be included in the Agent prompt. "
       + "They wait for the local user to approve the provider invocation in Codex Bridge before "
       + "execution starts. Return immediately with "
       + "a task_id and current status, then normally use wait_task to await the result and observe "
@@ -269,7 +270,7 @@ extension MCPServiceToolCatalog {
     name: MCPServiceToolName.steerTask.rawValue,
     title: "Steer task",
     description:
-      "Send bounded corrective input to the exact active provider run. Send only the user's concrete correction, not global custom instructions for ChatGPT or Qwen. The default queued mode preserves existing behavior. For DeepSeek Harness, mode=interrupt-current-then-continue cancels only the current prompt and sends the correction on the same session without terminating the task. Other external providers currently accept queued mode only.",
+      "Send bounded corrective input to the exact active provider run. Send only the user's concrete correction, not global custom instructions for ChatGPT or Qwen. Built-in Bridge instructions stay with the MCP client and must never be included in Agent input. The default queued mode preserves existing behavior. For DeepSeek Harness, mode=interrupt-current-then-continue cancels only the current prompt and sends the correction on the same session without terminating the task. Other external providers currently accept queued mode only.",
     inputSchema: objectSchema(
       properties: [
         "task_id": boundedStringSchema(maximum: 128),

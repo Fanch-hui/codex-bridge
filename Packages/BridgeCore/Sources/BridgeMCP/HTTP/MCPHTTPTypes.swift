@@ -52,10 +52,20 @@ public struct MCPInvocationContext: Equatable, Sendable {
 public struct AuthenticatedMCPRequest: Sendable {
   public let request: MCP.HTTPRequest
   public let clientID: MCPClientID
+  package let admissionToken: MCPClientAdmissionGate.Token?
 
   public init(request: MCP.HTTPRequest, clientID: MCPClientID) {
+    self.init(request: request, clientID: clientID, admissionToken: nil)
+  }
+
+  package init(
+    request: MCP.HTTPRequest,
+    clientID: MCPClientID,
+    admissionToken: MCPClientAdmissionGate.Token?
+  ) {
     self.request = request
     self.clientID = clientID
+    self.admissionToken = admissionToken
   }
 }
 
@@ -113,6 +123,13 @@ public final class MCPClientCredentialAuthenticator: @unchecked Sendable {
   }
 
   package func authenticate(_ values: [String]) -> MCPClientID? {
+    authenticate(values, admission: nil)?.clientID
+  }
+
+  package func authenticate(
+    _ values: [String],
+    admission: MCPClientAdmissionGate?
+  ) -> MCPClientAuthentication? {
     guard values.count == 1 else { return nil }
     let candidate = Array(values[0].utf8)
     lock.lock()
@@ -123,10 +140,12 @@ public final class MCPClientCredentialAuthenticator: @unchecked Sendable {
         matchedClientID = credential.clientID
       }
     }
-    if let matchedClientID {
-      lastAuthenticatedAt[matchedClientID] = Date()
-    }
-    return matchedClientID
+    guard let matchedClientID else { return nil }
+    // Credential replacement cannot complete before this generation is captured.
+    let token = admission?.token(for: matchedClientID)
+    guard admission == nil || token != nil else { return nil }
+    lastAuthenticatedAt[matchedClientID] = Date()
+    return MCPClientAuthentication(clientID: matchedClientID, admissionToken: token)
   }
 
   private static func isValid(_ credentials: [MCPClientCredential]) -> Bool {

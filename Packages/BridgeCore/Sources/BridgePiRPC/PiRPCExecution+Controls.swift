@@ -24,8 +24,9 @@ extension PiRPCExecution {
       var fields: [String: PiJSONValue] = ["message": .string(text)]
       if !images.isEmpty { fields["images"] = .array(images) }
       let result = try await client.request(command, fields: fields)
-      guard let disposition = result.data?["disposition"]?.stringValue,
-        disposition == "started" || disposition == "queued"
+      // Pi before 0.99 acknowledges accepted input without a data payload.
+      let disposition = result.data?["disposition"]?.stringValue
+      guard result.data == nil || disposition == "started" || disposition == "queued"
       else {
         throw PiRPCError.invalidArgument("pi_input_not_started")
       }

@@ -64,7 +64,7 @@ def is_public_path(path):
     if parts[:2] == ("Integrations", "MCPB"):
         return True
     if parts[:2] == (".github", "workflows"):
-        return pure.name in {"windows.yml", "mcp-registry.yml"}
+        return pure.name in {"windows.yml", "macos.yml", "mcp-registry.yml"}
     if parts[:2] == (".github", "scripts"):
         return not pure.name.lower().startswith("test-")
     return False
