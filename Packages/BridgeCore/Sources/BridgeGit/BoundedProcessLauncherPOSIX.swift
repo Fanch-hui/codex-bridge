@@ -166,8 +166,8 @@ import Foundation
             executable,
             &actions,
             &attributes,
-            argvBuffer.baseAddress,
-            environmentBuffer.baseAddress
+            argvBuffer.baseAddress!,
+            environmentBuffer.baseAddress!
           )
         }
       }

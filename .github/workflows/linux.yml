@@ -42,10 +42,19 @@ jobs:
         with:
           node-version: 22.23.2
       - name: Restore SwiftPM dependency repositories
-        uses: actions/cache@v6
+        id: dependencies-cache
+        uses: actions/cache/restore@v6
         with:
           path: Packages/BridgeCore/.build/repositories
           key: linux-swift-repositories-v1-${{ hashFiles('Packages/BridgeCore/Package.resolved', 'Vendor/swift-sdk/Package.resolved') }}
+      - name: Resolve SwiftPM dependencies
+        run: swift package --package-path Packages/BridgeCore resolve
+      - name: Save SwiftPM dependency repositories
+        if: steps.dependencies-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: Packages/BridgeCore/.build/repositories
+          key: ${{ steps.dependencies-cache.outputs.cache-primary-key }}
       - name: Record native toolchain
         run: |
           uname -m
