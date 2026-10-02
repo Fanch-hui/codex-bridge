@@ -7,6 +7,24 @@ import PackageDescription
 var macOSOnlyProducts: [Product] = []
 var macOSOnlyTargets: [Target] = []
 
+var linuxOnlyProducts: [Product] = []
+var linuxOnlyTargets: [Target] = []
+var linuxDesktopDependencies: [Target.Dependency] = []
+#if os(Linux)
+  linuxDesktopDependencies = ["CLinuxDesktop"]
+  linuxOnlyProducts = [
+    .executable(name: "codex-bridge-linux-app", targets: ["CodexBridgeLinuxApp"])
+  ]
+  linuxOnlyTargets = [
+    .systemLibrary(
+      name: "CWebKitGTK", pkgConfig: "webkit2gtk-4.1",
+      providers: [.apt(["libwebkit2gtk-4.1-dev"])]
+    ),
+    .target(name: "CLinuxDesktop", dependencies: ["CWebKitGTK"]),
+    .executableTarget(name: "CodexBridgeLinuxApp", dependencies: ["BridgeDesktopShell"]),
+  ]
+#endif
+
 var windowsApplicationLinkerFlags = [
   "-Xlinker", "/SUBSYSTEM:WINDOWS",
   "-Xlinker", "/ENTRY:mainCRTStartup",
@@ -21,7 +39,7 @@ var windowsApplicationLinkerFlags = [
   }
 #endif
 
-#if !os(Windows)
+#if os(macOS)
   macOSOnlyProducts = [
     .library(name: "BridgeServiceAppShell", targets: ["BridgeServiceAppShell"]),
     
@@ -78,13 +96,14 @@ let package = Package(
     .library(name: "BridgeServiceHost", targets: ["BridgeServiceHost"]),
     .library(name: "BridgeServiceAppCore", targets: ["BridgeServiceAppCore"]),
     .library(name: "BridgeWindowsShell", targets: ["BridgeWindowsShell"]),
+    .library(name: "BridgeDesktopShell", targets: ["BridgeDesktopShell"]),
     .executable(name: "codex-bridge-service", targets: ["CodexBridgeServiceExecutable"]),
     .executable(
       name: "codex-bridge-windows-app",
       targets: ["CodexBridgeWindowsApp"]
     ),
     
-  ] + macOSOnlyProducts,
+  ] + macOSOnlyProducts + linuxOnlyProducts,
   dependencies: [
     // Vendored MCP swift-sdk 0.12.1: upstream excludes the EventSource
     // dependency on Windows while importing it unconditionally, which breaks
@@ -327,14 +346,15 @@ let package = Package(
       ]
     ),
     .target(
-      name: "BridgeWindowsShell",
+      name: "BridgeDesktopShell",
       dependencies: [
         "BridgeDesktopUI",
         "BridgeIPC",
         "BridgeMCP",
         "BridgeServiceAppCore",
-      ]
+      ] + linuxDesktopDependencies
     ),
+    .target(name: "BridgeWindowsShell", dependencies: ["BridgeDesktopShell"]),
     .executableTarget(
       name: "CodexBridgeServiceExecutable",
       dependencies: ["BridgeServiceHost"]
@@ -353,5 +373,5 @@ let package = Package(
       ]
     ),
     
-  ] + macOSOnlyTargets
+  ] + macOSOnlyTargets + linuxOnlyTargets
 )

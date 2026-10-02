@@ -1,6 +1,10 @@
-#if canImport(Darwin)
+#if canImport(Darwin) || canImport(Glibc)
   import Crypto
-  import Darwin
+  #if canImport(Darwin)
+    import Darwin
+  #else
+    import Glibc
+  #endif
   import Foundation
 
   extension SecureFileArtifactSnapshot {
@@ -21,9 +25,9 @@
         .standardizedFileURL
         .path
       try validateAbsolutePath(canonicalPath)
-      let descriptor = Darwin.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+      let descriptor = POSIXSystem.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
       guard descriptor >= 0 else { throw SecureFileArtifactError.openFailed }
-      defer { Darwin.close(descriptor) }
+      defer { POSIXSystem.close(descriptor) }
 
       var before = stat()
       guard fstat(descriptor, &before) == 0 else {
@@ -86,7 +90,7 @@
       while bytesRead < maximumBytes {
         let requested = Int(min(UInt64(buffer.count), maximumBytes - bytesRead))
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, requested)
+          POSIXSystem.read(descriptor, bytes.baseAddress, requested)
         }
         if count == 0 { break }
         if count < 0 {
@@ -104,13 +108,13 @@
       first.st_dev == second.st_dev
         && first.st_ino == second.st_ino
         && first.st_size == second.st_size
-        && first.st_mtimespec.tv_sec == second.st_mtimespec.tv_sec
-        && first.st_mtimespec.tv_nsec == second.st_mtimespec.tv_nsec
+        && first.modificationTime.tv_sec == second.modificationTime.tv_sec
+        && first.modificationTime.tv_nsec == second.modificationTime.tv_nsec
     }
 
     private static func modificationTimeNanoseconds(_ metadata: stat) throws -> Int64 {
-      let seconds = Int64(metadata.st_mtimespec.tv_sec)
-      let nanoseconds = Int64(metadata.st_mtimespec.tv_nsec)
+      let seconds = Int64(metadata.modificationTime.tv_sec)
+      let nanoseconds = Int64(metadata.modificationTime.tv_nsec)
       guard seconds >= 0, (0..<1_000_000_000).contains(nanoseconds) else {
         throw SecureFileArtifactError.invalidModificationTime
       }

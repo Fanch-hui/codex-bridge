@@ -3,6 +3,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #elseif os(Windows)
   import WinSDK
 #endif
@@ -70,14 +72,22 @@ public struct ServiceDataPaths: Sendable {
   }
 
   public static func defaultRoot() -> URL {
-    let fileManager = FileManager.default
-    let parent =
-      fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-      ?? URL(fileURLWithPath: NSHomeDirectory()).appending(
-        path: "Library/Application Support",
-        directoryHint: .isDirectory
-      )
-    return parent.appending(path: "CodexBridgeService", directoryHint: .isDirectory)
+    #if os(Linux)
+      let configured = ProcessInfo.processInfo.environment["XDG_DATA_HOME"]
+      let parent =
+        configured.flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0) : nil }
+        ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share")
+      return parent.appendingPathComponent("CodexBridgeService", isDirectory: true)
+    #else
+      let fileManager = FileManager.default
+      let parent =
+        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        ?? URL(fileURLWithPath: NSHomeDirectory()).appending(
+          path: "Library/Application Support",
+          directoryHint: .isDirectory
+        )
+      return parent.appending(path: "CodexBridgeService", directoryHint: .isDirectory)
+    #endif
   }
 
   private static func preparePrivateDirectory(

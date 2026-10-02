@@ -139,7 +139,7 @@ public final class AppUpdateClient: AppUpdateClientProtocol, @unchecked Sendable
   }
 
   static func validateAsset(_ asset: AppUpdateAsset) throws {
-    guard ["macos", "windows"].contains(asset.platform),
+    guard ["macos", "windows", "linux"].contains(asset.platform),
       ["arm64", "x64"].contains(asset.architecture),
       ["app", "installer", "portable"].contains(asset.kind),
       asset.size >= 0,

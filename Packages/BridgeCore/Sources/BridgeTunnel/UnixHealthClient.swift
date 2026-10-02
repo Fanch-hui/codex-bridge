@@ -2,6 +2,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #endif
 
 struct TunnelHealthSnapshot: Equatable, Sendable {
@@ -83,11 +85,15 @@ struct LoopbackHealthClient: Sendable {
   #else
     private func request(path: String, baseURL: URL) throws -> HTTPResponse {
       guard let port = baseURL.port else { throw TunnelHealthError.invalidURLFile }
-      let descriptor = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+      #if os(Linux)
+        let descriptor = Glibc.socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
+      #else
+        let descriptor = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+      #endif
       guard descriptor >= 0 else {
         throw TunnelHealthError.unavailable
       }
-      defer { Darwin.close(descriptor) }
+      defer { close(descriptor) }
       try setTimeout(descriptor)
       try connect(descriptor, port: port)
       let request = Data(
@@ -109,13 +115,19 @@ struct LoopbackHealthClient: Sendable {
 
     private func connect(_ descriptor: Int32, port: Int) throws {
       var address = sockaddr_in()
-      address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+      #if canImport(Darwin)
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+      #endif
       address.sin_family = sa_family_t(AF_INET)
       address.sin_port = in_port_t(UInt16(port).bigEndian)
       address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
       let status = withUnsafePointer(to: &address) { pointer in
         pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-          Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+          #if os(Linux)
+            Glibc.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+          #else
+            Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+          #endif
         }
       }
       guard status == 0 else {
@@ -128,7 +140,7 @@ struct LoopbackHealthClient: Sendable {
         guard let baseAddress = bytes.baseAddress else { return }
         var offset = 0
         while offset < bytes.count {
-          let count = Darwin.send(
+          let count = send(
             descriptor,
             baseAddress.advanced(by: offset),
             bytes.count - offset,
@@ -146,7 +158,7 @@ struct LoopbackHealthClient: Sendable {
       var response = Data()
       var chunk = [UInt8](repeating: 0, count: 16_384)
       while response.count <= maximumResponseBytes {
-        let count = Darwin.recv(descriptor, &chunk, chunk.count, 0)
+        let count = recv(descriptor, &chunk, chunk.count, 0)
         if count == 0 { break }
         guard count > 0 else {
           if errno == EAGAIN || errno == EWOULDBLOCK {
@@ -187,6 +199,10 @@ struct LoopbackHealthClient: Sendable {
   #if os(Windows)
     private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {
       WindowsHealthPortOwner.owns(port: port, processID: processID)
+    }
+  #elseif os(Linux)
+    private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {
+      LinuxHealthPortOwner.owns(port: port, processID: processID)
     }
   #else
     private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {

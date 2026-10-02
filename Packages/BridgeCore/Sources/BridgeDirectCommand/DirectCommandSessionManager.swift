@@ -413,7 +413,7 @@ public actor DirectCommandSessionManager {
           CloseHandle(handle)
         }
       #else
-        _ = Darwin.kill(-identity.processGroupID, SIGKILL)
+        _ = kill(-identity.processGroupID, SIGKILL)
       #endif
       logger.warning(
         "Reaped orphan direct command session \(sessionID) pid \(identity.pid)"

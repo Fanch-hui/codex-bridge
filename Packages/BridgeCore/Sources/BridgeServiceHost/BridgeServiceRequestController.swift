@@ -237,7 +237,7 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
     case .cancelAppUpdate:
       return try await handleCancelAppUpdate(request)
     case .shutdownService:
-      #if os(Windows)
+      #if os(Windows) || os(Linux)
         return try handleShutdownService(request)
       #else
         return try BridgeServiceIPCCodec.failure(

@@ -23,6 +23,14 @@ extension ServiceAgentAutoDiscovery {
           return deepSeekWindowsLauncherTargets(at: launcher)
         }
       }
+    #elseif os(Linux)
+      let resolver = AgentExecutableResolver(
+        environment: environment,
+        additionalDirectories: LinuxAgentInstallationDirectories.search(environment: environment)
+      )
+      return resolver.searchDirectories().compactMap { directory in
+        canonicalRegularFile(pathJoin(directory, "dsh"))
+      }
     #else
       let resolver = AgentExecutableResolver(
         environment: environment,

@@ -162,6 +162,10 @@ pwsh -File Scripts/build-windows.ps1 `
 
 构建脚本使用 `swiftbuild`，输出 portable ZIP 和 EXE 安装器到 `.build`。
 
+### Ubuntu 24.04 x64 / ARM64
+
+Linux 桌面版使用 GTK 3 与 WebKitGTK，共用工作台与项目管理界面，提供 `.deb` 和便携包。系统依赖、构建命令与数据目录见 [Linux 指南](./docs/LINUX.md)。
+
 ## 许可与隐私
 
 - [Apache-2.0 许可证](./LICENSE)

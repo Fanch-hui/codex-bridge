@@ -179,7 +179,7 @@ import Foundation
       guard depth <= maximumDepth else { throw GitEvidenceError.pathByteLimitExceeded }
       let duplicate = dup(descriptor)
       guard duplicate >= 0, let directory = fdopendir(duplicate) else {
-        if duplicate >= 0 { Darwin.close(duplicate) }
+        if duplicate >= 0 { POSIXSystem.close(duplicate) }
         throw GitEvidenceError.unsafeGitAttributes
       }
       defer { closedir(directory) }
@@ -226,7 +226,7 @@ import Foundation
         openat(directoryDescriptor, $0, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
       }
       guard child >= 0 else { throw GitEvidenceError.unsafeGitAttributes }
-      defer { Darwin.close(child) }
+      defer { POSIXSystem.close(child) }
       try scanDirectory(descriptor: child, depth: depth)
     }
 
@@ -241,7 +241,7 @@ import Foundation
         openat(directoryDescriptor, $0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
       }
       guard descriptor >= 0 else { throw GitEvidenceError.unsafeGitAttributes }
-      defer { Darwin.close(descriptor) }
+      defer { POSIXSystem.close(descriptor) }
       let contents = try Self.read(
         descriptor: descriptor,
         maximumBytes: maximumFileBytes
@@ -265,7 +265,7 @@ import Foundation
       var output = Data()
       var buffer = [UInt8](repeating: 0, count: 16 * 1_024)
       while output.count <= maximumBytes {
-        let count = Darwin.read(descriptor, &buffer, buffer.count)
+        let count = POSIXSystem.read(descriptor, &buffer, buffer.count)
         if count == 0 { return output }
         if count > 0 {
           output.append(contentsOf: buffer.prefix(count))
@@ -279,7 +279,9 @@ import Foundation
 
     private static func entryName(_ entry: UnsafeMutablePointer<dirent>) -> String {
       withUnsafePointer(to: &entry.pointee.d_name) { name in
-        name.withMemoryRebound(to: CChar.self, capacity: Int(MAXNAMLEN) + 1) {
+        name.withMemoryRebound(
+          to: CChar.self, capacity: MemoryLayout.size(ofValue: entry.pointee.d_name)
+        ) {
           String(cString: $0)
         }
       }

@@ -85,11 +85,12 @@ public final class OpenedWorkingDirectory: @unchecked Sendable {
 
     public init(canonicalURL: URL) throws {
       var information = stat()
-      let opened = Darwin.open(canonicalURL.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+      let opened = POSIXSystem.open(
+        canonicalURL.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
       guard opened >= 0, fstat(opened, &information) == 0,
         information.st_mode & S_IFMT == S_IFDIR
       else {
-        if opened >= 0 { Darwin.close(opened) }
+        if opened >= 0 { POSIXSystem.close(opened) }
         throw GitEvidenceError.invalidAuthorizedRoot
       }
       url = canonicalURL
@@ -99,12 +100,12 @@ public final class OpenedWorkingDirectory: @unchecked Sendable {
     }
 
     deinit {
-      Darwin.close(descriptor)
+      POSIXSystem.close(descriptor)
     }
 
     public func validatePathIdentity() throws {
       var information = stat()
-      let result = url.path.withCString { Darwin.lstat($0, &information) }
+      let result = url.path.withCString { POSIXSystem.lstat($0, &information) }
       guard result == 0,
         information.st_mode & S_IFMT == S_IFDIR,
         UInt64(information.st_dev) == device,

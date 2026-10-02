@@ -296,8 +296,8 @@ public struct SecureProjectDirectoryMutation: Sendable {
       a.st_dev == b.st_dev
         && a.st_ino == b.st_ino
         && a.st_size == b.st_size
-        && a.st_mtimespec.tv_sec == b.st_mtimespec.tv_sec
-        && a.st_mtimespec.tv_nsec == b.st_mtimespec.tv_nsec
+        && a.modificationTime.tv_sec == b.modificationTime.tv_sec
+        && a.modificationTime.tv_nsec == b.modificationTime.tv_nsec
     }
 
     private func validateRootDescriptor(_ descriptor: Int32, root: RegisteredRoot) throws {
@@ -350,7 +350,7 @@ public struct SecureProjectDirectoryMutation: Sendable {
       while result.count <= maximumBytes {
         let requested = min(buffer.count, maximumBytes + 1 - result.count)
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, requested)
+          POSIXSystem.read(descriptor, bytes.baseAddress, requested)
         }
         if count == 0 { return result }
         guard count > 0 else {

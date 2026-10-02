@@ -431,7 +431,8 @@ public struct SecureProjectFileWriter: Sendable {
       var written = 0
       while written < data.count {
         let count = data.withUnsafeBytes { bytes in
-          Darwin.write(descriptor, bytes.baseAddress!.advanced(by: written), data.count - written)
+          POSIXSystem.write(
+            descriptor, bytes.baseAddress!.advanced(by: written), data.count - written)
         }
         if count > 0 {
           written += count
@@ -448,7 +449,7 @@ public struct SecureProjectFileWriter: Sendable {
       while result.count <= maximumBytes {
         let requested = min(buffer.count, maximumBytes + 1 - result.count)
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, requested)
+          POSIXSystem.read(descriptor, bytes.baseAddress, requested)
         }
         if count == 0 { return result }
         guard count > 0 else {

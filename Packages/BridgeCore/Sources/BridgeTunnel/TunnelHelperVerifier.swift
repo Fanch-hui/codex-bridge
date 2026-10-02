@@ -4,6 +4,8 @@ import Foundation
 #if canImport(Darwin)
   import Darwin
   import Security
+#elseif canImport(Glibc)
+  import Glibc
 #endif
 
 public struct TunnelCodeIdentity: Equatable, Sendable {
@@ -140,9 +142,7 @@ public protocol TunnelCodeSignatureVerifier: Sendable {
 
 #endif
 
-#if !canImport(Security)
-  /// Placeholder verifier for platforms without a code-signature facility; the
-  /// pinned tunnel helper itself has no build for those platforms either.
+#if !canImport(Security) && !os(Linux)
   public struct UnsupportedTunnelCodeSignatureVerifier: TunnelCodeSignatureVerifier {
     public init() {}
 
@@ -172,16 +172,18 @@ public struct TunnelHelperVerifier: Sendable {
       return MacOSTunnelCodeSignatureVerifier()
     #elseif os(Windows)
       return WindowsTunnelCodeSignatureVerifier()
+    #elseif os(Linux)
+      return LinuxTunnelCodeSignatureVerifier()
     #else
       return UnsupportedTunnelCodeSignatureVerifier()
     #endif
   }
 
   package func verify(executable: URL, expectedSHA256: String) throws -> TunnelVerifiedHelper {
-    #if canImport(Darwin)
+    #if canImport(Darwin) || canImport(Glibc)
       let descriptor = open(executable.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
       guard descriptor >= 0 else { throw TunnelHelperError.unavailable }
-      defer { Darwin.close(descriptor) }
+      defer { close(descriptor) }
       var metadata = stat()
       guard fstat(descriptor, &metadata) == 0 else { throw TunnelHelperError.unavailable }
       guard (metadata.st_mode & S_IFMT) == S_IFREG else { throw TunnelHelperError.notRegularFile }
@@ -196,7 +198,6 @@ public struct TunnelHelperVerifier: Sendable {
         expectedSHA256: expectedSHA256
       )
     #else
-      // No pinned helper build exists for this platform.
       throw TunnelHelperError.unavailable
     #endif
   }

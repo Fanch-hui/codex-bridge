@@ -1,0 +1,68 @@
+name: Linux
+
+on:
+  push:
+    branches: [win, 'codex/linux-*']
+  pull_request:
+    branches: [win]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Build Linux ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    container: swift:6.3.3-noble
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libsqlite3-dev \
+            libsecret-tools gnome-keyring bubblewrap dbus-x11 python3 unzip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Restore SwiftPM dependency repositories
+        uses: actions/cache@v6
+        with:
+          path: Packages/BridgeCore/.build/repositories
+          key: linux-swift-repositories-v1-${{ hashFiles('Packages/BridgeCore/Package.resolved', 'Vendor/swift-sdk/Package.resolved') }}
+      - name: Record native toolchain
+        run: |
+          uname -m
+          swift --version
+          pkg-config --modversion webkit2gtk-4.1
+      - name: Build service, desktop, and packages
+        run: Scripts/build-linux.sh "$GITHUB_WORKSPACE/.build/linux-dist"
+      - name: Verify dependency resolution is unchanged
+        run: git diff --exit-code -- Packages/BridgeCore/Package.resolved Vendor/swift-sdk/Package.resolved
+      - name: Verify packaged service IPC
+        run: .github/scripts/verify-linux-service.sh ".build/linux-dist/${{ matrix.architecture }}"
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-bridge-linux-${{ matrix.architecture }}
+          path: |
+            .build/linux-dist/*.tar.gz
+            .build/linux-dist/*.deb
+            .build/linux-dist/*.sha256
+          if-no-files-found: error

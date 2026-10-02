@@ -1,6 +1,10 @@
 #if !os(Windows)
   import Foundation
-  import Darwin
+  #if canImport(Darwin)
+    import Darwin
+  #else
+    import Glibc
+  #endif
 
   enum GitPatchStoreTransactionsPOSIX {
     static func withExclusiveLock<Result>(

@@ -3,6 +3,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #elseif os(Windows)
   import ucrt
 #endif

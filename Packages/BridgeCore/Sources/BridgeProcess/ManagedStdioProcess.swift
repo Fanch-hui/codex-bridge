@@ -118,6 +118,19 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       let errorPipe = mergeStandardError ? nil : Pipe()
       let processID: pid_t
       do {
+        #if os(Linux)
+          let handles =
+            [
+              inputPipe.fileHandleForReading, inputPipe.fileHandleForWriting,
+              outputPipe.fileHandleForReading, outputPipe.fileHandleForWriting,
+            ]
+            + (errorPipe.map { [$0.fileHandleForReading, $0.fileHandleForWriting] } ?? [])
+          for handle in handles {
+            guard fcntl(handle.fileDescriptor, F_SETFD, FD_CLOEXEC) == 0 else {
+              throw ManagedProcessError.processLaunchFailed(errno)
+            }
+          }
+        #endif
         processID = try Self.spawn(
           argv: argv,
           workingDirectory: workingDirectory,

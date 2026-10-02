@@ -14,7 +14,7 @@ public struct CodexClientInfo: Codable, Equatable, Sendable {
   public static func bridge(version: String) -> CodexClientInfo {
     CodexClientInfo(
       name: "codex_bridge_macos",
-      title: "Codex Bridge for macOS",
+      title: "Codex Bridge",
       version: version
     )
   }

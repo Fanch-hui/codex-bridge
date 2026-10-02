@@ -99,6 +99,16 @@ public struct DeepSeekHarnessACPRuntimeLayout: Equatable, Sendable {
       {
         return (runtime, archive)
       }
+      #if os(Linux)
+        for name in ["deepseek-harness", "DeepSeek Harness", "dsh"] {
+          let linuxRuntime = url.appendingPathComponent(name).path
+          if FileManager.default.fileExists(atPath: linuxRuntime),
+            FileManager.default.fileExists(atPath: archive)
+          {
+            return (linuxRuntime, archive)
+          }
+        }
+      #endif
       let parent = url.deletingLastPathComponent()
       if parent == url { break }
       url = parent

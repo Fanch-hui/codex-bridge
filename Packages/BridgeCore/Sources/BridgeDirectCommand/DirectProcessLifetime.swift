@@ -102,8 +102,13 @@ public final class DirectProcessLifetime: @unchecked Sendable {
     #else
       let launchArgv: [String]
       if denyNetwork {
-        guard Self.sandboxExecAvailable else { throw DirectProcessError.sandboxUnavailable }
-        launchArgv = [Self.sandboxExecPath, "-p", Self.denyNetworkProfile, "--"] + argv
+        #if os(Linux)
+          guard LinuxNetworkSandbox.isAvailable else { throw DirectProcessError.sandboxUnavailable }
+          launchArgv = LinuxNetworkSandbox.arguments(command: argv)
+        #else
+          guard Self.sandboxExecAvailable else { throw DirectProcessError.sandboxUnavailable }
+          launchArgv = [Self.sandboxExecPath, "-p", Self.denyNetworkProfile, "--"] + argv
+        #endif
       } else {
         launchArgv = argv
       }

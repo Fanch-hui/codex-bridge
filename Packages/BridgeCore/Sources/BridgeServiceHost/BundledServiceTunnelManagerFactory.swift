@@ -4,6 +4,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #elseif os(Windows)
   import WinSDK
 #endif
@@ -56,6 +58,8 @@ public struct BundledServiceTunnelManagerFactory: ServiceTunnelManagerBuilding {
   private var helperURL: URL {
     #if os(Windows)
       return Self.executableDirectoryURL.appending(path: Self.windowsHelperName)
+    #elseif os(Linux)
+      return Self.executableDirectoryURL.appending(path: "tunnel-client")
     #else
       return appBundleURL.appending(path: Self.helperRelativePath)
     #endif
@@ -64,6 +68,8 @@ public struct BundledServiceTunnelManagerFactory: ServiceTunnelManagerBuilding {
   private var digestURL: URL {
     #if os(Windows)
       return Self.executableDirectoryURL.appending(path: Self.windowsDigestName)
+    #elseif os(Linux)
+      return Self.executableDirectoryURL.appending(path: "tunnel-client.sha256")
     #else
       return appBundleURL.appending(path: Self.digestRelativePath)
     #endif
@@ -84,6 +90,12 @@ public struct BundledServiceTunnelManagerFactory: ServiceTunnelManagerBuilding {
         return URL(fileURLWithPath: "/")
       }
       return URL(fileURLWithPath: String(executable[..<directoryEnd]), isDirectory: true)
+    }
+  #endif
+
+  #if os(Linux)
+    private static var executableDirectoryURL: URL {
+      URL(fileURLWithPath: "/proc/self/exe").resolvingSymlinksInPath().deletingLastPathComponent()
     }
   #endif
 

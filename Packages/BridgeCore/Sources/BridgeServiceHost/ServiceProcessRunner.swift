@@ -4,6 +4,12 @@ import BridgeIPC
 import BridgeLegacyImport
 import Foundation
 
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
+
 #if os(Windows)
   import ucrt
   import WinSDK
@@ -52,7 +58,7 @@ public struct ServiceProcessOptions: Equatable, Sendable {
         foreground = true
         index += 1
       case "--shutdown":
-        #if os(Windows)
+        #if os(Windows) || os(Linux)
           shutdown = true
           index += 1
         #else
@@ -98,6 +104,12 @@ public enum ServiceProcessRunner {
   ) async throws {
     applyDefaultUmask()
     let options = try ServiceProcessOptions.parse(arguments)
+    #if os(Linux)
+      if options.shutdown {
+        try await LinuxServiceShutdown.requestAndWait()
+        return
+      }
+    #endif
     #if os(Windows)
       if options.shutdown {
         try await WindowsServiceShutdown.requestAndWait()
@@ -127,7 +139,7 @@ public enum ServiceProcessRunner {
     if options.foreground {
       listener = nil
     } else {
-      #if os(Windows)
+      #if os(Windows) || os(Linux)
         let active = try ServiceListenerFactory.makeListenerOrThrow(composition: composition)
       #else
         let active = ServiceListenerFactory.makeListener(composition: composition)
@@ -219,90 +231,6 @@ public enum ServiceProcessRunner {
       let continuation = continuation
       self.continuation = nil
       lock.unlock()
-      continuation?.resume()
-    }
-  }
-#else
-  enum ServiceTerminationSignal {
-    static func wait() async {
-      await wait(for: [SIGINT, SIGTERM])
-    }
-
-    static func wait(for signals: [Int32]) async {
-      let state = SignalState()
-      await withTaskCancellationHandler {
-        await withCheckedContinuation { continuation in
-          state.start(continuation: continuation, signals: signals)
-        }
-      } onCancel: {
-        state.finish()
-      }
-    }
-  }
-
-  private final class SignalState: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, Never>?
-    private var sources: [DispatchSourceSignal] = []
-    private var previousHandlers: [(signal: Int32, handler: (@convention(c) (Int32) -> Void)?)] = []
-    private var finished = false
-
-    func start(
-      continuation: CheckedContinuation<Void, Never>,
-      signals: [Int32]
-    ) {
-      lock.lock()
-      if finished {
-        lock.unlock()
-        continuation.resume()
-        return
-      }
-      self.continuation = continuation
-      lock.unlock()
-
-      var installedSignals: [Int32] = []
-      for signal in signals where !installedSignals.contains(signal) {
-        installedSignals.append(signal)
-        install(signal: signal)
-      }
-      if Task.isCancelled {
-        finish()
-      }
-    }
-
-    func install(signal: Int32) {
-      lock.lock()
-      guard !finished else {
-        lock.unlock()
-        return
-      }
-      let previousHandler = Darwin.signal(signal, SIG_IGN)
-      previousHandlers.append((signal: signal, handler: previousHandler))
-      let source = DispatchSource.makeSignalSource(signal: signal, queue: .global())
-      source.setEventHandler { [self] in self.finish() }
-      sources.append(source)
-      source.resume()
-      lock.unlock()
-    }
-
-    func finish() {
-      lock.lock()
-      guard !finished else {
-        lock.unlock()
-        return
-      }
-      finished = true
-      let continuation = continuation
-      self.continuation = nil
-      let activeSources = sources
-      sources.removeAll(keepingCapacity: false)
-      let handlers = previousHandlers
-      previousHandlers.removeAll(keepingCapacity: false)
-      lock.unlock()
-      for source in activeSources { source.cancel() }
-      for handler in handlers {
-        _ = Darwin.signal(handler.signal, handler.handler)
-      }
       continuation?.resume()
     }
   }

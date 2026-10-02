@@ -30,8 +30,13 @@ public struct DirectExecutionEnvironmentCapabilities: Equatable, Sendable {
   }
 
   public static func current() -> DirectExecutionEnvironmentCapabilities {
-    let sandboxExec = probeSandboxExec()
-    let nestedSandbox = probeNestedSandbox(sandboxExec: sandboxExec)
+    #if os(Linux)
+      let sandboxExec = LinuxNetworkSandbox.isAvailable ? "available" : "unavailable"
+      let nestedSandbox = sandboxExec
+    #else
+      let sandboxExec = probeSandboxExec()
+      let nestedSandbox = probeNestedSandbox(sandboxExec: sandboxExec)
+    #endif
     let loopback = probeLoopbackBind() ? "available" : "unsupported"
     var limitations: [String] = []
     if sandboxExec != "available" { limitations.append("sandbox_exec") }

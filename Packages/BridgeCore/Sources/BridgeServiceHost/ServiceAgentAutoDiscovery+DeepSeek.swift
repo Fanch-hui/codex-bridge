@@ -144,6 +144,11 @@ extension ServiceAgentAutoDiscovery {
         if let local = environmentValue("LOCALAPPDATA", environment: environment) {
           candidates.append(pathJoin(local, "CodexBridge", "DeepSeekHarness", "cordis.yml"))
         }
+      #elseif os(Linux)
+        let config =
+          environmentValue("XDG_CONFIG_HOME", environment: environment)
+          ?? pathJoin(home, ".config")
+        candidates.append(pathJoin(config, "codex-bridge", "deepseek-harness", "cordis.yml"))
       #else
         candidates.append(
           pathJoin(

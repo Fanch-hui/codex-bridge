@@ -14,6 +14,10 @@ extension ServiceAgentAutoDiscovery {
         candidates.append(pathJoin(local, "Programs", "DeepSeek Harness", "DeepSeek Harness.exe"))
         candidates.append(pathJoin(local, "Programs", "deepseek-harness", "DeepSeek Harness.exe"))
       }
+    #elseif os(Linux)
+      candidates += [
+        "/opt/DeepSeek Harness/deepseek-harness", "/opt/deepseek-harness/deepseek-harness",
+      ]
     #else
       candidates.append("/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness")
       if let home = homeDirectory(environment: environment) {

@@ -1,6 +1,10 @@
 #if !os(Windows)
   import Foundation
-  import Darwin
+  #if canImport(Darwin)
+    import Darwin
+  #else
+    import Glibc
+  #endif
 
   enum GitPatchStorePersistencePOSIX {
     static func openPrivateDirectory(_ url: URL) throws -> Int32 {
@@ -70,8 +74,8 @@
         result[name] = GitPatchStoreDocument(
           byteCount: byteCount,
           lastAccess: Date(
-            timeIntervalSince1970: TimeInterval(metadata.st_mtimespec.tv_sec)
-              + TimeInterval(metadata.st_mtimespec.tv_nsec) / 1_000_000_000
+            timeIntervalSince1970: TimeInterval(metadata.modificationTime.tv_sec)
+              + TimeInterval(metadata.modificationTime.tv_nsec) / 1_000_000_000
           ),
           verifiedBytes: nil
         )
@@ -157,7 +161,7 @@
       try bytes.withUnsafeBytes { buffer in
         var offset = 0
         while offset < buffer.count {
-          let written = Darwin.write(
+          let written = POSIXSystem.write(
             descriptor, buffer.baseAddress! + offset, buffer.count - offset)
           guard written > 0 else { throw GitEvidenceError.patchStoreCapacityExceeded }
           offset += written
@@ -177,7 +181,7 @@
       let count = try data.withUnsafeMutableBytes { buffer in
         var offset = 0
         while offset < buffer.count {
-          let received = Darwin.read(
+          let received = POSIXSystem.read(
             descriptor,
             buffer.baseAddress! + offset,
             buffer.count - offset

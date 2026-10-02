@@ -190,7 +190,7 @@ public struct SecureFileReader: Sendable {
       while result.count <= maximumBytes {
         let requested = min(buffer.count, maximumBytes + 1 - result.count)
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, requested)
+          POSIXSystem.read(descriptor, bytes.baseAddress, requested)
         }
         if count == 0 { return result }
         guard count > 0 else { throw PathSecurityError.readFailed(errno) }
