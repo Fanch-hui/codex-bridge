@@ -48,7 +48,9 @@ jobs:
           path: Packages/BridgeCore/.build/repositories
           key: linux-swift-repositories-v1-${{ hashFiles('Packages/BridgeCore/Package.resolved', 'Vendor/swift-sdk/Package.resolved') }}
       - name: Resolve SwiftPM dependencies
-        run: swift package --package-path Packages/BridgeCore resolve
+        run: |
+          swift package --package-path Packages/BridgeCore resolve
+          git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD -- Packages/BridgeCore/Package.resolved Vendor/swift-sdk/Package.resolved
       - name: Save SwiftPM dependency repositories
         if: steps.dependencies-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
@@ -63,7 +65,7 @@ jobs:
       - name: Build service, desktop, and packages
         run: Scripts/build-linux.sh "$GITHUB_WORKSPACE/.build/linux-dist"
       - name: Verify dependency resolution is unchanged
-        run: git diff --exit-code -- Packages/BridgeCore/Package.resolved Vendor/swift-sdk/Package.resolved
+        run: git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD -- Packages/BridgeCore/Package.resolved Vendor/swift-sdk/Package.resolved
       - name: Verify packaged service IPC
         run: .github/scripts/verify-linux-service.sh ".build/linux-dist/${{ matrix.architecture }}"
       - name: Upload Linux packages
