@@ -4,7 +4,7 @@
 
 [Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Fanch-hui%2Fcodex-bridge/versions/latest)
 
-Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, Antigravity, Pi, and Qoder.
+Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, [OpenAI Dot](#use-with-openai-dot), Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, Antigravity, Pi, and Qoder.
 
 macOS, Windows, and Linux share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
@@ -86,6 +86,16 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 6. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
 
 Credentials are managed through the operating system credential store. Remove credentials before sharing configuration, logs, or screenshots.
+
+## Use with OpenAI Dot
+
+**Dot can read, write, and edit local project files directly through Codex Bridge, without starting Work or Codex.** The local Bridge service performs these operations through Direct Workspace, using the project's permissions and approval settings. The project maintainer has tested this workflow and reports a better plugin experience with Dot.
+
+After [connecting the ChatGPT plugin](./docs/CHATGPT_DEVELOPER_MODE.md), enable Codex Bridge for your account and keep its connection active, then ask Dot to work directly with an authorized project. Existing plugin permissions apply; see OpenAI's [plugin connection guide](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps).
+
+- **Access:** As of October 2, 2026, Dot is rolling out to Pro 100/200/500, Business Premium, and Enterprise. Pro access requires age 18+ outside the EEA, UK, and Switzerland; Enterprise requires admin enablement. See [availability](https://learn.chatgpt.com/docs/dots#access).
+- **Direct file operations:** Calling Bridge's file tools directly creates no Work or Codex task, so it does not consume either task allowance. Dot conversations do not use your ChatGPT allowance; deeper work has a separate plan allowance. See [official usage details](https://learn.chatgpt.com/docs/dots#access).
+- **Delegated tasks:** If you separately ask Work, Codex, or another agent to execute a task, the product or model service used applies its own usage and billing rules.
 
 ## Capabilities
 

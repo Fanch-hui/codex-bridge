@@ -4,7 +4,7 @@
 
 [Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Fanch-hui%2Fcodex-bridge/versions/latest)
 
-Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
+Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、[OpenAI Dot](#通过-openai-dot-使用)、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
 
 macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
@@ -86,6 +86,16 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 6. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
 
 密钥通过系统凭据存储管理。分享配置、日志或截图前，请移除凭据。
+
+## 通过 OpenAI Dot 使用
+
+**Dot 可以直接通过 Codex Bridge 读取、写入和修改本地项目文件，无需启动 Work 或 Codex。** 文件操作由本机 Bridge 服务的 Direct Workspace 能力执行，沿用项目权限与审批设置。项目维护者实测可用，并认为 Dot 的插件使用体验更好。
+
+完成 [ChatGPT 插件连接](./docs/CHATGPT_DEVELOPER_MODE.md)后，确保 Codex Bridge 已在当前账号启用且连接有效，即可让 Dot 直接操作已授权的项目。Dot 沿用插件已有权限；参见 OpenAI 的[插件接入说明](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps)。
+
+- **订阅资格**：截至 2026-10-02，Dot 正逐步向 Pro 100/200/500、Business Premium 和 Enterprise 开放。Pro 用户需年满 18 岁且位于欧洲经济区、英国和瑞士以外；Enterprise 需管理员启用。具体资格与开放进度见[官方说明](https://learn.chatgpt.com/docs/dots#access)。
+- **直接读写的额度**：Dot 直接调用 Bridge 文件工具不创建 Work/Codex 任务，因此不产生这两类任务的额度消耗。与 Dot 的对话不计入 ChatGPT 用量；Dot 的深度工作另有套餐额度。参见[官方用量说明](https://learn.chatgpt.com/docs/dots#access)。
+- **委派任务的额度**：如果另行让 Work、Codex 或其他 Agent 执行任务，则按实际使用的产品或模型服务计算用量与费用。
 
 ## 能力
 
