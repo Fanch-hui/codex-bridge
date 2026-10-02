@@ -78,18 +78,28 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 ## 首次配置
 
+**如果只需要读写本地文件、运行命令，添加项目并配置权限后，配置好 Tunnel、添加并启用 Codex Bridge 插件即可，无需安装或连接 Agent。** 这些操作由 Direct Workspace 执行，按项目权限、Direct 执行规则与审批设置处理。
+
+### 本地文件与命令
+
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
 2. **添加项目**：登记本地目录，并设置读取、写入和网络权限。
-3. **连接 Agent**：首次初始化自动扫描并保存本机 Agent；在连接页点击连接完成验证和启用。后续安装 Agent 后点击“扫描 Agent”更新目录。Codex 使用本机 Codex 执行通道；DeepSeek Harness 可在 App 中配置服务地址和 API key。
-4. **选择项目和模式**：在工作台选择项目以及 `Read Only` / `Write`。
-5. **连接聊天客户端**：ChatGPT 使用 OpenAI Secure MCP Tunnel（ChatGPT 需要有 Plus 及以上订阅或团队订阅才可以使用）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
-6. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
+3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置并添加、启用插件（ChatGPT 需要有 Plus 及以上订阅或团队订阅才可以使用）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
+4. **直接操作项目**：在已启用插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
+
+### 委派 Agent 任务（可选）
+
+需要让 Codex、OpenCode、DeepSeek Harness 等 Agent 执行任务时，再完成以下配置：
+
+1. **连接 Agent**：首次初始化自动扫描并保存本机 Agent；在连接页点击连接完成验证和启用。后续安装 Agent 后点击“扫描 Agent”更新目录。Codex 使用本机 Codex 执行通道；DeepSeek Harness 可在 App 中配置服务地址和 API key。
+2. **选择项目和模式**：在工作台选择项目、Agent 以及 `Read Only` / `Write`，并设置该 Agent 的模型偏好。
+3. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
 
 密钥通过系统凭据存储管理。分享配置、日志或截图前，请移除凭据。
 
 ## 通过 OpenAI Dot 使用
 
-**Dot 可以直接通过 Codex Bridge 读取、写入和修改本地项目文件，无需启动 Work 或 Codex。** 文件操作由本机 Bridge 服务的 Direct Workspace 能力执行，沿用项目权限与审批设置。项目维护者实测可用，并认为 Dot 的插件使用体验更好。
+**Dot 可以直接通过 Codex Bridge 读写本地项目文件并运行命令，无需安装或连接 Agent，也无需启动 Work 或 Codex。** 操作由本机 Bridge 服务的 Direct Workspace 能力执行，沿用项目权限、Direct 执行规则与审批设置。项目维护者实测文件读写可用，并认为 Dot 的插件使用体验更好。
 
 完成 [ChatGPT 插件连接](./docs/CHATGPT_DEVELOPER_MODE.md)后，确保 Codex Bridge 已在当前账号启用且连接有效，即可让 Dot 直接操作已授权的项目。Dot 沿用插件已有权限；参见 OpenAI 的[插件接入说明](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps)。
 

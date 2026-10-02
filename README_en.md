@@ -78,18 +78,28 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 
 ## First setup
 
+**For local file access and command execution, register a project and configure its permissions, then set up the Tunnel and add and enable the Codex Bridge plugin. No agent installation or connection is required.** Direct Workspace performs these operations under the project's permissions, Direct execution rules, and approval settings.
+
+### Local files and commands
+
 1. Open the app and confirm that the background service is connected. Approve the macOS background item if prompted.
 2. Register a local project and set its read, write, and network permissions.
-3. Bridge scans for local agents once on first initialization and saves the catalog. Connect a discovered agent from the Connections page; after installing another agent, click **Scan Agents** to update the catalog. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
-4. Select a project and `Read Only` or `Write` in the workbench.
-5. Connect ChatGPT through OpenAI Secure MCP Tunnel (requires ChatGPT Plus or higher, or Team subscription), or Qwen Studio through loopback HTTP MCP. The Connections page provides configuration controls.
-6. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
+3. For ChatGPT / Dot, follow the [Tunnel guide](./docs/CHATGPT_DEVELOPER_MODE.md) to configure the Tunnel and add and enable the plugin (ChatGPT requires Plus or higher, or a Team subscription). Qwen Studio uses loopback HTTP MCP; the Connections page provides its configuration.
+4. In a conversation with the plugin enabled, ask it to read or edit project files or run commands. Handle any required approvals in Bridge.
+
+### Delegate agent tasks (optional)
+
+To delegate work to Codex, OpenCode, DeepSeek Harness, or another agent, complete these additional steps:
+
+1. Bridge scans for local agents once on first initialization and saves the catalog. Connect a discovered agent from the Connections page; after installing another agent, click **Scan Agents** to update the catalog. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
+2. Select a project, agent, and `Read Only` or `Write` in the workbench, and configure that agent's model preferences.
+3. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
 
 Credentials are managed through the operating system credential store. Remove credentials before sharing configuration, logs, or screenshots.
 
 ## Use with OpenAI Dot
 
-**Dot can read, write, and edit local project files directly through Codex Bridge, without starting Work or Codex.** The local Bridge service performs these operations through Direct Workspace, using the project's permissions and approval settings. The project maintainer has tested this workflow and reports a better plugin experience with Dot.
+**Dot can read and edit local project files and run commands directly through Codex Bridge, without installing or connecting an agent or starting Work or Codex.** The local Bridge service performs these operations through Direct Workspace, using the project's permissions, Direct execution rules, and approval settings. The project maintainer has tested file access through this workflow and reports a better plugin experience with Dot.
 
 After [connecting the ChatGPT plugin](./docs/CHATGPT_DEVELOPER_MODE.md), enable Codex Bridge for your account and keep its connection active, then ask Dot to work directly with an authorized project. Existing plugin permissions apply; see OpenAI's [plugin connection guide](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps).
 
