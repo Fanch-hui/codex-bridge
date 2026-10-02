@@ -144,7 +144,7 @@ struct LoopbackHealthClient: Sendable {
             descriptor,
             baseAddress.advanced(by: offset),
             bytes.count - offset,
-            MSG_NOSIGNAL
+            Int32(MSG_NOSIGNAL)
           )
           guard count > 0 else {
             throw TunnelHealthError.unavailable
