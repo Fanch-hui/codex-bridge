@@ -5,11 +5,29 @@
   enum WindowsApplicationIdentity {
     static let mainWindowClassName = "CodexBridgeMainWindow"
     static let explicitCloseRequest = WPARAM(1)
+    static let restoreRequest = UINT(WM_APP + 42)
   }
 
   public enum WindowsApplicationControl {
     public static func ensureServiceRunning() -> Bool {
       WindowsServiceLauncher.ensureServiceRunning()
+    }
+
+    /// Returns false when another copy already owns the session; that copy is restored.
+    public static func claimInstanceOrActivateExisting() -> Bool {
+      let mutexName = "Local\\CodexBridge.WindowsApp.SingleInstance"
+      SetLastError(0)
+      let created = mutexName.withCString(encodedAs: UTF16.self) {
+        CreateMutexW(nil, true, $0)
+      }
+      guard let created else { return true }
+      if GetLastError() == DWORD(ERROR_ALREADY_EXISTS) {
+        _ = CloseHandle(created)
+        activateExistingMainWindow()
+        return false
+      }
+      instanceMutex = created
+      return true
     }
 
     public static func shutdownRunningApplication() -> Bool {
@@ -41,20 +59,41 @@
       return WaitForSingleObject(process, 30_000) == WAIT_OBJECT_0
     }
 
-    private static func findMainWindow(for expectedPath: String) -> HWND? {
+    private static func findMainWindow(for expectedPath: String? = nil) -> HWND? {
       WindowsApplicationIdentity.mainWindowClassName.withCString(encodedAs: UTF16.self) { name in
         var previous: HWND?
         while let window = FindWindowExW(nil, previous, name, nil) {
           var processID: DWORD = 0
           if GetWindowThreadProcessId(window, &processID) != 0,
-            let path = processImagePath(processID),
-            path.caseInsensitiveCompare(expectedPath) == .orderedSame
+            matchesExecutable(processID, expectedPath: expectedPath)
           {
             return window
           }
           previous = window
         }
         return nil
+      }
+    }
+
+    private static func matchesExecutable(_ processID: DWORD, expectedPath: String?) -> Bool {
+      guard let expectedPath else { return true }
+      return processImagePath(processID)?.caseInsensitiveCompare(expectedPath) == .orderedSame
+    }
+
+    nonisolated(unsafe) private static var instanceMutex: HANDLE?
+
+    private static func activateExistingMainWindow() {
+      for _ in 0..<30 {
+        if let window = findMainWindow() {
+          var processID: DWORD = 0
+          _ = GetWindowThreadProcessId(window, &processID)
+          if processID > 0 {
+            _ = AllowSetForegroundWindow(processID)
+          }
+          _ = PostMessageW(window, WindowsApplicationIdentity.restoreRequest, 0, 0)
+          return
+        }
+        Sleep(100)
       }
     }
 

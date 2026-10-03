@@ -11,6 +11,9 @@
     _exit(WindowsApplicationControl.shutdownRunningApplication() ? EXIT_SUCCESS : EXIT_FAILURE)
   }
   if !arguments.isEmpty { _exit(EXIT_FAILURE) }
+  if !WindowsApplicationControl.claimInstanceOrActivateExisting() {
+    _exit(EXIT_SUCCESS)
+  }
   Task { @MainActor in
     await CodexBridgeWindowsApplication.main()
     _exit(EXIT_SUCCESS)

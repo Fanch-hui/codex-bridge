@@ -98,9 +98,7 @@
         enqueue(.windowVisibilityChanged(wParam != 0))
         return DefWindowProcW(window, message, wParam, lParam)
       case UINT(WM_SIZE):
-        if wParam == WPARAM(SIZE_MINIMIZED) {
-          _ = ShowWindow(window, SW_HIDE)
-        } else {
+        if wParam != WPARAM(SIZE_MINIMIZED) {
           layout()
         }
         return 0
@@ -130,6 +128,10 @@
         if WindowsMainWindowChrome.handleTrayMessage(lParam, window: window) {
           resynchronizeAfterRestore()
         }
+        return 0
+      case WindowsApplicationIdentity.restoreRequest:
+        WindowsMainWindowChrome.restore(window)
+        resynchronizeAfterRestore()
         return 0
       case UINT(WM_CLOSE):
         if wParam == WindowsApplicationIdentity.explicitCloseRequest {
