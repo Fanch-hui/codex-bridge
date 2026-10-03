@@ -75,7 +75,7 @@
       let payload = envelope.payload
       switch envelope.command {
       case .refresh:
-        refreshAll(model: model, management: management, auxiliary: auxiliary)
+        refreshCurrentPage(model: model, management: management, auxiliary: auxiliary)
       case .checkAppUpdate:
         appUpdater?.check()
       case .installAppUpdate:

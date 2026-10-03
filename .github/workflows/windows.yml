@@ -313,6 +313,16 @@ jobs:
             -PayloadDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}" `
             -OutputDir "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify Windows installer
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          $installerRoot = "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
+          $installers = @(Get-ChildItem -LiteralPath $installerRoot -Filter "*-Setup.exe" -File)
+          if ($installers.Count -ne 1) { throw "Expected exactly one EXE installer." }
+          & "$env:GITHUB_WORKSPACE\.github\scripts\verify-windows-installer.ps1" `
+            -InstallerPath $installers[0].FullName -Architecture "${{ matrix.architecture }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows portable ZIP
         uses: actions/upload-artifact@v4
         with:

@@ -6,7 +6,8 @@ extension BridgeServiceAppModel {
   func connect(
     includeCatalog: Bool,
     forceCatalogRefresh: Bool = false,
-    recoverRegistration: Bool = true
+    recoverRegistration: Bool = true,
+    includeCollections: Bool = true
   ) async {
     pollingTask?.cancel()
     pollingTask = nil
@@ -37,12 +38,14 @@ extension BridgeServiceAppModel {
         registrationStatus = .enabled
         lastRefreshAt = Date()
         errorMessage = nil
-        await refreshCollections(
-          client: candidate,
-          includeCatalog: includeCatalog,
-          includeProjectResources: true,
-          forceCatalogRefresh: forceCatalogRefresh
-        )
+        if includeCollections {
+          await refreshCollections(
+            client: candidate,
+            includeCatalog: includeCatalog,
+            includeProjectResources: true,
+            forceCatalogRefresh: forceCatalogRefresh
+          )
+        }
         startPolling()
         return
       } catch {
@@ -63,7 +66,8 @@ extension BridgeServiceAppModel {
           await connect(
             includeCatalog: includeCatalog,
             forceCatalogRefresh: forceCatalogRefresh,
-            recoverRegistration: false
+            recoverRegistration: false,
+            includeCollections: includeCollections
           )
           return
         }

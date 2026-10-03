@@ -169,6 +169,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   }
   @Published public internal(set) var chatBrowserReloadRequest: UInt64 = 0
   @Published public internal(set) var isRefreshing = false
+  @Published public internal(set) var isRefreshingModels = false
   @Published public internal(set) var lastRefreshAt: Date?
   @Published public internal(set) var conversation: TaskConversationModel?
   @Published public var errorMessage: String?
@@ -371,17 +372,13 @@ public final class BridgeServiceAppModel: ObservableObject {
 
   public func refresh() {
     Task { [weak self] in
-      await self?.refresh(silent: false, includeCatalog: true)
+      await self?.refreshCurrentPage()
     }
   }
 
   public func refreshModels() {
     Task { [weak self] in
-      await self?.refresh(
-        silent: false,
-        includeCatalog: true,
-        forceCatalogRefresh: true
-      )
+      await self?.refreshCodexModels()
     }
   }
 

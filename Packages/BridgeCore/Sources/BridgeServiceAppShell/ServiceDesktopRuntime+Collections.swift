@@ -98,7 +98,7 @@ extension BridgeServiceAppModel {
     scheduleServiceUpgradeIfNeeded()
   }
 
-  private func applyProjectSnapshot(_ value: [MCPProjectSummary]) {
+  func applyProjectSnapshot(_ value: [MCPProjectSummary]) {
     guard projects != value else { return }
     projects = value
     reconcileProjectSelection()
@@ -114,7 +114,7 @@ extension BridgeServiceAppModel {
     if agentInstallations != value.installations { agentInstallations = value.installations }
   }
 
-  private func applyTaskSnapshot(_ value: [MCPServiceTaskSnapshot]) {
+  func applyTaskSnapshot(_ value: [MCPServiceTaskSnapshot]) {
     let selectedTaskBeforeRefresh = selectedTaskID.flatMap { selectedTaskID in
       tasks.first(where: { $0.taskID == selectedTaskID })
     }

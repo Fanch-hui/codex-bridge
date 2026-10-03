@@ -40,7 +40,9 @@
           && settings.saveTaskStartApprovalEnabled,
         canChangeService: false,
         servicePlatform: DesktopPlatformHost.platformName,
-        serviceDescription: "开启后可在退出窗口后继续运行后台 Service，远程给本机发送任务时需同时将“远程任务启动”设为“自动批准”。",
+        serviceDescription:
+          "开启后，即使退出 App，仍可通过 ChatGPT 的 Codex Bridge 插件远程使用本机。"
+          + "请配置好客户端与项目权限；需要无人值守运行时，将相关审批策略设为“自动批准”。",
         serviceStatus: service.status,
         serviceStatusTitle: service.title,
         serviceStatusMessage: service.message,

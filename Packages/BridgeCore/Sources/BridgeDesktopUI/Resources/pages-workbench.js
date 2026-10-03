@@ -221,7 +221,16 @@
 
   function renderContent(page, emit) {
     var content = document.getElementById("workbench-inspector-content");
-    renderStable(content, JSON.stringify([page, P.revision()]), function () {
+    var inputs = Object.assign({}, page, {
+      browser: page.browser && page.browser.canLoadEarlierConversation
+    });
+    var keys = Object.keys(inputs), previous = content.__contentInputs, revision = P.revision();
+    if (previous && content.__submissionRevision === revision
+      && keys.length === Object.keys(previous).length
+      && keys.every(function (key) { return inputs[key] === previous[key]; })) return;
+    content.__contentInputs = inputs;
+    content.__submissionRevision = revision;
+    renderStable(content, JSON.stringify([inputs, revision]), function () {
       var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
       try { renderContentBody(content, page, emit); } finally { restore(); }
     }, true);

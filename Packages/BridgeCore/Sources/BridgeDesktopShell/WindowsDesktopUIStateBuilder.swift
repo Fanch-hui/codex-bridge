@@ -43,7 +43,7 @@
         selectedNavigation: selectedNavigation,
         connectionLabel: connectionLabel(for: workbench.connectionState),
         connectionTone: connectionTone(for: workbench.connectionState),
-        isRefreshing: isRefreshing || modelRefreshInProgress,
+        isRefreshing: isRefreshing,
         feedback: feedback,
         overview: pageCache.overview(
           key: WindowsDesktopOverviewCacheKey(

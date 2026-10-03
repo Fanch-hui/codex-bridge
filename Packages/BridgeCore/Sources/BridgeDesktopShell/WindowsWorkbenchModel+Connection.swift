@@ -261,7 +261,7 @@
       }
     }
 
-    private func refreshServiceStatus() async {
+    func refreshServiceStatus() async {
       do {
         let status = try await client.status()
         guard !isShuttingDown, connectionState == .connected else { return }

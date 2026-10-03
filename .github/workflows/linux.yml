@@ -66,8 +66,8 @@ jobs:
         run: Scripts/build-linux.sh "$GITHUB_WORKSPACE/.build/linux-dist"
       - name: Verify dependency resolution is unchanged
         run: git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD -- Packages/BridgeCore/Package.resolved Vendor/swift-sdk/Package.resolved
-      - name: Verify packaged service IPC
-        run: .github/scripts/verify-linux-service.sh ".build/linux-dist/${{ matrix.architecture }}"
+      - name: Verify installed package and service IPC
+        run: .github/scripts/verify-linux-deb.sh .build/linux-dist "${{ matrix.architecture }}"
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:

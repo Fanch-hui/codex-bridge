@@ -53,6 +53,9 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     }
 
     var changes: [BridgeDesktopUIStatePatch.Change] = []
+    if oldWorkbench.browser != newWorkbench.browser {
+      changes.append(.browser(newWorkbench.browser))
+    }
     if oldWorkbench.tasks != newWorkbench.tasks {
       let (mode, rows, removedIDs) = rowsPatch(
         old: oldWorkbench.tasks,
@@ -115,7 +118,6 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.history == new.history
       && old.nativeSessions == new.nativeSessions
       && old.steerModes == new.steerModes
-      && old.browser == new.browser
       && old.projectStatus == new.projectStatus
       && old.projectStatusTone == new.projectStatusTone
       && old.engineStatus == new.engineStatus

@@ -44,6 +44,7 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       case taskRows
       case approvals
       case selectedTask
+      case browser
     }
 
     public enum CollectionMode: String, Codable, Equatable, Sendable {
@@ -61,6 +62,7 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
     public let taskRows: [BridgeDesktopTaskRow]?
     public let approvalRows: [BridgeDesktopApprovalRow]?
     public let selectedTask: BridgeDesktopTaskDetail?
+    public let browser: BridgeDesktopBrowserSlot?
 
     private init(
       kind: Kind,
@@ -72,7 +74,8 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       collectionMode: CollectionMode? = nil,
       taskRows: [BridgeDesktopTaskRow]? = nil,
       approvalRows: [BridgeDesktopApprovalRow]? = nil,
-      selectedTask: BridgeDesktopTaskDetail? = nil
+      selectedTask: BridgeDesktopTaskDetail? = nil,
+      browser: BridgeDesktopBrowserSlot? = nil
     ) {
       self.kind = kind
       self.taskID = taskID
@@ -84,6 +87,7 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       self.taskRows = taskRows
       self.approvalRows = approvalRows
       self.selectedTask = selectedTask
+      self.browser = browser
     }
 
     public static func conversation(
@@ -122,6 +126,10 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
 
     public static func selectedTask(_ task: BridgeDesktopTaskDetail) -> Self {
       Self(kind: .selectedTask, taskID: task.taskID, selectedTask: task)
+    }
+
+    public static func browser(_ browser: BridgeDesktopBrowserSlot) -> Self {
+      Self(kind: .browser, browser: browser)
     }
   }
 }

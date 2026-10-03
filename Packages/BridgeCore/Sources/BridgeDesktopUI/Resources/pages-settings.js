@@ -109,12 +109,28 @@
     var platform = S.node("p", "hint");
     card.appendChild(description);
     card.appendChild(platform);
-    var keep = M.check("退出 App 后继续运行", page.keepServiceRunningAfterExit);
-    var keepDraft = D.bind({ keep: keep.control });
-    keep.wrapper.querySelector("input").addEventListener("change", function () {
-      context.emit("setKeepServiceRunning", { keepServiceRunningAfterExit: keep.control.checked });
+    var keepRow = S.node("div", "check-field");
+    var keep = S.node("button", "switch-toggle");
+    keep.type = "button";
+    keep.value = page.keepServiceRunningAfterExit ? "true" : "false";
+    keep.setAttribute("role", "switch");
+    keep.setAttribute("aria-label", "退出 App 后继续运行");
+    var thumb = S.node("span", "switch-thumb");
+    thumb.setAttribute("aria-hidden", "true");
+    keep.appendChild(thumb);
+    keepRow.appendChild(keep);
+    keepRow.appendChild(S.node("span", null, "退出 App 后继续运行"));
+    var keepDraft = D.bind({ keep: keep });
+    function updateSwitch() {
+      keep.className = "switch-toggle" + (keep.value === "true" ? " is-active" : "");
+      keep.setAttribute("aria-checked", keep.value);
+    }
+    keep.addEventListener("click", function () {
+      keep.value = keep.value === "true" ? "false" : "true";
+      updateSwitch();
+      context.emit("setKeepServiceRunning", { keepServiceRunningAfterExit: keep.value === "true" });
     });
-    card.appendChild(keep.wrapper);
+    card.appendChild(keepRow);
     var badge = S.badge("未注册", "warning");
     card.appendChild(badge);
     var serviceStatus = S.node("p", "hint");
@@ -125,15 +141,17 @@
       context.page = next;
       context.emit = nextEmit;
       description.textContent = next.serviceDescription
-        || "开启后可在退出 App 后继续运行后台 Service，远程给本机发送任务时需同时将“远程任务启动”设为“自动批准”。";
+        || "开启后，即使退出 App，仍可通过 ChatGPT 的 Codex Bridge 插件远程使用本机。请配置好客户端与项目权限；需要无人值守运行时，将相关审批策略设为“自动批准”。";
       platform.textContent = "平台：" + (next.servicePlatform || "未知");
-      keepDraft.update({ keep: next.keepServiceRunningAfterExit == null
-        ? false : next.keepServiceRunningAfterExit });
-      keep.control.disabled = false;
+      keepDraft.update({ keep: next.keepServiceRunningAfterExit ? "true" : "false" });
+      updateSwitch();
+      var needsAttention = next.serviceStatus
+        ? next.serviceStatus !== "enabled" : !next.serviceRegistered;
       badge.textContent = next.serviceStatusTitle || (next.serviceRegistered ? "已注册" : "未注册");
       badge.className = "status-badge " + serviceTone(next);
+      badge.hidden = !needsAttention;
       serviceStatus.textContent = next.serviceStatusMessage || "";
-      serviceStatus.hidden = !next.serviceStatusMessage;
+      serviceStatus.hidden = !needsAttention || !next.serviceStatusMessage;
       S.clear(actions);
       var availableActions = next.serviceStatus === "requires_approval"
         && Array.isArray(next.serviceActions) ? next.serviceActions : [];

@@ -35,9 +35,30 @@ struct CodexModelCatalogRequestState {
 }
 
 extension BridgeServiceAppModel {
+  func refreshCodexModels() async {
+    guard !stopped, !isRefreshingModels else { return }
+    isRefreshingModels = true
+    modelCatalogError = nil
+    defer { isRefreshingModels = false }
+
+    do {
+      _ = try await currentClient().status()
+    } catch {
+      await connect(includeCatalog: false, includeCollections: false)
+    }
+    guard !stopped else { return }
+    do {
+      let client = try currentClient()
+      await refreshModelCatalog(client: client, forceRefresh: true, includeInstructions: false)
+    } catch {
+      modelCatalogError = errorMessage ?? Self.message(error)
+    }
+  }
+
   func refreshModelCatalog(
     client: any BridgeServiceClientProtocol,
-    forceRefresh: Bool
+    forceRefresh: Bool,
+    includeInstructions: Bool = true
   ) async {
     let generation = codexModelCatalogRequests.beginCatalog()
     do {
@@ -52,7 +73,7 @@ extension BridgeServiceAppModel {
       guard generation == codexModelCatalogRequests.catalogGeneration else { return }
       modelCatalogError = Self.message(error)
     }
-    if let instructions = try? await client.customInstructions(),
+    if includeInstructions, let instructions = try? await client.customInstructions(),
       generation == codexModelCatalogRequests.catalogGeneration
     {
       customInstructions = instructions
@@ -69,7 +90,8 @@ extension BridgeServiceAppModel {
         try await self.currentClient().setModelPreferences(preferences)
         guard self.codexModelCatalogRequests.finishPreferenceMutation(generation) else { return }
         self.modelPreferences = preferences
-        await self.refresh(silent: true, includeCatalog: true)
+        await self.refreshModelCatalog(
+          client: try self.currentClient(), forceRefresh: false, includeInstructions: false)
         self.postToast("模型偏好设置已更新")
       } catch {
         guard self.codexModelCatalogRequests.finishPreferenceMutation(generation) else { return }

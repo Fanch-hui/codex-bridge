@@ -82,9 +82,6 @@
     var refreshModels = S.button("获取模型", "refreshModels", {}, emit, "small", false);
     var actions = S.node("div", "form-actions");
     actions.appendChild(refreshModels);
-    var save = S.button(
-      "保存模型偏好", null, {}, emit, "small primary", !page.canSavePreferences);
-    actions.appendChild(save);
     card.appendChild(actions);
 
     function updateDependent() {
@@ -118,17 +115,6 @@
         context.emit("setFastMode", { fastModeEnabled: toggle.control.checked });
       }
     });
-    save.addEventListener("click", function () {
-      if (save.disabled) return;
-      var values = draft.values();
-      context.emit("saveSettings", {
-        executionModel: values.model,
-        executionEffort: values.effort,
-        accessMode: values.access,
-        fastModeEnabled: values.enabled
-      });
-    });
-
     function update(next, nextEmit) {
       context.page = next;
       context.emit = nextEmit;
@@ -141,7 +127,8 @@
         access: next.accessMode,
         enabled: next.fastModeEnabled
       });
-      save.disabled = !next.canSavePreferences;
+      model.control.disabled = !next.canSavePreferences;
+      access.control.disabled = !next.canSavePreferences;
       modelStatus.textContent = modelRefreshStatus(next);
       modelStatus.hidden = false;
       var count = modelCount(next);

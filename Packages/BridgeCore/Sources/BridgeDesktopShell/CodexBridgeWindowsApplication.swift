@@ -103,6 +103,19 @@
       DesktopPlatformHost.enqueue(action)
     }
 
+    static func refreshCurrentPage(
+      model: WindowsWorkbenchModel,
+      management: WindowsManagementModel,
+      auxiliary: WindowsAuxiliaryRuntime
+    ) {
+      let page = selectedPage
+      Task {
+        if model.connectionState != .connected { await model.startServiceAndConnect() }
+        guard model.connectionState == .connected else { return }
+        refresh(page: page, model: model, management: management, auxiliary: auxiliary)
+      }
+    }
+
     static func refresh(
       page: WindowsMainPage,
       model: WindowsWorkbenchModel,
@@ -112,6 +125,7 @@
       switch page {
       case .overview:
         Task {
+          await model.refreshServiceStatus()
           await model.refreshTasks()
           await management.refresh()
         }

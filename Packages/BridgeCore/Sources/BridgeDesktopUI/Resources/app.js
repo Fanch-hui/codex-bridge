@@ -327,6 +327,8 @@
       } else if (change.kind === "selectedTask" && change.selectedTask) {
         workbench.selectedTask = change.selectedTask;
         workbench.selectedTaskID = change.taskID || change.selectedTask.taskID || null;
+      } else if (change.kind === "browser" && change.browser) {
+        workbench.browser = change.browser;
       } else {
         valid = false;
       }
