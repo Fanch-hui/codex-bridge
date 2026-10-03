@@ -64,7 +64,7 @@ struct MCPServiceToolContract: Sendable {
 }
 
 public struct MCPServiceToolCatalog: Sendable {
-  public static let contractVersion = "1.3.5"
+  public static let contractVersion = "1.3.6"
 
   public let definitions: [Tool]
 

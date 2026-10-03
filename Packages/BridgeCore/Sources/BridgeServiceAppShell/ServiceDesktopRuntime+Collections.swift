@@ -10,6 +10,7 @@ extension BridgeServiceAppModel {
     includeProjectResources: Bool,
     forceCatalogRefresh: Bool = false
   ) async {
+    let catalogConnectionGeneration = codexModelCatalogRequests.connectionGeneration
     let managementVisible =
       includeCatalog || includeProjectResources
       || navigation == .settings || navigation == .connections
@@ -84,7 +85,9 @@ extension BridgeServiceAppModel {
       deepSeekHarnessMCPServers = value.servers
     }
     if includeCatalog {
-      await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)
+      if catalogConnectionGeneration == codexModelCatalogRequests.connectionGeneration {
+        await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)
+      }
       for installation in agentInstallations
       where installation.isEnabled && installation.availability == "available" {
         refreshAgentModelCatalog(
@@ -159,25 +162,6 @@ extension BridgeServiceAppModel {
     let skillResult = await optional { try await client.skills(projectID: projectID) }
     if selectedProjectID == projectID, let value = skillResult {
       skills = value.skills
-    }
-  }
-
-  private func refreshModelCatalog(
-    client: any BridgeServiceClientProtocol,
-    forceRefresh: Bool
-  ) async {
-    do {
-      let catalog = try await client.modelCatalog(forceRefresh: forceRefresh)
-      models = catalog.models
-      modelPreferences = catalog.preferences
-      modelCatalogError = nil
-    } catch {
-      models = []
-      modelPreferences = nil
-      modelCatalogError = Self.message(error)
-    }
-    if let value = await optional({ try await client.customInstructions() }) {
-      customInstructions = value
     }
   }
 

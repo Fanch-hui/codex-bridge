@@ -13,18 +13,18 @@ macOS 与 Windows 安装前等待任务与 Direct 操作结束，并由 Service 
 ```bash
 python3 Scripts/generate-update-manifest.py \
   --output /absolute/release/latest.json \
-  --version 1.3.5 --tag v1.3.5 \
-  --notes-file docs/RELEASE_NOTES_v1.3.5.md \
-  --asset macos arm64 app /absolute/release/CodexBridge-1.3.5-macos-arm64.zip \
-  --asset macos x64 app /absolute/release/CodexBridge-1.3.5-macos-x86_64.zip \
-  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-1.3.5-Setup.exe \
-  --asset windows arm64 installer /absolute/release/CodexBridge-Windows-arm64-1.3.5-Setup.exe \
+  --version 1.3.6 --tag v1.3.6 \
+  --notes-file docs/RELEASE_NOTES_v1.3.6.md \
+  --asset macos arm64 app /absolute/release/CodexBridge-1.3.6-macos-arm64.zip \
+  --asset macos x64 app /absolute/release/CodexBridge-1.3.6-macos-x86_64.zip \
+  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-1.3.6-Setup.exe \
+  --asset windows arm64 installer /absolute/release/CodexBridge-Windows-arm64-1.3.6-Setup.exe \
   --asset windows x64 portable /absolute/release/codex-bridge-windows-x64.zip \
   --asset windows arm64 portable /absolute/release/codex-bridge-windows-arm64.zip \
-  --asset linux x64 installer /absolute/release/CodexBridge-Linux-x64-1.3.5.deb \
-  --asset linux arm64 installer /absolute/release/CodexBridge-Linux-arm64-1.3.5.deb \
-  --asset linux x64 portable /absolute/release/codex-bridge-linux-x64-1.3.5.tar.gz \
-  --asset linux arm64 portable /absolute/release/codex-bridge-linux-arm64-1.3.5.tar.gz
+  --asset linux x64 installer /absolute/release/CodexBridge-Linux-x64-1.3.6.deb \
+  --asset linux arm64 installer /absolute/release/CodexBridge-Linux-arm64-1.3.6.deb \
+  --asset linux x64 portable /absolute/release/codex-bridge-linux-x64-1.3.6.tar.gz \
+  --asset linux arm64 portable /absolute/release/codex-bridge-linux-arm64-1.3.6.tar.gz
 ```
 
 当前发布架构为 macOS `arm64` / `x86_64`、Windows `x64` / `arm64`

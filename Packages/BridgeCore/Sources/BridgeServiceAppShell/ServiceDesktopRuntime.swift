@@ -380,6 +380,7 @@ extension BridgeServiceAppModel {
   }
 
   func closeClient() async {
+    codexModelCatalogRequests.invalidate()
     stateChangesTask?.cancel()
     stateChangesTask = nil
     let current = client

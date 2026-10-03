@@ -40,14 +40,13 @@ extension BridgeServiceApplication {
   func resolvedDefaultModelPreferences(
     models: [MCPModelSummary]
   ) async throws -> ServiceModelPreferences {
-    guard !models.isEmpty else { throw BridgeMCPQueryError.unavailable }
-
     let configuredExecutionModel = try await settings.string(for: .defaultExecutionModel)
     let configuredExecutionEffort = try await settings.string(for: .defaultExecutionEffort)
     let executionModelID =
       configuredExecutionModel
       ?? models.first(where: \.isDefault)?.modelID
-      ?? models[0].modelID
+      ?? models.first?.modelID
+      ?? serviceDefaultProviderExecutionModel
     let execution = try Self.select(
       modelID: executionModelID,
       effort: configuredExecutionEffort,
@@ -116,16 +115,17 @@ extension BridgeServiceApplication {
     effort: String?,
     models: [MCPModelSummary]
   ) throws -> SelectedModel {
-    guard let model = models.first(where: { $0.modelID == modelID }) else {
-      throw BridgeMCPQueryError.contractRejected
-    }
-    let selectedEffort =
-      effort
-      ?? model.defaultReasoningEffort
-      ?? model.reasoningEfforts.first
-    guard let selectedEffort, model.reasoningEfforts.contains(selectedEffort) else {
-      throw BridgeMCPQueryError.contractRejected
-    }
-    return SelectedModel(model: model.modelID, effort: selectedEffort)
+    let selectedModel = try validatedCodexSelection(
+      modelID, fallback: serviceDefaultProviderExecutionModel, maximumBytes: 256
+    )
+    let model = models.first(where: { $0.modelID == selectedModel })
+    // The catalog may lag newly available models and reasoning options.
+    let selectedEffort = try validatedCodexSelection(
+      effort,
+      fallback: model?.defaultReasoningEffort ?? model?.reasoningEfforts.first
+        ?? serviceDefaultProviderExecutionEffort,
+      maximumBytes: 64
+    )
+    return SelectedModel(model: selectedModel, effort: selectedEffort)
   }
 }

@@ -34,7 +34,6 @@ extension ExecutionSession {
       return nil
     }
     var cursor: String?
-    var sawCatalogEntry = false
     for _ in 0..<8 {
       let page: ModelListResponse
       do {
@@ -46,15 +45,7 @@ extension ExecutionSession {
       } catch {
         return nil
       }
-      sawCatalogEntry = sawCatalogEntry || !page.data.isEmpty
       if let available = page.data.first(where: { $0.id == model }) {
-        guard
-          available.supportedReasoningEfforts.contains(where: {
-            $0.reasoningEffort == effort
-          })
-        else {
-          throw ExecutionServiceError.effortUnavailable(effort)
-        }
         guard !fastMode || available.supportsFastMode else {
           throw ExecutionServiceError.serviceTierUnavailable("fast")
         }
@@ -63,8 +54,8 @@ extension ExecutionSession {
       guard let next = page.nextCursor, !next.isEmpty, next != cursor else { break }
       cursor = next
     }
-    guard sawCatalogEntry else { return nil }
-    throw ExecutionServiceError.modelUnavailable(model)
+    guard !fastMode else { throw ExecutionServiceError.serviceTierUnavailable("fast") }
+    return nil
   }
 
   func prepareThread(

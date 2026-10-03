@@ -212,6 +212,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var pendingVisibleRefresh = false
   var pendingCatalogRefresh = false
   var pendingForceCatalogRefresh = false
+  var codexModelCatalogRequests = CodexModelCatalogRequestState()
   var chatWebViewSleepTask: Task<Void, Never>?
   var toastDismissTask: Task<Void, Never>?
   var workbenchProjectSyncTask: Task<Void, Never>?

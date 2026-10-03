@@ -152,25 +152,13 @@ extension BridgeServiceApplication {
     _ task: ServiceTaskRecord,
     project: ServiceProjectRecord
   ) async -> QueuedModelAvailability {
+    guard task.providerID != serviceCodexProviderID else { return .available }
     let usesExplicitSelection =
       task.executionModel != serviceDefaultProviderExecutionModel
       || task.executionEffort != serviceDefaultProviderExecutionEffort
       || task.fastMode
     guard usesExplicitSelection else { return .available }
     do {
-      let deadline = ContinuousClock.now.advanced(by: .seconds(30))
-      if task.providerID == serviceCodexProviderID {
-        let models = try await catalog.listModels(deadline: deadline).models
-        guard let model = models.first(where: { $0.modelID == task.executionModel }) else {
-          return .invalid
-        }
-        guard
-          task.executionEffort == serviceDefaultProviderExecutionEffort
-            || model.reasoningEfforts.contains(task.executionEffort),
-          !task.fastMode || model.supportsFastMode
-        else { return .invalid }
-        return .available
-      }
       guard let installationID = task.installationID, let registry = agentRegistry else {
         return .invalid
       }
