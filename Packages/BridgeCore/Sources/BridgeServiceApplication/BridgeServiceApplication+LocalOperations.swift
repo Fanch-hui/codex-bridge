@@ -151,6 +151,8 @@ extension BridgeServiceApplication {
       limit: limit
     )
     let activity = try await tasks.listActivity(taskIDs: records.map(\.id))
+    let usage = try await tasks.usage(taskIDs: records.map(\.id))
+    let attachments = try await tasks.taskAttachments(taskIDs: records.map(\.id))
     var queueInfos: [TaskID: ServiceTaskQueueInfo] = [:]
     for record in records {
       if let info = try await tasks.queueInfo(taskID: record.id) {
@@ -164,7 +166,9 @@ extension BridgeServiceApplication {
         events: activity.events[record.id] ?? [],
         activityMessages: activity.messages[record.id] ?? [],
         recentActivityAvailable: activity.messagesAvailable,
-        queueInfo: queueInfos[record.id]
+        queueInfo: queueInfos[record.id],
+        attachmentPaths: attachments[record.id, default: []].map(\.relativePath),
+        usage: usage[record.id]
       )
     }
   }

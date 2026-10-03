@@ -216,8 +216,6 @@ print -r -- "${NOTICE_TEXT}" > "${notice_file}"
 /bin/chmod 0755 "${amd64_binary}" "${arm64_binary}"
 verify_thin_architecture "${amd64_binary}" x86_64
 verify_thin_architecture "${arm64_binary}" arm64
-verify_version_output "${amd64_binary}"
-verify_version_output "${arm64_binary}"
 
 /usr/bin/lipo \
   "${amd64_binary}" \
@@ -227,6 +225,7 @@ verify_version_output "${arm64_binary}"
 /bin/chmod 0755 "${universal_binary}"
 /usr/bin/lipo "${universal_binary}" -verify_arch x86_64
 /usr/bin/lipo "${universal_binary}" -verify_arch arm64
+verify_version_output "${universal_binary}"
 
 readonly derived_sha256="$(sha256 "${universal_binary}")"
 readonly license_sha256="$(sha256 "${license_file}")"

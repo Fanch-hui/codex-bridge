@@ -96,6 +96,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var projectDetails: [String: MCPProjectDetail] = [:]
   @Published public internal(set) var agentProviders: [IPCAgentProviderSummary] = []
   @Published public internal(set) var agentInstallations: [IPCAgentInstallationSummary] = []
+  @Published public internal(set) var nativeSessionDirectory:
+    BridgeDesktopNativeSessionDirectoryState?
+  var nativeSessionDirectoryGeneration: UInt64 = 0
   @Published public internal(set) var agentModelOptionsByProvider:
     [String: [IPCAgentModelSummary]] = [:]
   @Published public internal(set) var agentModelRefreshingProviders: Set<String> = []
@@ -137,6 +140,8 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var mcpClients: [IPCMCPClientStatus] = []
   @Published public internal(set) var deepSeekHarnessMCPServers:
     [IPCDeepSeekHarnessMCPServerSummary] = []
+  @Published public internal(set) var selectedAgentMCPScope =
+    BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
   @Published public internal(set) var models: [MCPModelSummary] = []
   @Published public internal(set) var modelPreferences: IPCModelPreferences?
   @Published public internal(set) var customInstructions: String?
@@ -207,6 +212,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var pendingVisibleRefresh = false
   var pendingCatalogRefresh = false
   var pendingForceCatalogRefresh = false
+  var codexModelCatalogRequests = CodexModelCatalogRequestState()
   var chatWebViewSleepTask: Task<Void, Never>?
   var toastDismissTask: Task<Void, Never>?
   var workbenchProjectSyncTask: Task<Void, Never>?
@@ -382,14 +388,16 @@ public final class BridgeServiceAppModel: ObservableObject {
   public func postToast(
     _ message: String,
     symbol: String = "checkmark.circle.fill",
-    tone: StatusTone = .success
+    tone: StatusTone = .success,
+    title: String? = nil,
+    duration: Duration = .seconds(2.5)
   ) {
     toastDismissTask?.cancel()
     withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-      toast = ToastNotice(message: message, symbol: symbol, tone: tone)
+      toast = ToastNotice(message: message, symbol: symbol, tone: tone, title: title)
     }
     toastDismissTask = Task { [weak self] in
-      try? await Task.sleep(for: .seconds(2.5))
+      try? await Task.sleep(for: duration)
       guard !Task.isCancelled else { return }
       withAnimation(.easeInOut(duration: 0.25)) {
         self?.toast = nil
@@ -429,16 +437,19 @@ public struct ToastNotice: Identifiable, Equatable, Sendable {
   public let message: String
   public let symbol: String
   public let tone: StatusTone
+  public let title: String?
 
   public init(
     id: UUID = UUID(),
     message: String,
     symbol: String = "checkmark.circle.fill",
-    tone: StatusTone = .success
+    tone: StatusTone = .success,
+    title: String? = nil
   ) {
     self.id = id
     self.message = message
     self.symbol = symbol
     self.tone = tone
+    self.title = title
   }
 }

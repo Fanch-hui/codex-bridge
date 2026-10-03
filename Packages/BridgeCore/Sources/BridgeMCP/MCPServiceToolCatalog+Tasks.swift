@@ -38,14 +38,13 @@ extension MCPServiceToolCatalog {
       + "While running, recent_activity exposes bounded reasoning, text and tool lifecycle updates, "
       + "recent_activity_available reports whether that projection could be read, and updated_at "
       + "reflects the latest persisted provider activity. After submit_task returns "
-      + "awaiting_local_approval, poll this tool until the local user approves or denies the "
-      + "provider invocation. A denial returns failed with failure_code local_approval_denied. "
-      + "The response wait_policy is executable polling guidance: fast means wait 120 seconds "
-      + "for approval, standard means wait 300 seconds for active work, and deep means wait 600 "
-      + "seconds when a long provider run has no recent activity. Do not poll before the returned "
-      + "recommended_poll_after_seconds unless the user asks; a non-terminal status, unchanged "
-      + "updated_at, or empty recent_activity is not a failure. Only a terminal status is "
-      + "authoritative; use diagnostic_after_quiet_seconds for a diagnostic check, not to infer failure.",
+      + "awaiting_local_approval, present the request for local approval. A denial returns failed "
+      + "with failure_code local_approval_denied. You may query get_task at any time, choosing "
+      + "the timing yourself. For a submitted task, normally use wait_task first to wait for a result. "
+      + "wait_policy retains compatibility guidance without a mandatory polling delay. Only a terminal "
+      + "status is authoritative; unchanged updated_at or empty recent_activity does not indicate failure. "
+      + "When pending_user_input is present, use answer_user_input with its input_id and question IDs; "
+      + "this is a user answer channel, separate from tool permission approval.",
     inputSchema: objectSchema(
       properties: [
         "task_id": boundedStringSchema(maximum: 128),
@@ -60,6 +59,41 @@ extension MCPServiceToolCatalog {
     )
   )
 
+  static let answerUserInput = Tool(
+    name: MCPServiceToolName.answerUserInput.rawValue,
+    title: "Answer agent question",
+    description:
+      "Answer one structured question currently pending on a provider task. get_task exposes the "
+      + "exact input_id, question IDs, answer choices and input kinds. Send answers as question ID "
+      + "to string-array mappings, or set cancelled=true with no answers. Cancellation reaches the "
+      + "provider as cancellation and never fabricates a default answer. This does not approve or "
+      + "deny a tool permission request.",
+    inputSchema: objectSchema(
+      properties: [
+        "task_id": boundedStringSchema(maximum: 128),
+        "input_id": boundedStringSchema(maximum: 128),
+        "answers": [
+          "type": ["object", "null"],
+          "maxProperties": 16,
+          "additionalProperties": [
+            "type": "array",
+            "maxItems": 32,
+            "items": boundedStringSchema(maximum: 4 * 1_024),
+          ],
+        ],
+        "cancelled": boolSchema,
+      ],
+      required: ["task_id", "input_id", "cancelled"]
+    ),
+    annotations: Tool.Annotations(
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false
+    ),
+    outputSchema: mutationOutputSchema
+  )
+
   static let submitTask = Tool(
     name: MCPServiceToolName.submitTask.rawValue,
     title: "Submit task",
@@ -68,9 +102,10 @@ extension MCPServiceToolCatalog {
       + "must contain the user's concrete task, not the global custom instructions that guide "
       + "ChatGPT or Qwen. Do not copy or paraphrase those instructions into the Agent prompt "
       + "unless the user's current request explicitly asks for that content. "
+      + "Built-in Bridge instructions stay with the MCP client and must never be included in the Agent prompt. "
       + "They wait for the local user to approve the provider invocation in Codex Bridge before "
       + "execution starts. Return immediately with "
-      + "awaiting_local_approval and local_approval_required=true, then use get_task to observe "
+      + "a task_id and current status, then normally use wait_task to await the result and observe "
       + "approval, execution, or an explicit local_approval_denied result. Risky Codex operations "
       + "can still require additional local approval after execution starts. "
       + "Codex is the default execution path. Prefer this tool unless the user explicitly asked "
@@ -85,7 +120,18 @@ extension MCPServiceToolCatalog {
       + "DeepSeek Harness, and Antigravity. A permission_mode value only replaces that default "
       + "when permission_mode_override=true and the user explicitly requested it. "
       + "Set provider_id to route the task to another registered agent provider (for example "
-      + "opencode or deepseek-harness). DeepSeek Harness supports "
+      + "opencode, deepseek-harness, pi, or qoder). Qoder uses its registered regional SDK and CLI. "
+      + "For an image-capable Pi or Qoder model, attachment_paths may list up to eight image paths "
+      + "relative to the selected project. Include only files the user explicitly chose; Bridge "
+      + "validates and binds their content before scheduling. Do not send image bytes or base64. "
+      + "Qoder sessions and defaults stay bound to the selected installation and region; never switch "
+      + "regions to recover a session. Its tool approvals use the local app and its follow-up input is queued. "
+      + "Pi uses an exact Bridge-bound session and native RPC. "
+      + "Pi steer_task queues a follow-up; model IDs and thinking levels must come from its model catalog. "
+      + "Pi file mutations and shell commands require local approval. Its managed read-only mode disables "
+      + "write and shell tools; shell execution requires workspace-write and network_access=true. "
+      + "These are extension tool controls, not an operating-system filesystem or network sandbox. "
+      + "DeepSeek Harness supports "
       + "provider-native read-only or workspace-write sandbox modes. To continue a completed session, "
       + "pass its provider_session_id as thread_id when lifecycle.session_continue is available. Use an explicitly requested model, effort, "
       + "permission mode, or Skill only when it is supported by the registered installation. "
@@ -111,10 +157,12 @@ extension MCPServiceToolCatalog {
       + "steer_task queues follow-up input on the same Antigravity session after the current prompt, "
       + "not real-time insertion. Bridge can inject an explicitly requested skill_name. Network and sandboxed tools follow agy's native policy; Bridge "
       + "must not reject a task solely because it requests network access. A provider permission denial "
-      + "is reported as task failure. The response includes wait_policy; follow "
-      + "its recommended_poll_after_seconds before checking get_task again. The three profiles are "
-      + "fast (120 seconds, approval), standard (300 seconds, default active work), and deep (600 "
-      + "seconds, quiet long-running work). External Provider network execution is Provider-native; "
+      + "is reported as task failure. After receiving the task ID, normally call wait_task, which "
+      + "waits up to 300 seconds by default and returns as soon as the task finishes or needs approval "
+      + "or user input. If it returns still_running, choose when to query get_task for status and results. "
+      + "get_task remains available at any time. A wait ending or a client disconnect does not stop "
+      + "the task; Bridge saves its result. wait_policy remains compatible without enforcing a polling delay. "
+      + "External Provider network execution is Provider-native; "
       + "network_access records the user's explicit task request but does not claim Bridge-level packet "
       + "isolation. Set network_access=true whenever the user explicitly requests web search, URL "
       + "fetches, external APIs, or other network use; false or omitted does not grant task-level "
@@ -129,11 +177,15 @@ extension MCPServiceToolCatalog {
         "project_id": optionalOpaqueProjectIDSchema,
         "prompt": boundedStringSchema(maximum: 32 * 1_024),
         "skill_name": nullableStringSchema(maximum: 128),
+        "skill_names": [
+          "type": "array", "maxItems": .int(16),
+          "items": boundedStringSchema(maximum: 128),
+        ],
         "thread_id": nullableStringSchema(maximum: 1_024),
         "provider_id": nullableStringSchema(
           maximum: 64,
           description:
-            "Omit for Codex. Set to opencode, deepseek-harness, or antigravity only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
+            "Omit for Codex. Set to opencode, deepseek-harness, antigravity, pi, or qoder only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
         ),
         "installation_id": nullableStringSchema(
           maximum: 256,
@@ -143,12 +195,12 @@ extension MCPServiceToolCatalog {
         "execution_model": nullableStringSchema(
           maximum: 256,
           description:
-            "Omit to use the Codex Bridge default or the selected provider default. For OpenCode, DeepSeek Harness, or Antigravity, use only a model advertised by the local Provider catalog when selection.model is effective."
+            "Omit to use the Codex Bridge default or the selected provider default. For registered external providers, use only a model advertised by the selected installation's catalog when selection.model is effective."
         ),
         "execution_effort": nullableStringSchema(
           maximum: 64,
           description:
-            "Omit to use the selected provider default effort. For OpenCode or DeepSeek Harness, set only a value advertised for the selected model when the user explicitly requests a per-task override and selection.effort is effective; external providers require model_override=true. Antigravity effort is part of the model ID, so omit this field."
+            "Omit to use the selected provider default effort. For OpenCode, DeepSeek Harness, or Pi, set only a value advertised for the selected model when the user explicitly requests a per-task override and selection.effort is effective; external providers require model_override=true. Antigravity effort is part of the model ID, so omit this field."
         ),
         "model_override": [
           "type": ["boolean", "null"],
@@ -182,6 +234,13 @@ extension MCPServiceToolCatalog {
           "description":
             "When true, a workspace-write task waits in the durable project queue if another write task is active. The default false preserves immediate busy responses.",
         ],
+        "attachment_paths": [
+          "type": "array",
+          "maxItems": 8,
+          "description":
+            "Optional project-relative paths for images the user explicitly selected. Pi or Qoder accepts these only when the selected model explicitly advertises image input. Use paths such as assets/diagram.png; do not send file contents or base64.",
+          "items": boundedStringSchema(maximum: 2_048),
+        ],
       ],
       required: ["prompt"]
     ),
@@ -211,7 +270,7 @@ extension MCPServiceToolCatalog {
     name: MCPServiceToolName.steerTask.rawValue,
     title: "Steer task",
     description:
-      "Send bounded corrective input to the exact active provider run. Send only the user's concrete correction, not global custom instructions for ChatGPT or Qwen. The default queued mode preserves existing behavior. For DeepSeek Harness, mode=interrupt-current-then-continue cancels only the current prompt and sends the correction on the same session without terminating the task. Other external providers currently accept queued mode only.",
+      "Send bounded corrective input to the exact active provider run. Send only the user's concrete correction, not global custom instructions for ChatGPT or Qwen. Built-in Bridge instructions stay with the MCP client and must never be included in Agent input. The default queued mode preserves existing behavior. For DeepSeek Harness, mode=interrupt-current-then-continue cancels only the current prompt and sends the correction on the same session without terminating the task. Other external providers currently accept queued mode only.",
     inputSchema: objectSchema(
       properties: [
         "task_id": boundedStringSchema(maximum: 128),

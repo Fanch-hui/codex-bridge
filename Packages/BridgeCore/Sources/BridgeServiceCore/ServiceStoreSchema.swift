@@ -27,7 +27,7 @@ private struct LegacyWorkspaceCommand: Codable {
 }
 
 enum ServiceStoreSchema {
-  static let version: Int64 = 18
+  static let version: Int64 = 23
   static let migrationPrefix = "BridgeServiceCore."
   static let migrationV1 = "BridgeServiceCore.v1"
   static let migrationV2 = "BridgeServiceCore.v2"
@@ -47,17 +47,19 @@ enum ServiceStoreSchema {
   static let migrationV16 = "BridgeServiceCore.v16"
   static let migrationV17 = "BridgeServiceCore.v17"
   static let migrationV18 = "BridgeServiceCore.v18"
-  static let knownMigrations: Set<String> = [
-    migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7,
-    migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13,
-    migrationV14, migrationV15, migrationV16, migrationV17, migrationV18,
-  ]
+  static let migrationV19 = "BridgeServiceCore.v19"
+  static let migrationV20 = "BridgeServiceCore.v20"
+  static let migrationV21 = "BridgeServiceCore.v21"
+  static let migrationV22 = "BridgeServiceCore.v22"
+  static let migrationV23 = "BridgeServiceCore.v23"
+  static let knownMigrations = Set((1...version).map { "\(migrationPrefix)v\($0)" })
 
   static func prepare(_ database: DatabaseQueue) throws {
     do {
       try preflight(database)
       try makeMigrator().migrate(database)
       try ensureTaskMessageActivityIndex(database)
+      try ensureTaskEventRetentionIndex(database)
       try validate(database)
     } catch let error as ServiceStoreError {
       throw error
@@ -88,22 +90,9 @@ enum ServiceStoreSchema {
         )
       })
     else { return }
-    let backupSuffix: String
-    switch sourceVersion {
-    case 7: backupSuffix = ".pre-v8"
-    case 8: backupSuffix = ".pre-v9"
-    case 9: backupSuffix = ".pre-v10"
-    case 10: backupSuffix = ".pre-v11"
-    case 11: backupSuffix = ".pre-v12"
-    case 12: backupSuffix = ".pre-v13"
-    case 13: backupSuffix = ".pre-v14"
-    case 14: backupSuffix = ".pre-v15"
-    case 15: backupSuffix = ".pre-v16"
-    case 16: backupSuffix = ".pre-v17"
-    case 17: backupSuffix = ".pre-v18"
-    default: return
-    }
-    let backupPath = sourcePath + backupSuffix
+    guard sourceVersion >= 7, sourceVersion < version else { return }
+    let targetVersion = min(sourceVersion + 1, version)
+    let backupPath = sourcePath + ".pre-v\(targetVersion)"
     if FileManager.default.fileExists(atPath: backupPath) {
       do {
         try validatePrivateBackup(at: backupPath, expectedSchemaVersion: sourceVersion)
@@ -209,7 +198,8 @@ enum ServiceStoreSchema {
     let candidates = names.compactMap { name -> (path: String, version: Int64)? in
       guard name.hasPrefix(prefix),
         let targetVersion = Int64(name.dropFirst(prefix.count)),
-        (8...18).contains(targetVersion)
+        targetVersion >= 8,
+        targetVersion <= version
       else { return nil }
       return (
         URL(fileURLWithPath: directory).appendingPathComponent(name).path,
@@ -295,6 +285,21 @@ enum ServiceStoreSchema {
     }
     migrator.registerMigration(migrationV18) { db in
       try createVersionEighteen(in: db)
+    }
+    migrator.registerMigration(migrationV19) { db in
+      try createVersionNineteen(in: db)
+    }
+    migrator.registerMigration(migrationV20) { db in
+      try createVersionTwenty(in: db)
+    }
+    migrator.registerMigration(migrationV21) { db in
+      try createVersionTwentyOne(in: db)
+    }
+    migrator.registerMigration(migrationV22) { db in
+      try createVersionTwentyTwo(in: db)
+    }
+    migrator.registerMigration(migrationV23) { db in
+      try createVersionTwentyThree(in: db)
     }
     return migrator
   }
@@ -1182,6 +1187,7 @@ enum ServiceStoreSchema {
           "direct_command_mode", "workspace_commands_json",
           "direct_blacklist_json",
         ],
+        "bridge_service_agent_runtime_artifacts": ["installation_id", "artifacts_json"],
         "bridge_service_settings": ["setting_key", "setting_value", "updated_at"],
         "bridge_service_agent_installations": [
           "installation_id", "provider_id", "display_name", "executable_path",
@@ -1205,9 +1211,14 @@ enum ServiceStoreSchema {
           "created_at", "updated_at",
           "provider_id", "installation_id", "selection_mode",
           "provider_session_id", "provider_run_id", "queue_if_busy", "queue_state",
+          "selected_skills_json",
         ],
         "bridge_service_task_events": [
-          "event_id", "task_id", "kind", "summary", "created_at",
+          "event_id", "task_id", "kind", "summary", "details", "created_at",
+        ],
+        "bridge_service_task_usage": ["task_id", "snapshot"],
+        "bridge_service_task_attachments": [
+          "task_id", "position", "relative_path", "mime_type", "byte_count", "sha256",
         ],
         "bridge_service_task_messages": [
           "message_id", "task_id", "message_key", "role", "kind", "content",

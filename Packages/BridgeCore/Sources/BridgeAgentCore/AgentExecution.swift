@@ -68,6 +68,8 @@ public struct AgentExecutionRequest: Equatable, Sendable {
   public let networkAccessRequested: Bool
   public let toolApprovalPolicy: AgentToolApprovalPolicy
   public let requiredCapabilities: Set<AgentCapability>
+  public let attachments: [AgentImageAttachment]
+  public let selectedSkills: [AgentSelectedSkill]
 
   public init(
     taskID: TaskID,
@@ -82,7 +84,9 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     workspaceStrategy: AgentWorkspaceStrategy,
     networkAccessRequested: Bool,
     toolApprovalPolicy: AgentToolApprovalPolicy = .providerManaged,
-    requiredCapabilities: Set<AgentCapability> = []
+    requiredCapabilities: Set<AgentCapability> = [],
+    attachments: [AgentImageAttachment] = [],
+    selectedSkills: [AgentSelectedSkill] = []
   ) throws {
     try AgentValidation.identifier(taskID.rawValue, field: "request.taskID", maximumBytes: 128)
     try AgentValidation.identifier(
@@ -106,6 +110,23 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     guard toolApprovalPolicy != .autoApprove || networkAccessRequested else {
       throw AgentRuntimeError.invalidRequest("request.toolApprovalPolicy")
     }
+    guard attachments.count <= AgentImageAttachmentLimits.maximumCount,
+      Set(attachments.map(\.relativePath)).count == attachments.count,
+      attachments.reduce(Int64(0), { $0 + $1.byteCount })
+        <= AgentImageAttachmentLimits.maximumTotalBytes
+    else {
+      throw AgentRuntimeError.invalidRequest("request.attachments")
+    }
+    guard selectedSkills.count <= 16,
+      Set(selectedSkills.map(\.name)).count == selectedSkills.count,
+      selectedSkills.reduce(
+        0,
+        { total, skill in
+          total + skill.files.reduce(0, { $0 + $1.content.utf8.count })
+        }) <= 1_024 * 1_024
+    else {
+      throw AgentRuntimeError.invalidRequest("request.selectedSkills")
+    }
     self.taskID = taskID
     self.projectID = projectID
     self.projectRoot = projectRoot
@@ -119,6 +140,8 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     self.networkAccessRequested = networkAccessRequested
     self.toolApprovalPolicy = toolApprovalPolicy
     self.requiredCapabilities = requiredCapabilities
+    self.attachments = attachments
+    self.selectedSkills = selectedSkills
   }
 }
 
@@ -387,7 +410,9 @@ public enum AgentEvent: Equatable, Sendable {
   case tool(AgentToolUpdate)
   case plan([AgentPlanEntry])
   case usage(AgentUsageUpdate)
+  case usageStatistics(AgentUsageStatistics)
   case approvalRequested(AgentApprovalRequest)
+  case userInputRequested(AgentUserInputRequest)
   case approvalAutomaticallyDenied(String)
   case completed(summary: String, stopReason: String?)
   case interrupted
@@ -428,19 +453,22 @@ public struct AgentExecutionControl: Sendable {
   public let steer: (@Sendable (String) async throws -> Void)?
   public let interruptAndSteer: (@Sendable (String) async throws -> Void)?
   public let resolveApproval: (@Sendable (String, String) async throws -> Void)?
+  public let resolveUserInput: (@Sendable (String, AgentUserInputResponse) async throws -> Void)?
 
   public init(
     interrupt: @escaping @Sendable () async throws -> Void,
     shutdown: (@Sendable () async -> Void)? = nil,
     steer: (@Sendable (String) async throws -> Void)? = nil,
     interruptAndSteer: (@Sendable (String) async throws -> Void)? = nil,
-    resolveApproval: (@Sendable (String, String) async throws -> Void)? = nil
+    resolveApproval: (@Sendable (String, String) async throws -> Void)? = nil,
+    resolveUserInput: (@Sendable (String, AgentUserInputResponse) async throws -> Void)? = nil
   ) {
     self.interrupt = interrupt
     self.shutdown = shutdown
     self.steer = steer
     self.interruptAndSteer = interruptAndSteer
     self.resolveApproval = resolveApproval
+    self.resolveUserInput = resolveUserInput
   }
 }
 

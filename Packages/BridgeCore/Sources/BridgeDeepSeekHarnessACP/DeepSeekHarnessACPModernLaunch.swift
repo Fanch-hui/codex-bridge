@@ -43,29 +43,41 @@ enum DeepSeekHarnessACPModernLaunch {
     modelID: String?,
     catalogModelIDs: [String]? = nil,
     reasoningEffort: String?,
-    mutationIntent: AgentMutationIntent
+    mutationIntent: AgentMutationIntent,
+    sourceEnvironment: [String: String] = [:],
+    usesMessagesProvider: Bool = false
   ) throws -> String {
     let sourceProfile = try DeepSeekHarnessACPModelCatalog.profile(
       configuration: configurationData,
       template: template
     )
+    let rawRequested = modelID.flatMap { DeepSeekHarnessACPModelRoutes.decode($0)?.model ?? $0 }
     let selection = try DeepSeekHarnessACPModelCatalog.resolvedSelection(
-      configuration: configurationData,
-      template: template,
-      modelID: modelID,
-      reasoningEffort: reasoningEffort
+      configuration: configurationData, template: template,
+      modelID: rawRequested, reasoningEffort: usesMessagesProvider ? nil : reasoningEffort
     )
     var modelIDs = catalogModelIDs ?? sourceProfile.modelIDs
-    if !modelIDs.contains(selection.modelID) {
-      modelIDs.append(selection.modelID)
+    if catalogModelIDs == nil, let rawRequested, !modelIDs.contains(rawRequested) {
+      modelIDs.append(rawRequested)
     }
+    let selected =
+      rawRequested.flatMap { modelIDs.contains($0) ? $0 : nil } ?? modelIDs.first
+      ?? selection.modelID
+    let routeSelection = modelID.flatMap { DeepSeekHarnessACPModelRoutes.decode($0) }
+    let selectedID =
+      routeSelection.map { route in
+        String(data: try! JSONEncoder().encode([route.provider, selected]), encoding: .utf8)!
+      } ?? selected
+    let endpoints = try DeepSeekHarnessACPEndpoints.resolve(
+      environment: sourceEnvironment, usesMessagesProvider: usesMessagesProvider)
 
     var patch = makePatch(
       modelIDs: modelIDs,
-      selectedModelID: selection.modelID,
+      selectedModelID: selectedID,
       reasoningEffort: selection.reasoningEffort,
       thinkingEnabled: sourceProfile.supportedReasoningEfforts != ["off"],
-      mutationIntent: mutationIntent
+      mutationIntent: mutationIntent, endpoints: endpoints,
+      usesMessagesProvider: usesMessagesProvider
     )
     let additional = try DeepSeekHarnessACPModelCatalog.additionalEntries(
       configuration: configurationData, template: template
@@ -103,22 +115,20 @@ enum DeepSeekHarnessACPModernLaunch {
     selectedModelID: String,
     reasoningEffort: String,
     thinkingEnabled: Bool,
-    mutationIntent: AgentMutationIntent
+    mutationIntent: AgentMutationIntent,
+    endpoints: DeepSeekHarnessACPEndpoints, usesMessagesProvider: Bool
   ) -> String {
-    let models = modelIDs.map { "      - id: \(yamlString($0))" }.joined(separator: "\n")
+    let provider = DeepSeekHarnessACPProviderPatch.make(
+      modelIDs: modelIDs, selectedModelID: selectedModelID,
+      reasoningEffort: reasoningEffort, thinkingEnabled: thinkingEnabled,
+      endpoints: endpoints, usesMessagesProvider: usesMessagesProvider)
     let mode = mutationIntent == .workspaceWrite ? "workspace-write" : "read-only"
     return """
-      # Bridge overlay for the profile-based DSH ACP application.
-      - id: llm-deepseek
-        config:
-          thinking: \(thinkingEnabled ? "enabled" : "disabled")
-          reasoningEffort: \(yamlString(reasoningEffort))
-          models:
-      \(models)
+      \(provider.configuration)
       - id: acp
         config:
-          provider: deepseek-official
-          model: \(yamlString(selectedModelID))
+          provider: \(DeepSeekHarnessACPProviderPatch.yamlString(provider.providerID))
+          model: \(DeepSeekHarnessACPProviderPatch.yamlString(provider.modelID))
       - id: sandbox-policy
         config:
           mode: \(mode)
@@ -135,9 +145,4 @@ enum DeepSeekHarnessACPModernLaunch {
       """
   }
 
-  private static func yamlString(_ value: String) -> String {
-    var escaped = value.replacingOccurrences(of: "\\", with: "\\\\")
-    escaped = escaped.replacingOccurrences(of: "\"", with: "\\\"")
-    return "\"\(escaped)\""
-  }
 }

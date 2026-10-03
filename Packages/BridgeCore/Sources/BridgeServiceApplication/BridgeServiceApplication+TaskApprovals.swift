@@ -165,7 +165,8 @@ extension BridgeServiceApplication {
     _ taskID: TaskID,
     automatically: Bool = false,
     authorization: ServiceTaskExecutionAuthorization? = nil,
-    summary: String? = nil
+    summary: String? = nil,
+    startInBackground: Bool = false
   ) async throws {
     let started: ServiceTaskRecord
     do {
@@ -187,7 +188,11 @@ extension BridgeServiceApplication {
       throw error
     }
     do {
-      try await coordinator.start(taskID: started.id)
+      if startInBackground {
+        try await coordinator.scheduleStart(taskID: started.id)
+      } else {
+        try await coordinator.start(taskID: started.id)
+      }
     } catch {
       throw Self.publicExecutionError(error)
     }
@@ -238,6 +243,22 @@ extension BridgeServiceApplication {
       approvalID: approvalID,
       decision: decision,
       answers: answers
+    )
+  }
+
+  public func resolveUserInput(
+    taskID: TaskID,
+    inputID: String,
+    answers: [String: [String]]?,
+    cancelled: Bool
+  ) async throws {
+    guard cancelled ? answers == nil : answers != nil else {
+      throw ExecutionServiceError.invalidRequest("userInput.response")
+    }
+    try await coordinator.resolveUserInput(
+      taskID: taskID,
+      inputID: inputID,
+      response: cancelled ? .cancelled : .answers(answers ?? [:])
     )
   }
 }

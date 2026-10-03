@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeFiles
 import BridgeSecurity
 import Foundation
@@ -43,10 +44,10 @@ extension MCPServiceToolDispatcher {
       allowed: [
         "project_id", "prompt", "thread_id", "provider_id", "installation_id",
         "execution_model", "execution_effort", "supervisor_model", "supervisor_effort",
-        "model_override", "skill_name",
+        "model_override", "skill_name", "skill_names",
         "permission_mode", "permission_mode_override",
         "network_access",
-        "acceptance_criteria", "client_request_id", "queue_if_busy",
+        "acceptance_criteria", "client_request_id", "queue_if_busy", "attachment_paths",
       ],
       required: ["prompt"]
     )
@@ -109,6 +110,8 @@ extension MCPServiceToolDispatcher {
       projectID: try values.optionalIdentifier("project_id", maximumUTF8Bytes: 128),
       prompt: content.prompt,
       skillName: try values.optionalIdentifier("skill_name", maximumUTF8Bytes: 128),
+      skillNames: try values.optionalStringArray(
+        "skill_names", maximumCount: 16, maximumElementUTF8Bytes: 128),
       threadID: try values.optionalIdentifier("thread_id", maximumUTF8Bytes: 1_024),
       providerID: provider.providerID,
       installationID: provider.installationID,
@@ -129,7 +132,12 @@ extension MCPServiceToolDispatcher {
         "client_request_id",
         maximumUTF8Bytes: 512
       ),
-      queueIfBusy: try values.optionalBoolean("queue_if_busy")
+      queueIfBusy: try values.optionalBoolean("queue_if_busy"),
+      attachmentPaths: try values.optionalStringArray(
+        "attachment_paths",
+        maximumCount: AgentImageAttachmentLimits.maximumCount,
+        maximumElementUTF8Bytes: 2_048
+      )
     )
   }
 

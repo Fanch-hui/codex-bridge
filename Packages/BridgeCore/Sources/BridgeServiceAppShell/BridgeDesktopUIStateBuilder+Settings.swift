@@ -163,23 +163,29 @@ extension BridgeDesktopUIStateBuilder {
   private static func nativePermissionPolicy(
     from model: BridgeServiceAppModel
   ) -> BridgeDesktopNativePermissionState? {
+    let providers: Set<String> = ["antigravity", "pi", "qoder"]
     let installations = model.agentInstallations.filter {
-      $0.providerID == "antigravity" && $0.isEnabled && $0.availability == "available"
+      providers.contains($0.providerID) && $0.isEnabled && $0.availability == "available"
     }
     guard !installations.isEmpty else { return nil }
     let installation =
       model.focusedAgentNativePermissionInstallationID.flatMap { focused in
         installations.first(where: { $0.installationID == focused })
-      } ?? installations[0]
+      } ?? installations.first(where: { $0.providerID == "qoder" && $0.isActive == true })
+      ?? installations.first(where: { $0.providerID == "qoder" }) ?? installations[0]
+    let permissionInstallations =
+      installation.providerID == "qoder"
+      ? installations.filter { $0.providerID == "qoder" } : installations
     let snapshot = model.nativePermissionPolicy(installationID: installation.installationID)
     let isLoading = model.isLoadingNativePermissionPolicy(installation.installationID)
     let isSaving = model.isSavingNativePermissionPolicy(installation.installationID)
     return BridgeDesktopNativePermissionState(
       providerID: installation.providerID,
-      providerName: "Antigravity",
+      providerName: model.agentProviders.first(where: { $0.providerID == installation.providerID })?
+        .displayName ?? installation.providerID,
       installationID: installation.installationID,
       installationName: installation.displayName,
-      installations: installations.map {
+      installations: permissionInstallations.map {
         BridgeDesktopChoice(id: $0.installationID, title: $0.displayName)
       },
       toolPermission: snapshot?.toolPermission,

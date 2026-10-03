@@ -101,8 +101,10 @@ extension BridgeDesktopCommandRouter {
       project(projectID, in: model) != nil,
       let workspace = model.projectDetails[projectID]?.directWorkspace,
       let name = validatedID(payload.name, maximumBytes: 256),
-      let executable = validatedText(payload.executable, maximumBytes: 4_096),
-      !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      let executable = BridgeDesktopCommandValue.nonBlankText(
+        payload.executable,
+        maximumUTF8Bytes: 4_096
+      ),
       let risk = validatedID(payload.risk ?? "normal", maximumBytes: 64),
       let arguments = commandArguments(payload.arguments ?? [], maximum: 128)
     else { return }
@@ -139,11 +141,11 @@ extension BridgeDesktopCommandRouter {
     _ values: [String],
     maximum: Int
   ) -> [String]? {
-    guard values.count <= maximum else { return nil }
-    guard values.allSatisfy({ $0.utf8.count <= 4_096 && !$0.contains("\0") }) else {
-      return nil
-    }
-    return values
+    BridgeDesktopCommandValue.arguments(
+      values,
+      maximumCount: maximum,
+      maximumUTF8BytesPerArgument: 4_096
+    )
   }
 
   private static func validatedWorkingDirectory(_ value: String?) -> String {

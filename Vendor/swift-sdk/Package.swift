@@ -18,9 +18,7 @@ let package = Package(
         .library(
             name: "MCP",
             targets: ["MCP"]),
-
-
-    ],
+        ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", branch: "main"),
         .package(url: "https://github.com/apple/swift-system.git", from: "1.0.0"),
@@ -44,8 +42,6 @@ let package = Package(
                 .enableUpcomingFeature("StrictConcurrency")
             ]
         ),
-
-
-
-    ]
+        
+        ]
 )

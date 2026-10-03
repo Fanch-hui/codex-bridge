@@ -99,7 +99,6 @@ extension ServiceAgentRegistry {
       return models
     }
 
-    modelCatalogCache.removeValue(forKey: key)
     let task = Task { [self] in
       try await fetchAndCacheModelCatalog(
         record: record,
@@ -253,7 +252,9 @@ extension ServiceAgentRegistry {
         supportedReasoningEfforts: incoming.supportedReasoningEfforts,
         defaultReasoningEffort: incoming.defaultReasoningEffort,
         reasoningCapabilitiesAvailable: incoming.reasoningCapabilitiesAvailable,
-        isDefaultModel: existingDefault
+        isDefaultModel: existingDefault,
+        contextWindowTokens: incoming.contextWindowTokens,
+        inputModalities: incoming.inputModalities
       )) ?? incoming
   }
 
@@ -274,6 +275,7 @@ extension ServiceAgentRegistry {
     return [
       record.providerID.rawValue,
       String(record.adapterRevision),
+      record.lastProbedAt.map { String($0.timeIntervalSince1970) } ?? "",
       executable.canonicalPath,
       String(executable.device),
       String(executable.inode),

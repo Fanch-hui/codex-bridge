@@ -102,7 +102,7 @@ public enum WorkbenchSessionCatalog {
     for session in sessions {
       byProvider[session.providerID, default: []].append(session)
     }
-    let preferredOrder = ["codex", "antigravity", "opencode", "deepseek-harness"]
+    let preferredOrder = ["codex", "antigravity", "opencode", "deepseek-harness", "pi", "qoder"]
     var result: [WorkbenchProviderSessionGroup] = []
     for providerID in preferredOrder {
       guard let values = byProvider.removeValue(forKey: providerID), !values.isEmpty else {
@@ -182,13 +182,16 @@ public enum WorkbenchTaskTextPresentation {
     }
   }
 
+  public static func sessionStatusLabel(_ status: String, canContinue: Bool) -> String {
+    status == "completed" && canContinue ? "已创建" : statusLabel(status)
+  }
+
   public static func sessionMenuTitle(
     title: String,
     turnCount: Int,
     maximumCharacters: Int = 36
   ) -> String {
-    let cleaned = cleanTitle(title, maximumCharacters: maximumCharacters) ?? "未命名会话"
-    return turnCount > 1 ? "\(cleaned) [\(turnCount)轮]" : cleaned
+    cleanTitle(title, maximumCharacters: maximumCharacters) ?? "未命名会话"
   }
 
   public static func menuTitle(

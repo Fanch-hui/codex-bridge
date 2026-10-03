@@ -29,7 +29,6 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 #chat-browser-slot { position: relative; flex: 1 1 0; min-height: 0; background: var(--surface); }
 #chat-browser-slot.browser-hidden { display: grid; }
 .browser-slot-note { display: grid; place-items: center; height: 100%; padding: 24px; color: var(--text-secondary); text-align: center; }
-.placeholder-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
 .placeholder-sub { font-size: 12px; color: var(--text-tertiary); }
 .inspector-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface); overflow: hidden; }
 .inspector-header { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--separator); background: var(--surface); }
@@ -76,6 +75,8 @@ body.workbench-is-resizing iframe, body.workbench-is-resizing webview { pointer-
 .workbench-page .step-text { margin-top: 2px; font-size: 11px; line-height: 1.35; }
 .workbench-page .conversation-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .workbench-page .entry-message .entry-text { line-height: 1.75; }
+.workbench-page .message-delivery { margin-top: 4px; font-size: 11px; color: var(--text-secondary); }
+.workbench-page .message-delivery.error-text { color: var(--error); }
 .workbench-page .entry-message .markdown-body p:not(:last-child) { margin-bottom: 12px; }
 .workbench-page .entry-message .markdown-body li + li { margin-top: 6px; }
 .workbench-page .conversation-entry.entry-disclosure {

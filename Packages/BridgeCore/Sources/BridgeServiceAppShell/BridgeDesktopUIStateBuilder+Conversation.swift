@@ -29,9 +29,11 @@ extension BridgeDesktopUIStateBuilder {
       model: taskModelLabel(task, model: model),
       permissionMode: task.permissionMode,
       currentStep: task.currentStep,
+      usage: task.usage,
       resultSummary: task.resultSummary,
       failureCode: task.failureCode,
       changedFiles: task.changedFiles,
+      attachmentPaths: task.attachmentPaths,
       activity: taskActivity(task),
       conversation: model.desktopConversationPresentationCache.update(
         taskID: task.taskID,
@@ -45,7 +47,9 @@ extension BridgeDesktopUIStateBuilder {
           activity: model.conversation?.activity ?? .idle,
           pendingUserInput: model.approvals.contains {
             $0.taskID == task.taskID && $0.kind == "user_input"
-          })
+          },
+          canContinue: canResume(task, model: model)
+        )
       ),
       canInterrupt: TaskInspectorPresentation.canInterrupt(task),
       canStop: task.isActive,

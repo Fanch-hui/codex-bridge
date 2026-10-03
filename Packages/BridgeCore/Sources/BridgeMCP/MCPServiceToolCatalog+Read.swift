@@ -63,6 +63,7 @@ extension MCPServiceToolCatalog {
     title: "List registered Agent installations",
     description:
       "List user-registered Agent installations and their persisted Probe results. "
+      + "Use each installation_id with list_agent_models to query its native model catalog. "
       + "A selectable OpenCode installation can receive tasks through submit_task; DeepSeek "
       + "Harness supports fresh sessions with provider-native read-only or "
       + "workspace-write modes. Selectable OpenCode and Antigravity installations can receive "
@@ -75,7 +76,11 @@ extension MCPServiceToolCatalog {
       + "permission policy. The local user still approves each task before execution, while "
       + "DeepSeek execution-time permission requests are surfaced for local approval; "
       + "steer input for ACP and Antigravity providers is queued as a follow-up on the same session. "
-      + "Inspect network_enforcement to see whether Bridge or the Provider owns network policy.",
+      + "Pi installations use native RPC with a managed extension, exact session binding, queued follow-up "
+      + "and local tool approval. Pi read-only disables file mutations and shell; shell requires Write mode "
+      + "and network_access=true. Inspect network_enforcement to see the policy owner; extension controls "
+      + "do not imply operating-system isolation. Qoder uses one provider for regional installations; "
+      + "models, native authentication and sessions remain bound to the selected region and installation.",
     inputSchema: objectSchema(
       properties: ["project_id": optionalOpaqueProjectIDSchema]
     ),
@@ -313,7 +318,8 @@ extension MCPServiceToolCatalog {
   static let listModels = Tool(
     name: MCPServiceToolName.listModels.rawValue,
     title: "List Codex models",
-    description: "List current Codex models and advertised reasoning efforts.",
+    description:
+      "List current Codex models and advertised reasoning efforts. For other registered Agents, use list_agent_models with installation_id from list_agents.",
     inputSchema: objectSchema(properties: [:]),
     annotations: readAnnotations,
     outputSchema: outputSchema(

@@ -153,7 +153,7 @@ extension RestrictedProjectFileService {
     guard currentDepth <= maximumDepth else { return }
     let children = try FileManager.default.contentsOfDirectory(
       at: directory,
-      includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey],
+      includingPropertiesForKeys: [],
       options: [.skipsPackageDescendants]
     ).sorted { $0.lastPathComponent < $1.lastPathComponent }
     for child in children {
@@ -172,11 +172,9 @@ extension RestrictedProjectFileService {
       else { continue }
       guard (try? ProjectPathResolver(root: project.primaryRoot).resolve(securePath)) != nil
       else { continue }
-      let values = try child.resourceValues(forKeys: [
-        .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey,
-      ])
-      guard values.isSymbolicLink != true else { continue }
-      let entryKind: ProjectDirectoryEntryKind = values.isDirectory == true ? .directory : .file
+      let values = try FileSystemEntryMetadata(at: child)
+      guard !values.isSymbolicLink else { continue }
+      let entryKind: ProjectDirectoryEntryKind = values.isDirectory ? .directory : .file
       guard kind.includes(entryKind) else {
         if entryKind == .directory, currentDepth < maximumDepth {
           try await enumerate(

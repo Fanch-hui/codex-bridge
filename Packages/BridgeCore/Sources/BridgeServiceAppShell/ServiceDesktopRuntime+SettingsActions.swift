@@ -63,22 +63,6 @@ extension BridgeServiceAppModel {
     }
   }
 
-  func setModelPreferences(_ preferences: IPCModelPreferences) {
-    let previous = modelPreferences
-    modelPreferences = preferences
-    runMutation { [weak self] client in
-      guard let self else { return }
-      do {
-        try await client.setModelPreferences(preferences)
-        await self.refresh(silent: true, includeCatalog: true)
-        self.postToast("模型偏好设置已更新")
-      } catch {
-        modelPreferences = previous
-        throw error
-      }
-    }
-  }
-
   func setExecutionModel(_ modelID: String) {
     guard let current = modelPreferences,
       let model = models.first(where: { $0.modelID == modelID })

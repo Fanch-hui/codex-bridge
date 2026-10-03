@@ -191,10 +191,10 @@ public actor DeepSeekHarnessACPEventNormalizer {
       binding: binding,
       providerItemID: request.toolCallID,
       kind: Self.approvalKind(request.kind ?? tool?.kind),
-      title: Self.safeText(title) ?? "DeepSeek Harness permission request",
+      title: ACPApprovalSanitizer.safeText(title) ?? "DeepSeek Harness permission request",
       relativePaths: Self.relativePaths(from: input, projectRoot: projectRoot),
-      normalizedCommand: Self.safeCommand(Self.stringValue(input, key: "command")),
-      networkTarget: Self.safeNetworkTarget(
+      normalizedCommand: ACPApprovalSanitizer.safeCommand(Self.stringValue(input, key: "command")),
+      networkTarget: ACPApprovalSanitizer.safeNetworkTarget(
         Self.stringValue(input, key: "url")
           ?? Self.stringValue(input, key: "uri")
           ?? Self.stringValue(input, key: "target")
@@ -257,14 +257,6 @@ public actor DeepSeekHarnessACPEventNormalizer {
     value?.objectValue?[key]?.stringValue
   }
 
-  private static func safeText(_ value: String) -> String? {
-    guard !value.isEmpty, value.utf8.count <= 8 * 1_024,
-      !value.contains("\0"), value.rangeOfCharacter(from: .controlCharacters) == nil,
-      !containsSensitiveMarker(value.lowercased())
-    else { return nil }
-    return value
-  }
-
   private static func childRuns(
     from input: ACPJSONValue,
     title: String?,
@@ -281,13 +273,14 @@ public actor DeepSeekHarnessACPEventNormalizer {
     ]
     .compactMap { object[$0]?.stringValue }
     .first
-    .flatMap(safeText)
+    .flatMap(ACPApprovalSanitizer.safeText)
     guard let id else { return [] }
     let name =
       ["name", "role", "agent"].compactMap { object[$0]?.stringValue }
-      .first.flatMap(safeText) ?? title.flatMap(safeText)
+      .first.flatMap(ACPApprovalSanitizer.safeText)
+      ?? title.flatMap(ACPApprovalSanitizer.safeText)
     let summary = ["summary", "result", "description"].compactMap { object[$0]?.stringValue }
-      .first.flatMap(safeText)
+      .first.flatMap(ACPApprovalSanitizer.safeText)
     guard
       let child = try? AgentChildRun(
         id: id,
@@ -298,11 +291,6 @@ public actor DeepSeekHarnessACPEventNormalizer {
       )
     else { return [] }
     return [child]
-  }
-
-  private static func safeCommand(_ value: String?) -> String? {
-    guard let value else { return nil }
-    return safeText(value)
   }
 
   private static func relativePaths(
@@ -320,7 +308,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
           value,
           projectRoot: projectRoot
         ),
-        !containsSensitiveMarker(path.lowercased())
+        !ACPApprovalSanitizer.containsSensitiveMarker(path.lowercased())
       else { continue }
       paths.insert(path)
     }
@@ -337,27 +325,4 @@ public actor DeepSeekHarnessACPEventNormalizer {
     }
   }
 
-  private static func safeNetworkTarget(_ value: String?) -> String? {
-    guard let value, value.utf8.count <= 4 * 1_024,
-      !value.contains("\0"), value.rangeOfCharacter(from: .controlCharacters) == nil,
-      let url = URLComponents(string: value),
-      let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
-      url.host != nil,
-      !containsSensitiveMarker(value.lowercased())
-    else { return nil }
-    var sanitized = url
-    sanitized.user = nil
-    sanitized.password = nil
-    sanitized.query = nil
-    sanitized.fragment = nil
-    guard let result = sanitized.string, result.utf8.count <= 4 * 1_024 else { return nil }
-    return result
-  }
-
-  private static func containsSensitiveMarker(_ value: String) -> Bool {
-    [
-      "token", "secret", "password", "passwd", "api_key", "apikey", "authorization",
-      "cookie", "private_key", ".env", ".ssh",
-    ].contains { value.contains($0) }
-  }
 }

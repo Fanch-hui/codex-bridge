@@ -26,8 +26,12 @@ extension ServiceAgentRegistry {
     }
 
     let createdAt = now()
-    let artifacts = try captureArtifacts(request.artifactRequests, at: createdAt)
     let installationID = makeInstallationID()
+    let artifacts = try await runtimeArtifacts(
+      provider: provider, installationID: installationID,
+      executablePath: identity.canonicalPath,
+      existing: captureArtifacts(request.artifactRequests, at: createdAt), at: createdAt
+    )
     let record = try await probeRecord(
       id: installationID,
       provider: provider,
@@ -84,8 +88,16 @@ extension ServiceAgentRegistry {
     }
 
     let currentArtifacts: [ServiceAgentInstallationArtifact]
+    let currentArchives: [AgentInstallationRuntimeArtifact]
     do {
-      currentArtifacts = try captureArtifacts(existing.artifacts, at: now())
+      currentArchives = try await archiveArtifacts(
+        provider: provider, installationID: existing.id,
+        executablePath: currentIdentity.canonicalPath)
+      currentArtifacts = try await runtimeArtifacts(
+        provider: provider, installationID: existing.id,
+        executablePath: currentIdentity.canonicalPath,
+        existing: captureArtifacts(existing.artifacts, at: now()), at: now()
+      )
     } catch {
       let review = try unavailableRecord(
         existing,
@@ -99,7 +111,9 @@ extension ServiceAgentRegistry {
       try await store.updateAgentInstallation(review)
       return review
     }
-    let artifactsChanged = !artifactsHaveSameContent(currentArtifacts, existing.artifacts)
+    let artifactsChanged =
+      !artifactsHaveSameContent(currentArtifacts, existing.artifacts)
+      || !archivesHaveSameContent(currentArchives, existing.runtimeArtifacts)
     if artifactsChanged, !acceptReplacement {
       let review = try unavailableRecord(
         existing,

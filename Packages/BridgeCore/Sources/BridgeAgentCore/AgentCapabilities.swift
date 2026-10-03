@@ -15,6 +15,8 @@ public enum AgentCapability: String, Codable, CaseIterable, Hashable, Sendable {
   case oneShotApproval = "approval.one_shot"
   case sessionRuleApproval = "approval.session_rule"
   case structuredApprovalPayload = "approval.structured_payload"
+  case structuredUserInput = "interaction.structured_user_input"
+  case readOnlyExecution = "execution.read_only"
   case workspaceRead = "workspace.read"
   case workspaceWriteInPlace = "workspace.write_in_place"
   case workspaceWriteIsolated = "workspace.write_isolated"
@@ -65,6 +67,13 @@ public struct AgentCapabilitySnapshot: Codable, Equatable, Sendable {
 public enum AgentMutationIntent: String, Codable, CaseIterable, Sendable {
   case readOnly = "read_only"
   case workspaceWrite = "workspace_write"
+
+  public func requiredCapabilities(for providerID: AgentProviderID) -> Set<AgentCapability> {
+    if self == .workspaceWrite { return [.workspaceRead, .workspaceWriteInPlace] }
+    // Older adapters retain their existing read-only contract.
+    return providerID == .pi || providerID == .qoder
+      ? [.workspaceRead, .readOnlyExecution] : [.workspaceRead]
+  }
 }
 
 public enum AgentWorkspaceStrategy: String, Codable, CaseIterable, Sendable {

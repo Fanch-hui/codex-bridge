@@ -28,10 +28,10 @@ extension BridgeDesktopUIStateBuilder {
       },
       selectedProjectID: selected?.projectID,
       selectedProjectDetail: projectDetailText(detail),
-      policyOptions: policyOptions,
-      readOptions: readOptions,
-      writeOptions: guardedPermissionOptions,
-      networkOptions: guardedPermissionOptions,
+      policyOptions: BridgeDesktopProjectPresentation.policyOptions,
+      readOptions: BridgeDesktopProjectPresentation.readPermissionOptions,
+      writeOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
+      networkOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
       workspace: detail?.directWorkspace.map(workspaceState),
       verificationCommands: detail?.verificationCommands ?? [],
       threadCount: detail?.threadCount,
@@ -49,7 +49,9 @@ extension BridgeDesktopUIStateBuilder {
           source: task.sourceDisplayName,
           provider: task.providerDisplayName,
           providerID: task.providerIdentifier,
-          status: taskStatusLabel(task.status),
+          status: WorkbenchTaskTextPresentation.sessionStatusLabel(
+            task.status, canContinue: canResume(task, model: model)
+          ),
           updatedAt: task.updatedAt,
           turnCount: session.turnCount,
           selected: session.tasks.contains(where: { $0.taskID == model.selectedTaskID }),
@@ -71,19 +73,6 @@ extension BridgeDesktopUIStateBuilder {
     )
   }
 
-  private static let readOptions = [
-    BridgeDesktopChoice(id: "denied", title: "拒绝"),
-    BridgeDesktopChoice(id: "allowed", title: "允许"),
-  ]
-
-  private static let guardedPermissionOptions = [
-    BridgeDesktopChoice(id: "denied", title: "拒绝"),
-    BridgeDesktopChoice(id: "requiresLocalApproval", title: "需要本机批准"),
-    BridgeDesktopChoice(id: "allowed", title: "允许"),
-  ]
-
-  private static let policyOptions = readOptions + guardedPermissionOptions.dropFirst()
-
   private static func projectDetailText(_ detail: MCPProjectDetail?) -> String? {
     guard let detail else { return nil }
     var lines = ["项目 ID：\(detail.projectID)"]
@@ -102,11 +91,7 @@ extension BridgeDesktopUIStateBuilder {
     BridgeDesktopWorkspaceState(
       fileWritePermission: workspace.fileWritePermission,
       commandMode: workspace.commandMode,
-      commandModeOptions: [
-        BridgeDesktopChoice(id: "denied", title: "禁止直接执行"),
-        BridgeDesktopChoice(id: "safe", title: "安全模式"),
-        BridgeDesktopChoice(id: "full", title: "完全模式"),
-      ],
+      commandModeOptions: BridgeDesktopProjectPresentation.workspaceCommandModeOptions,
       commands: workspace.commands.map {
         BridgeDesktopWorkspaceCommand(
           commandID: $0.commandID,

@@ -26,10 +26,23 @@ extension DeepSeekHarnessACPProvider {
     do {
       let sourceEnvironment = try await configuration.runtimeEnvironment(for: installation)
       let remoteModels =
-        DeepSeekHarnessACPModernLaunch.isModernEntry(installation.executablePath)
-        ? try await DeepSeekHarnessACPRemoteModels.fetch(environment: sourceEnvironment) : nil
+        DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation)
+        ? try await DeepSeekHarnessACPRemoteModels.fetch(
+          environment: sourceEnvironment,
+          usesMessagesProvider: DeepSeekHarnessACPRuntimeLayout.usesMessagesProvider(installation))
+        : nil
+      if DeepSeekHarnessACPRuntimeLayout.usesMessagesProvider(installation), remoteModels == nil {
+        throw DeepSeekHarnessModelCatalogError.missingCredential
+      }
+      if let remoteModels {
+        await remoteCatalogCache.store(
+          remoteModels, installation: installation, environment: sourceEnvironment)
+      }
       let launchModel = remoteModels.flatMap { models in
-        selectedModelID.flatMap { models.contains($0) ? $0 : nil } ?? models.first
+        selectedModelID.flatMap { selected in
+          let raw = DeepSeekHarnessACPModelRoutes.decode(selected)?.model ?? selected
+          return models.contains(raw) ? selected : nil
+        } ?? models.first
       }
       let launch = try configuration.launchBuilder.make(
         installation: installation,
@@ -124,57 +137,24 @@ extension DeepSeekHarnessACPProvider {
     }
   }
 
-  private struct ModelCatalogEntry: Equatable, Sendable {
-    let wireValue: String
-    let modelID: String
-    let displayName: String
-    let modernRoute: Bool
+  private typealias ModelCatalogEntry = DeepSeekHarnessACPModelRoutes.Entry
+
+  private static func modelCatalog(from option: DeepSeekHarnessACPConfigOption)
+    -> [ModelCatalogEntry]
+  {
+    DeepSeekHarnessACPModelRoutes.catalog(from: option)
   }
 
-  private static func modelCatalog(
-    from option: DeepSeekHarnessACPConfigOption
-  ) -> [ModelCatalogEntry] {
-    var seenIDs = Set<String>()
-    return option.values.compactMap { value in
-      let modelID = modelID(from: value.value) ?? value.value
-      guard seenIDs.insert(modelID).inserted else { return nil }
-      return ModelCatalogEntry(
-        wireValue: value.value,
-        modelID: modelID,
-        displayName: value.name,
-        modernRoute: modelID != value.value
-      )
-    }
-  }
-
-  private static func model(
-    for selectedModelID: String,
-    in catalog: [ModelCatalogEntry]
-  ) -> ModelCatalogEntry? {
-    catalog.first {
-      $0.modelID == selectedModelID || $0.wireValue == selectedModelID
-    }
+  private static func model(for selectedModelID: String, in catalog: [ModelCatalogEntry])
+    -> ModelCatalogEntry?
+  {
+    DeepSeekHarnessACPModelRoutes.model(for: selectedModelID, in: catalog)
   }
 
   private static func currentModelID(
-    in option: DeepSeekHarnessACPConfigOption,
-    catalog: [ModelCatalogEntry]
+    in option: DeepSeekHarnessACPConfigOption, catalog: [ModelCatalogEntry]
   ) -> String? {
-    guard let currentValue = option.currentValue else { return nil }
-    return catalog.first { $0.wireValue == currentValue }?.modelID
-      ?? catalog.first { $0.modelID == currentValue }?.modelID
-  }
-
-  private static func modelID(from wireValue: String) -> String? {
-    guard let data = wireValue.data(using: .utf8),
-      let route = try? JSONDecoder().decode([String].self, from: data),
-      route.count == 2,
-      let provider = route.first,
-      let model = route.last,
-      !provider.isEmpty,
-      !model.isEmpty
-    else { return nil }
-    return model
+    option.currentValue.flatMap { model(for: $0, in: catalog)?.modelID }
   }
 
   static func modelDescriptors(

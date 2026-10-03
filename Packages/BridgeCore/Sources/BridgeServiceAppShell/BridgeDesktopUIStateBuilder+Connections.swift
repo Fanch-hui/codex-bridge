@@ -23,6 +23,8 @@ extension BridgeDesktopUIStateBuilder {
       clients: clientRows(from: model),
       deepSeekHarnessMCPServers: deepSeekHarnessMCPRows(from: model),
       canManageDeepSeekHarnessMCP: model.connectionState == .connected,
+      selectedAgentMCPScope: model.selectedAgentMCPScope,
+      agentMCPScopeOptions: BridgeDesktopAgentMCPScope.allCases.map(\.choice),
       providers: model.agentProviders.map(providerRow),
       installations: model.agentInstallations.map {
         installationRow(
@@ -218,6 +220,8 @@ extension BridgeDesktopUIStateBuilder {
       discoveredExecutablePath: provider.discoveredExecutablePath,
       discoveredConfigurationPath: provider.discoveredConfigurationPath,
       configuredBaseURL: provider.configuredBaseURL,
+      configuredInferenceProtocol: provider.configuredInferenceProtocol,
+      configuredCatalogBaseURL: provider.configuredCatalogBaseURL,
       requiresConfiguration: provider.requiresConfiguration,
       requiresHeadlessAlwaysProceed: provider.requiresHeadlessAlwaysProceed,
       supportsModelSelection: provider.supportsModelSelection,
@@ -236,6 +240,7 @@ extension BridgeDesktopUIStateBuilder {
       installationID: installation.installationID,
       providerID: installation.providerID,
       displayName: installation.displayName,
+      distribution: installation.distribution,
       executablePath: installation.executablePath,
       version: installation.version,
       protocolRevision: installation.protocolRevision,

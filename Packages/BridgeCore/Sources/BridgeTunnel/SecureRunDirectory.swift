@@ -2,6 +2,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #endif
 
 #if !os(Windows)
@@ -17,7 +19,7 @@ import Foundation
       guard descriptor >= 0 else { throw TunnelManagerError.launchFailed }
       var metadata = stat()
       guard fstat(descriptor, &metadata) == 0 else {
-        Darwin.close(descriptor)
+        close(descriptor)
         throw TunnelManagerError.launchFailed
       }
       guard
@@ -25,13 +27,13 @@ import Foundation
         metadata.st_uid == geteuid(),
         metadata.st_mode & 0o777 == 0o700
       else {
-        Darwin.close(descriptor)
+        close(descriptor)
         throw TunnelManagerError.launchFailed
       }
       device = metadata.st_dev
       inode = metadata.st_ino
       guard matchesPath() else {
-        Darwin.close(descriptor)
+        close(descriptor)
         throw TunnelManagerError.launchFailed
       }
     }
@@ -61,7 +63,7 @@ import Foundation
         metadata.st_uid == geteuid(),
         metadata.st_mode & 0o777 == 0o700
       else {
-        Darwin.close(descriptor)
+        close(descriptor)
         _ = unlinkat(parent.descriptor, name, AT_REMOVEDIR)
         throw TunnelManagerError.launchFailed
       }
@@ -70,7 +72,7 @@ import Foundation
     }
 
     deinit {
-      Darwin.close(descriptor)
+      close(descriptor)
     }
 
     package func matchesPath() -> Bool {
@@ -104,7 +106,7 @@ import Foundation
       }
       let file = openat(descriptor, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
       guard file >= 0 else { throw TunnelHealthError.unavailable }
-      defer { Darwin.close(file) }
+      defer { close(file) }
 
       var metadata = stat()
       guard
@@ -122,7 +124,7 @@ import Foundation
       var result = Data()
       var buffer = [UInt8](repeating: 0, count: min(1_024, maximumBytes))
       while result.count <= maximumBytes {
-        let count = Darwin.read(file, &buffer, buffer.count)
+        let count = read(file, &buffer, buffer.count)
         if count == 0 { break }
         guard count > 0 else { throw TunnelHealthError.unavailable }
         result.append(buffer, count: count)

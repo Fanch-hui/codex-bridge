@@ -1,5 +1,9 @@
-#if canImport(Darwin)
-  import Darwin
+#if canImport(Darwin) || canImport(Glibc)
+  #if canImport(Darwin)
+    import Darwin
+  #else
+    import Glibc
+  #endif
   import Foundation
 
   extension SecureFileArtifactReader {
@@ -9,9 +13,9 @@
         .standardizedFileURL
         .path
       try SecureFileArtifactSnapshot.validateAbsolutePath(canonicalPath)
-      let descriptor = Darwin.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+      let descriptor = POSIXSystem.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
       guard descriptor >= 0 else { throw SecureFileArtifactError.openFailed }
-      defer { Darwin.close(descriptor) }
+      defer { POSIXSystem.close(descriptor) }
 
       var metadata = stat()
       guard fstat(descriptor, &metadata) == 0 else {
@@ -29,9 +33,9 @@
         .standardizedFileURL
         .path
       try SecureFileArtifactSnapshot.validateAbsolutePath(canonicalPath)
-      let descriptor = Darwin.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+      let descriptor = POSIXSystem.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
       guard descriptor >= 0 else { throw SecureFileArtifactError.openFailed }
-      defer { Darwin.close(descriptor) }
+      defer { POSIXSystem.close(descriptor) }
 
       var metadata = stat()
       guard fstat(descriptor, &metadata) == 0 else {
@@ -50,7 +54,7 @@
       while true {
         let requested = min(buffer.count, maximumBytes + 1 - result.count)
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, requested)
+          POSIXSystem.read(descriptor, bytes.baseAddress, requested)
         }
         if count == 0 { return result }
         if count < 0 {
@@ -70,7 +74,7 @@
       while result.count < maximumBytes {
         let requested = min(buffer.count, maximumBytes - result.count)
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, requested)
+          POSIXSystem.read(descriptor, bytes.baseAddress, requested)
         }
         if count == 0 { return result }
         if count < 0 {

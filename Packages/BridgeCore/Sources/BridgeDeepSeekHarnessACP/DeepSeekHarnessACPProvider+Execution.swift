@@ -15,12 +15,19 @@ extension DeepSeekHarnessACPProvider {
         request: request
       )
       let sourceEnvironment = try await configuration.runtimeEnvironment(for: installation)
+      let catalog = try await executionCatalog(
+        installation: installation, environment: sourceEnvironment)
+      if let catalog, let requested = request.model {
+        let raw = DeepSeekHarnessACPModelRoutes.decode(requested)?.model ?? requested
+        guard catalog.contains(raw) else { throw AgentRuntimeError.modelUnavailable(requested) }
+      }
       let launch = try configuration.launchBuilder.make(
         installation: installation,
         projectRoot: request.projectRoot,
         runDirectory: runDirectory,
         persistentStateDirectory: persistentStateDirectory,
         modelID: request.model,
+        catalogModelIDs: catalog,
         reasoningEffort: request.effort,
         mutationIntent: request.mutationIntent,
         networkAllowed: request.networkAccessRequested,
@@ -31,7 +38,7 @@ extension DeepSeekHarnessACPProvider {
       let initialization = try await connected.initialize()
       try validate(initialization)
       let capabilities = Self.capabilities(
-        executablePath: launch.resolvedExecutablePath,
+        installation: installation,
         initialization: initialization,
         persistenceAvailable: configuration.persistentStateBaseDirectory != nil
       )
@@ -44,7 +51,7 @@ extension DeepSeekHarnessACPProvider {
       let session: DeepSeekHarnessACPSession
       if let requestedSessionID = request.requestedSessionID {
         guard persistentStateDirectory != nil,
-          DeepSeekHarnessACPModernLaunch.isModernEntry(launch.resolvedExecutablePath),
+          DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation),
           initialization.supportsResumeSession
         else {
           throw AgentRuntimeError.capabilityUnavailable(.sessionContinue)
@@ -56,11 +63,11 @@ extension DeepSeekHarnessACPProvider {
       } else {
         session = try await connected.newSession(cwd: request.projectRoot, mcpServers: mcpServers)
       }
-      try await applyRequestedSelection(
-        request: request,
-        session: session,
-        client: connected
-      )
+      if request.requestedSessionID != nil
+        || DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation)
+      {
+        try await applyRequestedSelection(request: request, session: session, client: connected)
+      }
       let binding = try AgentBinding(
         providerID: .deepSeekHarness,
         installationID: installation.id,
@@ -81,8 +88,7 @@ extension DeepSeekHarnessACPProvider {
         initialClientEventSequence: initialSequence,
         inactivityTimeout: configuration.inactivityTimeout,
         eventBufferLimit: configuration.eventBufferLimit,
-        requiresExecutionEvidence: !DeepSeekHarnessACPModernLaunch.isModernEntry(
-          launch.resolvedExecutablePath),
+        requiresExecutionEvidence: !DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation),
         cleanup: {
           DeepSeekHarnessACPLaunchBuilder.removeRunDirectory(launch.runDirectory)
         }
@@ -115,6 +121,24 @@ extension DeepSeekHarnessACPProvider {
     }
   }
 
+  func executionCatalog(
+    installation: AgentInstallation, environment: [String: String]
+  ) async throws -> [String]? {
+    guard DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation) else { return nil }
+    if let cached = await remoteCatalogCache.models(
+      installation: installation, environment: environment)
+    {
+      return cached
+    }
+    let catalog = try await DeepSeekHarnessACPRemoteModels.fetch(
+      environment: environment,
+      usesMessagesProvider: DeepSeekHarnessACPRuntimeLayout.usesMessagesProvider(installation))
+    if let catalog {
+      await remoteCatalogCache.store(catalog, installation: installation, environment: environment)
+    }
+    return catalog
+  }
+
   private func validate(
     request: AgentExecutionRequest,
     installation: AgentInstallation
@@ -131,11 +155,10 @@ extension DeepSeekHarnessACPProvider {
     else {
       throw AgentRuntimeError.invalidRequest("request.workspaceStrategy")
     }
-    _ = try configuration.launchBuilder.profile.resolvedSelection(
-      for: installation,
-      modelID: request.model,
-      reasoningEffort: request.effort
-    )
+    if !DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation) {
+      _ = try configuration.launchBuilder.profile.resolvedSelection(
+        for: installation, modelID: request.model, reasoningEffort: request.effort)
+    }
     guard
       request.profileID == nil || request.profileID == DeepSeekHarnessACPProfiles.controlledReadOnly
     else {

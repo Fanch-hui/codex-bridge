@@ -11,12 +11,20 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case readProjectFile = "read_project_file"
   case listThreads = "list_threads"
   case readThread = "read_thread"
+  case listAgentNativeSessions = "list_agent_native_sessions"
+  case readAgentNativeSession = "read_agent_native_session"
+  case indexAgentNativeSession = "index_agent_native_session"
+  case renameAgentNativeSession = "rename_agent_native_session"
+  case deleteAgentNativeSession = "delete_agent_native_session"
   case listModels = "list_models"
+  case listAgentModels = "list_agent_models"
   case listSkills = "list_skills"
   case readSkill = "read_skill"
   case runSkillAction = "run_skill_action"
   case listTasks = "list_tasks"
   case getTask = "get_task"
+  case waitTask = "wait_task"
+  case answerUserInput = "answer_user_input"
   case submitTask = "submit_task"
   case steerTask = "steer_task"
   case interruptTask = "interrupt_task"
@@ -41,6 +49,7 @@ enum MCPServiceToolRoute: Sendable {
   case readOnly
   case task
   case direct
+  case nativeSessionDirectory
 }
 
 struct MCPServiceToolContract: Sendable {
@@ -55,7 +64,7 @@ struct MCPServiceToolContract: Sendable {
 }
 
 public struct MCPServiceToolCatalog: Sendable {
-  public static let contractVersion = "1.3.0"
+  public static let contractVersion = "1.3.6"
 
   public let definitions: [Tool]
 
@@ -87,13 +96,29 @@ public struct MCPServiceToolCatalog: Sendable {
     contract(.readProjectFile, readProjectFile, exposure: .readOnly, route: .readOnly),
     contract(.listThreads, listThreads, exposure: .readOnly, route: .readOnly),
     contract(.readThread, readThread, exposure: .readOnly, route: .readOnly),
+    contract(
+      .listAgentNativeSessions, listAgentNativeSessions, exposure: .readOnly, route: .readOnly),
+    contract(
+      .readAgentNativeSession, readAgentNativeSession, exposure: .readOnly, route: .readOnly),
     contract(.listModels, listModels, exposure: .readOnly, route: .readOnly),
+    contract(.listAgentModels, listAgentModels, exposure: .readOnly, route: .readOnly),
     contract(.listSkills, listSkills, exposure: .readOnly, route: .readOnly),
     contract(.readSkill, readSkill, exposure: .readOnly, route: .readOnly),
     contract(.listTasks, listTasks, exposure: .readOnly, route: .task),
     contract(.getTask, getTask, exposure: .readOnly, route: .task),
+    contract(.waitTask, waitTask, exposure: .readOnly, route: .task),
     contract(.getProjectChanges, getProjectChanges, exposure: .readOnly, route: .readOnly),
     contract(.listProjectCommands, listProjectCommands, exposure: .readOnly, route: .readOnly),
+    contract(
+      .indexAgentNativeSession, indexAgentNativeSession, exposure: .full,
+      route: .nativeSessionDirectory),
+    contract(
+      .renameAgentNativeSession, renameAgentNativeSession, exposure: .full,
+      route: .nativeSessionDirectory),
+    contract(
+      .deleteAgentNativeSession, deleteAgentNativeSession, exposure: .full,
+      route: .nativeSessionDirectory),
+    contract(.answerUserInput, answerUserInput, exposure: .full, route: .task),
     contract(.submitTask, submitTask, exposure: .full, route: .task),
     contract(.runSkillAction, runSkillAction, exposure: .full, route: .task),
     contract(.steerTask, steerTask, exposure: .full, route: .task),

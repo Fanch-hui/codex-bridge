@@ -23,6 +23,9 @@ extension BridgeServiceApplication {
     baseURL: String?,
     apiKey: String?,
     candidates: [ServiceAgentRegistrationRequest],
+    inferenceProtocol: DeepSeekHarnessConnectionProtocol? = nil,
+    catalogBaseURL: String? = nil,
+    qoderDistribution: QoderDistribution? = nil,
     alwaysProceedConfirmed: Bool = false,
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
@@ -32,7 +35,16 @@ extension BridgeServiceApplication {
       providerID: providerID,
       confirmed: alwaysProceedConfirmed
     )
-    let matchingCandidates = candidates.filter { $0.providerID == providerID }
+    let matchingCandidates = candidates.filter { candidate in
+      guard candidate.providerID == providerID else { return false }
+      guard providerID == .qoder else { return true }
+      return qoderDistribution.map {
+        QoderDistribution.identify(executablePath: candidate.executablePath) == $0
+      } ?? false
+    }
+    if providerID == .qoder, qoderDistribution == nil {
+      throw BridgeMCPQueryError.contractRejected
+    }
     guard !matchingCandidates.isEmpty else {
       throw ServiceAgentConnectionError.installationNotFound
     }
@@ -47,7 +59,9 @@ extension BridgeServiceApplication {
     for candidate in matchingCandidates {
       try Self.checkDeadline(deadline)
       do {
-        try await configureConnectionCredentials(candidate, baseURL: baseURL, apiKey: apiKey)
+        try await configureConnectionCredentials(
+          candidate, baseURL: baseURL, apiKey: apiKey,
+          inferenceProtocol: inferenceProtocol, catalogBaseURL: catalogBaseURL)
         let record = try await registry.connect(candidate)
         if record.availability == .available {
           do {
@@ -62,6 +76,19 @@ extension BridgeServiceApplication {
               _ = try? await registry.setEnabled(false, installationID: record.id)
             }
             throw error
+          }
+          if providerID == .qoder, let qoderDistribution {
+            try await settings.setQoderInstallationDistribution(
+              installationID: record.id.rawValue, distribution: qoderDistribution)
+            let current = try await settings.qoderRuntimeSettings(distribution: qoderDistribution)
+            try await settings.setQoderRuntimeSettings(
+              ServiceQoderRuntimeSettings(
+                distribution: qoderDistribution,
+                activeInstallationID: record.id.rawValue,
+                nodeExecutablePath: current.nodeExecutablePath,
+                sdkRoot: current.sdkRoot
+              )
+            )
           }
           return record
         }
@@ -112,24 +139,37 @@ extension BridgeServiceApplication {
   private func configureConnectionCredentials(
     _ candidate: ServiceAgentRegistrationRequest,
     baseURL: String?,
-    apiKey: String?
+    apiKey: String?,
+    inferenceProtocol: DeepSeekHarnessConnectionProtocol?,
+    catalogBaseURL: String?
   ) async throws {
-    guard baseURL != nil || apiKey != nil else { return }
+    guard baseURL != nil || apiKey != nil || inferenceProtocol != nil || catalogBaseURL != nil
+    else { return }
     guard candidate.providerID == .deepSeekHarness else {
       throw ServiceAgentCredentialError.unsupportedProvider(candidate.providerID)
     }
-    guard let baseURL else { throw ServiceAgentCredentialError.invalidBaseURL }
-    guard let apiKey else { throw ServiceAgentCredentialError.invalidAPIKey }
+    let stored = try await settings.deepSeekHarnessConnectionConfiguration()
+    guard let baseURL = baseURL ?? stored?.baseURL else {
+      throw ServiceAgentCredentialError.invalidBaseURL
+    }
+    guard apiKey != nil || stored != nil else {
+      throw ServiceAgentCredentialError.invalidAPIKey
+    }
     guard let configurationPath = candidate.configurationPath, let agentCredentials else {
       throw ServiceAgentCredentialError.invalidConfigurationPath
     }
     try await agentCredentials.configureDeepSeekHarness(
       baseURL: baseURL,
       apiKey: apiKey,
-      configurationPath: configurationPath
+      configurationPath: configurationPath,
+      inferenceProtocol: inferenceProtocol ?? stored?.inferenceProtocol,
+      catalogBaseURL: inferenceProtocol == nil
+        ? catalogBaseURL ?? stored?.catalogBaseURL : catalogBaseURL
     )
-    let normalizedBaseURL = await agentCredentials.configuredDeepSeekBaseURL(for: configurationPath)
-    try await settings.set(normalizedBaseURL, for: .deepSeekHarnessBaseURL)
+    if let connection = await agentCredentials.configuredDeepSeekConnection(for: configurationPath)
+    {
+      try await settings.setDeepSeekHarnessConnectionConfiguration(connection)
+    }
     try await settings.set(configurationPath, for: .deepSeekHarnessManagedConfigurationPath)
   }
 

@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import BridgeProjects
 import Foundation
@@ -18,13 +19,13 @@ extension SimpleServiceStore {
           network_allowed, access_mode, fast_mode, current_step, changed_files_json,
           result_summary, supervisor_summary, failure_code, created_at, updated_at,
           provider_id, installation_id, selection_mode, provider_session_id, provider_run_id,
-          queue_if_busy, queue_state
+          queue_if_busy, queue_state, selected_skills_json
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?
         )
         """,
-      arguments: Self.taskArguments(task, changedFiles: changedFiles)
+      arguments: try Self.taskArguments(task, changedFiles: changedFiles)
     )
   }
 
@@ -159,13 +160,14 @@ extension SimpleServiceStore {
   ) throws {
     try db.execute(
       sql: """
-        INSERT INTO bridge_service_task_events (task_id, kind, summary, created_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO bridge_service_task_events (task_id, kind, summary, details, created_at)
+        VALUES (?, ?, ?, ?, ?)
         """,
       arguments: [
         taskID.rawValue,
         event.kind.rawValue,
         event.summary,
+        event.details,
         event.createdAt.timeIntervalSince1970,
       ]
     )
@@ -222,8 +224,12 @@ extension SimpleServiceStore {
   static func taskArguments(
     _ task: ServiceTaskRecord,
     changedFiles: Data
-  ) -> StatementArguments {
-    [
+  ) throws -> StatementArguments {
+    let selectedSkills = try JSONEncoder().encode(task.selectedSkills)
+    guard selectedSkills.count <= 2 * 1_024 * 1_024 else {
+      throw ServiceStoreError.invalidArgument("task.selectedSkills")
+    }
+    return [
       task.id.rawValue,
       task.projectID.rawValue,
       task.source.rawValue,
@@ -257,6 +263,7 @@ extension SimpleServiceStore {
       task.state.providerRunID,
       task.queueIfBusy ? 1 : 0,
       task.isQueued ? "queued" : "active",
+      selectedSkills,
     ]
   }
 
@@ -452,6 +459,8 @@ extension SimpleServiceStore {
       accessMode: accessMode,
       fastMode: fastModeValue == 1,
       queueIfBusy: queueIfBusyValue == 1,
+      selectedSkills: try JSONDecoder().decode(
+        [AgentSelectedSkill].self, from: row["selected_skills_json"]),
       isQueued: queueState == "queued",
       state: state,
       createdAt: Date(timeIntervalSince1970: row["created_at"]),
@@ -468,6 +477,7 @@ extension SimpleServiceStore {
       taskID: TaskID(rawValue: row["task_id"]),
       kind: kind,
       summary: row["summary"],
+      details: row["details"],
       createdAt: Date(timeIntervalSince1970: row["created_at"])
     )
   }

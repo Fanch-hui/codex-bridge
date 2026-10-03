@@ -38,7 +38,7 @@ extension BridgeServiceClient {
   }
 }
 
-#if os(Windows)
+#if os(Windows) || os(Linux)
   extension BridgeServiceClient {
     public func shutdownService() async throws -> IPCServiceShutdownResponse {
       let response: IPCServiceShutdownResponse = try await call(

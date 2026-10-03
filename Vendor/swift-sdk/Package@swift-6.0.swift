@@ -42,6 +42,6 @@ let package = Package(
         .target(
             name: "MCP",
             dependencies: targetDependencies),
-
+        
     ]
 )

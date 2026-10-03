@@ -9,33 +9,46 @@ public protocol ServiceRequestListener: AnyObject, Sendable {
 }
 
 public enum ServiceListenerFactory {
-  public static func makeListener(
-    composition: ServiceComposition
-  ) -> any ServiceRequestListener {
-    #if os(macOS)
-      return BridgeServiceXPCListener(
-        mode: .machService(BridgeServiceIPC.machServiceName),
-        composition: composition
-      )
-    #elseif os(Windows)
-      do {
-        return try makeListenerOrThrow(composition: composition)
-      } catch {
-        fatalError("Windows named pipe security could not be initialized.")
-      }
-    #else
-      fatalError("No service listener for this platform.")
-    #endif
-  }
+  #if os(Linux)
+    public static func makeListener(
+      composition: ServiceComposition
+    ) throws -> any ServiceRequestListener {
+      try makeListenerOrThrow(composition: composition)
+    }
+  #else
+    public static func makeListener(
+      composition: ServiceComposition
+    ) -> any ServiceRequestListener {
+      #if os(macOS)
+        return BridgeServiceXPCListener(
+          mode: .machService(BridgeServiceIPC.machServiceName),
+          composition: composition
+        )
+      #elseif os(Windows)
+        do {
+          return try makeListenerOrThrow(composition: composition)
+        } catch {
+          fatalError("Windows named pipe security could not be initialized.")
+        }
+      #else
+        fatalError("No service listener for this platform.")
+      #endif
+    }
 
-  #if os(Windows)
+  #endif
+
+  #if os(Windows) || os(Linux)
     static func makeListenerOrThrow(
       composition: ServiceComposition
     ) throws -> any ServiceRequestListener {
-      try BridgeServicePipeListener(
-        pipeName: WindowsPipeIdentity.currentPipeName(),
-        composition: composition
-      )
+      #if os(Windows)
+        return try BridgeServicePipeListener(
+          pipeName: WindowsPipeIdentity.currentPipeName(),
+          composition: composition
+        )
+      #else
+        return try BridgeServiceSocketListener(composition: composition)
+      #endif
     }
   #endif
 }

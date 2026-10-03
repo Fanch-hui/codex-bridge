@@ -33,6 +33,11 @@ public struct PendingDirectApproval: Codable, Equatable, Sendable {
   }
 }
 
+public enum DirectApprovalRequestResult: Equatable, Sendable {
+  case pending(String)
+  case denied
+}
+
 public enum DirectApprovalError: Error, Equatable, Sendable {
   case expired
   case denied
@@ -72,6 +77,7 @@ public actor DirectActionApprovalCenter {
     return digest.map { String(format: "%02x", $0) }.joined()
   }
 
+  @available(*, deprecated, message: "Use requestApproval(...) to distinguish denial.")
   public func request(
     projectID: String,
     kind: DirectApprovalKind,
@@ -79,14 +85,33 @@ public actor DirectActionApprovalCenter {
     payloadDigest: String,
     clientRequestID: String?
   ) -> String {
+    switch requestApproval(
+      projectID: projectID,
+      kind: kind,
+      summary: summary,
+      payloadDigest: payloadDigest,
+      clientRequestID: clientRequestID
+    ) {
+    case .pending(let approvalID):
+      return approvalID
+    case .denied:
+      return Self.deniedApprovalID(
+        for: Self.key(payloadDigest: payloadDigest, clientRequestID: clientRequestID))
+    }
+  }
+
+  public func requestApproval(
+    projectID: String,
+    kind: DirectApprovalKind,
+    summary: String,
+    payloadDigest: String,
+    clientRequestID: String?
+  ) -> DirectApprovalRequestResult {
     expireIfNeeded()
     let key = Self.key(payloadDigest: payloadDigest, clientRequestID: clientRequestID)
     if let deniedAt = deniedKeys[key] {
       if Date().timeIntervalSince(deniedAt) < denyLifetime {
-        // A denial is a cooldown, not another approval request. Keep the
-        // source-compatible String return while returning an unapprovable
-        // marker to legacy callers; no pending item is created.
-        return Self.deniedApprovalID(for: key)
+        return .denied
       }
       deniedKeys[key] = nil
     }
@@ -99,7 +124,7 @@ public actor DirectActionApprovalCenter {
       createdAt: Date()
     )
     changes.publish()
-    return approvalID
+    return .pending(approvalID)
   }
 
   public func pendingApprovals() -> [PendingDirectApproval] {

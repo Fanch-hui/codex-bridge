@@ -68,6 +68,10 @@ enum DeepSeekHarnessACPArtifactRuntime {
   }
 
   static func findSourceRoot(startingAt executable: String) throws -> String {
+    if isPublishedPackage(executable) {
+      return URL(fileURLWithPath: executable).deletingLastPathComponent()
+        .deletingLastPathComponent().path
+    }
     var candidate = AgentPathSemantics.directoryPath(of: executable)
     var matches: [String] = []
     while let candidatePath = candidate {
@@ -96,6 +100,7 @@ enum DeepSeekHarnessACPArtifactRuntime {
     let shebangCandidates = try shebangInterpreters(at: executablePath)
     let pathCandidates =
       shebangCandidates
+      + adjacentNodeCandidates(executablePath)
       + trustedNodeCandidates(
         sourceEnvironment: sourceEnvironment
       )
@@ -160,10 +165,43 @@ enum DeepSeekHarnessACPArtifactRuntime {
     return candidates
   }
 
+  static func isPublishedPackage(_ executable: String) -> Bool {
+    DeepSeekHarnessACPModernLaunch.isModernEntry(executable)
+      && executable.replacingOccurrences(of: "\\", with: "/").contains(
+        "/node_modules/@deepseek-ai/dsh/lib/bin.js")
+  }
+
+  private static func adjacentNodeCandidates(_ executable: String) -> [String] {
+    var directory = URL(fileURLWithPath: executable).deletingLastPathComponent()
+    var paths: [String] = []
+    #if os(Windows)
+      let name = "node.exe"
+    #else
+      let name = "node"
+    #endif
+    for _ in 0..<8 {
+      paths.append(directory.appendingPathComponent(name).path)
+      paths.append(directory.appendingPathComponent("bin/" + name).path)
+      let parent = directory.deletingLastPathComponent()
+      if parent == directory { break }
+      directory = parent
+    }
+    return paths
+  }
+
   static func dependencyLockPath(in sourceRoot: String) throws -> String {
-    for name in ["pnpm-lock.yaml", "package-lock.json", "npm-shrinkwrap.json"] {
-      let path = try DeepSeekHarnessACPPathSupport.append(name, to: sourceRoot)
-      if FileManager.default.fileExists(atPath: path) { return path }
+    var directory = URL(fileURLWithPath: sourceRoot)
+    let npm = isPublishedPackage(directory.appendingPathComponent("lib/bin.js").path)
+    for _ in 0..<(npm ? 8 : 1) {
+      for name in [
+        "pnpm-lock.yaml", "package-lock.json", "npm-shrinkwrap.json", ".package-lock.json",
+      ] {
+        let path = directory.appendingPathComponent(name).path
+        if FileManager.default.fileExists(atPath: path) { return path }
+      }
+      let parent = directory.deletingLastPathComponent()
+      if parent == directory { break }
+      directory = parent
     }
     throw DeepSeekHarnessACPError.artifactInvalid("dependency_lock")
   }
@@ -183,8 +221,15 @@ enum DeepSeekHarnessACPArtifactRuntime {
 
   static func commonSourceRoot(_ manifest: String, _ lock: String) throws -> String {
     guard let manifestRoot = AgentPathSemantics.directoryPath(of: manifest),
-      let lockRoot = AgentPathSemantics.directoryPath(of: lock),
-      DeepSeekHarnessACPPathSupport.samePath(manifestRoot, lockRoot)
+      let lockRoot = AgentPathSemantics.directoryPath(of: lock)
+    else {
+      throw DeepSeekHarnessACPError.artifactInvalid("source_root")
+    }
+    if DeepSeekHarnessACPPathSupport.samePath(manifestRoot, lockRoot) { return manifestRoot }
+    guard
+      isPublishedPackage(
+        URL(fileURLWithPath: manifestRoot).appendingPathComponent("lib/bin.js").path),
+      AgentPathSemantics.isContained(manifestRoot, in: lockRoot)
     else {
       throw DeepSeekHarnessACPError.artifactInvalid("source_root")
     }

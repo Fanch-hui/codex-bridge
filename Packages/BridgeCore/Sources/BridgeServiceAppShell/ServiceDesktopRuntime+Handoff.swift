@@ -21,7 +21,8 @@ extension BridgeServiceAppModel {
         }
         self.recordWorkbenchCommandReceipt(
           requestID: requestID, command: "handoffTask", taskID: task.taskID, input: prompt,
-          accepted: true, message: response.message, handoff: response)
+          accepted: true, message: response.message, handoff: response,
+          resultingTaskID: response.targetTaskID)
       } catch {
         self.rejectWorkbenchCommand(
           requestID: requestID, command: "handoffTask", taskID: task.taskID, input: prompt,

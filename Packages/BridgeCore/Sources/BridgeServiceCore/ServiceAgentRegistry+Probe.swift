@@ -15,6 +15,8 @@ extension ServiceAgentRegistry {
     artifacts: [ServiceAgentInstallationArtifact],
     createdAt: Date
   ) async throws -> ServiceAgentInstallationRecord {
+    let runtimeArtifacts = try await archiveArtifacts(
+      provider: provider, installationID: id, executablePath: identity.canonicalPath)
     let installation = try AgentInstallation(
       id: id,
       providerID: provider.descriptor.providerID,
@@ -29,7 +31,8 @@ extension ServiceAgentRegistry {
           modificationTimeNanoseconds: artifact.identity.modificationTimeNanoseconds,
           sha256: artifact.identity.sha256
         )
-      }
+      },
+      runtimeArtifacts: runtimeArtifacts
     )
     let request = try AgentProbeRequest(
       installation: installation,
@@ -52,6 +55,7 @@ extension ServiceAgentRegistry {
         isEnabled: isEnabled,
         result: result,
         artifacts: artifacts,
+        runtimeArtifacts: runtimeArtifacts,
         reason: "The executable changed while the Probe was running.",
         completedAt: completedAt,
         createdAt: createdAt
@@ -69,6 +73,7 @@ extension ServiceAgentRegistry {
         isEnabled: isEnabled,
         result: result,
         artifacts: artifacts,
+        runtimeArtifacts: runtimeArtifacts,
         reason: "The executable changed while the Probe was running.",
         completedAt: completedAt,
         createdAt: createdAt
@@ -94,12 +99,15 @@ extension ServiceAgentRegistry {
         isEnabled: isEnabled,
         result: result,
         artifacts: artifacts,
+        runtimeArtifacts: runtimeArtifacts,
         reason: "A registered installation artifact changed while the Probe was running.",
         completedAt: completedAt,
         createdAt: createdAt
       )
     }
-    guard artifactsHaveSameIdentity(observedArtifacts, artifacts) else {
+    guard artifactsHaveSameIdentity(observedArtifacts, artifacts),
+      (try? captureArchiveArtifacts(runtimeArtifacts)) == runtimeArtifacts
+    else {
       return try probeReviewRecord(
         id: id,
         provider: provider,
@@ -111,6 +119,7 @@ extension ServiceAgentRegistry {
         isEnabled: isEnabled,
         result: result,
         artifacts: artifacts,
+        runtimeArtifacts: runtimeArtifacts,
         reason: "A registered installation artifact changed while the Probe was running.",
         completedAt: completedAt,
         createdAt: createdAt
@@ -151,6 +160,7 @@ extension ServiceAgentRegistry {
       availability: availability,
       capabilities: available ? result.capabilities : .empty,
       artifacts: artifacts,
+      runtimeArtifacts: runtimeArtifacts,
       lastProbeError: reason,
       lastProbedAt: completedAt,
       createdAt: createdAt,
@@ -169,6 +179,7 @@ extension ServiceAgentRegistry {
     isEnabled: Bool,
     result: AgentProbeResult,
     artifacts: [ServiceAgentInstallationArtifact],
+    runtimeArtifacts: [AgentInstallationRuntimeArtifact],
     reason: String,
     completedAt: Date,
     createdAt: Date
@@ -188,6 +199,7 @@ extension ServiceAgentRegistry {
       availability: .needsReview,
       capabilities: .empty,
       artifacts: artifacts,
+      runtimeArtifacts: runtimeArtifacts,
       lastProbeError: reason,
       lastProbedAt: completedAt,
       createdAt: createdAt,
@@ -219,6 +231,7 @@ extension ServiceAgentRegistry {
       availability: availability,
       capabilities: .empty,
       artifacts: artifacts ?? existing.artifacts,
+      runtimeArtifacts: existing.runtimeArtifacts,
       lastProbeError: reason,
       lastProbedAt: probedAt,
       createdAt: existing.createdAt,

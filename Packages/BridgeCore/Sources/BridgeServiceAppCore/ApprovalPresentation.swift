@@ -33,9 +33,10 @@ public enum ApprovalPresentation {
     projectName: String? = nil
   ) -> Item {
     let project = projectName ?? approval.taskID
+    let rowPrefix = approval.kind == "user_input" ? "需要回答" : "安全审批"
     return Item(
       id: .task(approval.approvalID),
-      rowText: "安全审批 · \(compact(approval.title)) — \(project)",
+      rowText: "\(rowPrefix) · \(compact(approval.title)) — \(project)",
       detailText: taskDetails(approval, projectName: project),
       allowDecisions: allowDecisions(for: approval)
     )
@@ -80,7 +81,7 @@ public enum ApprovalPresentation {
     projectName: String
   ) -> String {
     var lines = [
-      "类型：任务审批（\(approval.kind)）",
+      approval.kind == "user_input" ? "类型：结构化提问" : "类型：任务审批（\(approval.kind)）",
       "标题：\(approval.title)",
       "项目：\(projectName)",
       "任务：\(approval.taskID)",

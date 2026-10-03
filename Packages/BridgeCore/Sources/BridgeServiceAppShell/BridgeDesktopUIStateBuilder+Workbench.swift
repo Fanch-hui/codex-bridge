@@ -29,6 +29,7 @@ extension BridgeDesktopUIStateBuilder {
       selectedTaskID: model.selectedTaskID,
       selectedTask: selectedTask(from: model),
       history: threadHistory(from: model),
+      nativeSessions: nativeSessions(from: model),
       approvals: approvals(from: model),
       steerModes: steerModes(from: model),
       browser: browserSlot(from: model),
@@ -43,36 +44,48 @@ extension BridgeDesktopUIStateBuilder {
     )
   }
 
+  private static func nativeSessions(
+    from model: BridgeServiceAppModel
+  ) -> BridgeDesktopNativeSessionDirectoryState {
+    let candidates = model.agentInstallations.map { item in
+      BridgeDesktopNativeSessionInstallationCandidate(
+        installationID: item.installationID,
+        providerID: item.providerID,
+        displayName: item.displayName,
+        region: item.distribution,
+        isEnabled: item.isEnabled,
+        availability: item.availability
+      )
+    }
+    return BridgeDesktopNativeSessionDirectoryPresentation.state(
+      candidates: candidates,
+      prior: model.nativeSessionDirectory
+    )
+  }
+
   private static func projectStatus(
     from model: BridgeServiceAppModel
   ) -> (String, String) {
     if let taskID = model.selectedTaskID,
       let task = model.tasks.first(where: { $0.taskID == taskID })
     {
-      if hasPendingUserInput(task, model: model) {
+      let pendingUserInput = hasPendingUserInput(task, model: model)
+      if pendingUserInput {
         return ("等待回答", "warning")
       }
       if task.isRunning {
         return ("运行中", "running")
       }
       let status = displayStatus(task, model: model)
-      let tone = hasPendingUserInput(task, model: model) ? "warning" : statusTone(task.status)
+      let tone =
+        pendingUserInput
+        ? "warning" : BridgeDesktopWorkbenchPresentation.statusTone(for: task.status)
       return (status, tone)
     }
     if model.runningTaskCount > 0 {
       return ("运行中", "running")
     }
     return ("就绪", "success")
-  }
-
-  private static func statusTone(_ status: String) -> String {
-    switch status {
-    case "running", "starting": "running"
-    case "completed": "success"
-    case "failed": "error"
-    case "等待回答", "awaiting_local_approval", "waiting_for_codex_approval": "warning"
-    default: "neutral"
-    }
   }
 
   private static func engineStatus(from model: BridgeServiceAppModel) -> String {
@@ -86,31 +99,34 @@ extension BridgeDesktopUIStateBuilder {
     return CodexActivityPresentation(
       task: task,
       activity: model.conversation?.activity ?? .idle,
-      pendingUserInput: task.map { hasPendingUserInput($0, model: model) } ?? false
+      pendingUserInput: task.map { hasPendingUserInput($0, model: model) } ?? false,
+      canContinue: task.map { canResume($0, model: model) } ?? false
     ).statusText
   }
-
-  private static let permissionOptions = [
-    BridgeDesktopChoice(id: "read-only", title: "只读", detail: "不写入项目文件"),
-    BridgeDesktopChoice(id: "workspace-write", title: "工作区可写", detail: "遵循项目权限与本机批准"),
-  ]
 
   private static func steerModes(
     from model: BridgeServiceAppModel
   ) -> [BridgeDesktopChoice] {
-    var result = [BridgeDesktopChoice(id: "queued", title: "当前轮结束后继续")]
-    guard let taskID = model.selectedTaskID,
+    return BridgeDesktopWorkbenchPresentation.steerModes(
+      supportsImmediateSteer: canSteerImmediately(
+        taskID: model.selectedTaskID, model: model
+      )
+    )
+  }
+
+  private static var permissionOptions: [BridgeDesktopChoice] {
+    BridgeDesktopWorkbenchPermissionMode.choices
+  }
+
+  private static func canSteerImmediately(
+    taskID: String?, model: BridgeServiceAppModel
+  ) -> Bool {
+    guard let taskID,
       let installationID = model.tasks.first(where: { $0.taskID == taskID })?.installationID,
       model.agentInstallations.first(where: { $0.installationID == installationID })?
         .effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
-    else { return result }
-    result.append(
-      BridgeDesktopChoice(
-        id: "interrupt-current-then-continue",
-        title: "立即纠偏当前轮"
-      )
-    )
-    return result
+    else { return false }
+    return true
   }
 
   private static func taskRow(
@@ -224,7 +240,11 @@ extension BridgeDesktopUIStateBuilder {
     _ task: MCPServiceTaskSnapshot,
     model: BridgeServiceAppModel
   ) -> String {
-    hasPendingUserInput(task, model: model) ? "等待回答" : taskStatusLabel(task.status)
+    hasPendingUserInput(task, model: model)
+      ? "等待回答"
+      : WorkbenchTaskTextPresentation.sessionStatusLabel(
+        task.status, canContinue: canResume(task, model: model)
+      )
   }
 
   private static func desktopQuestion(
@@ -234,8 +254,11 @@ extension BridgeDesktopUIStateBuilder {
       id: question.id,
       header: question.header,
       question: question.question,
+      inputType: question.inputType,
       isOther: question.isOther,
       isSecret: question.isSecret,
+      allowsMultiple: question.allowsMultiple,
+      isRequired: question.isRequired,
       options: question.options.map {
         BridgeDesktopApprovalOption(label: $0.label, description: $0.description)
       }

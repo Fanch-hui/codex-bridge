@@ -29,8 +29,12 @@ extension MCPServiceToolDispatcher {
       return try await callListThreads(arguments)
     case .readThread:
       return try await callReadThread(arguments)
+    case .listAgentNativeSessions, .readAgentNativeSession:
+      return try await callNativeSessionDirectory(name, arguments: arguments)
     case .listModels:
       return try await callListModels(arguments)
+    case .listAgentModels:
+      return try await callListAgentModels(arguments)
     case .listSkills:
       return try await callListSkills(arguments)
     case .readSkill:

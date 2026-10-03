@@ -1,9 +1,30 @@
 // swift-tools-version: 6.1
+
 import Foundation
 import PackageDescription
 
+
 var macOSOnlyProducts: [Product] = []
 var macOSOnlyTargets: [Target] = []
+
+var linuxOnlyProducts: [Product] = []
+var linuxOnlyTargets: [Target] = []
+var linuxDesktopDependencies: [Target.Dependency] = []
+#if os(Linux)
+  linuxDesktopDependencies = ["CLinuxDesktop"]
+  linuxOnlyProducts = [
+    .executable(name: "codex-bridge-linux-app", targets: ["CodexBridgeLinuxApp"])
+  ]
+  linuxOnlyTargets = [
+    .systemLibrary(
+      name: "CWebKitGTK", pkgConfig: "webkit2gtk-4.1",
+      providers: [.apt(["libwebkit2gtk-4.1-dev"])]
+    ),
+    .target(name: "CLinuxDesktop", dependencies: ["CWebKitGTK"]),
+    .executableTarget(name: "CodexBridgeLinuxApp", dependencies: ["BridgeDesktopShell"]),
+  ]
+#endif
+
 var windowsApplicationLinkerFlags = [
   "-Xlinker", "/SUBSYSTEM:WINDOWS",
   "-Xlinker", "/ENTRY:mainCRTStartup",
@@ -18,13 +39,31 @@ var windowsApplicationLinkerFlags = [
   }
 #endif
 
-#if !os(Windows)
-  macOSOnlyProducts = [.library(name: "BridgeServiceAppShell", targets: ["BridgeServiceAppShell"])]
+#if os(macOS)
+  macOSOnlyProducts = [
+    .library(name: "BridgeServiceAppShell", targets: ["BridgeServiceAppShell"]),
+    
+    
+    
+  ]
   macOSOnlyTargets = [
     .target(
       name: "BridgeServiceAppShell",
-      dependencies: ["BridgeDesktopUI", "BridgeIPC", "BridgeMCP", "BridgeServiceAppCore"])
+      dependencies: [
+        "BridgeAgentCore",
+        "BridgeDesktopUI",
+        "BridgeIPC",
+        "BridgeMCP",
+        "BridgeServiceAppCore",
+      ]
+    ),
+    
+    
+    
   ]
+#endif
+
+#if os(Windows)
 #endif
 
 let package = Package(
@@ -48,6 +87,8 @@ let package = Package(
     .library(name: "BridgeOpenCodeACP", targets: ["BridgeOpenCodeACP"]),
     .library(name: "BridgeDeepSeekHarnessACP", targets: ["BridgeDeepSeekHarnessACP"]),
     .library(name: "BridgeAntigravityCLI", targets: ["BridgeAntigravityCLI"]),
+    .library(name: "BridgePiRPC", targets: ["BridgePiRPC"]),
+    .library(name: "BridgeQoderSDK", targets: ["BridgeQoderSDK"]),
     .library(name: "BridgeProcess", targets: ["BridgeProcess"]),
     .library(name: "BridgeServiceApplication", targets: ["BridgeServiceApplication"]),
     .library(name: "BridgeDirectCommand", targets: ["BridgeDirectCommand"]),
@@ -55,13 +96,14 @@ let package = Package(
     .library(name: "BridgeServiceHost", targets: ["BridgeServiceHost"]),
     .library(name: "BridgeServiceAppCore", targets: ["BridgeServiceAppCore"]),
     .library(name: "BridgeWindowsShell", targets: ["BridgeWindowsShell"]),
+    .library(name: "BridgeDesktopShell", targets: ["BridgeDesktopShell"]),
     .executable(name: "codex-bridge-service", targets: ["CodexBridgeServiceExecutable"]),
     .executable(
       name: "codex-bridge-windows-app",
       targets: ["CodexBridgeWindowsApp"]
     ),
-
-  ] + macOSOnlyProducts,
+    
+  ] + macOSOnlyProducts + linuxOnlyProducts,
   dependencies: [
     // Vendored MCP swift-sdk 0.12.1: upstream excludes the EventSource
     // dependency on Windows while importing it unconditionally, which breaks
@@ -91,7 +133,7 @@ let package = Package(
   targets: [
     .target(
       name: "BridgeDesktopUI",
-      dependencies: ["BridgeServiceAppCore"],
+      dependencies: ["BridgeServiceAppCore", "BridgeAgentCore"],
       resources: [.process("Resources")]
     ),
     .target(name: "BridgeDomain"),
@@ -129,6 +171,7 @@ let package = Package(
     .target(
       name: "BridgeMCP",
       dependencies: [
+        "BridgeAgentCore",
         "BridgeDomain",
         "BridgeFiles",
         "BridgeSkills",
@@ -244,6 +287,16 @@ let package = Package(
     ),
     .target(name: "BridgeProcess"),
     .target(
+      name: "BridgePiRPC",
+      dependencies: ["BridgeAgentCore", "BridgeDomain", "BridgeProcess", "BridgeSecurity"],
+      resources: [.copy("Resources/PiBridgeExtension"), .copy("Resources/PiNativeHistory")]
+    ),
+    .target(
+      name: "BridgeQoderSDK",
+      dependencies: ["BridgeACP", "BridgeAgentCore", "BridgeDomain", "BridgeSecurity"],
+      resources: [.copy("Resources/QoderHost")]
+    ),
+    .target(
       name: "BridgeDirectCommand",
       dependencies: [
         "BridgeAgentCore",
@@ -264,6 +317,8 @@ let package = Package(
       dependencies: [
         "BridgeAgentCore",
         "BridgeAntigravityCLI",
+        "BridgePiRPC",
+        "BridgeQoderSDK",
         "BridgeCodexRPC",
         "BridgeCodexService",
         "BridgeDirectCommand",
@@ -291,14 +346,15 @@ let package = Package(
       ]
     ),
     .target(
-      name: "BridgeWindowsShell",
+      name: "BridgeDesktopShell",
       dependencies: [
         "BridgeDesktopUI",
         "BridgeIPC",
         "BridgeMCP",
         "BridgeServiceAppCore",
-      ]
+      ] + linuxDesktopDependencies
     ),
+    .target(name: "BridgeWindowsShell", dependencies: ["BridgeDesktopShell"]),
     .executableTarget(
       name: "CodexBridgeServiceExecutable",
       dependencies: ["BridgeServiceHost"]
@@ -316,6 +372,6 @@ let package = Package(
         )
       ]
     ),
-
-  ] + macOSOnlyTargets
+    
+  ] + macOSOnlyTargets + linuxOnlyTargets
 )

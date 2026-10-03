@@ -31,6 +31,7 @@ public struct IPCDeepSeekHarnessMCPSecretSummary: Codable, Equatable, Sendable {
 }
 
 public struct IPCDeepSeekHarnessMCPServerInput: Codable, Equatable, Sendable {
+  public let scope: String?
   public let id: String
   public let name: String
   public let enabled: Bool
@@ -50,8 +51,10 @@ public struct IPCDeepSeekHarnessMCPServerInput: Codable, Equatable, Sendable {
     args: [String] = [],
     url: String? = nil,
     environment: [IPCDeepSeekHarnessMCPSecretInput] = [],
-    headers: [IPCDeepSeekHarnessMCPSecretInput] = []
+    headers: [IPCDeepSeekHarnessMCPSecretInput] = [],
+    scope: String? = nil
   ) {
+    self.scope = scope
     self.id = id
     self.name = name
     self.enabled = enabled
@@ -64,6 +67,7 @@ public struct IPCDeepSeekHarnessMCPServerInput: Codable, Equatable, Sendable {
   }
 
   private enum CodingKeys: String, CodingKey {
+    case scope
     case id
     case name
     case enabled
@@ -132,8 +136,16 @@ public struct IPCDeepSeekHarnessMCPListResponse: Codable, Equatable, Sendable {
 
 public struct IPCDeepSeekHarnessMCPDeleteRequest: Codable, Equatable, Sendable {
   public let id: String
+  public let scope: String?
 
-  public init(id: String) {
+  public init(id: String, scope: String? = nil) {
     self.id = id
+    self.scope = scope
   }
+}
+
+public struct IPCAgentMCPListRequest: Codable, Equatable, Sendable {
+  public let scope: String?
+
+  public init(scope: String? = nil) { self.scope = scope }
 }

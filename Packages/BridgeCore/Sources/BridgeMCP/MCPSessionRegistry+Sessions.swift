@@ -112,10 +112,10 @@ extension MCPSessionRegistry {
 
   func createSession(
     for request: HTTPRequest,
-    clientID: MCPClientID
+    clientID: MCPClientID,
+    admissionToken: MCPClientAdmissionGate.Token?
   ) async -> HTTPResponse {
-    let admissionToken = clientAdmission?.token(for: clientID)
-    guard clientAdmission == nil || admissionToken != nil else {
+    guard isAdmissionCurrent(admissionToken, for: clientID) else {
       return .error(statusCode: 503, .internalError("MCP client unavailable"))
     }
     let retiredServers = retireQwenSessionsForAdmission(clientID: clientID)

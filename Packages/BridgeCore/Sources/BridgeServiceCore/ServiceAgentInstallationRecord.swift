@@ -16,6 +16,7 @@ public struct ServiceAgentInstallationRecord: Codable, Equatable, Sendable {
   public let availability: ServiceAgentInstallationAvailability
   public let capabilities: AgentCapabilitySnapshot
   public let artifacts: [ServiceAgentInstallationArtifact]
+  public let runtimeArtifacts: [AgentInstallationRuntimeArtifact]
   public let lastProbeError: String?
   public let lastProbedAt: Date?
   public let createdAt: Date
@@ -40,6 +41,7 @@ public struct ServiceAgentInstallationRecord: Codable, Equatable, Sendable {
     availability: ServiceAgentInstallationAvailability,
     capabilities: AgentCapabilitySnapshot,
     artifacts: [ServiceAgentInstallationArtifact] = [],
+    runtimeArtifacts: [AgentInstallationRuntimeArtifact] = [],
     lastProbeError: String? = nil,
     lastProbedAt: Date? = nil,
     createdAt: Date,
@@ -133,6 +135,8 @@ public struct ServiceAgentInstallationRecord: Codable, Equatable, Sendable {
     self.isEnabled = isEnabled
     self.availability = availability
     self.capabilities = capabilities
+    try AgentInstallationRuntimeArtifact.validate(runtimeArtifacts)
+    self.runtimeArtifacts = runtimeArtifacts
     self.artifacts = artifacts.sorted { $0.role.rawValue < $1.role.rawValue }
     self.lastProbeError = lastProbeError
     self.lastProbedAt = lastProbedAt
@@ -155,6 +159,7 @@ public struct ServiceAgentInstallationRecord: Codable, Equatable, Sendable {
     case availability
     case capabilities
     case artifacts
+    case runtimeArtifacts
     case lastProbeError
     case lastProbedAt
     case createdAt
@@ -187,6 +192,8 @@ public struct ServiceAgentInstallationRecord: Codable, Equatable, Sendable {
         [ServiceAgentInstallationArtifact].self,
         forKey: .artifacts
       ) ?? [],
+      runtimeArtifacts: container.decodeIfPresent(
+        [AgentInstallationRuntimeArtifact].self, forKey: .runtimeArtifacts) ?? [],
       lastProbeError: container.decodeIfPresent(String.self, forKey: .lastProbeError),
       lastProbedAt: container.decodeIfPresent(Date.self, forKey: .lastProbedAt),
       createdAt: container.decode(Date.self, forKey: .createdAt),
@@ -211,7 +218,8 @@ public struct ServiceAgentInstallationRecord: Codable, Equatable, Sendable {
           modificationTimeNanoseconds: artifact.identity.modificationTimeNanoseconds,
           sha256: artifact.identity.sha256
         )
-      }
+      },
+      runtimeArtifacts: runtimeArtifacts
     )
   }
 
@@ -233,6 +241,7 @@ public struct ServiceAgentInstallationRecord: Codable, Equatable, Sendable {
       availability: availability,
       capabilities: capabilities,
       artifacts: artifacts,
+      runtimeArtifacts: runtimeArtifacts,
       lastProbeError: lastProbeError,
       lastProbedAt: lastProbedAt,
       createdAt: createdAt,

@@ -5,6 +5,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #endif
 
 enum ServiceAgentAutoDiscovery {
@@ -15,13 +17,33 @@ enum ServiceAgentAutoDiscovery {
     credentialsProvided: Bool = false,
     environment: [String: String] = ToolDiscoveryEnvironment.current(),
     allowGeneratedConfiguration: Bool = true,
-    discoveredExecutablePath: String? = nil
+    discoveredExecutablePath: String? = nil,
+    qoderDistribution: QoderDistribution? = nil,
+    qoderDistributionsByExecutablePath: [String: QoderDistribution] = [:]
   ) throws -> [ServiceAgentRegistrationRequest] {
     var existingPaths = existingInstallations.map(\.executablePath)
     if let discoveredExecutablePath {
       existingPaths.insert(discoveredExecutablePath, at: 0)
     }
     switch providerID {
+    case .qoder:
+      return try qoderRequests(
+        existingPaths: existingPaths, environment: environment,
+        allowInstallationSearch: discoveredExecutablePath == nil,
+        distribution: qoderDistribution,
+        distributionsByExecutablePath: qoderDistributionsByExecutablePath
+      )
+    case .pi:
+      return try commandLineRequests(
+        providerID: providerID,
+        names: ["pi"],
+        displayName: "Pi",
+        trustProfile: .userTrusted,
+        securityProfileID: AgentProfileID(rawValue: "pi-managed"),
+        existingPaths: existingPaths,
+        environment: environment,
+        allowInstallationSearch: discoveredExecutablePath == nil
+      )
     case .openCode:
       return try commandLineRequests(
         providerID: providerID,
@@ -89,7 +111,8 @@ enum ServiceAgentAutoDiscovery {
     #if os(Windows)
       if allowInstallationSearch {
         let initialHasUsableCandidate = paths.contains { path in
-          guard let canonical = canonicalExecutable(path) else { return false }
+          guard let canonical = canonicalExecutable(path, allowJavaScript: providerID == .qoder)
+          else { return false }
           return isCommandLineExecutable(canonical)
         }
         let searchResolver: AgentExecutableResolver
@@ -114,7 +137,7 @@ enum ServiceAgentAutoDiscovery {
     #endif
     var seen = Set<String>()
     return try paths.compactMap { path in
-      guard let canonical = canonicalExecutable(path),
+      guard let canonical = canonicalExecutable(path, allowJavaScript: providerID == .qoder),
         isCommandLineExecutable(canonical),
         seen.insert(pathKey(canonical)).inserted
       else { return nil }
@@ -136,6 +159,8 @@ enum ServiceAgentAutoDiscovery {
     var directories = [
       pathJoin(home, ".opencode", "bin"),
       pathJoin(home, ".antigravity", "bin"),
+      pathJoin(home, ".qoder-cn", "bin"),
+      pathJoin(home, ".qoder", "bin"),
       pathJoin(home, ".local", "bin"),
     ]
     #if os(Windows)
@@ -149,6 +174,9 @@ enum ServiceAgentAutoDiscovery {
       if let local = environmentValue("LOCALAPPDATA", environment: environment) {
         directories.append(pathJoin(local, "Programs", "nodejs"))
       }
+    #elseif os(Linux)
+      directories.append(
+        contentsOf: LinuxAgentInstallationDirectories.search(environment: environment))
     #else
       directories.append(contentsOf: macOSAgentSearchDirectories(environment: environment))
     #endif
@@ -166,13 +194,15 @@ enum ServiceAgentAutoDiscovery {
     }
   #endif
 
-  private static func canonicalExecutable(_ path: String) -> String? {
+  private static func canonicalExecutable(_ path: String, allowJavaScript: Bool = false) -> String?
+  {
     guard let canonical = canonicalRegularFile(path) else { return nil }
     #if os(Windows)
       let lower = canonical.lowercased()
       guard
         lower.hasSuffix(".exe") || lower.hasSuffix(".com") || lower.hasSuffix(".cmd")
           || lower.hasSuffix(".bat")
+          || (allowJavaScript && [".js", ".mjs", ".cjs"].contains(where: lower.hasSuffix))
       else { return nil }
     #endif
     return canonical
@@ -183,7 +213,7 @@ enum ServiceAgentAutoDiscovery {
       path.rangeOfCharacter(from: .controlCharacters) == nil
     else { return nil }
     let canonical = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
-    #if canImport(Darwin)
+    #if canImport(Darwin) || canImport(Glibc)
       var metadata = stat()
       guard stat(canonical, &metadata) == 0,
         metadata.st_mode & S_IFMT == S_IFREG

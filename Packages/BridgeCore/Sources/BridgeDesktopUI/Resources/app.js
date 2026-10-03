@@ -24,7 +24,7 @@
     var root = document.documentElement;
     if (context && context.platform) {
       root.dataset.platform = context.platform;
-    } else if (root.dataset.platform !== "windows") {
+    } else if (root.dataset.platform !== "windows" && root.dataset.platform !== "linux") {
       root.removeAttribute("data-platform");
     }
   }
@@ -155,7 +155,7 @@
   }
 
   function recentTaskTone(status) {
-    if (status === "completed" || status === "已完成") return "success";
+    if (status === "completed" || status === "已完成" || status === "已创建") return "success";
     if (status === "failed" || status === "失败") return "error";
     if (["running", "starting", "运行中", "正在启动"].includes(status)) return "running";
     if (/approval|等待|审批/.test(status)) return "warning";

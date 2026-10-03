@@ -199,7 +199,9 @@ public actor ServiceCodexCatalog {
     }
     switch result {
     case .success(let models):
-      modelCache = ModelCacheEntry(models: models, fetchedAt: clock.now)
+      if inFlight.generation == modelsFetchGeneration {
+        modelCache = ModelCacheEntry(models: models, fetchedAt: clock.now)
+      }
       try Self.checkDeadline(deadline)
       return models
     case .failure(let error):
@@ -209,7 +211,7 @@ public actor ServiceCodexCatalog {
   }
 
   public func refreshModels(deadline: ContinuousClock.Instant) async throws -> MCPModelList {
-    modelCache = nil
+    invalidateModelCache()
     return try await listModels(deadline: deadline)
   }
 
@@ -217,6 +219,8 @@ public actor ServiceCodexCatalog {
   /// app-server configuration.
   public func invalidateModelCache() {
     modelCache = nil
+    inFlightModels = nil
+    modelsFetchGeneration += 1
   }
 
   private func makeModelsFetchTask() -> Task<MCPModelList, any Error> {
@@ -233,25 +237,18 @@ public actor ServiceCodexCatalog {
     configuration: ServiceCodexCatalogConfiguration,
     deadline: ContinuousClock.Instant
   ) async throws -> MCPModelList {
-    try await withClient(configuration: configuration, deadline: deadline) { client in
-      var cursor: String?
-      var models: [MCPModelSummary] = []
-      for _ in 0..<8 {
-        try checkDeadline(deadline)
-        let page = try await client.listModels(
-          ModelListParams(cursor: cursor, limit: 100, includeHidden: false)
-        )
-        models.append(contentsOf: try page.data.map(Self.model))
-        guard let next = page.nextCursor, !next.isEmpty, next != cursor else {
-          guard Set(models.map(\.modelID)).count == models.count else {
-            throw BridgeMCPQueryError.unavailable
-          }
-          return MCPModelList(models: models)
-        }
-        cursor = next
+    for _ in 0..<2 {
+      let models = try await withClient(configuration: configuration, deadline: deadline) {
+        client in
+        try await ServiceCodexCatalogModelFetch.models(client: client, deadline: deadline)
       }
-      throw BridgeMCPQueryError.unavailable
+      if let models {
+        return MCPModelList(models: try models.map(Self.model))
+      }
     }
+    throw BridgeMCPQueryError.codexAppServerUnavailable(
+      "Codex could not refresh its model catalog. Check the Codex connection and try fetching models again."
+    )
   }
 
   private func withClient<Output: Sendable>(

@@ -3,6 +3,8 @@ import Foundation
 
 #if canImport(Darwin)
   import Darwin
+#elseif canImport(Glibc)
+  import Glibc
 #elseif os(Windows)
   import WinSDK
 #endif
@@ -126,16 +128,16 @@ public struct ServiceAgentExecutableIdentity: Codable, Equatable, Sendable {
         modificationTimeNanoseconds: modificationTime,
         sha256: digest
       )
-    #elseif canImport(Darwin)
+    #elseif canImport(Darwin) || canImport(Glibc)
       let canonicalPath = URL(fileURLWithPath: executablePath)
         .resolvingSymlinksInPath()
         .standardizedFileURL
         .path
-      let descriptor = Darwin.open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+      let descriptor = open(canonicalPath, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
       guard descriptor >= 0 else {
         throw ServiceStoreError.invalidArgument("agentInstallation.executablePath")
       }
-      defer { Darwin.close(descriptor) }
+      defer { close(descriptor) }
 
       var before = stat()
       guard fstat(descriptor, &before) == 0 else {
@@ -162,7 +164,7 @@ public struct ServiceAgentExecutableIdentity: Codable, Equatable, Sendable {
     #endif
   }
 
-  #if canImport(Darwin)
+  #if canImport(Darwin) || canImport(Glibc)
     private static func validateExecutable(_ metadata: stat) throws {
       let executableBits = mode_t(S_IXUSR | S_IXGRP | S_IXOTH)
       guard metadata.st_mode & S_IFMT == S_IFREG,
@@ -182,7 +184,7 @@ public struct ServiceAgentExecutableIdentity: Codable, Equatable, Sendable {
       var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
       while true {
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, bytes.count)
+          read(descriptor, bytes.baseAddress, bytes.count)
         }
         if count == 0 { break }
         if count < 0 {
@@ -198,13 +200,21 @@ public struct ServiceAgentExecutableIdentity: Codable, Equatable, Sendable {
       first.st_dev == second.st_dev
         && first.st_ino == second.st_ino
         && first.st_size == second.st_size
-        && first.st_mtimespec.tv_sec == second.st_mtimespec.tv_sec
-        && first.st_mtimespec.tv_nsec == second.st_mtimespec.tv_nsec
+        && modificationTimestamp(first).tv_sec == modificationTimestamp(second).tv_sec
+        && modificationTimestamp(first).tv_nsec == modificationTimestamp(second).tv_nsec
+    }
+
+    private static func modificationTimestamp(_ metadata: stat) -> timespec {
+      #if os(Linux)
+        metadata.st_mtim
+      #else
+        metadata.st_mtimespec
+      #endif
     }
 
     private static func modificationTimeNanoseconds(_ metadata: stat) throws -> Int64 {
-      let seconds = Int64(metadata.st_mtimespec.tv_sec)
-      let nanoseconds = Int64(metadata.st_mtimespec.tv_nsec)
+      let seconds = Int64(modificationTimestamp(metadata).tv_sec)
+      let nanoseconds = Int64(modificationTimestamp(metadata).tv_nsec)
       guard seconds >= 0, (0..<1_000_000_000).contains(nanoseconds) else {
         throw ServiceStoreError.invalidArgument("agentInstallation.executableIdentity")
       }

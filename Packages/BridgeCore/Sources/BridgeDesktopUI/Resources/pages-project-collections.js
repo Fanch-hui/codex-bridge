@@ -123,7 +123,7 @@
     open.appendChild(S.icon("bubble.left.and.text.bubble.right.fill", "icon"));
     var copy = S.node("div", "row-main");
     copy.appendChild(S.node("div", "row-title", session.title || "未命名会话"));
-    copy.appendChild(S.node("div", "row-detail", session.turnCount + " 轮 · " + session.status));
+    copy.appendChild(S.node("div", "row-detail", session.status));
     open.appendChild(copy);
     open.addEventListener("click", function () { emit("selectTask", { taskID: session.taskID }); });
     row.appendChild(open);

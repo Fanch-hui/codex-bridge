@@ -16,6 +16,8 @@ public struct AgentTaskBrief: Sendable {
   public let permissionMode: ServicePermissionMode
   public let profileID: AgentProfileID?
   public let networkAllowed: Bool
+  public let attachments: [AgentImageAttachment]
+  public let selectedSkills: [AgentSelectedSkill]
   // Retained for source compatibility; external providers own their tool approval policy.
   public let accessMode: ServiceAccessMode
 
@@ -36,7 +38,9 @@ public struct AgentTaskBrief: Sendable {
     permissionMode: ServicePermissionMode = .readOnly,
     profileID: AgentProfileID? = nil,
     networkAllowed: Bool,
-    accessMode: ServiceAccessMode = .requestApproval
+    accessMode: ServiceAccessMode = .requestApproval,
+    attachments: [AgentImageAttachment] = [],
+    selectedSkills: [AgentSelectedSkill] = []
   ) {
     self.taskID = taskID
     self.providerID = providerID
@@ -51,6 +55,8 @@ public struct AgentTaskBrief: Sendable {
     self.profileID = profileID
     self.networkAllowed = networkAllowed
     self.accessMode = accessMode
+    self.attachments = attachments
+    self.selectedSkills = selectedSkills
   }
 }
 
@@ -63,6 +69,7 @@ public struct AgentTaskRunHandle: Sendable {
   public let interruptAndSteer: (@Sendable (String) async throws -> Void)?
   public let shutdown: @Sendable () async -> Void
   public let resolveApproval: (@Sendable (String, String) async throws -> Void)?
+  public let resolveUserInput: (@Sendable (String, AgentUserInputResponse) async throws -> Void)?
 
   public init(
     sessionID: String?,
@@ -72,7 +79,8 @@ public struct AgentTaskRunHandle: Sendable {
     steer: (@Sendable (String) async throws -> Void)? = nil,
     interruptAndSteer: (@Sendable (String) async throws -> Void)? = nil,
     shutdown: @escaping @Sendable () async -> Void,
-    resolveApproval: (@Sendable (String, String) async throws -> Void)? = nil
+    resolveApproval: (@Sendable (String, String) async throws -> Void)? = nil,
+    resolveUserInput: (@Sendable (String, AgentUserInputResponse) async throws -> Void)? = nil
   ) {
     self.sessionID = sessionID
     self.runID = runID
@@ -82,6 +90,7 @@ public struct AgentTaskRunHandle: Sendable {
     self.interruptAndSteer = interruptAndSteer
     self.shutdown = shutdown
     self.resolveApproval = resolveApproval
+    self.resolveUserInput = resolveUserInput
   }
 }
 
@@ -133,10 +142,9 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
     if let profileID = brief.profileID, record.securityProfileID != profileID {
       throw AgentRuntimeError.invalidRequest("request.profileID")
     }
-    var requiredCapabilities: Set<AgentCapability> =
-      brief.permissionMode == .workspaceWrite
-      ? [.workspaceRead, .workspaceWriteInPlace]
-      : [.workspaceRead]
+    let mutationIntent: AgentMutationIntent =
+      brief.permissionMode == .workspaceWrite ? .workspaceWrite : .readOnly
+    var requiredCapabilities = mutationIntent.requiredCapabilities(for: record.providerID)
     if brief.requestedSessionID != nil {
       requiredCapabilities.insert(.sessionContinue)
     }
@@ -181,7 +189,9 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
         ? .exclusiveProject : .sharedProject,
       networkAccessRequested: brief.networkAllowed,
       toolApprovalPolicy: brief.toolApprovalPolicy,
-      requiredCapabilities: requiredCapabilities
+      requiredCapabilities: requiredCapabilities,
+      attachments: brief.attachments,
+      selectedSkills: brief.selectedSkills
     )
     let handle = try await provider.start(request, installation: installation)
     guard handle.taskID == brief.taskID,
@@ -205,7 +215,8 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
       shutdown: handle.control.shutdown ?? {
         try? await handle.control.interrupt()
       },
-      resolveApproval: handle.control.resolveApproval
+      resolveApproval: handle.control.resolveApproval,
+      resolveUserInput: handle.control.resolveUserInput
     )
   }
 }

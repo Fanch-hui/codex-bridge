@@ -7,6 +7,16 @@ import WebKit
 struct BridgeDesktopWebView: NSViewRepresentable {
   @ObservedObject var model: BridgeServiceAppModel
 
+  static let websiteDataStoreIdentifier = UUID(
+    uuid: (
+      0x63, 0x6F, 0x64, 0x65, 0x78, 0x62, 0x72, 0x69,
+      0x64, 0x67, 0x65, 0x64, 0x65, 0x73, 0x6B, 0x31
+    ))
+
+  static func websiteDataStore() -> WKWebsiteDataStore {
+    WKWebsiteDataStore(forIdentifier: websiteDataStoreIdentifier)
+  }
+
   func makeCoordinator() -> Coordinator {
     Coordinator(model: model)
   }
@@ -16,7 +26,7 @@ struct BridgeDesktopWebView: NSViewRepresentable {
     userContentController.add(context.coordinator, name: "bridgeDesktopUI")
 
     let configuration = WKWebViewConfiguration()
-    configuration.websiteDataStore = .nonPersistent()
+    configuration.websiteDataStore = Self.websiteDataStore()
     configuration.userContentController = userContentController
     configuration.defaultWebpagePreferences.allowsContentJavaScript = true
     let webView = WKWebView(frame: .zero, configuration: configuration)

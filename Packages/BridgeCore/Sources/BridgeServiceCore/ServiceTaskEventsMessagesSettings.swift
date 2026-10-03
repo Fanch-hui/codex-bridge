@@ -11,6 +11,8 @@ public enum ServiceTaskEventKind: String, Codable, CaseIterable, Sendable {
   case fileChanged = "execution.file_changed"
   case approvalRequested = "approval.requested"
   case approvalResolved = "approval.resolved"
+  case userInputRequested = "user_input.requested"
+  case userInputResolved = "user_input.resolved"
   case supervisorStarted = "supervisor.started"
   case supervisorDecision = "supervisor.decision"
   case supervisorDegraded = "supervisor.degraded"
@@ -24,13 +26,22 @@ public enum ServiceTaskEventKind: String, Codable, CaseIterable, Sendable {
 public struct ServiceTaskEventDraft: Codable, Equatable, Sendable {
   public let kind: ServiceTaskEventKind
   public let summary: String
+  public let details: String?
   public let createdAt: Date
 
-  public init(kind: ServiceTaskEventKind, summary: String, createdAt: Date) throws {
+  public init(
+    kind: ServiceTaskEventKind,
+    summary: String,
+    details: String? = nil,
+    createdAt: Date
+  ) throws {
     try ServiceValidation.text(summary, field: "taskEvent.summary", maximumBytes: 8 * 1_024)
+    try ServiceValidation.optionalText(
+      details, field: "taskEvent.details", maximumBytes: 64 * 1_024)
     try ServiceValidation.date(createdAt, field: "taskEvent.createdAt")
     self.kind = kind
     self.summary = summary
+    self.details = details
     self.createdAt = createdAt
   }
 }
@@ -173,6 +184,7 @@ public struct ServiceTaskEventRecord: Codable, Equatable, Sendable {
   public let taskID: TaskID
   public let kind: ServiceTaskEventKind
   public let summary: String
+  public let details: String?
   public let createdAt: Date
 
   public init(
@@ -180,16 +192,20 @@ public struct ServiceTaskEventRecord: Codable, Equatable, Sendable {
     taskID: TaskID,
     kind: ServiceTaskEventKind,
     summary: String,
+    details: String? = nil,
     createdAt: Date
   ) throws {
     guard id > 0 else { throw ServiceStoreError.invalidArgument("taskEvent.id") }
     try ServiceValidation.identifier(taskID.rawValue, field: "taskEvent.taskID", maximumBytes: 128)
     try ServiceValidation.text(summary, field: "taskEvent.summary", maximumBytes: 8 * 1_024)
+    try ServiceValidation.optionalText(
+      details, field: "taskEvent.details", maximumBytes: 64 * 1_024)
     try ServiceValidation.date(createdAt, field: "taskEvent.createdAt")
     self.id = id
     self.taskID = taskID
     self.kind = kind
     self.summary = summary
+    self.details = details
     self.createdAt = createdAt
   }
 }

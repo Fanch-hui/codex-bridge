@@ -1,13 +1,13 @@
 (function (global) {
   "use strict";
 
-  var S = global.CodexBridgeDesktopPageSupport;
-  var drafts = new Map(), pendingSubmissions = new Map(), currentKey = null;
+  var S = global.CodexBridgeDesktopPageSupport, P = global.CodexBridgeDesktopWorkbenchSubmissions;
+  var drafts = new Map(), currentKey = null, currentPage = null;
   var persistedDrafts, draftStorageKey = "codexbridge.workbench.drafts.v1";
-  var submissionSequence = 0;
   var controls = null, status = null;
 
   function render(page, emit) {
+    currentPage = page;
     var footer = document.getElementById("workbench-inspector-footer");
     if (!controls) {
       controls = S.node("div", "workbench-controls");
@@ -25,22 +25,22 @@
       }
     }
     var detail = page && page.selectedTask;
-    controls.__receiptID = page && page.commandReceipt ? page.commandReceipt.receiptID : null;
     acknowledgeSubmission(page);
     var modes = page ? S.safeArray(page.steerModes) : [];
-    var kind = detail && detail.canSteer === true ? "steer" : detail && (detail.canResume || detail.canRestart) ? "retry" : "";
-    var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, detail.canRestart, modes]) : "";
+    var canRetry = !!(detail && detail.canRestart);
+    var kind = detail && detail.canSteer === true ? "steer" : detail && (detail.canResume || canRetry) ? "continue" : "";
+    var key = detail ? JSON.stringify([detail.taskID, kind, detail.canResume, canRetry, modes]) : "";
     if (key !== currentKey) {
       var updateControls = function () {
         var focused = captureFocus();
         S.clear(controls);
         controls.__activeForm = null;
         if (kind === "steer") {
-          controls.__activeForm = steerForm(detail, modes, emit, controls.__receiptID);
+          controls.__activeForm = steerForm(detail, modes, emit);
           controls.appendChild(controls.__activeForm);
         }
-        if (kind === "retry") {
-          controls.__activeForm = retryForm(detail, emit, controls.__receiptID);
+        if (kind === "continue") {
+          controls.__activeForm = continuationForm(detail, emit, canRetry);
           controls.appendChild(controls.__activeForm);
         }
         currentKey = key;
@@ -68,34 +68,28 @@
     }
   }
 
-  function newSubmissionRequestID() {
-    submissionSequence += 1;
-    return "workbench-" + Date.now().toString(36) + "-" + submissionSequence + "-"
-      + Math.random().toString(36).slice(2, 10);
+  function acknowledgeSubmission(page) {
+    var pending = P.acknowledge(page);
+    if (!pending) return;
+    var draft = draftFor(pending.taskID), value = null;
+    if (pending.state === "accepted" && !pending.visible && draft.input === pending.input) value = "";
+    if (pending.state === "failed" && pending.visible && !draft.input) value = pending.input;
+    var form = controls && controls.__activeForm;
+    if (value !== null) updateDraft(pending.taskID, value,
+      form && form.__taskID === pending.taskID ? form.__inputControl : null);
+    if (form && form.__validate) form.__validate();
   }
 
-  function acknowledgeSubmission(page) {
-    var receipt = page && page.commandReceipt;
-    if (!receipt || !receipt.receiptID || !receipt.requestID || !receipt.command) return;
-    var receiptInput = receipt.input == null ? null : receipt.input;
-    pendingSubmissions.forEach(function (pending, taskID) {
-      if (pending.baselineReceiptID && pending.baselineReceiptID === receipt.receiptID) return;
-      if (pending.requestID !== receipt.requestID || pending.command !== receipt.command
-        || pending.taskID !== receipt.taskID || pending.input !== receiptInput) return;
-      pendingSubmissions.delete(taskID);
-      var draft = draftFor(taskID);
-      if (receipt.accepted === true && draft.input === pending.input) {
-        draft.input = "";
-        persistDraft(taskID, draft);
-        var form = controls && controls.__activeForm;
-        if (form && form.__taskID === taskID && form.__inputControl) {
-          form.__inputControl.value = "";
-          S.autoGrowTextArea(form.__inputControl);
-        }
-      }
-      var activeForm = controls && controls.__activeForm;
-      if (activeForm && activeForm.__validate) activeForm.__validate();
-    });
+  function updateDraft(taskID, value, input) {
+    var draft = draftFor(taskID);
+    draft.input = value;
+    persistDraft(taskID, draft);
+    if (input) { input.value = value; S.autoGrowTextArea(input); }
+  }
+
+  function beginSubmission(request, input) {
+    var pending = P.begin(currentPage, request);
+    if (pending.visible) updateDraft(request.taskID, "", input);
   }
 
   function renderStatus(page, emit) {
@@ -166,12 +160,12 @@
     return field;
   }
 
-  function steerForm(detail, modes, emit, baselineReceiptID) {
+  function steerForm(detail, modes, emit) {
     var draft = draftFor(detail.taskID), form = S.node("div", "steer-form");
     var grid = S.node("div", "form-grid workbench-steer-grid");
     var input = inputField(detail, "补充指令", "");
     grid.appendChild(input.wrapper);
-    var options = modes.length ? modes : [{ id: "queued", title: "当前轮结束后继续" }];
+    var options = modes.length ? modes : [{ id: "queued", title: "当前任务结束后继续" }];
     if (!options.some(function (mode) { return mode.id === draft.mode && mode.enabled !== false; })) draft.mode = options[0].id;
     var mode = S.selectField("发送方式", draft.mode, options, function (value) {
       draft.mode = value;
@@ -188,9 +182,9 @@
     var send = S.button("发送指令", null, {}, emit, "small primary", false);
     function updateModeText() {
       var immediate = draft.mode === "interrupt-current-then-continue";
-      input.control.placeholder = immediate ? "输入指令，立即插入对话引导" : "输入指令，当前轮结束后运行";
+      input.control.placeholder = immediate ? "输入指令，立即插入对话引导" : "输入指令，当前任务结束后运行";
       send.textContent = immediate ? "立即插入对话引导" : "结束后运行";
-      send.title = immediate ? "中断当前轮并继续执行这条指令" : "当前轮结束后执行这条指令";
+      send.title = immediate ? "中断当前任务并继续执行这条指令" : "当前任务结束后执行这条指令";
     }
     updateModeText();
     var actions = S.node("div", "form-actions workbench-steer-actions");
@@ -202,7 +196,7 @@
     function validate() {
       var value = input.control.value;
       var invalid = value.indexOf("\u0000") >= 0 || new TextEncoder().encode(value).length > 32768;
-      var pending = pendingSubmissions.has(detail.taskID);
+      var pending = P.isPending(detail.taskID);
       send.disabled = pending || !value.trim() || invalid;
       updateModeText();
       send.setAttribute("aria-busy", String(pending));
@@ -214,14 +208,11 @@
     function submit() {
       if (send.disabled) return;
       var value = input.control.value;
-      var requestID = newSubmissionRequestID();
-      pendingSubmissions.set(detail.taskID, {
-        command: "steerTask",
-        requestID: requestID,
-        baselineReceiptID: baselineReceiptID,
-        taskID: detail.taskID,
-        input: value
-      });
+      var requestID = P.newRequestID();
+      beginSubmission({
+        command: "steerTask", requestID: requestID,
+        taskID: detail.taskID, input: value, mode: draft.mode
+      }, input.control);
       validate();
       emit("steerTask", { taskID: detail.taskID, input: value, mode: draft.mode }, requestID);
     }
@@ -240,79 +231,51 @@
     return form;
   }
 
-  function retryForm(detail, emit, baselineReceiptID) {
-    var form = S.node("div", "retry-form"), draft = draftFor(detail.taskID);
-    var actions = S.node("div", "form-actions");
-    var resumeButton = null, restartButton = null;
-    var queueLabel = S.node("label", "checkbox-row");
-    var queueInput = S.node("input"); queueInput.type = "checkbox";
-    queueInput.checked = !!draft.queueIfBusy;
-    queueInput.addEventListener("change", function () { draft.queueIfBusy = queueInput.checked; });
-    queueLabel.appendChild(queueInput);
-    queueLabel.appendChild(S.node("span", null, "项目忙时排队"));
-    form.appendChild(queueLabel);
+  function continuationForm(detail, emit, canRetry) {
+    var form = S.node("div", "workbench-continuation-form");
+    var actions = S.node("div", "form-actions"), buttons = [];
+    var input = null;
     if (detail.canResume) {
-      var input = inputField(detail, "消息", "输入下一条指令，沿用当前会话上下文");
+      input = inputField(detail, "消息", "输入消息，续写当前会话");
       form.appendChild(input.wrapper);
-      function resume() {
-        if (resumeButton.disabled) return;
-        var value = input.control.value;
-        var requestID = newSubmissionRequestID();
-        pendingSubmissions.set(detail.taskID, {
-          command: "resumeTask",
-          requestID: requestID,
-          baselineReceiptID: baselineReceiptID,
-          taskID: detail.taskID,
-          input: value
-        });
-        validate();
-        emit("resumeTask", { taskID: detail.taskID, input: value || null, ...(queueInput.checked ? { queueIfBusy: true } : {}) }, requestID);
-      }
-      resumeButton = S.button("发送", null, {}, emit, "small primary", false);
-      resumeButton.addEventListener("click", resume);
+      addAction("插入对话", "resumeTask", "small primary");
       input.control.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-          event.preventDefault(); resume();
+          event.preventDefault(); submit("resumeTask");
         }
       });
-      form.__taskID = detail.taskID;
-      form.__inputControl = input.control;
-      actions.appendChild(resumeButton);
     }
-    if (detail.canRestart) {
-      restartButton = S.button("重新开始", null, {}, emit, "small", false);
-      restartButton.addEventListener("click", function () {
-        if (restartButton.disabled) return;
-        if (!global.confirm("使用原始指令在当前项目开启全新会话？")) return;
-        var requestID = newSubmissionRequestID();
-        pendingSubmissions.set(detail.taskID, {
-          command: "restartTask",
-          requestID: requestID,
-          baselineReceiptID: baselineReceiptID,
-          taskID: detail.taskID,
-          input: null
-        });
-        validate();
-        emit("restartTask", { taskID: detail.taskID, ...(queueInput.checked ? { queueIfBusy: true } : {}) }, requestID);
-      });
-      actions.appendChild(restartButton);
+    if (canRetry) addAction("失败重试", "restartTask", "small");
+    function addAction(title, command, style) {
+      var button = S.button(title, null, {}, emit, style, false);
+      button.addEventListener("click", function () { submit(command); });
+      buttons.push(button); actions.appendChild(button);
+    }
+    function submit(command) {
+      if (P.isPending(detail.taskID)) return;
+      var value = command === "resumeTask" ? input.control.value : null;
+      var requestID = P.newRequestID();
+      beginSubmission({
+        command: command, requestID: requestID,
+        taskID: detail.taskID, input: value
+      }, input && input.control);
+      validate();
+      var payload = { taskID: detail.taskID };
+      if (command === "resumeTask") payload.input = value;
+      else payload.attachmentPaths = S.safeArray(detail.attachmentPaths).slice();
+      emit(command, payload, requestID);
     }
     function validate() {
-      var pending = pendingSubmissions.has(detail.taskID);
-      if (resumeButton) {
-        resumeButton.disabled = pending;
-        resumeButton.textContent = "发送";
-        resumeButton.setAttribute("aria-busy", String(pending));
-        resumeButton.setAttribute("data-pending", String(pending));
-      }
-      if (restartButton) {
-        restartButton.disabled = pending;
-        restartButton.textContent = "重新开始";
-        restartButton.setAttribute("aria-busy", String(pending));
-        restartButton.setAttribute("data-pending", String(pending));
-      }
+      var pending = P.isPending(detail.taskID);
+      buttons.forEach(function (button) {
+        button.disabled = pending;
+        button.setAttribute("aria-busy", String(pending));
+        button.setAttribute("data-pending", String(pending));
+      });
     }
     form.appendChild(actions);
+    form.__taskID = detail.taskID;
+    form.__inputControl = input && input.control;
     form.__validate = validate;
     validate();
     return form;

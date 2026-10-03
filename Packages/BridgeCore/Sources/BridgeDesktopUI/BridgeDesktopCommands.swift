@@ -65,6 +65,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case saveDeepSeekHarnessMCPServer
   case deleteDeepSeekHarnessMCPServer
   case setDeepSeekHarnessMCPServerEnabled
+  case setAgentMCPScope
   case configureTunnel
   case connectTunnel
   case disconnectTunnel
@@ -72,10 +73,13 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case connectAgent
   case registerAgent
   case beginAgentRegistration
+  case saveQoderRuntimeSettings
   case selectAgent
   case setAgentEnabled
   case reprobeAgent
   case removeAgent
+  case manageNativeAgentSession
+  case continueNativeAgentSession
   case refreshAgentModels
   case saveAgentDefault
   case refreshAgentNativePermission
@@ -114,6 +118,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let installationID: String?
   public let clientID: String?
   public let mcpServerID: String?
+  public let mcpServerScope: String?
   public let logID: String?
   public let commandID: String?
   public let ruleID: String?
@@ -135,6 +140,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let displayName: String?
   public let configurationPath: String?
   public let baseURL: String?
+  public let inferenceProtocol: String?
+  public let catalogBaseURL: String?
   public let apiKey: String?
   public let mcpTransport: String?
   public let mcpCommand: String?
@@ -163,7 +170,14 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let keepServiceRunningAfterExit: Bool?
   public let oneTimeToolAutoApproval: Bool?
   public let queueIfBusy: Bool?
+  public let skillNames: [String]?
+  public let attachmentPaths: [String]?
   public let confirmed: Bool?
+  public let offset: Int?
+  public let limit: Int?
+  public let qoderDistribution: String?
+  public let nodeExecutablePath: String?
+  public let sdkRoot: String?
   public let viewport: BridgeDesktopBrowserViewport?
 
   public init(
@@ -178,6 +192,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     installationID: String? = nil,
     clientID: String? = nil,
     mcpServerID: String? = nil,
+    mcpServerScope: String? = nil,
     logID: String? = nil,
     commandID: String? = nil,
     ruleID: String? = nil,
@@ -199,6 +214,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     displayName: String? = nil,
     configurationPath: String? = nil,
     baseURL: String? = nil,
+    inferenceProtocol: String? = nil,
+    catalogBaseURL: String? = nil,
     apiKey: String? = nil,
     mcpTransport: String? = nil,
     mcpCommand: String? = nil,
@@ -227,7 +244,14 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     keepServiceRunningAfterExit: Bool? = nil,
     oneTimeToolAutoApproval: Bool? = nil,
     queueIfBusy: Bool? = nil,
+    skillNames: [String]? = nil,
+    attachmentPaths: [String]? = nil,
     confirmed: Bool? = nil,
+    offset: Int? = nil,
+    limit: Int? = nil,
+    qoderDistribution: String? = nil,
+    nodeExecutablePath: String? = nil,
+    sdkRoot: String? = nil,
     viewport: BridgeDesktopBrowserViewport? = nil
   ) {
     self.navigation = navigation
@@ -241,6 +265,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.installationID = installationID
     self.clientID = clientID
     self.mcpServerID = mcpServerID
+    self.mcpServerScope = mcpServerScope
     self.logID = logID
     self.commandID = commandID
     self.ruleID = ruleID
@@ -262,6 +287,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.displayName = displayName
     self.configurationPath = configurationPath
     self.baseURL = baseURL
+    self.inferenceProtocol = inferenceProtocol
+    self.catalogBaseURL = catalogBaseURL
     self.apiKey = apiKey
     self.mcpTransport = mcpTransport
     self.mcpCommand = mcpCommand
@@ -290,7 +317,14 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.keepServiceRunningAfterExit = keepServiceRunningAfterExit
     self.oneTimeToolAutoApproval = oneTimeToolAutoApproval
     self.queueIfBusy = queueIfBusy
+    self.skillNames = skillNames
+    self.attachmentPaths = attachmentPaths
     self.confirmed = confirmed
+    self.offset = offset
+    self.limit = limit
+    self.qoderDistribution = qoderDistribution
+    self.nodeExecutablePath = nodeExecutablePath
+    self.sdkRoot = sdkRoot
     self.viewport = viewport
   }
 }

@@ -1,6 +1,8 @@
 # ChatGPT 与 Secure MCP Tunnel 配置指南
 
-适用于 Codex Bridge v1.2.0 的 macOS 与 Windows 版本。完成顺序：创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 创建 App → 提交第一项任务。
+适用于 Codex Bridge v1.2.0 的 macOS 与 Windows 版本。完成顺序：准备 Bridge 和项目权限 → 创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 添加并启用插件 → 直接操作项目。
+
+**如果只需要本地文件读写、运行命令，配置好 Tunnel 并添加、启用 Codex Bridge 插件即可，无需安装或连接 Agent，也无需配置 Agent 模型。** 操作由 Bridge 的 Direct Workspace 执行，沿用项目权限、Direct 执行规则与审批设置。需要委派 Agent 执行任务时，再连接相应 Agent。
 
 ## 1. 准备 Bridge
 
@@ -18,7 +20,7 @@ Bridge 自动运行随包 `tunnel-client`，并把收到的请求转发给本机
 | --- | --- | --- |
 | Tunnel ID | OpenAI Platform 的 Tunnels 页面 | Bridge 的 Tunnel ID；ChatGPT 的 Tunnel 连接 |
 | Tunnel Runtime API Key | OpenAI Platform 的 API Keys 页面 | Bridge 的 Runtime Key 输入框 |
-| DeepSeek API Key | DeepSeek 或所用模型服务商平台 | Bridge 的 DeepSeek Harness 连接配置 |
+| DeepSeek API Key（使用 DSH 时） | DeepSeek 或所用模型服务商平台 | Bridge 的 DeepSeek Harness 连接配置 |
 
 Qwen 配置中的本地 MCP 凭据由 Bridge 生成，和这三项不同。ChatGPT Tunnel 连接不需要填写 Qwen JSON 或本地 MCP Token。
 
@@ -84,13 +86,25 @@ Tunnel 表单使用 Tunnel ID，不填写本机 `127.0.0.1` 地址。Runtime Key
 
 ## 7. 第一次调用
 
+### 直接读写文件与运行命令
+
 先在 ChatGPT 输入：
 
 ```text
-请使用 Codex Bridge 调用 bridge_status，然后列出已登记项目和可用 Agent。先不要修改文件。
+请使用 Codex Bridge 调用 bridge_status，然后列出已登记项目。
 ```
 
-确认能返回真实项目后，在 Bridge 选好项目、Agent 和 `Read Only`，再输入：
+确认能返回项目后，选择已授权的项目，再输入：
+
+```text
+请通过 Codex Bridge 直接读取当前项目的 README，说明项目用途。
+```
+
+文件修改与命令执行同样可以直接调用 Bridge 工具，按项目权限、Direct 执行规则和审批设置处理。需要批准时，在 Bridge 核对操作后批准。完整操作说明见 [Direct 与 Skills](./USER_GUIDE.md#11-direct-与-skills)。
+
+### 委派 Agent 任务（可选）
+
+需要 Agent 执行任务时，先在 Bridge 连接该 Agent 并配置模型，然后选好项目、Agent 和 `Read Only`，再输入：
 
 ```text
 请通过 Codex Bridge 的 Codex Agent 检查当前项目 README，总结项目用途，不修改文件。
@@ -135,7 +149,7 @@ Codex Bridge 升级新版本后，ChatGPT 网页端可能会保留旧版的工�
 
 ## 10. 后续使用
 
-- 查询任务结果时，客户端按 `get_task.wait_policy` 等待，并从 `get_task` 读取结果摘要与状态。
+- 提交后先获得任务 ID，再用 `wait_task` 等待结果，默认最多 300 秒；完成、审批或补充信息会提前返回。到点仍在执行时，客户端自行决定何时用 `get_task` 查询状态和保存的结果。等待结束或连接断开不取消 Agent 任务。
 - Tunnel 暂时断线不等于本机任务失败；恢复后可继续查询。
 - 本机工作台可直接提交任务，不依赖 ChatGPT Tunnel。
 - 使用与项目权限、Qwen、模型选择相关的完整流程，见 [详细使用指南](./USER_GUIDE.md)。

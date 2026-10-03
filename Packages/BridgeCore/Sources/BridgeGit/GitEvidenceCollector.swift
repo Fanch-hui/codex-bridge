@@ -293,9 +293,9 @@ public struct GitEvidenceCollector: Sendable {
     }
   #else
     private func readAttributeFile(_ file: URL) throws -> Data {
-      let descriptor = Darwin.open(file.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+      let descriptor = POSIXSystem.open(file.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
       guard descriptor >= 0 else { throw GitEvidenceError.unsafeGitAttributes }
-      defer { Darwin.close(descriptor) }
+      defer { POSIXSystem.close(descriptor) }
       var information = stat()
       guard fstat(descriptor, &information) == 0,
         information.st_mode & S_IFMT == S_IFREG,
@@ -307,7 +307,7 @@ public struct GitEvidenceCollector: Sendable {
       var output = Data()
       var buffer = [UInt8](repeating: 0, count: 16 * 1_024)
       while output.count <= 256 * 1_024 {
-        let count = Darwin.read(descriptor, &buffer, buffer.count)
+        let count = POSIXSystem.read(descriptor, &buffer, buffer.count)
         if count == 0 { return output }
         if count > 0 {
           output.append(contentsOf: buffer.prefix(count))

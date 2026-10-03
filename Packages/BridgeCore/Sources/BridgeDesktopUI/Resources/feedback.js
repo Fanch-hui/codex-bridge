@@ -74,7 +74,7 @@
     close.addEventListener("click", function () { dismiss(feedback, emit); });
     toast.appendChild(close);
     layer.appendChild(toast);
-    timer = global.setTimeout(function () { dismiss(feedback, emit); }, 3200);
+    timer = global.setTimeout(function () { dismiss(feedback, emit); }, feedback.tone === "warning" ? 10000 : 3200);
   }
 
   function render(feedback, emit) {

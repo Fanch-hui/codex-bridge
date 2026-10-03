@@ -53,6 +53,29 @@ extension BridgeServiceRequestController {
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
     }
+    if let error = error as? AgentModelCatalogError {
+      return .init(
+        code: error.code, message: error.localizedDescription, retryable: error.retryable)
+    }
+    if let error = error as? AgentNativeSessionDirectoryError {
+      switch error {
+      case .invalidRequest:
+        return .init(code: "invalid_request", message: error.localizedDescription)
+      case .unsupported:
+        return .init(code: "agent_history_unsupported", message: error.localizedDescription)
+      case .unavailable:
+        return .init(code: "agent_history_unavailable", message: error.localizedDescription)
+      case .sessionNotFound:
+        return .init(code: "agent_session_not_found", message: error.localizedDescription)
+      case .activeSession:
+        return .init(code: "agent_session_active", message: error.localizedDescription)
+      case .scopeMismatch:
+        return .init(code: "agent_session_scope_mismatch", message: error.localizedDescription)
+      case .runtimeFailure:
+        return .init(
+          code: "agent_history_failed", message: error.localizedDescription, retryable: true)
+      }
+    }
     if let error = error as? DeepSeekHarnessModelCatalogError {
       return .init(
         code: "agent_model_catalog_failed", message: error.localizedDescription, retryable: true)
@@ -75,12 +98,8 @@ extension BridgeServiceRequestController {
     if let error = error as? ServiceTunnelError {
       return mapTunnelError(error)
     }
-    if error is ExecutionServiceError {
-      return .init(
-        code: "execution_failed",
-        message: "The provider operation failed.",
-        retryable: true
-      )
+    if let error = error as? ExecutionServiceError {
+      return mapMCPQueryError(BridgeServiceApplication.publicExecutionError(error))
     }
     return .init(
       code: "internal_error",

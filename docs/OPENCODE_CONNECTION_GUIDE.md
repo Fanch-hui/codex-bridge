@@ -179,9 +179,9 @@ ChatGPT/Qwen 新任务通常应省略权限覆盖字段，让工作台选择生�
 
 `submit_task` 通常先返回 `awaiting_local_approval`。本机用户在 Bridge 工作台批准后，任务才进入 `starting` 和 `running`。设置中的“自动批准远程 Agent 启动请求”默认关闭；即使开启，也不会自动批准 OpenCode 执行期 permission 或 Direct 操作。
 
-使用 `get_task` 查询阶段、`result_summary`、`failure_code`、`changed_files`、`recent_activity`、`execution_model`、`execution_effort`、`permission_mode` 以及 Provider 绑定字段。按它返回的 `wait_policy` 继续查询；进入终态后，直接从同一 `get_task` 快照读取最终结果。`next_action=read_final_report` 只是提示字符串，不是另一个 MCP 工具。
+收到任务 ID 后，可调用 `wait_task` 由 Bridge 等待结果，默认最多 300 秒；任务完成或需要审批、补充信息时立即返回。到点返回 `still_running` 和同一任务 ID，模型自行决定何时通过 `get_task` 查询。`get_task` 随时可用，返回阶段、`result_summary`、`failure_code`、`changed_files`、`recent_activity`、模型、权限和 Provider 绑定字段。
 
-不要因为 `updated_at` 暂时不变、`recent_activity` 为空或任务较安静就推断失败；按 `get_task` 返回的 `wait_policy` 继续轮询，终态才是权威结果。
+等待结束或连接断开时，Agent 任务继续执行，结果仍会保存。审批或补充信息处理后，继续等待原任务即可；最终结果以任务终态为准。
 
 OpenCode 的 `steer_task` 和 `interrupt_task` 使用 `get_task` 返回的 `provider_run_id` 填入 `expected_turn_id`：
 

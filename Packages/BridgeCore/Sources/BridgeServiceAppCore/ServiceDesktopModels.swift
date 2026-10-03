@@ -122,6 +122,8 @@ public enum AgentProviderPresentation {
     case "opencode": return "OpenCode"
     case "deepseek-harness": return "DeepSeek Harness"
     case "antigravity": return "Antigravity"
+    case "pi": return "Pi"
+    case "qoder": return "Qoder"
     default:
       let value = providerID.trimmingCharacters(in: .whitespacesAndNewlines)
       return value.isEmpty ? "Codex" : value
@@ -134,6 +136,8 @@ public enum AgentProviderPresentation {
     case "opencode": return "chevron.left.forwardslash.chevron.right"
     case "deepseek-harness": return "gearshape.2.fill"
     case "antigravity": return "sparkles"
+    case "pi": return "terminal.fill"
+    case "qoder": return "chevron.left.forwardslash.chevron.right"
     default: return "point.3.connected.trianglepath.dotted"
     }
   }
@@ -164,7 +168,8 @@ public struct CodexActivityPresentation: Equatable {
   public init(
     task: MCPServiceTaskSnapshot?,
     activity: TaskConversationModel.Activity,
-    pendingUserInput: Bool = false
+    pendingUserInput: Bool = false,
+    canContinue: Bool = false
   ) {
     guard let task else {
       statusText = "已连接本机 Codex 引擎"
@@ -207,7 +212,10 @@ public struct CodexActivityPresentation: Equatable {
       isActive = true
       showsBubble = true
     case "completed":
-      statusText = "\(providerName) 已完成"
+      let status = WorkbenchTaskTextPresentation.sessionStatusLabel(
+        task.status, canContinue: canContinue
+      )
+      statusText = "\(providerName) \(status)"
       isActive = false
       showsBubble = false
     case "failed":

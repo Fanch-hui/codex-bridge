@@ -38,6 +38,25 @@ extension DeepSeekHarnessACPProvider {
     return snapshot
   }
 
+  static func capabilities(
+    installation: AgentInstallation,
+    initialization: DeepSeekHarnessACPInitialization,
+    persistenceAvailable: Bool = true
+  ) -> AgentCapabilitySnapshot {
+    guard DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation) else {
+      return capabilitySnapshot
+    }
+    var dynamic: Set<AgentCapability> = [.reasoningDelta, .usage]
+    if persistenceAvailable && initialization.supportsResumeSession {
+      dynamic.insert(.sessionContinue)
+    }
+    if initialization.supportsMCPHTTP { dynamic.insert(.mcpClient) }
+    return AgentCapabilitySnapshot(
+      advertised: capabilitySnapshot.advertised.union(dynamic),
+      observed: capabilitySnapshot.observed.union(dynamic),
+      enforced: capabilitySnapshot.enforced.union(dynamic))
+  }
+
   public static let capabilitySnapshot = AgentCapabilitySnapshot(
     advertised: [
       .sessionCreate,

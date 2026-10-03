@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Codex Bridge
+Comment=Local Agent workbench and MCP gateway
+Exec=/opt/codex-bridge/codex-bridge
+Icon=org.codexbridge.CodexBridge
+Terminal=false
+Categories=Development;Utility;
+StartupWMClass=org.codexbridge.CodexBridge

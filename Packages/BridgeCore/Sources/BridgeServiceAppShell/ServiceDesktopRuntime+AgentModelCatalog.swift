@@ -371,14 +371,12 @@ extension BridgeServiceAppModel {
       }
       do {
         let client = try self.currentClient()
-        _ = try await client.setAgentDefaults(
+        let persisted = try await client.setAgentDefaults(
           providerID: providerID,
           model: model,
           permissionMode: permissionMode,
           effort: effort
         )
-        guard self.agentModelDefaultRevision(for: providerID) == revision else { return }
-        let persisted = try await client.agentModelDefault(providerID: providerID)
         guard self.agentModelDefaultRevision(for: providerID) == revision else { return }
         self.applyAgentModelDefault(persisted, providerID: providerID)
         self.postToast(

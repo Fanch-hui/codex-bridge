@@ -71,7 +71,7 @@ extension BridgeServiceApplication {
     }
   }
 
-  static func publicExecutionError(_ error: Error) -> BridgeMCPQueryError {
+  public static func publicExecutionError(_ error: Error) -> BridgeMCPQueryError {
     guard let value = error as? ExecutionServiceError else { return .unavailable }
     switch value {
     case .bindingMismatch, .threadMismatch:

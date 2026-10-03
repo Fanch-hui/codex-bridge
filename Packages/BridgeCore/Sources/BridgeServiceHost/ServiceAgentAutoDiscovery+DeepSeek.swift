@@ -18,9 +18,11 @@ extension ServiceAgentAutoDiscovery {
         existingInstallations: existingInstallations,
         environment: environment,
         includeSourceSearch: false
-      )).compactMap(canonicalRegularFile)
+      )).compactMap(deepSeekResolvedExecutable)
     #if os(Windows)
-      executables = executables.filter { !isWindowsGUIExecutable($0) }
+      executables = executables.filter {
+        !isWindowsGUIExecutable($0) || DeepSeekHarnessACPRuntimeLayout.desktop(at: $0) != nil
+      }
     #endif
     guard !executables.isEmpty else { return [] }
 
@@ -102,6 +104,8 @@ extension ServiceAgentAutoDiscovery {
     )
     knownCandidates.append(contentsOf: deepSeekLauncherCandidates(environment: environment))
 
+    knownCandidates.append(contentsOf: deepSeekDesktopCandidates(environment: environment))
+
     // PATH, package-manager launchers and an explicitly supplied root are cheap
     // and authoritative. Only when they produce no file do we inspect the
     // bounded set of local development directories.
@@ -140,6 +144,11 @@ extension ServiceAgentAutoDiscovery {
         if let local = environmentValue("LOCALAPPDATA", environment: environment) {
           candidates.append(pathJoin(local, "CodexBridge", "DeepSeekHarness", "cordis.yml"))
         }
+      #elseif os(Linux)
+        let config =
+          environmentValue("XDG_CONFIG_HOME", environment: environment)
+          ?? pathJoin(home, ".config")
+        candidates.append(pathJoin(config, "codex-bridge", "deepseek-harness", "cordis.yml"))
       #else
         candidates.append(
           pathJoin(

@@ -14,7 +14,8 @@ from urllib.parse import quote
 
 
 REPOSITORY = "Fanch-hui/codex-bridge"
-PLATFORMS = {"macos", "windows"}
+PLATFORMS = {"macos", "windows", "linux"}
+PRIMARY_PLATFORMS = {"macos", "windows"}
 ARCHITECTURES = {"arm64", "x64"}
 KINDS = {"app", "installer", "portable"}
 VERSION_RE = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
@@ -62,8 +63,8 @@ def verify_asset_shape(platform: str, architecture: str, kind: str, path: Path) 
         fail(f"unsupported asset kind: {kind}")
     if platform == "macos" and kind != "app":
         fail("macOS assets must use kind app")
-    if platform == "windows" and kind == "app":
-        fail("Windows assets must use kind installer or portable")
+    if platform in {"windows", "linux"} and kind == "app":
+        fail(f"{platform} assets must use kind installer or portable")
     if platform == "macos":
         if path.suffix.lower() != ".zip":
             fail(f"macOS app asset must be a ZIP: {path}")
@@ -118,7 +119,14 @@ def main() -> None:
             asset_record(platform, architecture, kind, Path(raw_path), arguments.tag)
         )
 
-    manifest = {"version": arguments.version, "notes": notes, "assets": assets}
+    manifest = {
+        "version": arguments.version,
+        "notes": notes,
+        "assets": [asset for asset in assets if asset["platform"] in PRIMARY_PLATFORMS],
+    }
+    additional = [asset for asset in assets if asset["platform"] not in PRIMARY_PLATFORMS]
+    if additional:
+        manifest["additionalAssets"] = additional
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

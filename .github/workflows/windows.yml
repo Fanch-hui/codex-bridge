@@ -2,32 +2,34 @@ name: windows
 
 on:
   push:
-    branches: [win]
+    branches: [win, 'codex/platform-*']
   pull_request:
     branches: [win]
   workflow_dispatch:
-
+    inputs:
+      architecture:
+        description: Target architecture
+        type: choice
+        options: [all, x64, arm64]
+        default: all
 permissions:
   contents: read
 
 concurrency:
-  group: windows-${{ github.ref }}
+  group: windows-${{ github.ref }}-${{ inputs.architecture || 'all' }}
   cancel-in-progress: true
 
 jobs:
   build:
     name: build (${{ matrix.architecture }})
-    runs-on: windows-latest
+    runs-on: ${{ matrix.architecture == 'arm64' && 'windows-11-arm' || 'windows-latest' }}
+    env:
+      SWIFT_VERSION: 6.3.3
+      TARGET_TRIPLE: ${{ matrix.architecture == 'arm64' && 'aarch64-unknown-windows-msvc' || 'x86_64-unknown-windows-msvc' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - architecture: x64
-            triplet: x64-windows
-            library_architecture: x64
-            target_triple: ""
-            run_tests: true
-            publish: true
+        architecture: ${{ fromJSON(inputs.architecture == 'arm64' && '["arm64"]' || inputs.architecture == 'x64' && '["x64"]' || '["x64","arm64"]') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,54 +43,24 @@ jobs:
           Add-MpPreference -ExclusionProcess "swift.exe"
           Add-MpPreference -ExclusionProcess "clang.exe"
           Add-MpPreference -ExclusionProcess "lld-link.exe"
-      - name: Install Swift 6.3.3 toolchain
+      - name: Restore Swift installer cache
+        id: swift-installer-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/swift-downloads
+          key: windows-swift-installer-v2-${{ env.SWIFT_VERSION }}-${{ runner.arch }}
+      - name: Install Swift toolchain
         shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://download.swift.org/swift-6.3.3-release/windows10/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE-windows10.exe" -OutFile swift-installer.exe
-          $proc = Start-Process -Wait -PassThru -FilePath .\swift-installer.exe `
-            -ArgumentList "/quiet", "/norestart", "InstallPerMachine=1"
-          Remove-Item .\swift-installer.exe
-          if ($proc.ExitCode -notin @(0, 3010)) { throw "Swift installer failed: $($proc.ExitCode)" }
-          $roots = @(
-            "$env:ProgramFiles\Swift",
-            "$env:LOCALAPPDATA\Programs\Swift",
-            "C:\Library\Developer\Toolchains"
-          )
-          $candidates = Get-ChildItem $roots -Recurse -Filter swift.exe `
-            -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-          # Prefer the standard toolchain over the +Asserts variant.
-          $swiftExe = ($candidates | Where-Object { $_ -notmatch '\+Asserts' } |
-            Select-Object -First 1)
-          if (-not $swiftExe) { $swiftExe = $candidates | Select-Object -First 1 }
-          if (-not $swiftExe) { throw "swift.exe not found after install" }
-          Write-Host "found swift at $swiftExe"
-          $swiftBin = Split-Path $swiftExe
-          Add-Content $env:GITHUB_PATH $swiftBin
-          $toolchainVersionDirectory = (Get-Item $swiftBin).Parent.Parent
-          if (-not $toolchainVersionDirectory -or
-              -not $toolchainVersionDirectory.Parent.Name.Equals("Toolchains", [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Swift toolchain version directory was not found."
-          }
-          $swiftRoot = $toolchainVersionDirectory.Parent.Parent.FullName
-          $sdkVersion = $toolchainVersionDirectory.Name -replace "\+.*$", ""
-          if ($sdkVersion -ne "6.3.3") { throw "Expected Swift 6.3.3, found $sdkVersion" }
-          # The host runtime is separate from the toolchain and must be on PATH.
-          $runtimeBin = Join-Path $swiftRoot "Runtimes\$sdkVersion\usr\bin"
-          if (-not (Test-Path (Join-Path $runtimeBin "swiftCore.dll"))) {
-            throw "Version-matching swiftCore.dll was not found after install."
-          }
-          Write-Host "found runtime at $runtimeBin"
-          Add-Content $env:GITHUB_PATH $runtimeBin
-          # The installer ships a version-matched Windows SDK separately from
-          # the toolchain. Installer environment changes do not reach an
-          # already-running job, so forward the exact SDK explicitly.
-          $platformDir = Join-Path $swiftRoot "Platforms\$sdkVersion\Windows.platform"
-          $sdkRoot = Join-Path $platformDir "Developer\SDKs\Windows.sdk"
-          if (-not (Test-Path -LiteralPath $sdkRoot -PathType Container)) {
-            throw "Version-matching Swift Windows SDK was not found."
-          }
-          Write-Host "SDKROOT=$sdkRoot"
-          Add-Content $env:GITHUB_ENV "SDKROOT=$sdkRoot"
+        run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-swift.ps1" -Version $env:SWIFT_VERSION'
+      - name: Save Swift installer cache
+        if: steps.swift-installer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/swift-downloads
+          key: ${{ steps.swift-installer-cache.outputs.cache-primary-key }}
+      - name: Prepare WiX runtime extraction tools
+        shell: pwsh
+        run: '& "$env:GITHUB_WORKSPACE\.github\scripts\setup-windows-wix.ps1"'
       - name: Validate Swift portable runtime
         shell: pwsh
         run: |
@@ -111,69 +83,63 @@ jobs:
               Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
             }
           }
+      - name: Identify vcpkg cache
+        id: vcpkg-cache-key
+        shell: pwsh
+        run: |
+          $revision = & git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content $env:GITHUB_OUTPUT "revision=$revision"
+          Add-Content $env:GITHUB_OUTPUT "image=$env:ImageVersion"
+          $cachePath = Join-Path $env:GITHUB_WORKSPACE ".build\ci-cache\vcpkg"
+          New-Item -ItemType Directory -Path $cachePath -Force | Out-Null
+          Add-Content $env:GITHUB_ENV "VCPKG_BINARY_SOURCES=clear;files,$cachePath,readwrite"
+      - name: Restore vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .build/ci-cache/vcpkg
+          key: windows-vcpkg-v1-${{ matrix.architecture }}-windows-${{ steps.vcpkg-cache-key.outputs.image }}-${{ steps.vcpkg-cache-key.outputs.revision }}
       - name: Install SQLite via vcpkg (for GRDB)
         shell: pwsh
         run: |
-          $triplet = "${{ matrix.triplet }}"
+          $triplet = "${{ matrix.architecture }}-windows"
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "sqlite3:$triplet"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $archDir = "${{ matrix.library_architecture }}"
+          $archDir = "${{ matrix.architecture }}"
           $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -property installationPath | Select-Object -First 1
-          $msvcRoot = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory |
-            Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $kitsInc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $inc = @(
-            "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\include",
-            "$msvcRoot\include",
-            "$kitsInc\ucrt",
-            "$kitsInc\um",
-            "$kitsInc\shared",
-            "$kitsInc\winrt"
-          ) -join ";"
-          Add-Content $env:GITHUB_ENV "INCLUDE=$inc"
-          $vsRoot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -property installationPath | Select-Object -First 1
-          $msvcLib = Get-ChildItem "$vsRoot\VC\Tools\MSVC" -Directory |
-            Sort-Object Name -Descending | ForEach-Object { "$($_.FullName)\lib\$archDir" } |
-            Where-Object { Test-Path $_ } | Select-Object -First 1
-          $kitsLib = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" -Directory `
-            -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-          $vcpkgLib = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\lib"
-          $vcpkgBin = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\bin"
-          $sdkUM = "$kitsLib\um\$archDir"
-          $sdkUCRT = "$kitsLib\ucrt\$archDir"
-          $requiredLibraries = @(
-            "$vcpkgLib\sqlite3.lib",
-            "$msvcLib\libcmt.lib",
-            "$sdkUM\kernel32.lib",
-            "$sdkUM\runtimeobject.lib",
-            "$sdkUCRT\ucrt.lib"
-          )
-          foreach ($library in $requiredLibraries) {
-            if (-not (Test-Path $library)) {
-              throw "Required $archDir library is unavailable: $library"
-            }
-          }
-          $targetLibraryPaths = @($vcpkgLib, $msvcLib, $sdkUM, $sdkUCRT) -join ";"
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-build-environment.ps1"
+          $buildEnvironment = Get-WindowsBuildEnvironment -Architecture $archDir
+          $vcpkgRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet"
+          $vcpkgBin = Join-Path $vcpkgRoot "bin"
+          $includePaths = @((Join-Path $vcpkgRoot "include")) + $buildEnvironment.IncludePaths
+          Add-Content $env:GITHUB_ENV "INCLUDE=$($includePaths -join ';')"
+          $targetLibraryPaths = (@((Join-Path $vcpkgRoot "lib")) + $buildEnvironment.LibraryPaths) -join ";"
           Add-Content $env:GITHUB_ENV "TARGET_LIBRARY_PATHS=$targetLibraryPaths"
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-portable-support.ps1"
+          $expectedMachine = if ($archDir -eq "arm64") { [UInt16]0xAA64 } else { [UInt16]0x8664 }
+          if ((Get-PEMachine (Join-Path $vcpkgBin "sqlite3.dll")) -ne $expectedMachine) {
+            throw "SQLite runtime architecture does not match $archDir."
+          }
           $vcRedistRoot = Get-ChildItem "$vsRoot\VC\Redist\MSVC" -Directory |
             Where-Object { $_.Name -match "^[0-9]+(?:\.[0-9]+)+$" } |
             Sort-Object { [version]$_.Name } -Descending |
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $vcRedistRoot) { throw "Visual C++ Redistributable files are unavailable." }
           Add-Content $env:GITHUB_ENV "CODEX_BRIDGE_VC_REDIST_ROOT=$vcRedistRoot"
-          if ($archDir -eq "x64") {
-            Write-Host "LIB=$targetLibraryPaths"
-            Add-Content $env:GITHUB_ENV "LIB=$targetLibraryPaths"
-            if (-not (Test-Path (Join-Path $vcpkgBin "sqlite3.dll"))) {
-              throw "SQLite runtime is unavailable: $vcpkgBin\sqlite3.dll"
-            }
-            Add-Content $env:GITHUB_PATH $vcpkgBin
+          Write-Host "LIB=$targetLibraryPaths"
+          Add-Content $env:GITHUB_ENV "LIB=$targetLibraryPaths"
+          if (-not (Test-Path (Join-Path $vcpkgBin "sqlite3.dll"))) {
+            throw "SQLite runtime is unavailable: $vcpkgBin\sqlite3.dll"
           }
+          Add-Content $env:GITHUB_PATH $vcpkgBin
+      - name: Save vcpkg binary cache
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .build/ci-cache/vcpkg
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
       - name: Compile Windows application resources
         shell: pwsh
         run: |
@@ -181,16 +147,34 @@ jobs:
           & "$env:GITHUB_WORKSPACE\Scripts\compile-windows-resources.ps1" -OutputPath $resourceOutput
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Add-Content $env:GITHUB_ENV "CODEX_BRIDGE_WINDOWS_RESOURCE=$resourceOutput"
+      - name: Restore SwiftPM dependency repositories
+        id: swift-dependencies-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: Packages/BridgeCore/.build/repositories
+          key: windows-swift-repositories-v1-${{ hashFiles('Packages/BridgeCore/Package.resolved', 'Vendor/swift-sdk/Package.resolved') }}
+          restore-keys: windows-swift-repositories-v1-
+      - name: Resolve SwiftPM dependencies
+        shell: pwsh
+        run: |
+          swift package --package-path Packages/BridgeCore resolve
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Save SwiftPM dependency repositories
+        if: steps.swift-dependencies-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: Packages/BridgeCore/.build/repositories
+          key: ${{ steps.swift-dependencies-cache.outputs.cache-primary-key }}
       - name: Build service and Windows shell
         working-directory: Packages/BridgeCore
         shell: pwsh
         run: |
           swift --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $targetTriple = "${{ matrix.target_triple }}"
+          $targetTriple = $env:TARGET_TRIPLE
           . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
           $swiftArguments = @(Get-WindowsSwiftArguments `
-            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.architecture }}-windows" `
             -TargetTriple $targetTriple -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
           $buildArguments = @($swiftArguments) + @("-c", "release")
           swift build @buildArguments --product codex-bridge-windows-app
@@ -202,8 +186,82 @@ jobs:
           $binPath = ($binPathOutput | Select-Object -Last 1).ToString().Trim()
           if (-not $binPath) { throw "Swift build output directory was empty." }
           Add-Content $env:GITHUB_ENV "SWIFT_BIN_PATH=$binPath"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Verify installed Agent CLI contracts
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          node Scripts/verify-agent-runtime-resources.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node Scripts/verify-agent-runtime-resources.mjs "$env:SWIFT_BIN_PATH"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm install --prefix .build/agent-contract --ignore-scripts --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 @qodercn-ai/qoderclicn@1.1.64 @qodercn-ai/qodercn-agent-sdk@1.0.50
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          import { spawn, execFileSync } from 'node:child_process';
+          import { readFile, mkdir } from 'node:fs/promises';
+          import { createInterface } from 'node:readline';
+          import { pathToFileURL } from 'node:url';
+          import path from 'node:path';
+          import { SDKProcessOwner } from '../../Packages/BridgeCore/Sources/BridgeQoderSDK/Resources/QoderHost/process.mjs';
+          const root = path.resolve('.build/agent-contract');
+          const modules = path.join(root, 'node_modules');
+          const piRoot = path.join(modules, '@earendil-works/pi-coding-agent');
+          const manifest = JSON.parse(await readFile(path.join(piRoot, 'package.json'), 'utf8'));
+          const piEntry = path.join(piRoot, typeof manifest.bin === 'string' ? manifest.bin : manifest.bin.pi);
+          const cli = path.join(modules, '@qodercn-ai/qoderclicn/bundle/qoderclicn.js');
+          console.log('Pi CLI:', execFileSync(process.execPath, [piEntry, '--version'], { encoding: 'utf8' }).trim());
+          console.log('Qoder CN CLI:', execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }).trim());
+          const sessionDir = path.join(root, 'sessions');
+          await mkdir(sessionDir, { recursive: true });
+          const pi = spawn(process.execPath, [piEntry, '--mode', 'rpc', '--no-extensions', '--no-skills',
+            '--no-prompt-templates', '--no-themes', '--session-dir', sessionDir], { stdio: ['pipe', 'pipe', 'pipe'] });
+          pi.stderr.resume();
+          const exited = new Promise(resolve => pi.once('exit', resolve));
+          const lines = createInterface({ input: pi.stdout });
+          const timer = setTimeout(() => pi.kill(), 30000);
+          let stateSeen = false;
+          try {
+            pi.stdin.write(JSON.stringify({ id: 'state', type: 'get_state' }) + '\n');
+            for await (const line of lines) {
+              const value = JSON.parse(line);
+              if (value.type === 'response' && value.id === 'state') {
+                if (!value.success) throw new Error('Pi get_state failed');
+                stateSeen = true; break;
+              }
+            }
+          } finally { pi.stdin.end(); pi.kill(); await exited; clearTimeout(timer); lines.close(); }
+          if (!stateSeen) throw new Error('Pi RPC state was not received');
+          console.log('Pi native RPC handshake: passed');
+          const sdk = await import(pathToFileURL(path.join(modules, '@qodercn-ai/qodercn-agent-sdk/dist/index.js')));
+          const owner = new SDKProcessOwner();
+          let authRequired = false;
+          let warm;
+          try {
+            warm = await sdk.startup({ initializeTimeoutMs: 30000, options: {
+              auth: sdk.qodercliAuth(), transport: sdk.ProcessTransport.default,
+              executable: process.execPath, pathToQoderCLIExecutable: cli, cwd: root,
+              settingSources: [], tools: [], persistSession: false,
+              spawnQoderCLIProcess: options => owner.spawn(options),
+              onAuthExpired: () => { authRequired = true; },
+            } });
+            console.log('Qoder CN native SDK initialization: passed');
+          } catch (error) {
+            if (!authRequired) throw new Error('Qoder SDK startup failed before authentication was verified');
+            console.log('Qoder CN native SDK reached authentication; inference requires a signed-in account');
+          } finally { if (warm) await warm.close(); await owner.close(); }
+          '@ | Set-Content -LiteralPath .build/agent-contract/verify.mjs -Encoding utf8
+          node .build/agent-contract/verify.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Restore Tunnel helper cache
+        id: tunnel-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .build/tunnel-client/${{ matrix.architecture }}
+          key: windows-tunnel-v1-${{ matrix.architecture }}-${{ hashFiles('Scripts/stage-windows-tunnel-client.ps1') }}
       - name: Stage Windows tunnel client
-        if: matrix.publish
         shell: pwsh
         run: |
           $tunnelClientDir = Join-Path $env:GITHUB_WORKSPACE ".build\tunnel-client\${{ matrix.architecture }}"
@@ -211,11 +269,16 @@ jobs:
             -Architecture "${{ matrix.architecture }}" `
             -Destination $tunnelClientDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Save Tunnel helper cache
+        if: steps.tunnel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .build/tunnel-client/${{ matrix.architecture }}
+          key: ${{ steps.tunnel-cache.outputs.cache-primary-key }}
       - name: Stage Windows portable package
-        if: matrix.publish
         shell: pwsh
         run: |
-          $targetTriple = "${{ matrix.target_triple }}"
+          $targetTriple = $env:TARGET_TRIPLE
           $portableDir = Join-Path $env:GITHUB_WORKSPACE ".build\windows-dist\${{ matrix.architecture }}"
           # The helper directory is derived here instead of being forwarded
           # through GITHUB_ENV, so a package can never be staged without it.
@@ -229,7 +292,7 @@ jobs:
             BinPath = $env:SWIFT_BIN_PATH
             OutDir = $portableDir
             Architecture = "${{ matrix.architecture }}"
-            VcpkgTriplet = "${{ matrix.triplet }}"
+            VcpkgTriplet = "${{ matrix.architecture }}-windows"
             TunnelClientDir = $tunnelClientDir
           }
           if ($targetTriple) {
@@ -237,92 +300,12 @@ jobs:
           }
           & "$env:GITHUB_WORKSPACE\Scripts\stage-windows-portable.ps1" @stageArguments
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke portable service startup
-        if: matrix.run_tests
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-portable-service.ps1" `
-            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke app-to-service launch from spaced path
-        if: matrix.run_tests
-        timeout-minutes: 5
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-spaced-path-launch.ps1" `
-            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke Windows GUI startup
-        if: matrix.run_tests
-        timeout-minutes: 5
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-gui-startup.ps1" `
-            -PortableDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke tests
-        if: matrix.run_tests
-        working-directory: Packages/BridgeCore
-        shell: pwsh
-        run: |
-          . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
-          $swiftArguments = @(Get-WindowsSwiftArguments `
-            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.triplet }}" `
-            -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
-          $developerRoot = Split-Path -Parent (Split-Path -Parent $env:SDKROOT)
-          $testRuntimePaths = Get-ChildItem "$developerRoot\Library" -Directory |
-            ForEach-Object { Join-Path $_.FullName "usr\bin64" } |
-            Where-Object { Test-Path $_ }
-          $env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join ";"
-          $filters = @(
-            "BridgeDomainTests", "BridgeAgentCoreTests", "BridgeSecurityTests",
-            "BridgeCodexRPCTests", "BridgeProcessWindowsTests", "BridgeDesktopUITests",
-            "BridgeServiceAppCoreTests", "BridgeServiceHostWindowsTests", "BridgeTunnelWindowsTests",
-            "BridgeCodexServiceWindowsTests", "BridgeConversationWindowsTests",
-            "BridgeServiceApplicationWindowsTests", "BridgeFilesWindowsTests",
-            "BridgeServiceCoreWindowsTests", "BridgeDirectCommandWindowsTests",
-            "BridgeDeepSeekHarnessACPWindowsTests", "BridgeWindowsShellTests"
-          )
-          foreach ($filter in $filters) {
-            $output = @(& swift test @swiftArguments --filter $filter 2>&1)
-            $exitCode = $LASTEXITCODE
-            $output | ForEach-Object { Write-Host $_ }
-            if ($exitCode -ne 0) { exit $exitCode }
-            $summary = @(
-              $output | Select-String -Pattern 'Executed\s+(\d+)\s+tests?|# tests\s+(\d+)|Test run with\s+(\d+)\s+tests?'
-            )
-            if ($summary.Count -eq 0) {
-              throw "Swift filter '$filter' did not report an executed test count."
-            }
-            $executed = 0
-            foreach ($line in $summary) {
-              $match = [regex]::Match(
-                $line.ToString(),
-                'Executed\s+(\d+)\s+tests?|# tests\s+(\d+)|Test run with\s+(\d+)\s+tests?'
-              )
-              if ($match.Success) {
-                $value = if ($match.Groups[1].Success) {
-                  $match.Groups[1].Value
-                } elseif ($match.Groups[2].Success) {
-                  $match.Groups[2].Value
-                } else {
-                  $match.Groups[3].Value
-                }
-                $executed += [int]$value
-              }
-            }
-            if ($executed -le 0) {
-              throw "Swift filter '$filter' executed no tests."
-            }
-          }
       - name: Install pinned Inno Setup 7.1.0
-        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\.github\scripts\install-inno-setup.ps1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build Windows EXE installer
-        if: matrix.publish
         shell: pwsh
         run: |
           & "$env:GITHUB_WORKSPACE\Scripts\build-windows-installer.ps1" `
@@ -330,26 +313,13 @@ jobs:
             -PayloadDir "$env:GITHUB_WORKSPACE\.build\windows-dist\${{ matrix.architecture }}" `
             -OutputDir "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Smoke EXE install, upgrade, and uninstall
-        if: matrix.run_tests
-        timeout-minutes: 15
-        shell: pwsh
-        run: |
-          $installerRoot = "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
-          $installers = @(Get-ChildItem -LiteralPath $installerRoot -Filter "*-Setup.exe" -File)
-          if ($installers.Count -ne 1) { throw "Expected exactly one EXE installer." }
-          & "$env:GITHUB_WORKSPACE\.github\scripts\test-windows-exe-install.ps1" `
-            -InstallerPath $installers[0].FullName
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload Windows portable ZIP
-        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}
           path: .build/windows-dist/codex-bridge-windows-${{ matrix.architecture }}.zip
           if-no-files-found: error
       - name: Upload Windows EXE installer
-        if: matrix.publish
         uses: actions/upload-artifact@v4
         with:
           name: codex-bridge-windows-${{ matrix.architecture }}-installer

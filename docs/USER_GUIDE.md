@@ -1,6 +1,11 @@
 # Codex Bridge 详细使用指南
 
-适用于 macOS Apple Silicon 和 Windows x64。首次使用按“安装 → 项目 → Agent → 模型 → 聊天客户端 → 第一项任务”的顺序操作。
+适用于 macOS Apple Silicon 和 Windows x64。首次使用按需要选择配置流程：
+
+- **本地读写文件、运行命令**：安装并启动 Bridge → 添加项目并配置权限 → 配置 Tunnel → 添加并启用插件 → 直接操作项目。无需安装或连接 Agent，也无需配置 Agent 模型。
+- **委派 Agent 任务**：安装并启动 Bridge → 添加项目并配置权限 → 连接 Agent → 配置模型 → 从工作台或已连接的聊天客户端提交任务。
+
+Qwen Studio 使用本机 HTTP MCP 配置代替 Tunnel 和 ChatGPT 插件，直接文件与命令操作同样无需连接 Agent。
 
 ## 文档导航
 
@@ -11,7 +16,7 @@
 
 ## 1. 客户端与 Agent
 
-ChatGPT、Qwen Studio 和 Bridge 工作台是提交任务的入口。Codex、OpenCode、DeepSeek Harness（DSH）和 Antigravity（AGY）是实际执行任务的本机 Agent。
+ChatGPT 和 Qwen Studio 可以通过 Bridge 直接读写文件、运行命令，也可以委派 Agent 任务；Bridge 工作台用于提交和管理 Agent 任务。直接操作由本机 Bridge 服务的 Direct Workspace 执行。Codex、OpenCode、DeepSeek Harness（DSH）和 Antigravity（AGY）是实际执行委派任务的本机 Agent。
 
 ```text
 ChatGPT ── Secure MCP Tunnel ─┐
@@ -19,7 +24,7 @@ Qwen ──── 本机 HTTP MCP ──────┼─ Bridge Service ─ �
 Bridge 工作台 ── 本机 IPC ────┘
 ```
 
-你可以先只用本机工作台，再配置 ChatGPT 或 Qwen。远程请求省略 `provider_id` 时使用 Codex；使用其他 Agent 时要明确选择。
+委派 Agent 任务时，你可以先只用本机工作台，再配置 ChatGPT 或 Qwen。远程任务请求省略 `provider_id` 时使用 Codex；使用其他 Agent 时要明确选择。
 
 ## 2. 安装与启动
 
@@ -82,6 +87,8 @@ AGY 的 Always Proceed 由 AGY 连接流程单独征得同意后设置；它属�
 
 ## 5. 连接 Agent
 
+本节用于委派 Agent 任务。只需要本地文件读写和命令执行时，可直接前往第 7 节连接 ChatGPT 或第 8 节连接 Qwen，再按第 11 节使用 Direct。
+
 ### Codex
 
 1. 准备当前系统用户能够运行并已完成登录的本机 Codex。
@@ -106,6 +113,8 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 
 ## 6. 模型与推理强度
 
+委派 Agent 任务时配置本节选项；Direct 文件与命令操作无需 Agent 模型。
+
 1. 在设置中找到目标 Agent 的模型区域。
 2. 点击“获取模型”或“刷新模型列表”。
 3. 选择实际返回的模型 ID。
@@ -120,7 +129,9 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 
 流程是：在 OpenAI Platform 创建 Tunnel，明确选择并保存 **WORKSPACES**（个人空间选 **Personal**，团队选对应工作区），再创建受限 Runtime Key，在 Bridge 连接页保存并等待 `ready`，再在 ChatGPT 中创建 Tunnel 类型 App。Bridge 和 ChatGPT 使用同一个 Tunnel ID。
 
-OpenAI Runtime Key 用于 Tunnel，DeepSeek Key 用于 DSH 模型；两者分别填写。Runtime Key 不填入 ChatGPT 对话或 Qwen 配置。
+完成 Tunnel 配置并在 ChatGPT 添加、启用 Codex Bridge 插件后，即可按第 11 节直接读写已授权项目的文件、运行命令，无需连接 Agent。
+
+OpenAI Runtime Key 用于 Tunnel；使用 DSH 执行任务时，另行配置 DeepSeek Key。Runtime Key 不填入 ChatGPT 对话或 Qwen 配置。
 
 ## 8. 连接 Qwen Studio
 
@@ -135,6 +146,8 @@ OpenAI Runtime Key 用于 Tunnel，DeepSeek Key 用于 DSH 模型；两者分别
 “重新生成凭证”会使旧凭据失效，之后重新复制配置到 Qwen。“重新生成 Endpoint”会改变本机服务地址，需要更新使用旧地址的客户端。
 
 ## 9. 提交第一项任务
+
+本节适用于已连接 Agent 的任务执行。直接文件与命令操作见第 11 节。
 
 ### 从本机工作台
 
@@ -191,7 +204,7 @@ OpenAI Runtime Key 用于 Tunnel，DeepSeek Key 用于 DSH 模型；两者分别
 | 失败 | 查看错误摘要、失败码和相关日志 |
 | 已中断 | 按需要继续会话或提交新任务 |
 
-客户端可用 `list_tasks` 按项目查找任务，并通过 `get_task` 的状态和 `wait_policy` 等待结果；暂时没有文本不等于失败。单个工具失败会保留在过程记录中，整项任务结果以最终状态为准。
+客户端可用 `list_tasks` 按项目查找任务。提交后先获得任务 ID，再调用 `wait_task`，由 Bridge 默认最多等待 300 秒；完成、审批或补充信息会提前返回。到点仍在执行时，客户端可以随时用 `get_task` 查询状态和结果。等待结束或连接断开不取消任务，结果会继续保存。单个工具失败保留在过程记录中，整项任务结果以最终状态为准。
 
 工作台可发送补充指令或中断任务。具体操作服从当前 Agent 的能力；历史续聊选择原项目、原 Agent 安装对应的会话，DSH 的恢复取决于握手能力和已保存会话。模型与安装变化后，先查看连接状态再继续。
 
@@ -201,7 +214,13 @@ OpenAI Runtime Key 用于 Tunnel，DeepSeek Key 用于 DSH 模型；两者分别
 
 ## 11. Direct 与 Skills
 
-Direct 让聊天客户端直接执行授权的文件、命令或 Git 操作，不通过 Agent 生成执行计划。
+**Direct 让聊天客户端直接执行授权的文件、命令或 Git 操作，无需安装或连接 Agent。** 在 Bridge 添加项目并配置权限、完成 Tunnel 和插件接入（Qwen 使用本机 HTTP MCP）后即可使用。
+
+例如，在已启用插件的对话中输入：
+
+```text
+请通过 Codex Bridge 直接读取当前项目的 README，说明项目用途。
+```
 
 1. 在设置中管理 Direct 执行模式与规则。
 2. 在项目中设置访问策略和需要的 workspace commands。

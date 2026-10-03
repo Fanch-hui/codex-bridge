@@ -1,5 +1,9 @@
 import Foundation
 
+#if os(Linux)
+  import BridgeIPC
+#endif
+
 #if canImport(Darwin)
   import Darwin
 #elseif os(Windows)
@@ -31,6 +35,8 @@ public enum ServiceBundleLocator {
       }
       let path = String(decoding: buffer[..<Int(length)], as: UTF16.self)
       return URL(fileURLWithPath: path)
+    #elseif os(Linux)
+      return LinuxServiceEndpoint.executableURL()
     #else
       return posixExecutableURL() ?? Bundle.main.executableURL
     #endif

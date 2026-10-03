@@ -56,7 +56,8 @@ extension BridgeServiceApplication {
     let additional = OutboundContentSecurity.redactedSecrets(
       request.additionalInstructions, maximumUTF8Bytes: 8192)
     let rendered = TaskHandoffRenderer.render(
-      packet, handoffID: request.handoffID, additionalInstructions: additional)
+      packet, handoffID: request.handoffID, additionalInstructions: additional,
+      contextWindowTokens: target.contextWindowTokens)
     let revision = Self.handoffDigest([
       packet.sourceRevision, rendered.prompt, additional, target.fingerprint,
     ])
@@ -66,7 +67,8 @@ extension BridgeServiceApplication {
       permissionMode: target.prepared.request.permissionMode.rawValue,
       networkAllowed: target.prepared.request.networkAllowed,
       revision: revision, prompt: rendered.prompt, additionalInstructions: additional,
-      warnings: rendered.warnings, ready: rendered.ready, estimatedTokens: rendered.estimatedTokens)
+      warnings: rendered.warnings, ready: rendered.ready, estimatedTokens: rendered.estimatedTokens,
+      contextWindowTokens: target.contextWindowTokens)
     try Self.checkDeadline(deadline)
     try await tasks.saveHandoff(
       .init(packet: packet, preview: preview, targetFingerprint: target.fingerprint))

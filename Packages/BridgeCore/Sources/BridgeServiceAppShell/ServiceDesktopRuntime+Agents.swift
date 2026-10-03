@@ -7,7 +7,8 @@ extension BridgeServiceAppModel {
     providerID: String,
     displayName: String,
     executableURL: URL,
-    configurationURL: URL? = nil
+    configurationURL: URL? = nil,
+    qoderDistribution: String? = nil
   ) {
     runAgentMutation(
       operation: { client in
@@ -16,7 +17,8 @@ extension BridgeServiceAppModel {
             providerID: providerID,
             displayName: displayName,
             executablePath: executableURL.standardizedFileURL.path,
-            configurationPath: configurationURL?.standardizedFileURL.path
+            configurationPath: configurationURL?.standardizedFileURL.path,
+            qoderDistribution: qoderDistribution
           )
         )
       },
@@ -24,7 +26,8 @@ extension BridgeServiceAppModel {
         let name = installation?.displayName ?? displayName
         return installation?.availability == "available"
           ? "已登记并验证 \(name)，点击连接后即可使用"
-          : "已登记 \(name)，但连接检查未通过"
+          : installation.map { AgentConnectionFailurePresentation.message(for: $0) }
+            ?? "已登记 \(name)，但连接检查未通过"
       }
     )
   }
@@ -33,7 +36,11 @@ extension BridgeServiceAppModel {
     providerID: String,
     baseURL: String? = nil,
     apiKey: String? = nil,
-    alwaysProceedConfirmed: Bool = false
+    alwaysProceedConfirmed: Bool = false,
+    qoderDistribution: String? = nil,
+    installationID: String? = nil,
+    inferenceProtocol: String? = nil,
+    catalogBaseURL: String? = nil
   ) {
     guard let provider = agentProviders.first(where: { $0.providerID == providerID }) else {
       errorMessage = "未找到可连接的 Agent Provider。"
@@ -45,15 +52,28 @@ extension BridgeServiceAppModel {
           providerID: provider.providerID,
           baseURL: baseURL,
           apiKey: apiKey,
-          alwaysProceedConfirmed: alwaysProceedConfirmed
+          alwaysProceedConfirmed: alwaysProceedConfirmed,
+          qoderDistribution: qoderDistribution,
+          installationID: installationID,
+          inferenceProtocol: inferenceProtocol, catalogBaseURL: catalogBaseURL
         )
       },
       successMessage: { installation in
         guard let installation else { return "Agent 连接请求已完成" }
         return installation.availability == "available"
           ? "已连接并验证 \(installation.displayName)"
-          : "已发现 \(installation.displayName)，但连接检查未通过"
+          : AgentConnectionFailurePresentation.message(for: installation)
       }
+    )
+  }
+
+  func setQoderRuntimeSettings(_ request: IPCAgentQoderRuntimeSettingsRequest) {
+    runAgentMutation(
+      operation: { client in
+        _ = try await client.setQoderRuntimeSettings(request)
+        return nil
+      },
+      successMessage: { _ in "Qoder 地区与运行时配置已保存" }
     )
   }
 
@@ -71,7 +91,8 @@ extension BridgeServiceAppModel {
       successMessage: { installation in
         installation?.availability == "available"
           ? "Agent 检查通过"
-          : "Agent 检查未通过，请查看原因"
+          : installation.map { AgentConnectionFailurePresentation.message(for: $0) }
+            ?? "Agent 检查未通过，请查看原因"
       }
     )
   }

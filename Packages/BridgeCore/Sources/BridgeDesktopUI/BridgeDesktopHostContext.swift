@@ -3,6 +3,7 @@ import Foundation
 public enum BridgeDesktopPlatform: String, Codable, Equatable, Sendable {
   case macOS = "macos"
   case windows
+  case linux
 }
 
 public struct BridgeDesktopHostContext: Codable, Equatable, Sendable {

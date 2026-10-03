@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import Foundation
 
 public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
@@ -11,10 +12,12 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let providerID: String
   public let model: String?
   public let permissionMode: String?
+  public let usage: AgentUsageStatistics?
   public let currentStep: String?
   public let resultSummary: String?
   public let failureCode: String?
   public let changedFiles: [String]
+  public let attachmentPaths: [String]?
   public let activity: [BridgeDesktopActivityRow]
   public let conversation: [BridgeDesktopConversationEntry]
   public let conversationState: BridgeDesktopConversationState?
@@ -44,9 +47,11 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     model: String? = nil,
     permissionMode: String? = nil,
     currentStep: String? = nil,
+    usage: AgentUsageStatistics? = nil,
     resultSummary: String? = nil,
     failureCode: String? = nil,
     changedFiles: [String] = [],
+    attachmentPaths: [String]? = nil,
     activity: [BridgeDesktopActivityRow] = [],
     conversation: [BridgeDesktopConversationEntry] = [],
     conversationState: BridgeDesktopConversationState? = nil,
@@ -75,9 +80,11 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.model = model
     self.permissionMode = permissionMode
     self.currentStep = currentStep
+    self.usage = usage
     self.resultSummary = resultSummary
     self.failureCode = failureCode
     self.changedFiles = changedFiles
+    self.attachmentPaths = attachmentPaths
     self.activity = activity
     self.conversation = conversation
     self.conversationState = conversationState

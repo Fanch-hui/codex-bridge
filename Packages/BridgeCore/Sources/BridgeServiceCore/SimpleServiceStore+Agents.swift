@@ -21,6 +21,7 @@ extension SimpleServiceStore {
           )
         }
         try Self.insertAgentInstallation(installation, capabilities: capabilities, in: db)
+        try Self.writeAgentRuntimeArtifacts(installation, in: db)
         try Self.insertAgentInstallationArtifacts(
           installation.artifacts,
           for: installation.id,
@@ -97,6 +98,7 @@ extension SimpleServiceStore {
           )
         )
         guard db.changesCount == 1 else { throw ServiceStoreError.storageFailure }
+        try Self.writeAgentRuntimeArtifacts(installation, in: db)
         try Self.replaceAgentInstallationArtifacts(
           installation.artifacts,
           for: installation.id,
@@ -430,6 +432,7 @@ extension SimpleServiceStore {
       availability: availability,
       capabilities: capabilities,
       artifacts: artifacts,
+      runtimeArtifacts: readAgentRuntimeArtifacts(for: installationID, in: db),
       lastProbeError: row["last_probe_error"],
       lastProbedAt: lastProbedAt.map(Date.init(timeIntervalSince1970:)),
       createdAt: Date(timeIntervalSince1970: row["created_at"]),

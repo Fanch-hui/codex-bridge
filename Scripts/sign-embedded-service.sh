@@ -15,6 +15,16 @@ readonly deepseek_template="${deepseek_bundle}/Contents/Resources/cordis.yml"
   exit 66
 }
 
+for spec in "BridgeCore_BridgePiRPC.bundle:PiBridgeExtension/index.mjs" \
+  "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs"; do
+  bundle="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/${spec%%:*}"
+  entry="${bundle}/Contents/Resources/${spec#*:}"
+  [[ -d "${bundle}" && ! -L "${bundle}" && -f "${entry}" && ! -L "${entry}" ]] || {
+    print -u2 "Embedded Agent resources are missing or unsafe: ${spec%%:*}"
+    exit 66
+  }
+done
+
 for architecture in ${(z)ARCHS}; do
   /usr/bin/lipo "${service_path}" -verify_arch "${architecture}"
 done

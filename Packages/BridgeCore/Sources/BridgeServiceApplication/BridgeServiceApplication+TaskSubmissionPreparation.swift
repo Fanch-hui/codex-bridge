@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeDomain
 import BridgeMCP
 import BridgeServiceCore
@@ -25,6 +26,11 @@ extension BridgeServiceApplication {
         workbenchPermissionMode: workbenchPermissionMode,
         deadline: deadline
       )
+    }
+    guard submission.attachmentPaths?.isEmpty != false,
+      submission.attachmentSourceTaskID == nil
+    else {
+      throw BridgeMCPQueryError.contractRejected
     }
     let models: [MCPModelSummary]?
     do {
@@ -54,7 +60,16 @@ extension BridgeServiceApplication {
     guard !submission.networkAccess || project.accessPolicy.network != .denied else {
       throw BridgeMCPQueryError.contractRejected
     }
-    let taskPrompt = try await taskPrompt(for: submission, project: project, deadline: deadline)
+    let selectedSkills = try await selectedSkillSnapshots(
+      for: submission,
+      project: project,
+      deadline: deadline
+    )
+    let taskPrompt = try await taskPrompt(
+      for: submission,
+      deadline: deadline,
+      selectedSkills: selectedSkills
+    )
     return PreparedTaskSubmission(
       projectID: project.id,
       request: ServiceTaskRequest(
@@ -72,7 +87,8 @@ extension BridgeServiceApplication {
         networkAllowed: submission.networkAccess,
         accessMode: accessMode,
         fastMode: fastMode,
-        queueIfBusy: submission.queueIfBusy == true
+        queueIfBusy: submission.queueIfBusy == true,
+        selectedSkills: selectedSkills
       )
     )
   }
@@ -99,23 +115,24 @@ extension BridgeServiceApplication {
 
   func taskPrompt(
     for submission: MCPServiceTaskSubmission,
-    project: ServiceProjectRecord,
-    deadline: ContinuousClock.Instant
+    deadline: ContinuousClock.Instant,
+    selectedSkills: [AgentSelectedSkill]
   ) async throws -> String {
     var prompt = Self.prompt(
       submission.prompt,
       acceptanceCriteria: submission.acceptanceCriteria
     )
-    if let skillName = submission.skillName {
-      let skill = try await serviceReadSkill(
-        skillName: skillName,
-        projectID: project.id.rawValue,
-        subpath: "SKILL.md",
-        deadline: deadline
-      )
-      let instructions = String(skill.content.prefix(8 * 1_024))
-      prompt =
-        "Skill instructions for \(skill.name):\n\n\(instructions)\n\nUser task:\n\(prompt)"
+    if submission.providerID != "pi", submission.providerID != "qoder" {
+      let names = (submission.skillNames ?? []) + [submission.skillName].compactMap { $0 }
+      var seen = Set<String>()
+      for skillName in names where seen.insert(skillName).inserted {
+        try Self.checkDeadline(deadline)
+        let skill = try await serviceReadSkill(
+          skillName: skillName, projectID: submission.projectID, subpath: "SKILL.md",
+          deadline: deadline)
+        let instructions = String(skill.content.prefix(8 * 1_024))
+        prompt = "Skill instructions for \(skill.name):\n\n\(instructions)\n\nUser task:\n\(prompt)"
+      }
     }
     guard prompt.utf8.count <= 32 * 1_024 else {
       throw BridgeMCPQueryError.contractRejected

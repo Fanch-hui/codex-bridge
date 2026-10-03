@@ -1,4 +1,5 @@
 import BridgeAgentCore
+import BridgeDeepSeekHarnessACP
 import Foundation
 
 extension ServiceAgentAutoDiscovery {
@@ -15,9 +16,20 @@ extension ServiceAgentAutoDiscovery {
         ["dsh", "dsh.cmd", "dsh.bat"].flatMap { name -> [String] in
           let launcher = pathJoin(directory, name)
           guard let canonical = canonicalRegularFile(launcher) else { return [] }
+          if let desktop = DeepSeekHarnessACPRuntimeLayout.desktop(at: canonical) {
+            return [desktop.runtimePath]
+          }
           if name == "dsh" { return [canonical] }
           return deepSeekWindowsLauncherTargets(at: launcher)
         }
+      }
+    #elseif os(Linux)
+      let resolver = AgentExecutableResolver(
+        environment: environment,
+        additionalDirectories: LinuxAgentInstallationDirectories.search(environment: environment)
+      )
+      return resolver.searchDirectories().compactMap { directory in
+        canonicalRegularFile(pathJoin(directory, "dsh"))
       }
     #else
       let resolver = AgentExecutableResolver(

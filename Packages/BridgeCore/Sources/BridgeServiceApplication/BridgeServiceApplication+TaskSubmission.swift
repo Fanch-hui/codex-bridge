@@ -79,7 +79,11 @@ extension BridgeServiceApplication {
         !submitted.isQueued,
         submitted.requiresLocalStartApproval
       {
-        try await approveAndStartTask(submitted.id, automatically: true)
+        try await approveAndStartTask(
+          submitted.id,
+          automatically: true,
+          startInBackground: source.isRemoteMCPOrigin
+        )
       }
       let task = try await tasks.task(id: result.task.id)
       let latest = task ?? result.task

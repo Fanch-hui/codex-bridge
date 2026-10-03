@@ -2,33 +2,38 @@
 
 [简体中文](./README.md) · [English](./README_en.md)
 
-[Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.yeyuancc0-glitch%2Fcodex-bridge/versions/latest)
+[Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Fanch-hui%2Fcodex-bridge/versions/latest)
 
-Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness 与 Antigravity 的任务、审批和会话。
+Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、[OpenAI Dot](#通过-openai-dot-使用)、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
 
-macOS 与 Windows 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
+macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 `v1.2.0`。
+当前版本为 `v1.3.6`。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v1.2.0 安装包 | 安装方式 |
+| 平台 | v1.3.6 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-1.2.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.2.0-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows x64，便携运行 | `codex-bridge-windows-x64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
+| macOS 14+，Apple Silicon | `CodexBridge-1.3.6-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-1.3.6-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.3.6-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-1.3.6-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.3.6.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.3.6.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.3.6.tar.gz` / `codex-bridge-linux-arm64-1.3.6.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
 升级时沿用现有应用数据和内置浏览器登录态。Windows 关闭主窗口后保留托盘，使用托盘菜单退出。
 
-带内置更新功能的版本会在每次启动时后台检查 GitHub 更新，发现新版后在首页提示。点击“立即更新”即可下载并安装；有任务正在执行时，等待任务结束后安装并重新启动。每次更新完成后请在 ChatGPT 中刷新一次插件以清除旧版缓存（参见 [配置指南](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)）。设置页可手动检查更新。旧版本需先手动安装一次带更新功能的版本。
+带内置更新功能的版本会在每次启动时后台检查 GitHub 更新，发现新版后在首页提示。点击“立即更新”即可下载并安装；有任务正在执行时，等待任务结束后安装并重新启动。每次更新完成后请在 ChatGPT 中刷新一次插件以清除旧版缓存（参见 [配置指南](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)）。Linux 的更新入口提供对应架构的 `.deb` 下载，下载后通过系统包管理器安装并重新启动 App。设置页可手动检查更新。旧版本需先手动安装一次带更新功能的版本。
 
 ## 实际界面与任务演示
 
-以下页面为 macOS 实录，Windows 共用同一套产品界面。约 15 秒演示：ChatGPT 提交“你好” → 本机批准 → Codex 执行 → 工作台显示回复。
+以下页面为 macOS 实录，Windows 与 Linux 共用同一套产品界面。约 15 秒演示：ChatGPT 提交“你好” → 本机批准 → Codex 执行 → 工作台显示回复。
 
 <img src="./docs/assets/workbench-demo.gif" width="640" alt="ChatGPT 提交任务、本机批准与 Codex 执行回复的完整动态演示">
 
@@ -67,29 +72,52 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 - [详细使用指南](./docs/USER_GUIDE.md)：安装、项目权限、Qwen、任务与故障排查
 - [ChatGPT / Tunnel / OpenAI API Key 配置](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness 安装与 API 配置](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
+- [Pi 与 Qoder 安装、地区选择与连接](./docs/PI_QODER_CONNECTION_GUIDE.md)
 - [OpenCode 连接](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity 连接与权限](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
 - [MCPB 客户端连接与 Registry 发布](./docs/MCP_REGISTRY.md)
 
 ## 首次配置
 
+**如果只需要读写本地文件、运行命令，添加项目并配置权限后，配置好 Tunnel、添加并启用 Codex Bridge 插件即可，无需安装或连接 Agent。** 这些操作由 Direct Workspace 执行，按项目权限、Direct 执行规则与审批设置处理。
+
+### 本地文件与命令
+
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
 2. **添加项目**：登记本地目录，并设置读取、写入和网络权限。
-3. **连接 Agent**：首次初始化自动扫描并保存本机 Agent；在连接页点击连接完成验证和启用。后续安装 Agent 后点击“扫描 Agent”更新目录。Codex 使用本机 Codex 执行通道；DeepSeek Harness 可在 App 中配置服务地址和 API key。
-4. **选择项目和模式**：在工作台选择项目以及 `Read Only` / `Write`。
-5. **连接聊天客户端**：ChatGPT 使用 OpenAI Secure MCP Tunnel（ChatGPT 需要有 Plus 及以上订阅或团队订阅才可以使用）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
-6. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
+3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置并添加、启用插件（ChatGPT 需要有 Plus 及以上订阅或团队订阅才可以使用）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
+4. **直接操作项目**：在已启用插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
+
+### 委派 Agent 任务（可选）
+
+需要让 Codex、OpenCode、DeepSeek Harness 等 Agent 执行任务时，再完成以下配置：
+
+1. **连接 Agent**：首次初始化自动扫描并保存本机 Agent；在连接页点击连接完成验证和启用。后续安装 Agent 后点击“扫描 Agent”更新目录。Codex 使用本机 Codex 执行通道；DeepSeek Harness 可在 App 中配置服务地址和 API key。
+2. **选择项目和模式**：在工作台选择项目、Agent 以及 `Read Only` / `Write`，并设置该 Agent 的模型偏好。
+3. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
 
 密钥通过系统凭据存储管理。分享配置、日志或截图前，请移除凭据。
+
+## 通过 OpenAI Dot 使用
+
+**Dot 可以直接通过 Codex Bridge 读写本地项目文件并运行命令，无需安装或连接 Agent，也无需启动 Work 或 Codex。** 操作由本机 Bridge 服务的 Direct Workspace 能力执行，沿用项目权限、Direct 执行规则与审批设置。项目维护者实测文件读写可用，并认为 Dot 的插件使用体验更好。
+
+完成 [ChatGPT 插件连接](./docs/CHATGPT_DEVELOPER_MODE.md)后，确保 Codex Bridge 已在当前账号启用且连接有效，即可让 Dot 直接操作已授权的项目。Dot 沿用插件已有权限；参见 OpenAI 的[插件接入说明](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps)。
+
+- **订阅资格**：截至 2026-10-02，Dot 正逐步向 Pro 100/200/500、Business Premium 和 Enterprise 开放。Pro 用户需年满 18 岁且位于欧洲经济区、英国和瑞士以外；Enterprise 需管理员启用。具体资格与开放进度见[官方说明](https://learn.chatgpt.com/docs/dots#access)。
+- **直接读写的额度**：Dot 直接调用 Bridge 文件工具不创建 Work/Codex 任务，因此不产生这两类任务的额度消耗。与 Dot 的对话不计入 ChatGPT 用量；Dot 的深度工作另有套餐额度。参见[官方用量说明](https://learn.chatgpt.com/docs/dots#access)。
+- **委派任务的额度**：如果另行让 Work、Codex 或其他 Agent 执行任务，则按实际使用的产品或模型服务计算用量与费用。
 
 ## 能力
 
 | 模块 | 功能 |
 | --- | --- |
-| Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断 |
+| Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断；macOS 同时识别新版与旧版 App 内置 CLI 路径 |
 | OpenCode | ACP 连接、模型与推理选项、权限回传、会话继续 |
 | DeepSeek Harness | ACP 入口与能力探测、真实模型目录、搜索配置、MCP 服务配置与会话持久化 |
 | Antigravity | CLI 接入、原生权限策略、执行过程与会话继续 |
-| 工作台 | 按 Agent 分组的项目会话、历史分页、工具卡片、任务控制和审批 |
+| Pi | 原生 CLI 与会话接入、模型目录、MCP、Skills 与任务续写 |
+| Qoder | CN/国际版原生 CLI 与 SDK 接入、地区隔离、权限模式、工具审批与会话续写 |
+| 工作台 | 按 Agent 分组的项目会话、历史分页、工具卡片、审批、失败任务重试与跨 Agent 交接 |
 | Direct Workspace | 受控文件读写、Patch、命令执行与 Git 操作 |
 | Skills | 本机技能发现、只读查看与显式 Action 调用 |
 
@@ -97,7 +125,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 ## 任务并发限制
 
-macOS 与 Windows 使用相同的任务并发规则：
+macOS、Windows 与 Linux 使用相同的任务并发规则：
 
 | 范围 | 限制 |
 | --- | --- |
@@ -115,11 +143,11 @@ ChatGPT Web ── Secure MCP Tunnel ─┐
 Qwen Studio ── localhost MCP ────┼─► Codex Bridge Service
 Desktop App ── local IPC ────────┘   ├─ 项目权限与审批
                                     ├─ 任务、会话与 SQLite
-                                    ├─ Codex / OpenCode / DSH / AGY
+                                    ├─ Codex / OpenCode / DSH / AGY / Pi / Qoder
                                     └─ Direct Workspace / Skills
 ```
 
-macOS 使用 WKWebView 和 XPC；Windows 使用 WebView2 和命名管道。两平台共用 `BridgeDesktopUI` 与 `BridgeServiceAppCore`。Windows 展示采用状态版本检查、页面缓存和增量消息更新；活动会话继续通过独立订阅接收实时输出。
+macOS 使用 WKWebView 和 XPC；Windows 使用 WebView2 和命名管道；Linux 使用 GTK 3 / WebKitGTK 4.1 和 Unix domain socket。三平台共用 `BridgeDesktopUI` 与 `BridgeServiceAppCore`，Windows 与 Linux 还共用 `BridgeDesktopShell` 的桌面状态和命令适配。活动会话通过独立订阅接收实时输出。
 
 ## 从源码构建
 
@@ -130,7 +158,7 @@ git clone --branch win https://github.com/Fanch-hui/codex-bridge.git
 cd codex-bridge
 ```
 
-### macOS Apple Silicon
+### macOS Apple Silicon / Intel
 
 需要 Xcode 与可编译项目的 Swift 工具链。
 
@@ -143,7 +171,9 @@ Scripts/with-xcode.sh xcodebuild \
 
 普通源码构建可使用本地 MCP。ChatGPT Secure Tunnel 还需要经过摘要校验的 `tunnel-client`；正式安装包已包含该组件。
 
-### Windows x64
+Intel Mac 构建将 `arch=arm64` 替换为 `arch=x86_64`。发布脚本的架构参数同样支持 `arm64` 与 `x86_64`。
+
+### Windows x64 / ARM64
 
 需要 Swift 6.3.3、Visual Studio C++ 工具链、Windows SDK、vcpkg SQLite，以及生成安装器所需的 Inno Setup 7.1.0。
 
@@ -153,7 +183,13 @@ pwsh -File Scripts/build-windows.ps1 `
   -Installer -ISCCPath 'C:\Program Files (x86)\Inno Setup 7\ISCC.exe'
 ```
 
+构建脚本默认使用本机架构，也可通过 `-Architecture x64` 或 `-Architecture arm64` 指定目标。SQLite 的 vcpkg triplet 需分别使用 `x64-windows` 或 `arm64-windows`。
+
 构建脚本使用 `swiftbuild`，输出 portable ZIP 和 EXE 安装器到 `.build`。
+
+### Ubuntu 24.04 x64 / ARM64
+
+Linux 桌面版使用 GTK 3 与 WebKitGTK，共用工作台与项目管理界面，提供 `.deb` 和便携包。系统依赖、构建命令与数据目录见 [Linux 指南](./docs/LINUX.md)。
 
 ## 许可与隐私
 

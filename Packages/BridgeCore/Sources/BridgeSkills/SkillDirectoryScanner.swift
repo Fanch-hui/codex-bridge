@@ -1,3 +1,4 @@
+import BridgeSecurity
 import Foundation
 
 struct SkillDirectoryScanner {
@@ -68,23 +69,22 @@ struct SkillDirectoryScanner {
     depth: Int,
     traversal: Traversal
   ) throws -> [DiscoveredManifest] {
-    let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey]
     if depth > 0 {
-      let values = try directory.resourceValues(forKeys: Set(keys))
-      guard values.isDirectory == true, values.isSymbolicLink != true else { return [] }
+      let metadata = try FileSystemEntryMetadata(at: directory)
+      guard metadata.isDirectory, !metadata.isSymbolicLink else { return [] }
     }
     let entries = try fileManager.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: keys, options: []
+      at: directory, includingPropertiesForKeys: [], options: []
     )
     var manifests: [DiscoveredManifest] = []
     for entry in entries.sorted(by: {
       $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent)
         == .orderedAscending
     }) {
-      let values = try entry.resourceValues(forKeys: Set(keys))
-      guard values.isDirectory == true else { continue }
+      let metadata = try FileSystemEntryMetadata(at: entry)
+      guard metadata.isDirectory else { continue }
       let name = entry.lastPathComponent
-      guard SkillManifestMetadata.isValidSkillName(name), values.isSymbolicLink != true else {
+      guard SkillManifestMetadata.isValidSkillName(name), !metadata.isSymbolicLink else {
         continue
       }
       guard !Self.excludedContainerNames.contains(name.lowercased()) else { continue }

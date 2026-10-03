@@ -115,6 +115,7 @@ public actor TaskConversationBuffer {
     var cleanupGeneration = 0
     var subscribers: [Int: AsyncStream<ConversationChange>.Continuation] = [:]
     var nextSubscriberID = 0
+    var pendingImmediateSteers: [(id: UUID, content: String)] = []
   }
 
   let tasks: ServiceTaskManager

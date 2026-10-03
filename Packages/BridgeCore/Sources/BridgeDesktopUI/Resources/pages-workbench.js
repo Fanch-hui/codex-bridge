@@ -3,6 +3,7 @@
 
   var S = global.CodexBridgeDesktopPageSupport;
   var N = global.CodexBridgeDesktopNativePermissions;
+  var P = global.CodexBridgeDesktopWorkbenchSubmissions;
 
   function renderApprovals(page, emit) {
     var container = document.getElementById("workbench-inspector-approvals");
@@ -52,6 +53,15 @@
           });
         });
         actions.appendChild(answerButton);
+        var cancelButton = S.button("取消提问", null, {}, emit, "small", appr.resolving);
+        cancelButton.addEventListener("click", function () {
+          emit("resolveApproval", {
+            approvalID: appr.approvalID,
+            taskID: appr.taskID,
+            decision: "cancel"
+          });
+        });
+        actions.appendChild(cancelButton);
         card.appendChild(actions); section.appendChild(card);
         return;
       }
@@ -90,15 +100,29 @@
       legend.textContent = question.header || question.question;
       fieldset.appendChild(legend);
       fieldset.appendChild(S.node("p", "user-input-prompt", question.question));
+      var inputType = question.inputType || "select";
+      var isTextInput = inputType === "input" || inputType === "editor";
+      var optionControls = [];
+      var customInput = null;
       S.safeArray(question.options).forEach(function (option) {
         var label = S.node("label", "user-input-option");
         var control = document.createElement("input");
-        control.type = "radio";
+        control.type = question.allowsMultiple === true ? "checkbox" : "radio";
         control.name = "approval-" + approval.approvalID + "-" + question.id;
         control.value = option.label;
         control.checked = questionDraft.options.indexOf(option.label) >= 0;
+        optionControls.push(control);
         control.addEventListener("change", function () {
-          if (control.checked) questionDraft.options = [option.label];
+          if (question.allowsMultiple === true) {
+            questionDraft.options = questionDraft.options.filter(function (item) {
+              return item !== option.label;
+            });
+            if (control.checked) questionDraft.options.push(option.label);
+          } else if (control.checked) {
+            questionDraft.options = [option.label];
+            questionDraft.other = "";
+            if (customInput) customInput.value = "";
+          }
         });
         label.appendChild(control);
         var copy = S.node("span", "user-input-option-copy");
@@ -109,15 +133,23 @@
         label.appendChild(copy);
         fieldset.appendChild(label);
       });
-      if (question.isOther || !question.options || question.options.length === 0) {
-        var other = document.createElement("input");
+      if (question.isOther || isTextInput || !question.options || question.options.length === 0) {
+        var useEditor = inputType === "editor" && !question.isSecret;
+        var other = document.createElement(useEditor ? "textarea" : "input");
+        customInput = other;
         other.className = "user-input-other";
-        other.type = question.isSecret ? "password" : "text";
+        if (!useEditor) other.type = question.isSecret ? "password" : "text";
         other.value = questionDraft.other || "";
-        other.placeholder = question.isOther ? "其他回答" : "请输入回答";
+        other.placeholder = question.isOther && !isTextInput ? "其他回答" : "请输入回答";
         other.setAttribute("aria-label", question.header || question.question);
-        other.autocomplete = question.isSecret ? "off" : "on";
-        other.addEventListener("input", function () { questionDraft.other = other.value; });
+        if (other.tagName === "INPUT") other.autocomplete = question.isSecret ? "off" : "on";
+        other.addEventListener("input", function () {
+          questionDraft.other = other.value;
+          if (question.allowsMultiple !== true && other.value) {
+            questionDraft.options = [];
+            optionControls.forEach(function (control) { control.checked = false; });
+          }
+        });
         fieldset.appendChild(other);
       }
       body.appendChild(fieldset);
@@ -142,13 +174,15 @@
     if (!questions.length) return false;
     var answers = collectAnswers(approval, questions, drafts);
     return questions.every(function (question) {
-      return S.safeArray(answers[question.id]).some(function (value) {
+      if (question.isRequired === false) return true;
+      var values = S.safeArray(answers[question.id]);
+      return values.some(function (value) {
         return typeof value === "string" && value.trim().length > 0;
       });
     });
   }
 
-  function renderStable(container, signature, render) {
+  function renderStable(container, signature, render, preservesButtons) {
     if (!container.__renderState) {
       var state = container.__renderState = { pressed: false, signature: null, pending: null };
       container.addEventListener("pointerdown", function () { state.pressed = true; });
@@ -175,8 +209,9 @@
     var active = document && document.activeElement;
     var focusedControl = active && container.contains(active)
       && /^(SELECT|INPUT|TEXTAREA|BUTTON)$/.test(String(active.tagName || "").toUpperCase());
-    if (state.pressed || focusedControl) {
-      state.pending = function () { renderStable(container, signature, render); };
+    var focusedButton = active && String(active.tagName || "").toUpperCase() === "BUTTON";
+    if (state.pressed || (focusedControl && !(preservesButtons && focusedButton))) {
+      state.pending = function () { renderStable(container, signature, render, preservesButtons); };
       return;
     }
     if (state.signature === signature) return;
@@ -186,17 +221,17 @@
 
   function renderContent(page, emit) {
     var content = document.getElementById("workbench-inspector-content");
-    renderStable(content, JSON.stringify(page), function () {
+    renderStable(content, JSON.stringify([page, P.revision()]), function () {
       var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
       try { renderContentBody(content, page, emit); } finally { restore(); }
-    });
+    }, true);
   }
 
   function prepareContentCard(content, page) {
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
     var detail = page.selectedTask;
     var keepConversation = incremental && detail
-      && ((detail.conversation && detail.conversation.length) || detail.conversationState);
+      && ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page));
     var stableCard = keepConversation && content.__windowsDetailCard;
     if (stableCard) {
       Array.from(content.children).forEach(function (child) {
@@ -221,7 +256,13 @@
     if (conversation.parentNode !== card) card.appendChild(conversation);
     if (card.firstChild !== header) card.insertBefore(header, card.firstChild);
     if (card.lastChild !== conversation) card.appendChild(conversation);
-    return { header: header, conversation: conversation };
+    var summary = header.__summary || (header.__summary = S.node("div", "task-detail-summary"));
+    var actions = header.__actions || (header.__actions = S.node("div", "form-actions"));
+    var files = header.__files || (header.__files = S.node("div", "task-detail-files"));
+    [summary, actions, files].forEach(function (node) {
+      if (node.parentNode !== header) header.appendChild(node);
+    });
+    return { header: header, summary: summary, actions: actions, files: files, conversation: conversation };
   }
 
   function renderContentBody(content, page, emit) {
@@ -252,38 +293,75 @@
     if (remediationCard) content.appendChild(remediationCard);
     var card = retained.card || S.node("div", "page-card task-detail-card");
     var sections = detailCardSections(card);
-    S.clear(sections.header);
+    S.clear(sections.summary);
+    S.clear(sections.files);
     if (retained.keep) content.__windowsDetailCard = card;
-    sections.header.appendChild(S.node("h3", "detail-title", detail.title));
-    sections.header.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));
+    sections.summary.appendChild(S.node("h3", "detail-title", detail.title));
+    sections.summary.appendChild(S.node("p", "detail-subtitle", detail.projectName + " · " + detail.provider));
     var grid = S.node("dl", "detail-grid");
     addDetail(grid, "状态", detail.status); addDetail(grid, "更新时间", detail.updatedAt);
     addDetail(grid, "模型", detail.model || "未记录"); addDetail(grid, "权限", detail.permissionMode || "未记录");
-    if (detail.failureCode) addDetail(grid, "失败代码", detail.failureCode);
-    sections.header.appendChild(grid);
-
-    var actions = S.node("div", "form-actions");
-    if (detail.canInterrupt) actions.appendChild(S.button("中断", "interruptTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (detail.canStop) actions.appendChild(S.button("停止", "stopTask", { taskID: detail.taskID }, emit, "small danger", false));
-    if (row.canDelete) {
-      var rm = S.button("删除会话", null, {}, emit, "small danger", false);
-      rm.addEventListener("click", function () {
-        if (global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部轮次任务、事件和对话记录，无法撤销。")) emit("deleteSession", { taskID: detail.taskID, sessionID: detail.sessionID });
-      });
-      actions.appendChild(rm);
+    if (detail.usage) {
+      var usage = detail.usage;
+      if (usage.contextTokens != null) addDetail(grid, "上下文 Token", String(usage.contextTokens) + (usage.contextWindow != null ? " / " + usage.contextWindow : ""));
+      else if (usage.contextUsedPercentage != null) addDetail(grid, "上下文占用", String(usage.contextUsedPercentage) + "%");
+      if (usage.inputTokens != null) addDetail(grid, "累计输入 Token", String(usage.inputTokens));
+      if (usage.outputTokens != null) addDetail(grid, "累计输出 Token", String(usage.outputTokens));
+      if (usage.cacheReadTokens != null) addDetail(grid, "缓存读取 Token", String(usage.cacheReadTokens));
+      if (usage.cacheWriteTokens != null) addDetail(grid, "缓存写入 Token", String(usage.cacheWriteTokens));
+      if (usage.totalTokens != null) addDetail(grid, "累计 Token", String(usage.totalTokens));
+      if (usage.costAmount != null) addDetail(grid, usage.currency ? "费用" : "原生费用值", String(usage.costAmount) + (usage.currency ? " " + usage.currency : "（单位未提供）"));
     }
-    actions.appendChild(S.button(
-      "刷新当前对话", "refreshConversation", { taskID: detail.taskID }, emit, "small", false
-    ));
-    sections.header.appendChild(actions);
+    if (detail.failureCode) addDetail(grid, "失败代码", detail.failureCode);
+    sections.summary.appendChild(grid);
 
-    if (detail.changedFiles && detail.changedFiles.length) addListBlock(sections.header, "变更文件", detail.changedFiles);
-    if ((detail.conversation && detail.conversation.length) || detail.conversationState) {
+    updateDetailActions(sections.actions, detail, row, emit);
+    if (detail.changedFiles && detail.changedFiles.length) addListBlock(sections.files, "变更文件", detail.changedFiles);
+
+    if ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page)) {
       global.CodexBridgeDesktopWorkbenchConversation.render(
         sections.conversation, detail.conversation || [], page, emit, { owner: content });
     }
     if (card.parentNode !== content) content.appendChild(card);
     else if (content.lastChild !== card) content.appendChild(card);
+  }
+
+  function updateDetailActions(actions, detail, row, emit) {
+    actions.__detail = detail;
+    actions.__emit = emit;
+    if (actions.__taskID !== detail.taskID) {
+      S.clear(actions);
+      actions.__buttons = Object.create(null);
+      actions.__taskID = detail.taskID;
+    }
+    var buttons = actions.__buttons, specs = [];
+    if (detail.canInterrupt) specs.push(["interruptTask", "中断", "small danger"]);
+    if (detail.canStop) specs.push(["stopTask", "停止", "small danger"]);
+    if (row.canDelete) specs.push(["deleteSession", "删除会话", "small danger"]);
+    specs.push(["refreshConversation", "刷新当前对话", "small"]);
+    var active = Object.create(null);
+    specs.forEach(function (spec, index) {
+      var command = spec[0], button = buttons[command];
+      active[command] = true;
+      if (!button) {
+        button = buttons[command] = S.button(spec[1], null, {}, emit, spec[2], false);
+        button.addEventListener("click", function () {
+          var current = actions.__detail;
+          if (command === "deleteSession" && !global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部任务、事件和对话记录，无法撤销。")) return;
+          var payload = { taskID: current.taskID };
+          if (command === "deleteSession") payload.sessionID = current.sessionID;
+          actions.__emit(command, payload);
+        });
+      }
+      var atIndex = actions.children[index];
+      if (atIndex !== button) {
+        if (atIndex) actions.insertBefore(button, atIndex);
+        else actions.appendChild(button);
+      }
+    });
+    Object.keys(buttons).forEach(function (command) {
+      if (!active[command]) { buttons[command].remove(); delete buttons[command]; }
+    });
   }
 
   function decisionLabel(approval, decision) {
@@ -307,6 +385,13 @@
   }
 
   function render(page, emit) {
+    P.bind(page, function (follow) {
+      renderContent(page, emit);
+      if (!follow) return;
+      var content = document.getElementById("workbench-inspector-content");
+      content.scrollTop = content.scrollHeight;
+      if (content.__conversationFollow) content.__conversationFollow.following = true;
+    });
     if (!page) {
       global.CodexBridgeDesktopWorkbenchHeader.reset();
       global.CodexBridgeDesktopWorkbenchControls.render(null, emit);

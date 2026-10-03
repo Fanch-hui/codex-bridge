@@ -33,11 +33,19 @@ enum BridgeDesktopCommandRouter {
     case .refreshModels:
       model.refreshModels()
     case .setCodexExecutable:
-      guard let path = envelope.payload.path, path.utf8.count <= 16 * 1_024, !path.contains("\0")
+      guard
+        let path = BridgeDesktopCommandValue.pathText(
+          envelope.payload.path,
+          maximumUTF8Bytes: BridgeDesktopCommandValue.maximumExecutablePathBytes
+        )
       else { return }
       model.setCodexExecutablePath(path.trimmingCharacters(in: .whitespacesAndNewlines))
     case .scanAgents:
       model.scanAgents()
+    case .manageNativeAgentSession:
+      handleNativeSessionDirectory(envelope.payload, model: model)
+    case .continueNativeAgentSession:
+      handleNativeSessionContinuation(envelope, model: model)
     case .selectPage:
       guard let navigation = envelope.payload.navigation else { return }
       select(navigation, model: model)
@@ -77,9 +85,9 @@ enum BridgeDesktopCommandRouter {
       .copyLocalMCPEndpoint,
       .rotateMCPClientCredential, .rotateLocalMCPEndpoint,
       .saveDeepSeekHarnessMCPServer, .deleteDeepSeekHarnessMCPServer,
-      .setDeepSeekHarnessMCPServerEnabled, .configureTunnel,
+      .setDeepSeekHarnessMCPServerEnabled, .setAgentMCPScope, .configureTunnel,
       .connectTunnel, .disconnectTunnel, .clearTunnel, .connectAgent, .registerAgent,
-      .beginAgentRegistration,
+      .beginAgentRegistration, .saveQoderRuntimeSettings,
       .selectAgent,
       .setAgentEnabled, .reprobeAgent, .removeAgent, .refreshAgentModels:
       handleConnections(envelope, model: model)
@@ -109,17 +117,11 @@ enum BridgeDesktopCommandRouter {
   }
 
   static func validatedID(_ value: String?, maximumBytes: Int = 1_024) -> String? {
-    guard let value else { return nil }
-    let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !result.isEmpty, result.utf8.count <= maximumBytes, !result.contains("\0") else {
-      return nil
-    }
-    return result
+    BridgeDesktopCommandValue.nonEmpty(value, maximumUTF8Bytes: maximumBytes)
   }
 
   static func validatedText(_ value: String?, maximumBytes: Int) -> String? {
-    guard let value, value.utf8.count <= maximumBytes, !value.contains("\0") else { return nil }
-    return value
+    BridgeDesktopCommandValue.text(value, maximumUTF8Bytes: maximumBytes)
   }
 
   static func connected(_ model: BridgeServiceAppModel) -> Bool {
@@ -135,7 +137,11 @@ enum BridgeDesktopCommandRouter {
   }
 
   static func panelURL(_ path: String?, directory: Bool = false) -> URL? {
-    guard let path = validatedText(path, maximumBytes: 4_096),
+    guard
+      let path = BridgeDesktopCommandValue.pathText(
+        path,
+        maximumUTF8Bytes: BridgeDesktopCommandValue.maximumPanelPathBytes
+      ),
       !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       path.hasPrefix("/")
     else { return nil }

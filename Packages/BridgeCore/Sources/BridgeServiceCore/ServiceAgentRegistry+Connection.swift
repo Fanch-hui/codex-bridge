@@ -30,9 +30,14 @@ extension ServiceAgentRegistry {
     }
 
     let createdAt = now()
-    let artifacts = try captureArtifacts(request.artifactRequests, at: createdAt)
+    let installationID = makeInstallationID()
+    let artifacts = try await runtimeArtifacts(
+      provider: provider, installationID: installationID,
+      executablePath: identity.canonicalPath,
+      existing: captureArtifacts(request.artifactRequests, at: createdAt), at: createdAt
+    )
     let record = try await probeRecord(
-      id: makeInstallationID(),
+      id: installationID,
       provider: provider,
       displayName: request.displayName,
       executablePath: request.executablePath,
@@ -60,7 +65,11 @@ extension ServiceAgentRegistry {
   ) async throws -> ServiceAgentInstallationRecord {
     let artifacts: [ServiceAgentInstallationArtifact]
     do {
-      artifacts = try captureArtifacts(request.artifactRequests, at: now())
+      artifacts = try await runtimeArtifacts(
+        provider: provider, installationID: existing.id,
+        executablePath: identity.canonicalPath,
+        existing: captureArtifacts(request.artifactRequests, at: now()), at: now()
+      )
     } catch {
       if existing.availability == .available {
         throw ServiceAgentRegistryError.connectionProbeFailed(existing.id)

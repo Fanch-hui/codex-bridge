@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import Foundation
 
 #if canImport(FoundationNetworking)
@@ -10,11 +11,20 @@ struct DeepSeekHarnessACPRemoteModels {
     let data: [Model]
   }
 
-  static func fetch(environment: [String: String]) async throws -> [String]? {
-    guard let base = environment["DEEPSEEK_BASE_URL"],
-      let key = environment["DEEPSEEK_API_KEY"], !key.isEmpty,
-      let url = URL(string: base)?.appendingPathComponent("models")
-    else { return nil }
+  static func fetch(
+    environment: [String: String], usesMessagesProvider: Bool = false
+  ) async throws -> [String]? {
+    guard let key = environment["DEEPSEEK_API_KEY"], !key.isEmpty else { return nil }
+    let endpoints: DeepSeekHarnessACPEndpoints
+    do {
+      endpoints = try DeepSeekHarnessACPEndpoints.resolve(
+        environment: environment, usesMessagesProvider: usesMessagesProvider)
+    } catch {
+      throw AgentModelCatalogError.invalidConfiguration
+    }
+    guard let url = endpoints.catalogURL else {
+      throw DeepSeekHarnessModelCatalogError.catalogNotConfigured
+    }
     let configuration = URLSessionConfiguration.ephemeral
     configuration.timeoutIntervalForRequest = 10
     let session = URLSession(
@@ -53,16 +63,4 @@ struct DeepSeekHarnessACPRemoteModels {
   }
 }
 
-public enum DeepSeekHarnessModelCatalogError: Error, LocalizedError {
-  case unavailable
-  case http(Int)
-  case invalidResponse, empty
-  public var errorDescription: String? {
-    switch self {
-    case .unavailable: "无法连接 DSH API 的模型目录，请检查 Base URL 与网络。"
-    case .http(let status): "DSH API 模型目录返回 HTTP \(status)，请检查地址、凭据和套餐权限。"
-    case .invalidResponse: "DSH API 模型目录未返回有效的 OpenAI 兼容模型列表。"
-    case .empty: "DSH API 返回的模型目录为空。"
-    }
-  }
-}
+public typealias DeepSeekHarnessModelCatalogError = AgentModelCatalogError

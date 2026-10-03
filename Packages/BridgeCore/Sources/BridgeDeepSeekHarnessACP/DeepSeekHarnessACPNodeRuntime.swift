@@ -3,14 +3,15 @@ import BridgeProcess
 import Foundation
 
 extension DeepSeekHarnessACPArtifactRuntime {
-  static func nodeVersion(at path: String) throws -> String {
+  static func nodeVersion(at path: String, electron: Bool = false) throws -> String {
     let captured = BoundedProcessOutputCollector(maximumBytes: 4 * 1_024)
     let process: ManagedStdioProcess
     do {
       process = try ManagedStdioProcess(
-        argv: [path, "--version"],
+        argv: electron
+          ? [path, "--eval", "process.stdout.write(process.versions.node)"] : [path, "--version"],
         workingDirectory: nil,
-        environment: nodeVersionEnvironment(path: path),
+        environment: nodeVersionEnvironment(path: path, electron: electron),
         mergeStandardError: false,
         onStandardOutput: captured.append
       )
@@ -48,11 +49,12 @@ extension DeepSeekHarnessACPArtifactRuntime {
     return value
   }
 
-  private static func nodeVersionEnvironment(path: String) -> [String: String] {
+  private static func nodeVersionEnvironment(path: String, electron: Bool) -> [String: String] {
     let directory = AgentPathSemantics.directoryPath(of: path) ?? path
     var environment = [
       "PATH": AgentPathSemantics.joinPathList([directory])
     ]
+    if electron { environment["ELECTRON_RUN_AS_NODE"] = "1" }
     #if os(Windows)
       let source = ProcessInfo.processInfo.environment
       for key in ["SystemRoot", "SystemDrive", "ComSpec"] {

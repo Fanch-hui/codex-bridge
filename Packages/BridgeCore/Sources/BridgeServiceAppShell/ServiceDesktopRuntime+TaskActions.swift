@@ -51,7 +51,7 @@ extension BridgeServiceAppModel {
       taskID: task.taskID,
       input: input
     ) { [weak self] client in
-      guard let self else { return false }
+      guard let self else { return (false, nil) }
       let receipt = try await client.steerTask(
         taskID: task.taskID,
         expectedTurnID: expectedTurnID,
@@ -59,7 +59,7 @@ extension BridgeServiceAppModel {
         mode: mode
       )
       await self.refresh(silent: true, includeCatalog: false)
-      return receipt.accepted
+      return (receipt.accepted, nil)
     }
   }
 
@@ -67,7 +67,9 @@ extension BridgeServiceAppModel {
     _ task: MCPServiceTaskSnapshot,
     prompt: String? = nil,
     requestID: String? = nil,
-    queueIfBusy: Bool = false
+    queueIfBusy: Bool = false,
+    skillNames: [String]? = nil,
+    attachmentPaths: [String] = []
   ) {
     let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
       for: task, providers: agentProviders, installations: agentInstallations
@@ -98,12 +100,17 @@ extension BridgeServiceAppModel {
       successMessage: "已续接任务",
       requestID: requestID,
       command: BridgeDesktopCommand.resumeTask.rawValue,
-      receiptInput: prompt ?? "", queueIfBusy: queueIfBusy
+      receiptInput: prompt ?? "", queueIfBusy: queueIfBusy,
+      skillNames: skillNames,
+      attachmentPaths: attachmentPaths,
+      attachmentSourceTaskID: nil
     )
   }
 
   public func restartTask(
-    _ task: MCPServiceTaskSnapshot, requestID: String? = nil, queueIfBusy: Bool = false
+    _ task: MCPServiceTaskSnapshot, requestID: String? = nil, queueIfBusy: Bool = false,
+    skillNames: [String]? = nil,
+    attachmentPaths: [String] = []
   ) {
     guard let prompt = task.prompt?.trimmingCharacters(in: .whitespacesAndNewlines),
       !prompt.isEmpty
@@ -124,7 +131,10 @@ extension BridgeServiceAppModel {
       successMessage: "已重新开始任务",
       requestID: requestID,
       command: BridgeDesktopCommand.restartTask.rawValue,
-      receiptInput: nil, queueIfBusy: queueIfBusy
+      receiptInput: nil, queueIfBusy: queueIfBusy,
+      skillNames: skillNames,
+      attachmentPaths: attachmentPaths,
+      attachmentSourceTaskID: task.isCodexTask ? nil : task.taskID
     )
   }
 
@@ -136,7 +146,10 @@ extension BridgeServiceAppModel {
     requestID: String?,
     command: String,
     receiptInput: String?,
-    queueIfBusy: Bool
+    queueIfBusy: Bool,
+    skillNames: [String]?,
+    attachmentPaths: [String],
+    attachmentSourceTaskID: String?
   ) {
     let request = IPCAgentSubmitRequest(
       projectID: task.projectID,
@@ -147,10 +160,14 @@ extension BridgeServiceAppModel {
       permissionMode: task.permissionMode,
       prompt: prompt,
       threadID: threadID,
+      skillNames: skillNames,
       networkAccess: task.networkAccess,
       modelOverride: TaskRetrySubmission.modelOverride(for: task),
       permissionModeOverride: task.permissionMode != nil,
-      clientRequestID: requestID, queueIfBusy: queueIfBusy
+      clientRequestID: requestID, queueIfBusy: queueIfBusy,
+      attachmentPaths: attachmentSourceTaskID == nil && attachmentPaths.isEmpty
+        ? nil : attachmentPaths,
+      attachmentSourceTaskID: task.isCodexTask ? nil : attachmentSourceTaskID
     )
     runWorkbenchMutation(
       requestID: requestID,
@@ -158,12 +175,12 @@ extension BridgeServiceAppModel {
       taskID: task.taskID,
       input: receiptInput
     ) { [weak self] client in
-      guard let self else { return false }
+      guard let self else { return (false, nil) }
       let response = try await client.submitAgentTask(request)
       await self.refresh(silent: true, includeCatalog: false)
       self.openTask(response.taskID)
       self.postToast(successMessage)
-      return true
+      return (true, response.taskID)
     }
   }
 

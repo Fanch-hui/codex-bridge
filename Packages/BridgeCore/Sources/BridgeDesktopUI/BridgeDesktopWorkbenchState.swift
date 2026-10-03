@@ -178,6 +178,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let selectedTaskID: String?
   public let selectedTask: BridgeDesktopTaskDetail?
   public let history: BridgeDesktopThreadHistoryState
+  public let nativeSessions: BridgeDesktopNativeSessionDirectoryState?
   public let approvals: [BridgeDesktopApprovalRow]
   public let steerModes: [BridgeDesktopChoice]
   public let browser: BridgeDesktopBrowserSlot
@@ -200,6 +201,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     selectedTaskID: String? = nil,
     selectedTask: BridgeDesktopTaskDetail? = nil,
     history: BridgeDesktopThreadHistoryState = .init(),
+    nativeSessions: BridgeDesktopNativeSessionDirectoryState? = nil,
     approvals: [BridgeDesktopApprovalRow] = [],
     steerModes: [BridgeDesktopChoice] = [],
     browser: BridgeDesktopBrowserSlot = .init(),
@@ -221,6 +223,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     self.selectedTaskID = selectedTaskID
     self.selectedTask = selectedTask
     self.history = history
+    self.nativeSessions = nativeSessions
     self.approvals = approvals
     self.steerModes = steerModes
     self.browser = browser

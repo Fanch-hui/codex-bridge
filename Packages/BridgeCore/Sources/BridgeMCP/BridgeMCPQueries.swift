@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import Foundation
 
 public enum MCPCommandDenialReason: String, Codable, Equatable, Sendable {
@@ -23,6 +24,8 @@ public enum BridgeMCPQueryError: Error, Equatable, Sendable {
   case busy
   case timeout
   case unavailable
+  case nativeSessionDirectory(AgentNativeSessionDirectoryError)
+  case agentModelCatalog(AgentModelCatalogError)
   /// The local Codex app-server could not be started, or failed while it was
   /// starting. The detail carries host-only diagnostics (configured executable
   /// path, OS error, stderr excerpt) that the desktop surfaces verbatim; remote

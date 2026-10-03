@@ -32,7 +32,11 @@ struct BridgeDesktopConversationPresentationCache {
       return presentations
     }
 
-    guard entries.count >= sourceEntries.count, Self.hasSameKeys(sourceEntries, entries) else {
+    let updatePlan = TaskConversationPresentationUpdatePlan(
+      previous: sourceEntries,
+      next: entries
+    )
+    guard !updatePlan.needsFullRebuild else {
       sourceEntries = entries
       presentations = entries.map {
         BridgeDesktopUIStateBuilder.conversationEntry($0, providerID: providerID)
@@ -41,14 +45,14 @@ struct BridgeDesktopConversationPresentationCache {
     }
 
     var next = presentations
-    for index in sourceEntries.indices where sourceEntries[index] != entries[index] {
+    for index in updatePlan.changedEntryIndices {
       next[index] = BridgeDesktopUIStateBuilder.conversationEntry(
         entries[index], providerID: providerID
       )
     }
-    if entries.count > sourceEntries.count {
+    if let appendedRange = updatePlan.appendedEntryRange {
       next.append(
-        contentsOf: entries.dropFirst(sourceEntries.count).map {
+        contentsOf: entries[appendedRange].map {
           BridgeDesktopUIStateBuilder.conversationEntry($0, providerID: providerID)
         }
       )
@@ -63,16 +67,5 @@ struct BridgeDesktopConversationPresentationCache {
     providerID = nil
     sourceEntries.removeAll(keepingCapacity: false)
     presentations.removeAll(keepingCapacity: false)
-  }
-
-  private static func hasSameKeys(
-    _ old: [TaskConversationModel.Entry],
-    _ new: [TaskConversationModel.Entry]
-  ) -> Bool {
-    guard new.count >= old.count else { return false }
-    for index in old.indices where old[index].key != new[index].key {
-      return false
-    }
-    return true
   }
 }

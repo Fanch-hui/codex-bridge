@@ -74,12 +74,12 @@
   function messageFor(update) {
     if (update && update.message) return String(update.message);
     switch (phaseOf(update)) {
-      case "available": return "新版已发布，点击立即更新。更新后请在 ChatGPT 刷新一次插件，以防保留旧版缓存。";
+      case "available": return "新版已发布，点击立即更新。";
       case "checking": return "正在从发布源读取最新版本。";
       case "upToDate": return "当前版本已经是最新版本。";
       case "downloading": return "下载完成后会继续安装。";
       case "waiting": return "当前任务结束后会继续安装。";
-      case "installing": return "安装完成后 App 会重新启动。更新后请在 ChatGPT 刷新一次插件，以防保留旧版缓存。";
+      case "installing": return "安装完成后 App 会重新启动。";
       case "failed": return update && update.availableVersion
         ? "可以重试下载和安装。" : "可以重试检查更新。";
       default: return "启动 App 时会自动检查更新。";
@@ -134,6 +134,13 @@
     }
     if (state.notes) copy.appendChild(node("p", "app-update-notes", String(state.notes)));
     copy.appendChild(node("p", "app-update-message", messageFor(state)));
+    if (["available", "downloading", "waiting", "installing"].indexOf(phase) !== -1) {
+      var reminder = node("div", "app-update-plugin-reminder");
+      reminder.appendChild(node("strong", null, "更新后，请刷新 ChatGPT 插件"));
+      reminder.appendChild(node("p", null,
+        "在 ChatGPT 的插件设置中找到 Codex Bridge，点击刷新，让新工具和模型列表生效。"));
+      copy.appendChild(reminder);
+    }
     appendProgress(copy, state, phase);
     card.appendChild(copy);
 

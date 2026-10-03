@@ -30,13 +30,22 @@
     var fields = S.node("div", "form-grid agent-connect-fields");
     var baseURL = S.textField("Base URL", "", "https://api.example.com"),
       apiKey = S.textField("API key", "", "输入 API key");
+    var inferenceProtocol = S.selectField("推理协议", "deepseek-messages", [
+      { id: "deepseek-messages", title: "DeepSeek Messages" },
+      { id: "openai-completions", title: "OpenAI Chat Completions" }
+    ], refreshAction);
+    var catalogBaseURL = S.textField("模型目录 Base URL（可选）", "", "留空时按推理协议解析");
     apiKey.control.type = "password";
     apiKey.control.autocomplete = "off";
+    fields.appendChild(inferenceProtocol.wrapper);
     fields.appendChild(baseURL.wrapper);
+    fields.appendChild(catalogBaseURL.wrapper);
     fields.appendChild(apiKey.wrapper);
     var configPanel = S.node("div", "agent-config-panel"); configPanel.appendChild(fields);
     var configSave = S.button("更新配置", null, {}, null, "small", true); configPanel.appendChild(configSave);
     row.appendChild(configPanel);
+    var qoderSettings = global.CodexBridgeDesktopQoderRuntimeSettings.create(refreshAction);
+    row.appendChild(qoderSettings.root);
 
     var actionBar = S.node("div", "agent-connect-actionbar");
     var action = S.button("连接", null, {}, null, "small primary", true);
@@ -63,22 +72,36 @@
     details.appendChild(detailsBody);
     row.appendChild(details);
 
-    var draft = D.bind({ baseURL: baseURL.control, apiKey: apiKey.control });
+    var draft = D.bind({ baseURL: baseURL.control, apiKey: apiKey.control,
+      inferenceProtocol: inferenceProtocol.control, catalogBaseURL: catalogBaseURL.control });
+
+    function scopedInstallations() {
+      if (currentProvider.providerID !== "qoder") return currentInstallations;
+      var distribution = qoderSettings.distribution();
+      return currentInstallations.filter(function (item) {
+        return item.distribution === distribution;
+      });
+    }
 
     function configurationValid() {
       if (!currentProvider.requiresConfiguration) return true;
       var base = hasValue(baseURL.control.value);
       var key = hasValue(apiKey.control.value);
+      if (currentProvider.configuredBaseURL) return base || !key;
       if (base || key) return base && key;
       return currentInstallations.length > 0 || !!currentProvider.discoveredConfigurationPath;
     }
 
     function refreshAction() {
-      var primary = primaryInstallation(currentInstallations);
-      var isConnectedValue = currentInstallations.some(isConnected);
+      var scoped = scopedInstallations();
+      var primary = primaryInstallation(scoped);
+      var isConnectedValue = scoped.some(isConnected);
       var review = primary && primary.availability === "needs_review";
       var ready = context.canConnect && !context.busy && configurationValid();
-      var hasConfigurationInput = hasValue(baseURL.control.value) || hasValue(apiKey.control.value);
+      var hasConfigurationInput = baseURL.control.value !== (currentProvider.configuredBaseURL || "")
+        || hasValue(apiKey.control.value)
+        || inferenceProtocol.control.value !== (currentProvider.configuredInferenceProtocol || "deepseek-messages")
+        || catalogBaseURL.control.value !== (currentProvider.configuredCatalogBaseURL || "");
       var noCandidate = !primary && discoveryState(currentProvider) === "not_found";
       actionMode = null;
       actionBar.hidden = isConnectedValue;
@@ -128,10 +151,17 @@
         providerID: currentProvider.providerID,
         baseURL: currentProvider.requiresConfiguration ? values.baseURL : null,
         apiKey: currentProvider.requiresConfiguration ? values.apiKey : null,
-        confirmed: !!alwaysProceedConfirmed
+        inferenceProtocol: currentProvider.providerID === "deepseek-harness" && hasValue(values.baseURL) ? values.inferenceProtocol : null,
+        catalogBaseURL: currentProvider.providerID === "deepseek-harness" && hasValue(values.baseURL) ? values.catalogBaseURL : null,
+        confirmed: !!alwaysProceedConfirmed,
+        qoderDistribution: currentProvider.providerID === "qoder"
+          ? qoderSettings.distribution() : null,
+        installationID: currentProvider.providerID === "qoder"
+          ? qoderSettings.installationID() : null
       });
       apiKey.control.value = "";
-      draft.update({ baseURL: baseURL.control.value, apiKey: "" });
+      draft.update({ baseURL: baseURL.control.value, apiKey: "",
+        inferenceProtocol: inferenceProtocol.control.value, catalogBaseURL: catalogBaseURL.control.value });
     }
 
     function sendReprobe(installation, acceptReplacement) {
@@ -167,30 +197,38 @@
       currentInstallations = S.safeArray(installations);
       context.canConnect = !!nextContext.canConnect; context.busy = !!nextContext.busy;
       context.acceptReplacement = nextContext.acceptReplacement !== false;
+      qoderSettings.update(nextProvider, currentInstallations, {
+        canEdit: context.canConnect,
+        busy: context.busy
+      }, context.emit);
       if (lastBusy === true && !context.busy) pending = null;
       lastBusy = context.busy;
       finishPending();
 
+      var scoped = scopedInstallations();
       title.textContent = nextProvider.displayName;
-      var primary = primaryInstallation(currentInstallations);
-      var isConnectedValue = currentInstallations.some(isConnected);
+      var primary = primaryInstallation(scoped);
+      var isConnectedValue = scoped.some(isConnected);
       status.textContent = stateLabel(nextProvider, primary, isConnectedValue);
       status.className = "status-badge " + stateTone(nextProvider, primary, isConnectedValue);
-      detail.textContent = rowDetail(nextProvider, currentInstallations, primary, isConnectedValue);
+      detail.textContent = rowDetail(nextProvider, scoped, primary, isConnectedValue);
       fields.hidden = !nextProvider.requiresConfiguration || (!isConnectedValue && !!nextProvider.discoveredConfigurationPath)
         || (!primary && discoveryState(nextProvider) === "not_found");
-      providerDetail.textContent = providerDetailText(nextProvider, currentInstallations);
+      providerDetail.textContent = providerDetailText(nextProvider, scoped);
       providerDetail.hidden = !providerDetail.textContent;
       if (isConnectedValue && configPanel.parentNode !== detailsBody) {
         detailsBody.insertBefore(configPanel, detailsBody.firstChild.nextSibling);
       } else if (!isConnectedValue && configPanel.parentNode !== row) {
         row.insertBefore(configPanel, actionBar);
       }
-      updateDetails(nextProvider, currentInstallations, primary);
-      updateProviderSpecificDetails(nextProvider);
+      updateDetails(nextProvider, scoped, primary);
+      inferenceProtocol.wrapper.hidden = nextProvider.providerID !== "deepseek-harness";
+      catalogBaseURL.wrapper.hidden = nextProvider.providerID !== "deepseek-harness";
       draft.update({
         baseURL: nextProvider.configuredBaseURL || "",
-        apiKey: ""
+        apiKey: "",
+        inferenceProtocol: nextProvider.configuredInferenceProtocol || "deepseek-messages",
+        catalogBaseURL: nextProvider.configuredCatalogBaseURL || ""
       });
       refreshAction();
     }
@@ -246,17 +284,7 @@
       }
     }
 
-    function updateProviderSpecificDetails(nextProvider) {
-      var component = context.dshMCP;
-      if (!component || nextProvider.providerID !== "deepseek-harness") {
-        if (component && component.root.parentNode === detailsBody) component.root.remove();
-        return;
-      }
-      if (component.root.parentNode !== detailsBody) detailsBody.appendChild(component.root);
-      component.update(context.dshMCPPage || {}, context.emit);
-    }
-
-    [baseURL.control, apiKey.control].forEach(function (control) {
+    [baseURL.control, apiKey.control, catalogBaseURL.control, inferenceProtocol.control].forEach(function (control) {
       control.addEventListener("input", refreshAction);
       control.addEventListener("compositionend", refreshAction);
     });

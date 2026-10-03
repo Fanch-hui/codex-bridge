@@ -15,11 +15,18 @@ public actor ServiceExecutionCoordinator {
     let interruptAndSteer: (@Sendable (String) async throws -> Void)?
     let shutdown: @Sendable () async -> Void
     let resolveApproval: (@Sendable (String, String) async throws -> Void)?
+    let resolveUserInput: (@Sendable (String, AgentUserInputResponse) async throws -> Void)?
     var lastSequence: Int64? = nil
   }
 
   struct PendingAgentApproval: Sendable {
     let request: AgentApprovalRequest
+    let createdAt: Date
+  }
+
+  struct PendingAgentUserInput: Sendable {
+    let approvalID: String
+    let request: AgentUserInputRequest
     let createdAt: Date
   }
 
@@ -36,7 +43,10 @@ public actor ServiceExecutionCoordinator {
   var workspaceChangeTrackers: [TaskID: ServiceWorkspaceChangeTracker] = [:]
   var presentedCodexApprovals: [TaskID: Set<String>] = [:]
   var pendingAgentApprovals: [String: PendingAgentApproval] = [:]
+  var pendingAgentUserInputs: [String: PendingAgentUserInput] = [:]
+  var agentUserInputTimeouts: [String: Task<Void, Never>] = [:]
   var finishedRuns: Set<TaskID> = []
+  var scheduledStarts: [TaskID: Task<Void, Never>] = [:]
   private var startingTasks: Set<TaskID> = []
   var isShuttingDown = false
   let agentApprovalLifetime: TimeInterval = 5 * 60
@@ -145,9 +155,16 @@ public actor ServiceExecutionCoordinator {
       guard let steer else {
         throw ExecutionServiceError.sessionUnavailable(taskID)
       }
-      try await steer(text)
-      if interruptCurrentPrompt {
-        await conversation.appendUserMessage(taskID: taskID, content: text)
+      let immediateReceipt =
+        interruptCurrentPrompt
+        ? await conversation.presentImmediateSteer(taskID: taskID, content: text) : nil
+      do {
+        try await steer(text)
+      } catch {
+        if let immediateReceipt {
+          await conversation.discardImmediateSteerReceipt(taskID: taskID, id: immediateReceipt)
+        }
+        throw error
       }
       return
     }
@@ -213,6 +230,7 @@ public actor ServiceExecutionCoordinator {
     taskID: TaskID,
     summary: String = "The local service stopped the task."
   ) async {
+    scheduledStarts.removeValue(forKey: taskID)?.cancel()
     startingTasks.remove(taskID)
     presentedCodexApprovals.removeValue(forKey: taskID)
     finishedRuns.insert(taskID)
@@ -233,12 +251,17 @@ public actor ServiceExecutionCoordinator {
 
   public func shutdown() async {
     isShuttingDown = true
+    finishedRuns.formUnion(scheduledStarts.keys)
     finishedRuns.formUnion(startingTasks)
     finishedRuns.formUnion(activeAgentRuns.keys)
+    let scheduledTasks = Array(scheduledStarts.values)
+    scheduledStarts.removeAll(keepingCapacity: false)
+    for task in scheduledTasks { task.cancel() }
     startingTasks.removeAll(keepingCapacity: false)
     let executionTasks = collectors.values
     collectors.removeAll(keepingCapacity: false)
     pendingAgentApprovals.removeAll(keepingCapacity: false)
+    clearAgentUserInputs()
     presentedCodexApprovals.removeAll(keepingCapacity: false)
     for task in executionTasks { task.cancel() }
     let shutdowns = activeAgentRuns.values.map(\.shutdown)
@@ -248,6 +271,7 @@ public actor ServiceExecutionCoordinator {
       await shutdown()
     }
     await execution.shutdown()
+    for task in scheduledTasks { await task.value }
     let failedConversationTasks = await conversation.closeAll()
     for taskID in failedConversationTasks {
       _ = try? await tasks.fail(
@@ -263,6 +287,7 @@ public actor ServiceExecutionCoordinator {
     finishedRuns.insert(taskID)
     workspaceChangeTrackers.removeValue(forKey: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
+    clearAgentUserInputs(taskID: taskID)
     if let run = activeAgentRuns.removeValue(forKey: taskID) {
       await run.shutdown()
     }

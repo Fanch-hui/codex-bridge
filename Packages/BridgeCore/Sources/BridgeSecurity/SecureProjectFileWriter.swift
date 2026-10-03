@@ -84,44 +84,34 @@ public struct SecureProjectFileWriter: Sendable {
         createParents: createParents
       )
     #else
-      var rootFD = open(
+      let rootFD = open(
         resolver.root.canonicalPath,
         O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
       )
       guard rootFD >= 0 else { throw PathSecurityError.writeFailed(errno) }
-      do {
-        try validateRootDescriptor(rootFD, root: resolver.root)
-        let components = relativePath.components
-        guard !components.isEmpty else { throw PathSecurityError.invalidRelativePath("empty path") }
-        let parentFD = try openParentDirectory(
-          components: components.dropLast(),
-          rootFD: rootFD,
-          createParents: createParents,
-          resolver: resolver
+      defer { close(rootFD) }
+      try validateRootDescriptor(rootFD, root: resolver.root)
+      let components = relativePath.components
+      guard !components.isEmpty else { throw PathSecurityError.invalidRelativePath("empty path") }
+      let parentFD = try openParentDirectory(
+        components: components.dropLast(),
+        rootFD: rootFD,
+        createParents: createParents,
+        resolver: resolver
+      )
+      defer { close(parentFD) }
+      let name = components[components.count - 1]
+      switch mode {
+      case .create:
+        return try create(name: name, parentFD: parentFD, content: content, root: resolver.root)
+      case .replace:
+        return try replace(
+          name: name,
+          parentFD: parentFD,
+          content: content,
+          expectedSHA256: expectedSHA256,
+          root: resolver.root
         )
-        defer { closeFD(parentFD) }
-        let name = components[components.count - 1]
-        switch mode {
-        case .create:
-          return try create(
-            name: name,
-            parentFD: parentFD,
-            content: content,
-            root: resolver.root
-          )
-        case .replace:
-          return try replace(
-            name: name,
-            parentFD: parentFD,
-            content: content,
-            expectedSHA256: expectedSHA256,
-            root: resolver.root
-          )
-        }
-      } catch {
-        if rootFD >= 0 { close(rootFD) }
-        rootFD = -1
-        throw error
       }
     #endif
   }
@@ -274,6 +264,9 @@ public struct SecureProjectFileWriter: Sendable {
         var staged = try stagingDescriptor(parentFD: parentFD, name: staging)
         do {
           try writeAll(staged, data: content)
+          guard fchmod(staged, metadata.st_mode & 0o777) == 0 else {
+            throw PathSecurityError.writeFailed(errno)
+          }
           guard fsync(staged) == 0 else { throw PathSecurityError.writeFailed(errno) }
           close(staged)
           staged = -1
@@ -347,8 +340,9 @@ public struct SecureProjectFileWriter: Sendable {
       createParents: Bool,
       resolver: ProjectPathResolver
     ) throws -> Int32 {
-      var current = rootFD
-      var currentIsRoot = true
+      var current = dup(rootFD)
+      guard current >= 0 else { throw PathSecurityError.writeFailed(errno) }
+      defer { if current >= 0 { close(current) } }
       for component in components {
         var next = component.withCString {
           openat(current, $0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
@@ -361,28 +355,22 @@ public struct SecureProjectFileWriter: Sendable {
             openat(current, $0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
           }
         }
-        let openError = errno
-        if !currentIsRoot { close(current) }
-        current = -1
         guard next >= 0 else {
-          if openError == ENOENT || openError == ENOTDIR {
+          if errno == ENOENT || errno == ENOTDIR {
             throw PathSecurityError.pathDoesNotExist
           }
-          throw PathSecurityError.writeFailed(openError)
+          throw PathSecurityError.writeFailed(errno)
         }
         guard validateDirectoryDescriptor(next, root: resolver.root) else {
           close(next)
           throw PathSecurityError.pathEscapeBlocked
         }
+        close(current)
         current = next
-        currentIsRoot = false
       }
-      if currentIsRoot {
-        let duplicate = dup(rootFD)
-        guard duplicate >= 0 else { throw PathSecurityError.writeFailed(errno) }
-        return duplicate
-      }
-      return current
+      let parent = current
+      current = -1
+      return parent
     }
 
     private func validateRootDescriptor(_ descriptor: Int32, root: RegisteredRoot) throws {
@@ -443,7 +431,8 @@ public struct SecureProjectFileWriter: Sendable {
       var written = 0
       while written < data.count {
         let count = data.withUnsafeBytes { bytes in
-          Darwin.write(descriptor, bytes.baseAddress!.advanced(by: written), data.count - written)
+          POSIXSystem.write(
+            descriptor, bytes.baseAddress!.advanced(by: written), data.count - written)
         }
         if count > 0 {
           written += count
@@ -460,7 +449,7 @@ public struct SecureProjectFileWriter: Sendable {
       while result.count <= maximumBytes {
         let requested = min(buffer.count, maximumBytes + 1 - result.count)
         let count = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, requested)
+          POSIXSystem.read(descriptor, bytes.baseAddress, requested)
         }
         if count == 0 { return result }
         guard count > 0 else {
@@ -472,9 +461,6 @@ public struct SecureProjectFileWriter: Sendable {
       throw PathSecurityError.fileTooLarge(maximumBytes: maximumBytes)
     }
 
-    private func closeFD(_ descriptor: Int32) {
-      if descriptor >= 0 { close(descriptor) }
-    }
   #endif
 
   #if os(Windows)

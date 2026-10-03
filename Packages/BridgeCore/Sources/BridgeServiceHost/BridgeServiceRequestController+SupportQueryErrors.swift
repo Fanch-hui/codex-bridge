@@ -37,6 +37,11 @@ extension BridgeServiceRequestController {
         message: "A local component is unavailable.",
         retryable: true
       )
+    case .agentModelCatalog(let error):
+      return .init(
+        code: error.code, message: error.localizedDescription, retryable: error.retryable)
+    case .nativeSessionDirectory(let error):
+      return map(error)
     case .codexAppServerUnavailable(let detail):
       return .init(
         code: "codex_app_server_unavailable",

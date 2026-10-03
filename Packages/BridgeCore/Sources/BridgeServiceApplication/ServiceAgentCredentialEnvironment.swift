@@ -31,24 +31,31 @@ public enum ServiceAgentCredentialError: Error, Equatable, LocalizedError, Senda
 public actor ServiceAgentCredentialEnvironment {
   private let secretStore: any SecretStore
   private let sourceEnvironment: [String: String]
-  private var deepSeekBaseURLs: [String: String]
+  private var deepSeekConnections: [String: DeepSeekHarnessConnectionConfiguration]
   private var managedDeepSeekConfigurationPaths: Set<String>
 
   public init(
     secretStore: any SecretStore,
     sourceEnvironment: [String: String] = ProcessInfo.processInfo.environment,
     deepSeekBaseURL: String? = nil,
+    deepSeekConnection: DeepSeekHarnessConnectionConfiguration? = nil,
     managedDeepSeekConfigurationPath: String? = nil
   ) {
     self.secretStore = secretStore
     self.sourceEnvironment = sourceEnvironment
-    if let deepSeekBaseURL = deepSeekBaseURL.flatMap({ try? Self.validatedBaseURL($0) }),
+    if let baseURL = (deepSeekConnection?.baseURL ?? deepSeekBaseURL).flatMap({
+      try? Self.validatedBaseURL($0)
+    }),
       let path = Self.canonicalConfigurationPath(managedDeepSeekConfigurationPath)
     {
-      self.deepSeekBaseURLs = [path: deepSeekBaseURL]
+      self.deepSeekConnections = [
+        path: DeepSeekHarnessConnectionConfiguration(
+          inferenceProtocol: deepSeekConnection?.inferenceProtocol,
+          baseURL: baseURL, catalogBaseURL: deepSeekConnection?.catalogBaseURL)
+      ]
       self.managedDeepSeekConfigurationPaths = [path]
     } else {
-      self.deepSeekBaseURLs = [:]
+      self.deepSeekConnections = [:]
       self.managedDeepSeekConfigurationPaths = []
     }
   }
@@ -56,10 +63,13 @@ public actor ServiceAgentCredentialEnvironment {
   public func configureDeepSeekHarness(
     baseURL: String?,
     apiKey: String?,
-    configurationPath: String
+    configurationPath: String,
+    inferenceProtocol: DeepSeekHarnessConnectionProtocol? = nil,
+    catalogBaseURL: String? = nil
   ) throws {
     let normalizedBaseURL = try baseURL.map(Self.validatedBaseURL)
     let normalizedAPIKey = try apiKey.map(Self.validatedAPIKey)
+    let normalizedCatalogURL = try catalogBaseURL.map(Self.validatedBaseURL)
     guard let canonicalPath = Self.canonicalConfigurationPath(configurationPath) else {
       throw ServiceAgentCredentialError.invalidConfigurationPath
     }
@@ -68,14 +78,23 @@ public actor ServiceAgentCredentialEnvironment {
       try secretStore.store(Data(normalizedAPIKey.utf8), for: reference)
     }
     if let normalizedBaseURL {
-      deepSeekBaseURLs[canonicalPath] = normalizedBaseURL
+      deepSeekConnections[canonicalPath] = DeepSeekHarnessConnectionConfiguration(
+        inferenceProtocol: inferenceProtocol, baseURL: normalizedBaseURL,
+        catalogBaseURL: normalizedCatalogURL)
     }
     managedDeepSeekConfigurationPaths.insert(canonicalPath)
   }
 
   public func configuredDeepSeekBaseURL(for configurationPath: String) -> String? {
     guard let path = Self.canonicalConfigurationPath(configurationPath) else { return nil }
-    return deepSeekBaseURLs[path]
+    return deepSeekConnections[path]?.baseURL
+  }
+
+  public func configuredDeepSeekConnection(
+    for configurationPath: String
+  ) -> DeepSeekHarnessConnectionConfiguration? {
+    guard let path = Self.canonicalConfigurationPath(configurationPath) else { return nil }
+    return deepSeekConnections[path]
   }
 
   public func runtimeEnvironment(
@@ -95,8 +114,10 @@ public actor ServiceAgentCredentialEnvironment {
     else {
       return environment
     }
-    if let baseURL = deepSeekBaseURLs[canonicalPath] {
-      environment["DEEPSEEK_BASE_URL"] = baseURL
+    if let connection = deepSeekConnections[canonicalPath] {
+      environment["DEEPSEEK_BASE_URL"] = connection.baseURL
+      environment["BRIDGE_DSH_PROTOCOL"] = connection.inferenceProtocol.rawValue
+      environment["BRIDGE_DSH_CATALOG_BASE_URL"] = connection.catalogBaseURL
     }
     let reference = try Self.deepSeekHarnessAPIKeyReference(for: canonicalPath)
     do {
@@ -112,7 +133,10 @@ public actor ServiceAgentCredentialEnvironment {
   }
 
   private func removeCredentialEntries(from environment: inout [String: String]) {
-    let credentialKeys = Set(["DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL", "DEEPSEEK_SEARCH_BASE_URL"])
+    let credentialKeys = Set([
+      "DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL",
+      "BRIDGE_DSH_PROTOCOL", "BRIDGE_DSH_CATALOG_BASE_URL",
+    ])
     for key in Array(environment.keys) where credentialKeys.contains(key.uppercased()) {
       environment.removeValue(forKey: key)
     }

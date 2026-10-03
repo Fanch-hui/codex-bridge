@@ -1,7 +1,9 @@
 import Foundation
 
 enum DeepSeekHarnessACPProfileBootstrap {
-  static func prepare(configurationDirectory: String, runDirectory: String) throws -> String {
+  static func prepare(
+    configurationDirectory: String, runDirectory: String, usesMessagesProvider: Bool = false
+  ) throws -> String {
     let source = URL(fileURLWithPath: configurationDirectory).appendingPathComponent(".env").path
     let literal = String(data: try JSONEncoder().encode(source), encoding: .utf8)!
     let keys =
@@ -25,8 +27,15 @@ enum DeepSeekHarnessACPProfileBootstrap {
           process.env[name] = values[name];
         }
       }
-      if (process.env.DEEPSEEK_SEARCH_BASE_URL === undefined && process.env.DEEPSEEK_BASE_URL) {
+      if (!\(usesMessagesProvider ? "true" : "false") && process.env.DEEPSEEK_SEARCH_BASE_URL === undefined && process.env.DEEPSEEK_BASE_URL) {
         process.env.DEEPSEEK_SEARCH_BASE_URL = process.env.DEEPSEEK_BASE_URL;
+      }
+      if (\(usesMessagesProvider ? "true" : "false") && process.env.BRIDGE_DSH_PROTOCOL !== 'openai-completions') {
+        const base = process.env.DEEPSEEK_BASE_URL;
+        const url = base ? new URL(base) : null;
+        if (url && url.hostname === 'api.deepseek.com' && ['', '/', '/v1', '/v1/'].includes(url.pathname)) {
+          process.env.DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
+        }
       }
       """
     let path = URL(fileURLWithPath: runDirectory).appendingPathComponent("profile-env.mjs")

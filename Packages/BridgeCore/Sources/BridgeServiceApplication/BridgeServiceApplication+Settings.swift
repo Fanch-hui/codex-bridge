@@ -83,6 +83,7 @@ extension BridgeServiceApplication {
           isDefault: model.modelID == preferences.executionModel,
           reasoningEfforts: model.reasoningEfforts,
           defaultReasoningEffort: model.modelID == preferences.executionModel
+            && model.reasoningEfforts.contains(preferences.executionEffort)
             ? preferences.executionEffort : model.defaultReasoningEffort,
           serviceTiers: model.serviceTiers,
           additionalSpeedTiers: model.additionalSpeedTiers
