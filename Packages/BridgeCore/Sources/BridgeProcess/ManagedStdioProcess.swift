@@ -28,6 +28,8 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   #if os(Windows)
     private var windowsProcessHandle: HANDLE?
     private var windowsProcessJob: ManagedWindowsProcessJob?
+  #else
+    private let posixProcessGroup: ManagedPOSIXProcessGroup
   #endif
 
   public var identity: ManagedProcessIdentity? {
@@ -160,6 +162,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       standardOutputHandle = outputPipe.fileHandleForReading
       standardErrorHandle = errorPipe?.fileHandleForReading
       identityStorage = Self.identity(of: processID)
+      posixProcessGroup = ManagedPOSIXProcessGroup(pid: processID, identity: identityStorage)
     #endif
 
     if readOutput {
@@ -270,21 +273,19 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   }
 
   public func terminateGroup() {
-    guard isRunning else { return }
     #if os(Windows)
-      terminateWindowsProcess()
+      if isRunning { terminateWindowsProcess() }
     #else
-      _ = systemKill(-pid, SIGTERM)
+      posixProcessGroup.signal(SIGTERM)
     #endif
   }
 
   public func interruptGroup() {
-    guard isRunning else { return }
     #if os(Windows)
       // Windows cannot deliver SIGINT without a shared console; force termination.
-      terminateWindowsProcess()
+      if isRunning { terminateWindowsProcess() }
     #else
-      _ = systemKill(-pid, SIGINT)
+      posixProcessGroup.signal(SIGINT)
     #endif
   }
 
@@ -292,7 +293,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     #if os(Windows)
       if isRunning { terminateWindowsProcess() }
     #else
-      if isRunning { _ = systemKill(-pid, SIGKILL) }
+      posixProcessGroup.signal(SIGKILL)
     #endif
   }
 
@@ -338,10 +339,30 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     killWait: Duration = .seconds(5)
   ) -> ManagedProcessTermination? {
     terminateGroup()
-    if let termination = waitForExit(timeout: gracePeriod) { return termination }
+    #if os(Windows)
+      if let termination = waitForExit(timeout: gracePeriod) { return termination }
+    #else
+      if let termination = waitForGroupExit(timeout: gracePeriod) { return termination }
+    #endif
     killGroup()
-    return waitForExit(timeout: killWait)
+    #if os(Windows)
+      return waitForExit(timeout: killWait)
+    #else
+      return waitForGroupExit(timeout: killWait)
+    #endif
   }
+
+  #if !os(Windows)
+    private func waitForGroupExit(timeout: Duration) -> ManagedProcessTermination? {
+      let deadline = ContinuousClock.now.advanced(by: timeout)
+      repeat {
+        let termination = reapIfExited(gracePeriod: .zero)
+        if !posixProcessGroup.exists, let termination { return termination }
+        Thread.sleep(forTimeInterval: 0.01)
+      } while ContinuousClock.now < deadline
+      return nil
+    }
+  #endif
 
   public func drainRemainingOutput(timeout: Duration = .seconds(1)) {
     lock.lock()
@@ -486,12 +507,10 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   }
 #endif
 #if canImport(Darwin)
-  private let systemKill = Darwin.kill
   private let systemWaitPID = Darwin.waitpid
   private let systemWrite = Darwin.write
   private let systemRead = Darwin.read
 #elseif canImport(Glibc)
-  private let systemKill = Glibc.kill
   private let systemWaitPID = Glibc.waitpid
   private let systemWrite = Glibc.write
   private let systemRead = Glibc.read

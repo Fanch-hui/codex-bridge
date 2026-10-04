@@ -91,7 +91,7 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 
 To delegate work to Codex, OpenCode, DeepSeek Harness, or another agent, complete these additional steps:
 
-1. Bridge scans for local agents once on first initialization and saves the catalog. Connect a discovered agent from the Connections page; after installing another agent, click **Scan Agents** to update the catalog. Codex uses the local Codex execution channel. DeepSeek Harness supports configuring its service URL and API key in the app.
+1. Bridge discovers existing agents on first initialization; click **Connect** on the Connections page to verify and enable them. The additional **One-click setup** action prepares missing software and dependencies, then guides you through native sign-in or API configuration. See the [setup guide (Chinese)](./docs/AGENT_SETUP_GUIDE.md). Codex uses the local Codex execution channel.
 2. Select a project, agent, and `Read Only` or `Write` in the workbench, and configure that agent's model preferences.
 3. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
 

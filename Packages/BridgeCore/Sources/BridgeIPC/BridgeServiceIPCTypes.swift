@@ -16,6 +16,10 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setWorkbenchPermissionMode = "set_workbench_permission_mode"
   case getAgentCatalog = "get_agent_catalog"
   case connectAgentInstallation = "connect_agent_installation"
+  case beginAgentSetup = "begin_agent_setup"
+  case getAgentSetups = "get_agent_setups"
+  case continueAgentSetup = "continue_agent_setup"
+  case cancelAgentSetup = "cancel_agent_setup"
   case registerAgentInstallation = "register_agent_installation"
   case reprobeAgentInstallation = "reprobe_agent_installation"
   case setAgentInstallationEnabled = "set_agent_installation_enabled"
@@ -77,6 +81,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case prepareAppUpdate = "prepare_app_update"
   case cancelAppUpdate = "cancel_app_update"
   case shutdownService = "shutdown_service"
+  case shutdownServiceIfIdle = "shutdown_service_if_idle"
 }
 
 public struct BridgeServiceIPCRequest: Codable, Equatable, Sendable {

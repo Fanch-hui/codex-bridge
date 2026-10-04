@@ -64,74 +64,40 @@ extension BridgeServiceAppModel {
   }
 
   func setExecutionModel(_ modelID: String) {
-    guard let current = modelPreferences,
-      let model = models.first(where: { $0.modelID == modelID })
-    else { return }
-
-    let effort =
-      model.reasoningEfforts.contains(current.executionEffort)
-      ? current.executionEffort
-      : model.defaultReasoningEffort ?? model.reasoningEfforts[0]
-
-    setModelPreferences(
-      IPCModelPreferences(
-        executionModel: modelID,
-        executionEffort: effort,
-        supervisorModel: current.supervisorModel,
-        supervisorEffort: current.supervisorEffort,
-        supervisorEnabled: current.supervisorEnabled,
-        accessMode: current.accessMode,
-        fastModeEnabled: current.fastModeEnabled
-      )
-    )
+    applyModelPreferencesPatch(executionModel: modelID)
   }
 
   func setExecutionEffort(_ effort: String) {
-    guard let current = modelPreferences,
-      let model = models.first(where: { $0.modelID == current.executionModel }),
-      model.reasoningEfforts.contains(effort)
-    else { return }
-    setModelPreferences(
-      IPCModelPreferences(
-        executionModel: current.executionModel,
-        executionEffort: effort,
-        supervisorModel: current.supervisorModel,
-        supervisorEffort: current.supervisorEffort,
-        supervisorEnabled: current.supervisorEnabled,
-        accessMode: current.accessMode,
-        fastModeEnabled: current.fastModeEnabled
-      )
-    )
+    applyModelPreferencesPatch(executionEffort: effort)
   }
 
   func setAccessMode(_ mode: String) {
-    guard let current = modelPreferences else { return }
-    setModelPreferences(
-      IPCModelPreferences(
-        executionModel: current.executionModel,
-        executionEffort: current.executionEffort,
-        supervisorModel: current.supervisorModel,
-        supervisorEffort: current.supervisorEffort,
-        supervisorEnabled: current.supervisorEnabled,
-        accessMode: mode,
-        fastModeEnabled: current.fastModeEnabled
-      )
-    )
+    applyModelPreferencesPatch(accessMode: mode)
   }
 
   func setFastMode(_ enabled: Bool) {
-    guard let current = modelPreferences else { return }
-    setModelPreferences(
-      IPCModelPreferences(
-        executionModel: current.executionModel,
-        executionEffort: current.executionEffort,
-        supervisorModel: current.supervisorModel,
-        supervisorEffort: current.supervisorEffort,
-        supervisorEnabled: current.supervisorEnabled,
-        accessMode: current.accessMode,
-        fastModeEnabled: enabled
-      )
-    )
+    applyModelPreferencesPatch(fastModeEnabled: enabled)
+  }
+
+  func applyModelPreferencesPatch(
+    executionModel: String? = nil, executionEffort: String? = nil,
+    accessMode: String? = nil, fastModeEnabled: Bool? = nil
+  ) {
+    guard
+      let current = codexModelCatalogRequests.preferenceQueue.editingValue(
+        confirmed: modelPreferences)
+    else { return }
+    do {
+      setModelPreferences(
+        try CodexPreferencesPatch.apply(
+          to: current, models: models, executionModel: executionModel,
+          executionEffort: executionEffort, accessMode: accessMode, fastModeEnabled: fastModeEnabled
+        ))
+    } catch let error as CodexPreferencesPatchError {
+      errorMessage = error.message
+    } catch {
+      errorMessage = Self.message(error)
+    }
   }
 
 }

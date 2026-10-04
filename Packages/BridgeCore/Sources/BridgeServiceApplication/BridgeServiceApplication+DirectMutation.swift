@@ -39,7 +39,7 @@ extension BridgeServiceApplication {
     let project = try await approvedDirectProject(
       projectID: operation.request.projectID,
       kind: .fileWrite,
-      summary: "Apply (operation.request.kind) mutation (request.operationID)",
+      summary: Self.mutationSummary(operation, action: "Apply"),
       payload: operation.request,
       clientRequestID: request.clientRequestID ?? operation.request.clientRequestID
     )
@@ -71,14 +71,14 @@ extension BridgeServiceApplication {
     let project = try await approvedDirectProject(
       projectID: operation.request.projectID,
       kind: .fileWrite,
-      summary: "Undo file mutation (request.operationID)",
+      summary: Self.mutationSummary(operation, action: "Undo"),
       payload: request,
       clientRequestID: request.clientRequestID
     )
     do {
       _ = try await withDirectLease(
         project: project,
-        owner: .directFileOperation(operationID: "undo-(request.operationID)")
+        owner: .directFileOperation(operationID: "undo-\(request.operationID)")
       ) {
         try await self.mutations.undo(operation.prepared)
       }
@@ -158,6 +158,12 @@ extension BridgeServiceApplication {
     default:
       throw BridgeMCPQueryError.contractRejected
     }
+  }
+
+  private static func mutationSummary(_ operation: StoredDirectMutation, action: String) -> String {
+    let paths = operation.prepared.changedFiles.map(\.relativePath).joined(separator: ", ")
+    return
+      "\(action) \(operation.prepared.kind.rawValue) mutation \(operation.operationID): \(paths)"
   }
 
   private static func mutationFiles(

@@ -196,6 +196,7 @@ extension BridgeServiceApplication {
     guard let session = await directCommands.snapshot(sessionID: sessionID) else {
       throw BridgeMCPQueryError.commandSessionNotFound
     }
+    _ = try await readableProject(session.projectID.rawValue)
     return MCPDirectCommandReceipt(
       sessionID: session.sessionID,
       status: session.status,

@@ -116,6 +116,7 @@ async function runCLIChild({ context, cwd, task, signal, model, thinkingLevel, o
   let promiseFinished = false;
   let promptAccepted = false;
   let agentSettled = false;
+  let finalMessageSucceeded = false;
   let failure;
   let timeout;
   return await new Promise((resolve, reject) => {
@@ -127,6 +128,21 @@ async function runCLIChild({ context, cwd, task, signal, model, thinkingLevel, o
       if (error) reject(error); else resolve(result);
     };
     const abort = () => terminate(child);
+    const settle = () => {
+      if (!promptAccepted || !agentSettled) return;
+      if (!finalMessageSucceeded) failure = "Pi 子任务未返回完整的最终消息。";
+      terminate(child);
+    };
+    const handlers = {
+      onPromptAccepted() { promptAccepted = true; settle(); },
+      onText(text) {
+        output = bounded(text, maximumOutputBytes);
+        onText(output);
+      },
+      onMessageFinished(successful) { finalMessageSucceeded = successful; },
+      onSettled() { agentSettled = true; settle(); },
+      onError(message) { failure = message; terminate(child); },
+    };
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });
     timeout = setTimeout(() => terminate(child), maximumRuntimeMs);
@@ -138,37 +154,19 @@ async function runCLIChild({ context, cwd, task, signal, model, thinkingLevel, o
       while ((newline = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, newline);
         buffer = buffer.slice(newline + 1);
-        processRPCLine(line, promptID, {
-          onPromptAccepted() { promptAccepted = true; },
-          onText(text) {
-            output = bounded(text, maximumOutputBytes);
-            onText(output);
-          },
-          onSettled() {
-            if (!promptAccepted) return;
-            agentSettled = true;
-            terminate(child);
-          },
-          onError(message) {
-            failure = message;
-            terminate(child);
-          },
-        });
+        processRPCLine(line, promptID, handlers);
       }
     });
     child.on("error", () => finish(new Error("Pi child process could not start.")));
     child.stdin.on("error", () => terminate(child));
-    child.on("close", code => {
+    child.on("close", () => {
       if (signal.aborted) { finish(new Error("Pi child process was cancelled.")); return; }
-      if (buffer.trim()) processRPCLine(buffer, promptID, {
-        onPromptAccepted() { promptAccepted = true; },
-        onText(text) { output = bounded(text, maximumOutputBytes); },
-        onSettled() { agentSettled = promptAccepted; },
-        onError(message) { failure = message; },
-      });
+      if (buffer.trim()) processRPCLine(buffer, promptID, handlers);
       if (failure) { finish(undefined, { code: 1, summary: output, error: failure }); return; }
-      if (agentSettled) { finish(undefined, { code: 0, summary: output }); return; }
-      finish(undefined, { code: code ?? 1, summary: output,
+      if (promptAccepted && finalMessageSucceeded && agentSettled) {
+        finish(undefined, { code: 0, summary: output }); return;
+      }
+      finish(undefined, { code: 1, summary: output,
         error: "Pi 子任务未能完成。" });
     });
     child.stdin.write(JSON.stringify({ type: "prompt", id: promptID,
@@ -181,7 +179,11 @@ function processRPCLine(line, promptID, handlers) {
   let event;
   try { event = JSON.parse(line); } catch { return; }
   if (event?.type === "response" && event.id === promptID) {
-    if (!event.success) handlers.onError(event.error || "Pi child prompt was rejected.");
+    const disposition = event.data?.disposition;
+    if (event.success !== true
+        || (event.data != null && disposition !== "started" && disposition !== "queued")) {
+      handlers.onError(event.error || "Pi child prompt was rejected.");
+    }
     else handlers.onPromptAccepted();
     return;
   }
@@ -191,6 +193,11 @@ function processRPCLine(line, promptID, handlers) {
   const text = Array.isArray(message.content)
     ? message.content.filter(block => block?.type === "text").map(block => block.text).join("\n")
     : "";
+  if (message.errorMessage || message.stopReason === "error" || message.stopReason === "aborted") {
+    handlers.onError(message.errorMessage || "Pi child response failed.");
+    return;
+  }
+  handlers.onMessageFinished(message.stopReason === "stop" && Boolean(text.trim()));
   if (text) handlers.onText(text);
 }
 

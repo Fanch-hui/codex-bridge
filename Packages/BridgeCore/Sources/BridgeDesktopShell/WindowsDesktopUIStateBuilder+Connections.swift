@@ -65,6 +65,7 @@
         canScanAgents: management.connectionState == .connected,
         isManagingAgents: management.agent.isManagingAgents,
         agentOperationRevision: management.agent.agentOperationRevision,
+        setupOperations: management.agent.setupOperations,
         statusMessage: message.isEmpty ? nil : message
       )
     }

@@ -267,6 +267,7 @@ extension BridgeServiceApplication {
     if installation.providerID == .deepSeekHarness {
       try await reconcileDeepSeekHarnessModelDefaults(models: models, deadline: deadline)
     }
+    Task { [weak self] in await self?.drainQueuedTasks() }
     return models.map {
       ServiceAgentModelListItem(
         modelID: $0.id,

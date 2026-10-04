@@ -41,6 +41,7 @@ public struct OpenCodeACPSemanticVersion: Comparable, Equatable, Sendable {
 
 public struct OpenCodeACPCompatibility: Equatable, Sendable {
   public let minimumVersion: OpenCodeACPSemanticVersion
+  /// Retained for source compatibility; ACP handshake validation determines support above the minimum.
   public let maximumExclusiveVersion: OpenCodeACPSemanticVersion
 
   public init(
@@ -57,7 +58,7 @@ public struct OpenCodeACPCompatibility: Equatable, Sendable {
 
   public func accepts(version: String) -> Bool {
     guard let parsed = OpenCodeACPSemanticVersion(version) else { return false }
-    return parsed >= minimumVersion && parsed < maximumExclusiveVersion
+    return parsed >= minimumVersion
   }
 }
 

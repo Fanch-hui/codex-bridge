@@ -1,9 +1,10 @@
 # OpenCode 连接指南
 
-适用于 Codex Bridge v1.0.1。
 本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并让 ChatGPT、Qwen Studio 或 Bridge 工作台通过 MCP 提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
 
 ## 自动发现与连接
+
+在 OpenCode 卡片点击“一键配置”。Bridge 会复用现有兼容安装，或下载当前官方版本，然后引导完成原生 `auth login`。登录或 API 配置完成后返回 Bridge 重新检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。
 
 Bridge 首次初始化时扫描本机 Agent 并保存结果。打开连接页后，选择已发现的 Agent 并点击“连接”；需要授权或配置的项目会在连接时提示。后续安装或移动 Agent，可点击“扫描 Agent”更新目录。App 与后台服务重启、切页及日常状态刷新都复用保存的结果。
 

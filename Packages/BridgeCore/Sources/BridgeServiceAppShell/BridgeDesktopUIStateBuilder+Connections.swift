@@ -36,6 +36,7 @@ extension BridgeDesktopUIStateBuilder {
       canScanAgents: model.connectionState == .connected,
       isManagingAgents: model.isManagingAgents,
       agentOperationRevision: model.agentOperationRevision,
+      setupOperations: model.agentSetupOperations.map(agentSetupState),
       statusMessage: ServiceStatusPresentation.connectionMessage(
         status: model.serviceStatus?.status,
         currentMessage: model.errorMessage

@@ -15,6 +15,8 @@
     var models: [MCPModelSummary] = []
     var directConfiguration: IPCDirectConfiguration?
     var preferences: IPCModelPreferences?
+    var preferenceQueue = CodexPreferencesSaveQueue()
+    var modelCatalogGeneration: UInt64 = 0
     private(set) var instructions = ""
     private(set) var directMode = "require"
     private(set) var taskStartMode = "require"
@@ -23,7 +25,11 @@
     var keepServiceRunningAfterExit = true
     var serviceRegistered = false
     private var serviceRegistrationError: String?
-    var busy = false
+    private var operationBusy = false
+    var busy: Bool {
+      get { operationBusy || preferenceQueue.active != nil || preferenceQueue.pending != nil }
+      set { operationBusy = newValue }
+    }
     var statusText = "尚未加载设置。"
 
     init(
@@ -129,43 +135,6 @@
       publishDisplay()
     }
 
-    func savePreferences(_ value: IPCModelPreferences) async {
-      guard connectionState == .connected, !busy else { return }
-      guard !value.executionModel.isEmpty else {
-        let message = "模型设置不完整。"
-        statusText = message
-        feedback.postAlert(message, title: "模型设置无法保存")
-        publishDisplay()
-        return
-      }
-      busy = true
-      statusText = "正在保存模型设置…"
-      publishDisplay()
-      defer {
-        busy = false
-        publishDisplay()
-      }
-      let normalized = IPCModelPreferences(
-        executionModel: value.executionModel,
-        executionEffort: value.executionEffort,
-        supervisorModel: value.supervisorModel,
-        supervisorEffort: value.supervisorEffort,
-        supervisorEnabled: false,
-        accessMode: value.accessMode,
-        fastModeEnabled: value.fastModeEnabled
-      )
-      do {
-        try await client.setModelPreferences(normalized)
-        preferences = normalized
-        statusText = "模型设置已保存。"
-        feedback.postToast(statusText)
-      } catch {
-        statusText = "模型设置保存失败：\(BridgeServiceErrorMessage.message(error))"
-        feedback.postAlert(statusText)
-      }
-      publishDisplay()
-    }
-
     func saveInstructions(_ value: String) async {
       guard connectionState == .connected, !busy else { return }
       guard !value.utf8.contains(0), value.utf8.count <= 32 * 1_024 else {
@@ -267,8 +236,7 @@
         taskStartApprovalValues: Self.approvalValues,
         selectedTaskStartApprovalIndex: taskIndex,
         customInstructions: instructions,
-        savePreferencesEnabled: connectionState == .connected && !busy && current != nil
-          && !models.isEmpty,
+        savePreferencesEnabled: connectionState == .connected && !busy && current != nil,
         saveInstructionsEnabled: connectionState == .connected && !busy,
         saveDirectApprovalEnabled: connectionState == .connected && !busy,
         saveTaskStartApprovalEnabled: connectionState == .connected && !busy,

@@ -1,6 +1,8 @@
 # Pi 与 Qoder 连接
 
-Pi 和 Qoder 使用本机安装与各自的原生登录态。先安装 Node.js 22.19 或更新版本，再安装需要的 Agent。macOS Apple Silicon 与 Windows x64 使用同一套连接设置。
+Pi 和 Qoder 使用本机安装与各自的原生登录态。在连接页点击“一键配置”，Bridge 会复用已有安装，或准备官方 CLI、Node/npm 和 Qoder SDK，再显示登录指引。Qoder 先选择地区。安装位置、取消和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。
+
+以下命令用于需要自行管理安装的情况。
 
 ## Pi
 

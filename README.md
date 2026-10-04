@@ -91,7 +91,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 需要让 Codex、OpenCode、DeepSeek Harness 等 Agent 执行任务时，再完成以下配置：
 
-1. **连接 Agent**：首次初始化自动扫描并保存本机 Agent；在连接页点击连接完成验证和启用。后续安装 Agent 后点击“扫描 Agent”更新目录。Codex 使用本机 Codex 执行通道；DeepSeek Harness 可在 App 中配置服务地址和 API key。
+1. **连接 Agent**：首次初始化自动发现已有安装，在连接页点击“连接”完成验证和启用。需要安装或补齐环境时，可以额外点击“一键配置”，按指引完成登录或填写 API Key，详见[一键配置指南](./docs/AGENT_SETUP_GUIDE.md)。Codex 使用本机 Codex 执行通道。
 2. **选择项目和模式**：在工作台选择项目、Agent 以及 `Read Only` / `Write`，并设置该 Agent 的模型偏好。
 3. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
 

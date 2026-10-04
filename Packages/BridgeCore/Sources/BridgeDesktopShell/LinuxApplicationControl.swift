@@ -16,13 +16,10 @@
     }
 
     public static func shutdownService() async -> Bool {
-      let client = BridgeServiceClient(transport: ServiceTransportFactory.defaultTransport())
       do {
-        _ = try await client.shutdownService()
-        await client.invalidate()
+        try await LinuxServiceControl.shutdownAndWait()
         return true
       } catch {
-        await client.invalidate()
         return false
       }
     }

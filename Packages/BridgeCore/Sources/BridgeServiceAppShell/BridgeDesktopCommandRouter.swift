@@ -88,6 +88,8 @@ enum BridgeDesktopCommandRouter {
       .setDeepSeekHarnessMCPServerEnabled, .setAgentMCPScope, .configureTunnel,
       .connectTunnel, .disconnectTunnel, .clearTunnel, .connectAgent, .registerAgent,
       .beginAgentRegistration, .saveQoderRuntimeSettings,
+      .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .cancelAgentSetup,
+      .openAgentSetupLogin,
       .selectAgent,
       .setAgentEnabled, .reprobeAgent, .removeAgent, .refreshAgentModels:
       handleConnections(envelope, model: model)

@@ -162,18 +162,31 @@ extension BridgeServiceApplication {
       guard let installationID = task.installationID, let registry = agentRegistry else {
         return .invalid
       }
-      let models = try await serviceAgentModelCatalog(
-        registry: registry,
-        installationID: AgentInstallationID(rawValue: installationID),
-        projectRoot: project.root.canonicalPath,
-        selectedModelID: nil
-      )
-      guard let model = models.first(where: { $0.id == task.executionModel }) else {
+      let providerID = AgentProviderID(rawValue: task.providerID)
+      let requiresKnownModel = try ServiceAgentDefaultSettings.requiresKnownModel(for: providerID)
+      let modelID =
+        task.executionModel == serviceDefaultProviderExecutionModel
+        ? nil : task.executionModel
+      let models: [AgentModelDescriptor]
+      do {
+        models = try await serviceAgentModelCatalog(
+          registry: registry,
+          installationID: AgentInstallationID(rawValue: installationID),
+          projectRoot: project.root.canonicalPath,
+          selectedModelID: Self.agentCatalogModelID(providerID: providerID, modelID: modelID),
+          requireSelectedModel: requiresKnownModel)
+      } catch AgentRuntimeError.modelUnavailable {
         return .invalid
+      } catch {
+        return !requiresKnownModel && task.executionEffort == serviceDefaultProviderExecutionEffort
+          ? .available : .unavailable
       }
+      let model = Self.agentModelDescriptor(
+        providerID: providerID, modelID: modelID, catalog: models)
+      if requiresKnownModel, modelID != nil, model == nil { return .invalid }
       guard
         task.executionEffort == serviceDefaultProviderExecutionEffort
-          || model.supportedReasoningEfforts.contains(task.executionEffort)
+          || model?.supportedReasoningEfforts.contains(task.executionEffort) == true
       else { return .invalid }
       return .available
     } catch {

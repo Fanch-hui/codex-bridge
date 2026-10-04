@@ -93,6 +93,7 @@ extension BridgeServiceAppModel {
   private func refreshConnectionCollections(client: any BridgeServiceClientProtocol) async {
     let scope = selectedAgentMCPScope
     async let agentResult = try? await client.agentCatalog()
+    await refreshAgentSetups(client: client)
     async let mcpResult = try? await client.mcpClients()
     async let serverResult = try? await client.deepSeekHarnessMCPServers(scope: scope)
     if let value = await agentResult { applyAgentCatalogSnapshot(value) }

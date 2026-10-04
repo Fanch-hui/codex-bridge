@@ -1,6 +1,8 @@
 # Connecting Pi and Qoder
 
-Pi and Qoder use locally installed runtimes and their native sign-in state. Install Node.js 22.19 or later before installing either agent. macOS Apple Silicon and Windows x64 share the same connection settings.
+Pi and Qoder use local runtimes and native sign-in state. Click **One-click setup** in Connections to reuse an existing installation or prepare the official CLI, Node/npm, and Qoder SDK, then follow the sign-in instructions. Select the Qoder region first. See the [setup guide (Chinese)](./AGENT_SETUP_GUIDE.md) for installation locations and retries.
+
+The commands below are for installations you manage yourself.
 
 ## Pi
 

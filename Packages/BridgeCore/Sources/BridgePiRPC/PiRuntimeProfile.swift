@@ -26,8 +26,9 @@ struct PiRuntimeProfile: Sendable {
     let executable = try SecureFileArtifactSnapshot.capture(at: installation.executablePath)
     let environmentSource = configuration.sourceEnvironment
     guard
-      let node = AgentNodeExecutableResolver.resolve(
-        near: installation.executablePath, environment: environmentSource)
+      let node = installation.artifacts.first(where: { $0.role == .nodeInterpreter })?.canonicalPath
+        ?? AgentNodeExecutableResolver.resolve(
+          near: installation.executablePath, environment: environmentSource)
     else {
       throw PiRPCError.invalidArgument("node_runtime_missing")
     }
@@ -151,6 +152,7 @@ struct PiRuntimeProfile: Sendable {
     #endif
     let keys = [
       "USER", "LOGNAME", "LANG", "LC_ALL", "SHELL", "TEMP", "TMP", "TMPDIR",
+      "PI_CODING_AGENT_DIR",
       "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
       "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
       "OPENROUTER_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY",

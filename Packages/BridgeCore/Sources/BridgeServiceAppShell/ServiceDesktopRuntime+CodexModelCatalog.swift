@@ -6,6 +6,7 @@ struct CodexModelCatalogRequestState {
   private(set) var connectionGeneration: UInt64 = 0
   private(set) var preferenceGeneration: UInt64 = 0
   private(set) var isSavingPreferences = false
+  var preferenceQueue = CodexPreferencesSaveQueue()
 
   mutating func beginCatalog() -> UInt64 {
     catalogGeneration += 1
@@ -31,6 +32,7 @@ struct CodexModelCatalogRequestState {
     connectionGeneration += 1
     preferenceGeneration += 1
     isSavingPreferences = false
+    preferenceQueue = CodexPreferencesSaveQueue()
   }
 }
 
@@ -81,22 +83,33 @@ extension BridgeServiceAppModel {
   }
 
   func setModelPreferences(_ preferences: IPCModelPreferences) {
+    codexModelCatalogRequests.preferenceQueue.enqueue(preferences)
+    guard !codexModelCatalogRequests.isSavingPreferences else { return }
     let generation = codexModelCatalogRequests.beginPreferenceMutation()
     errorMessage = nil
     Task { [weak self] in
       guard let self else { return }
-      guard self.codexModelCatalogRequests.preferenceGeneration == generation else { return }
-      do {
-        try await self.currentClient().setModelPreferences(preferences)
-        guard self.codexModelCatalogRequests.finishPreferenceMutation(generation) else { return }
-        self.modelPreferences = preferences
-        await self.refreshModelCatalog(
-          client: try self.currentClient(), forceRefresh: false, includeInstructions: false)
-        self.postToast("模型偏好设置已更新")
-      } catch {
-        guard self.codexModelCatalogRequests.finishPreferenceMutation(generation) else { return }
-        self.errorMessage = Self.message(error)
-      }
+      await self.saveQueuedModelPreferences(generation: generation)
     }
+  }
+
+  private func saveQueuedModelPreferences(generation: UInt64) async {
+    while codexModelCatalogRequests.preferenceGeneration == generation,
+      let preferences = codexModelCatalogRequests.preferenceQueue.beginNext()
+    {
+      do {
+        try await currentClient().setModelPreferences(preferences)
+        guard codexModelCatalogRequests.preferenceGeneration == generation else { return }
+        modelPreferences = preferences
+      } catch {
+        guard codexModelCatalogRequests.preferenceGeneration == generation else { return }
+        errorMessage = Self.message(error)
+      }
+      codexModelCatalogRequests.preferenceQueue.finish()
+    }
+    guard codexModelCatalogRequests.finishPreferenceMutation(generation) else { return }
+    guard let client = try? currentClient() else { return }
+    await refreshModelCatalog(client: client, forceRefresh: false, includeInstructions: false)
+    if errorMessage == nil { postToast("模型偏好设置已更新") }
   }
 }

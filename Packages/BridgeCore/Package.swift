@@ -7,6 +7,9 @@ import PackageDescription
 var macOSOnlyProducts: [Product] = []
 var macOSOnlyTargets: [Target] = []
 
+#if !os(Windows)
+#endif
+
 var linuxOnlyProducts: [Product] = []
 var linuxOnlyTargets: [Target] = []
 var linuxDesktopDependencies: [Target.Dependency] = []
@@ -329,6 +332,7 @@ let package = Package(
         "BridgeMCP",
         "BridgeOpenCodeACP",
         "BridgeProjects",
+        "BridgeProcess",
         "BridgeSecurity",
         "BridgeServiceApplication",
         "BridgeServiceCore",

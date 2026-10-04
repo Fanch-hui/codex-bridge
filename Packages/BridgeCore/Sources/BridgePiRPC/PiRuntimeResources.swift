@@ -40,7 +40,7 @@ struct PiRuntimeResources {
     "plan.mjs": "c0b99244c69ff306cb40c8b43db9ca2e0ad0850797474a384e94554ad82406f2",
     "ask-user.mjs": "8872ba9a6ab74f621d2113dcdf255c89cd35b1d81ea79b2740b96c73fc5535c9",
     "mcp.mjs": "13a7ea8af6fed5f010ba8480228a5b016c84d5b682c6296f67c52d0740355f99",
-    "subtask.mjs": "c53f37b00646e25800832816a3f12de666882b939851b58de082c39ad33c93af",
+    "subtask.mjs": "552e7428ca0a30b8fc4512520f6d6aaa2329d1440ae24230414af97b55471806",
     "child-policy.mjs": "39db0dc3cb888fc7e1c3f8ed8400291d4dc3c7bfecad7bb99297f7b480daf0f8",
     "mcp-client-entry.mjs": "0a2ffbdb963153a9312ebfb1f0961e076e7e468046987a2cd9a316ca64880543",
     "mcp-client-sdk.mjs": "73661e63c24791d33221730cb7cb7a738b0d347b379452dabebda35b1889d37c",

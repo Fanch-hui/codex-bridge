@@ -207,7 +207,9 @@ actor PiRPCExecution {
         generation == settlementGeneration
       else { return }
       if let usageRefresh { await usageRefresh.value } else { await refreshUsage() }
-      guard phase == .active else { return }
+      guard phase == .active, inFlightInputs == 0, settledObserved,
+        generation == settlementGeneration
+      else { return }
       guard state.data?["isStreaming"]?.boolValue == false,
         state.data?["isCompacting"]?.boolValue == false,
         state.data?["pendingMessageCount"]?.integerValue == 0

@@ -200,20 +200,20 @@ public actor OpenCodeACPExecution {
     }
 
     let finalizedContent = try await normalizer.finalizeContent()
+    let unfinishedToolCount = await normalizer.unfinishedToolCount()
     guard !terminal else { return nil }
     if interruptRequested {
       await finishInterrupted()
       return nil
     }
     try emitFinalizedContent(finalizedContent)
-    // A steer can arrive while the normalizer is finalizing the previous
-    // turn. Re-check before claiming terminal so accepted input is never
-    // lost to a completion race.
+    // Queue and interrupt checks must follow all normalizer awaits so accepted
+    // input cannot be lost while terminal evidence is being collected.
     if let nextPrompt = dequeueSteer() {
       try await emitSteerDispatched(nextPrompt)
       return nextPrompt
     }
-    guard await normalizer.unfinishedToolCount() == 0 else {
+    guard unfinishedToolCount == 0 else {
       await failExecution(
         code: "opencode_unfinished_tool",
         summary: "OpenCode ended the turn with an unfinished tool call."

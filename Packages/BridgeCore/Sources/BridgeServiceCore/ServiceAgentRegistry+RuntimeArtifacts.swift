@@ -14,7 +14,14 @@ extension ServiceAgentRegistry {
     }
     let installation = try AgentInstallation(
       id: installationID, providerID: provider.descriptor.providerID,
-      executablePath: executablePath
+      executablePath: executablePath,
+      artifacts: existing.map {
+        AgentInstallationArtifact(
+          role: $0.role, canonicalPath: $0.identity.canonicalPath,
+          device: $0.identity.device, inode: $0.identity.inode, fileSize: $0.identity.fileSize,
+          modificationTimeNanoseconds: $0.identity.modificationTimeNanoseconds,
+          sha256: $0.identity.sha256)
+      }
     )
     let snapshots = try await resolver.installationArtifacts(for: installation)
     _ = try AgentInstallation(

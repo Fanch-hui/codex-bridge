@@ -11,6 +11,13 @@
     ) -> Bool {
       let payload = envelope.payload
       switch envelope.command {
+      case .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .cancelAgentSetup,
+        .openAgentSetupLogin:
+        Task { @MainActor in
+          if await management.handleAgentSetupCommand(envelope) {
+            await auxiliary.agentDefaults.refresh()
+          }
+        }
       case .connectAgent:
         return connectAgent(payload, management: management, auxiliary: auxiliary)
       case .registerAgent:
