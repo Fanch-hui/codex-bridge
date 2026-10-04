@@ -22,11 +22,12 @@
         }
         while let frame = try? channel.readFrame(), frame.kind == 0 {
           let response = dispatchSync(frame.payload)
-          guard (try? channel.writeFrame(kind: 1, payload: response)) != nil else { return }
+          let delivered = (try? channel.writeFrame(kind: 1, payload: response)) != nil
           if Self.shouldShutdown(request: frame.payload, response: response) {
             ServiceTerminationSignal.request()
             return
           }
+          guard delivered else { return }
         }
       }
       thread.name = "codex-bridge.socket-session"
@@ -52,7 +53,7 @@
 
     private static func shouldShutdown(request: Data, response: Data) -> Bool {
       guard let request = try? BridgeServiceIPCCodec.decodeRequest(request),
-        request.operation == .shutdownService,
+        request.operation == .shutdownService || request.operation == .shutdownServiceIfIdle,
         let response = try? BridgeServiceIPCCodec.response(response)
       else { return false }
       return response.error == nil

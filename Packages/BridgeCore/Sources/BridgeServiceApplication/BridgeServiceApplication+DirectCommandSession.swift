@@ -27,11 +27,13 @@ extension BridgeServiceApplication {
     if let cursorOffset {
       guard let current = await directCommands.output(sessionID: sessionID, from: cursorOffset)
       else { throw BridgeMCPQueryError.commandSessionNotFound }
+      _ = try await readableProject(current.session.projectID.rawValue)
       return Self.output(current.session, delta: current.delta)
     }
     guard let session = await directCommands.snapshot(sessionID: sessionID) else {
       throw BridgeMCPQueryError.commandSessionNotFound
     }
+    _ = try await readableProject(session.projectID.rawValue)
     return Self.output(session)
   }
 
@@ -49,13 +51,21 @@ extension BridgeServiceApplication {
       guard !projectID.isEmpty, projectID.utf8.count <= 128 else {
         throw BridgeMCPQueryError.contractRejected
       }
+      _ = try await readableProject(projectID)
       filter = ProjectID(rawValue: projectID)
     } else {
       filter = nil
     }
-    let sessions = await directCommands.recentSessions(projectID: filter, limit: limit)
+    let sessions = await directCommands.allSessions()
+    let readableIDs = Set(
+      try await projects.projects().filter {
+        $0.accessPolicy.read == .allowed && (try? $0.root.validateCurrentIdentity()) != nil
+      }.map(\.id)
+    )
     return MCPDirectCommandPage(
-      commands: sessions.map { session in
+      commands: sessions.filter {
+        (filter == nil || $0.projectID == filter) && readableIDs.contains($0.projectID)
+      }.prefix(limit).map { session in
         MCPDirectCommandSummary(
           sessionID: session.sessionID,
           projectID: session.projectID.rawValue,
@@ -126,6 +136,7 @@ extension BridgeServiceApplication {
       throw BridgeMCPQueryError.commandSessionNotFound
     }
     if existing.status != "running" {
+      _ = try await readableProject(existing.projectID.rawValue)
       return Self.output(existing)
     }
     do {
@@ -136,6 +147,7 @@ extension BridgeServiceApplication {
     guard let session = await directCommands.snapshot(sessionID: sessionID) else {
       throw BridgeMCPQueryError.commandSessionNotFound
     }
+    _ = try await readableProject(session.projectID.rawValue)
     return Self.output(session)
   }
 

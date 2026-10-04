@@ -127,6 +127,7 @@
     }
 
     func closeNativeSessionDirectory() {
+      nativeSessionDirectoryGeneration &+= 1
       guard let prior = nativeSessionDirectory else { return }
       nativeSessionDirectory = BridgeDesktopNativeSessionDirectoryState(
         installations: prior.installations,

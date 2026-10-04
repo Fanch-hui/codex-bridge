@@ -77,6 +77,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case prepareAppUpdate = "prepare_app_update"
   case cancelAppUpdate = "cancel_app_update"
   case shutdownService = "shutdown_service"
+  case shutdownServiceIfIdle = "shutdown_service_if_idle"
 }
 
 public struct BridgeServiceIPCRequest: Codable, Equatable, Sendable {

@@ -38,27 +38,12 @@ extension ServiceAgentRegistry {
       fingerprint: modelCatalogFingerprint(for: stored)
     )
     if !forceRefresh,
-      let cached = modelCatalogCache[storedKey],
-      now().timeIntervalSince(cached.createdAt) < Self.modelCatalogCacheTTL
+      let cached = freshModelCatalog(for: storedKey)
     {
-      if let selectedModelID,
-        let selected = cached.models.first(where: { $0.id == selectedModelID }),
-        !selected.reasoningCapabilitiesAvailable
-      {
-        return try await resolveMissingModel(
-          installationID: installationID,
-          projectRoot: projectRoot,
-          selectedModelID: selectedModelID,
-          key: storedKey,
-          cached: cached.models
-        )
-      }
-      if selectedModelID == nil || cached.models.contains(where: { $0.id == selectedModelID }) {
-        return cached.models
-      }
-      if !requireSelectedModel {
-        return cached.models
-      }
+      return try await resolveSelectedModel(
+        installationID: installationID, projectRoot: projectRoot,
+        selectedModelID: selectedModelID, requireSelectedModel: requireSelectedModel,
+        key: storedKey, models: cached)
     }
 
     let record = try await validateForExecution(installationID: installationID)
@@ -67,117 +52,66 @@ extension ServiceAgentRegistry {
       projectRoot: projectRoot,
       fingerprint: modelCatalogFingerprint(for: record)
     )
-    if !forceRefresh,
-      let cached = modelCatalogCache[key],
+    let models: [AgentModelDescriptor]
+    if !forceRefresh, let cached = freshModelCatalog(for: key) {
+      models = cached
+    } else {
+      models = try await sharedModelCatalog(record: record, projectRoot: projectRoot, key: key)
+    }
+    return try await resolveSelectedModel(
+      installationID: installationID, projectRoot: projectRoot,
+      selectedModelID: selectedModelID, requireSelectedModel: requireSelectedModel,
+      key: key, models: models)
+  }
+
+  private func freshModelCatalog(
+    for key: ServiceAgentModelCatalogCacheKey
+  ) -> [AgentModelDescriptor]? {
+    guard let cached = modelCatalogCache[key],
       now().timeIntervalSince(cached.createdAt) < Self.modelCatalogCacheTTL
-    {
-      if let selectedModelID,
-        let selected = cached.models.first(where: { $0.id == selectedModelID }),
-        !selected.reasoningCapabilitiesAvailable
-      {
-        return try await resolveMissingModel(
-          installationID: installationID,
-          projectRoot: projectRoot,
-          selectedModelID: selectedModelID,
-          key: key,
-          cached: cached.models
-        )
-      }
-      if selectedModelID == nil || cached.models.contains(where: { $0.id == selectedModelID }) {
-        return cached.models
-      }
-      if !requireSelectedModel {
-        return cached.models
-      }
-    }
+    else { return nil }
+    return cached.models
+  }
 
-    if let task = modelCatalogInFlight[key] {
-      let models = try await task.value
-      if requireSelectedModel {
-        return try selectedModelID.map { try requireModel($0, in: models) } ?? models
-      }
-      return models
-    }
-
+  private func sharedModelCatalog(
+    record: ServiceAgentInstallationRecord,
+    projectRoot: String?,
+    key: ServiceAgentModelCatalogCacheKey
+  ) async throws -> [AgentModelDescriptor] {
+    if let task = modelCatalogInFlight[key] { return try await task.value }
     let task = Task { [self] in
-      try await fetchAndCacheModelCatalog(
-        record: record,
-        projectRoot: projectRoot,
-        selectedModelID: selectedModelID,
-        key: key,
-        requireSelectedModel: requireSelectedModel
-      )
+      let fetched = try await providerModels(
+        record: record, projectRoot: projectRoot, selectedModelID: nil)
+      let models = mergeModelDescriptors([], fetched)
+      modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: models, createdAt: now())
+      return models
     }
     modelCatalogInFlight[key] = task
     defer { modelCatalogInFlight.removeValue(forKey: key) }
     return try await task.value
   }
 
-  private func fetchAndCacheModelCatalog(
-    record: ServiceAgentInstallationRecord,
-    projectRoot: String?,
-    selectedModelID: String?,
-    key: ServiceAgentModelCatalogCacheKey,
-    requireSelectedModel: Bool
-  ) async throws -> [AgentModelDescriptor] {
-    let fetched = try await providerModels(
-      record: record,
-      projectRoot: projectRoot,
-      selectedModelID: nil
-    )
-    var models = mergeModelDescriptors([], fetched)
-    if requireSelectedModel, let selectedModelID,
-      let selected = models.first(where: { $0.id == selectedModelID }),
-      !selected.reasoningCapabilitiesAvailable
-    {
-      models = try await fetchAndMergeSelectedModel(
-        record: record,
-        projectRoot: projectRoot,
-        selectedModelID: selectedModelID,
-        into: models
-      )
-    } else if requireSelectedModel, let selectedModelID,
-      !models.contains(where: { $0.id == selectedModelID })
-    {
-      models = try await fetchAndMergeSelectedModel(
-        record: record,
-        projectRoot: projectRoot,
-        selectedModelID: selectedModelID,
-        into: models
-      )
-    }
-    modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: models, createdAt: now())
-    if requireSelectedModel {
-      return try selectedModelID.map { try requireModel($0, in: models) } ?? models
-    }
-    return models
-  }
-
-  private func resolveMissingModel(
+  private func resolveSelectedModel(
     installationID: AgentInstallationID,
     projectRoot: String?,
-    selectedModelID: String,
+    selectedModelID: String?,
+    requireSelectedModel: Bool,
     key: ServiceAgentModelCatalogCacheKey,
-    cached: [AgentModelDescriptor]
+    models: [AgentModelDescriptor]
   ) async throws -> [AgentModelDescriptor] {
-    if let task = modelCatalogInFlight[key] {
-      let models = try await task.value
-      return try requireModel(selectedModelID, in: models)
-    }
+    guard let selectedModelID else { return models }
+    let selected = models.first(where: { $0.id == selectedModelID })
+    guard
+      selected?.reasoningCapabilitiesAvailable == false
+        || (selected == nil && requireSelectedModel)
+    else { return models }
     let record = try await validateForExecution(installationID: installationID)
-    let task = Task { [self] in
-      let models = try await fetchAndMergeSelectedModel(
-        record: record,
-        projectRoot: projectRoot,
-        selectedModelID: selectedModelID,
-        into: cached
-      )
-      modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: models, createdAt: now())
-      return models
-    }
-    modelCatalogInFlight[key] = task
-    defer { modelCatalogInFlight.removeValue(forKey: key) }
-    return try requireModel(selectedModelID, in: await task.value)
+    let resolved = try await fetchAndMergeSelectedModel(
+      record: record, projectRoot: projectRoot, selectedModelID: selectedModelID, into: models)
+    // Another caller may have resolved a different selection during this await.
+    let merged = mergeModelDescriptors(modelCatalogCache[key]?.models ?? [], resolved)
+    modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: merged, createdAt: now())
+    return requireSelectedModel ? try requireModel(selectedModelID, in: merged) : merged
   }
 
   private func fetchAndMergeSelectedModel(

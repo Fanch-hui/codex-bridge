@@ -13,7 +13,7 @@ This document defines the process boundary used by `BridgeTunnel`. The current s
 
 ## Secret-safe launch contract
 
-Bridge passes bounded non-secret configuration through argv and sends both secrets through anonymous file descriptors:
+Bridge passes bounded non-secret configuration through argv. macOS and Linux send both secrets through anonymous file descriptors:
 
 ```text
 run
@@ -30,11 +30,11 @@ run
 --log.format json
 ```
 
-Descriptor 3 receives the Runtime API Key loaded from Keychain. Descriptor 4 receives an independent 256-bit local `X-Codex-Bridge-Token`. Both descriptors are closed immediately after one bounded write. Neither secret enters argv, environment variables, YAML, SQLite, logs, IPC status, support output, or the public MCP URL.
+On macOS and Linux, descriptor 3 receives the Runtime API Key loaded from the platform secret store. Descriptor 4 receives an independent 256-bit local `X-Codex-Bridge-Token`. Both descriptors are closed immediately after one bounded write. Windows uses `env:CODEX_BRIDGE_TUNNEL_API_KEY` and `env:CODEX_BRIDGE_TUNNEL_TOKEN` references with values injected into the child environment for this launch. Both delivery modes keep secret values out of argv, YAML, SQLite, logs, IPC status, support output, and the public MCP URL.
 
-The local MCP server binds only to `127.0.0.1` and uses the fixed `/mcp` route with constant-time header authentication. Tunnel forwards the fd-backed static header only to that configured MCP origin. ChatGPT and Tunnel never receive a local secret-bearing path URL.
+The local MCP server binds only to `127.0.0.1` and uses the fixed `/mcp` route with constant-time header authentication. Tunnel forwards the static header only to that configured MCP origin. ChatGPT and Tunnel never receive a local secret-bearing path URL.
 
-The helper is spawned without a shell, with stdin replaced by `/dev/null`, inherited descriptors closed, and an explicit minimal environment. It must not inherit OpenAI API keys, admin keys, proxy credentials, MCP credentials, Codex authentication paths, or variables that can override command-line configuration. `CODEX_HOME` points to a private empty directory and `PATH` is absent.
+The helper is spawned without a shell, with stdin replaced by `/dev/null` on macOS/Linux or `NUL` on Windows, and an explicit minimal environment. macOS/Linux receive only `TMPDIR` and `CODEX_HOME`. Windows inherits only `SystemRoot` and `WINDIR`, matched without case sensitivity, and receives private per-run `TMP`, `TEMP`, `CODEX_HOME` plus the two current Tunnel secret variables. Windows passes a sorted UTF-16 environment block terminated by two NUL code units. `CODEX_HOME` points to a private empty directory on every platform. Parent `PATH`, proxy variables, authentication paths and unrelated credentials are excluded.
 
 The caller creates an app-owned runtime root with exact mode 0700. Bridge holds root and per-run directory file descriptors, binds both paths to device/inode identity, creates fixed entries with `openat`/`mkdirat`, and removes only those fixed entries. It does not recursively delete an arbitrary pathname after identity drift.
 
@@ -66,13 +66,13 @@ Tunnel failure closes only remote admission. It never cancels an already-running
 
 ## Background Service ownership
 
-`CodexBridgeService` owns the MCP listener, Tunnel manager, Execution sessions and Supervisor sessions. The SwiftUI App controls them only through versioned local XPC calls.
+`codex-bridge-service` owns the MCP listeners, Tunnel manager, Agent execution sessions and persisted tasks. The shared desktop UI communicates through versioned local IPC: Mach XPC on macOS, named pipes on Windows, and a Unix domain socket on Linux.
 
-- Closing or quitting the UI invalidates only the UI's XPC connection.
+- Closing or quitting the UI follows the background-service setting; disconnecting a UI session invalidates only its IPC connection.
 - MCP mode changes pause Tunnel, restart the local listener, then reconnect Tunnel with the new endpoint.
 - Tunnel ID and enabled state are stored in the single Service SQLite database.
-- Runtime Key and local MCP token are stored only in Keychain.
-- XPC status returns Tunnel ID and health state, never either key.
+- Runtime Key and local MCP token are stored in the platform secret store: Keychain, Credential Manager or Secret Service.
+- IPC status returns Tunnel ID and health state, never either key.
 - Explicit “Disable background Service” is the only UI operation that unregisters the LaunchAgent.
 
 ## Output and shutdown
@@ -86,7 +86,8 @@ Requested shutdown sends `SIGTERM`, waits for the bounded process timeout, then 
 Automated tests use real fake executable processes and synthetic secrets to verify:
 
 - suspended dynamic code identity and exact helper PID ownership;
-- descriptor-only secret delivery and environment/stdin isolation;
+- descriptor-only secret delivery on macOS/Linux and environment/stdin isolation;
+- Windows system-variable filtering, current Tunnel configuration injection and UTF-16 environment encoding using synthetic values;
 - private dirfd and health URL-file permissions;
 - strict loopback HTTP parsing and fresh control-plane poll semantics;
 - bounded output redaction and authorization failure detection;

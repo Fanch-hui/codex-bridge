@@ -23,6 +23,11 @@ struct ServiceAgentDefaultSettings: Sendable {
     return value
   }
 
+  static func requiresKnownModel(for provider: AgentProviderID) throws -> Bool {
+    if provider == .qoder { return qoderInternational.requiresKnownModel }
+    return try descriptor(for: provider).requiresKnownModel
+  }
+
   func permissionMode(from settings: ServiceSettings) async throws -> String {
     let value = try await settings.string(for: permissionKey) ?? writeMode
     guard value == writeMode || value == readMode else { throw ServiceStoreError.corruptRecord }

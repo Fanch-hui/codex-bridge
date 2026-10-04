@@ -4,18 +4,22 @@ import Foundation
 
 extension BridgeServiceRequestController {
   func handleDirectConfiguration(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let saved: ServiceDirectConfiguration?
     if request.operation == .updateDirectConfiguration {
       let input = try BridgeServiceIPCCodec.payload(IPCDirectConfiguration.self, from: request)
       guard let mode = ServiceDirectCommandMode(rawValue: input.commandMode) else {
         throw ServiceStoreError.invalidArgument("direct.commandMode")
       }
-      try await composition.settings.setDirectConfiguration(
+      saved = try await composition.application.serviceUpdateDirectConfiguration(
         ServiceDirectConfiguration(
           commandMode: mode, allowedCommands: input.allowedCommands,
-          deniedCommands: input.deniedCommands)
+          deniedCommands: input.deniedCommands),
+        deadline: Self.deadline()
       )
+    } else {
+      saved = try await composition.application.serviceDirectConfiguration(
+        deadline: Self.deadline())
     }
-    let saved = try await composition.settings.directConfiguration()
     let configuration = saved ?? ServiceDirectConfiguration()
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,

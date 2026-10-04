@@ -24,11 +24,11 @@ info = json.loads(Path('/opt/codex-bridge/BUILD-INFO.json').read_text())
 if info['appVersion'] != sys.argv[1]:
     raise SystemExit('Installed payload version does not match the release version.')
 PY
-"$root/.github/scripts/verify-linux-service.sh" /opt/codex-bridge
+"$root/.github/scripts/verify-linux-service.sh" /opt/codex-bridge "$package"
 dpkg --remove codex-bridge
 if [[ "$(dpkg-query --show --showformat='${Status}' codex-bridge 2>/dev/null || true)" == 'install ok installed' ]]; then
   echo 'Codex Bridge remains installed after package removal.' >&2
   exit 1
 fi
 trap - EXIT
-echo "Installed Codex Bridge $version, verified Unix IPC, and removed the package."
+echo "Installed Codex Bridge $version, verified running-service replacement and Unix IPC, and removed the package."

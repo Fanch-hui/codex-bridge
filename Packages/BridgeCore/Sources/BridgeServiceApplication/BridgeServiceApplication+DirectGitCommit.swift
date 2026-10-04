@@ -35,6 +35,8 @@ extension BridgeServiceApplication {
           runner: DirectGitRunner()
         )
       }
+    } catch is CancellationError {
+      throw CancellationError()
     } catch {
       throw Self.publicGitError(error)
     }

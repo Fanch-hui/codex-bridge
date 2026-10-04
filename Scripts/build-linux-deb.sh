@@ -16,6 +16,9 @@ trap 'rm -rf -- "$temporary"' EXIT
 mkdir -p "$temporary/DEBIAN" "$temporary/opt/codex-bridge" \
   "$temporary/usr/share/applications" "$temporary/usr/share/icons/hicolor/512x512/apps"
 cp -a "$payload/." "$temporary/opt/codex-bridge/"
+install -m 755 "$root/Scripts/linux-package-preinst.py" "$temporary/DEBIAN/preinst"
+install -m 755 "$root/Scripts/linux-package-postinst.sh" "$temporary/DEBIAN/postinst"
+install -m 755 "$root/Scripts/linux-package-postrm.sh" "$temporary/DEBIAN/postrm"
 install -m 644 "$root/Linux/org.codexbridge.CodexBridge.desktop" "$temporary/usr/share/applications/"
 install -m 644 "$root/App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-512.png" \
   "$temporary/usr/share/icons/hicolor/512x512/apps/org.codexbridge.CodexBridge.png"
@@ -26,6 +29,7 @@ Architecture: $debian_architecture
 Maintainer: Codex Bridge contributors
 Section: devel
 Priority: optional
+Pre-Depends: python3-minimal, util-linux
 Depends: libc6 (>= 2.39), libgtk-3-0t64, libwebkit2gtk-4.1-0, libsqlite3-0, libsecret-tools, gnome-keyring, bubblewrap, libcurl4t64, libicu74, libxml2, libatomic1
 Description: Local Agent workbench and MCP gateway
  Shared desktop workspace for local coding agents and MCP clients.
