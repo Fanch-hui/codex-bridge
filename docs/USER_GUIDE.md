@@ -127,7 +127,7 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 
 完整分步说明见 [Tunnel 配置指南](./CHATGPT_DEVELOPER_MODE.md)，包含平台入口、权限和 Key 获取步骤。
 
-流程是：在 OpenAI Platform 创建 Tunnel，明确选择并保存 **WORKSPACES**（个人空间选 **Personal**，团队选对应工作区），再创建受限 Runtime Key，在 Bridge 连接页保存并等待 `ready`，再在 ChatGPT 中创建 Tunnel 类型 App。Bridge 和 ChatGPT 使用同一个 Tunnel ID。
+流程是：在 OpenAI Platform 创建 Tunnel，明确选择并保存 **WORKSPACES**（个人空间选 **Personal**，团队选对应工作区），再创建受限 Runtime Key，在 Bridge 连接页保存并等待 `ready`。随后在 ChatGPT 侧栏打开 **插件 → 添加 → 创建自定义 MCP 服务器**，选择 **Tunnel** 连接类型并添加 Codex Bridge。Bridge 和 ChatGPT 使用同一个 Tunnel ID。
 
 完成 Tunnel 配置并在 ChatGPT 添加、启用 Codex Bridge 插件后，即可按第 11 节直接读写已授权项目的文件、运行命令，无需连接 Agent。
 

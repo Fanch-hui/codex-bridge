@@ -334,7 +334,7 @@ npx @modelcontextprotocol/conformance@0.1.15 server \
 
 Do not reuse the upstream baseline. Bridge begins with no expected failures; any unavoidable, reviewed incompatibility gets a Bridge-owned baseline with a linked issue and removal condition. The SDK script itself tests the SDK example, not Bridge's listener, limits, route, or tools, so it cannot replace this gate.
 
-Final phase-2 acceptance also requires a real MCP Inspector pass and a ChatGPT Developer Mode call through the actual Tunnel helper. Tunnel disconnect must reject new remote calls without interrupting already-running local tasks.
+Final phase-2 acceptance also requires a real MCP Inspector pass and a ChatGPT custom MCP plugin call through the actual Tunnel helper. Create the ChatGPT connection from Plugins → Add → Create custom MCP server and select Tunnel. Tunnel disconnect must reject new remote calls without interrupting already-running local tasks.
 
 ## 9. Known 0.12.1 risks to keep visible
 

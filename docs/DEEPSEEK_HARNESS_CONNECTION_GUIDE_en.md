@@ -346,7 +346,7 @@ Do not paste `.env` or raw authentication responses into support reports. Probe 
 - [pnpm installation guide](https://pnpm.io/installation)
 - [Detailed Chinese DSH guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
 - [Detailed user guide](./USER_GUIDE.md)
-- [ChatGPT Developer Mode and Secure Tunnel guide](./CHATGPT_DEVELOPER_MODE.md)
+- [ChatGPT custom MCP plugin and Secure Tunnel guide](./CHATGPT_DEVELOPER_MODE.md)
 
 ## Clash / Mihomo TUN and Fake-IP
 

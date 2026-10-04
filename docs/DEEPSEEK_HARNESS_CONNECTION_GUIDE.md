@@ -594,4 +594,4 @@ waiting_for_codex_approval
 - [Node.js 官方下载页](https://nodejs.org/en/download/)
 - [pnpm 官方安装说明](https://pnpm.io/installation)
 - [Codex Bridge 详细使用指南](./USER_GUIDE.md)
-- [ChatGPT Developer Mode 接入指南](./CHATGPT_DEVELOPER_MODE.md)
+- [ChatGPT 插件与 Secure Tunnel 接入指南](./CHATGPT_DEVELOPER_MODE.md)

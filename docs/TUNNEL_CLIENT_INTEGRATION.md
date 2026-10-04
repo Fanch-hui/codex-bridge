@@ -97,7 +97,7 @@ Automated tests use real fake executable processes and synthetic secrets to veri
 
 `build-tunnel-helper.sh` reproduces the pinned v0.0.10 Universal 2 unsigned helper. `verify-tunnel-helper.sh` requires an external trusted digest and never executes its input. On Apple Silicon, `test-tunnel-helper-config.sh` separately pins the official arm64 archive and embedded helper hashes, then runs the exact official `doctor` image through the production suspended-process/CDHash boundary against the real header-authenticated Swift MCP fixture.
 
-Final acceptance still requires the user's real Developer ID identity, a Platform-supported helper build, a restricted Runtime API Key with Tunnels Read + Use, a real Tunnel ID, and a ChatGPT Developer Mode scan/call/reconnect exercise. Those credentials are entered locally and must never be pasted into source, chat, issue reports, or logs.
+Final acceptance still requires the user's real Developer ID identity, a Platform-supported helper build, a restricted Runtime API Key with Tunnels Read + Use, a real Tunnel ID, and a ChatGPT custom MCP plugin scan/call/reconnect exercise. Create the ChatGPT connection from Plugins → Add → Create custom MCP server and select Tunnel. Those credentials are entered locally and must never be pasted into source, chat, issue reports, or logs.
 
 Official references:
 

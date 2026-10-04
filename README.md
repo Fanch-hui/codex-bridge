@@ -84,7 +84,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
 2. **添加项目**：登记本地目录，并设置读取、写入和网络权限。
-3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置并添加、启用插件（ChatGPT 需要有 Plus 及以上订阅或团队订阅才可以使用）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
+3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置，在 ChatGPT **插件 → 添加 → 创建自定义 MCP 服务器** 中添加 Codex Bridge，并在对话中启用插件（ChatGPT 使用 Secure MCP Tunnel 需要 Plus 及以上订阅或团队订阅）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
 4. **直接操作项目**：在已启用插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
 
 ### 委派 Agent 任务（可选）

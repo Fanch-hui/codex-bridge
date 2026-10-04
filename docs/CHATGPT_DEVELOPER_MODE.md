@@ -32,7 +32,7 @@ Qwen 配置中的本地 MCP 凭据由 Bridge 生成，和这三项不同。ChatG
 4. 在 Tunnel 的 **WORKSPACES** 中选择你实际使用的 ChatGPT 工作区并保存；个人空间选择 **Personal**，团队使用则选择对应的工作区。**这一项需要明确选择，不能留空。**
 5. 复制 Tunnel ID，保留给 Bridge 和 ChatGPT 使用。
 
-**已创建 Tunnel，但 ChatGPT 插件的隧道列表里找不到？先检查 WORKSPACES。** 打开 Platform 的 Tunnels 页面，编辑该 Tunnel，在 **WORKSPACES** 中选中目标工作区并保存，再返回同一工作区的 ChatGPT Plugins/Apps 页面，刷新页面或重新打开 Tunnel 选择列表。仅创建 Tunnel、或 Bridge 已显示 `ready`，都不代表已完成工作区关联。
+**已创建 Tunnel，但 ChatGPT 插件的隧道列表里找不到？先检查 WORKSPACES。** 打开 Platform 的 Tunnels 页面，编辑该 Tunnel，在 **WORKSPACES** 中选中目标工作区并保存，再返回同一工作区的 ChatGPT「插件 → 添加 → 创建自定义 MCP 服务器」，刷新页面或重新打开 Tunnel 选择列表。仅创建 Tunnel、或 Bridge 已显示 `ready`，都不代表已完成工作区关联。
 
 创建和编辑 Tunnel 需要 Tunnels **Read + Manage**；运行 Helper 和在 ChatGPT 选择 Tunnel 需要 **Read + Use**。若入口不可用，由组织管理员检查角色权限。只关联 Platform 组织，可能无法在目标 ChatGPT Workspace 找到它。依据：[OpenAI Secure MCP Tunnel 官方指南](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)。
 
@@ -71,16 +71,16 @@ Runtime Key 由后台 Service 存入 macOS Keychain 或 Windows Credential Manag
 ## 6. 在 ChatGPT 创建连接
 
 > [!NOTE]
-> ChatGPT 需要有 Plus 及以上订阅或团队订阅才可以使用 Developer mode 与 Secure MCP Tunnel（免费版账号不提供开发者模式入口）。实测订阅用户都可以使用完整权限的 MCP。
+> ChatGPT 使用 Secure MCP Tunnel 需要 Plus 及以上订阅或团队订阅。实测订阅用户都可以使用完整权限的 MCP。
 
-1. 打开 ChatGPT 设置，在 **Security and login** 中启用 **Developer mode**。
-2. 打开 Plugins/Apps 管理页面，点击加号创建 developer-mode App。
+1. 打开 ChatGPT 侧栏的 **插件** 页面。
+2. 点击右上角 **添加 → 创建自定义 MCP 服务器**，填写名称，例如 `Codex Bridge`。
 3. 连接类型选择 **Tunnel**。
 4. 选择刚创建的 Tunnel，或粘贴与 Bridge 相同的 Tunnel ID。
 5. 完成工具扫描并保存。
-6. 新建对话，从加号菜单的 Developer mode 中选择这个 App。
+6. 新建对话，从输入框的加号菜单中选择 Codex Bridge 插件。
 
-这是当前官方入口；受管 Workspace 还需管理员授予开发者模式权限。实测订阅用户都可以使用完整权限的 MCP（包括工具发现、`bridge_status` 查询与 `submit_task` 执行）。入口随账号与网页版本变化，以 [OpenAI Developer mode 文档](https://developers.openai.com/api/docs/guides/developer-mode) 为准。
+受管 Workspace 需由管理员允许使用自定义 MCP 服务器。实测订阅用户都可以使用完整权限的 MCP（包括工具发现、`bridge_status` 查询与 `submit_task` 执行）。
 
 Tunnel 表单使用 Tunnel ID，不填写本机 `127.0.0.1` 地址。Runtime Key 只保存在 Bridge。若表单只有公共 MCP URL，返回连接类型选择 Tunnel。
 
@@ -114,21 +114,21 @@ Tunnel 表单使用 Tunnel ID，不填写本机 `127.0.0.1` 地址。Runtime Key
 
 若希望使用 DeepSeek Harness，请明确说“使用 DeepSeek Harness”，客户端应发送 `provider_id=deepseek-harness`。先按 [DSH 配置指南](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) 完成连接。
 
-Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task`；实测订阅用户都可以使用完整权限的 MCP，实际执行仍服从项目策略和审批。工具目录变更或 App 更新后，请在 ChatGPT 刷新 App/重新扫描工具。
+Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task`；实测订阅用户都可以使用完整权限的 MCP，实际执行仍服从项目策略和审批。工具目录变更或 App 更新后，请在 ChatGPT 刷新 Codex Bridge 插件/重新扫描工具。
 
 ## 8. 版本更新后在 ChatGPT 刷新插件（防旧版缓存）
 
 Codex Bridge 升级新版本后，ChatGPT 网页端可能会保留旧版的工具列表、提示词或会话缓存。为确保加载最新工具与指令，每次更新后建议按以下步骤刷新一次：
 
 1. **重新扫描/刷新工具**：
-   - 打开 ChatGPT，进入 **Settings → Security and login → Developer mode**（或在输入框加号菜单中找到 Codex Bridge App 详情）；
-   - 点击该 App，选择 **Refresh tools**（刷新工具）重新拉取最新的 MCP 工具定义与描述。
+   - 打开 ChatGPT 侧栏的 **插件** 页面，找到 Codex Bridge 并打开插件详情；
+   - 选择 **Refresh tools**（刷新工具）重新拉取最新的 MCP 工具定义与描述。
 2. **新建对话加载**：
    - 关闭旧对话，点击左上角 **New Chat**（新建对话）；
-   - 在输入框左下角加号（`+`）菜单中重新选择 Developer mode 下的 Codex Bridge App；
+   - 在输入框左下角加号（`+`）菜单中重新选择 Codex Bridge 插件；
    - 发送一条测试指令（如：`请调用 bridge_status 查看当前状态`），确认加载的是最新版本。
 3. **彻底重新挂载（可选）**：
-   - 若 ChatGPT 持续返回旧参数或未识别新工具，可在 App 管理中先删除该 App，再点击加号选择相同的 Tunnel ID 重新添加并完成工具扫描。
+   - 若 ChatGPT 持续返回旧参数或未识别新工具，可在插件页删除 Codex Bridge，再通过 **添加 → 创建自定义 MCP 服务器** 选择相同的 Tunnel ID 重新添加并完成工具扫描。
 
 ## 9. 常见问题
 
@@ -136,12 +136,12 @@ Codex Bridge 升级新版本后，ChatGPT 网页端可能会保留旧版的工�
 | --- | --- |
 | 看不到 Tunnels 或无法创建 | 确认 Platform 组织及 Read + Manage 权限 |
 | 已创建 Tunnel，但 ChatGPT 插件的隧道列表中找不到 | 优先检查 Platform → Tunnels → 编辑该 Tunnel → **WORKSPACES** 是否已选中并保存。个人空间选择 **Personal**，团队选择对应工作区；回到同一工作区的 ChatGPT 刷新列表。仍不可见时，再检查 Read + Use 权限 |
-| 找不到 Developer mode | 确认账号是否拥有 Plus 及以上或团队订阅（免费版账号不提供开发者模式入口）；受管 Workspace 需检查账号权限和管理员设置 |
+| 找不到「创建自定义 MCP 服务器」 | 在 ChatGPT 侧栏打开「插件」，检查右上角「添加」菜单；受管 Workspace 需检查账号权限和管理员设置 |
 | 保存时报配置无效 | 重新复制 Tunnel ID；Key 不加引号或空白 |
 | 一直认证失败 | 确认 Key 所属组织、Read + Use 权限、是否撤销；查看 Bridge 日志 |
 | 连接失败或反复掉线 | 检查本机到 OpenAI 的出站 HTTPS 与代理配置；查看 Tunnel 诊断 |
 | Bridge ready，但扫描失败 | 保持 Service 运行，核对两端 ID、Workspace、连接类型 |
-| 工具能扫描但没有执行任务 | 在当前对话选择 App，明确要求调用；刷新工具目录 |
+| 工具能扫描但没有执行任务 | 在当前对话选择 Codex Bridge 插件，明确要求调用；刷新工具目录 |
 | 更新后工具未生效或仍使用旧参数 | ChatGPT 网页端保留了旧版工具缓存；按第 8 节说明在 ChatGPT 刷新工具并新建对话 |
 | 任务等待本机审批 | 在工作台批准启动或处理当前工具权限请求 |
 | 任务长时间没有新文本 | 查看活动与审批状态，按客户端返回的等待策略继续查询 |

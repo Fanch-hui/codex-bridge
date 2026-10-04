@@ -12,7 +12,7 @@
 | Swift MCP SDK | 0.12.1 | pinned in `Package.resolved`; loopback and Inspector acceptance | Production HTTP boundary is implemented by BridgeMCP because this SDK version does not provide the required listener. |
 | MCP Inspector | 2.1.0 on Node 22.19+ | pinned one-shot acceptance script | Development-only; never bundled. |
 | OpenAI tunnel-client | 0.0.10, commit `105e17a79a36e4e5c897fd698ed2b8dbf935b144` | pinned official archives, reproducible Universal 2 supply build, official arm64 `doctor`, loopback health ownership and helper lifecycle tests | Platform Tunnels remains the support source of truth. Unsigned preview packages ad-hoc sign the selected helper slice and record its digest; a future Developer ID release must re-sign it with the App identity before signing the App. |
-| ChatGPT Developer Mode | current Secure MCP Tunnel client behavior | local helper, admission and MCP contract are covered; real account connection remains user acceptance | Bridge requires a user-provided Tunnel ID and Restricted Runtime API Key with Tunnels Read + Use. ChatGPT uses the same Tunnel ID and never receives the Runtime Key or the ChatGPT profile's local MCP Header Secret. |
+| ChatGPT custom MCP plugin | current Secure MCP Tunnel client behavior | local helper, admission and MCP contract are covered; real account connection remains user acceptance | Create the connection from Plugins → Add → Create custom MCP server and select Tunnel. Bridge requires a user-provided Tunnel ID and Restricted Runtime API Key with Tunnels Read + Use. ChatGPT uses the same Tunnel ID and never receives the Runtime Key or the ChatGPT profile's local MCP Header Secret. |
 
 ## Fail-closed compatibility behavior
 
