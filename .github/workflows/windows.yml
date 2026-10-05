@@ -186,6 +186,18 @@ jobs:
           $binPath = ($binPathOutput | Select-Object -Last 1).ToString().Trim()
           if (-not $binPath) { throw "Swift build output directory was empty." }
           Add-Content $env:GITHUB_ENV "SWIFT_BIN_PATH=$binPath"
+      - name: Run package test suite
+        working-directory: Packages/BridgeCore
+        shell: pwsh
+        run: |
+          $targetTriple = $env:TARGET_TRIPLE
+          . "$env:GITHUB_WORKSPACE\Scripts\windows-swift-arguments.ps1"
+          $swiftArguments = @(Get-WindowsSwiftArguments `
+            -VcpkgInstalledRoot "$env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.architecture }}-windows" `
+            -TargetTriple $targetTriple -LibraryPaths ($env:TARGET_LIBRARY_PATHS -split ";"))
+          $testArguments = @($swiftArguments) + @("-c", "release")
+          swift test @testArguments
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/setup-node@v4
         with:
           node-version: 22.23.2

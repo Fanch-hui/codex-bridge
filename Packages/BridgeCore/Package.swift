@@ -376,6 +376,20 @@ let package = Package(
         )
       ]
     ),
-    
+    .testTarget(
+      name: "BridgeCoreTests",
+      dependencies: [
+        "BridgeAgentCore",
+        "BridgeCodexRPC",
+        "BridgeDesktopUI",
+        "BridgeDirectCommand",
+        "BridgeDomain",
+        "BridgeFiles",
+        "BridgeGit",
+        "BridgeProjects",
+        "BridgeSecurity",
+        "BridgeServiceCore",
+      ]
+    ),
   ] + macOSOnlyTargets + linuxOnlyTargets
 )

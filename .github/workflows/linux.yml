@@ -62,6 +62,8 @@ jobs:
           uname -m
           swift --version
           pkg-config --modversion webkit2gtk-4.1
+      - name: Run package test suite
+        run: swift test --package-path Packages/BridgeCore
       - name: Build service, desktop, and packages
         run: Scripts/build-linux.sh "$GITHUB_WORKSPACE/.build/linux-dist"
       - name: Run development Linux platform tests
