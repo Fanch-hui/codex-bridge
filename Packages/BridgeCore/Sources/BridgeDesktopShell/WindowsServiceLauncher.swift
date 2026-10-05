@@ -117,7 +117,7 @@
       // mode is inherited by the child, so a crashing service cannot raise
       // "stopped working" dialogs in a loop.
       let previousErrorMode = SetErrorMode(
-        SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)
+        UINT(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX))
       defer { _ = SetErrorMode(previousErrorMode) }
 
       let launched = executablePath.withCString(encodedAs: UTF16.self) { applicationName in

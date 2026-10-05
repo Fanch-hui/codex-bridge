@@ -123,7 +123,7 @@ public enum ServiceProcessRunner {
       // and crash-reporter popups for this process and every agent child
       // process it spawns (the error mode is inherited).
       _ = SetErrorMode(
-        SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)
+        UINT(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX))
     #endif
     let options = try ServiceProcessOptions.parse(arguments)
     #if os(Linux)
