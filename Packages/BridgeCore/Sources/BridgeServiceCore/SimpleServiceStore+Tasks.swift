@@ -37,7 +37,7 @@ extension SimpleServiceStore {
           if let handoffID { try Self.linkHandoff(handoffID, taskID: task.id.rawValue, in: db) }
           return try Self.reusedResult(existing: Self.decodeTask(row), requested: task)
         }
-        if task.permissionMode == .workspaceWrite, task.state.status.holdsWriteSlot,
+        if task.permissionMode == .full, task.state.status.holdsWriteSlot,
           !task.isQueued,
           try Self.activeWriteTaskRow(projectID: task.projectID, in: db) != nil
         {
@@ -66,7 +66,7 @@ extension SimpleServiceStore {
       if let existing = try? self.task(id: task.id) {
         return try Self.reusedResult(existing: existing, requested: task)
       }
-      if task.permissionMode == .workspaceWrite,
+      if task.permissionMode == .full,
         (try? activeWriteTask(projectID: task.projectID)) != nil
       {
         throw ServiceStoreError.activeWriteTaskExists(task.projectID)
@@ -134,13 +134,10 @@ extension SimpleServiceStore {
           )
         }
         try Self.validateTransition(from: existing.state.status, to: .starting)
-        guard let projectRow = try Self.projectRow(id: existing.projectID, in: db) else {
+        guard try Self.projectRow(id: existing.projectID, in: db) != nil else {
           throw ServiceStoreError.unknownProject(existing.projectID)
         }
-        let project = try Self.decodeProject(projectRow)
-        guard project.accessPolicy.network != .denied,
-          existing.permissionMode != .workspaceWrite || project.accessPolicy.write != .denied
-        else {
+        guard existing.permissionMode == .full else {
           throw ServiceStoreError.invalidArgument("task.executionAuthorization")
         }
         try db.execute(
@@ -153,7 +150,7 @@ extension SimpleServiceStore {
           arguments: [
             ServiceTaskStatus.starting.rawValue,
             supervisorStatus.rawValue,
-            authorization.networkAllowed ? 1 : 0,
+            existing.networkAllowed ? 1 : 0,
             authorization.accessMode.rawValue,
             event.createdAt.timeIntervalSince1970,
             id.rawValue,

@@ -9,23 +9,13 @@ extension MCPServiceToolCatalog {
   static let opaqueProjectIDSchema = MCPSharedToolSchemas.opaqueProjectID
   static let optionalOpaqueProjectIDSchema = MCPSharedToolSchemas.optionalOpaqueProjectID
 
-  static let capabilitiesSchema = objectSchema(
-    properties: [
-      "read": stringSchema,
-      "write": stringSchema,
-      "network": stringSchema,
-    ],
-    required: ["read", "write", "network"]
-  )
-
   static let projectSummarySchema = objectSchema(
     properties: [
       "project_id": stringSchema,
       "name": stringSchema,
-      "capabilities": capabilitiesSchema,
       "git_state": stringSchema,
     ],
-    required: ["project_id", "name", "capabilities"]
+    required: ["project_id", "name"]
   )
 
   static let agentSummarySchema = objectSchema(
@@ -58,7 +48,7 @@ extension MCPServiceToolCatalog {
       "network_enforcement": [
         "type": "string",
         "description":
-          "Network enforcement owner. provider_native means the Provider applies its own network and tool policy; Bridge records task intent and project admission without claiming packet-level isolation.",
+          "Network enforcement owner. provider_native means the Provider applies its own network and tool policy; Bridge uses the user-selected task mode for admission without claiming packet-level isolation.",
       ],
       "models_summary": arraySchema(stringSchema),
       "unavailable_reason": stringSchema,
@@ -76,13 +66,11 @@ extension MCPServiceToolCatalog {
     properties: [
       "project_id": stringSchema,
       "name": stringSchema,
-      "capabilities": capabilitiesSchema,
       "git_state": stringSchema,
       "verification_commands": arraySchema(stringSchema),
       "thread_count": integerSchema(minimum: 0),
       "direct_workspace": objectSchema(
         properties: [
-          "file_write_permission": stringSchema,
           "command_mode": ["type": "string", "enum": ["denied", "safe", "full"]],
           "commands": arraySchema(projectCommandSchema),
           "command_blacklist": arraySchema(
@@ -97,10 +85,10 @@ extension MCPServiceToolCatalog {
             )
           ),
         ],
-        required: ["file_write_permission", "command_mode", "commands", "command_blacklist"]
+        required: ["command_mode", "commands", "command_blacklist"]
       ),
     ],
-    required: ["project_id", "name", "capabilities", "verification_commands"]
+    required: ["project_id", "name", "verification_commands"]
   )
 
   static let searchMatchSchema = objectSchema(
@@ -316,7 +304,10 @@ extension MCPServiceToolCatalog {
       "execution_model": stringSchema,
       "execution_effort": stringSchema,
       "permission_mode": stringSchema,
-      "network_access": boolSchema,
+      "network_access": [
+        "type": "boolean",
+        "description": "Derived from permission_mode: true for full, false for read-only.",
+      ],
       "thread_id": stringSchema,
       "turn_id": stringSchema,
       "provider_session_id": stringSchema,

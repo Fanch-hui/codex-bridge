@@ -21,6 +21,7 @@ extension OpenCodeACPProvider {
         runDirectory: runDirectory,
         persistentStateDirectory: persistentStateDirectory,
         networkAllowed: request.networkAccessRequested,
+        readOnly: request.mutationIntent == .readOnly,
         sourceEnvironment: configuration.sourceEnvironment
       )
       let connected = makeClient(transport: try configuration.transportFactory(launch))
@@ -38,6 +39,7 @@ extension OpenCodeACPProvider {
       )
       let mode = try Self.modeValue(
         for: request.mutationIntent,
+        readOnlyModeID: launch.readOnlyModeID,
         in: session
       )
       var configOptions = try await connected.setSessionConfigOption(
@@ -102,6 +104,7 @@ extension OpenCodeACPProvider {
         normalizer: normalizer,
         sessionID: session.id,
         prompt: request.prompt,
+        literalInput: request.mutationIntent == .readOnly,
         initialClientEventSequence: initialSequence,
         inactivityTimeout: configuration.inactivityTimeout,
         eventBufferLimit: configuration.eventBufferLimit,

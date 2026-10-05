@@ -1,12 +1,23 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
-  var disclosures = new Map(), viewports = new Map(), viewportKey = null;
+  var disclosures = new Map(), viewports = new Map(), viewportKey = null, activeContextKey = null;
 
   function contextKey(page) {
     var task = page.selectedTask;
     return JSON.stringify([page.selectedProjectID, task && task.providerID,
       task ? task.sessionID || task.taskID : page.history && page.history.selectedThreadID]);
+  }
+
+  function pruneContextState(page) {
+    var key = contextKey(page);
+    if (activeContextKey === key) return;
+    activeContextKey = key;
+    // Contexts accumulate disclosure and viewport state forever otherwise;
+    // keep only the active conversation so long sessions stay bounded.
+    [disclosures, viewports].forEach(function (map) {
+      Array.from(map.keys()).forEach(function (k) { if (k !== key) map.delete(k); });
+    });
   }
 
   function captureViewport(container, page) {
@@ -53,6 +64,7 @@
   }
 
   function addConversationBlock(container, values, page, emit, options) {
+    pruneContextState(page);
     var submissions = global.CodexBridgeDesktopWorkbenchSubmissions;
     if (submissions) values = submissions.entries(values, page);
     var process = global.CodexBridgeDesktopWorkbenchProcess;

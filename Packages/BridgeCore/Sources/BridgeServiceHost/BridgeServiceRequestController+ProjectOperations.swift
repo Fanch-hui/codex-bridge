@@ -20,35 +20,9 @@ extension BridgeServiceRequestController {
       IPCProjectRegistrationRequest.self,
       from: request
     )
-    let policy = try Self.projectPolicy(
-      read: payload.readPermission,
-      write: payload.writePermission,
-      network: payload.networkPermission
-    )
     let detail = try await composition.application.serviceRegisterManagedProject(
       name: payload.name,
       rootURL: try Self.absoluteDirectoryURL(payload.absolutePath),
-      accessPolicy: policy,
-      deadline: Self.deadline()
-    )
-    return try BridgeServiceIPCCodec.success(
-      requestID: request.requestID,
-      payload: detail
-    )
-  }
-
-  func handleUpdateProjectPolicy(_ request: BridgeServiceIPCRequest) async throws -> Data {
-    let payload = try BridgeServiceIPCCodec.payload(
-      IPCProjectPolicyRequest.self,
-      from: request
-    )
-    let detail = try await composition.application.serviceUpdateManagedProjectPolicy(
-      projectID: payload.projectID,
-      policy: try Self.projectPolicy(
-        read: payload.readPermission,
-        write: payload.writePermission,
-        network: payload.networkPermission
-      ),
       deadline: Self.deadline()
     )
     return try BridgeServiceIPCCodec.success(

@@ -465,9 +465,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
   public let threadID: String?
   public let skillName: String?
   public let skillNames: [String]?
-  public let networkAccess: Bool?
   public let modelOverride: Bool?
-  public let permissionModeOverride: Bool?
   public let acceptanceCriteria: [String]?
   public let clientRequestID: String?
   public let queueIfBusy: Bool?
@@ -485,9 +483,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     threadID: String? = nil,
     skillName: String? = nil,
     skillNames: [String]? = nil,
-    networkAccess: Bool? = nil,
     modelOverride: Bool? = nil,
-    permissionModeOverride: Bool? = nil,
     acceptanceCriteria: [String]? = nil,
     clientRequestID: String? = nil,
     queueIfBusy: Bool? = nil,
@@ -504,9 +500,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     self.threadID = threadID
     self.skillName = skillName
     self.skillNames = skillNames
-    self.networkAccess = networkAccess
     self.modelOverride = modelOverride
-    self.permissionModeOverride = permissionModeOverride
     self.acceptanceCriteria = acceptanceCriteria
     self.clientRequestID = clientRequestID
     self.queueIfBusy = queueIfBusy
@@ -525,9 +519,7 @@ public struct IPCAgentSubmitRequest: Codable, Equatable, Sendable {
     case threadID = "thread_id"
     case skillName = "skill_name"
     case skillNames = "skill_names"
-    case networkAccess = "network_access"
     case modelOverride = "model_override"
-    case permissionModeOverride = "permission_mode_override"
     case acceptanceCriteria = "acceptance_criteria"
     case clientRequestID = "client_request_id"
     case queueIfBusy = "queue_if_busy"
@@ -653,12 +645,16 @@ public struct IPCAgentModelDefaultResponse: Codable, Equatable, Sendable {
   public init(
     providerID: String = "opencode",
     model: String?,
-    permissionMode: String = "build",
+    permissionMode: String = "full",
     effort: String? = nil
   ) {
     self.providerID = providerID
     self.model = model
-    self.permissionMode = permissionMode
+    switch permissionMode {
+    case "plan": self.permissionMode = "read-only"
+    case "build", "workspace-write": self.permissionMode = "full"
+    default: self.permissionMode = permissionMode
+    }
     self.effort = effort
   }
 
@@ -675,7 +671,7 @@ public struct IPCAgentModelDefaultResponse: Codable, Equatable, Sendable {
       providerID: try container.decodeIfPresent(String.self, forKey: .providerID) ?? "opencode",
       model: try container.decodeIfPresent(String.self, forKey: .model),
       permissionMode: try container.decodeIfPresent(String.self, forKey: .permissionMode)
-        ?? "build",
+        ?? "full",
       effort: try container.decodeIfPresent(String.self, forKey: .effort)
     )
   }

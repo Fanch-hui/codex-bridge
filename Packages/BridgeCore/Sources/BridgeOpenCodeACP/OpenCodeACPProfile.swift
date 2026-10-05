@@ -66,15 +66,18 @@ public struct OpenCodeACPLaunchConfiguration: Sendable {
   public let process: OpenCodeACPProcessTransportConfiguration
   public let runDirectory: String
   public let resolvedExecutablePath: String
+  public let readOnlyModeID: String?
 
   public init(
     process: OpenCodeACPProcessTransportConfiguration,
     runDirectory: String,
-    resolvedExecutablePath: String
+    resolvedExecutablePath: String,
+    readOnlyModeID: String? = nil
   ) {
     self.process = process
     self.runDirectory = runDirectory
     self.resolvedExecutablePath = resolvedExecutablePath
+    self.readOnlyModeID = readOnlyModeID
   }
 }
 
@@ -98,7 +101,8 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
     projectRoot: String,
     runDirectory: String,
     persistentStateDirectory: String? = nil,
-    networkAllowed _: Bool,
+    networkAllowed: Bool,
+    readOnly: Bool? = nil,
     sourceEnvironment: [String: String] = ProcessInfo.processInfo.environment
   ) throws -> OpenCodeACPLaunchConfiguration {
     guard installation.providerID == .openCode else {
@@ -107,12 +111,16 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
     let executable = try Self.resolveExecutable(installation.executablePath)
     let project = try Self.canonicalExistingDirectory(projectRoot, field: "projectRoot")
     let runtime = try Self.prepareRunDirectory(runDirectory)
-    let environment = try Self.environment(
+    var environment = try Self.environment(
       executable: executable,
       runDirectory: runtime,
       persistentStateDirectory: persistentStateDirectory,
       source: sourceEnvironment
     )
+    let policy = (readOnly ?? !networkAllowed) ? OpenCodeACPReadOnlyPolicy() : nil
+    if let policy {
+      environment["OPENCODE_CONFIG_CONTENT"] = try policy.configuration()
+    }
     let argv = [
       executable,
       "acp",
@@ -129,7 +137,8 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
         maximumLifetime: maximumLifetime
       ),
       runDirectory: runtime,
-      resolvedExecutablePath: executable
+      resolvedExecutablePath: executable,
+      readOnlyModeID: policy?.modeID
     )
   }
 

@@ -195,7 +195,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     header: BridgeDesktopPageHeader,
     projects: [BridgeDesktopChoice] = [],
     selectedProjectID: String? = nil,
-    permissionMode: String = "workspace-write",
+    permissionMode: String = "full",
     permissionOptions: [BridgeDesktopChoice] = [],
     tasks: [BridgeDesktopTaskRow] = [],
     selectedTaskID: String? = nil,

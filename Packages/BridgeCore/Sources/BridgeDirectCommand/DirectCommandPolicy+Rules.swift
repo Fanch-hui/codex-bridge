@@ -224,16 +224,10 @@ extension DirectCommandPolicy {
     let needsNetwork =
       matched?.requiresNetwork == true || matchedBuiltInRule?.requiresNetwork == true
       || request.requiresNetwork
-    if needsNetwork {
-      guard project.accessPolicy.network != .denied else { return .denied(.networkNotAllowed) }
-    }
-    guard project.accessPolicy.write != .denied else { return .denied(.writeNotAllowed) }
 
     let risk = matched?.risk ?? .normal
     let requiresApproval =
       risk == .elevated
-      || project.accessPolicy.write == .requiresLocalApproval
-      || (needsNetwork && project.accessPolicy.network == .requiresLocalApproval)
       || requiresUnregisteredApproval
     let executionArgv: [String]
     let commandName = DirectPathSemantics.basename(policyArgv.first ?? "").lowercased()

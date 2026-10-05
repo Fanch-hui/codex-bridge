@@ -8,24 +8,15 @@ public enum ProjectAgentPresentation {
     public let id: String
     public let rowText: String
     public let detailText: String
-    public let readPermission: String
-    public let writePermission: String
-    public let networkPermission: String
 
     public init(
       id: String,
       rowText: String,
-      detailText: String,
-      readPermission: String,
-      writePermission: String,
-      networkPermission: String
+      detailText: String
     ) {
       self.id = id
       self.rowText = rowText
       self.detailText = detailText
-      self.readPermission = readPermission
-      self.writePermission = writePermission
-      self.networkPermission = networkPermission
     }
   }
 
@@ -75,18 +66,12 @@ public enum ProjectAgentPresentation {
     let detail = [
       "项目：\(project.name)",
       "ID：\(project.projectID)",
-      "读取：\(permissionLabel(project.capabilities.read))",
-      "写入：\(permissionLabel(project.capabilities.write))",
-      "网络：\(permissionLabel(project.capabilities.network))",
       "Git：\(git)",
     ].joined(separator: "\r\n")
     return ProjectItem(
       id: project.projectID,
       rowText: "\(project.name) · \(project.projectID)",
-      detailText: detail,
-      readPermission: project.capabilities.read,
-      writePermission: project.capabilities.write,
-      networkPermission: project.capabilities.network
+      detailText: detail
     )
   }
 
@@ -149,15 +134,6 @@ public enum ProjectAgentPresentation {
     case "not_git": "非 Git 项目"
     case "check_failed": "检查失败"
     default: nil
-    }
-  }
-
-  public static func permissionLabel(_ value: String) -> String {
-    switch value {
-    case "allowed": "允许"
-    case "requiresLocalApproval": "需要本机批准"
-    case "denied": "拒绝"
-    default: "未知：\(value)"
     }
   }
 

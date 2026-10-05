@@ -51,7 +51,7 @@
     public var selectedProjectID: String? = nil
     public var permissionRows: [String]
     public var selectedPermissionIndex: Int?
-    public var permissionMode: String = "workspace-write"
+    public var permissionMode: String = "full"
     public var taskRows: [String]
     public var recentTaskRows: [String]
     public var recentTasks: [WindowsRecentTaskPresentation] = []
@@ -181,7 +181,7 @@
     }
     var selectedThreadID: String?
     var selectedThreadPage: MCPThreadReadPage?
-    var workbenchPermissionMode = "workspace-write"
+    var workbenchPermissionMode = "full"
     var isChatBrowserEnabled = true
     var selectedTaskID: String?
     var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
@@ -225,6 +225,7 @@
     var taskRefreshInProgress = false
     var isWindowVisible = true
     var connectionGeneration: UInt64 = 0
+    let serviceConnectionCoordinator = ServiceConnectionCoordinator()
 
     public convenience init() {
       self.init(feedback: WindowsDesktopFeedbackStore())

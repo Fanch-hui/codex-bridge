@@ -175,7 +175,7 @@
       return try await client.setAgentDefaults(
         providerID: providerID,
         model: resolution.defaultWasRemoved ? nil : persistedDefault.model,
-        permissionMode: providerID == "opencode" ? persistedDefault.permissionMode : nil,
+        permissionMode: persistedDefault.permissionMode,
         effort: nil
       )
     }

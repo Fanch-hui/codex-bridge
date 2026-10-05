@@ -209,8 +209,6 @@ public struct ProjectChangesResult: Codable, Equatable, Sendable {
 
 public enum ProjectMutationError: Error, LocalizedError, Equatable, Sendable {
   case unknownProject
-  case writeNotAllowed
-  case readNotAllowed
   case forbiddenPath
   case invalidRequest
   case pathExists
@@ -235,10 +233,6 @@ public enum ProjectMutationError: Error, LocalizedError, Equatable, Sendable {
     switch self {
     case .unknownProject:
       "The project identifier is not registered."
-    case .writeNotAllowed:
-      "The project does not allow remote writes."
-    case .readNotAllowed:
-      "The project does not allow remote file reads."
     case .forbiddenPath:
       "The path is blocked by the project policy."
     case .invalidRequest:

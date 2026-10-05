@@ -108,7 +108,6 @@
         selectedCommandID: selectedCommandID,
         selectedSkillID: selectedSkillID,
         selectedThreadID: selectedThreadID,
-        fileWritePermission: detail?.directWorkspace?.fileWritePermission ?? "denied",
         commands: desktopCommands,
         blacklist: desktopBlacklist,
         skills: desktopSkills,

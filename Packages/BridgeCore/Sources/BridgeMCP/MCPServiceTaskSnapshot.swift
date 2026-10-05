@@ -19,7 +19,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
   public let providerSessionID: String?
   public let providerRunID: String?
   public let permissionMode: String?
-  public let networkAccess: Bool
+  public var networkAccess: Bool { permissionMode == "full" }
   public let currentStep: String?
   public let changedFiles: [String]
   public let attachmentPaths: [String]
@@ -53,7 +53,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     providerSessionID: String? = nil,
     providerRunID: String? = nil,
     permissionMode: String? = nil,
-    networkAccess: Bool = false,
+    networkAccess _: Bool = false,
     currentStep: String? = nil,
     changedFiles: [String] = [],
     attachmentPaths: [String] = [],
@@ -89,8 +89,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     self.turnID = turnID
     self.providerSessionID = providerSessionID
     self.providerRunID = providerRunID
-    self.permissionMode = permissionMode
-    self.networkAccess = networkAccess
+    self.permissionMode = permissionMode == "workspace-write" ? "full" : permissionMode
     self.currentStep = currentStep
     self.changedFiles = changedFiles
     self.attachmentPaths = attachmentPaths
@@ -154,6 +153,44 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     case waitPolicy = "wait_policy"
   }
 
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encodeIfPresent(usage, forKey: .usage)
+    try container.encodeIfPresent(pendingUserInput, forKey: .pendingUserInput)
+    try container.encode(taskID, forKey: .taskID)
+    try container.encode(projectID, forKey: .projectID)
+    try container.encodeIfPresent(prompt, forKey: .prompt)
+    try container.encodeIfPresent(source, forKey: .source)
+    try container.encodeIfPresent(sourceClientID, forKey: .sourceClientID)
+    try container.encode(status, forKey: .status)
+    try container.encodeIfPresent(providerID, forKey: .providerID)
+    try container.encodeIfPresent(installationID, forKey: .installationID)
+    try container.encodeIfPresent(executionModel, forKey: .executionModel)
+    try container.encodeIfPresent(executionEffort, forKey: .executionEffort)
+    try container.encodeIfPresent(threadID, forKey: .threadID)
+    try container.encodeIfPresent(turnID, forKey: .turnID)
+    try container.encodeIfPresent(providerSessionID, forKey: .providerSessionID)
+    try container.encodeIfPresent(providerRunID, forKey: .providerRunID)
+    try container.encodeIfPresent(permissionMode, forKey: .permissionMode)
+    try container.encode(networkAccess, forKey: .networkAccess)
+    try container.encodeIfPresent(currentStep, forKey: .currentStep)
+    try container.encode(changedFiles, forKey: .changedFiles)
+    try container.encode(attachmentPaths, forKey: .attachmentPaths)
+    try container.encode(recentEvents, forKey: .recentEvents)
+    try container.encode(recentActivity, forKey: .recentActivity)
+    try container.encode(recentActivityAvailable, forKey: .recentActivityAvailable)
+    try container.encode(supervisorStatus, forKey: .supervisorStatus)
+    try container.encodeIfPresent(supervisorSummary, forKey: .supervisorSummary)
+    try container.encode(localApprovalRequired, forKey: .localApprovalRequired)
+    try container.encodeIfPresent(resultSummary, forKey: .resultSummary)
+    try container.encodeIfPresent(failureCode, forKey: .failureCode)
+    try container.encode(updatedAt, forKey: .updatedAt)
+    try container.encodeIfPresent(queuePosition, forKey: .queuePosition)
+    try container.encodeIfPresent(queueOccupantTaskID, forKey: .queueOccupantTaskID)
+    try container.encodeIfPresent(queueRequestedAt, forKey: .queueRequestedAt)
+    try container.encode(waitPolicy, forKey: .waitPolicy)
+  }
+
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     usage = try container.decodeIfPresent(AgentUsageStatistics.self, forKey: .usage)
@@ -173,8 +210,8 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     turnID = try container.decodeIfPresent(String.self, forKey: .turnID)
     providerSessionID = try container.decodeIfPresent(String.self, forKey: .providerSessionID)
     providerRunID = try container.decodeIfPresent(String.self, forKey: .providerRunID)
-    permissionMode = try container.decodeIfPresent(String.self, forKey: .permissionMode)
-    networkAccess = try container.decodeIfPresent(Bool.self, forKey: .networkAccess) ?? false
+    let storedPermissionMode = try container.decodeIfPresent(String.self, forKey: .permissionMode)
+    permissionMode = storedPermissionMode == "workspace-write" ? "full" : storedPermissionMode
     currentStep = try container.decodeIfPresent(String.self, forKey: .currentStep)
     changedFiles = try container.decodeIfPresent([String].self, forKey: .changedFiles) ?? []
     attachmentPaths = try container.decodeIfPresent([String].self, forKey: .attachmentPaths) ?? []

@@ -26,49 +26,18 @@ extension BridgeServiceApplication {
   }
 
   func readableProject(_ rawID: String) async throws -> ServiceProjectRecord {
-    let project = try await managedProject(rawID)
-    guard project.accessPolicy.read == .allowed else {
-      throw BridgeMCPQueryError.pathDenied
-    }
-    return project
+    try await managedProject(rawID)
   }
 
   static func permissionMode(
     _ rawValue: String?,
-    project: ServiceProjectRecord,
-    defaultMode: ServicePermissionMode? = nil
+    defaultMode: ServicePermissionMode = .full
   ) throws -> ServicePermissionMode {
-    if let rawValue {
-      guard let mode = ServicePermissionMode(rawValue: rawValue) else {
-        throw BridgeMCPQueryError.contractRejected
-      }
-      if mode == .workspaceWrite, project.accessPolicy.write == .denied {
-        throw BridgeMCPQueryError.contractRejected
-      }
-      return mode
-    }
-    guard let defaultMode else {
-      return project.accessPolicy.write == .denied ? .readOnly : .workspaceWrite
-    }
-    if defaultMode == .workspaceWrite, project.accessPolicy.write == .denied {
-      return .readOnly
-    }
-    return defaultMode
-  }
-
-  static func permissionModeRequest(
-    _ rawValue: String?,
-    override: Bool?,
-    requirePermissionModeOverride: Bool
-  ) throws -> String? {
-    guard let rawValue else { return nil }
+    guard let rawValue else { return defaultMode }
     guard let mode = ServicePermissionMode(rawValue: rawValue) else {
       throw BridgeMCPQueryError.contractRejected
     }
-    if requirePermissionModeOverride, override != true {
-      return nil
-    }
-    return mode.rawValue
+    return mode
   }
 
   static func prompt(_ prompt: String, acceptanceCriteria: [String]) -> String {
@@ -85,7 +54,6 @@ extension BridgeServiceApplication {
     MCPProjectSummary(
       projectID: source.id.rawValue,
       name: safe(source.name, maximum: 1_024),
-      capabilities: capabilities(source.accessPolicy),
       gitState: gitState
     )
   }
@@ -96,11 +64,9 @@ extension BridgeServiceApplication {
     MCPProjectDetail(
       projectID: project.id.rawValue,
       name: safe(project.name, maximum: 1_024),
-      capabilities: capabilities(project.accessPolicy),
       gitState: gitState,
       verificationCommands: [],
       directWorkspace: MCPDirectWorkspace(
-        fileWritePermission: project.accessPolicy.write.rawValue,
         commandMode: project.directCommandMode.rawValue,
         commands: project.workspaceCommands.map(Self.projectCommand),
         commandBlacklist: project.commandBlacklist.map(Self.blacklistRule)
@@ -115,14 +81,6 @@ extension BridgeServiceApplication {
         ? $0.id.rawValue < $1.id.rawValue
         : order == .orderedAscending
     }
-  }
-
-  static func capabilities(_ policy: ProjectAccessPolicy) -> MCPProjectCapabilities {
-    MCPProjectCapabilities(
-      read: policy.read.rawValue,
-      write: policy.write.rawValue,
-      network: policy.network.rawValue
-    )
   }
 
   static func projectCommand(_ command: ServiceWorkspaceCommand) -> MCPProjectCommand {

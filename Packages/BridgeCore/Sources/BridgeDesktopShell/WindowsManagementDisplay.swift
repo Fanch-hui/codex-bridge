@@ -2,20 +2,12 @@
   import BridgeDesktopUI
   import Foundation
 
-  struct WindowsProjectPolicy: Equatable, Sendable {
-    let read: String
-    let write: String
-    let network: String
-  }
-
   struct WindowsProjectManagementDisplay: Equatable, Sendable {
     let rows: [String]
     let selectedIndex: Int?
     let detailText: String
-    let policy: WindowsProjectPolicy?
     let registerEnabled: Bool
     let removeEnabled: Bool
-    let savePolicyEnabled: Bool
     let statusText: String
     var projectItems: [BridgeDesktopProjectRow] = []
   }

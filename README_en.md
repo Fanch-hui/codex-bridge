@@ -6,24 +6,24 @@
 
 Codex Bridge is a self-hosted desktop app and background service that connects ChatGPT on the web, [OpenAI Dot](#use-with-openai-dot), Qwen Studio, and a local workbench to explicitly authorized projects. It manages tasks, approvals, and conversations across Codex, OpenCode, DeepSeek Harness, Antigravity, Pi, and Qoder.
 
-macOS, Windows, and Linux share the Swift core and desktop UI. Project permissions, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
+macOS, Windows, and Linux share the Swift core and desktop UI. Project directory authorizations, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is `v1.4.0`.
+The current release is `v1.4.1`.
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest).
 
-| Platform | v1.4.0 package | Installation |
+| Platform | v1.4.1 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-1.4.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| macOS 14+, Intel | `CodexBridge-1.4.0-macos-x86_64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.4.0-Setup.exe` | Run the installer and choose an installation folder |
-| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.0-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-1.4.1-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| macOS 14+, Intel | `CodexBridge-1.4.1-macos-x86_64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.4.1-Setup.exe` | Run the installer and choose an installation folder |
+| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.1-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64 / ARM64, portable | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.0.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.0.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64, portable | `codex-bridge-linux-x64-1.4.0.tar.gz` / `codex-bridge-linux-arm64-1.4.0.tar.gz` | Extract the complete archive and run `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.1.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.1.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64, portable | `codex-bridge-linux-x64-1.4.1.tar.gz` / `codex-bridge-linux-arm64-1.4.1.tar.gz` | Extract the complete archive and run `./codex-bridge` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
 
@@ -78,12 +78,12 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 
 ## First setup
 
-**For local file access and command execution, register a project and configure its permissions, then set up the Tunnel and add and enable the Codex Bridge plugin. No agent installation or connection is required.** Direct Workspace performs these operations under the project's permissions, Direct execution rules, and approval settings.
+**For local file access and command execution, register a project directory, then set up the Tunnel and add and enable the Codex Bridge plugin. No agent installation or connection is required.** Direct Workspace performs these operations under the registered project directory, Direct execution rules, and approval settings.
 
 ### Local files and commands
 
 1. Open the app and confirm that the background service is connected. Approve the macOS background item if prompted.
-2. Register a local project and set its read, write, and network permissions.
+2. Register a local project directory to authorize full access to that directory.
 3. For ChatGPT / Dot, follow the [Tunnel guide](./docs/CHATGPT_DEVELOPER_MODE.md) to configure the Tunnel and add and enable the plugin (ChatGPT requires Plus or higher, or a Team subscription). Qwen Studio uses loopback HTTP MCP; the Connections page provides its configuration.
 4. In a conversation with the plugin enabled, ask it to read or edit project files or run commands. Handle any required approvals in Bridge.
 
@@ -92,14 +92,14 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 To delegate work to Codex, OpenCode, DeepSeek Harness, or another agent, complete these additional steps:
 
 1. Bridge discovers existing agents on first initialization; click **Connect** on the Connections page to verify and enable them. The additional **One-click setup** action prepares missing software and dependencies, then guides you through native sign-in or API configuration. See the [setup guide (Chinese)](./docs/AGENT_SETUP_GUIDE.md). Codex uses the local Codex execution channel.
-2. Select a project, agent, and `Read Only` or `Write` in the workbench, and configure that agent's model preferences.
+2. Select a project, agent, and **Read Only** or **Full** in the workbench, and configure its model preferences. Full includes writes and network tools; Read Only allows neither. ChatGPT/Qwen tasks inherit the default task permission selected by the user in the workbench.
 3. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
 
 Credentials are managed through the operating system credential store. Remove credentials before sharing configuration, logs, or screenshots.
 
 ## Use with OpenAI Dot
 
-**Dot can read and edit local project files and run commands directly through Codex Bridge, without installing or connecting an agent or starting Work or Codex.** The local Bridge service performs these operations through Direct Workspace, using the project's permissions, Direct execution rules, and approval settings. The project maintainer has tested file access through this workflow and reports a better plugin experience with Dot.
+**Dot can read and edit local project files and run commands directly through Codex Bridge, without installing or connecting an agent or starting Work or Codex.** The local Bridge service performs these operations through Direct Workspace, using the registered project directory, Direct execution rules, and approval settings. The project maintainer has tested file access through this workflow and reports a better plugin experience with Dot.
 
 After [connecting the ChatGPT plugin](./docs/CHATGPT_DEVELOPER_MODE.md), enable Codex Bridge for your account and keep its connection active, then ask Dot to work directly with an authorized project. Existing plugin permissions apply; see OpenAI's [plugin connection guide](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps).
 
@@ -119,7 +119,7 @@ After [connecting the ChatGPT plugin](./docs/CHATGPT_DEVELOPER_MODE.md), enable 
 - **Direct Workspace:** controlled file access, patches, command execution, and Git operations.
 - **Skills:** local discovery, read-only inspection, and explicit actions.
 
-Effective capabilities depend on the agent, its connection probe, and project permissions. Requests without `project_id` use the workbench default project; requests without `provider_id` use Codex.
+Effective capabilities depend on the agent, its connection probe, the registered project directory, and user-selected task permissions. Requests without `project_id` use the workbench default project; requests without `provider_id` use Codex.
 
 ## Task concurrency limits
 

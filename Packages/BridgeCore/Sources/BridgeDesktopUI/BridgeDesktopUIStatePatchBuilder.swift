@@ -1,7 +1,8 @@
 /// Produces a small patch when the new state differs only in a patchable
-/// workbench domain. It deliberately falls back to a full snapshot for any
-/// ambiguous change so the page never applies a partial state over the wrong
-/// base revision.
+/// domain: the workbench collections, the selected task's conversation, or
+/// the volatile page domains (overview, connections, logs, appUpdate). It
+/// deliberately falls back to a full snapshot for any ambiguous change so
+/// the page never applies a partial state over the wrong base revision.
 public struct BridgeDesktopUIStatePatchBuilder: Sendable {
   private var previousState: BridgeDesktopUIState?
   private var previousRevision: UInt64?
@@ -23,10 +24,14 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       return .full(state: state, nextRevision: nextRevision)
     }
 
-    let changes = patchChanges(from: previousState, to: state)
-    guard !changes.isEmpty else {
+    guard let changes = patchChanges(from: previousState, to: state) else {
+      // The change cannot be expressed as a patch (selection, workbench
+      // shell, unknown domain); only a full snapshot can carry it.
       return .full(state: state, nextRevision: nextRevision)
     }
+    // An empty change set is a provable no-op (for example a poll tick that
+    // only refreshed timestamps); keep the revision chain advancing with an
+    // empty patch instead of re-shipping the full state.
     return BridgeDesktopUIStatePatch(
       baseRevision: previousRevision,
       nextRevision: nextRevision,
@@ -44,15 +49,31 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
   private func patchChanges(
     from old: BridgeDesktopUIState,
     to new: BridgeDesktopUIState
-  ) -> [BridgeDesktopUIStatePatch.Change] {
+  ) -> [BridgeDesktopUIStatePatch.Change]? {
+    // Identical states are the canonical provable no-op, whatever their shape.
+    // Without this, a state without a workbench (any non-workbench page)
+    // would re-ship in full on every poll tick that changed nothing.
+    guard old != new else { return [] }
     guard sameGlobalState(old, new), let oldWorkbench = old.workbench,
       let newWorkbench = new.workbench,
       sameWorkbenchShell(oldWorkbench, newWorkbench)
     else {
-      return []
+      return nil
     }
 
     var changes: [BridgeDesktopUIStatePatch.Change] = []
+    if old.overview != new.overview {
+      changes.append(.overview(new.overview))
+    }
+    if old.connections != new.connections {
+      changes.append(.connection(new.connections))
+    }
+    if old.logs != new.logs {
+      changes.append(.logs(new.logs))
+    }
+    if old.appUpdate != new.appUpdate {
+      changes.append(.appUpdate(new.appUpdate))
+    }
     if oldWorkbench.browser != newWorkbench.browser {
       changes.append(.browser(newWorkbench.browser))
     }
@@ -69,7 +90,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     }
 
     guard oldWorkbench.selectedTaskID == newWorkbench.selectedTaskID else {
-      return []
+      return nil
     }
     switch (oldWorkbench.selectedTask, newWorkbench.selectedTask) {
     case (let oldTask?, let newTask?) where taskMetadataEqual(oldTask, newTask):
@@ -81,11 +102,15 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     case (nil, nil):
       break
     default:
-      return []
+      return nil
     }
     return changes
   }
 
+  /// Everything a patch cannot express must be identical for the patch path.
+  /// The volatile page domains (overview, connections, logs, appUpdate) are
+  /// excluded here: they churn on every poll tick or log line and are carried
+  /// by their own change kinds instead of forcing a full snapshot.
   private func sameGlobalState(
     _ old: BridgeDesktopUIState,
     _ new: BridgeDesktopUIState
@@ -97,12 +122,8 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.connectionTone == new.connectionTone
       && old.isRefreshing == new.isRefreshing
       && old.feedback == new.feedback
-      && old.overview == new.overview
       && old.projects == new.projects
-      && old.logs == new.logs
-      && old.connections == new.connections
       && old.settings == new.settings
-      && old.appUpdate == new.appUpdate
   }
 
   private func sameWorkbenchShell(
@@ -128,6 +149,10 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.commandReceipt == new.commandReceipt
   }
 
+  /// Equality for the content of the selected task. `updatedAt` is
+  /// deliberately excluded: the 2-second poll ticks it for every running
+  /// task, and treating that as a metadata change re-ships the whole task
+  /// detail (conversation included) on every poll.
   private func taskMetadataEqual(
     _ old: BridgeDesktopTaskDetail,
     _ new: BridgeDesktopTaskDetail
@@ -155,7 +180,6 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.turnCount == new.turnCount
       && old.canResume == new.canResume
       && old.canRestart == new.canRestart
-      && old.updatedAt == new.updatedAt
       && old.queuePosition == new.queuePosition
       && old.queueOccupantTaskID == new.queueOccupantTaskID
       && old.queueRequestedAt == new.queueRequestedAt

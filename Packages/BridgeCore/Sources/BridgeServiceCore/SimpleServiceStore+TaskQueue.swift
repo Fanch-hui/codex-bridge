@@ -121,7 +121,7 @@ extension SimpleServiceStore {
         guard existing.isQueued else { return nil }
         guard
           try
-            (existing.permissionMode != .workspaceWrite
+            (existing.permissionMode != .full
             || Self.activeWriteTaskRow(projectID: existing.projectID, in: db) == nil)
         else { return nil }
         guard try Self.projectRow(id: existing.projectID, in: db) != nil else {

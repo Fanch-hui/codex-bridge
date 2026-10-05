@@ -118,9 +118,7 @@ extension BridgeDesktopCommandRouter {
     _ value: String,
     providerID: String
   ) -> String? {
-    let writable = providerID == "opencode" ? "build" : "workspace-write"
-    let readOnly = providerID == "opencode" || providerID == "antigravity" ? "plan" : "read-only"
-    return value == writable || value == readOnly ? value : nil
+    return ["read-only", "full"].contains(value) ? value : nil
   }
 
   private static func saveSettings(

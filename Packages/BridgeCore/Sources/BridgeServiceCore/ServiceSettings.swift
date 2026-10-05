@@ -241,7 +241,7 @@ public actor ServiceSettings {
 
   public func workbenchPermissionMode() async throws -> ServicePermissionMode {
     guard let value = try await string(for: .workbenchPermissionMode) else {
-      return .workspaceWrite
+      return .full
     }
     guard let mode = ServicePermissionMode(rawValue: value) else {
       throw ServiceStoreError.corruptRecord
@@ -347,56 +347,27 @@ public actor ServiceSettings {
   }
 
   public func openCodeDefaultPermissionMode() async throws -> String {
-    guard let value = try await string(for: .openCodeDefaultPermissionMode) else {
-      return "build"
-    }
-    guard value == "build" || value == "plan" else {
-      throw ServiceStoreError.corruptRecord
-    }
-    return value
+    try await taskPermissionMode(for: .openCodeDefaultPermissionMode).rawValue
   }
 
   public func setOpenCodeDefaultPermissionMode(_ mode: String) async throws {
-    guard mode == "build" || mode == "plan" else {
-      throw ServiceStoreError.invalidArgument("agent.opencode.default_permission_mode")
-    }
-    try await set(mode, for: .openCodeDefaultPermissionMode)
+    try await setTaskPermissionMode(mode, for: .openCodeDefaultPermissionMode)
   }
 
   public func deepSeekHarnessDefaultPermissionMode() async throws -> String {
-    guard let value = try await string(for: .deepSeekHarnessDefaultPermissionMode) else {
-      return "workspace-write"
-    }
-    guard value == "workspace-write" || value == "read-only" else {
-      throw ServiceStoreError.corruptRecord
-    }
-    return value
+    try await taskPermissionMode(for: .deepSeekHarnessDefaultPermissionMode).rawValue
   }
 
   public func setDeepSeekHarnessDefaultPermissionMode(_ mode: String) async throws {
-    guard mode == "workspace-write" || mode == "read-only" else {
-      throw ServiceStoreError.invalidArgument("agent.deepseek-harness.default_permission_mode")
-    }
-    try await set(mode, for: .deepSeekHarnessDefaultPermissionMode)
+    try await setTaskPermissionMode(mode, for: .deepSeekHarnessDefaultPermissionMode)
   }
 
   public func antigravityDefaultPermissionMode() async throws -> String {
-    guard let value = try await string(for: .antigravityDefaultPermissionMode) else {
-      return "workspace-write"
-    }
-    guard value == "workspace-write" || value == "read-only" else {
-      throw ServiceStoreError.corruptRecord
-    }
-    return value
+    try await taskPermissionMode(for: .antigravityDefaultPermissionMode).rawValue
   }
 
   public func setAntigravityDefaultPermissionMode(_ mode: String) async throws {
-    guard mode == "workspace-write" || mode == "read-only" else {
-      throw ServiceStoreError.invalidArgument(
-        "agent.antigravity.default_permission_mode"
-      )
-    }
-    try await set(mode, for: .antigravityDefaultPermissionMode)
+    try await setTaskPermissionMode(mode, for: .antigravityDefaultPermissionMode)
   }
 
   public func antigravityDefaultModel() async throws -> String? {

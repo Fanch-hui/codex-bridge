@@ -5,8 +5,6 @@ public enum MCPCommandDenialReason: String, Codable, Equatable, Sendable {
   case commandModeDenied = "command_mode_denied"
   case commandNotRegistered = "command_not_registered"
   case invalidArguments = "invalid_command_arguments"
-  case networkDenied = "command_network_denied"
-  case writeDenied = "command_write_denied"
   case blacklisted = "command_blacklisted"
 }
 
@@ -24,6 +22,7 @@ public enum BridgeMCPQueryError: Error, Equatable, Sendable {
   case busy
   case timeout
   case unavailable
+  case agentPermissionUnsupported
   case nativeSessionDirectory(AgentNativeSessionDirectoryError)
   case agentModelCatalog(AgentModelCatalogError)
   /// The local Codex app-server could not be started, or failed while it was
@@ -36,7 +35,6 @@ public enum BridgeMCPQueryError: Error, Equatable, Sendable {
   case fileRevisionConflict
   case pathForbidden
   case pathChanged
-  case writeNotAllowed
   case approvalRequired(approvalID: String)
   case approvalExpired
   case approvalDenied
@@ -205,40 +203,24 @@ public struct BridgeStatusSnapshot: Codable, Equatable, Sendable {
   }
 }
 
-public struct MCPProjectCapabilities: Codable, Equatable, Sendable {
-  public let read: String
-  public let write: String
-  public let network: String
-
-  public init(read: String, write: String, network: String) {
-    self.read = read
-    self.write = write
-    self.network = network
-  }
-}
-
 public struct MCPProjectSummary: Codable, Equatable, Sendable {
   public let projectID: String
   public let name: String
-  public let capabilities: MCPProjectCapabilities
   public let gitState: String?
 
   public init(
     projectID: String,
     name: String,
-    capabilities: MCPProjectCapabilities,
     gitState: String? = nil
   ) {
     self.projectID = projectID
     self.name = name
-    self.capabilities = capabilities
     self.gitState = gitState
   }
 
   private enum CodingKeys: String, CodingKey {
     case projectID = "project_id"
     case name
-    case capabilities
     case gitState = "git_state"
   }
 }

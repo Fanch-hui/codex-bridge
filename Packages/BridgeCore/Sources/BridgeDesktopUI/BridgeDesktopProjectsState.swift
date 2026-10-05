@@ -6,9 +6,6 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
   public let name: String
   public let detail: String?
   public let gitState: String?
-  public let readPermission: String
-  public let writePermission: String
-  public let networkPermission: String
   public let selected: Bool
 
   public init(
@@ -16,18 +13,12 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
     name: String,
     detail: String? = nil,
     gitState: String? = nil,
-    readPermission: String,
-    writePermission: String,
-    networkPermission: String,
     selected: Bool = false
   ) {
     self.projectID = projectID
     self.name = name
     self.detail = detail
     self.gitState = gitState
-    self.readPermission = readPermission
-    self.writePermission = writePermission
-    self.networkPermission = networkPermission
     self.selected = selected
   }
 }
@@ -73,7 +64,6 @@ public struct BridgeDesktopBlacklistRule: Codable, Equatable, Sendable {
 }
 
 public struct BridgeDesktopWorkspaceState: Codable, Equatable, Sendable {
-  public let fileWritePermission: String
   public let commandMode: String
   public let commandModeOptions: [BridgeDesktopChoice]
   public let commands: [BridgeDesktopWorkspaceCommand]
@@ -85,7 +75,6 @@ public struct BridgeDesktopWorkspaceState: Codable, Equatable, Sendable {
   public let canRemoveBlacklist: Bool
 
   public init(
-    fileWritePermission: String,
     commandMode: String,
     commandModeOptions: [BridgeDesktopChoice] = [],
     commands: [BridgeDesktopWorkspaceCommand] = [],
@@ -96,7 +85,6 @@ public struct BridgeDesktopWorkspaceState: Codable, Equatable, Sendable {
     canSaveBlacklist: Bool = true,
     canRemoveBlacklist: Bool = true
   ) {
-    self.fileWritePermission = fileWritePermission
     self.commandMode = commandMode
     self.commandModeOptions = commandModeOptions
     self.commands = commands
@@ -165,10 +153,6 @@ public struct BridgeDesktopProjectsState: Codable, Equatable, Sendable {
   public let rows: [BridgeDesktopProjectRow]
   public let selectedProjectID: String?
   public let selectedProjectDetail: String?
-  public let policyOptions: [BridgeDesktopChoice]
-  public let readOptions: [BridgeDesktopChoice]
-  public let writeOptions: [BridgeDesktopChoice]
-  public let networkOptions: [BridgeDesktopChoice]
   public let workspace: BridgeDesktopWorkspaceState?
   public let verificationCommands: [String]
   public let threadCount: Int?
@@ -180,17 +164,12 @@ public struct BridgeDesktopProjectsState: Codable, Equatable, Sendable {
   public let skills: [BridgeDesktopSkillRow]
   public let canRegister: Bool
   public let canRemove: Bool
-  public let canSavePolicy: Bool
 
   public init(
     header: BridgeDesktopPageHeader,
     rows: [BridgeDesktopProjectRow] = [],
     selectedProjectID: String? = nil,
     selectedProjectDetail: String? = nil,
-    policyOptions: [BridgeDesktopChoice] = [],
-    readOptions: [BridgeDesktopChoice] = [],
-    writeOptions: [BridgeDesktopChoice] = [],
-    networkOptions: [BridgeDesktopChoice] = [],
     workspace: BridgeDesktopWorkspaceState? = nil,
     verificationCommands: [String] = [],
     threadCount: Int? = nil,
@@ -201,17 +180,12 @@ public struct BridgeDesktopProjectsState: Codable, Equatable, Sendable {
     selectedThreadConversation: [BridgeDesktopConversationEntry] = [],
     skills: [BridgeDesktopSkillRow] = [],
     canRegister: Bool = true,
-    canRemove: Bool = false,
-    canSavePolicy: Bool = false
+    canRemove: Bool = false
   ) {
     self.header = header
     self.rows = rows
     self.selectedProjectID = selectedProjectID
     self.selectedProjectDetail = selectedProjectDetail
-    self.policyOptions = policyOptions
-    self.readOptions = readOptions
-    self.writeOptions = writeOptions
-    self.networkOptions = networkOptions
     self.workspace = workspace
     self.verificationCommands = verificationCommands
     self.threadCount = threadCount
@@ -223,6 +197,5 @@ public struct BridgeDesktopProjectsState: Codable, Equatable, Sendable {
     self.skills = skills
     self.canRegister = canRegister
     self.canRemove = canRemove
-    self.canSavePolicy = canSavePolicy
   }
 }

@@ -81,6 +81,7 @@ public struct IPCTaskConversationPage: Codable, Equatable, Sendable {
 
 public struct IPCTaskConversationPush: Codable, Equatable, Sendable {
   public let taskID: String
+  public let messageID: Int64?
   public let key: String
   public let role: String
   public let kind: String
@@ -103,9 +104,11 @@ public struct IPCTaskConversationPush: Codable, Equatable, Sendable {
     final: Bool,
     toolName: String? = nil,
     toolStatus: String? = nil,
-    toolArguments: String? = nil
+    toolArguments: String? = nil,
+    messageID: Int64? = nil
   ) {
     self.taskID = taskID
+    self.messageID = messageID
     self.key = key
     self.role = role
     self.kind = kind
@@ -120,6 +123,7 @@ public struct IPCTaskConversationPush: Codable, Equatable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case taskID = "task_id"
+    case messageID = "message_id"
     case key
     case role
     case kind

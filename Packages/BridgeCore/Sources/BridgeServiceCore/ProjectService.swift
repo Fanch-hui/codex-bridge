@@ -23,7 +23,6 @@ public actor ServiceProjectService {
   public func register(
     name: String,
     rootURL: URL,
-    accessPolicy: ProjectAccessPolicy = .init(),
     id requestedID: ProjectID? = nil
   ) async throws -> ServiceProjectRecord {
     let date = now()
@@ -31,7 +30,6 @@ public actor ServiceProjectService {
       id: requestedID ?? makeProjectID(),
       name: name,
       root: ServiceRootIdentity(capturing: rootURL),
-      accessPolicy: accessPolicy,
       createdAt: date,
       updatedAt: date
     )
@@ -46,14 +44,6 @@ public actor ServiceProjectService {
 
   public func projects() async throws -> [ServiceProjectRecord] {
     try await store.projects()
-  }
-
-  @discardableResult
-  public func updateAccessPolicy(
-    _ policy: ProjectAccessPolicy,
-    projectID: ProjectID
-  ) async throws -> ServiceProjectRecord {
-    try await store.updateProjectAccessPolicy(policy, projectID: projectID, at: now())
   }
 
   @discardableResult

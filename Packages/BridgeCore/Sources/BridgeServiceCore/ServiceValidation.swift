@@ -53,16 +53,6 @@ enum ServiceValidation {
     }
   }
 
-  static func projectPolicy(_ policy: ProjectAccessPolicy) throws {
-    let allowed: Set<ProjectPermission> = [.denied, .requiresLocalApproval, .allowed]
-    guard allowed.contains(policy.read),
-      allowed.contains(policy.write),
-      allowed.contains(policy.network)
-    else {
-      throw ServiceStoreError.invalidArgument("project.accessPolicy")
-    }
-  }
-
   static func relativePath(_ value: String, field: String) throws {
     let components = value.split(separator: "/", omittingEmptySubsequences: false)
     guard !value.isEmpty,

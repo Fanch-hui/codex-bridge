@@ -56,10 +56,10 @@ extension BridgeServiceApplication {
       policy.supportsEffortSelection
       ? try await settings.string(for: defaults.effortKey) : nil
     let permission = try await agentSubmissionPermission(
-      submission: submission, policy: policy, defaults: defaults, project: project,
+      submission: submission, policy: policy, defaults: defaults,
       workbenchPermissionMode: workbenchPermissionMode)
     let effectiveCapabilities = try Self.agentSubmissionCapabilities(
-      submission: submission, policy: policy, record: record, project: project,
+      submission: submission, policy: policy, record: record,
       permission: permission, requestedModel: requestedModel, requestedEffort: requestedEffort)
     let supportsModelSelection = effectiveCapabilities.contains(.modelSelection)
     let resolvedModel = try Self.validatedAgentModel(
@@ -108,36 +108,24 @@ extension BridgeServiceApplication {
 
   private func agentSubmissionPermission(
     submission: MCPServiceTaskSubmission, policy: ServiceAgentProviderPolicy,
-    defaults: ServiceAgentDefaultSettings, project: ServiceProjectRecord,
+    defaults: ServiceAgentDefaultSettings,
     workbenchPermissionMode: ServicePermissionMode?
   ) async throws -> ServicePermissionMode {
-    let configuredMode = try await defaults.permissionMode(from: settings)
-    let providerDefaultMode: ServicePermissionMode =
-      configuredMode == defaults.readMode ? .readOnly : .workspaceWrite
-    let requestedPermissionMode = try Self.permissionModeRequest(
-      submission.permissionMode,
-      override: submission.permissionModeOverride,
-      requirePermissionModeOverride: workbenchPermissionMode != nil
-    )
-    if !policy.supportsWorkspaceWrite,
-      requestedPermissionMode == ServicePermissionMode.workspaceWrite.rawValue
-    {
-      throw BridgeMCPQueryError.contractRejected
+    let defaultMode: ServicePermissionMode
+    if let workbenchPermissionMode {
+      defaultMode = workbenchPermissionMode
+    } else {
+      let configuredMode = try await defaults.permissionMode(from: settings)
+      defaultMode = try Self.permissionMode(configuredMode)
     }
     let permission = try Self.permissionMode(
-      requestedPermissionMode,
-      project: project,
-      defaultMode: workbenchPermissionMode ?? providerDefaultMode
+      workbenchPermissionMode == nil ? submission.permissionMode : nil,
+      defaultMode: defaultMode
     )
-    guard policy.supportsWorkspaceWrite || permission != .workspaceWrite else {
+    guard policy.supportsWorkspaceWrite || permission != .full else {
       throw BridgeMCPQueryError.contractRejected
     }
-    guard !submission.networkAccess || project.accessPolicy.network != .denied else {
-      throw BridgeMCPQueryError.contractRejected
-    }
-    guard !submission.networkAccess || policy.allowsNetworkAccess else {
-      // Provider policies never persist a requested network grant as though
-      // the Bridge enforced it when the adapter has no task-level sandbox.
+    guard permission != .full || policy.allowsNetworkAccess else {
       throw BridgeMCPQueryError.unavailable
     }
     return permission
@@ -145,17 +133,19 @@ extension BridgeServiceApplication {
 
   private static func agentSubmissionCapabilities(
     submission: MCPServiceTaskSubmission, policy: ServiceAgentProviderPolicy,
-    record: ServiceAgentInstallationRecord, project: ServiceProjectRecord,
+    record: ServiceAgentInstallationRecord,
     permission: ServicePermissionMode, requestedModel: String?, requestedEffort: String?
   ) throws -> Set<AgentCapability> {
     let providerID = policy.providerID
     let effectiveCapabilities = policy.effectiveCapabilities(
-      record.capabilities.effective,
-      projectAllowsWorkspaceWrite: project.accessPolicy.write != .denied
+      record.capabilities.effective
     )
+    if permission == .readOnly, !effectiveCapabilities.contains(.readOnlyExecution) {
+      throw BridgeMCPQueryError.agentPermissionUnsupported
+    }
     let supportsModelSelection = effectiveCapabilities.contains(.modelSelection)
     let mutationIntent: AgentMutationIntent =
-      permission == .workspaceWrite ? .workspaceWrite : .readOnly
+      permission == .full ? .workspaceWrite : .readOnly
     if providerID == .pi || providerID == .qoder,
       !effectiveCapabilities.isSuperset(of: mutationIntent.requiredCapabilities(for: providerID))
     {

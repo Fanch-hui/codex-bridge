@@ -57,41 +57,6 @@
       }
     }
 
-    func saveSelectedProjectPolicy(
-      read: String,
-      write: String,
-      network: String,
-      projectID requestedProjectID: String? = nil
-    ) async {
-      guard let projectID = requestedProjectID ?? selectedProjectID else {
-        reportProjectFailure("请先选择要保存策略的项目。")
-        return
-      }
-      guard connectionState == .connected else {
-        reportProjectFailure("后台 Service 未连接，无法保存项目策略。")
-        return
-      }
-      guard !projectBusy else { return }
-      setProjectBusy(true)
-      setProjectStatus("正在保存项目策略…")
-      defer { setProjectBusy(false) }
-      do {
-        _ = try await client.updateProjectPolicy(
-          IPCProjectPolicyRequest(
-            projectID: projectID,
-            readPermission: read,
-            writePermission: write,
-            networkPermission: network
-          )
-        )
-        await refreshProjects()
-        reportProjectSuccess("项目策略已保存生效。", projectID: projectID)
-      } catch {
-        reportProjectFailure(
-          "项目策略保存失败：\(BridgeServiceErrorMessage.message(error))", projectID: projectID)
-      }
-    }
-
     func connectAgent(
       providerID: String,
       baseURL: String? = nil,

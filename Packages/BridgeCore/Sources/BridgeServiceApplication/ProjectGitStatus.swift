@@ -7,7 +7,6 @@ enum ProjectGitStatus {
   static func read(
     _ project: ServiceProjectRecord, deadline: ContinuousClock.Instant
   ) async -> String? {
-    guard project.accessPolicy.read == .allowed else { return nil }
     let remaining = ContinuousClock.now.duration(to: deadline)
     guard remaining > .zero else { return "check_failed" }
     do {

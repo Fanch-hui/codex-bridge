@@ -99,14 +99,11 @@ extension BridgeServiceApplication {
       )
       return false
     }
-    guard project.accessPolicy.read != .denied,
-      project.accessPolicy.write != .denied,
-      !task.networkAllowed || project.accessPolicy.network != .denied
-    else {
+    guard (try? project.root.validateCurrentIdentity()) != nil else {
       _ = try? await tasks.fail(
         taskID: task.id,
-        failureCode: "queued_policy_denied",
-        summary: "The project policy no longer allows this queued task."
+        failureCode: "queued_project_unavailable",
+        summary: "The registered project directory is no longer available."
       )
       return false
     }

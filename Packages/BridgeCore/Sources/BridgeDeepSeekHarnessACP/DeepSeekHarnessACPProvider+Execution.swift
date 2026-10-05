@@ -146,6 +146,9 @@ extension DeepSeekHarnessACPProvider {
     guard installation.providerID == .deepSeekHarness else {
       throw AgentRuntimeError.providerUnavailable(installation.providerID)
     }
+    guard request.mutationIntent != .readOnly else {
+      throw AgentRuntimeError.capabilityUnavailable(.readOnlyExecution)
+    }
     guard request.mutationIntent == .readOnly || request.mutationIntent == .workspaceWrite else {
       throw AgentRuntimeError.invalidRequest("request.mutationIntent")
     }

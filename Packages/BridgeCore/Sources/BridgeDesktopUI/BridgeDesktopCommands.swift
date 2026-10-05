@@ -43,7 +43,6 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case refreshProjects
   case registerProject
   case removeProject
-  case saveProjectPolicy
   case setProjectCommandMode
   case saveProjectCommand
   case removeProjectCommand
@@ -168,9 +167,6 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let executionModel: String?
   public let executionEffort: String?
   public let accessMode: String?
-  public let readPermission: String?
-  public let writePermission: String?
-  public let networkPermission: String?
   public let enabled: Bool?
   public let acceptReplacement: Bool?
   public let fastModeEnabled: Bool?
@@ -244,9 +240,6 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     executionModel: String? = nil,
     executionEffort: String? = nil,
     accessMode: String? = nil,
-    readPermission: String? = nil,
-    writePermission: String? = nil,
-    networkPermission: String? = nil,
     enabled: Bool? = nil,
     acceptReplacement: Bool? = nil,
     fastModeEnabled: Bool? = nil,
@@ -319,9 +312,6 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.executionModel = executionModel
     self.executionEffort = executionEffort
     self.accessMode = accessMode
-    self.readPermission = readPermission
-    self.writePermission = writePermission
-    self.networkPermission = networkPermission
     self.enabled = enabled
     self.acceptReplacement = acceptReplacement
     self.fastModeEnabled = fastModeEnabled

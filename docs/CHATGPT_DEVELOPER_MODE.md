@@ -1,15 +1,15 @@
 # ChatGPT 与 Secure MCP Tunnel 配置指南
 
-适用于 Codex Bridge v1.2.0 的 macOS 与 Windows 版本。完成顺序：准备 Bridge 和项目权限 → 创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 添加并启用插件 → 直接操作项目。
+适用于 Codex Bridge v1.2.0 的 macOS 与 Windows 版本。完成顺序：准备 Bridge 并登记项目 → 创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 添加并启用插件 → 直接操作项目。
 
-**如果只需要本地文件读写、运行命令，配置好 Tunnel 并添加、启用 Codex Bridge 插件即可，无需安装或连接 Agent，也无需配置 Agent 模型。** 操作由 Bridge 的 Direct Workspace 执行，沿用项目权限、Direct 执行规则与审批设置。需要委派 Agent 执行任务时，再连接相应 Agent。
+**如果只需要本地文件读写、运行命令，配置好 Tunnel 并添加、启用 Codex Bridge 插件即可，无需安装或连接 Agent，也无需配置 Agent 模型。** 操作由 Bridge 的 Direct Workspace 执行，按已登记的项目目录、Direct 执行规则与审批设置。需要委派 Agent 执行任务时，再连接相应 Agent。
 
 ## 1. 准备 Bridge
 
 1. 从 [Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 安装对应平台版本。
 2. 打开 App，在概览中确认后台 Service 已连接。
-3. 在“项目”添加一个本地目录并允许读取。
-4. 在工作台选择该项目和 `Read Only`。
+3. 在“项目”登记一个本地目录，登记即授权完整访问。
+4. 在工作台选择该项目；委派任务时由用户选择“只读”或“完整”。
 5. 在“连接”确认 Secure MCP 隧道的 Helper 显示“就绪”。发布安装包已包含 Helper。
 
 Bridge 自动运行随包 `tunnel-client`，并把收到的请求转发给本机 MCP 服务。正常使用不需要另开终端运行 Helper。
@@ -100,11 +100,11 @@ Tunnel 表单使用 Tunnel ID，不填写本机 `127.0.0.1` 地址。Runtime Key
 请通过 Codex Bridge 直接读取当前项目的 README，说明项目用途。
 ```
 
-文件修改与命令执行同样可以直接调用 Bridge 工具，按项目权限、Direct 执行规则和审批设置处理。需要批准时，在 Bridge 核对操作后批准。完整操作说明见 [Direct 与 Skills](./USER_GUIDE.md#11-direct-与-skills)。
+文件修改与命令执行同样可以直接调用 Bridge 工具，按已登记的项目目录、Direct 执行规则和审批设置处理。需要批准时，在 Bridge 核对操作后批准。完整操作说明见 [Direct 与 Skills](./USER_GUIDE.md#11-direct-与-skills)。
 
 ### 委派 Agent 任务（可选）
 
-需要 Agent 执行任务时，先在 Bridge 连接该 Agent 并配置模型，然后选好项目、Agent 和 `Read Only`，再输入：
+需要 Agent 执行任务时，先在 Bridge 连接该 Agent 并配置模型，然后选好项目、Codex Agent 和“只读”，再输入：
 
 ```text
 请通过 Codex Bridge 的 Codex Agent 检查当前项目 README，总结项目用途，不修改文件。
@@ -112,9 +112,9 @@ Tunnel 表单使用 Tunnel ID，不填写本机 `127.0.0.1` 地址。Runtime Key
 
 默认远程任务会等待本机批准。在 Bridge 工作台核对项目和任务内容，点击批准，查看实时输出。运行中若出现工具审批或结构化问题，在工作台处理；批准启动与执行期审批各自独立。
 
-若希望使用 DeepSeek Harness，请明确说“使用 DeepSeek Harness”，客户端应发送 `provider_id=deepseek-harness`。先按 [DSH 配置指南](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) 完成连接。
+若希望使用 DeepSeek Harness，请明确说“使用 DeepSeek Harness”，客户端应发送 `provider_id=deepseek-harness`。先按 [DSH 配置指南](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) 完成连接，并由用户在工作台选择“完整”；DSH 当前不支持工具禁网的只读任务。
 
-Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task`；实测订阅用户都可以使用完整权限的 MCP，实际执行仍服从项目策略和审批。工具目录变更或 App 更新后，请在 ChatGPT 刷新 Codex Bridge 插件/重新扫描工具。
+Bridge 为 ChatGPT 和 Qwen 默认提供完整工具目录，包括 `submit_task`；实测订阅用户都可以使用完整权限的 MCP，实际执行仍服从用户选择的任务权限、命令规则和审批。工具目录变更或 App 更新后，请在 ChatGPT 刷新 Codex Bridge 插件/重新扫描工具。
 
 ## 8. 版本更新后在 ChatGPT 刷新插件（防旧版缓存）
 
@@ -152,4 +152,4 @@ Codex Bridge 升级新版本后，ChatGPT 网页端可能会保留旧版的工�
 - 提交后先获得任务 ID，再用 `wait_task` 等待结果，默认最多 300 秒；完成、审批或补充信息会提前返回。到点仍在执行时，客户端自行决定何时用 `get_task` 查询状态和保存的结果。等待结束或连接断开不取消 Agent 任务。
 - Tunnel 暂时断线不等于本机任务失败；恢复后可继续查询。
 - 本机工作台可直接提交任务，不依赖 ChatGPT Tunnel。
-- 使用与项目权限、Qwen、模型选择相关的完整流程，见 [详细使用指南](./USER_GUIDE.md)。
+- 使用与项目授权、Qwen、模型选择相关的完整流程，见 [详细使用指南](./USER_GUIDE.md)。

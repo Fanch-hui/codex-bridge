@@ -11,7 +11,6 @@ actor ProjectGitStatusCache {
   private var pending: [String: Task<String?, Never>] = [:]
 
   func read(_ project: ServiceProjectRecord, deadline: ContinuousClock.Instant) async -> String? {
-    guard project.accessPolicy.read == .allowed else { return nil }
     let key = project.id.rawValue + "|" + project.root.canonicalPath
     if let entry = entries[key], entry.path == project.root.canonicalPath,
       entry.checkedAt.duration(to: .now) < .seconds(20)

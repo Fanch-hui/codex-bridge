@@ -2,35 +2,6 @@ import BridgeDomain
 import BridgeSecurity
 import Foundation
 
-public struct ProjectPermission: RawRepresentable, Codable, Equatable, Hashable, Sendable {
-  public let rawValue: String
-
-  public init(rawValue: String) {
-    self.rawValue = rawValue
-  }
-
-  public static let denied = ProjectPermission(rawValue: "denied")
-  public static let requiresLocalApproval = ProjectPermission(
-    rawValue: "requiresLocalApproval")
-  public static let allowed = ProjectPermission(rawValue: "allowed")
-}
-
-public struct ProjectAccessPolicy: Codable, Equatable, Sendable {
-  public let read: ProjectPermission
-  public let write: ProjectPermission
-  public let network: ProjectPermission
-
-  public init(
-    read: ProjectPermission = .allowed,
-    write: ProjectPermission = .requiresLocalApproval,
-    network: ProjectPermission = .denied
-  ) {
-    self.read = read
-    self.write = write
-    self.network = network
-  }
-}
-
 public struct VerificationCommand: Codable, Equatable, Sendable {
   public let executable: String
   public let arguments: [String]
@@ -108,7 +79,6 @@ public struct LocalProjectRegistration: Sendable {
   public let name: String
   public let rootURL: URL
   public let repositoryRootURL: URL?
-  public let accessPolicy: ProjectAccessPolicy
   public let verificationCommands: [VerificationCommand]
   public let forbiddenPatterns: [ForbiddenPathPattern]
 
@@ -116,7 +86,6 @@ public struct LocalProjectRegistration: Sendable {
     name: String,
     rootURL: URL,
     repositoryRootURL: URL? = nil,
-    accessPolicy: ProjectAccessPolicy = .init(),
     verificationCommands: [VerificationCommand] = [],
     forbiddenPatterns: [ForbiddenPathPattern] = []
   ) throws {
@@ -129,7 +98,6 @@ public struct LocalProjectRegistration: Sendable {
     self.name = normalizedName
     self.rootURL = rootURL
     self.repositoryRootURL = repositoryRootURL
-    self.accessPolicy = accessPolicy
     self.verificationCommands = verificationCommands
     self.forbiddenPatterns = forbiddenPatterns
   }
@@ -141,7 +109,6 @@ public struct RegisteredProject: Codable, Equatable, Sendable {
   public let primaryRoot: RegisteredRoot
   public let repositoryRoot: RegisteredRoot
   public let worktreeRoots: [RegisteredRoot]
-  public let accessPolicy: ProjectAccessPolicy
   public let verificationCommands: [VerificationCommand]
   public let forbiddenPatterns: [ForbiddenPathPattern]
   public let createdAt: Date
@@ -152,7 +119,6 @@ public struct RegisteredProject: Codable, Equatable, Sendable {
     primaryRoot: RegisteredRoot,
     repositoryRoot: RegisteredRoot,
     worktreeRoots: [RegisteredRoot] = [],
-    accessPolicy: ProjectAccessPolicy,
     verificationCommands: [VerificationCommand],
     forbiddenPatterns: [ForbiddenPathPattern],
     createdAt: Date
@@ -162,7 +128,6 @@ public struct RegisteredProject: Codable, Equatable, Sendable {
     self.primaryRoot = primaryRoot
     self.repositoryRoot = repositoryRoot
     self.worktreeRoots = worktreeRoots
-    self.accessPolicy = accessPolicy
     self.verificationCommands = verificationCommands
     self.forbiddenPatterns = forbiddenPatterns
     self.createdAt = createdAt
@@ -175,21 +140,6 @@ public struct RegisteredProject: Codable, Equatable, Sendable {
       primaryRoot: primaryRoot,
       repositoryRoot: repositoryRoot,
       worktreeRoots: worktreeRoots + [root],
-      accessPolicy: accessPolicy,
-      verificationCommands: verificationCommands,
-      forbiddenPatterns: forbiddenPatterns,
-      createdAt: createdAt
-    )
-  }
-
-  public func updatingAccessPolicy(_ policy: ProjectAccessPolicy) -> RegisteredProject {
-    RegisteredProject(
-      id: id,
-      name: name,
-      primaryRoot: primaryRoot,
-      repositoryRoot: repositoryRoot,
-      worktreeRoots: worktreeRoots,
-      accessPolicy: policy,
       verificationCommands: verificationCommands,
       forbiddenPatterns: forbiddenPatterns,
       createdAt: createdAt
@@ -202,7 +152,6 @@ public struct RegisteredProject: Codable, Equatable, Sendable {
       name: name,
       primaryRoot: root,
       repositoryRoot: root,
-      accessPolicy: accessPolicy,
       verificationCommands: verificationCommands,
       forbiddenPatterns: forbiddenPatterns,
       createdAt: createdAt
@@ -218,27 +167,13 @@ public struct RegisteredProject: Codable, Equatable, Sendable {
   }
 }
 
-public struct ProjectCapabilitiesDTO: Codable, Equatable, Sendable {
-  public let read: ProjectPermission
-  public let write: ProjectPermission
-  public let network: ProjectPermission
-
-  public init(policy: ProjectAccessPolicy) {
-    read = policy.read
-    write = policy.write
-    network = policy.network
-  }
-}
-
 public struct ProjectSummaryDTO: Codable, Equatable, Sendable {
   public let id: ProjectID
   public let name: String
-  public let capabilities: ProjectCapabilitiesDTO
 
   public init(project: RegisteredProject) {
     id = project.id
     name = project.name
-    capabilities = ProjectCapabilitiesDTO(policy: project.accessPolicy)
   }
 }
 

@@ -390,9 +390,7 @@
         prompt: prompt,
         threadID: threadID,
         skillNames: skillNames,
-        networkAccess: task.networkAccess,
         modelOverride: TaskRetrySubmission.modelOverride(for: task),
-        permissionModeOverride: task.permissionMode != nil,
         clientRequestID: requestID, queueIfBusy: queueIfBusy,
         attachmentPaths: attachmentSourceTaskID == nil && attachmentPaths.isEmpty
           ? nil : attachmentPaths,

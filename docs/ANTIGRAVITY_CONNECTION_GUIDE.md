@@ -1,6 +1,6 @@
 # Antigravity / AGY 连接与权限指南
 
-本指南说明如何让 Antigravity CLI 在 Codex Bridge 中正常完成只读分析、联网检索和项目写入。Bridge 使用的是 `agy` CLI 的 headless `stream-json` 模式，不是 Antigravity Desktop App。
+本指南说明如何让 Antigravity CLI 在 Codex Bridge 中完成项目分析、联网检索和项目写入。Bridge 使用的是 `agy` CLI 的 headless `stream-json` 模式，不是 Antigravity Desktop App。
 
 Provider ID 固定为：
 
@@ -32,10 +32,10 @@ Bridge 桌面 App 中的设置边界如下：
 
 | 设置 | 作用范围 |
 | --- | --- |
-| `设置 → Antigravity 默认偏好` | 只保存 AGY 的模型、effort 和只读/写入默认模式 |
-| `设置 → OpenCode 默认偏好` | 只保存 OpenCode 的模型、effort 和 Plan/Build 默认模式 |
+| `设置 → Antigravity 默认偏好` | 保存 AGY 的模型和推理偏好 |
+| `设置 → OpenCode 默认偏好` | 保存 OpenCode 的模型和 effort |
 | `设置 → Codex 执行默认偏好` | 只保存 Codex 的模型、effort、访问模式和快速模式 |
-| 项目访问策略、工作台 Read Only/Write、远程启动批准 | Bridge 任务级约束；会按目标 Provider 映射为对应的原生执行模式 |
+| 项目登记、任务只读/完整、远程启动批准 | 项目登记授权目录完整访问；用户选择任务权限并审批远程启动 |
 | AGY `/settings`、`/config`、`/permissions` | 控制 AGY 的原生工具权限和规则；核心设置按官方行为与 Antigravity 2.0 同步 |
 
 因此，Antigravity 2.0 与 AGY CLI 会共享 AGY 自己的核心设置、权限和安全配置；OpenCode 与 AGY 不会共享彼此的 Provider 配置。Bridge 的桌面 App 只提供统一的项目、任务、模型和审批控制面，Codex 的访问模式也不会作为 AGY 的工具放行开关。
@@ -45,19 +45,19 @@ Bridge 桌面 App 中的设置边界如下：
 AGY 任务能否成功由三层共同决定：
 
 ```text
-Bridge 项目和任务模式
+Bridge 项目目录授权和任务权限
         ↓
 Bridge 远程任务启动批准
         ↓
 AGY CLI 原生 Sandbox + Global Permissions
 ```
 
-最常见的误区是只在 Bridge 中选择 `Write`，却没有配置 AGY CLI 自己的权限。Bridge 不能在 headless `stream-json` 中回答 AGY 的交互式确认；需要询问但没有提前放行的工具会被 AGY 拒绝或软拒绝。
+最常见的误区是只在 Bridge 中选择“完整”，却没有配置 AGY CLI 自己的权限。Bridge 不能在 headless `stream-json` 中回答 AGY 的交互式确认；需要询问但没有提前放行的工具会被 AGY 拒绝或软拒绝。
 
 | 设置 | 控制什么 |
 | --- | --- |
-| `项目 → 访问与执行权限` | 项目可读、是否允许进入写模式，以及用户期望的网络边界 |
-| `工作台 → GPT/Qwen 新任务` | ChatGPT/Qwen 默认使用 `Read Only` 还是 `Write` |
+| `项目 → 添加项目` | 登记即授权目录完整访问 |
+| `工作台 → GPT/Qwen 新任务` | 用户选择 ChatGPT/Qwen 新任务的默认权限：只读或完整 |
 | “批准启动” | 是否启动这一次远程 Provider 任务 |
 | AGY `/settings` 或 `/config` | Tool Permission 等 CLI 全局行为 |
 | AGY `/permissions` | 哪些命令、URL 和 MCP 工具可以在 headless 中直接执行 |
@@ -66,7 +66,7 @@ AGY CLI 原生 Sandbox + Global Permissions
 
 > **连接 AGY 前必须确认**：Bridge 的 AGY 连接流程会在页面中明确请求将当前用户的 AGY Global **Tool Permission** 设为 `always-proceed`（Always Proceed，总是通过）。这是 headless 任务无法回答交互式工具确认的前置条件。用户取消时不修改设置，也不会连接；用户同意后，Service 才会 Probe 并写入当前用户的 Global 配置。该设置会影响使用同一用户配置的其他 AGY CLI 任务。
 
-Bridge 每次启动 AGY 仍会传入 `--sandbox`，项目读写策略和任务模式继续生效。`proceed-in-sandbox` 适合交互式 AGY 或不使用 Bridge 的场景；如果在 Bridge 连接后手动改回该模式，未通过 `/permissions` 提前放行的 headless 工具可能被拒绝。
+Bridge 每次启动 AGY 仍会传入 `--sandbox`，任务权限与项目目录边界继续生效。`proceed-in-sandbox` 适合交互式 AGY 或不使用 Bridge 的场景；如果在 Bridge 连接后手动改回该模式，未通过 `/permissions` 提前放行的 headless 工具可能被拒绝。
 
 ## 2. 兼容要求
 
@@ -256,7 +256,7 @@ deny > ask > allow
 
 ### 5.3 文件写入为何通常不需要额外规则
 
-Bridge 对写任务传入：
+Bridge 对完整任务传入：
 
 ```text
 --mode accept-edits
@@ -264,13 +264,7 @@ Bridge 对写任务传入：
 
 AGY 的 Accept Edits 会自动批准活动工作区内的标准文件创建和修改。Shell、Web、MCP、工作区外路径仍是独立权限，必须由 `/permissions` 或其他明确策略处理。
 
-只读任务则传入：
-
-```text
---mode plan
-```
-
-Plan 用于分析和规划，不应依赖它修改项目文件。
+AGY 原生 Plan 用于分析和规划，但不能保证工具禁网。Bridge 的只读任务包含工具禁网约束，因此当前不支持用 AGY 执行只读任务。
 
 ## 6. 在 Bridge 中连接和启用
 
@@ -294,26 +288,15 @@ Plan 用于分析和规划，不应依赖它修改项目文件。
 3. 有多个安装时选择目标 AGY。
 4. 点击“刷新模型列表”。Bridge 读取当前 AGY 安装实际返回的模型目录，不会补入静态或过期模型。
 5. 选择当前返回的精确 model 和 effort；推理强度只显示所选模型声明支持的值。
-6. 选择 Provider 默认访问权限：只读或工作区可写。
+6. 在工作台选择任务权限。AGY 当前支持“完整”。
 
-对 ChatGPT/Qwen 新任务，`工作台 → GPT/Qwen 新任务 → Read Only / Write` 是 Bridge 的任务级选择，会映射为 AGY 的 `plan` 或 `accept-edits`；它不修改 AGY 的 Global Tool Permission。远程客户端通常应省略 `permission_mode`，让 Workbench 决定；只有用户明确要求单任务覆盖时才同时发送 `permission_mode_override=true`。
+ChatGPT/Qwen 新任务使用用户在工作台选择的默认任务权限，AI 不选择或覆盖权限。AGY 的原生 plan 模式不能保证任务级工具禁网，因此 Bridge 对只读任务明确返回不支持；需要只读时选择支持该能力的 Agent。
 
 连接完成后，连接详情会显示 AGY Global Tool Permission。使用 Bridge headless 任务期间应保持 `always-proceed`；需要收窄行为时优先在 AGY `/permissions` 为具体命令、域名或 MCP 工具添加 Project 规则。
 
 ## 8. Bridge 实际如何启动 AGY
 
-只读任务的核心参数：
-
-```text
-agy
---sandbox
---input-format stream-json
---output-format stream-json
---mode plan
---add-dir <项目根>
-```
-
-写任务的核心参数：
+完整任务的核心参数：
 
 ```text
 agy
@@ -324,67 +307,27 @@ agy
 --add-dir <项目根>
 ```
 
-Bridge 不再给 AGY 套外层 `sandbox-exec`。真实文件、命令、Web 和 MCP 约束由 AGY 原生 Sandbox、执行模式和权限规则负责。
+AGY 的文件、命令、Web 和 MCP 约束由原生 Sandbox、执行模式和权限规则负责。Bridge 同时校验项目目录身份和任务授权。
 
-## 9. 三种正常使用场景
+## 9. 完整任务的使用
 
-### 9.1 只读分析，不联网
+1. 登记项目目录，在工作台选择正确项目、AGY 和“完整”。
+2. 确认同一项目没有其他活动写任务。
+3. 在 AGY `/permissions` 中放行任务需要的具体命令、域名或 MCP 工具。
+4. 批准远程任务启动。
 
-Bridge：
-
-1. `项目`：读取“允许”、写入“拒绝”。
-2. `工作台`：选择正确项目和 `Read Only`。
-3. `设置 → Antigravity 执行默认偏好`：默认权限选“只读”。
-4. 任务使用 `network_access=false`。
-
-请求示例：
+完整包含写入和联网，实际使用哪些工具由任务内容和 AGY 原生规则决定。
 
 ```json
 {
   "provider_id": "antigravity",
-  "prompt": "只读分析当前项目并说明问题，不要修改文件。",
-  "network_access": false
+  "prompt": "实现指定修改并运行相关测试。"
 }
 ```
 
-这种任务会使用 `--mode plan`，不会加入 `--dangerously-skip-permissions`。如果 prompt 要求运行 Shell，仍应提前添加对应的窄 `command(...)` allow 规则。
+联网任务同样使用用户选择的完整权限。Web/URL 调用可能需要 `read_url(domain)`、`execute_url(domain)`；浏览器或辅助脚本也可能需要命令、MCP 或缓存写入权限。按失败的具体工具配置原生规则。
 
-### 9.2 只读联网
-
-1. 保持 Workbench 为 `Read Only`。
-2. 项目读取设为“允许”，网络意图设为“允许”或“需要本机批准”。
-3. 在 AGY `/permissions` 中只放行需要访问的 `read_url(domain)`、`execute_url(domain)`，以及必要命令/MCP。
-4. 任务显式发送 `network_access=true`。
-
-```json
-{
-  "provider_id": "antigravity",
-  "prompt": "搜索并核对官方资料，给出来源；不要修改项目。",
-  "network_access": true
-}
-```
-
-`network_access=true` 只表达用户明确的联网意图，不会替你创建 AGY allow 规则。当前项目网络选择器也不是外部 Provider 的网络包级防火墙；最终仍以 AGY 原生 `read_url`、`execute_url`、Sandbox 和命令规则为准。
-
-原生 `search_web` 可能不需要本地缓存写入，但 `read_url_content`、浏览器、第三方插件或辅助脚本可能需要额外 URL、命令、MCP 或本地状态权限。看到拒绝时按失败的具体工具补最窄规则，不要直接开放全部权限。
-
-### 9.3 修改项目文件
-
-1. `项目`：读取“允许”、写入“允许”。
-2. `工作台`：选择 `Write`。
-3. 确认同一项目没有其他活动写任务。
-4. 在 AGY `/permissions` 中放行构建、测试和查询所需的窄命令/网络规则。
-5. 任务不需要联网时使用 `network_access=false`。
-
-```json
-{
-  "provider_id": "antigravity",
-  "prompt": "实现指定修改并运行相关测试。",
-  "network_access": false
-}
-```
-
-Bridge 使用 `--mode accept-edits`，同一项目的写任务进入独占 workspace gate。项目写入为“需要本机批准”不会给 AGY 增加逐文件审批；希望硬性禁止写入时应选择“拒绝”。
+Bridge 使用 `--mode accept-edits`；同一项目的完整任务进入独占工作区 gate。
 
 ## 10. 从 ChatGPT/Qwen 提交
 
@@ -411,7 +354,7 @@ list_models
 awaiting_local_approval
 ```
 
-在 Bridge 工作台核对项目、Provider、Read Only/Write、网络意图和 prompt 后点击“批准启动”。AGY 后续工具不会进入可交互的 App 审批卡片；权限不足时应回到 AGY `/permissions` 修正规则后重试。
+在 Bridge 工作台核对项目、Provider、用户选择的任务权限和 prompt 后点击“批准启动”。AGY 后续工具不会进入可交互的 App 审批卡片；权限不足时应回到 AGY `/permissions` 修正规则后重试。
 
 ## 11. 常见故障
 
@@ -428,17 +371,17 @@ awaiting_local_approval
 | 手动改为 `request-review` / `proceed-in-sandbox` 后工具被拒绝 | Bridge headless 无法回答交互确认；保持连接所需的 `always-proceed`，或在 AGY `/permissions` 为具体工具添加 Project allow 规则 |
 | 已添加 allow 仍被询问 | 检查 ask/deny 是否匹配同一操作；AGY 优先级为 `deny > ask > allow`，并确认规则作用域是当前 Project |
 | Shell 仍被拒绝 | 放行精确 `command(...)`；若命令必须逃离 Sandbox，应先评估风险，不要默认扩大到全部命令 |
-| Web/URL 被拒绝 | 任务发送 `network_access=true`，并为具体域名添加 `read_url(domain)` / `execute_url(domain)` |
+| Web/URL 被拒绝 | 用户是否选择“完整”；为具体域名添加 `read_url(domain)` / `execute_url(domain)` |
 | MCP 工具被拒绝 | 在 AGY `/permissions` 添加精确 `mcp(server/tool)`，不是修改 Bridge MCP 客户端权限 |
 | Desktop 已设自动执行仍无效 | Desktop 与 CLI 的核心设置按官方行为同步；检查 CLI 是否使用同一系统用户/钥匙串、是否有命令行覆盖，以及 AGY `/settings` 和 `/permissions` |
-| 只读搜索能用，URL/辅助脚本失败 | 后者可能需要 URL、命令、MCP 或缓存写入权限；按实际失败工具补窄规则 |
-| 写任务没有修改文件 | Workbench 是否为 `Write`、项目写入是否允许、任务是否实际使用 `--mode accept-edits` |
+| 搜索能用，URL/辅助脚本失败 | 后者可能需要 URL、命令、MCP 或缓存写入权限；按实际失败工具补窄规则 |
+| 写任务没有修改文件 | 用户是否选择“完整”、AGY 原生工具规则、任务是否实际使用 `--mode accept-edits` |
 ## 12. 安全与验收
 
 - 不读取、复制或提交 AGY 的认证文件、Token、Cookie 或浏览器授权响应。
 - 优先使用 Project 作用域和精确规则，不使用全局通配符代替必要配置。
 - Probe 成功只证明二进制、版本、帮助能力和基础 Provider 行为可用，不证明账号额度、Web、Shell、MCP 或写入已验收。
-- 最终使用自己的账号，在可回滚的测试项目中分别验证只读、联网、写入、命令和会话继续。
+- 最终使用自己的账号，在可回滚的测试项目中分别验证完整任务、联网、写入、命令和会话继续。
 
 ## 13. 参考
 

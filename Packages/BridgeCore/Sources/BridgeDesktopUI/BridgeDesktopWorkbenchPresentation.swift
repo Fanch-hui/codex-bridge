@@ -2,19 +2,19 @@ import Foundation
 
 public enum BridgeDesktopWorkbenchPermissionMode: String, CaseIterable, Equatable, Sendable {
   case readOnly = "read-only"
-  case workspaceWrite = "workspace-write"
+  case full = "full"
 
   public var title: String {
     switch self {
     case .readOnly: "只读"
-    case .workspaceWrite: "工作区可写"
+    case .full: "完整"
     }
   }
 
   public var detail: String {
     switch self {
-    case .readOnly: "不写入项目文件"
-    case .workspaceWrite: "遵循项目权限与本机批准"
+    case .readOnly: "允许读取，禁止写入和联网"
+    case .full: "允许读取、写入和联网"
     }
   }
 

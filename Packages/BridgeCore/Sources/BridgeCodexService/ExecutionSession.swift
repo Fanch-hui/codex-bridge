@@ -76,7 +76,6 @@ package actor ExecutionSession {
     guard request.task.id == taskID else {
       throw ExecutionServiceError.invalidRequest("task.id")
     }
-    try validateProjectPolicy(request)
     do {
       try request.project.root.validateCurrentIdentity()
     } catch {

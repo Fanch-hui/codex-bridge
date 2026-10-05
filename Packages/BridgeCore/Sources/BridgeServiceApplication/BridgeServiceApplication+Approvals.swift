@@ -22,11 +22,7 @@ extension BridgeServiceApplication {
   }
 
   func writableProject(_ projectID: String) async throws -> ServiceProjectRecord {
-    let project = try await readableProject(projectID)
-    guard project.accessPolicy.write != .denied else {
-      throw BridgeMCPQueryError.writeNotAllowed
-    }
-    return project
+    try await readableProject(projectID)
   }
 
   public func servicePendingDirectApprovals(

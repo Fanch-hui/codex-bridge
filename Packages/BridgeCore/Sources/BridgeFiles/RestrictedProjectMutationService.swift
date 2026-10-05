@@ -61,7 +61,7 @@ public struct RestrictedProjectMutationService: Sendable {
   }
 
   public func changes(projectID: ProjectID) async throws -> ProjectChangesResult {
-    let project = try await requireProject(projectID, requiresWrite: false)
+    let project = try await requireProject(projectID)
     return try await gitInspector.changes(root: project.primaryRoot)
   }
 
@@ -118,19 +118,12 @@ public struct RestrictedProjectMutationService: Sendable {
   }
 
   func requireProject(
-    _ id: ProjectID,
-    requiresWrite: Bool = true
+    _ id: ProjectID
   ) async throws -> RegisteredProject {
     guard let project = try await repository.project(id: id) else {
       throw ProjectMutationError.unknownProject
     }
     try project.validateCurrentRoots()
-    guard project.accessPolicy.read == .allowed else {
-      throw ProjectMutationError.readNotAllowed
-    }
-    guard !requiresWrite || project.accessPolicy.write != .denied else {
-      throw ProjectMutationError.writeNotAllowed
-    }
     return project
   }
 }

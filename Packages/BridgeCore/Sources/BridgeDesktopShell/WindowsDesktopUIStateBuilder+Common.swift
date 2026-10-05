@@ -26,7 +26,7 @@
     static func permissionLabel(_ value: String) -> String {
       switch value {
       case "read-only": "只读"
-      case "workspace-write": "工作区可写"
+      case "full": "完整"
       case "allowed": "允许"
       case "requiresLocalApproval": "需要本机批准"
       case "denied": "拒绝"

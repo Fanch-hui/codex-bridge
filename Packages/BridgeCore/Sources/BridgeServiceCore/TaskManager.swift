@@ -386,6 +386,7 @@ public actor ServiceTaskManager {
     try await store.events(taskID: taskID, limit: limit)
   }
 
+  @discardableResult
   public func upsertTaskMessage(
     taskID: TaskID,
     key: String,
@@ -397,10 +398,10 @@ public actor ServiceTaskManager {
     toolArguments: String? = nil,
     createdAt: Date? = nil,
     updatedAt: Date? = nil
-  ) async throws {
+  ) async throws -> ServiceTaskMessageRecord {
     let creationDate = createdAt ?? now()
     let updateDate = updatedAt ?? creationDate
-    try await store.upsertTaskMessage(
+    return try await store.upsertTaskMessage(
       ServiceTaskMessageDraft(
         key: key,
         role: role,

@@ -126,7 +126,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var agentPermissionRemediationAppliedTaskIDs: Set<String> = []
   @Published public internal(set) var agentPermissionRemediationErrors: [String: String] = [:]
   @Published public internal(set) var openCodeDefaultModel: String?
-  @Published public internal(set) var openCodeDefaultPermissionMode = "build"
+  @Published public internal(set) var openCodeDefaultPermissionMode = "full"
   @Published public internal(set) var openCodeDefaultEffort: String?
   @Published public internal(set) var isManagingAgents = false
   @Published var directConfiguration: IPCDirectConfiguration?
@@ -164,7 +164,7 @@ public final class BridgeServiceAppModel: ObservableObject {
       if oldValue != selectedProjectID { synchronizeAgentModelScopes() }
     }
   }
-  @Published public internal(set) var workbenchPermissionMode = "workspace-write"
+  @Published public internal(set) var workbenchPermissionMode = "full"
   @Published public internal(set) var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
   @Published var desktopLogSearchText = ""
   @Published var desktopLogProjectID: String?
@@ -230,7 +230,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var workbenchProjectSyncTask: Task<Void, Never>?
   var workbenchPermissionModeSyncTask: Task<Void, Never>?
   var workbenchPermissionModeSyncGeneration: UInt64 = 0
-  var confirmedWorkbenchPermissionMode = "workspace-write"
+  var confirmedWorkbenchPermissionMode = "full"
   var agentModelCatalogGenerations: [String: UInt64] = [:]
   var agentModelCatalogScopes: [String: AgentModelCatalogScope] = [:]
   var agentModelHydrationGenerations: [String: UInt64] = [:]
@@ -315,7 +315,7 @@ public final class BridgeServiceAppModel: ObservableObject {
         providerID: providerID,
         model: providerID == "opencode" ? openCodeDefaultModel : nil,
         permissionMode:
-          providerID == "opencode" ? openCodeDefaultPermissionMode : "workspace-write",
+          providerID == "opencode" ? openCodeDefaultPermissionMode : "full",
         effort: providerID == "opencode" ? openCodeDefaultEffort : nil
       )
   }

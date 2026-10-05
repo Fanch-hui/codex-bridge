@@ -13,11 +13,6 @@ public enum ServiceTaskSource: String, Codable, CaseIterable, Sendable {
   }
 }
 
-public enum ServicePermissionMode: String, Codable, CaseIterable, Sendable {
-  case readOnly = "read-only"
-  case workspaceWrite = "workspace-write"
-}
-
 public enum ServiceAccessMode: String, Codable, CaseIterable, Sendable {
   case requestApproval = "request-approval"
   case autoReview = "auto-review"
@@ -26,11 +21,9 @@ public enum ServiceAccessMode: String, Codable, CaseIterable, Sendable {
 
 public struct ServiceTaskExecutionAuthorization: Equatable, Sendable {
   public let accessMode: ServiceAccessMode
-  public let networkAllowed: Bool
 
-  public init(accessMode: ServiceAccessMode, networkAllowed: Bool) {
+  public init(accessMode: ServiceAccessMode) {
     self.accessMode = accessMode
-    self.networkAllowed = networkAllowed
   }
 }
 
@@ -201,7 +194,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
   public let supervisorModel: String?
   public let supervisorEffort: String?
   public let permissionMode: ServicePermissionMode
-  public let networkAllowed: Bool
+  public var networkAllowed: Bool { permissionMode == .full }
   public let accessMode: ServiceAccessMode
   public let fastMode: Bool
   public let queueIfBusy: Bool
@@ -215,7 +208,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
   private enum CodingKeys: String, CodingKey {
     case id, projectID, source, sourceClientID, clientRequestID, prompt, requestedThreadID
     case providerID, installationID, selectionMode, executionModel, executionEffort
-    case supervisorModel, supervisorEffort, permissionMode, networkAllowed, accessMode
+    case supervisorModel, supervisorEffort, permissionMode, accessMode
     case fastMode, queueIfBusy, selectedSkills, isQueued, state, createdAt, updatedAt
   }
 
@@ -237,7 +230,6 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
       supervisorModel: values.decodeIfPresent(String.self, forKey: .supervisorModel),
       supervisorEffort: values.decodeIfPresent(String.self, forKey: .supervisorEffort),
       permissionMode: values.decode(ServicePermissionMode.self, forKey: .permissionMode),
-      networkAllowed: values.decode(Bool.self, forKey: .networkAllowed),
       accessMode: values.decode(ServiceAccessMode.self, forKey: .accessMode),
       fastMode: values.decode(Bool.self, forKey: .fastMode),
       queueIfBusy: values.decode(Bool.self, forKey: .queueIfBusy),
@@ -274,7 +266,7 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
     supervisorModel: String? = nil,
     supervisorEffort: String? = nil,
     permissionMode: ServicePermissionMode,
-    networkAllowed: Bool,
+    networkAllowed _: Bool = false,
     accessMode: ServiceAccessMode = .requestApproval,
     fastMode: Bool = false,
     queueIfBusy: Bool = false,
@@ -384,7 +376,6 @@ public struct ServiceTaskRecord: Codable, Equatable, Sendable {
     self.supervisorModel = supervisorModel
     self.supervisorEffort = supervisorEffort
     self.permissionMode = permissionMode
-    self.networkAllowed = networkAllowed
     self.accessMode = accessMode
     self.fastMode = fastMode
     self.queueIfBusy = queueIfBusy

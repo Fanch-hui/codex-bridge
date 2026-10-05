@@ -21,8 +21,7 @@ extension BridgeServiceApplication {
     let project = try await readableProject(source.projectID.rawValue)
     let submission = MCPServiceTaskSubmission(
       projectID: source.projectID.rawValue, prompt: prompt, providerID: providerID,
-      permissionMode: source.permissionMode.rawValue, permissionModeOverride: true,
-      networkAccess: source.networkAllowed, clientRequestID: "handoff:" + handoffID)
+      permissionMode: source.permissionMode.rawValue, clientRequestID: "handoff:" + handoffID)
     let prepared = try await prepareTaskSubmission(
       submission, sourceClientID: "macos.app", source: .macOSApp, deadline: deadline)
     var capabilityFingerprint = "codex"
@@ -40,7 +39,7 @@ extension BridgeServiceApplication {
         installationID: AgentInstallationID(rawValue: installationID))
       let capabilities = installation.capabilities.effective
       let mutationIntent: AgentMutationIntent =
-        prepared.request.permissionMode == .workspaceWrite ? .workspaceWrite : .readOnly
+        prepared.request.permissionMode == .full ? .workspaceWrite : .readOnly
       guard installation.isSelectable, capabilities.contains(.sessionCreate),
         capabilities.contains(.workspaceRead),
         mutationIntent == .workspaceWrite
@@ -49,7 +48,7 @@ extension BridgeServiceApplication {
       else {
         throw TaskHandoffError.rejected("目标 Agent 无法创建会话或不支持所选读写模式。")
       }
-      if prepared.request.permissionMode == .workspaceWrite {
+      if prepared.request.permissionMode == .full {
         guard
           capabilities.contains(.workspaceWriteInPlace)
             || capabilities.contains(.workspaceWriteIsolated)
@@ -95,6 +94,9 @@ extension BridgeServiceApplication {
 
   func handoffStatus(_ record: ServiceTaskHandoffRecord) async throws -> MCPTaskHandoffPreview {
     let original = record.preview
+    guard let permissionMode = ServicePermissionMode(rawValue: original.permissionMode) else {
+      throw ServiceStoreError.corruptRecord
+    }
     var phase = handoffOperations.contains(original.handoffID) ? "submitting" : "prepared"
     var message: String? = nil
     if let targetID = record.targetTaskID {
@@ -126,7 +128,7 @@ extension BridgeServiceApplication {
     return MCPTaskHandoffPreview(
       handoffID: original.handoffID, sourceTaskID: original.sourceTaskID,
       providerID: original.providerID, model: original.model,
-      permissionMode: original.permissionMode, networkAllowed: original.networkAllowed,
+      permissionMode: permissionMode.rawValue, networkAllowed: permissionMode == .full,
       revision: original.revision, prompt: original.prompt,
       additionalInstructions: original.additionalInstructions, warnings: original.warnings,
       ready: original.ready && (phase == "prepared" || phase == "awaiting_local_approval"),

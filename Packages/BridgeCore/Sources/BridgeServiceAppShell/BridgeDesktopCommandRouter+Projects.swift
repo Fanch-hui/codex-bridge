@@ -26,8 +26,6 @@ extension BridgeDesktopCommandRouter {
         project(projectID, in: model) != nil
       else { return }
       model.removeProject(projectID)
-    case .saveProjectPolicy:
-      savePolicy(payload, model: model)
     case .setProjectCommandMode:
       guard connected(model), let projectID = validatedID(payload.projectID),
         project(projectID, in: model) != nil,
@@ -59,38 +57,6 @@ extension BridgeDesktopCommandRouter {
     panel.allowsMultipleSelection = false
     guard panel.runModal() == .OK, let url = panel.url else { return }
     model.registerProject(at: url)
-  }
-
-  private static func savePolicy(
-    _ payload: BridgeDesktopCommandPayload,
-    model: BridgeServiceAppModel
-  ) {
-    guard connected(model), let projectID = validatedID(payload.projectID),
-      project(projectID, in: model) != nil,
-      let read = validatedPermission(payload.readPermission, readOnly: true),
-      let write = validatedPermission(payload.writePermission, readOnly: false),
-      let network = validatedPermission(payload.networkPermission, readOnly: false)
-    else { return }
-    model.updateProjectPolicy(
-      projectID: projectID,
-      draft: BridgeProjectPolicyDraft(
-        readPermission: read,
-        writePermission: write,
-        networkPermission: network
-      )
-    )
-  }
-
-  private static func validatedPermission(
-    _ value: String?,
-    readOnly: Bool
-  ) -> String? {
-    guard let value = validatedID(value, maximumBytes: 64) else { return nil }
-    let allowed =
-      readOnly
-      ? ["denied", "allowed"]
-      : ["denied", "requiresLocalApproval", "allowed"]
-    return allowed.contains(value) ? value : nil
   }
 
   private static func saveCommand(

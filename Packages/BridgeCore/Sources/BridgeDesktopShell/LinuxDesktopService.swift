@@ -24,7 +24,7 @@
       return false
     }
 
-    private static func socketReady() -> Bool {
+    static func socketReady() -> Bool {
       let descriptor = socket(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0)
       guard descriptor >= 0 else { return false }
       defer { _ = Glibc.close(descriptor) }

@@ -256,7 +256,6 @@ public struct ProjectFileSearchResult: Codable, Equatable, Sendable {
 public enum ProjectFileError: Error, LocalizedError, Equatable, Sendable {
   case invalidLimits
   case unknownProject
-  case readNotAllowed
   case invalidLineRange
   case invalidSearchRequest
   case invalidDirectoryRequest
@@ -278,8 +277,6 @@ public enum ProjectFileError: Error, LocalizedError, Equatable, Sendable {
       "File-service limits are invalid."
     case .unknownProject:
       "The project identifier is not registered."
-    case .readNotAllowed:
-      "The project does not allow remote file reads."
     case .invalidLineRange:
       "A file read can return at most 300 lines from a positive line number."
     case .invalidSearchRequest:

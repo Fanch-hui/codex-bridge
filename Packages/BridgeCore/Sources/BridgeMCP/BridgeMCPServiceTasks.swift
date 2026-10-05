@@ -79,11 +79,6 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
   public let supervisorModel: String?
   public let supervisorEffort: String?
   public let permissionMode: String?
-  /// Whether a remote client explicitly derived `permission_mode` from the
-  /// user's request. The parser supplies `false` when the marker is absent;
-  /// `nil` is retained for in-process callers that predate this field.
-  public let permissionModeOverride: Bool?
-  public let networkAccess: Bool
   public let acceptanceCriteria: [String]
   public let clientRequestID: String?
   public let queueIfBusy: Bool?
@@ -104,8 +99,6 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
     supervisorModel: String? = nil,
     supervisorEffort: String? = nil,
     permissionMode: String? = nil,
-    permissionModeOverride: Bool? = nil,
-    networkAccess: Bool = false,
     acceptanceCriteria: [String] = [],
     clientRequestID: String? = nil,
     queueIfBusy: Bool? = nil,
@@ -125,8 +118,6 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
     self.supervisorModel = supervisorModel
     self.supervisorEffort = supervisorEffort
     self.permissionMode = permissionMode
-    self.permissionModeOverride = permissionModeOverride
-    self.networkAccess = networkAccess
     self.acceptanceCriteria = acceptanceCriteria
     self.clientRequestID = clientRequestID
     self.queueIfBusy = queueIfBusy
@@ -148,8 +139,6 @@ public struct MCPServiceTaskSubmission: Codable, Equatable, Sendable {
     case supervisorModel = "supervisor_model"
     case supervisorEffort = "supervisor_effort"
     case permissionMode = "permission_mode"
-    case permissionModeOverride = "permission_mode_override"
-    case networkAccess = "network_access"
     case acceptanceCriteria = "acceptance_criteria"
     case clientRequestID = "client_request_id"
     case queueIfBusy = "queue_if_busy"

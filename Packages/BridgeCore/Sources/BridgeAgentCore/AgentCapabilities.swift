@@ -68,11 +68,9 @@ public enum AgentMutationIntent: String, Codable, CaseIterable, Sendable {
   case readOnly = "read_only"
   case workspaceWrite = "workspace_write"
 
-  public func requiredCapabilities(for providerID: AgentProviderID) -> Set<AgentCapability> {
+  public func requiredCapabilities(for _: AgentProviderID) -> Set<AgentCapability> {
     if self == .workspaceWrite { return [.workspaceRead, .workspaceWriteInPlace] }
-    // Older adapters retain their existing read-only contract.
-    return providerID == .pi || providerID == .qoder
-      ? [.workspaceRead, .readOnlyExecution] : [.workspaceRead]
+    return [.workspaceRead, .readOnlyExecution]
   }
 }
 

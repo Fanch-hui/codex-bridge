@@ -23,7 +23,6 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func cancelAppUpdate() async throws
   func projects() async throws -> [MCPProjectSummary]
   func registerProject(_ request: IPCProjectRegistrationRequest) async throws -> MCPProjectDetail
-  func updateProjectPolicy(_ request: IPCProjectPolicyRequest) async throws -> MCPProjectDetail
   func projectCommands(projectID: String) async throws -> MCPProjectDetail
   func updateProjectCommands(
     projectID: String,

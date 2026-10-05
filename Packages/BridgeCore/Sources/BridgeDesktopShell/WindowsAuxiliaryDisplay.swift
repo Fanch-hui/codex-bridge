@@ -40,7 +40,6 @@
     var selectedCommandID: String? = nil
     var selectedSkillID: String? = nil
     var selectedThreadID: String? = nil
-    var fileWritePermission: String = "denied"
     var commands: [BridgeDesktopWorkspaceCommand] = []
     var blacklist: [BridgeDesktopBlacklistRule] = []
     var skills: [BridgeDesktopSkillRow] = []

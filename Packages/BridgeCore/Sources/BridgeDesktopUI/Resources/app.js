@@ -306,11 +306,22 @@
     var next = Object.assign({}, base);
     var workbench = base && base.workbench
       ? Object.assign({}, base.workbench) : null;
-    if (!workbench) return null;
     var valid = true;
     (Array.isArray(changes) ? changes : []).forEach(function (change) {
       if (!change || !change.kind) { valid = false; return; }
-      if (change.kind === "conversation") {
+      if (change.kind === "overview") {
+        next.overview = change.overview || null;
+      } else if (change.kind === "connection") {
+        next.connections = change.connections || null;
+      } else if (change.kind === "logs") {
+        next.logs = change.logs || null;
+      } else if (change.kind === "appUpdate") {
+        next.appUpdate = change.appUpdate || null;
+      } else if (!workbench) {
+        // Workbench-scoped kinds need a workbench on the page; an empty
+        // change list or a page-domain change applies without one.
+        valid = false;
+      } else if (change.kind === "conversation") {
         valid = applyConversationChange(workbench, change) && valid;
       } else if (change.kind === "taskRows") {
         if ((change.collectionMode !== "replace" && change.collectionMode !== "upsert")
@@ -334,7 +345,7 @@
       }
     });
     if (!valid) return null;
-    next.workbench = workbench;
+    if (workbench) next.workbench = workbench;
     return next;
   }
 

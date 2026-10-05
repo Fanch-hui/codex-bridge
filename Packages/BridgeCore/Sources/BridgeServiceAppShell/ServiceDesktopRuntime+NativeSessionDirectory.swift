@@ -17,7 +17,7 @@ extension BridgeServiceAppModel {
     let request = IPCAgentSubmitRequest(
       projectID: projectID, providerID: providerID, installationID: installationID,
       permissionMode: workbenchPermissionMode, prompt: prompt, threadID: sessionID,
-      networkAccess: false, permissionModeOverride: true, clientRequestID: requestID)
+      clientRequestID: requestID)
     runWorkbenchMutation(
       requestID: requestID, command: BridgeDesktopCommand.continueNativeAgentSession.rawValue,
       taskID: nil, input: prompt

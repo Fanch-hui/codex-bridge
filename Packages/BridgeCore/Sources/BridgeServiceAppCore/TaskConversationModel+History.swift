@@ -15,6 +15,7 @@ extension TaskConversationModel {
     isLoadingEarlier = true
     defer { isLoadingEarlier = false }
 
+    isBrowsingHistory = true
     if canLoadEarlierCurrentTask {
       await loadEarlierCurrentTask(lifecycle: lifecycle, load: load)
       updateEarlierAvailability()

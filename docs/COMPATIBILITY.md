@@ -18,9 +18,9 @@
 
 - Unknown Codex model or reasoning effort is never silently replaced.
 - OpenCode model IDs and effort values are accepted only when returned by the current ACP session; no cross-provider aliases are synthesized.
-- OpenCode Plan/Build maps to `read-only`/`workspace-write`. OpenCode network behavior remains in its native permission system; Bridge does not claim a per-task network sandbox for this provider.
+- User-selected Read Only/Full tasks map to OpenCode Plan/Build. Read Only applies a native permission overlay allowing only read, glob, grep, and question tools; Full allows writes and network tools subject to native permissions. This is tool permission enforcement, not an OS network sandbox.
 - DeepSeek Harness accepts only the pinned artifact/runtime/profile contract. Model IDs come from the current ACP Session, while effort values come from the validated DSH Profile; historical Session resume is not supported.
-- Antigravity accepts only a registered compatible `agy` whose observed CLI options satisfy the adapter. Plan/Accept Edits and network/tool behavior remain provider-native.
+- Antigravity accepts only a registered compatible `agy` whose observed CLI options satisfy the adapter. Full tasks use Accept Edits and native tool rules. Antigravity and DSH cannot guarantee task-local network-tool restrictions in their current native execution profiles, so Bridge explicitly reports Read Only as unsupported.
 - A catalog-declared default reasoning effort is advisory UI state; missing legacy defaults fall back only to the first advertised effort, while an unknown declared default fails closed.
 - Thread binding requires the exact registered working directory.
 - If the background Service loses an active Codex event stream, the task becomes `unknown`; V1 does not start a replacement Turn and pretend the original resumed.

@@ -91,22 +91,32 @@
       lock.withLock { worker }?.applyLayout(to: bounds, visible: visible)
     }
 
-    func setState(_ state: BridgeDesktopUIState, revision: UInt64? = nil) {
-      let patch = lock.withLock { () -> BridgeDesktopUIStatePatch? in
-        let nextRevision: UInt64
-        if let revision {
-          guard latestStateRevision != revision else { return nil }
-          nextRevision = revision
-        } else {
-          guard latestState != state else { return nil }
-          nextRevision = (latestStateRevision ?? 0) &+ 1
-        }
-        let patch = patchBuilder.makePatch(state: state, nextRevision: nextRevision)
+    /// Builds and encodes the patch for `state` off the UI thread. The render
+    /// pipeline is serial, and the lock keeps the builder consistent with the
+    /// webview-thread resync path.
+    func preparedPatch(for state: BridgeDesktopUIState, revision: UInt64) -> PreparedPatch? {
+      lock.withLock { () -> PreparedPatch? in
+        guard latestStateRevision != revision else { return nil }
+        let patch = patchBuilder.makePatch(state: state, nextRevision: revision)
         latestState = state
-        latestStateRevision = nextRevision
-        return isPageReady ? patch : nil
+        latestStateRevision = revision
+        guard isPageReady else { return nil }
+        guard let data = try? JSONEncoder().encode(patch),
+          let message = String(data: data, encoding: .utf8)
+        else { return nil }
+        return PreparedPatch(message: message, replacesPendingMessages: patch.isFull)
       }
-      if let patch { send(patch) }
+    }
+
+    /// Posts a patch that was encoded off the UI thread; O(1) on the pump.
+    func post(_ prepared: PreparedPatch) {
+      lock.withLock { worker }?.postWebMessageAsJSON(
+        prepared.message, replacesPendingMessages: prepared.replacesPendingMessages)
+    }
+
+    struct PreparedPatch: Sendable {
+      let message: String
+      let replacesPendingMessages: Bool
     }
 
     func beginShutdown(notifying window: HWND, message: UINT) -> Bool {
@@ -121,20 +131,17 @@
       active?.shutdown()
     }
 
-    private func send(_ patch: BridgeDesktopUIStatePatch) {
-      guard let data = try? JSONEncoder().encode(patch),
-        let message = String(data: data, encoding: .utf8)
-      else { return }
-      lock.withLock { worker }?.postWebMessageAsJSON(message)
-    }
-
     private func sendFullSnapshot() {
-      let patch = lock.withLock { () -> BridgeDesktopUIStatePatch? in
+      let prepared = lock.withLock { () -> PreparedPatch? in
         guard let state = latestState, let revision = latestStateRevision else { return nil }
+        guard isPageReady else { return nil }
         let patch = patchBuilder.fullSnapshot(state: state, revision: revision)
-        return isPageReady ? patch : nil
+        guard let data = try? JSONEncoder().encode(patch),
+          let message = String(data: data, encoding: .utf8)
+        else { return nil }
+        return PreparedPatch(message: message, replacesPendingMessages: true)
       }
-      if let patch { send(patch) }
+      if let prepared { post(prepared) }
     }
 
     private func receive(_ message: String) {

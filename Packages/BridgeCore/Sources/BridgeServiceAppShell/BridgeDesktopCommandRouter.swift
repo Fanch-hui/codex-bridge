@@ -75,7 +75,7 @@ enum BridgeDesktopCommandRouter {
       .resolveApproval, .resolveDirectApproval:
       handleWorkbench(envelope, model: model)
     case .selectProject, .refreshProjects, .registerProject, .removeProject,
-      .saveProjectPolicy, .setProjectCommandMode, .saveProjectCommand,
+      .setProjectCommandMode, .saveProjectCommand,
       .removeProjectCommand, .saveProjectBlacklist, .removeProjectBlacklist, .openThread:
       handleProjects(envelope, model: model)
     case .selectLog, .refreshLogs, .setLogSearch, .setLogProjectFilter,

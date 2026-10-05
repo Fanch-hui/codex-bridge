@@ -7,7 +7,6 @@ public protocol ProjectRepository: Sendable {
   func project(id: ProjectID) async throws -> RegisteredProject?
   func insert(_ project: RegisteredProject) async throws
   func addWorktree(_ root: RegisteredRoot, to projectID: ProjectID) async throws
-  func updateAccessPolicy(_ policy: ProjectAccessPolicy, for projectID: ProjectID) async throws
 }
 
 public protocol MutableProjectRepository: ProjectRepository {
@@ -51,16 +50,6 @@ public actor InMemoryProjectRepository: MutableProjectRepository,
       throw ProjectRegistryError.duplicateRoot
     }
     projectsByID[projectID] = project.addingWorktree(root)
-  }
-
-  public func updateAccessPolicy(
-    _ policy: ProjectAccessPolicy,
-    for projectID: ProjectID
-  ) throws {
-    guard let project = projectsByID[projectID] else {
-      throw ProjectRegistryError.unknownProject
-    }
-    projectsByID[projectID] = project.updatingAccessPolicy(policy)
   }
 
   public func removeProject(id: ProjectID) throws {

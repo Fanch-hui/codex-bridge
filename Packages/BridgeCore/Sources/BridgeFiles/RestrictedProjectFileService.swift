@@ -88,9 +88,6 @@ public struct RestrictedProjectFileService: Sendable {
       throw ProjectFileError.unknownProject
     }
     try project.validateCurrentRoots()
-    guard project.accessPolicy.read == .allowed else {
-      throw ProjectFileError.readNotAllowed
-    }
     return project
   }
 

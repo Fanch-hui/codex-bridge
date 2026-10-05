@@ -17,7 +17,7 @@
     var selectedInstallationID: String?
     var selectedModelID: String?
     var selectedEffort = ""
-    var selectedPermissionMode: String = "build"
+    var selectedPermissionMode: String = "full"
     var modelCatalogs: [String: [IPCAgentModelSummary]] = [:]
     struct ModelCatalogScope: Equatable {
       let installationID: String?

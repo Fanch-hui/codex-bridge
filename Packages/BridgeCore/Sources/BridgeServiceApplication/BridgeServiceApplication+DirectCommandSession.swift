@@ -59,7 +59,7 @@ extension BridgeServiceApplication {
     let sessions = await directCommands.allSessions()
     let readableIDs = Set(
       try await projects.projects().filter {
-        $0.accessPolicy.read == .allowed && (try? $0.root.validateCurrentIdentity()) != nil
+        (try? $0.root.validateCurrentIdentity()) != nil
       }.map(\.id)
     )
     return MCPDirectCommandPage(

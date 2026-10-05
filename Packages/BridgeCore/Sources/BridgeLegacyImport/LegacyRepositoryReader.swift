@@ -199,7 +199,7 @@ struct LegacyRepositoryReader {
     }
     guard envelope.schemaVersion == 1,
       envelope.project.id.rawValue == expectedID,
-      try canonicalData(envelope) == data
+      try canonicalData(envelope) == LegacyProjectData.normalized(data)
     else {
       throw LegacyImportError.corruptRepository
     }
@@ -258,7 +258,6 @@ struct LegacyRepositoryReader {
           device: project.primaryRoot.identity.device,
           inode: project.primaryRoot.identity.inode
         ),
-        accessPolicy: project.accessPolicy,
         createdAt: project.createdAt,
         updatedAt: max(project.createdAt, importDate)
       )

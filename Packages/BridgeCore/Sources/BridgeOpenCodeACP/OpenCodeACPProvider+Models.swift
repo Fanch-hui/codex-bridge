@@ -123,6 +123,7 @@ extension OpenCodeACPProvider {
       .oneShotApproval,
       .profileSelection,
       .modelSelection,
+      .readOnlyExecution,
     ]
     if initialization.supportsLoadSession || initialization.supportsResumeSession {
       supported.insert(.sessionContinue)
@@ -232,14 +233,17 @@ extension OpenCodeACPProvider {
 
   static func modeValue(
     for mutationIntent: AgentMutationIntent,
+    readOnlyModeID: String?,
     in session: OpenCodeACPSession
   ) throws -> String {
-    let expected = mutationIntent == .readOnly ? "plan" : "build"
+    guard let expected = mutationIntent == .readOnly ? readOnlyModeID : "build" else {
+      throw AgentRuntimeError.capabilityUnavailable(.readOnlyExecution)
+    }
     guard let option = session.configOptions.first(where: { $0.id == "mode" }),
       option.values.contains(where: { $0.value == expected })
     else {
       throw AgentRuntimeError.capabilityUnavailable(
-        mutationIntent == .readOnly ? .workspaceRead : .workspaceWriteInPlace
+        mutationIntent == .readOnly ? .readOnlyExecution : .workspaceWriteInPlace
       )
     }
     return expected

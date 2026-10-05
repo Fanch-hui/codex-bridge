@@ -47,21 +47,6 @@
           await model.connectAndRefresh()
           await auxiliary.workspace.refreshSelected()
         }
-      case .saveProjectPolicy:
-        guard let projectID = BridgeDesktopCommandValue.nonEmpty(payload.projectID),
-          let read = BridgeDesktopCommandValue.nonEmpty(payload.readPermission),
-          let write = BridgeDesktopCommandValue.nonEmpty(payload.writePermission),
-          let network = BridgeDesktopCommandValue.nonEmpty(payload.networkPermission),
-          management.selectedProjectID == projectID
-        else { return true }
-        Task { @MainActor in
-          await management.saveSelectedProjectPolicy(
-            read: read,
-            write: write,
-            network: network,
-            projectID: projectID
-          )
-        }
       case .setProjectCommandMode:
         guard let projectID = BridgeDesktopCommandValue.nonEmpty(payload.projectID),
           let mode = BridgeDesktopCommandValue.nonEmpty(payload.mode),

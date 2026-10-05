@@ -66,10 +66,10 @@ extension MCPServiceToolCatalog {
       + "Use each installation_id with list_agent_models to query its native model catalog. "
       + "A selectable OpenCode installation can receive tasks through submit_task; DeepSeek "
       + "Harness supports fresh sessions with provider-native read-only or "
-      + "workspace-write modes. Selectable OpenCode and Antigravity installations can receive "
+      + "full modes. Selectable OpenCode and Antigravity installations can receive "
       + "explicit provider tasks through submit_task. Antigravity supports native plan/accept-edits "
       + "modes, mapping Plan/read-only "
-      + "(agy mode: plan) and Accept Edits/workspace-write (agy mode: accept-edits) to its native "
+      + "(agy mode: plan) and Accept Edits/full (agy mode: accept-edits) to its native "
       + "in-place modes, and may expose exact "
       + "session continuation and queued steer when effective_capabilities reports them. "
       + "Antigravity has no Supervisor support; sandboxed headless tools use its Provider-native "
@@ -77,8 +77,7 @@ extension MCPServiceToolCatalog {
       + "DeepSeek execution-time permission requests are surfaced for local approval; "
       + "steer input for ACP and Antigravity providers is queued as a follow-up on the same session. "
       + "Pi installations use native RPC with a managed extension, exact session binding, queued follow-up "
-      + "and local tool approval. Pi read-only disables file mutations and shell; shell requires Write mode "
-      + "and network_access=true. Inspect network_enforcement to see the policy owner; extension controls "
+      + "and local tool approval. Pi read-only disables file mutations and shell; shell requires full mode. Inspect network_enforcement to see the policy owner; extension controls "
       + "do not imply operating-system isolation. Qoder uses one provider for regional installations; "
       + "models, native authentication and sessions remain bound to the selected region and installation.",
     inputSchema: objectSchema(

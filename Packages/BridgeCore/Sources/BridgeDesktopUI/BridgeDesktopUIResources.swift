@@ -34,7 +34,6 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case pagesCodexConnectionJS = "pages-codex-connection.js"
   case pagesDeepSeekHarnessMCPEditorJS = "pages-deepseek-harness-mcp-editor.js"
   case pagesDeepSeekHarnessMCPJS = "pages-deepseek-harness-mcp.js"
-  case pagesProjectEditorsJS = "pages-project-editors.js"
   case pagesProjectCollectionsJS = "pages-project-collections.js"
   case pagesProjectsJS = "pages-projects.js"
   case pagesLogsJS = "pages-logs.js"

@@ -141,9 +141,9 @@ extension SimpleServiceStore {
         String(project.root.device),
         String(project.root.inode),
         project.root.volumeUUID,
-        project.accessPolicy.read.rawValue,
-        project.accessPolicy.write.rawValue,
-        project.accessPolicy.network.rawValue,
+        "allowed",
+        "allowed",
+        "allowed",
         project.createdAt.timeIntervalSince1970,
         project.updatedAt.timeIntervalSince1970,
         project.directCommandMode.rawValue,
@@ -245,7 +245,7 @@ extension SimpleServiceStore {
       task.executionEffort,
       task.supervisorModel,
       task.supervisorEffort,
-      task.permissionMode.rawValue,
+      task.permissionMode.databaseValue,
       task.networkAllowed ? 1 : 0,
       task.accessMode.rawValue,
       task.fastMode ? 1 : 0,
@@ -375,11 +375,6 @@ extension SimpleServiceStore {
         inode: inode,
         volumeUUID: row["root_volume_uuid"]
       ),
-      accessPolicy: ProjectAccessPolicy(
-        read: ProjectPermission(rawValue: row["read_permission"]),
-        write: ProjectPermission(rawValue: row["write_permission"]),
-        network: ProjectPermission(rawValue: row["network_permission"])
-      ),
       directCommandMode: directCommandMode,
       workspaceCommands: workspaceCommands,
       commandBlacklist: commandBlacklist,
@@ -422,10 +417,6 @@ extension SimpleServiceStore {
     } catch {
       throw ServiceStoreError.corruptRecord
     }
-    let networkAllowedValue: Int = row["network_allowed"]
-    guard networkAllowedValue == 0 || networkAllowedValue == 1 else {
-      throw ServiceStoreError.corruptRecord
-    }
     let state = try ServiceTaskState(
       codexThreadID: row["codex_thread_id"],
       codexTurnID: row["codex_turn_id"],
@@ -455,7 +446,6 @@ extension SimpleServiceStore {
       supervisorModel: row["supervisor_model"],
       supervisorEffort: row["supervisor_effort"],
       permissionMode: permissionMode,
-      networkAllowed: networkAllowedValue == 1,
       accessMode: accessMode,
       fastMode: fastModeValue == 1,
       queueIfBusy: queueIfBusyValue == 1,

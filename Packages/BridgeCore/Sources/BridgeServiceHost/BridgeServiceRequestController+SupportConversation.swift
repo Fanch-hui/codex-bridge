@@ -11,7 +11,7 @@ extension BridgeServiceRequestController {
       taskID: taskID,
       messages: entries.map { entry in
         IPCTaskConversationMessage(
-          messageID: nil,
+          messageID: entry.messageID,
           key: entry.key,
           role: entry.role.rawValue,
           kind: entry.kind.rawValue,
@@ -37,7 +37,8 @@ extension BridgeServiceRequestController {
       final: change.final,
       toolName: change.toolName,
       toolStatus: change.toolStatus,
-      toolArguments: change.toolArguments
+      toolArguments: change.toolArguments,
+      messageID: change.messageID
     )
     guard let data = try? JSONEncoder().encode(push),
       data.count <= BridgeServiceIPC.maximumMessageBytes

@@ -6,24 +6,24 @@
 
 Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、[OpenAI Dot](#通过-openai-dot-使用)、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
 
-macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目权限、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
+macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目目录授权、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 `v1.4.0`。
+当前版本为 `v1.4.1`。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v1.4.0 安装包 | 安装方式 |
+| 平台 | v1.4.1 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-1.4.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| macOS 14+，Intel | `CodexBridge-1.4.0-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.4.0-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.0-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-1.4.1-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-1.4.1-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.4.1-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.1-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.0.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.0.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.4.0.tar.gz` / `codex-bridge-linux-arm64-1.4.0.tar.gz` | 完整解压后运行 `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.1.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.1.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.4.1.tar.gz` / `codex-bridge-linux-arm64-1.4.1.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
@@ -69,7 +69,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 ## 使用指南
 
-- [详细使用指南](./docs/USER_GUIDE.md)：安装、项目权限、Qwen、任务与故障排查
+- [详细使用指南](./docs/USER_GUIDE.md)：安装、项目授权、Qwen、任务与故障排查
 - [ChatGPT / Tunnel / OpenAI API Key 配置](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness 安装与 API 配置](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
 - [Pi 与 Qoder 安装、地区选择与连接](./docs/PI_QODER_CONNECTION_GUIDE.md)
@@ -78,12 +78,12 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 ## 首次配置
 
-**如果只需要读写本地文件、运行命令，添加项目并配置权限后，配置好 Tunnel、添加并启用 Codex Bridge 插件即可，无需安装或连接 Agent。** 这些操作由 Direct Workspace 执行，按项目权限、Direct 执行规则与审批设置处理。
+**如果只需要读写本地文件、运行命令，登记项目目录后，配置好 Tunnel、添加并启用 Codex Bridge 插件即可，无需安装或连接 Agent。** 这些操作由 Direct Workspace 执行，按已登记的项目目录、Direct 执行规则与审批设置处理。
 
 ### 本地文件与命令
 
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
-2. **添加项目**：登记本地目录，并设置读取、写入和网络权限。
+2. **添加项目**：登记本地目录即授权完整访问。
 3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置，在 ChatGPT **插件 → 添加 → 创建自定义 MCP 服务器** 中添加 Codex Bridge，并在对话中启用插件（ChatGPT 使用 Secure MCP Tunnel 需要 Plus 及以上订阅或团队订阅）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
 4. **直接操作项目**：在已启用插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
 
@@ -92,14 +92,14 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 需要让 Codex、OpenCode、DeepSeek Harness 等 Agent 执行任务时，再完成以下配置：
 
 1. **连接 Agent**：首次初始化自动发现已有安装，在连接页点击“连接”完成验证和启用。需要安装或补齐环境时，可以额外点击“一键配置”，按指引完成登录或填写 API Key，详见[一键配置指南](./docs/AGENT_SETUP_GUIDE.md)。Codex 使用本机 Codex 执行通道。
-2. **选择项目和模式**：在工作台选择项目、Agent 以及 `Read Only` / `Write`，并设置该 Agent 的模型偏好。
+2. **选择项目和权限**：在工作台选择项目、Agent 及“只读”或“完整”，并设置模型偏好。“完整”包含写入和联网，“只读”不允许写入和工具联网；GPT/Qwen 新任务使用用户在工作台选择的默认任务权限。
 3. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
 
 密钥通过系统凭据存储管理。分享配置、日志或截图前，请移除凭据。
 
 ## 通过 OpenAI Dot 使用
 
-**Dot 可以直接通过 Codex Bridge 读写本地项目文件并运行命令，无需安装或连接 Agent，也无需启动 Work 或 Codex。** 操作由本机 Bridge 服务的 Direct Workspace 能力执行，沿用项目权限、Direct 执行规则与审批设置。项目维护者实测文件读写可用，并认为 Dot 的插件使用体验更好。
+**Dot 可以直接通过 Codex Bridge 读写本地项目文件并运行命令，无需安装或连接 Agent，也无需启动 Work 或 Codex。** 操作由本机 Bridge 服务的 Direct Workspace 能力执行，按已登记的项目目录、Direct 执行规则与审批设置处理。项目维护者实测文件读写可用，并认为 Dot 的插件使用体验更好。
 
 完成 [ChatGPT 插件连接](./docs/CHATGPT_DEVELOPER_MODE.md)后，确保 Codex Bridge 已在当前账号启用且连接有效，即可让 Dot 直接操作已授权的项目。Dot 沿用插件已有权限；参见 OpenAI 的[插件接入说明](https://learn.chatgpt.com/docs/dots/computers-and-apps#connect-apps)。
 
@@ -121,7 +121,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 | Direct Workspace | 受控文件读写、Patch、命令执行与 Git 操作 |
 | Skills | 本机技能发现、只读查看与显式 Action 调用 |
 
-可用能力由实际 Agent、连接探测和项目权限共同决定。远程请求省略 `project_id` 时使用工作台默认项目；省略 `provider_id` 时使用 Codex。
+可用能力由实际 Agent、连接探测和用户选择的任务权限共同决定。远程请求省略 `project_id` 时使用工作台默认项目；省略 `provider_id` 时使用 Codex。
 
 ## 任务并发限制
 
@@ -141,7 +141,7 @@ macOS、Windows 与 Linux 使用相同的任务并发规则：
 ```text
 ChatGPT Web ── Secure MCP Tunnel ─┐
 Qwen Studio ── localhost MCP ────┼─► Codex Bridge Service
-Desktop App ── local IPC ────────┘   ├─ 项目权限与审批
+Desktop App ── local IPC ────────┘   ├─ 项目目录授权与审批
                                     ├─ 任务、会话与 SQLite
                                     ├─ Codex / OpenCode / DSH / AGY / Pi / Qoder
                                     └─ Direct Workspace / Skills

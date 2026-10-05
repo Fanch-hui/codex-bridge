@@ -100,15 +100,17 @@
     permLabel.appendChild(S.node("span", null, "Agent权限"));
     row3.appendChild(permLabel);
     var seg = S.node("div", "segmented-control");
-    model.readOnly = S.node("button", "segmented-btn", "Read Only");
+    model.readOnly = S.node("button", "segmented-btn", "只读");
     model.readOnly.type = "button";
+    model.readOnly.title = "允许读取，禁止写入和联网";
     model.readOnly.addEventListener("click", function () {
       if (model.emit) model.emit("setWorkbenchPermissionMode", { mode: "read-only" });
     });
-    model.write = S.node("button", "segmented-btn", "Write");
+    model.write = S.node("button", "segmented-btn", "完整");
     model.write.type = "button";
+    model.write.title = "允许读取、写入和联网";
     model.write.addEventListener("click", function () {
-      if (model.emit) model.emit("setWorkbenchPermissionMode", { mode: "workspace-write" });
+      if (model.emit) model.emit("setWorkbenchPermissionMode", { mode: "full" });
     });
     seg.appendChild(model.readOnly); seg.appendChild(model.write); row3.appendChild(seg);
     header.appendChild(row3);

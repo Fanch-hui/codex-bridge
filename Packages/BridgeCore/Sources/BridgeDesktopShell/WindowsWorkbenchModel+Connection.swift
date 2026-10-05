@@ -6,30 +6,59 @@
   import Foundation
 
   extension WindowsWorkbenchModel {
-    /// Launches the service if needed, then verifies connectivity via
-    /// `status()` and pulls the task list.
     public func startServiceAndConnect() async {
+      guard !isShuttingDown, !connectionRefreshInProgress else { return }
       let wasConnected = connectionState == .connected
-      connectionState = .connecting
-      publishDisplay()
-      let launched = await Task.detached(priority: .utility) {
-        DesktopServiceLauncher.ensureServiceRunning()
-      }.value
-      guard launched else {
-        fail("未能连接后台服务：服务启动失败或本机通信未就绪。")
-        startTaskPolling()
-        return
+      let result = await serviceConnectionCoordinator.connect(
+        shouldContinue: { !self.isShuttingDown },
+        probe: {
+          await Task.detached(priority: .utility) {
+            DesktopServiceLauncher.isServiceAvailable()
+          }.value
+        },
+        launch: {
+          self.connectionState = .connecting
+          self.publishDisplay()
+          return await Task.detached(priority: .utility) {
+            DesktopServiceLauncher.ensureServiceRunning()
+          }.value
+        },
+        handshake: {
+          guard !self.isShuttingDown else { return false }
+          return await self.connectAndRefresh(notifyOnConnect: !wasConnected)
+        })
+      guard !isShuttingDown, !Task.isCancelled else { return }
+      switch result {
+      case .connected, .connectionFailed, .inProgress:
+        break
+      case .blocked(.circuitOpen):
+        fail("后台服务连续多次启动失败，已暂停自动重启。请检查安装目录或手动启动服务后再试。")
+      case .blocked:
+        break
+      case .launchFailed(.readinessTimeout):
+        fail("后台服务已启动但长时间未就绪，稍后将自动重试。")
+      case .launchFailed(.exitedDuringStartup(let exitCode)):
+        let detail = exitCode.map { "（退出码 \($0)）" } ?? ""
+        fail("后台服务启动后立即退出\(detail)，稍后将自动重试。")
+      case .launchFailed(.launchFailed(let systemError)):
+        let detail = systemError.map { "（系统错误 \($0)）" } ?? ""
+        fail("无法启动后台服务进程\(detail)，稍后将自动重试。")
+      case .launchFailed(.ready):
+        break
       }
-      await connectAndRefresh(notifyOnConnect: !wasConnected)
+      startTaskPolling()
     }
 
     /// Verifies the pipe transport with a `status()` round trip, then loads tasks.
     public func connectAndRefresh() async {
-      await connectAndRefresh(notifyOnConnect: connectionState != .connected)
+      guard !serviceConnectionCoordinator.isConnecting else { return }
+      if await connectAndRefresh(notifyOnConnect: connectionState != .connected), !isShuttingDown {
+        serviceConnectionCoordinator.reset()
+      }
     }
 
-    private func connectAndRefresh(notifyOnConnect: Bool) async {
-      guard !connectionRefreshInProgress else { return }
+    private func connectAndRefresh(notifyOnConnect: Bool) async -> Bool {
+      guard !connectionRefreshInProgress else { return false }
       connectionRefreshInProgress = true
       connectionGeneration &+= 1
       let requestGeneration = connectionGeneration
@@ -39,19 +68,21 @@
       }
       connectionState = .connecting
       publishDisplay()
+      var didHandshake = false
       do {
         let status = try await client.status()
-        guard isCurrentConnection(requestGeneration) else { return }
+        guard isCurrentConnection(requestGeneration) else { return false }
+        didHandshake = true
         serviceStatus = status
         do {
           let refreshedProjects = try await client.projects()
-          guard isCurrentConnection(requestGeneration) else { return }
+          guard isCurrentConnection(requestGeneration) else { return didHandshake }
           if projects != refreshedProjects {
             projects = refreshedProjects
           }
           projectLoadError = nil
         } catch {
-          guard isCurrentConnection(requestGeneration) else { return }
+          guard isCurrentConnection(requestGeneration) else { return didHandshake }
           projectLoadError = "项目查询失败：\(BridgeServiceErrorMessage.message(error))"
         }
         selectedProjectID =
@@ -59,7 +90,7 @@
           ?? selectedProjectID
           ?? projects.first?.projectID
         try await synchronizeWorkbenchProject()
-        guard isCurrentConnection(requestGeneration) else { return }
+        guard isCurrentConnection(requestGeneration) else { return didHandshake }
         if let mode = status.workbenchPermissionMode,
           BridgeDesktopWorkbenchPermissionMode(rawValue: mode) != nil
         {
@@ -67,7 +98,9 @@
         }
         errorMessage = nil
         await refreshTasks()
-        guard isCurrentConnection(requestGeneration), connectionState == .connected else { return }
+        guard isCurrentConnection(requestGeneration), connectionState == .connected else {
+          return didHandshake
+        }
         startTaskPolling()
         scheduleDeferredConnectionWork(
           generation: requestGeneration,
@@ -75,10 +108,11 @@
         )
         startServiceChangeSubscription(generation: requestGeneration)
       } catch {
-        guard isCurrentConnection(requestGeneration) else { return }
+        guard isCurrentConnection(requestGeneration) else { return didHandshake }
         fail(BridgeServiceErrorMessage.message(error))
       }
       startTaskPolling()
+      return didHandshake
     }
 
     public func refreshTasks() async {
@@ -241,7 +275,12 @@
       }
       isWindowVisible = visible
       restartTaskPolling()
-      if visible { userDidInteract() }
+      if visible {
+        // Returning to the foreground is an explicit user signal: give a
+        // tripped crash-loop circuit one fresh set of launch attempts.
+        serviceConnectionCoordinator.reset()
+        userDidInteract()
+      }
     }
 
     /// Coalesces command-driven refreshes so a batch of UI commands causes one

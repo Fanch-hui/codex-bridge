@@ -25,7 +25,7 @@ public enum TaskInspectorPresentation {
     if let step = task.currentStep?.nilIfEmpty {
       lines.append("当前步骤：\(step)")
     }
-    lines.append("网络访问：\(task.networkAccess ? "允许" : "关闭")")
+    lines.append("任务权限：\(task.permissionMode == "read-only" ? "只读" : "完整")")
     return lines.joined(separator: "\r\n")
   }
 

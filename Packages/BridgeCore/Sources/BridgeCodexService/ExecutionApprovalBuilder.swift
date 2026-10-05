@@ -10,14 +10,10 @@ package struct PreparedExecutionApproval: Sendable {
 }
 
 package struct ExecutionApprovalLimits: Sendable {
-  let projectPolicy: ProjectAccessPolicy
   let taskPermissionMode: ServicePermissionMode
-  let taskNetworkAllowed: Bool
 
   init(request: ExecutionRequest) {
-    projectPolicy = request.project.accessPolicy
     taskPermissionMode = request.task.permissionMode
-    taskNetworkAllowed = request.task.networkAllowed
   }
 }
 
@@ -42,6 +38,7 @@ package enum ExecutionApprovalBuilder {
 
     switch request {
     case .command(let command):
+      try requireWritePermission(limits)
       guard let itemEvidence, case .commandExecution(let evidence) = itemEvidence else {
         throw ExecutionServiceError.protocolViolation("command approval item")
       }
@@ -213,9 +210,6 @@ package enum ExecutionApprovalBuilder {
         try requireWritePermission(limits)
         details.append("File-system write: \(path.display)")
       case .read:
-        guard limits.projectPolicy.read == .allowed else {
-          throw ExecutionServiceError.approvalExceedsPolicy
-        }
         details.append("File-system read: \(path.display)")
       case .deny:
         details.append("File-system deny: \(path.display)")
@@ -223,9 +217,6 @@ package enum ExecutionApprovalBuilder {
       if let relative = path.relative { paths.append(relative) }
     }
     for path in fileSystem.legacyReadPaths ?? [] {
-      guard limits.projectPolicy.read == .allowed else {
-        throw ExecutionServiceError.approvalExceedsPolicy
-      }
       let relative = try ExecutionValidation.relativePath(path, root: projectRoot)
       details.append("File-system read: \(relative)")
       paths.append(relative)
@@ -239,15 +230,13 @@ package enum ExecutionApprovalBuilder {
   }
 
   private static func requireWritePermission(_ limits: ExecutionApprovalLimits) throws {
-    guard limits.taskPermissionMode == .workspaceWrite,
-      limits.projectPolicy.write != .denied
-    else {
+    guard limits.taskPermissionMode == .full else {
       throw ExecutionServiceError.approvalExceedsPolicy
     }
   }
 
   private static func requireNetworkPermission(_ limits: ExecutionApprovalLimits) throws {
-    guard limits.taskNetworkAllowed, limits.projectPolicy.network != .denied else {
+    guard limits.taskPermissionMode == .full else {
       throw ExecutionServiceError.approvalExceedsPolicy
     }
   }

@@ -70,28 +70,12 @@ extension BridgeServiceApplication {
   public func serviceRegisterManagedProject(
     name: String,
     rootURL: URL,
-    accessPolicy: ProjectAccessPolicy,
     deadline: ContinuousClock.Instant
   ) async throws -> MCPProjectDetail {
     try Self.checkDeadline(deadline)
     let project = try await projects.register(
       name: name,
-      rootURL: rootURL,
-      accessPolicy: accessPolicy
-    )
-    return Self.projectDetail(
-      project, gitState: await ProjectGitStatus.read(project, deadline: deadline))
-  }
-
-  public func serviceUpdateManagedProjectPolicy(
-    projectID: String,
-    policy: ProjectAccessPolicy,
-    deadline: ContinuousClock.Instant
-  ) async throws -> MCPProjectDetail {
-    try Self.checkDeadline(deadline)
-    let project = try await projects.updateAccessPolicy(
-      policy,
-      projectID: ProjectID(rawValue: projectID)
+      rootURL: rootURL
     )
     return Self.projectDetail(
       project, gitState: await ProjectGitStatus.read(project, deadline: deadline))

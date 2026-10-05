@@ -40,6 +40,11 @@ extension BridgeServiceRequestController {
     case .agentModelCatalog(let error):
       return .init(
         code: error.code, message: error.localizedDescription, retryable: error.retryable)
+    case .agentPermissionUnsupported:
+      return .init(
+        code: "agent_permission_unsupported",
+        message: "当前 Agent 不支持禁止写入和联网的只读任务。请在本机选择支持只读的 Agent，或将任务权限设为完整。"
+      )
     case .nativeSessionDirectory(let error):
       return map(error)
     case .codexAppServerUnavailable(let detail):
@@ -89,9 +94,6 @@ extension BridgeServiceRequestController {
         message: "The target changed after it was validated.",
         retryable: true
       )
-    case .writeNotAllowed:
-      return .init(
-        code: "write_not_allowed", message: "The project does not allow remote writes.")
     case .approvalRequired(let approvalID):
       return .init(
         code: "approval_required",

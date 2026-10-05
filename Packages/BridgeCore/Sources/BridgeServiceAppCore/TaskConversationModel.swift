@@ -44,6 +44,7 @@ public final class TaskConversationModel: Identifiable {
   var priorEntries: [Entry] = []
   var priorTaskHistories: [String: PriorTaskHistory] = [:]
   var canLoadEarlierCurrentTask = false
+  var isBrowsingHistory = false
   var index: [String: Int] = [:]
   private var hasAppliedPage = false
   private var streamingTask: Task<Void, Never>?
@@ -61,6 +62,8 @@ public final class TaskConversationModel: Identifiable {
   static let initialPriorPageCount = 2
   static let conversationPageSize = 200
   static let earlierPageSize = 100
+  static let maximumCurrentTaskEntries = TaskConversationWindowPolicy
+    .defaultMaximumCurrentTaskEntries
   private static let resyncRetryDelays: [Duration] = [
     .milliseconds(100),
     .milliseconds(250),
@@ -259,6 +262,7 @@ public final class TaskConversationModel: Identifiable {
     pendingPushes.removeAll(keepingCapacity: false)
     pendingResyncPushes.removeAll(keepingCapacity: false)
     pendingPushFirstEnqueuedAt = nil
+    isBrowsingHistory = false
     entries = priorEntries + page.messages.map { Entry($0, isFinal: $0.final) }
     canLoadEarlierCurrentTask = page.messages.count >= Self.conversationPageSize
     updateEarlierAvailability()
@@ -359,6 +363,13 @@ public final class TaskConversationModel: Identifiable {
     for push in pushes {
       if let position = updatedIndex[push.key] {
         var entry = updatedEntries[position]
+        if push.fullContent != nil || push.delta != nil || push.toolName != nil
+          || push.toolStatus != nil || push.toolArguments != nil
+        {
+          entry.messageID = push.messageID
+        } else if let messageID = push.messageID {
+          entry.messageID = messageID
+        }
         if let fullContent = push.fullContent {
           entry.content = fullContent
         } else if let delta = push.delta, entry.content.count == push.baseContentLength {
@@ -399,7 +410,8 @@ public final class TaskConversationModel: Identifiable {
           role: push.role,
           kind: push.kind,
           content: content,
-          isFinal: push.final
+          isFinal: push.final,
+          messageID: push.messageID
         )
         entry.toolName = push.toolName
         entry.toolStatus = push.toolStatus
@@ -416,6 +428,7 @@ public final class TaskConversationModel: Identifiable {
     guard changed else { return }
     entries = updatedEntries
     index = updatedIndex
+    trimOversizedCurrentTaskEntries()
     refreshStreamingState()
     requestAutoScroll()
   }
@@ -460,11 +473,20 @@ public final class TaskConversationModel: Identifiable {
     for message in page.messages {
       if let position = refreshedIndex[message.key] {
         var entry = refreshedEntries[position]
+        if entry.messageID == nil, let messageID = message.messageID,
+          entry.content == message.content, entry.toolName == message.toolName,
+          entry.toolStatus == message.toolStatus, entry.toolArguments == message.toolArguments
+        {
+          entry.messageID = messageID
+          refreshedEntries[position] = entry
+          changed = true
+        }
         guard message.final || message.content.count > entry.content.count else {
           continue
         }
         if entry.content != message.content {
           entry.content = message.content
+          entry.messageID = message.messageID
           changed = true
         }
         if entry.toolName != message.toolName, let toolName = message.toolName {
@@ -494,6 +516,7 @@ public final class TaskConversationModel: Identifiable {
     guard changed else { return }
     entries = refreshedEntries
     index = refreshedIndex
+    trimOversizedCurrentTaskEntries()
     refreshStreamingState()
     requestAutoScroll()
   }

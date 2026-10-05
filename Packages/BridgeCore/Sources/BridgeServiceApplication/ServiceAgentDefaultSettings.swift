@@ -7,9 +7,6 @@ struct ServiceAgentDefaultSettings: Sendable {
   let modelKey: ServiceSettingKey
   let effortKey: ServiceSettingKey
   let permissionKey: ServiceSettingKey
-  let writeMode: String
-  let readMode: String
-  let acceptsPermissionAliases: Bool
   let requiresKnownModel: Bool
 
   static func descriptor(for provider: AgentProviderID, distribution: QoderDistribution? = nil)
@@ -29,19 +26,18 @@ struct ServiceAgentDefaultSettings: Sendable {
   }
 
   func permissionMode(from settings: ServiceSettings) async throws -> String {
-    let value = try await settings.string(for: permissionKey) ?? writeMode
-    guard value == writeMode || value == readMode else { throw ServiceStoreError.corruptRecord }
-    return value
+    let value = try await settings.string(for: permissionKey) ?? ServicePermissionMode.full.rawValue
+    do {
+      return try normalizedPermission(value)
+    } catch {
+      throw ServiceStoreError.corruptRecord
+    }
   }
 
   func normalizedPermission(_ value: String) throws -> String {
-    if value == writeMode || value == readMode { return value }
-    guard acceptsPermissionAliases else {
-      throw ServiceStoreError.invalidArgument(permissionKey.rawValue)
-    }
     switch value {
-    case "build", "workspace-write": return writeMode
-    case "plan", "read-only": return readMode
+    case "build", "workspace-write", "full": return ServicePermissionMode.full.rawValue
+    case "plan", "read-only": return ServicePermissionMode.readOnly.rawValue
     default: throw BridgeMCPQueryError.contractRejected
     }
   }
@@ -49,33 +45,23 @@ struct ServiceAgentDefaultSettings: Sendable {
   private static let all: [AgentProviderID: Self] = [
     .openCode: Self(
       modelKey: .openCodeDefaultModel, effortKey: .openCodeDefaultEffort,
-      permissionKey: .openCodeDefaultPermissionMode, writeMode: "build", readMode: "plan",
-      acceptsPermissionAliases: false, requiresKnownModel: false),
+      permissionKey: .openCodeDefaultPermissionMode, requiresKnownModel: false),
     .deepSeekHarness: Self(
       modelKey: .deepSeekHarnessDefaultModel, effortKey: .deepSeekHarnessDefaultEffort,
-      permissionKey: .deepSeekHarnessDefaultPermissionMode, writeMode: "workspace-write",
-      readMode: "read-only",
-      acceptsPermissionAliases: true, requiresKnownModel: true),
+      permissionKey: .deepSeekHarnessDefaultPermissionMode, requiresKnownModel: true),
     .antigravity: Self(
       modelKey: .antigravityDefaultModel, effortKey: .antigravityDefaultEffort,
-      permissionKey: .antigravityDefaultPermissionMode, writeMode: "workspace-write",
-      readMode: "read-only",
-      acceptsPermissionAliases: true, requiresKnownModel: false),
+      permissionKey: .antigravityDefaultPermissionMode, requiresKnownModel: false),
     .pi: Self(
       modelKey: .piDefaultModel, effortKey: .piDefaultEffort,
-      permissionKey: .piDefaultPermissionMode, writeMode: "workspace-write", readMode: "read-only",
-      acceptsPermissionAliases: true, requiresKnownModel: true),
+      permissionKey: .piDefaultPermissionMode, requiresKnownModel: true),
   ]
 
   private static let qoderCN = Self(
     modelKey: .qoderCNDefaultModel, effortKey: .qoderCNDefaultEffort,
-    permissionKey: .qoderCNDefaultPermissionMode, writeMode: "workspace-write",
-    readMode: "read-only",
-    acceptsPermissionAliases: true, requiresKnownModel: true)
+    permissionKey: .qoderCNDefaultPermissionMode, requiresKnownModel: true)
 
   private static let qoderInternational = Self(
     modelKey: .qoderInternationalDefaultModel, effortKey: .qoderInternationalDefaultEffort,
-    permissionKey: .qoderInternationalDefaultPermissionMode, writeMode: "workspace-write",
-    readMode: "read-only",
-    acceptsPermissionAliases: true, requiresKnownModel: true)
+    permissionKey: .qoderInternationalDefaultPermissionMode, requiresKnownModel: true)
 }

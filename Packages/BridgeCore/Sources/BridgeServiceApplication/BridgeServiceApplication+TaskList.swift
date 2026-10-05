@@ -28,7 +28,7 @@ extension BridgeServiceApplication {
       beforeID: position?.taskID, limit: limit + 1)
     let visible = records.prefix(limit)
     let readableIDs = Set(
-      try await projects.projects().filter { $0.accessPolicy.read == .allowed }.map {
+      try await projects.projects().map {
         $0.id.rawValue
       })
     var items: [MCPTaskListItem] = []

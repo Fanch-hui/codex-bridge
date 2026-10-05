@@ -31,7 +31,6 @@ public actor ServiceProjectRepositoryAdapter: ProjectRepository {
     _ = try await projects.register(
       name: project.name,
       rootURL: URL(fileURLWithPath: project.primaryRoot.canonicalPath, isDirectory: true),
-      accessPolicy: project.accessPolicy,
       id: project.id
     )
   }
@@ -40,13 +39,6 @@ public actor ServiceProjectRepositoryAdapter: ProjectRepository {
     _ = root
     _ = projectID
     throw ProjectRegistryError.rootRebindingUnsupported
-  }
-
-  public func updateAccessPolicy(
-    _ policy: ProjectAccessPolicy,
-    for projectID: ProjectID
-  ) async throws {
-    _ = try await projects.updateAccessPolicy(policy, projectID: projectID)
   }
 
   private static func registeredProject(_ source: ServiceProjectRecord) throws
@@ -66,7 +58,6 @@ public actor ServiceProjectRepositoryAdapter: ProjectRepository {
       name: source.name,
       primaryRoot: root,
       repositoryRoot: root,
-      accessPolicy: source.accessPolicy,
       verificationCommands: [],
       forbiddenPatterns: [],
       createdAt: source.createdAt

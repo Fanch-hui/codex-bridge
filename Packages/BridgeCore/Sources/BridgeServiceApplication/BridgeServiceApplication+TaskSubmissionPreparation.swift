@@ -14,7 +14,7 @@ extension BridgeServiceApplication {
     let projectID = try await submissionProjectID(explicit: submission.projectID)
     let project = try await readableProject(projectID)
     let workbenchPermissionMode = try await workbenchDefaultPermissionMode(
-      sourceClientID: sourceClientID
+      source: source
     )
     if let providerRaw = submission.providerID, providerRaw != serviceCodexProviderID {
       return try await prepareAgentSubmission(
@@ -42,24 +42,15 @@ extension BridgeServiceApplication {
       models = nil
     }
     let selections = try await modelSelections(submission: submission, models: models)
-    let requestedPermissionMode = try Self.permissionModeRequest(
-      submission.permissionMode,
-      override: submission.permissionModeOverride,
-      requirePermissionModeOverride: workbenchPermissionMode != nil
-    )
     let permission = try Self.permissionMode(
-      requestedPermissionMode,
-      project: project,
-      defaultMode: workbenchPermissionMode
+      workbenchPermissionMode == nil ? submission.permissionMode : nil,
+      defaultMode: workbenchPermissionMode ?? .full
     )
     let accessMode = try await settings.accessMode()
     let fastMode =
       try await settings.isFastModeEnabled()
       && models?.first(where: { $0.modelID == selections.execution.model })?
         .supportsFastMode == true
-    guard !submission.networkAccess || project.accessPolicy.network != .denied else {
-      throw BridgeMCPQueryError.contractRejected
-    }
     let selectedSkills = try await selectedSkillSnapshots(
       for: submission,
       project: project,
@@ -84,7 +75,6 @@ extension BridgeServiceApplication {
         supervisorModel: selections.supervisor?.model,
         supervisorEffort: selections.supervisor?.effort,
         permissionMode: permission,
-        networkAllowed: submission.networkAccess,
         accessMode: accessMode,
         fastMode: fastMode,
         queueIfBusy: submission.queueIfBusy == true,
@@ -94,14 +84,9 @@ extension BridgeServiceApplication {
   }
 
   private func workbenchDefaultPermissionMode(
-    sourceClientID: String
+    source: ServiceTaskSource
   ) async throws -> ServicePermissionMode? {
-    guard
-      sourceClientID == MCPClientID.chatGPT.rawValue
-        || sourceClientID == MCPClientID.qwenStudio.rawValue
-    else {
-      return nil
-    }
+    guard source.isRemoteMCPOrigin else { return nil }
     return try await settings.workbenchPermissionMode()
   }
 

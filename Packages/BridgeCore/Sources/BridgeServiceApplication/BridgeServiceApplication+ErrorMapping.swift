@@ -15,7 +15,7 @@ extension BridgeServiceApplication {
       switch value {
       case .unknownProject:
         return .projectNotFound
-      case .readNotAllowed, .forbiddenPath:
+      case .forbiddenPath:
         return .pathDenied
       case .pathMissing:
         return .pathNotFound
@@ -106,10 +106,6 @@ extension BridgeServiceApplication {
     switch value {
     case .unknownProject:
       return .projectNotFound
-    case .readNotAllowed:
-      return .pathDenied
-    case .writeNotAllowed:
-      return .writeNotAllowed
     case .forbiddenPath:
       return .pathForbidden
     case .pathMissing:

@@ -215,13 +215,13 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 9. **Direct 命令的网络隔离边界**。Windows 的 `denyNetwork` 由零网络 Capabilities
    的 AppContainer 执行，工作目录通过显式 DACL 授权，Job Object 在关闭时终止进程树。
    无法创建隔离环境时在启动前报错。Windows safe command 限于已校验的 PE 可执行文件；
-   声明需要网络的命令仍按项目网络策略执行。
+   命令是否联网由 Direct 执行规则与审批决定。
 10. **Windows UI 与功能以 macOS 为产品基准**。Windows 使用 Win32/WebView2 承载相同的
    概览、工作台、项目、日志、连接和设置导航；页面状态、文案、操作后果与 Service API
    闭环必须一致，不能用独立工具窗口、占位页或静态指标代替。平台原生控件允许存在渲染
    差异。Windows Supervisor 按已确认边界保持不可用；Skills 与 macOS 一样只读。主窗口现已统一概览、工作台、项目、
    日志、连接和设置六页；工作台接通项目/权限/任务/Thread/审批与控制动作，项目页接通
-   权限、Direct、黑名单、Skills、Threads，连接页接通本地 MCP/Qwen 与 Agent，日志和设置
+   目录授权、Direct、黑名单、Skills、Threads，连接页接通本地 MCP/Qwen 与 Agent，日志和设置
    复用同一 Service API 与状态语义。Swift Windows 的 `MainActor` 与入口线程不绑定；
    `WindowsWebViewThread` 独占 STA COM、消息循环和 WebView2 接口，主窗口只通过线程安全
    命令同步尺寸、显隐和浏览器操作。

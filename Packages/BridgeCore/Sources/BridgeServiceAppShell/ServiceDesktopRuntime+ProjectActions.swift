@@ -19,25 +19,6 @@ extension BridgeServiceAppModel {
     }
   }
 
-  func updateProjectPolicy(
-    projectID: String,
-    draft: BridgeProjectPolicyDraft
-  ) {
-    runMutation { [weak self] client in
-      guard let self else { return }
-      _ = try await client.updateProjectPolicy(
-        IPCProjectPolicyRequest(
-          projectID: projectID,
-          readPermission: draft.readPermission,
-          writePermission: draft.writePermission,
-          networkPermission: draft.networkPermission
-        )
-      )
-      await self.refresh(silent: true, includeCatalog: false)
-      self.postToast("项目权限配置已保存生效")
-    }
-  }
-
   func loadProjectDetail(projectID: String) {
     guard let client, connectionState == .connected else { return }
     Task { [weak self] in

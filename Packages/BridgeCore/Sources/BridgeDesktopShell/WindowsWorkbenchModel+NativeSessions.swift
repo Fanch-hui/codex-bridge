@@ -15,8 +15,7 @@
     ) async {
       let request = IPCAgentSubmitRequest(
         projectID: projectID, providerID: providerID, installationID: installationID,
-        permissionMode: workbenchPermissionMode, prompt: prompt, threadID: sessionID,
-        networkAccess: false, permissionModeOverride: true)
+        permissionMode: workbenchPermissionMode, prompt: prompt, threadID: sessionID)
       do {
         let response = try await client.submitAgentTask(request)
         await refreshTasks()

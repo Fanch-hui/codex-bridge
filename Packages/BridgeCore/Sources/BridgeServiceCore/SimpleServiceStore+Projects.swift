@@ -59,9 +59,9 @@ extension SimpleServiceStore {
             """,
           arguments: [
             project.name,
-            project.accessPolicy.read.rawValue,
-            project.accessPolicy.write.rawValue,
-            project.accessPolicy.network.rawValue,
+            "allowed",
+            "allowed",
+            "allowed",
             project.directCommandMode.rawValue,
             workspaceCommands,
             commandBlacklist,

@@ -223,7 +223,7 @@ The catalog endpoint needs a Bearer-authenticated OpenAI-compatible `/models` re
 
 Do not copy model IDs or effort values from Codex, OpenCode, or Antigravity. Without an explicit user override, Bridge preserves the provider/profile current value or a saved default that remains valid.
 
-ChatGPT/Qwen permission defaults come from `Workbench → Read Only / Write`. Project hard policy still outranks the Workbench setting and every task override.
+Registering a project authorizes full access to that directory. ChatGPT/Qwen submissions use the default task permission selected by the user in Workbench: **Read Only** or **Full**. AI clients do not choose or override permissions.
 
 ## Protocol and endpoints, model catalog, and search endpoints
 
@@ -241,38 +241,20 @@ Bridge requests real model IDs from the catalog using Bearer authentication. The
 
 Web search independently uses `DEEPSEEK_SEARCH_BASE_URL`. An explicit value wins; new providers use their official default `https://api.deepseek.com/anthropic/v1` when absent. Search appends `/messages` and requires `web_search_20250305` support. An inference gateway does not automatically provide web search.
 
-## 8. Configure permissions for normal use
+## 8. Task permissions and approvals
 
-DSH has two separate approval stages:
+Full tasks allow writes and network tools. Read Only tasks allow neither. The current DSH profile cannot guarantee a task-local restriction on network tools, so Bridge explicitly rejects Read Only tasks as unsupported. Select an agent that supports Read Only for that requirement.
 
-1. Remote task start: approve the `awaiting_local_approval` task in Workbench, unless automatic remote-start approval is intentionally enabled.
-2. Runtime tool permission: when the task enters `waiting_for_codex_approval`, open `Workbench → Pending Local Approval`, inspect the command, scope, and paths, then select one-shot allow or deny.
+For a DSH Full task:
 
-Current DSH ACP accepts only `allow_once` and `reject_once`. `full-access`, `auto-review`, `network_access=true`, and automatic task-start approval do not bypass runtime DSH permissions. One task may therefore ask more than once.
+1. Register the project directory and select the project, DSH, and **Full** in Workbench.
+2. Ensure no other write task is active for the same project.
+3. Approve the remote task start unless automatic remote-start approval is enabled.
+4. Handle each runtime tool request in Workbench. DSH ACP supports `allow_once` and `reject_once`; separate tool calls may ask separately.
 
-For read-only analysis:
+Codex's full-access and auto-review settings apply only to Codex. Full task permission and automatic remote-start approval do not bypass DSH runtime approvals.
 
-1. Allow project reads and deny project writes.
-2. Select `Read Only` in Workbench.
-3. Send `network_access=false` unless the task explicitly needs network access.
-4. Approve the start and handle any runtime command/tool request one at a time.
-
-For code changes:
-
-1. Allow project reads and writes.
-2. Select `Write` in Workbench.
-3. Ensure no other write task is active for the same project.
-4. Approve the start, then resolve each DSH runtime permission request.
-
-For Web Search:
-
-1. Configure the adjacent `.env` and a search endpoint that supports `web_search_20250305`.
-2. Set the project network intent consistently and send `network_access=true`.
-3. Approve the start and any runtime Web-tool permission.
-
-New providers use the official search default independently from inference. To choose another endpoint, set `DEEPSEEK_SEARCH_BASE_URL` in the external profile's `.env`; the App Base URL field configures the main model endpoint only. Do not include `/messages`; DSH appends it. The endpoint must accept Anthropic Messages-compatible requests and the native `web_search_20250305` server tool.
-
-The project network selector is not a packet-level firewall for external providers. The current DSH launcher does not rewrite its profile from `network_access`; actual model and Web access remain governed by DSH's profile, endpoints, and native tools.
+For Web Search, configure the external profile's adjacent `.env` and a search endpoint that supports `web_search_20250305`. New providers use the official search default independently from inference. `DEEPSEEK_SEARCH_BASE_URL` selects another endpoint; omit `/messages`, which DSH appends. Full permission does not configure credentials or prove account access.
 
 ## 9. Submit a task
 
@@ -283,24 +265,22 @@ With the correct Workbench project and permission selected, the minimal task is:
 ```json
 {
   "provider_id": "deepseek-harness",
-  "prompt": "Inspect the current project and summarize its build problem.",
-  "network_access": false
+  "prompt": "Inspect the current project and summarize its build problem."
 }
 ```
 
-Web Search, URL fetch, and external APIs require explicit network intent:
+With **Full** selected by the user, a Web Search task can be submitted as:
 
 ```json
 {
   "provider_id": "deepseek-harness",
-  "prompt": "Verify the dependency against official sources and cite them.",
-  "network_access": true
+  "prompt": "Verify the dependency against official sources and cite them."
 }
 ```
 
-Only when the user explicitly requests overrides should the client add `model_override`, the exact effort returned by the selected model's current ACP session, or `permission_mode_override`. For continuation, pass the `provider_session_id` of a completed task as `thread_id` when `lifecycle.session_continue` is available. The project and installation must match, and persistent session data must still exist. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
+Only when the user explicitly requests a model override should the client add `model_override` and the exact model and effort returned by the current ACP session. Task permissions always come from the user's Workbench selection. For continuation, pass the `provider_session_id` of a completed task as `thread_id` when `lifecycle.session_continue` is available. The project and installation must match, and persistent session data must still exist. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
 
-Remote submissions normally enter `awaiting_local_approval`. Review project, provider, access mode, network intent, and prompt in Workbench before approving the start. Automatic remote-start approval is disabled by default and never approves later DSH permission requests or Direct operations.
+Remote submissions normally enter `awaiting_local_approval`. Review project, provider, task permission, and prompt in Workbench before approving the start. Automatic remote-start approval is disabled by default and never approves later DSH permission requests or Direct operations.
 
 When DSH requests a runtime tool, the persisted task state uses `waiting_for_codex_approval` for compatibility even though the provider remains DSH. In Workbench, inspect the approval card and choose one-shot allow or deny. There is currently no session-wide allow choice for DSH.
 
@@ -329,13 +309,13 @@ Choose Continue conversation on an ended task to retain its context after a Serv
 | Probe works but API auth fails | Confirm `.env` is adjacent to the registered config, the key is valid, and the main base URL is correct |
 | Main model works but search fails | Check the independent search base URL, key acceptance, and `web_search_20250305` support |
 | Model list is empty | Select the project and installation, refresh ACP config options, and use exact provider values |
-| Write denied | Check Workbench mode, project hard policy, and the per-project write gate |
-| Network denied | Set explicit `network_access=true`; verify the adjacent `.env`, endpoint support, and current DSH runtime approval. The project selector is not an external-provider packet firewall |
+| Write denied | Check the user-selected Full permission, native tool rules, and the per-project write gate |
+| Network denied | Check the user-selected Full permission, adjacent `.env`, endpoint support, and current DSH runtime approval |
 | Start was approved but the task still waits | Open Workbench pending approvals, inspect the DSH tool request, and choose one-shot allow or deny |
 | Runtime approval repeats | DSH supports only `allow_once` / `reject_once`; `full-access` does not bypass it |
 | Automatic task start still shows approvals | It skips only `awaiting_local_approval`, not DSH `session/request_permission` |
 
-Do not paste `.env` or raw authentication responses into support reports. Probe success is not end-to-end acceptance: validate the real model, Web Search, read-only task, write task, and permission flow with your own account and a safe test project.
+Do not paste `.env` or raw authentication responses into support reports. Probe success is not end-to-end acceptance: validate the real model, Web Search, Full task, and permission flow with your own account and a safe test project.
 
 ## References
 

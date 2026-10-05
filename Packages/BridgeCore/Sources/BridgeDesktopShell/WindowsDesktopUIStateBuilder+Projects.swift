@@ -17,7 +17,6 @@
       let workspaceState: BridgeDesktopWorkspaceState?
       if let workspace, workspace.selectedProjectID == selectedProjectID, selectedProjectID != nil {
         workspaceState = BridgeDesktopWorkspaceState(
-          fileWritePermission: workspace.fileWritePermission,
           commandMode: workspace.commandMode,
           commandModeOptions: workspace.commandModeValues.map(
             BridgeDesktopProjectPresentation.workspaceCommandModeChoice
@@ -37,16 +36,12 @@
       return BridgeDesktopProjectsState(
         header: header(
           "项目",
-          "管理项目登记、访问权限与项目资源。",
+          "管理项目登记与项目资源。",
           "folder.fill"
         ),
         rows: projectRows,
         selectedProjectID: selectedProjectID,
         selectedProjectDetail: selectedProject.map { _ in management.project.detailText },
-        policyOptions: BridgeDesktopProjectPresentation.policyOptions,
-        readOptions: BridgeDesktopProjectPresentation.readPermissionOptions,
-        writeOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
-        networkOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
         workspace: workspaceState,
         verificationCommands: workspace?.verificationCommands ?? [],
         threadCount: workspace?.threadCount,
@@ -57,8 +52,7 @@
         selectedThreadConversation: workspace?.selectedThreadConversation ?? [],
         skills: workspace?.skills ?? [],
         canRegister: management.project.registerEnabled,
-        canRemove: management.project.removeEnabled,
-        canSavePolicy: management.project.savePolicyEnabled
+        canRemove: management.project.removeEnabled
       )
     }
 

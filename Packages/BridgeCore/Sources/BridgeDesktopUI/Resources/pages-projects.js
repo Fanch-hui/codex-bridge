@@ -9,11 +9,11 @@
     var header = S.node("div"), toolbar = S.node("div", "page-toolbar");
     var add = S.button("添加项目", null, {}, null, "primary");
     add.addEventListener("click", function () { context.emit("registerProject", {}); });
-    toolbar.appendChild(S.node("span", "muted", "只有明确注册的本地目录才会暴露给 MCP 客户端。"));
+    toolbar.appendChild(S.node("span", "muted", "注册项目即授权读写该目录；Agent 任务权限由你选择。"));
     toolbar.appendChild(S.node("span", "toolbar-spacer")); toolbar.appendChild(add);
     var layout = S.node("div", "split-layout"), list = S.node("section", "list-panel");
     var detailHost = S.node("div", "project-detail-host"), empty = S.node("section", "detail-panel");
-    S.empty(empty, "请选择一个项目", "从左侧列表选择目录后，可以配置访问权限并查看项目资源。");
+    S.empty(empty, "请选择一个项目", "从左侧列表选择目录后，可以查看项目资源。");
     detailHost.appendChild(empty); layout.appendChild(list); layout.appendChild(detailHost);
     container.appendChild(header); container.appendChild(toolbar); container.appendChild(layout);
     return { header: header, add: add, layout: layout, list: list, detailHost: detailHost, empty: empty };
@@ -85,20 +85,18 @@
     });
     header.appendChild(remove); root.appendChild(header);
     var body = S.node("div", "detail-body"), description = S.node("p", "muted");
-    var policy = global.CodexBridgeDesktopProjectEditors.policy(projectID);
     var collections = S.node("div", "project-collections-stack");
-    body.appendChild(description); body.appendChild(policy.root);
+    body.appendChild(description);
     body.appendChild(collections); root.appendChild(body);
     return {
       root: root,
       setAvailable: function (available) {
-        remove.disabled = !available; policy.setAvailable(available);
+        remove.disabled = !available;
       },
       update: function (page, project, emit) {
         current.project = project; current.emit = emit;
         name.textContent = project.name; description.textContent = page.selectedProjectDetail || "";
         description.hidden = !page.selectedProjectDetail; remove.disabled = !page.canRemove;
-        policy.update(page, project, emit);
         var nextCollectionsSignature = JSON.stringify({
           verificationCommands: page.verificationCommands,
           sessions: page.sessions,

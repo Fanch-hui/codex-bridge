@@ -277,28 +277,6 @@ extension BridgeServiceRegistrationStatus {
   }
 }
 
-public struct BridgeProjectPolicyDraft: Equatable, Sendable {
-  public var readPermission: String
-  public var writePermission: String
-  public var networkPermission: String
-
-  public init(
-    readPermission: String = "allowed",
-    writePermission: String = "requiresLocalApproval",
-    networkPermission: String = "denied"
-  ) {
-    self.readPermission = readPermission
-    self.writePermission = writePermission
-    self.networkPermission = networkPermission
-  }
-
-  public init(project: MCPProjectSummary) {
-    readPermission = project.capabilities.read
-    writePermission = project.capabilities.write
-    networkPermission = project.capabilities.network
-  }
-}
-
 public struct BridgeWorkspaceCommandDraft: Equatable, Identifiable, Sendable {
   public var name: String
   public var executable: String

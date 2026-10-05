@@ -1,17 +1,4 @@
 public enum BridgeDesktopProjectPresentation {
-  public static let readPermissionOptions = [
-    BridgeDesktopChoice(id: "denied", title: "拒绝"),
-    BridgeDesktopChoice(id: "allowed", title: "允许"),
-  ]
-
-  public static let guardedPermissionOptions = [
-    BridgeDesktopChoice(id: "denied", title: "拒绝"),
-    BridgeDesktopChoice(id: "requiresLocalApproval", title: "需要本机批准"),
-    BridgeDesktopChoice(id: "allowed", title: "允许"),
-  ]
-
-  public static let policyOptions = guardedPermissionOptions
-
   public static let workspaceCommandModeOptions = [
     BridgeDesktopChoice(id: "denied", title: "禁止直接执行"),
     BridgeDesktopChoice(id: "safe", title: "安全模式"),

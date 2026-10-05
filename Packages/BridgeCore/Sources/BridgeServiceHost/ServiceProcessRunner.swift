@@ -115,9 +115,16 @@ public struct ServiceProcessOptions: Equatable, Sendable {
 public enum ServiceProcessRunner {
   public static func run(
     arguments: [String] = Array(CommandLine.arguments.dropFirst()),
-    appVersion: String = "1.4.0"
+    appVersion: String = "1.4.1"
   ) async throws {
     applyDefaultUmask()
+    #if os(Windows)
+      // The service runs detached in the user session; suppress hard-error
+      // and crash-reporter popups for this process and every agent child
+      // process it spawns (the error mode is inherited).
+      _ = SetErrorMode(
+        UINT(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX))
+    #endif
     let options = try ServiceProcessOptions.parse(arguments)
     #if os(Linux)
       if options.shutdown || options.shutdownIfIdle {

@@ -114,11 +114,8 @@ extension MCPServiceToolCatalog {
       + "that default. Omit all model and effort fields unless the user explicitly requests a "
       + "different model for this task; omitted values use the defaults configured in Codex Bridge. "
       + "Model and effort fields are applied only when model_override is true. "
-      + "For ChatGPT and Qwen submissions, omit permission_mode. If a client sends a default "
-      + "permission_mode without permission_mode_override=true, Bridge treats it as an implicit "
-      + "client default and uses the Workbench default task mode shared by Codex, OpenCode, "
-      + "DeepSeek Harness, and Antigravity. A permission_mode value only replaces that default "
-      + "when permission_mode_override=true and the user explicitly requested it. "
+      + "Task permissions are selected by the local user in the Workbench: read-only or full. "
+      + "Full includes file writes and network access. This tool uses that selection and cannot override it. "
       + "Set provider_id to route the task to another registered agent provider (for example "
       + "opencode, deepseek-harness, pi, or qoder). Qoder uses its registered regional SDK and CLI. "
       + "For an image-capable Pi or Qoder model, attachment_paths may list up to eight image paths "
@@ -129,28 +126,24 @@ extension MCPServiceToolCatalog {
       + "Pi uses an exact Bridge-bound session and native RPC. "
       + "Pi steer_task queues a follow-up; model IDs and thinking levels must come from its model catalog. "
       + "Pi file mutations and shell commands require local approval. Its managed read-only mode disables "
-      + "write and shell tools; shell execution requires workspace-write and network_access=true. "
+      + "write and shell tools; shell execution requires full mode. "
       + "These are extension tool controls, not an operating-system filesystem or network sandbox. "
       + "DeepSeek Harness supports "
-      + "provider-native read-only or workspace-write sandbox modes. To continue a completed session, "
+      + "full tasks through its native tools. It cannot enforce read-only tasks without network access. To continue a completed session, "
       + "pass its provider_session_id as thread_id when lifecycle.session_continue is available. Use an explicitly requested model, effort, "
-      + "permission mode, or Skill only when it is supported by the registered installation. "
+      + "or Skill only when it is supported by the registered installation. "
       + "DeepSeek Harness uses its verified native tool composition; Web, network, MCP, file, command, "
       + "and subagent work should be routed to it when the registered installation exposes those "
-      + "capabilities. Its execution-time permission requests are surfaced for local approval. For "
-      + "OpenCode, native ACP Plan/read-only or native ACP Build/workspace-write follows the Workbench default "
-      + "for ChatGPT and Qwen; local Provider API callers may retain their saved Provider default. "
-      + "OpenCode network access follows its native permissions; the "
-      + "network_access field does not override them. OpenCode supports model override through the same model_override rule as "
+      + "capabilities. Its execution-time permission requests are surfaced for local approval. "
+      + "OpenCode uses a restricted read-only agent for read-only tasks and native Build for full tasks. "
+      + "OpenCode network execution follows native permissions. OpenCode supports model override through the same model_override rule as "
       + "Codex. For OpenCode, execution_effort accepts only the selected model's ACP effort values; "
       + "when omitted, Bridge uses the saved OpenCode default when supported and otherwise the Provider default. "
-      + "If permission_mode is omitted or unmarked, Bridge uses the Workbench default for ChatGPT and Qwen; "
-      + "skill fields must also be omitted. To continue an OpenCode conversation, pass the "
+      + "For OpenCode, skill fields must be omitted. To continue an OpenCode conversation, pass the "
       + "provider_session_id returned by get_task as thread_id; Bridge resumes or loads that exact "
       + "ACP session in the selected project. For Antigravity, set provider_id=antigravity; it "
-      + "uses the registered official agy stream-json installation and supports native plan/accept-edits "
-      + "modes: Plan/read-only "
-      + "(agy mode: plan) or Accept Edits/workspace-write (agy mode: accept-edits) in-place modes. "
+      + "uses the registered official agy stream-json installation for full tasks in native accept-edits mode. "
+      + "It cannot enforce read-only tasks without network access. "
       + "Model selection, including effort encoded in the model ID, and session continuation are "
       + "available only when list_agents reports the corresponding effective capability; thread_id "
       + "must be a prior Bridge-bound Antigravity conversation from the same project and installation. "
@@ -162,14 +155,10 @@ extension MCPServiceToolCatalog {
       + "or user input. If it returns still_running, choose when to query get_task for status and results. "
       + "get_task remains available at any time. A wait ending or a client disconnect does not stop "
       + "the task; Bridge saves its result. wait_policy remains compatible without enforcing a polling delay. "
-      + "External Provider network execution is Provider-native; "
-      + "network_access records the user's explicit task request but does not claim Bridge-level packet "
-      + "isolation. Set network_access=true whenever the user explicitly requests web search, URL "
-      + "fetches, external APIs, or other network use; false or omitted does not grant task-level "
-      + "network access. For Antigravity, a locally selected full-access mode plus network_access=true "
-      + "uses agy's documented non-interactive approval while retaining agy's native sandbox and the "
-      + "requested Plan/Accept Edits mode. Bridge controls task admission, project policy, and local "
-      + "start approval without wrapping Agent processes in a filesystem or network sandbox. Never "
+      + "External Provider network execution is Provider-native. Full mode authorizes writes and network use; "
+      + "read-only mode restricts file mutation and network-capable tools where the Provider supports enforcement. "
+      + "Bridge controls task admission and local start approval without wrapping Agent processes in an "
+      + "operating-system filesystem or network sandbox. Never "
       + "treat a non-terminal status or unchanged "
       + "updated_at as failure.",
     inputSchema: objectSchema(
@@ -207,22 +196,6 @@ extension MCPServiceToolCatalog {
           "description":
             "Set true only when the user explicitly requests a per-task model or effort override. Otherwise omit; supplied model fields are ignored for compatibility.",
         ],
-        "permission_mode": [
-          "type": ["string", "null"],
-          "enum": ["read-only", "workspace-write", .null],
-          "description":
-            "For ChatGPT and Qwen submissions, omitting this field or sending it without permission_mode_override=true uses the Workbench default task mode across Codex and registered external agents. A permission_mode value only replaces that default when permission_mode_override=true and the user explicitly requested it. Codex selects its native sandbox. OpenCode maps these modes to native ACP Plan/Build. DeepSeek Harness applies them to a private provider profile and surfaces execution-time permission requests for local approval. Antigravity selects agy Plan or Accept Edits and uses its native sandbox permission policy for headless tools.",
-        ],
-        "permission_mode_override": [
-          "type": ["boolean", "null"],
-          "description":
-            "Set true only when the user explicitly requests a per-task permission override. For ChatGPT and Qwen, absent or false uses the Workbench default even when a client supplies permission_mode: read-only.",
-        ],
-        "network_access": [
-          "type": "boolean",
-          "description":
-            "Set true whenever the user's task explicitly requires web search, URL fetches, external APIs, or other network use. False or omitted does not grant task-level network access. Codex applies its native sandbox policy. OpenCode, DeepSeek Harness, and Antigravity execute network-capable tools under their Provider-native policies; this field records the explicit request and project admission but does not claim Bridge-level packet isolation.",
-        ],
         "acceptance_criteria": [
           "type": "array",
           "maxItems": 32,
@@ -232,7 +205,7 @@ extension MCPServiceToolCatalog {
         "queue_if_busy": [
           "type": "boolean",
           "description":
-            "When true, a workspace-write task waits in the durable project queue if another write task is active. The default false preserves immediate busy responses.",
+            "When true, a full task waits in the durable project queue if another write task is active. The default false preserves immediate busy responses.",
         ],
         "attachment_paths": [
           "type": "array",

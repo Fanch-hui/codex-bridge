@@ -38,10 +38,8 @@
         rows: [],
         selectedIndex: nil,
         detailText: "请选择项目。",
-        policy: nil,
         registerEnabled: false,
         removeEnabled: false,
-        savePolicyEnabled: false,
         statusText: "尚未加载项目。"
       )
       let emptyAgent = WindowsAgentManagementDisplay(
@@ -168,9 +166,6 @@
           name: project.name,
           detail: ProjectAgentPresentation.project(project).detailText,
           gitState: project.gitState,
-          readPermission: project.capabilities.read,
-          writePermission: project.capabilities.write,
-          networkPermission: project.capabilities.network,
           selected: project.projectID == selectedProjectID
         )
       }
@@ -212,16 +207,8 @@
         rows: projectPresentations.map(\.rowText),
         selectedIndex: selectedProjectIndex,
         detailText: selectedProject?.detailText ?? "请选择项目。",
-        policy: selectedProject.map {
-          WindowsProjectPolicy(
-            read: $0.readPermission,
-            write: $0.writePermission,
-            network: $0.networkPermission
-          )
-        },
         registerEnabled: projectActions,
         removeEnabled: projectActions && selectedProject != nil,
-        savePolicyEnabled: projectActions && selectedProject != nil,
         statusText: projectStatusText,
         projectItems: projectItems
       )

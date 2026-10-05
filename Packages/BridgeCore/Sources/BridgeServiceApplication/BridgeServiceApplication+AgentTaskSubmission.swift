@@ -57,7 +57,6 @@ extension BridgeServiceApplication {
         executionModel: model.executionModel,
         executionEffort: model.executionEffort,
         permissionMode: context.permission,
-        networkAllowed: submission.networkAccess,
         accessMode: .requestApproval,
         queueIfBusy: submission.queueIfBusy == true,
         attachments: attachments,

@@ -24,25 +24,21 @@ public struct MCPCommandBlacklistRule: Codable, Equatable, Sendable {
 }
 
 public struct MCPDirectWorkspace: Codable, Equatable, Sendable {
-  public let fileWritePermission: String
   public let commandMode: String
   public let commands: [MCPProjectCommand]
   public let commandBlacklist: [MCPCommandBlacklistRule]
 
   public init(
-    fileWritePermission: String,
     commandMode: String,
     commands: [MCPProjectCommand],
     commandBlacklist: [MCPCommandBlacklistRule] = []
   ) {
-    self.fileWritePermission = fileWritePermission
     self.commandMode = commandMode
     self.commands = commands
     self.commandBlacklist = commandBlacklist
   }
 
   private enum CodingKeys: String, CodingKey {
-    case fileWritePermission = "file_write_permission"
     case commandMode = "command_mode"
     case commands
     case commandBlacklist = "command_blacklist"
@@ -52,7 +48,6 @@ public struct MCPDirectWorkspace: Codable, Equatable, Sendable {
 public struct MCPProjectDetail: Codable, Equatable, Sendable {
   public let projectID: String
   public let name: String
-  public let capabilities: MCPProjectCapabilities
   public let gitState: String?
   public let verificationCommands: [String]
   public let threadCount: Int?
@@ -61,7 +56,6 @@ public struct MCPProjectDetail: Codable, Equatable, Sendable {
   public init(
     projectID: String,
     name: String,
-    capabilities: MCPProjectCapabilities,
     gitState: String? = nil,
     verificationCommands: [String] = [],
     threadCount: Int? = nil,
@@ -69,7 +63,6 @@ public struct MCPProjectDetail: Codable, Equatable, Sendable {
   ) {
     self.projectID = projectID
     self.name = name
-    self.capabilities = capabilities
     self.gitState = gitState
     self.verificationCommands = verificationCommands
     self.threadCount = threadCount
@@ -79,7 +72,6 @@ public struct MCPProjectDetail: Codable, Equatable, Sendable {
   private enum CodingKeys: String, CodingKey {
     case projectID = "project_id"
     case name
-    case capabilities
     case gitState = "git_state"
     case verificationCommands = "verification_commands"
     case threadCount = "thread_count"

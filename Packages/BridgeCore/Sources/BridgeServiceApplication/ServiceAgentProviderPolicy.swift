@@ -94,11 +94,10 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
   }
 
   public func effectiveCapabilities(
-    _ capabilities: Set<AgentCapability>,
-    projectAllowsWorkspaceWrite: Bool
+    _ capabilities: Set<AgentCapability>
   ) -> Set<AgentCapability> {
     var result = allowedCapabilities.map { capabilities.intersection($0) } ?? capabilities
-    if !supportsWorkspaceWrite || !projectAllowsWorkspaceWrite {
+    if !supportsWorkspaceWrite {
       result.remove(.workspaceWriteInPlace)
       result.remove(.workspaceWriteIsolated)
     }
@@ -146,7 +145,7 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
   }
 
   public var defaultPermissionMode: ServicePermissionMode {
-    supportsWorkspaceWrite ? .workspaceWrite : .readOnly
+    supportsWorkspaceWrite ? .full : .readOnly
   }
 }
 

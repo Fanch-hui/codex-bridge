@@ -5,23 +5,6 @@ import BridgeServiceCore
 import Foundation
 
 extension ExecutionSession {
-  func validateProjectPolicy(_ request: ExecutionRequest) throws {
-    let policy = request.project.accessPolicy
-    switch request.task.permissionMode {
-    case .readOnly:
-      guard policy.read != .denied else {
-        throw ExecutionServiceError.projectPermissionDenied(request.project.id)
-      }
-    case .workspaceWrite:
-      guard policy.read != .denied, policy.write != .denied else {
-        throw ExecutionServiceError.projectPermissionDenied(request.project.id)
-      }
-    }
-    if request.task.networkAllowed, policy.network == .denied {
-      throw ExecutionServiceError.projectPermissionDenied(request.project.id)
-    }
-  }
-
   func validateModel(
     model: String,
     effort: String,
@@ -204,38 +187,29 @@ extension ExecutionSession {
     fastServiceTierID: String?
   ) -> ExecutionPosture {
     let task = request.task
-    let projectPolicy = request.project.accessPolicy
-    let fullAccess =
-      task.accessMode == .fullAccess
-      && task.permissionMode == .workspaceWrite
-      && task.networkAllowed
-      && projectPolicy.write != .denied
-      && projectPolicy.network != .denied
+    let fullAccess = task.accessMode == .fullAccess && task.permissionMode == .full
     let sandboxPolicy: CodexSandboxPolicy
-    let approvalPolicy: CodexApprovalPolicy
     if fullAccess {
       sandboxPolicy = .dangerFullAccess
-      approvalPolicy = .never
     } else {
       switch task.permissionMode {
       case .readOnly:
-        sandboxPolicy = .readOnly(networkAccess: task.networkAllowed)
-      case .workspaceWrite:
+        sandboxPolicy = .readOnly(networkAccess: false)
+      case .full:
         sandboxPolicy = .workspaceWrite(
           writableRoots: [root],
-          networkAccess: task.networkAllowed,
+          networkAccess: true,
           excludeSlashTmp: false,
           excludeTmpdirEnvVar: false
         )
       }
-      approvalPolicy = .onRequest
     }
     return ExecutionPosture(
       model: wireModel(task.executionModel),
       threadSandbox: fullAccess
         ? .dangerFullAccess : (task.permissionMode == .readOnly ? .readOnly : .workspaceWrite),
       sandboxPolicy: sandboxPolicy,
-      approvalPolicy: approvalPolicy,
+      approvalPolicy: task.accessMode == .fullAccess ? .never : .onRequest,
       approvalsReviewer: task.accessMode == .autoReview ? "auto_review" : "user",
       serviceTier: fastServiceTierID
     )

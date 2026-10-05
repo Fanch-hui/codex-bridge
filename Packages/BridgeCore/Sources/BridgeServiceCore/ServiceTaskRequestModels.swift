@@ -27,7 +27,7 @@ public struct ServiceTaskRequest: Equatable, Sendable {
   public let supervisorModel: String?
   public let supervisorEffort: String?
   public let permissionMode: ServicePermissionMode
-  public let networkAllowed: Bool
+  public var networkAllowed: Bool { permissionMode == .full }
   public let accessMode: ServiceAccessMode
   public let fastMode: Bool
   public let queueIfBusy: Bool
@@ -49,7 +49,7 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     supervisorModel: String? = nil,
     supervisorEffort: String? = nil,
     permissionMode: ServicePermissionMode,
-    networkAllowed: Bool = false,
+    networkAllowed _: Bool = false,
     accessMode: ServiceAccessMode = .requestApproval,
     fastMode: Bool = false,
     queueIfBusy: Bool = false,
@@ -70,7 +70,6 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     self.supervisorModel = supervisorModel
     self.supervisorEffort = supervisorEffort
     self.permissionMode = permissionMode
-    self.networkAllowed = networkAllowed
     self.accessMode = accessMode
     self.fastMode = fastMode
     self.queueIfBusy = queueIfBusy

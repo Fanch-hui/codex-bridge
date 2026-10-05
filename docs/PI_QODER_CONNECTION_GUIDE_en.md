@@ -26,7 +26,7 @@ Select the China region on the Qoder connection card, scan local installations, 
 
 Changing regions affects defaults for new tasks. Continuing an existing session uses its original region and installation binding.
 
-In **Settings → Agent Models and Permissions → Qoder Execution Permissions**, choose **Request approval**, **Approve for me**, or **Allow full access** for the selected region. Qoder decides whether to allow each operation in the second mode; the third skips Qoder's per-operation permission prompts. Bridge project read/write and network restrictions still apply. The latter two modes require the project directory to be trusted by Qoder. Permission settings are stored separately for each region.
+In **Settings → Agent Models and Permissions → Qoder Execution Permissions**, choose **Request approval**, **Approve for me**, or **Allow full access** for the selected region. Qoder decides whether to allow each operation in the second mode; the third skips Qoder's per-operation permission prompts. The user-selected task permission still applies: Read Only prohibits writes and network tools; Full includes writes and network tools. The latter two modes require the project directory to be trusted by Qoder. Permission settings are stored separately for each region.
 
 ## Installation discovery and runtime paths
 
@@ -43,6 +43,6 @@ Bridge validates the CLI, Node, SDK, and bundled host resources. Changed files r
 - **SDK unavailable or version mismatch:** check the SDK region, required CLI version, and SDK directory.
 - **Model unavailable:** check the model catalog and provider configuration in the native agent first.
 
-MCP servers are configured separately for Pi, Qoder CN, and Qoder international. Tool availability also depends on task network access, read/write mode, and local approval decisions.
+MCP servers are configured separately for Pi, Qoder CN, and Qoder international. The user chooses Read Only or Full; ChatGPT/Qwen tasks inherit the default selected in Workbench, and AI clients do not select permissions. Pi/Qoder enforce Read Only through controlled application tools, which is not operating-system isolation. Native tool rules and local approval decisions also apply.
 
 When continuing or restarting a Pi/Qoder task in the workbench, enter names from the project's Skills list in the Skills field, separated by commas. Leave it empty to retain the session's selection. MCP submissions accept `skill_names`; the singular `skill_name` field remains supported.

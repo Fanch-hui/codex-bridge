@@ -4,56 +4,15 @@ import Foundation
 public struct IPCProjectRegistrationRequest: Codable, Equatable, Sendable {
   public let name: String
   public let absolutePath: String
-  public let readPermission: String
-  public let writePermission: String
-  public let networkPermission: String
 
-  public init(
-    name: String,
-    absolutePath: String,
-    readPermission: String = "allowed",
-    writePermission: String = "requiresLocalApproval",
-    networkPermission: String = "denied"
-  ) {
+  public init(name: String, absolutePath: String) {
     self.name = name
     self.absolutePath = absolutePath
-    self.readPermission = readPermission
-    self.writePermission = writePermission
-    self.networkPermission = networkPermission
   }
 
   private enum CodingKeys: String, CodingKey {
     case name
     case absolutePath = "absolute_path"
-    case readPermission = "read_permission"
-    case writePermission = "write_permission"
-    case networkPermission = "network_permission"
-  }
-}
-
-public struct IPCProjectPolicyRequest: Codable, Equatable, Sendable {
-  public let projectID: String
-  public let readPermission: String
-  public let writePermission: String
-  public let networkPermission: String
-
-  public init(
-    projectID: String,
-    readPermission: String,
-    writePermission: String,
-    networkPermission: String
-  ) {
-    self.projectID = projectID
-    self.readPermission = readPermission
-    self.writePermission = writePermission
-    self.networkPermission = networkPermission
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case projectID = "project_id"
-    case readPermission = "read_permission"
-    case writePermission = "write_permission"
-    case networkPermission = "network_permission"
   }
 }
 

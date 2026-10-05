@@ -86,6 +86,13 @@ extension BridgeMCPQueryError {
         "unavailable", .infrastructureFailure, true, "retry_or_check_bridge_status",
         "A required local Bridge component is unavailable."
       )
+    case .agentPermissionUnsupported:
+      return error(
+        "agent_permission_unsupported", .policyDenied, false,
+        "ask_local_user_to_choose_supported_agent",
+        "The selected Agent cannot enforce read-only tasks without write or network access. "
+          + "The local user must choose a supported Agent or change the saved task permission."
+      )
     case .agentModelCatalog(let error):
       return error.modelCatalogToolError
     case .nativeSessionDirectory(let error):
@@ -119,11 +126,6 @@ extension BridgeMCPQueryError {
       return error(
         "path_changed", .stateConflict, true, "read_path_and_retry",
         "The target changed after it was validated."
-      )
-    case .writeNotAllowed:
-      return error(
-        "write_not_allowed", .policyDenied, false, "request_project_write_access",
-        "The project does not allow remote writes."
       )
     case .approvalRequired(let approvalID):
       return MCPToolErrorDTO(
@@ -281,14 +283,6 @@ extension BridgeMCPQueryError {
       category = .policyDenied
       nextAction = "do_not_run_direct_commands"
       message = "Direct command execution is disabled for this project."
-    case .networkDenied:
-      category = .policyDenied
-      nextAction = "use_command_without_network"
-      message = "The project policy denies the command's network requirement."
-    case .writeDenied:
-      category = .policyDenied
-      nextAction = "request_project_write_access"
-      message = "The project policy denies Direct command execution without write access."
     case .blacklisted:
       category = .policyDenied
       nextAction = "do_not_retry_command"

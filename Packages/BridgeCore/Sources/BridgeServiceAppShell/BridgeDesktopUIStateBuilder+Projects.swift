@@ -11,7 +11,7 @@ extension BridgeDesktopUIStateBuilder {
     return BridgeDesktopProjectsState(
       header: BridgeDesktopPageHeader(
         title: "项目",
-        subtitle: "管理注册目录、访问权限与项目资源。",
+        subtitle: "管理注册目录与项目资源。",
         symbol: BridgeServiceNavigation.projects.symbol
       ),
       rows: model.projects.map { project in
@@ -20,18 +20,11 @@ extension BridgeDesktopUIStateBuilder {
           name: project.name,
           detail: project.projectID,
           gitState: project.gitState,
-          readPermission: project.capabilities.read,
-          writePermission: project.capabilities.write,
-          networkPermission: project.capabilities.network,
           selected: project.projectID == model.selectedProjectID
         )
       },
       selectedProjectID: selected?.projectID,
       selectedProjectDetail: projectDetailText(detail),
-      policyOptions: BridgeDesktopProjectPresentation.policyOptions,
-      readOptions: BridgeDesktopProjectPresentation.readPermissionOptions,
-      writeOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
-      networkOptions: BridgeDesktopProjectPresentation.guardedPermissionOptions,
       workspace: detail?.directWorkspace.map(workspaceState),
       verificationCommands: detail?.verificationCommands ?? [],
       threadCount: detail?.threadCount,
@@ -68,8 +61,7 @@ extension BridgeDesktopUIStateBuilder {
       },
       skills: model.skills.map(skillRow),
       canRegister: model.connectionState == .connected,
-      canRemove: selected != nil && model.connectionState == .connected,
-      canSavePolicy: selected != nil && model.connectionState == .connected
+      canRemove: selected != nil && model.connectionState == .connected
     )
   }
 
@@ -89,7 +81,6 @@ extension BridgeDesktopUIStateBuilder {
     _ workspace: MCPDirectWorkspace
   ) -> BridgeDesktopWorkspaceState {
     BridgeDesktopWorkspaceState(
-      fileWritePermission: workspace.fileWritePermission,
       commandMode: workspace.commandMode,
       commandModeOptions: BridgeDesktopProjectPresentation.workspaceCommandModeOptions,
       commands: workspace.commands.map {

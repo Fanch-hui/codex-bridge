@@ -15,7 +15,7 @@ public struct AgentTaskBrief: Sendable {
   public let effort: String?
   public let permissionMode: ServicePermissionMode
   public let profileID: AgentProfileID?
-  public let networkAllowed: Bool
+  public var networkAllowed: Bool { permissionMode == .full }
   public let attachments: [AgentImageAttachment]
   public let selectedSkills: [AgentSelectedSkill]
   // Retained for source compatibility; external providers own their tool approval policy.
@@ -37,7 +37,7 @@ public struct AgentTaskBrief: Sendable {
     effort: String? = nil,
     permissionMode: ServicePermissionMode = .readOnly,
     profileID: AgentProfileID? = nil,
-    networkAllowed: Bool,
+    networkAllowed _: Bool = false,
     accessMode: ServiceAccessMode = .requestApproval,
     attachments: [AgentImageAttachment] = [],
     selectedSkills: [AgentSelectedSkill] = []
@@ -53,7 +53,6 @@ public struct AgentTaskBrief: Sendable {
     self.effort = effort
     self.permissionMode = permissionMode
     self.profileID = profileID
-    self.networkAllowed = networkAllowed
     self.accessMode = accessMode
     self.attachments = attachments
     self.selectedSkills = selectedSkills
@@ -143,7 +142,7 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
       throw AgentRuntimeError.invalidRequest("request.profileID")
     }
     let mutationIntent: AgentMutationIntent =
-      brief.permissionMode == .workspaceWrite ? .workspaceWrite : .readOnly
+      brief.permissionMode == .full ? .workspaceWrite : .readOnly
     var requiredCapabilities = mutationIntent.requiredCapabilities(for: record.providerID)
     if brief.requestedSessionID != nil {
       requiredCapabilities.insert(.sessionContinue)
@@ -184,8 +183,8 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
       model: brief.model,
       effort: brief.effort,
       profileID: brief.profileID ?? record.securityProfileID,
-      mutationIntent: brief.permissionMode == .workspaceWrite ? .workspaceWrite : .readOnly,
-      workspaceStrategy: brief.permissionMode == .workspaceWrite
+      mutationIntent: brief.permissionMode == .full ? .workspaceWrite : .readOnly,
+      workspaceStrategy: brief.permissionMode == .full
         ? .exclusiveProject : .sharedProject,
       networkAccessRequested: brief.networkAllowed,
       toolApprovalPolicy: brief.toolApprovalPolicy,

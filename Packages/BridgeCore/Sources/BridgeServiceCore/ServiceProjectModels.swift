@@ -116,7 +116,6 @@ public struct ServiceProjectRecord: Codable, Equatable, Sendable {
   public let id: ProjectID
   public let name: String
   public let root: ServiceRootIdentity
-  public let accessPolicy: ProjectAccessPolicy
   public let directCommandMode: ServiceDirectCommandMode
   public let workspaceCommands: [ServiceWorkspaceCommand]
   public let commandBlacklist: [ServiceCommandBlacklistRule]
@@ -127,7 +126,6 @@ public struct ServiceProjectRecord: Codable, Equatable, Sendable {
     id: ProjectID,
     name: String,
     root: ServiceRootIdentity,
-    accessPolicy: ProjectAccessPolicy,
     directCommandMode: ServiceDirectCommandMode = .safe,
     workspaceCommands: [ServiceWorkspaceCommand] = [],
     commandBlacklist: [ServiceCommandBlacklistRule] = [],
@@ -136,7 +134,6 @@ public struct ServiceProjectRecord: Codable, Equatable, Sendable {
   ) throws {
     try ServiceValidation.identifier(id.rawValue, field: "project.id", maximumBytes: 128)
     try ServiceValidation.text(name, field: "project.name", maximumBytes: 1_024)
-    try ServiceValidation.projectPolicy(accessPolicy)
     guard workspaceCommands.count <= 128 else {
       throw ServiceStoreError.invalidArgument("project.workspaceCommands")
     }
@@ -151,29 +148,11 @@ public struct ServiceProjectRecord: Codable, Equatable, Sendable {
     self.id = id
     self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
     self.root = root
-    self.accessPolicy = accessPolicy
     self.directCommandMode = directCommandMode
     self.workspaceCommands = workspaceCommands
     self.commandBlacklist = commandBlacklist
     self.createdAt = createdAt
     self.updatedAt = updatedAt
-  }
-
-  public func updatingAccessPolicy(
-    _ policy: ProjectAccessPolicy,
-    at date: Date
-  ) throws -> ServiceProjectRecord {
-    try ServiceProjectRecord(
-      id: id,
-      name: name,
-      root: root,
-      accessPolicy: policy,
-      directCommandMode: directCommandMode,
-      workspaceCommands: workspaceCommands,
-      commandBlacklist: commandBlacklist,
-      createdAt: createdAt,
-      updatedAt: date
-    )
   }
 
   public func updatingWorkspaceConfiguration(
@@ -186,7 +165,6 @@ public struct ServiceProjectRecord: Codable, Equatable, Sendable {
       id: id,
       name: name,
       root: root,
-      accessPolicy: accessPolicy,
       directCommandMode: directCommandMode,
       workspaceCommands: workspaceCommands,
       commandBlacklist: commandBlacklist,

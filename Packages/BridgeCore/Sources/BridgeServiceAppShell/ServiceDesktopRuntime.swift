@@ -113,7 +113,7 @@ extension BridgeServiceAppModel {
       agentModelDefaultMutationTasks = [:]
       agentModelDefaults = [:]
       openCodeDefaultModel = nil
-      openCodeDefaultPermissionMode = "build"
+      openCodeDefaultPermissionMode = "full"
       openCodeDefaultEffort = nil
       isRefreshingAgentModels = false
       agentModelRefreshError = nil
@@ -121,8 +121,8 @@ extension BridgeServiceAppModel {
       tasks = []
       approvals = []
       taskStartApprovalMode = "require"
-      workbenchPermissionMode = "workspace-write"
-      confirmedWorkbenchPermissionMode = "workspace-write"
+      workbenchPermissionMode = "full"
+      confirmedWorkbenchPermissionMode = "full"
       resolvingApprovalKeys = []
       resolvedTaskApprovalKeys = []
       resolvedDirectApprovalKeys = []
@@ -366,9 +366,9 @@ extension BridgeServiceAppModel {
 
   func applyWorkbenchPermissionMode(_ mode: String?) {
     guard workbenchPermissionModeSyncTask == nil else { return }
-    guard let mode, mode == "read-only" || mode == "workspace-write" else {
-      workbenchPermissionMode = "workspace-write"
-      confirmedWorkbenchPermissionMode = "workspace-write"
+    guard let mode, mode == "read-only" || mode == "full" else {
+      workbenchPermissionMode = "full"
+      confirmedWorkbenchPermissionMode = "full"
       return
     }
     workbenchPermissionMode = mode

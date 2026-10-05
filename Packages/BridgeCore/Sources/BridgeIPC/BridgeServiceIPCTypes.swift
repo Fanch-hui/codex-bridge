@@ -7,7 +7,6 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case updateDirectConfiguration = "update_direct_configuration"
   case listProjects = "list_projects"
   case registerProject = "register_project"
-  case updateProjectPolicy = "update_project_policy"
   case removeProject = "remove_project"
   case getProjectCommands = "get_project_commands"
   case updateProjectCommands = "update_project_commands"

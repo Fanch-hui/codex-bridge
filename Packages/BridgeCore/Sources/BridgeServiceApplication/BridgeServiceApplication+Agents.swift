@@ -10,11 +10,8 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPAgentList {
     try Self.checkDeadline(deadline)
-    let project: ServiceProjectRecord?
     if let projectID {
-      project = try await readableProject(projectID)
-    } else {
-      project = nil
+      _ = try await readableProject(projectID)
     }
     guard let agentRegistry else { return MCPAgentList(agents: []) }
     let persistedRecords = try await agentRegistry.installations()
@@ -36,26 +33,18 @@ extension BridgeServiceApplication {
     }
     try Self.checkDeadline(deadline)
     return MCPAgentList(
-      agents: records.map { Self.agentSummary($0, project: project, formatter: iso8601) }
+      agents: records.map { Self.agentSummary($0, formatter: iso8601) }
     )
   }
 
   private static func agentSummary(
     _ record: ServiceAgentInstallationRecord,
-    project: ServiceProjectRecord?,
     formatter: ISO8601DateFormatter
   ) -> MCPAgentSummary {
     let policy = ServiceAgentProviderPolicyRegistry.policy(for: record.providerID)
-    let projectAllowsWorkspaceWrite = project?.accessPolicy.write != .denied
     var capabilities = record.capabilities.effective
     if let policy {
-      capabilities = policy.effectiveCapabilities(
-        capabilities,
-        projectAllowsWorkspaceWrite: projectAllowsWorkspaceWrite
-      )
-    } else if !projectAllowsWorkspaceWrite {
-      capabilities.remove(.workspaceWriteInPlace)
-      capabilities.remove(.workspaceWriteIsolated)
+      capabilities = policy.effectiveCapabilities(capabilities)
     }
     let submissionEnabled =
       policy?.taskSubmissionEnabled(

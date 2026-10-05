@@ -50,14 +50,7 @@ extension BridgeServiceRequestController {
     default:
       clientLabel = "远程客户端"
     }
-    let permission = taskPermissionDescription(
-      providerID: approval.providerID,
-      permissionMode: approval.permissionMode
-    )
-    let network = taskNetworkDescription(
-      providerID: approval.providerID,
-      networkAccess: approval.networkAllowed
-    )
+    let permission = approval.permissionMode == "read-only" ? "只读" : "完整（读写与联网）"
     return IPCApprovalSummary(
       approvalID: approval.approvalID,
       taskID: approval.taskID,
@@ -67,47 +60,10 @@ extension BridgeServiceRequestController {
       kind: "task_start",
       title: "\(clientLabel)请求调用 \(approval.providerDisplayName)",
       summary: prompt,
-      reason: "项目：\(approval.projectID) · 权限：\(permission) · 网络：\(network)",
+      reason: "项目：\(approval.projectID) · 权限：\(permission)",
       decisionOptions: ["allow", "deny"],
       oneTimeToolAutoApprovalAvailable: approval.oneTimeToolAutoApprovalAvailable
     )
   }
 
-  private static func taskPermissionDescription(
-    providerID: String,
-    permissionMode: String?
-  ) -> String {
-    guard let permissionMode, !permissionMode.isEmpty else { return "未记录" }
-    if providerID == "opencode" {
-      switch permissionMode {
-      case "workspace-write": return "OpenCode 原生 Build（工作区可写）"
-      case "read-only": return "OpenCode 原生 Plan（只读）"
-      default: return "OpenCode：\(permissionMode)"
-      }
-    }
-    if providerID == "antigravity" {
-      switch permissionMode {
-      case "workspace-write": return "Antigravity 原生 Accept Edits（工作区可写）"
-      case "read-only": return "Antigravity 原生 Plan（项目只读）"
-      default: return "Antigravity：\(permissionMode)"
-      }
-    }
-    return permissionMode
-  }
-
-  private static func taskNetworkDescription(
-    providerID: String,
-    networkAccess: Bool?
-  ) -> String {
-    if providerID == "opencode" {
-      return "OpenCode 原生 permissions（network_access 不覆盖）"
-    }
-    if providerID == "antigravity" {
-      return networkAccess == true
-        ? "已请求（仍受 AGY Global 或本机单次授权）"
-        : "未请求"
-    }
-    guard let networkAccess else { return "未记录" }
-    return networkAccess ? "已请求" : "未请求"
-  }
 }

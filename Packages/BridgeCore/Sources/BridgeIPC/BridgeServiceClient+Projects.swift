@@ -15,12 +15,6 @@ extension BridgeServiceClient {
     try await call(operation: .registerProject, payload: request)
   }
 
-  public func updateProjectPolicy(
-    _ request: IPCProjectPolicyRequest
-  ) async throws -> MCPProjectDetail {
-    try await call(operation: .updateProjectPolicy, payload: request)
-  }
-
   public func removeProject(projectID: String) async throws {
     let _: IPCMutationResponse = try await call(
       operation: .removeProject,

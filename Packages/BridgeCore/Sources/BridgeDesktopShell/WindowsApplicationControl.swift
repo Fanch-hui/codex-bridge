@@ -10,7 +10,7 @@
 
   public enum WindowsApplicationControl {
     public static func ensureServiceRunning() -> Bool {
-      WindowsServiceLauncher.ensureServiceRunning()
+      WindowsServiceLauncher.ensureServiceRunning().isReady
     }
 
     /// Returns false when another copy already owns the session; that copy is restored.

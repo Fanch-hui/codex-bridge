@@ -45,6 +45,10 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       case approvals
       case selectedTask
       case browser
+      case overview
+      case connection
+      case logs
+      case appUpdate
     }
 
     public enum CollectionMode: String, Codable, Equatable, Sendable {
@@ -63,6 +67,10 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
     public let approvalRows: [BridgeDesktopApprovalRow]?
     public let selectedTask: BridgeDesktopTaskDetail?
     public let browser: BridgeDesktopBrowserSlot?
+    public let overview: BridgeDesktopOverviewState?
+    public let connections: BridgeDesktopConnectionsState?
+    public let logs: BridgeDesktopLogsState?
+    public let appUpdate: BridgeDesktopAppUpdateState?
 
     private init(
       kind: Kind,
@@ -75,7 +83,11 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       taskRows: [BridgeDesktopTaskRow]? = nil,
       approvalRows: [BridgeDesktopApprovalRow]? = nil,
       selectedTask: BridgeDesktopTaskDetail? = nil,
-      browser: BridgeDesktopBrowserSlot? = nil
+      browser: BridgeDesktopBrowserSlot? = nil,
+      overview: BridgeDesktopOverviewState? = nil,
+      connections: BridgeDesktopConnectionsState? = nil,
+      logs: BridgeDesktopLogsState? = nil,
+      appUpdate: BridgeDesktopAppUpdateState? = nil
     ) {
       self.kind = kind
       self.taskID = taskID
@@ -88,6 +100,10 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       self.approvalRows = approvalRows
       self.selectedTask = selectedTask
       self.browser = browser
+      self.overview = overview
+      self.connections = connections
+      self.logs = logs
+      self.appUpdate = appUpdate
     }
 
     public static func conversation(
@@ -130,6 +146,22 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
 
     public static func browser(_ browser: BridgeDesktopBrowserSlot) -> Self {
       Self(kind: .browser, browser: browser)
+    }
+
+    public static func overview(_ state: BridgeDesktopOverviewState?) -> Self {
+      Self(kind: .overview, overview: state)
+    }
+
+    public static func connection(_ state: BridgeDesktopConnectionsState?) -> Self {
+      Self(kind: .connection, connections: state)
+    }
+
+    public static func logs(_ state: BridgeDesktopLogsState?) -> Self {
+      Self(kind: .logs, logs: state)
+    }
+
+    public static func appUpdate(_ state: BridgeDesktopAppUpdateState?) -> Self {
+      Self(kind: .appUpdate, appUpdate: state)
     }
   }
 }

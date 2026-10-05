@@ -27,7 +27,6 @@ public actor ProjectRegistry {
       name: registration.name,
       primaryRoot: primaryRoot,
       repositoryRoot: repositoryRoot,
-      accessPolicy: registration.accessPolicy,
       verificationCommands: registration.verificationCommands,
       forbiddenPatterns: registration.forbiddenPatterns,
       createdAt: Date()
@@ -41,15 +40,6 @@ public actor ProjectRegistry {
     try project.validateCurrentRoots()
     let root = try RegisteredRoot(capturing: localRootURL)
     try await repository.addWorktree(root, to: projectID)
-  }
-
-  public func updateAccessPolicy(
-    _ policy: ProjectAccessPolicy,
-    for projectID: ProjectID
-  ) async throws {
-    let project = try await requireProject(projectID)
-    try project.validateCurrentRoots()
-    try await repository.updateAccessPolicy(policy, for: projectID)
   }
 
   public func unregister(_ projectID: ProjectID) async throws {

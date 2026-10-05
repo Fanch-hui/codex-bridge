@@ -78,6 +78,9 @@ extension AntigravityCLIProvider {
     guard installation.providerID == .antigravity else {
       throw AgentRuntimeError.providerUnavailable(installation.providerID)
     }
+    guard request.mutationIntent != .readOnly else {
+      throw AgentRuntimeError.capabilityUnavailable(.readOnlyExecution)
+    }
     let expectedStrategy: AgentWorkspaceStrategy =
       request.mutationIntent == .readOnly ? .sharedProject : .exclusiveProject
     guard request.workspaceStrategy == expectedStrategy

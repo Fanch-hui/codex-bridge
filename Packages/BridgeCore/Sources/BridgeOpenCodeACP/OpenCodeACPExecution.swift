@@ -8,6 +8,7 @@ public actor OpenCodeACPExecution {
   private let normalizer: OpenCodeACPEventNormalizer
   private let sessionID: String
   private let initialPrompt: String
+  private let literalInput: Bool
   private let initialClientEventSequence: Int64
   private let inactivityTimeout: Duration
   private let cleanup: @Sendable () -> Void
@@ -29,6 +30,7 @@ public actor OpenCodeACPExecution {
     normalizer: OpenCodeACPEventNormalizer,
     sessionID: String,
     prompt: String,
+    literalInput: Bool = false,
     initialClientEventSequence: Int64,
     inactivityTimeout: Duration = .seconds(10 * 60),
     eventBufferLimit: Int = 256,
@@ -43,6 +45,7 @@ public actor OpenCodeACPExecution {
     self.normalizer = normalizer
     self.sessionID = sessionID
     self.initialPrompt = prompt
+    self.literalInput = literalInput
     self.initialClientEventSequence = max(0, initialClientEventSequence)
     self.inactivityTimeout = inactivityTimeout
     consumedClientEventBarrier = max(0, initialClientEventSequence)
@@ -147,7 +150,8 @@ public actor OpenCodeACPExecution {
           await finishInterrupted()
           return
         }
-        let result = try await client.prompt(sessionID: sessionID, text: prompt)
+        let text = literalInput ? OpenCodeACPReadOnlyPolicy.literalPrompt(prompt) : prompt
+        let result = try await client.prompt(sessionID: sessionID, text: text)
         try await waitUntilConsumed(result.eventSequenceBarrier)
         guard !terminal else { return }
         if result.stopReason == "cancelled" || interruptRequested {

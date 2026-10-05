@@ -12,7 +12,7 @@ extension BridgeServiceApplication {
     try Self.checkDeadline(deadline)
     guard (1...100).contains(limit) else { throw BridgeMCPQueryError.contractRejected }
     let all = try await projects.projects()
-    let visible = Self.sortedProjects(all.filter { $0.accessPolicy.read == .allowed })
+    let visible = Self.sortedProjects(all)
     let defaultID = try await defaultSubmissionProjectID(in: all)
     let visibleDefault = visible.first { $0.id.rawValue == defaultID }?.id.rawValue
     let offset = try Self.decodeOffset(cursor, maximum: visible.count)

@@ -6,30 +6,6 @@ import BridgeServiceCore
 import Foundation
 
 extension BridgeServiceRequestController {
-  static func projectPolicy(
-    read: String,
-    write: String,
-    network: String
-  ) throws -> ProjectAccessPolicy {
-    guard read != ProjectPermission.requiresLocalApproval.rawValue else {
-      throw ServiceStoreError.invalidArgument("project.policy.read")
-    }
-    let values = [read, write, network]
-    let allowed = Set([
-      ProjectPermission.denied.rawValue,
-      ProjectPermission.requiresLocalApproval.rawValue,
-      ProjectPermission.allowed.rawValue,
-    ])
-    guard values.allSatisfy(allowed.contains) else {
-      throw ServiceStoreError.invalidArgument("project.policy")
-    }
-    return ProjectAccessPolicy(
-      read: ProjectPermission(rawValue: read),
-      write: ProjectPermission(rawValue: write),
-      network: ProjectPermission(rawValue: network)
-    )
-  }
-
   static func workspaceCommands(
     _ commands: [IPCWorkspaceCommand]
   ) throws -> [ServiceWorkspaceCommand] {

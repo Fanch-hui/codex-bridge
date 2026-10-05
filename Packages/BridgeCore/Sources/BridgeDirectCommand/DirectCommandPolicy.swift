@@ -9,8 +9,6 @@ public enum DirectCommandDenialReason: Equatable, Sendable {
   case commandNotRegistered
   case invalidArguments
   case unknownCommand
-  case networkNotAllowed
-  case writeNotAllowed
   case blacklisted
 }
 

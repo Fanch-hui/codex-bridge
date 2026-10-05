@@ -36,7 +36,8 @@ actor ServiceExecutionConversationCoordinator {
         toolName: $0.toolName,
         toolStatus: $0.toolStatus,
         toolArguments: $0.toolArguments,
-        isFinal: $0.isFinal(for: task.state.status)
+        isFinal: $0.isFinal(for: task.state.status),
+        messageID: $0.id
       )
     }
     if task.state.status.isTerminal {

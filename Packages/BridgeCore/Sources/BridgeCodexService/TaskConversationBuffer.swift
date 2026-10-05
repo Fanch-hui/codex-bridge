@@ -4,6 +4,7 @@ import Foundation
 
 public struct ConversationChange: Sendable, Equatable {
   public let taskID: TaskID
+  public let messageID: Int64?
   public let key: String
   public let role: ServiceTaskMessageRole
   public let kind: ServiceTaskMessageKind
@@ -26,9 +27,11 @@ public struct ConversationChange: Sendable, Equatable {
     final: Bool,
     toolName: String? = nil,
     toolStatus: String? = nil,
-    toolArguments: String? = nil
+    toolArguments: String? = nil,
+    messageID: Int64? = nil
   ) {
     self.taskID = taskID
+    self.messageID = messageID
     self.key = key
     self.role = role
     self.kind = kind
@@ -61,6 +64,7 @@ public struct ConversationSubscription: Sendable {
 public actor TaskConversationBuffer {
   public struct Entry: Sendable, Equatable {
     public let key: String
+    public var messageID: Int64?
     public let role: ServiceTaskMessageRole
     public let kind: ServiceTaskMessageKind
     public let content: String
@@ -84,9 +88,11 @@ public actor TaskConversationBuffer {
       toolArguments: String? = nil,
       isFinal: Bool,
       createdAt: Date = Date(),
-      updatedAt: Date? = nil
+      updatedAt: Date? = nil,
+      messageID: Int64? = nil
     ) {
       self.key = key
+      self.messageID = messageID
       self.role = role
       self.kind = kind
       self.content = content
@@ -339,55 +345,6 @@ public actor TaskConversationBuffer {
     return false
   }
 
-  func flush(taskID: TaskID) async -> Bool {
-    guard let state = states[taskID] else { return true }
-    guard !state.isFlushing else { return false }
-    let revisions = state.dirtyRevisions
-    // Closing retries dirty entries without rewriting clean persisted messages.
-    let snapshot: [(Entry, Int?)] = state.entries.compactMap { entry in
-      guard let revision = revisions[entry.key] else { return nil }
-      return (entry, Optional(revision))
-    }
-    guard !snapshot.isEmpty else { return true }
-
-    state.isFlushing = true
-    let flushedDeltaCount = state.unflushedCount
-    var persisted: [(String, Int?)] = []
-    for (entry, revision) in snapshot {
-      do {
-        try await tasks.upsertTaskMessage(
-          taskID: taskID,
-          key: entry.key,
-          role: entry.role,
-          content: entry.content,
-          kind: entry.kind,
-          toolName: entry.toolName,
-          toolStatus: entry.toolStatus,
-          toolArguments: entry.toolArguments,
-          createdAt: entry.createdAt,
-          updatedAt: entry.updatedAt
-        )
-        persisted.append((entry.key, revision))
-      } catch {
-        continue
-      }
-    }
-
-    for (key, revision) in persisted {
-      state.persistedKeys.insert(key)
-      guard let revision, state.dirtyRevisions[key] == revision else { continue }
-      state.dirtyRevisions.removeValue(forKey: key)
-    }
-    state.unflushedCount = max(
-      state.dirtyRevisions.count,
-      state.unflushedCount - flushedDeltaCount
-    )
-    state.lastFlush = Date()
-    state.isFlushing = false
-    prunePersistedFinalEntries(in: state)
-    return persisted.count == snapshot.count
-  }
-
   func markDirty(taskID: TaskID, key: String, in state: TaskState) {
     if state.lastFlush == nil {
       state.lastFlush = Date()
@@ -396,36 +353,6 @@ public actor TaskConversationBuffer {
     state.nextRevision &+= 1
     state.dirtyRevisions[key] = state.nextRevision
     state.unflushedCount += 1
-  }
-
-  private func prunePersistedFinalEntries(in state: TaskState) {
-    var excess = state.entries.count - Self.maximumRetainedMessagesPerTask
-    guard excess > 0 else { return }
-    var retained: [Entry] = []
-    retained.reserveCapacity(state.entries.count - excess)
-    for entry in state.entries {
-      let canEvict =
-        excess > 0
-        && entry.isFinal
-        && state.persistedKeys.contains(entry.key)
-        && state.dirtyRevisions[entry.key] == nil
-      if canEvict {
-        excess -= 1
-        state.persistedKeys.remove(entry.key)
-      } else {
-        retained.append(entry)
-      }
-    }
-    guard retained.count != state.entries.count else { return }
-    state.entries = retained
-    rebuildIndex(in: state)
-  }
-
-  private func rebuildIndex(in state: TaskState) {
-    state.index.removeAll(keepingCapacity: true)
-    for (position, entry) in state.entries.enumerated() {
-      state.index[entry.key] = position
-    }
   }
 
 }

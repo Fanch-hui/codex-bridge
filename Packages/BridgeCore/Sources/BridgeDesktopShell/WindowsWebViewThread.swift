@@ -47,7 +47,10 @@
     var navigationCompletedHandler: UnsafeMutableRawPointer?
     var navigationCompletedToken = WebView2EventRegistrationToken()
     var hasNavigationCompletedToken = false
-    private var pendingWebMessage: String?
+    private var pendingWebMessages: [String] = []
+    /// Overflow sheds the oldest queued patches; the page detects the broken
+    /// revision chain and requests a full-state resync.
+    private static let maximumPendingWebMessages = 256
     var pendingMemoryUsageLow = false
 
     convenience init(
@@ -127,8 +130,18 @@
     func goForward() { post(Message.goForward) }
     func reload() { post(Message.reload) }
 
-    func postWebMessageAsJSON(_ message: String) {
-      lock.withLock { pendingWebMessage = message }
+    /// Enqueues a web message. `replacesPendingMessages` is set for full
+    /// state snapshots, which supersede everything still queued; incremental
+    /// patches queue in order.
+    func postWebMessageAsJSON(_ message: String, replacesPendingMessages: Bool) {
+      lock.withLock {
+        if replacesPendingMessages {
+          pendingWebMessages.removeAll(keepingCapacity: true)
+        } else if pendingWebMessages.count >= Self.maximumPendingWebMessages {
+          pendingWebMessages.removeFirst()
+        }
+        pendingWebMessages.append(message)
+      }
       post(Message.postWebMessage)
     }
 
@@ -150,7 +163,9 @@
         return threadID
       }
       if target != 0 { _ = PostThreadMessageW(target, UINT(WM_QUIT), 0, 0) }
-      if let finished { _ = WaitForSingleObject(finished, 5_000) }
+      // The detached thread releases its own COM interfaces, and complete()
+      // posts the registered shutdown notification. Waiting here blocked the
+      // UI pump for up to 5 seconds on teardown.
     }
 
     private func run() {
@@ -420,24 +435,31 @@
       case Message.goBack: runAction(WebView2Slot.webViewGoBack)
       case Message.goForward: runAction(WebView2Slot.webViewGoForward)
       case Message.reload: runAction(WebView2Slot.webViewReload)
-      case Message.postWebMessage: postPendingWebMessage()
+      case Message.postWebMessage: postPendingWebMessages()
       case Message.setMemoryUsageTarget: applyMemoryUsageTarget()
       default: break
       }
     }
 
-    private func postPendingWebMessage() {
+    /// Drains the whole mailbox in order. The previous single-slot design
+    /// kept only the newest message: whenever two patches queued up, the
+    /// first was lost, the page saw a revision gap, and requested a
+    /// full-state resync.
+    private func postPendingWebMessages() {
       guard let webView else { return }
-      let message = lock.withLock { () -> String? in
-        defer { pendingWebMessage = nil }
-        return pendingWebMessage
+      let messages = lock.withLock { () -> [String] in
+        let pending = pendingWebMessages
+        pendingWebMessages.removeAll(keepingCapacity: true)
+        return pending
       }
-      guard let message else { return }
+      guard !messages.isEmpty else { return }
       let post: WebView2PostWebMessageAsJSONFn = webView2Method(
         webView, WebView2Slot.webViewPostWebMessageAsJSON,
         as: WebView2PostWebMessageAsJSONFn.self
       )
-      _ = message.withCString(encodedAs: UTF16.self) { post(webView, $0) }
+      for message in messages {
+        _ = message.withCString(encodedAs: UTF16.self) { post(webView, $0) }
+      }
     }
 
     private func synchronizeController() {

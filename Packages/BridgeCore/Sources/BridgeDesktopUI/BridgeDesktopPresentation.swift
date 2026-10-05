@@ -37,28 +37,11 @@ public enum BridgeDesktopPresentation {
   }
 
   public static func agentPermissionOptions(
-    for providerID: String?
+    for _: String?
   ) -> [BridgeDesktopChoice] {
-    let provider =
-      providerID?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-      .lowercased() ?? "opencode"
-    switch provider {
-    case "", "opencode":
-      return [
-        BridgeDesktopChoice(id: "build", title: "工作区可写（Build）"),
-        BridgeDesktopChoice(id: "plan", title: "只读（Plan）"),
-      ]
-    case "antigravity":
-      return [
-        BridgeDesktopChoice(id: "workspace-write", title: "工作区可写"),
-        BridgeDesktopChoice(id: "plan", title: "只读（Plan）"),
-      ]
-    default:
-      return [
-        BridgeDesktopChoice(id: "workspace-write", title: "工作区可写"),
-        BridgeDesktopChoice(id: "read-only", title: "只读"),
-      ]
-    }
+    [
+      BridgeDesktopChoice(id: "full", title: "完整", detail: "允许读取、写入和联网"),
+      BridgeDesktopChoice(id: "read-only", title: "只读", detail: "允许读取，禁止写入和联网"),
+    ]
   }
 }

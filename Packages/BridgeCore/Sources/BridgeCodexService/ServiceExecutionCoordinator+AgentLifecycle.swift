@@ -5,6 +5,10 @@ import Foundation
 
 extension ServiceExecutionCoordinator {
   private static func agentStartFailureSummary(_ error: Error, provider: String) -> String {
+    if case AgentRuntimeError.capabilityUnavailable(.readOnlyExecution) = error {
+      return
+        "The selected \(provider) agent cannot enforce a read-only task without network tools. Select Full task permission or use an agent that supports read-only execution."
+    }
     if case AgentRuntimeError.modelUnavailable(let model) = error {
       let value = String(model.prefix(256))
       return
@@ -20,6 +24,9 @@ extension ServiceExecutionCoordinator {
   }
 
   private static func agentStartFailureCode(_ error: Error) -> String {
+    if case AgentRuntimeError.capabilityUnavailable(.readOnlyExecution) = error {
+      return "agent_read_only_unavailable"
+    }
     if case AgentRuntimeError.modelUnavailable = error {
       return "agent_model_unavailable"
     }
@@ -61,12 +68,6 @@ extension ServiceExecutionCoordinator {
         try project.root.validateCurrentIdentity()
       } catch {
         throw ExecutionServiceError.projectIdentityChanged(project.id)
-      }
-      guard project.accessPolicy.read != .denied,
-        task.permissionMode != .workspaceWrite || project.accessPolicy.write != .denied,
-        !task.networkAllowed || project.accessPolicy.network != .denied
-      else {
-        throw ExecutionServiceError.projectPermissionDenied(project.id)
       }
       workspaceChangeTracker = ServiceWorkspaceChangeTracker(
         projectRoot: project.root.canonicalPath

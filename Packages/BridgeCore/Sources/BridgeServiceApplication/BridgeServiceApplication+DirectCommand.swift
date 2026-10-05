@@ -132,8 +132,7 @@ extension BridgeServiceApplication {
         requiresNetwork: resolution.requiresNetwork,
         usePTY: request.tty,
         timeout: .milliseconds(request.timeoutMS),
-        denyNetwork: denyNetwork || !resolution.requiresNetwork
-          || project.accessPolicy.network == .denied,
+        denyNetwork: denyNetwork || !resolution.requiresNetwork,
         onExit: { await lease.release() }
       )
       launched = true
@@ -234,8 +233,6 @@ extension BridgeServiceApplication {
     case .commandModeDenied: .commandModeDenied
     case .commandNotRegistered, .unknownCommand: .commandNotRegistered
     case .invalidArguments, nil: .invalidArguments
-    case .networkNotAllowed: .networkDenied
-    case .writeNotAllowed: .writeDenied
     case .blacklisted: .blacklisted
     }
   }

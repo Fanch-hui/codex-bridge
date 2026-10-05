@@ -64,8 +64,8 @@ extension BridgeServiceApplication {
       let project = try await projects.project(id: task.projectID)
       let canGrantOneTimeAccess =
         policy?.supportsOneTimeToolAutoApproval == true
-        && project?.accessPolicy.network != .denied
-        && (task.permissionMode != .workspaceWrite || project?.accessPolicy.write != .denied)
+        && task.permissionMode == .full
+        && project.map { (try? $0.root.validateCurrentIdentity()) != nil } == true
       result.append(
         PendingTaskStartApproval(
           task: task,
@@ -209,8 +209,8 @@ extension BridgeServiceApplication {
       let installationID = task.installationID,
       let registry = agentRegistry,
       let project = try await projects.project(id: task.projectID),
-      project.accessPolicy.network != .denied,
-      task.permissionMode != .workspaceWrite || project.accessPolicy.write != .denied
+      task.permissionMode == .full,
+      (try? project.root.validateCurrentIdentity()) != nil
     else {
       throw BridgeMCPQueryError.approvalDenied
     }
@@ -221,8 +221,7 @@ extension BridgeServiceApplication {
       throw BridgeMCPQueryError.approvalDenied
     }
     return ServiceTaskExecutionAuthorization(
-      accessMode: .fullAccess,
-      networkAllowed: true
+      accessMode: .fullAccess
     )
   }
 

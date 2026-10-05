@@ -15,23 +15,16 @@ extension MCPServiceToolDispatcher {
     let acceptanceCriteria: [String]
   }
 
-  private struct SubmissionExecutionPolicy {
-    let permissionMode: String?
-    let permissionModeOverride: Bool
-  }
-
   func parseSubmission(_ arguments: [String: Value]?) throws
     -> MCPServiceTaskSubmission
   {
     let values = try submissionArguments(arguments)
     let provider = try parseSubmissionProvider(values)
     let content = try parseSubmissionContent(values)
-    let execution = try parseSubmissionExecutionPolicy(values)
     return try makeSubmission(
       values: values,
       provider: provider,
-      content: content,
-      execution: execution
+      content: content
     )
   }
 
@@ -81,30 +74,10 @@ extension MCPServiceToolDispatcher {
     return SubmissionContent(prompt: prompt, acceptanceCriteria: criteria)
   }
 
-  private func parseSubmissionExecutionPolicy(
-    _ values: StrictToolArguments
-  ) throws -> SubmissionExecutionPolicy {
-    let permissionMode = try values.optionalIdentifier(
-      "permission_mode",
-      maximumUTF8Bytes: 32
-    )
-    let permissionModeOverride = try values.optionalBoolean("permission_mode_override") ?? false
-    if let permissionMode,
-      permissionMode != "read-only" && permissionMode != "workspace-write"
-    {
-      throw MCPError.invalidParams("Argument 'permission_mode' is invalid.")
-    }
-    return SubmissionExecutionPolicy(
-      permissionMode: permissionMode,
-      permissionModeOverride: permissionModeOverride
-    )
-  }
-
   private func makeSubmission(
     values: StrictToolArguments,
     provider: SubmissionProviderSelection,
-    content: SubmissionContent,
-    execution: SubmissionExecutionPolicy
+    content: SubmissionContent
   ) throws -> MCPServiceTaskSubmission {
     return MCPServiceTaskSubmission(
       projectID: try values.optionalIdentifier("project_id", maximumUTF8Bytes: 128),
@@ -124,9 +97,6 @@ extension MCPServiceToolDispatcher {
         maximumUTF8Bytes: 64
       ),
       modelOverride: try values.optionalBoolean("model_override"),
-      permissionMode: execution.permissionMode,
-      permissionModeOverride: execution.permissionModeOverride,
-      networkAccess: try values.optionalBoolean("network_access") ?? false,
       acceptanceCriteria: content.acceptanceCriteria,
       clientRequestID: try values.optionalIdentifier(
         "client_request_id",
