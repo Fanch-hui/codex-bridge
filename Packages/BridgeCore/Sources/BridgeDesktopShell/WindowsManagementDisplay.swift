@@ -40,6 +40,7 @@
     var installationItems: [BridgeDesktopAgentInstallationRow] = []
     var isManagingAgents = false
     var agentOperationRevision = 0
+    var setupOperations: [BridgeDesktopAgentSetupState] = []
   }
 
   struct WindowsManagementDisplay: Equatable, Sendable {

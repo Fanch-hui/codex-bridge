@@ -148,9 +148,11 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
    - `TunnelProcessLauncher`/`TunnelSpawnedProcess`
      （`TunnelProcessLauncher+Windows.swift`）：CreateProcessW + 继承管道
      （`CreatePipe` + `STARTF_USESTDHANDLES`）+ 可继承 NUL stdin + 环境块注入
-     （继承当前环境并 upsert `CODEX_BRIDGE_TUNNEL_API_KEY` /
-     `CODEX_BRIDGE_TUNNEL_TOKEN` / `TMP` / `TEMP` / `CODEX_HOME`，密钥不落
-     argv/磁盘）；job 对象（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）保证树终止；
+     （仅按大小写无关名称继承 `SystemRoot` / `WINDIR`，注入本次
+     `CODEX_BRIDGE_TUNNEL_API_KEY` / `CODEX_BRIDGE_TUNNEL_TOKEN` 与私有运行目录的
+     `TMP` / `TEMP` / `CODEX_HOME`；环境块按名称排序，采用 UTF-16 双 NUL 结尾，
+     密钥不落 argv/磁盘；父进程 `PATH`、代理变量与其他凭据不传入）；
+     job 对象（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）保证树终止；
      后台线程读管道到 EOF/断管。helper 参数里 macOS `file:/dev/fd/{3,4}` 在
      Windows 改为 `env:VARNAME` 引用（v0.0.10 起 tunnel-client 的
      `--control-plane.api-key` 与 `--mcp.extra-headers` 值均支持 `env:` 前缀，

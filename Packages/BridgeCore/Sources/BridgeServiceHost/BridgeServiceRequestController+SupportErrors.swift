@@ -265,7 +265,7 @@ extension BridgeServiceRequestController {
       return .init(
         code: "agent_configuration_mismatch",
         message:
-          "The selected cordis.yml must retain the Codex Bridge read-only profile structure. Only the model catalog, default model, thinking mode, and reasoning effort may differ."
+          "DSH 的 cordis.yml 与 Codex Bridge 配置档案不兼容。请在连接设置中填写服务地址和 API Key，使用 Bridge 自动生成的配置；手动登记需使用当前 Bridge 模板，并保留其中的沙箱与审批配置。"
       )
     case .nodeVersionIncompatible:
       return .init(

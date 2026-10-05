@@ -8,6 +8,25 @@ import Foundation
 #endif
 
 extension BridgeServiceRequestController {
+  #if os(Linux)
+    func handleShutdownServiceIfIdle(_ request: BridgeServiceIPCRequest) async throws -> Data {
+      guard request.payload == nil else {
+        throw BridgeServiceIPCCodecError.invalidMessage
+      }
+      guard try await composition.application.prepareIdleServiceShutdown() else {
+        return try BridgeServiceIPCCodec.failure(
+          requestID: request.requestID,
+          error: .init(
+            code: "service_busy",
+            message: "Agent tasks or workspace operations are active. Retry after they finish.",
+            retryable: true
+          )
+        )
+      }
+      return try handleShutdownService(request)
+    }
+  #endif
+
   #if os(Windows) || os(Linux)
     func handleShutdownService(_ request: BridgeServiceIPCRequest) throws -> Data {
       guard request.payload == nil else {

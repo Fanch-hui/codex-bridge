@@ -39,16 +39,21 @@ public struct ServiceProcessOptions: Equatable, Sendable {
   public let foreground: Bool
   public let dataRootURL: URL
   public let shutdown: Bool
+  public let shutdownIfIdle: Bool
 
-  public init(foreground: Bool, dataRootURL: URL, shutdown: Bool = false) {
+  public init(
+    foreground: Bool, dataRootURL: URL, shutdown: Bool = false, shutdownIfIdle: Bool = false
+  ) {
     self.foreground = foreground
     self.dataRootURL = dataRootURL
     self.shutdown = shutdown
+    self.shutdownIfIdle = shutdownIfIdle
   }
 
   public static func parse(_ arguments: [String]) throws -> ServiceProcessOptions {
     var foreground = false
     var shutdown = false
+    var shutdownIfIdle = false
     var dataRootSpecified = false
     var dataRoot = ServiceDataPaths.defaultRoot()
     var index = 0
@@ -63,6 +68,13 @@ public struct ServiceProcessOptions: Equatable, Sendable {
           index += 1
         #else
           throw ServiceProcessArgumentError.unknownArgument("--shutdown")
+        #endif
+      case "--shutdown-if-idle":
+        #if os(Linux)
+          shutdownIfIdle = true
+          index += 1
+        #else
+          throw ServiceProcessArgumentError.unknownArgument("--shutdown-if-idle")
         #endif
       case "--data-root":
         let valueIndex = index + 1
@@ -85,13 +97,16 @@ public struct ServiceProcessOptions: Equatable, Sendable {
         throw ServiceProcessArgumentError.unknownArgument(arguments[index])
       }
     }
-    guard !shutdown || (!foreground && !dataRootSpecified) else {
+    guard !(shutdown && shutdownIfIdle),
+      !(shutdown || shutdownIfIdle) || (!foreground && !dataRootSpecified)
+    else {
       throw ServiceProcessArgumentError.invalidArgumentCombination
     }
     return ServiceProcessOptions(
       foreground: foreground,
       dataRootURL: dataRoot,
-      shutdown: shutdown
+      shutdown: shutdown,
+      shutdownIfIdle: shutdownIfIdle
     )
   }
 
@@ -100,15 +115,16 @@ public struct ServiceProcessOptions: Equatable, Sendable {
 public enum ServiceProcessRunner {
   public static func run(
     arguments: [String] = Array(CommandLine.arguments.dropFirst()),
-    appVersion: String = "1.3.7"
+    appVersion: String = "1.4.0"
   ) async throws {
     applyDefaultUmask()
     let options = try ServiceProcessOptions.parse(arguments)
     #if os(Linux)
-      if options.shutdown {
-        try await LinuxServiceShutdown.requestAndWait()
+      if options.shutdown || options.shutdownIfIdle {
+        try await LinuxServiceShutdown.requestAndWait(requireIdle: options.shutdownIfIdle)
         return
       }
+      try LinuxPackageMaintenance.requireAvailable()
     #endif
     #if os(Windows)
       if options.shutdown {

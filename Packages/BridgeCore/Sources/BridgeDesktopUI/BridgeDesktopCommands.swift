@@ -70,6 +70,11 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case connectTunnel
   case disconnectTunnel
   case clearTunnel
+  case beginAgentSetup
+  case refreshAgentSetups
+  case continueAgentSetup
+  case cancelAgentSetup
+  case openAgentSetupLogin
   case connectAgent
   case registerAgent
   case beginAgentRegistration
@@ -114,6 +119,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let projectID: String?
   public let tunnelID: String?
   public let threadID: String?
+  public let operationID: String?
+  public let installDirectory: String?
   public let providerID: String?
   public let installationID: String?
   public let clientID: String?
@@ -188,6 +195,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     projectID: String? = nil,
     tunnelID: String? = nil,
     threadID: String? = nil,
+    operationID: String? = nil,
+    installDirectory: String? = nil,
     providerID: String? = nil,
     installationID: String? = nil,
     clientID: String? = nil,
@@ -261,6 +270,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.projectID = projectID
     self.tunnelID = tunnelID
     self.threadID = threadID
+    self.operationID = operationID
+    self.installDirectory = installDirectory
     self.providerID = providerID
     self.installationID = installationID
     self.clientID = clientID

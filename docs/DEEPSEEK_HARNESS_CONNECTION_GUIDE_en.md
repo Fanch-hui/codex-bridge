@@ -2,7 +2,7 @@
 
 This guide describes the DeepSeek Harness (DSH) setup supported by Bridge. The [Chinese guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) contains the most detailed troubleshooting and task examples.
 
-The shortest path is: build DSH from the official repository, open `Connections → Local Agent Engine Connections → DeepSeek Harness`, enter the Base URL and API key, connect it, then refresh the model list in Settings. macOS and Windows use the same flow. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
+Open `Connections → Local Agent Engine Connections → DeepSeek Harness` and click **One-click setup**. Bridge prepares official DSH and Node/npm, then prompts for the Base URL and API Key. See the [setup guide (Chinese)](./AGENT_SETUP_GUIDE.md) for installation locations and retries. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
 
 The provider ID is:
 

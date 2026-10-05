@@ -42,7 +42,7 @@ extension BridgeServiceApplication {
     {
       guard request.trustProfile == policy.registrationTrustProfile,
         request.securityProfileID == policy.registrationSecurityProfileID,
-        Set(request.artifactRequests.map(\.role)) == policy.requiredArtifactRoles
+        policy.registrationArtifactRolesMatch(Set(request.artifactRequests.map(\.role)))
       else {
         throw BridgeMCPQueryError.contractRejected
       }
@@ -267,6 +267,7 @@ extension BridgeServiceApplication {
     if installation.providerID == .deepSeekHarness {
       try await reconcileDeepSeekHarnessModelDefaults(models: models, deadline: deadline)
     }
+    Task { [weak self] in await self?.drainQueuedTasks() }
     return models.map {
       ServiceAgentModelListItem(
         modelID: $0.id,

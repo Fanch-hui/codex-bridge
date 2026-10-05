@@ -67,6 +67,11 @@ public actor ServiceWorkspaceMutationGate {
   private var codexAdmissions: [ProjectID: Set<String>] = [:]
   private var taskAdmissions: Set<String> = []
   private var appUpdateLeaseExpiresAt: Date?
+  private enum ServiceShutdownState {
+    case checking, committed
+  }
+
+  private var serviceShutdown: ServiceShutdownState?
   private let appUpdateLeaseDuration: TimeInterval
   public nonisolated let changes: ServiceStateChangeHub
 
@@ -78,7 +83,7 @@ public actor ServiceWorkspaceMutationGate {
   @discardableResult
   public func beginTaskAdmission() throws -> String {
     expireAppUpdateIfNeeded()
-    guard appUpdateLeaseExpiresAt == nil else {
+    guard appUpdateLeaseExpiresAt == nil, serviceShutdown == nil else {
       throw BridgeMCPQueryError.busy
     }
     let token = UUID().uuidString
@@ -93,6 +98,7 @@ public actor ServiceWorkspaceMutationGate {
   @discardableResult
   public func beginAppUpdate() -> Bool {
     expireAppUpdateIfNeeded()
+    guard serviceShutdown == nil else { return false }
     if appUpdateLeaseExpiresAt != nil { return true }
     guard directReservations.isEmpty,
       codexAdmissions.values.allSatisfy(\.isEmpty),
@@ -107,6 +113,22 @@ public actor ServiceWorkspaceMutationGate {
   public func appUpdatePrepared() -> Bool {
     expireAppUpdateIfNeeded()
     return appUpdateLeaseExpiresAt != nil
+  }
+
+  public func beginIdleServiceShutdown() -> Bool {
+    guard serviceShutdown == nil, beginAppUpdate() else { return false }
+    serviceShutdown = .checking
+    return true
+  }
+
+  public func commitServiceShutdown() {
+    serviceShutdown = .committed
+  }
+
+  public func cancelIdleServiceShutdown() {
+    guard serviceShutdown == .checking else { return }
+    serviceShutdown = nil
+    cancelAppUpdate()
   }
 
   public func cancelAppUpdate() {
@@ -136,7 +158,7 @@ public actor ServiceWorkspaceMutationGate {
     activeCodexWriteTask: @Sendable () async throws -> ServiceTaskRecord?
   ) async throws -> DirectWorkspaceLease {
     expireAppUpdateIfNeeded()
-    guard appUpdateLeaseExpiresAt == nil else {
+    guard appUpdateLeaseExpiresAt == nil, serviceShutdown == nil else {
       throw ProjectWorkspaceBusyError.busy(.direct(owner: "app_update"))
     }
     if let direct = directReservations[projectID] {
@@ -163,7 +185,7 @@ public actor ServiceWorkspaceMutationGate {
   @discardableResult
   public func beginCodexAdmission(projectID: ProjectID) async throws -> String {
     expireAppUpdateIfNeeded()
-    guard appUpdateLeaseExpiresAt == nil else {
+    guard appUpdateLeaseExpiresAt == nil, serviceShutdown == nil else {
       throw ProjectWorkspaceBusyError.busy(.direct(owner: "app_update"))
     }
     if let direct = directReservations[projectID] {
@@ -212,6 +234,7 @@ public actor ServiceWorkspaceMutationGate {
     directReservations = [:]
     codexAdmissions = [:]
     taskAdmissions = []
+    serviceShutdown = nil
     appUpdateLeaseExpiresAt = nil
     changes.publish()
   }

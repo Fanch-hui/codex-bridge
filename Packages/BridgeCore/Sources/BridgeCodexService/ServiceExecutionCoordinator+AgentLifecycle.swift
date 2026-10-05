@@ -54,17 +54,23 @@ extension ServiceExecutionCoordinator {
       attachments: try await tasks.taskAttachments(taskID: task.id),
       selectedSkills: task.selectedSkills
     )
-    let workspaceChangeTracker = ServiceWorkspaceChangeTracker(
-      projectRoot: project.root.canonicalPath
-    )
+    let workspaceChangeTracker: ServiceWorkspaceChangeTracker?
     let handle: AgentTaskRunHandle
     do {
+      do {
+        try project.root.validateCurrentIdentity()
+      } catch {
+        throw ExecutionServiceError.projectIdentityChanged(project.id)
+      }
       guard project.accessPolicy.read != .denied,
         task.permissionMode != .workspaceWrite || project.accessPolicy.write != .denied,
         !task.networkAllowed || project.accessPolicy.network != .denied
       else {
         throw ExecutionServiceError.projectPermissionDenied(project.id)
       }
+      workspaceChangeTracker = ServiceWorkspaceChangeTracker(
+        projectRoot: project.root.canonicalPath
+      )
       handle = try await runner.start(brief)
     } catch {
       if !finishedRuns.contains(task.id), !isShuttingDown {

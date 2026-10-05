@@ -27,6 +27,7 @@ extension BridgeServiceApplication {
     catalogBaseURL: String? = nil,
     qoderDistribution: QoderDistribution? = nil,
     alwaysProceedConfirmed: Bool = false,
+    selectQoderInstallation: Bool = true,
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
     try Self.checkDeadline(deadline)
@@ -80,15 +81,17 @@ extension BridgeServiceApplication {
           if providerID == .qoder, let qoderDistribution {
             try await settings.setQoderInstallationDistribution(
               installationID: record.id.rawValue, distribution: qoderDistribution)
-            let current = try await settings.qoderRuntimeSettings(distribution: qoderDistribution)
-            try await settings.setQoderRuntimeSettings(
-              ServiceQoderRuntimeSettings(
-                distribution: qoderDistribution,
-                activeInstallationID: record.id.rawValue,
-                nodeExecutablePath: current.nodeExecutablePath,
-                sdkRoot: current.sdkRoot
+            if selectQoderInstallation {
+              let current = try await settings.qoderRuntimeSettings(distribution: qoderDistribution)
+              try await settings.setQoderRuntimeSettings(
+                ServiceQoderRuntimeSettings(
+                  distribution: qoderDistribution,
+                  activeInstallationID: record.id.rawValue,
+                  nodeExecutablePath: current.nodeExecutablePath,
+                  sdkRoot: current.sdkRoot
+                )
               )
-            )
+            }
           }
           return record
         }
@@ -185,7 +188,7 @@ extension BridgeServiceApplication {
         !policy.requiresExactRegistrationProfile
           || (candidate.trustProfile == policy.registrationTrustProfile
             && candidate.securityProfileID == policy.registrationSecurityProfileID
-            && Set(candidate.artifactRequests.map(\.role)) == policy.requiredArtifactRoles)
+            && policy.registrationArtifactRolesMatch(Set(candidate.artifactRequests.map(\.role))))
       else {
         throw BridgeMCPQueryError.contractRejected
       }

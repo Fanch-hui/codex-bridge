@@ -36,6 +36,11 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setWorkbenchPermissionMode(_ mode: String) async throws
   func agentCatalog() async throws -> IPCAgentCatalogResponse
   func agentCatalog(forceRefresh: Bool) async throws -> IPCAgentCatalogResponse
+  func beginAgentSetup(_ request: IPCAgentSetupRequest) async throws -> IPCAgentSetupState
+  func agentSetups() async throws -> [IPCAgentSetupState]
+  func continueAgentSetup(_ request: IPCAgentSetupContinueRequest) async throws
+    -> IPCAgentSetupState
+  func cancelAgentSetup(operationID: String) async throws -> IPCAgentSetupState
   func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
   ) async throws -> IPCAgentInstallationSummary

@@ -25,6 +25,7 @@ public actor ServiceComposition {
   public let deepSeekHarnessMCP: ServiceDeepSeekHarnessMCPConfiguration
   public let agentRegistry: ServiceAgentRegistry
   let agentDiscoveryCatalog: ServiceAgentDiscoveryCatalog
+  let agentSetup: ServiceAgentSetupCoordinator
   public let execution: ExecutionManager
   public let coordinator: ServiceExecutionCoordinator
   public let catalog: ServiceCodexCatalog
@@ -94,6 +95,7 @@ public actor ServiceComposition {
       managedDeepSeekConfigurationPath: deepSeekConfigurationPath
     )
     let qoderEnvironment = ToolDiscoveryEnvironment.current()
+    let setupRuntimeBindings = ServiceAgentSetupRuntimeBindings()
     let qoderDistribution: @Sendable (AgentInstallation) async throws -> QoderDistribution = {
       [settings] installation in
       if let configured = try await settings.qoderInstallationDistribution(
@@ -120,6 +122,20 @@ public actor ServiceComposition {
           runtimeConfiguration: { installation in
             let distribution = try await qoderDistribution(installation)
             let runtime = try await settings.qoderRuntimeSettings(distribution: distribution)
+            if let staged = await setupRuntimeBindings.staged(for: installation.executablePath) {
+              return QoderSDKRuntimeConfiguration(
+                distribution: distribution, nodeExecutablePath: staged.nodeExecutablePath,
+                sdkRoot: staged.sdkRoot)
+            }
+            if runtime.activeInstallationID != installation.id.rawValue,
+              let node = installation.artifacts.first(where: { $0.role == .nodeInterpreter }),
+              let manifest = installation.artifacts.first(where: { $0.role == .runtimeManifest })
+            {
+              return QoderSDKRuntimeConfiguration(
+                distribution: distribution, nodeExecutablePath: node.canonicalPath,
+                sdkRoot: URL(fileURLWithPath: manifest.canonicalPath).deletingLastPathComponent()
+                  .path)
+            }
             return QoderSDKRuntimeConfiguration(
               distribution: distribution,
               nodeExecutablePath: runtime.nodeExecutablePath,
@@ -288,6 +304,7 @@ public actor ServiceComposition {
       catalog: catalog,
       runtimeStatus: runtimeStatus,
       application: application,
+      setupRuntimeBindings: setupRuntimeBindings,
       tunnel: tunnel,
       mcpClients: mcpClients,
       legacyImportReport: legacyImport.report
@@ -339,6 +356,7 @@ public actor ServiceComposition {
     catalog: ServiceCodexCatalog,
     runtimeStatus: ServiceRuntimeStatus,
     application: BridgeServiceApplication,
+    setupRuntimeBindings: ServiceAgentSetupRuntimeBindings,
     tunnel: ServiceTunnelController,
     mcpClients: ServiceMCPClientRegistry,
     legacyImportReport: LegacyImportReport?
@@ -355,6 +373,14 @@ public actor ServiceComposition {
     self.agentMCP = agentMCP
     self.agentRegistry = agentRegistry
     self.agentDiscoveryCatalog = agentDiscoveryCatalog
+    self.agentSetup = ServiceAgentSetupCoordinator(
+      defaultRoot: paths.rootURL.appendingPathComponent("AgentTools", isDirectory: true),
+      cacheURL: paths.agentStateURL.appendingPathComponent("agent-setup.json"),
+      dependencies: ServiceAgentSetupService(
+        paths: paths, registry: agentRegistry, settings: settings,
+        application: application, discovery: agentDiscoveryCatalog,
+        bindings: setupRuntimeBindings, tasks: tasks
+      ).dependencies())
     self.execution = execution
     self.coordinator = coordinator
     self.catalog = catalog
@@ -614,6 +640,7 @@ public actor ServiceComposition {
   public func shutdown() async {
     guard !isShutdown else { return }
     isShutdown = true
+    await agentSetup.shutdown()
     let refreshTask = startupAgentRefreshTask
     startupAgentRefreshTask = nil
     refreshTask?.cancel()

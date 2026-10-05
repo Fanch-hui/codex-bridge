@@ -5,13 +5,17 @@
 
   extension WindowsSettingsModel {
     func loadModelCatalog(forceRefresh: Bool) async -> IPCModelCatalogResponse? {
+      modelCatalogGeneration &+= 1
+      let generation = modelCatalogGeneration
       do {
         let catalog = try await client.modelCatalog(forceRefresh: forceRefresh)
+        guard generation == modelCatalogGeneration else { return nil }
         models = catalog.models
-        preferences = catalog.preferences
+        if preferenceQueue.active == nil { preferences = catalog.preferences }
         modelError = nil
         return catalog
       } catch {
+        guard generation == modelCatalogGeneration else { return nil }
         modelError = BridgeServiceErrorMessage.message(error)
         return nil
       }

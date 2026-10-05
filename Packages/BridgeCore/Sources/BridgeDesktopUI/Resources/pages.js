@@ -24,6 +24,7 @@
 
   function render(state, emit) {
     viewportEmitter = emit;
+    pages.connections.setActive(!!state && state.selectedNavigation === "connections", emit);
     var names = ["overview", "workbench", "projects", "logs", "connections", "settings"];
     names.forEach(function (name) {
       var section = document.getElementById(name + "-page");

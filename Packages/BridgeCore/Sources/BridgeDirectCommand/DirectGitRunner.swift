@@ -80,57 +80,55 @@ public struct DirectGitRunner: Sendable {
       throw DirectGitError.invalidArgument
     }
     let launchArgv = try Self.resolvedArgv(argv)
-    return try await Task.detached(priority: .userInitiated) {
-      var environment = Self.environmentOverrides()
-      if let overrides {
-        environment.merge(overrides) { _, replacement in replacement }
-      }
-      let collector = DirectCommandOutputCollector(maximumBytes: maximumOutputBytes)
-      let process: DirectProcessLifetime
-      do {
-        process = try DirectProcessLifetime(
-          argv: launchArgv,
-          workingDirectory: workingDirectory,
-          environment: environment,
-          usePTY: false,
-          output: collector
-        )
-      } catch {
-        throw DirectGitError.launchFailed
-      }
-
-      let deadline = ContinuousClock.now.advanced(by: timeout ?? defaultTimeout)
-      while process.isRunning && ContinuousClock.now < deadline {
-        try? await Task.sleep(for: .milliseconds(20))
-      }
-      if process.isRunning {
-        _ = process.terminateAndWait(gracePeriod: .seconds(1))
-        process.drainRemainingOutput()
-        process.close()
-        throw DirectGitError.timedOut
-      }
-      guard let termination = process.waitForExit(timeout: .seconds(1)) else {
-        _ = process.terminateAndWait(gracePeriod: .milliseconds(0))
-        process.drainRemainingOutput()
-        process.close()
-        throw DirectGitError.timedOut
-      }
-      process.drainRemainingOutput()
-      process.close()
-      let completeOutput = collector.completeData()
-      guard case .exited(let exitCode) = termination else {
-        return DirectGitResult(
-          exitCode: -1,
-          output: collector.snapshot(),
-          completeOutput: completeOutput
-        )
-      }
-      return DirectGitResult(
-        exitCode: exitCode,
-        output: collector.snapshot(),
-        completeOutput: completeOutput
+    let operation = Task.detached(priority: .userInitiated) {
+      try await execute(
+        argv: launchArgv, workingDirectory: workingDirectory,
+        timeout: timeout ?? defaultTimeout, overrides: overrides,
+        maximumOutputBytes: maximumOutputBytes
       )
-    }.value
+    }
+    return try await withTaskCancellationHandler {
+      try await operation.value
+    } onCancel: {
+      operation.cancel()
+    }
+  }
+
+  private func execute(
+    argv: [String], workingDirectory: String, timeout: Duration,
+    overrides: [String: String]?, maximumOutputBytes: Int
+  ) async throws -> DirectGitResult {
+    try Task.checkCancellation()
+    var environment = Self.environmentOverrides()
+    if let overrides { environment.merge(overrides) { _, replacement in replacement } }
+    let collector = DirectCommandOutputCollector(maximumBytes: maximumOutputBytes)
+    let process: DirectProcessLifetime
+    do {
+      process = try DirectProcessLifetime(
+        argv: argv, workingDirectory: workingDirectory, environment: environment,
+        usePTY: false, output: collector
+      )
+    } catch {
+      throw DirectGitError.launchFailed
+    }
+    defer {
+      if process.isRunning { _ = process.terminateAndWait(gracePeriod: .seconds(1)) }
+      process.close()
+    }
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    while process.isRunning && ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    try Task.checkCancellation()
+    guard !process.isRunning,
+      let termination = process.waitForExit(timeout: .seconds(1))
+    else { throw DirectGitError.timedOut }
+    process.drainRemainingOutput()
+    let exitCode: Int32
+    if case .exited(let code) = termination { exitCode = code } else { exitCode = -1 }
+    return DirectGitResult(
+      exitCode: exitCode, output: collector.snapshot(), completeOutput: collector.completeData()
+    )
   }
 
   private static func resolvedArgv(_ argv: [String]) throws -> [String] {

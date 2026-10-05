@@ -1,6 +1,5 @@
 # Antigravity / AGY 连接与权限指南
 
-适用于 Codex Bridge v1.0.1。
 本指南说明如何让 Antigravity CLI 在 Codex Bridge 中正常完成只读分析、联网检索和项目写入。Bridge 使用的是 `agy` CLI 的 headless `stream-json` 模式，不是 Antigravity Desktop App。
 
 Provider ID 固定为：
@@ -12,6 +11,8 @@ antigravity
 省略 `provider_id` 时，Bridge 会使用 Codex，不会自动选择 AGY。
 
 ## 自动发现与连接
+
+在 AGY 卡片点击“一键配置”。Bridge 准备运行时后请求确认 Always Proceed，再显示原生登录指引；登录完成后返回检测连接。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。
 
 Bridge 首次初始化时扫描本机 Agent 并保存结果。打开连接页后，选择已发现的 Agent 并点击“连接”；需要授权或配置的项目会在连接时提示。后续安装或移动 Agent，可点击“扫描 Agent”更新目录。App 与后台服务重启、切页及日常状态刷新都复用保存的结果。
 

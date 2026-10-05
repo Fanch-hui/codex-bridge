@@ -114,6 +114,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleSetWorkbenchPermissionMode(request)
     case .getAgentCatalog:
       return try await handleGetAgentCatalog(request)
+    case .beginAgentSetup, .getAgentSetups, .continueAgentSetup, .cancelAgentSetup:
+      return try await handleAgentSetup(request)
     case .connectAgentInstallation:
       return try await handleConnectAgentInstallation(request)
     case .registerAgentInstallation:
@@ -236,6 +238,18 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handlePrepareAppUpdate(request)
     case .cancelAppUpdate:
       return try await handleCancelAppUpdate(request)
+    case .shutdownServiceIfIdle:
+      #if os(Linux)
+        return try await handleShutdownServiceIfIdle(request)
+      #else
+        return try BridgeServiceIPCCodec.failure(
+          requestID: request.requestID,
+          error: .init(
+            code: "unsupported_operation",
+            message: "Conditional service shutdown is unavailable on this platform."
+          )
+        )
+      #endif
     case .shutdownService:
       #if os(Windows) || os(Linux)
         return try handleShutdownService(request)

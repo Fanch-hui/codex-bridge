@@ -95,7 +95,11 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var projects: [MCPProjectSummary] = []
   @Published public internal(set) var projectDetails: [String: MCPProjectDetail] = [:]
   @Published public internal(set) var agentProviders: [IPCAgentProviderSummary] = []
-  @Published public internal(set) var agentInstallations: [IPCAgentInstallationSummary] = []
+  @Published public internal(set) var agentInstallations: [IPCAgentInstallationSummary] = [] {
+    didSet {
+      if oldValue != agentInstallations { synchronizeAgentModelScopes() }
+    }
+  }
   @Published public internal(set) var nativeSessionDirectory:
     BridgeDesktopNativeSessionDirectoryState?
   var nativeSessionDirectoryGeneration: UInt64 = 0
@@ -127,6 +131,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var isManagingAgents = false
   @Published var directConfiguration: IPCDirectConfiguration?
   @Published var isSavingDirectConfiguration = false
+  @Published var agentSetupOperations: [IPCAgentSetupState] = []
+  var agentSetupRefreshInFlight = false
+  var agentSetupRequestGeneration = 0
   @Published var agentOperationRevision = 0
   var didAttemptServiceUpgrade = false
   @Published public internal(set) var isRefreshingAgentModels = false
@@ -152,7 +159,11 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var selectedThread: MCPThreadReadPage?
   @Published public internal(set) var selectedThreadID: String?
   @Published public internal(set) var selectedTaskID: String?
-  @Published public internal(set) var selectedProjectID: String?
+  @Published public internal(set) var selectedProjectID: String? {
+    didSet {
+      if oldValue != selectedProjectID { synchronizeAgentModelScopes() }
+    }
+  }
   @Published public internal(set) var workbenchPermissionMode = "workspace-write"
   @Published public internal(set) var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
   @Published var desktopLogSearchText = ""

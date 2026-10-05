@@ -314,3 +314,8 @@
 .native-session-status { color: var(--success); }
 .native-session-error { color: var(--error); }
 .native-session-message { padding: 8px 0; border-bottom: 1px solid var(--separator); }
+
+.agent-setup-dialog { max-width: min(620px, calc(100vw - 32px)); width: 100%; color: var(--text); background: var(--surface); border: 1px solid var(--separator); border-radius: 12px; padding: 24px; }
+.agent-setup-dialog::backdrop { background: rgba(0, 0, 0, .4); }
+.agent-setup-dialog .row-detail { overflow-wrap: anywhere; }
+.agent-setup-instructions { white-space: pre-wrap; }

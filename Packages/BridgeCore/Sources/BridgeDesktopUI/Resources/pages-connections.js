@@ -2,8 +2,28 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var E = global.CodexBridgeDesktopConnectionsEditors;
+  var active = false, timer = null, currentPage = null, currentEmit = null;
+  function setActive(value, emit) {
+    currentEmit = emit;
+    if (active === value) return;
+    active = value;
+    if (!active && timer) { global.clearTimeout(timer); timer = null; }
+    if (active) {
+      global.setTimeout(function () { if (active) currentEmit("refreshAgentSetups", {}); }, 0);
+      schedule();
+    }
+  }
+  function schedule() {
+    if (timer || !active || !currentPage || !S.safeArray(currentPage.setupOperations).some(
+      global.CodexBridgeDesktopAgentSetup.running)) return;
+    timer = global.setTimeout(function () {
+      timer = null;
+      if (active) { currentEmit("refreshAgentSetups", {}); schedule(); }
+    }, 1500);
+  }
 
   function render(page, emit) {
+    currentPage = page; currentEmit = emit; schedule();
     var container = document.getElementById("connections-content");
     if (!container.__connectionsPage) container.__connectionsPage = create(container, emit);
     container.__connectionsPage.update(page, emit);
@@ -222,6 +242,7 @@
       canConnect: page.canRegisterAgent,
       busy: page.isManagingAgents === true,
       revision: page.agentOperationRevision,
+      setupOperations: page.setupOperations,
       acceptReplacement: true
     }, emit);
     editor.update(providers, page.canRegisterAgent, emit);
@@ -242,5 +263,5 @@
     return "neutral";
   }
 
-  global.CodexBridgeDesktopConnectionsPage = { render: render };
+  global.CodexBridgeDesktopConnectionsPage = { render: render, setActive: setActive };
 }(window));

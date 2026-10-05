@@ -137,7 +137,9 @@ enum ServiceAgentAutoDiscovery {
     #endif
     var seen = Set<String>()
     return try paths.compactMap { path in
-      guard let canonical = canonicalExecutable(path, allowJavaScript: providerID == .qoder),
+      guard
+        let canonical = canonicalExecutable(
+          path, allowJavaScript: providerID == .qoder || providerID == .pi),
         isCommandLineExecutable(canonical),
         seen.insert(pathKey(canonical)).inserted
       else { return nil }

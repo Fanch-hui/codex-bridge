@@ -71,9 +71,7 @@ enum DeepSeekHarnessACPModelCatalog {
       modelID: modelID,
       reasoningEffort: reasoningEffort
     )
-    guard var value = String(data: configuration, encoding: .utf8) else {
-      throw DeepSeekHarnessACPError.templateMismatch
-    }
+    var value = try configurationText(configuration)
     value = try replacingScalar(
       prefix: reasoningPrefix,
       with: selection.reasoningEffort,
@@ -88,11 +86,8 @@ enum DeepSeekHarnessACPModelCatalog {
   }
 
   static func profile(configuration: Data, template: Data) throws -> Profile {
-    guard let value = String(data: configuration, encoding: .utf8),
-      let templateValue = String(data: template, encoding: .utf8)
-    else {
-      throw DeepSeekHarnessACPError.templateMismatch
-    }
+    let value = try configurationText(configuration)
+    let templateValue = try configurationText(template)
     let parsed = try parsedProfile(from: value)
     _ = try parsedProfile(from: templateValue)
     let normalizedProfile = try normalized(value)
@@ -107,9 +102,8 @@ enum DeepSeekHarnessACPModelCatalog {
   }
 
   static func additionalEntries(configuration: Data, template: Data) throws -> String {
-    guard let value = String(data: configuration, encoding: .utf8),
-      let templateValue = String(data: template, encoding: .utf8)
-    else { throw DeepSeekHarnessACPError.templateMismatch }
+    let value = try configurationText(configuration)
+    let templateValue = try configurationText(template)
     let normalizedProfile = try normalized(value)
     let normalizedTemplate = try normalized(templateValue)
     guard normalizedProfile.hasPrefix(normalizedTemplate) else {
@@ -145,6 +139,13 @@ enum DeepSeekHarnessACPModelCatalog {
       defaultReasoningEffort: effort,
       supportedReasoningEfforts: efforts
     )
+  }
+
+  private static func configurationText(_ data: Data) throws -> String {
+    guard let value = String(data: data, encoding: .utf8) else {
+      throw DeepSeekHarnessACPError.templateMismatch
+    }
+    return value.replacingOccurrences(of: "\r\n", with: "\n")
   }
 
   private static func modelIDs(from value: String) throws -> [String] {

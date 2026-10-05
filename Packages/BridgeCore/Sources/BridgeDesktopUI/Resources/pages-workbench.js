@@ -277,6 +277,7 @@
   function renderContentBody(content, page, emit) {
     var retained = prepareContentCard(content, page);
     if (!page.selectedTask) {
+      global.CodexBridgeDesktopWorkbenchActions.reset();
       var empty = S.node("div", "workbench-empty-state");
       empty.appendChild(S.icon("sparkles", "empty-sparkle-icon"));
       empty.appendChild(S.node("h3", "empty-title", "等待 ChatGPT 指令"));
@@ -324,7 +325,7 @@
     if (detail.failureCode) addDetail(grid, "失败代码", detail.failureCode);
     sections.summary.appendChild(grid);
 
-    updateDetailActions(sections.actions, detail, row, emit);
+    global.CodexBridgeDesktopWorkbenchActions.render(sections.actions, detail, row, emit);
     if (detail.changedFiles && detail.changedFiles.length) addListBlock(sections.files, "变更文件", detail.changedFiles);
 
     if ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page)) {
@@ -333,44 +334,6 @@
     }
     if (card.parentNode !== content) content.appendChild(card);
     else if (content.lastChild !== card) content.appendChild(card);
-  }
-
-  function updateDetailActions(actions, detail, row, emit) {
-    actions.__detail = detail;
-    actions.__emit = emit;
-    if (actions.__taskID !== detail.taskID) {
-      S.clear(actions);
-      actions.__buttons = Object.create(null);
-      actions.__taskID = detail.taskID;
-    }
-    var buttons = actions.__buttons, specs = [];
-    if (detail.canInterrupt) specs.push(["interruptTask", "中断", "small danger"]);
-    if (detail.canStop) specs.push(["stopTask", "停止", "small danger"]);
-    if (row.canDelete) specs.push(["deleteSession", "删除会话", "small danger"]);
-    specs.push(["refreshConversation", "刷新当前对话", "small"]);
-    var active = Object.create(null);
-    specs.forEach(function (spec, index) {
-      var command = spec[0], button = buttons[command];
-      active[command] = true;
-      if (!button) {
-        button = buttons[command] = S.button(spec[1], null, {}, emit, spec[2], false);
-        button.addEventListener("click", function () {
-          var current = actions.__detail;
-          if (command === "deleteSession" && !global.confirm("删除会话？\n这会删除 Codex Bridge 保存的全部任务、事件和对话记录，无法撤销。")) return;
-          var payload = { taskID: current.taskID };
-          if (command === "deleteSession") payload.sessionID = current.sessionID;
-          actions.__emit(command, payload);
-        });
-      }
-      var atIndex = actions.children[index];
-      if (atIndex !== button) {
-        if (atIndex) actions.insertBefore(button, atIndex);
-        else actions.appendChild(button);
-      }
-    });
-    Object.keys(buttons).forEach(function (command) {
-      if (!active[command]) { buttons[command].remove(); delete buttons[command]; }
-    });
   }
 
   function decisionLabel(approval, decision) {
@@ -402,6 +365,7 @@
       if (content.__conversationFollow) content.__conversationFollow.following = true;
     });
     if (!page) {
+      global.CodexBridgeDesktopWorkbenchActions.reset();
       global.CodexBridgeDesktopWorkbenchHeader.reset();
       global.CodexBridgeDesktopWorkbenchControls.render(null, emit);
       document.getElementById("chat-browser-slot").classList.add("browser-hidden");

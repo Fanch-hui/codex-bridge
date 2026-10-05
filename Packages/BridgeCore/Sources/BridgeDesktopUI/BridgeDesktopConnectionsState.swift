@@ -316,6 +316,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
   public let canScanAgents: Bool?
   public let isManagingAgents: Bool?
   public let agentOperationRevision: Int?
+  public let setupOperations: [BridgeDesktopAgentSetupState]?
   public let statusMessage: String?
 
   public init(
@@ -338,6 +339,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     canScanAgents: Bool? = nil,
     isManagingAgents: Bool? = nil,
     agentOperationRevision: Int? = nil,
+    setupOperations: [BridgeDesktopAgentSetupState]? = nil,
     statusMessage: String? = nil
   ) {
     self.header = header
@@ -359,6 +361,7 @@ public struct BridgeDesktopConnectionsState: Codable, Equatable, Sendable {
     self.canScanAgents = canScanAgents
     self.isManagingAgents = isManagingAgents
     self.agentOperationRevision = agentOperationRevision
+    self.setupOperations = setupOperations
     self.statusMessage = statusMessage
   }
 }

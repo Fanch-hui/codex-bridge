@@ -13,13 +13,13 @@ extension BridgeDesktopCommandRouter {
     case .saveAgentDefault:
       saveAgentDefault(payload, model: model)
     case .setExecutionModel:
-      guard connected(model), let modelID = modelID(payload.modelID, in: model.models) else {
+      guard connected(model), let modelID = validatedID(payload.modelID, maximumBytes: 256) else {
         return
       }
       model.setExecutionModel(modelID)
     case .setExecutionEffort:
-      guard connected(model), let preferences = model.modelPreferences,
-        let effort = effort(payload.effort, for: preferences.executionModel, in: model.models)
+      guard connected(model),
+        let effort = validatedID(payload.effort, maximumBytes: 64)
       else { return }
       model.setExecutionEffort(effort)
     case .setAccessMode:
@@ -27,12 +27,6 @@ extension BridgeDesktopCommandRouter {
       model.setAccessMode(mode)
     case .setFastMode:
       guard connected(model), let enabled = payload.fastModeEnabled else { return }
-      if enabled {
-        guard let current = model.modelPreferences,
-          model.models.first(where: { $0.modelID == current.executionModel })?.supportsFastMode
-            == true
-        else { return }
-      }
       model.setFastMode(enabled)
     case .setDirectApprovalMode:
       guard connected(model), let mode = approvalMode(payload.mode) else { return }
@@ -133,58 +127,10 @@ extension BridgeDesktopCommandRouter {
     _ payload: BridgeDesktopCommandPayload,
     model: BridgeServiceAppModel
   ) {
-    guard connected(model), let current = model.modelPreferences else { return }
-    let executionModel =
-      payload.executionModel.flatMap { modelID($0, in: model.models) }
-      ?? current.executionModel
-    guard model.models.contains(where: { $0.modelID == executionModel }) else { return }
-    let executionEffort =
-      payload.executionEffort.flatMap {
-        effort($0, for: executionModel, in: model.models)
-      } ?? current.executionEffort
-    guard
-      model.models.first(where: { $0.modelID == executionModel })?.reasoningEfforts
-        .contains(executionEffort) == true,
-      accessMode(payload.accessMode ?? current.accessMode) != nil
-    else { return }
-    let fastModeEnabled = payload.fastModeEnabled ?? current.fastModeEnabled
-    if fastModeEnabled,
-      model.models.first(where: { $0.modelID == executionModel })?.supportsFastMode != true
-    {
-      return
-    }
-    model.setModelPreferences(
-      IPCModelPreferences(
-        executionModel: executionModel,
-        executionEffort: executionEffort,
-        supervisorModel: current.supervisorModel,
-        supervisorEffort: current.supervisorEffort,
-        supervisorEnabled: current.supervisorEnabled,
-        accessMode: payload.accessMode ?? current.accessMode,
-        fastModeEnabled: fastModeEnabled
-      )
-    )
-  }
-
-  private static func modelID(
-    _ value: String?,
-    in models: [MCPModelSummary]
-  ) -> String? {
-    guard let value = validatedID(value, maximumBytes: 512),
-      models.contains(where: { $0.modelID == value })
-    else { return nil }
-    return value
-  }
-
-  private static func effort(
-    _ value: String?,
-    for modelID: String,
-    in models: [MCPModelSummary]
-  ) -> String? {
-    guard let value = validatedID(value, maximumBytes: 64),
-      models.first(where: { $0.modelID == modelID })?.reasoningEfforts.contains(value) == true
-    else { return nil }
-    return value
+    guard connected(model) else { return }
+    model.applyModelPreferencesPatch(
+      executionModel: payload.executionModel, executionEffort: payload.executionEffort,
+      accessMode: payload.accessMode, fastModeEnabled: payload.fastModeEnabled)
   }
 
   private static func accessMode(_ value: String?) -> String? {

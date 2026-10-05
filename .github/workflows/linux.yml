@@ -2,7 +2,7 @@ name: Linux
 
 on:
   push:
-    branches: [win, 'codex/linux-*']
+    branches: [win, 'codex/linux-*', 'codex/review-*']
   pull_request:
     branches: [win]
   workflow_dispatch:
@@ -64,6 +64,8 @@ jobs:
           pkg-config --modversion webkit2gtk-4.1
       - name: Build service, desktop, and packages
         run: Scripts/build-linux.sh "$GITHUB_WORKSPACE/.build/linux-dist"
+      - name: Run development Linux platform tests
+        run: bash .github/scripts/verify-linux-platform.sh
       - name: Verify dependency resolution is unchanged
         run: git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD -- Packages/BridgeCore/Package.resolved Vendor/swift-sdk/Package.resolved
       - name: Verify installed package and service IPC

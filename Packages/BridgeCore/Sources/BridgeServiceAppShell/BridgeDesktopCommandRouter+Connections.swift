@@ -72,6 +72,9 @@ extension BridgeDesktopCommandRouter {
     case .clearTunnel:
       guard connected(model), tunnel(model)?.configured == true else { return }
       model.clearTunnel()
+    case .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .cancelAgentSetup,
+      .openAgentSetupLogin:
+      model.handleAgentSetupCommand(envelope)
     case .connectAgent:
       connectAgent(payload, model: model)
     case .registerAgent:

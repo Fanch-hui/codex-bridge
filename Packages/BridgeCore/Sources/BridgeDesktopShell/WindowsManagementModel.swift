@@ -21,6 +21,9 @@
     private var agentLoading = false
     var projectBusy = false
     var agentBusy = false
+    var agentSetupOperations: [IPCAgentSetupState] = []
+    var agentSetupRefreshInFlight = false
+    var agentSetupRequestGeneration = 0
     private var agentOperationRevision = 0
     private var projectStatusText = "尚未加载项目。"
     private var agentStatusText = "尚未加载 Agent 目录。"
@@ -125,6 +128,7 @@
       }
       agentLoading = false
       publishDisplay()
+      await refreshAgentSetups()
     }
 
     func selectProject(at index: Int) {
@@ -240,7 +244,8 @@
         providerItems: desktopProviderItems,
         installationItems: desktopInstallationItems,
         isManagingAgents: agentBusy || agentLoading,
-        agentOperationRevision: agentOperationRevision
+        agentOperationRevision: agentOperationRevision,
+        setupOperations: agentSetupOperations.map(WindowsDesktopUIStateBuilder.agentSetupState)
       )
       displayBox.store(
         WindowsManagementDisplay(

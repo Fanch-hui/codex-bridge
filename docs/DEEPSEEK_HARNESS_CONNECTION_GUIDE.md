@@ -2,7 +2,7 @@
 
 本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、自动发现并一键连接并从 ChatGPT/Qwen 提交任务。
 
-最短路径是：安装官方 DSH 桌面版、npm 包或源码构建 → 在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 输入 Base URL 和 API key → 点击“连接” → 在设置中刷新模型。Mac 与 Windows 共用这套流程。API key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
+最短路径是：在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 点击“一键配置” → Bridge 准备官方 DSH 与 Node/npm → 按弹窗填写 Base URL 和 API Key 并检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。API Key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
 DSH 的 Provider ID 固定为：
 

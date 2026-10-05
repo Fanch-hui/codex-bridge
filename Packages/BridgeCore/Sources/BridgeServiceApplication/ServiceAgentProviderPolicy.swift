@@ -138,6 +138,13 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
       && (requiredProtocolRevision == nil || protocolRevision == requiredProtocolRevision)
   }
 
+  public func registrationArtifactRolesMatch(_ roles: Set<AgentInstallationArtifactRole>) -> Bool {
+    guard providerID == .deepSeekHarness else { return roles == requiredArtifactRoles }
+    // DSH validates the layout-specific manifest, lock or Desktop archive during Probe.
+    return requiredArtifactRoles.isSubset(of: roles)
+      && (!roles.contains(.dependencyLock) || roles.contains(.runtimeManifest))
+  }
+
   public var defaultPermissionMode: ServicePermissionMode {
     supportsWorkspaceWrite ? .workspaceWrite : .readOnly
   }
@@ -216,7 +223,7 @@ public enum ServiceAgentProviderPolicyRegistry {
       .effortSelection, .shell, .webSearch, .webFetch, .codeExecution, .subagents, .workflow,
       .skills,
     ],
-    requiredArtifactRoles: Set(AgentInstallationArtifactRole.allCases),
+    requiredArtifactRoles: [.launchConfiguration, .nodeInterpreter],
     requiredProtocolRevision: "1",
     registrationTrustProfile: .userTrusted,
     registrationSecurityProfileID: controlledReadOnlyProfileID,

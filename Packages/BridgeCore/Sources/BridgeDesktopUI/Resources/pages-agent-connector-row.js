@@ -52,7 +52,27 @@
     var actionHint = S.node("span", "agent-action-hint");
     actionBar.appendChild(action);
     actionBar.appendChild(actionHint);
+    var setupAction = S.button("一键配置", null, {}, null, "small", false);
+    var setupProgress = S.button("查看配置进度", null, {}, null, "small", false);
+    actionBar.appendChild(setupAction);
+    actionBar.appendChild(setupProgress);
     row.appendChild(actionBar);
+    var setup = global.CodexBridgeDesktopAgentSetup.create(context, provider, beginSetup);
+    row.appendChild(setup.root);
+    var installOptions = S.node("details", "agent-details");
+    installOptions.appendChild(S.node("summary", null, "高级安装选项"));
+    var installDirectory = S.textField("安装目录（可选）", "", "留空时使用应用管理的安装目录");
+    installOptions.appendChild(installDirectory.wrapper);
+    row.appendChild(installOptions);
+    function beginSetup() {
+      context.emit("beginAgentSetup", { providerID: currentProvider.providerID,
+        qoderDistribution: currentProvider.providerID === "qoder" ? qoderSettings.distribution() : null,
+        installationID: currentProvider.providerID === "qoder" ? qoderSettings.installationID() : null,
+        installDirectory: installDirectory.control.value.trim() || null });
+      setupAction.disabled = true;
+    }
+    setupAction.addEventListener("click", beginSetup);
+    setupProgress.addEventListener("click", function () { setup.open(); });
     var reviewConfirmation = Details.confirmation(S, "确认新的 Agent 文件并重新检查？", function () {
         var installation = primaryInstallation(currentInstallations);
         if (installation && installation.canReprobe) sendReprobe(installation, context.acceptReplacement);
@@ -93,6 +113,11 @@
     }
 
     function refreshAction() {
+      var scopedOperation = S.safeArray(context.setupOperations).filter(function (item) {
+        return item.providerID === currentProvider.providerID
+          && (currentProvider.providerID !== "qoder" || item.distribution === qoderSettings.distribution());
+      }).slice(-1)[0] || null;
+      setup.update(scopedOperation, currentProvider);
       var scoped = scopedInstallations();
       var primary = primaryInstallation(scoped);
       var isConnectedValue = scoped.some(isConnected);
@@ -104,7 +129,11 @@
         || catalogBaseURL.control.value !== (currentProvider.configuredCatalogBaseURL || "");
       var noCandidate = !primary && discoveryState(currentProvider) === "not_found";
       actionMode = null;
-      actionBar.hidden = isConnectedValue;
+      var operation = setup.operation();
+      actionBar.hidden = false;
+      setupAction.disabled = !context.canConnect || global.CodexBridgeDesktopAgentSetup.running(operation);
+      setupProgress.hidden = !operation;
+      setupProgress.textContent = operation && operation.state === "needs_user_action" ? "继续配置" : "查看配置进度";
       action.hidden = isConnectedValue || (!primary && discoveryState(currentProvider) === "discovering")
         || (!primary && discoveryState(currentProvider) === "not_found");
       configPanel.hidden = !currentProvider.requiresConfiguration || noCandidate
@@ -205,13 +234,18 @@
       lastBusy = context.busy;
       finishPending();
 
+      var operation = S.safeArray(nextContext.setupOperations).filter(function (item) {
+        return item.providerID === nextProvider.providerID
+          && (nextProvider.providerID !== "qoder" || item.distribution === qoderSettings.distribution());
+      }).slice(-1)[0] || null;
+      setup.update(operation, nextProvider);
       var scoped = scopedInstallations();
       title.textContent = nextProvider.displayName;
       var primary = primaryInstallation(scoped);
       var isConnectedValue = scoped.some(isConnected);
       status.textContent = stateLabel(nextProvider, primary, isConnectedValue);
       status.className = "status-badge " + stateTone(nextProvider, primary, isConnectedValue);
-      detail.textContent = rowDetail(nextProvider, scoped, primary, isConnectedValue);
+      detail.textContent = operation ? operation.message : rowDetail(nextProvider, scoped, primary, isConnectedValue);
       fields.hidden = !nextProvider.requiresConfiguration || (!isConnectedValue && !!nextProvider.discoveredConfigurationPath)
         || (!primary && discoveryState(nextProvider) === "not_found");
       providerDetail.textContent = providerDetailText(nextProvider, scoped);

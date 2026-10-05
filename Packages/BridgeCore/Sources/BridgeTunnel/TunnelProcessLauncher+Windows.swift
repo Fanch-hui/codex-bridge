@@ -2,14 +2,6 @@
   import Foundation
   import WinSDK
 
-  /// Environment variable names carrying the tunnel secrets into the helper
-  /// process. The helper reads them through `env:VARNAME` references, so the
-  /// values never appear in argv or on disk.
-  package enum WindowsTunnelEnvironment {
-    package static let runtimeKeyVariable = "CODEX_BRIDGE_TUNNEL_API_KEY"
-    package static let headerSecretVariable = "CODEX_BRIDGE_TUNNEL_TOKEN"
-  }
-
   final class TunnelSpawnedProcess: @unchecked Sendable {
     let pid: Int32
     let stdout: RedactedOutputBuffer
@@ -153,23 +145,14 @@
           ).utf16
         ) + [WCHAR(0)]
       let runtimePath = WindowsTunnelPathRules.normalize(runtimeDirectory.standardizedFileURL.path)
-      let environmentBlock = Self.windowsEnvironmentBlock(
+      let environmentBlock = WindowsTunnelEnvironment.block(
+        parentEnvironment: Self.currentSystemEnvironment(),
         runtimePath: runtimePath,
-        additions: [
-          (
-            WindowsTunnelEnvironment.runtimeKeyVariable, String(decoding: runtimeKey, as: UTF8.self)
-          ),
-          (
-            WindowsTunnelEnvironment.headerSecretVariable,
-            String(decoding: localMCPHeaderSecret, as: UTF8.self)
-          ),
-          ("TMP", runtimePath),
-          ("TEMP", runtimePath),
-          ("CODEX_HOME", WindowsTunnelPathRules.join(runtimePath, "codex-home")),
-        ]
+        runtimeKey: String(decoding: runtimeKey, as: UTF8.self),
+        headerSecret: String(decoding: localMCPHeaderSecret, as: UTF8.self)
       )
       let launched = commandLine.withUnsafeMutableBufferPointer { commandWide in
-        environmentBlock.withCString(encodedAs: UTF16.self) { environmentWide in
+        environmentBlock.withUnsafeBufferPointer { environmentWide in
           runtimePath.withCString(encodedAs: UTF16.self) { workingWide in
             CreateProcessW(
               nil,
@@ -179,7 +162,7 @@
               true,
               DWORD(CREATE_UNICODE_ENVIRONMENT) | DWORD(CREATE_NO_WINDOW)
                 | DWORD(CREATE_SUSPENDED),
-              UnsafeMutableRawPointer(mutating: environmentWide),
+              UnsafeMutableRawPointer(mutating: environmentWide.baseAddress),
               workingWide,
               &startup,
               &processInformation
@@ -281,74 +264,21 @@
       return handle
     }
 
-    /// Inherits the current environment and upserts the tunnel additions, so
-    /// the helper sees the injected secrets plus the runtime temp directory.
-    private static func windowsEnvironmentBlock(
-      runtimePath: String,
-      additions: [(String, String)]
-    ) -> String {
+    private static func currentSystemEnvironment() -> [String: String] {
       var values: [String: String] = [:]
-      for entry in currentEnvironmentEntries() {
-        guard let separator = environmentSeparator(in: entry) else { continue }
-        let name = String(entry[..<separator])
-        let value = String(entry[entry.index(after: separator)...])
-        upsertEnvironmentValue(value, for: name, in: &values)
-      }
-      for (name, value) in additions {
-        upsertEnvironmentValue(value, for: name, in: &values)
-      }
-      let entries = values.sorted {
-        windowsEnvironmentNameCompare($0.key, $1.key) == 1
-      }.map { "\($0.key)=\($0.value)" }
-      return entries.joined(separator: "\0") + "\0\0"
-    }
-
-    private static func windowsEnvironmentNameCompare(_ lhs: String, _ rhs: String) -> CInt {
-      lhs.withCString(encodedAs: UTF16.self) { left in
-        rhs.withCString(encodedAs: UTF16.self) { right in
-          CompareStringOrdinal(left, -1, right, -1, true)
+      for name in WindowsTunnelEnvironment.inheritedVariableNames {
+        name.withCString(encodedAs: UTF16.self) { nameWide in
+          let capacity = GetEnvironmentVariableW(nameWide, nil, 0)
+          guard capacity > 0 else { return }
+          var buffer = [WCHAR](repeating: 0, count: Int(capacity))
+          let count = buffer.withUnsafeMutableBufferPointer {
+            GetEnvironmentVariableW(nameWide, $0.baseAddress, capacity)
+          }
+          guard count > 0, count < capacity else { return }
+          values[name] = String(decoding: buffer.prefix(Int(count)), as: UTF16.self)
         }
       }
-    }
-
-    private static func upsertEnvironmentValue(
-      _ value: String,
-      for name: String,
-      in values: inout [String: String]
-    ) {
-      if let existing = values.keys.first(where: {
-        windowsEnvironmentNameCompare($0, name) == 2
-      }) {
-        values.removeValue(forKey: existing)
-      }
-      values[name] = value
-    }
-
-    private static func environmentSeparator(in entry: String) -> String.Index? {
-      guard let first = entry.firstIndex(of: "=") else { return nil }
-      if first == entry.startIndex {
-        let afterFirst = entry.index(after: first)
-        guard afterFirst < entry.endIndex,
-          let second = entry[afterFirst...].firstIndex(of: "=")
-        else { return nil }
-        return second
-      }
-      return first
-    }
-
-    private static func currentEnvironmentEntries() -> [String] {
-      guard let block = GetEnvironmentStringsW() else { return [] }
-      defer { _ = FreeEnvironmentStringsW(block) }
-      var entries: [String] = []
-      var cursor = block
-      while cursor.pointee != 0 {
-        var end = cursor
-        while end.pointee != 0 { end += 1 }
-        let units = Array(UnsafeBufferPointer(start: cursor, count: end - cursor))
-        entries.append(String(decoding: units, as: UTF16.self))
-        cursor = end + 1
-      }
-      return entries
+      return values
     }
 
     private static func windowsCommandLine(_ arguments: [String]) -> String {

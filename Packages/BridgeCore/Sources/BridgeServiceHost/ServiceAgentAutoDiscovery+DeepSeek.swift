@@ -42,6 +42,12 @@ extension ServiceAgentAutoDiscovery {
     {
       configurations = [generated]
     }
+    if allowGeneratedConfiguration {
+      for configuration in configurations {
+        try ServiceAgentDeepSeekGeneratedProfile.refresh(
+          at: URL(fileURLWithPath: configuration), stateRoot: dataPaths.agentStateURL)
+      }
+    }
     var requests: [ServiceAgentRegistrationRequest] = []
     var validationError: (any Error)?
     var seen = Set<String>()

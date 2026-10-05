@@ -21,19 +21,34 @@ extension BridgeServiceApplication {
     }
   }
 
+  public func prepareIdleServiceShutdown() async throws -> Bool {
+    guard await workspaceGate.beginIdleServiceShutdown() else { return false }
+    do {
+      guard try await appUpdateIsIdle() else {
+        await workspaceGate.cancelIdleServiceShutdown()
+        return false
+      }
+      await workspaceGate.commitServiceShutdown()
+      return true
+    } catch {
+      await workspaceGate.cancelIdleServiceShutdown()
+      throw error
+    }
+  }
+
   public func cancelAppUpdate() async throws {
     await workspaceGate.cancelAppUpdate()
+  }
+
+  private func appUpdateIsIdle() async throws -> Bool {
+    guard try await tasks.nonterminalTasks().isEmpty else { return false }
+    return await !directCommands.allSessions().contains { $0.status == "running" }
   }
 
   private func performAppUpdatePreparation() async throws -> Bool {
     guard await workspaceGate.beginAppUpdate() else { return false }
     do {
-      guard try await tasks.nonterminalTasks().isEmpty else {
-        await workspaceGate.cancelAppUpdate()
-        return false
-      }
-      let directBusy = await directCommands.allSessions().contains { $0.status == "running" }
-      guard !directBusy else {
+      guard try await appUpdateIsIdle() else {
         await workspaceGate.cancelAppUpdate()
         return false
       }

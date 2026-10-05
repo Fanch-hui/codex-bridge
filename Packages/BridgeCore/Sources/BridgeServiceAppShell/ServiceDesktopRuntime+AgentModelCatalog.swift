@@ -17,6 +17,9 @@ extension BridgeServiceAppModel {
       return
     }
 
+    updateAgentModelScope(
+      AgentModelCatalogScope(installationID: installationID, projectID: selectedProjectID),
+      providerID: providerID)
     incrementAgentModelCatalogGeneration(for: providerID)
     let catalogGeneration = agentModelCatalogGeneration(for: providerID)
     incrementAgentModelRefreshGeneration(for: providerID)
@@ -67,6 +70,9 @@ extension BridgeServiceAppModel {
       let client = try currentClient()
       let persistedDefault = try await client.agentModelDefault(providerID: providerID)
       guard !Task.isCancelled,
+        catalogGeneration == agentModelCatalogGeneration(for: providerID),
+        refreshGeneration == agentModelRefreshGeneration(for: providerID),
+        selectedProjectID == projectID,
         defaultRevision == agentModelDefaultRevision(for: providerID)
       else { return }
       let rawResponse = try await client.agentModels(
@@ -79,6 +85,7 @@ extension BridgeServiceAppModel {
       guard !Task.isCancelled,
         catalogGeneration == agentModelCatalogGeneration(for: providerID),
         refreshGeneration == agentModelRefreshGeneration(for: providerID),
+        selectedProjectID == projectID,
         defaultRevision == agentModelDefaultRevision(for: providerID)
       else { return }
 
@@ -91,6 +98,13 @@ extension BridgeServiceAppModel {
         catalogResponse: rawResponse
       )
 
+      guard catalogGeneration == agentModelCatalogGeneration(for: providerID),
+        refreshGeneration == agentModelRefreshGeneration(for: providerID),
+        agentModelCatalogScopes[providerID]
+          == AgentModelCatalogScope(
+            installationID: installationID, projectID: projectID),
+        selectedProjectID == projectID
+      else { return }
       let correctedDefault = try await correctAgentModelDefaultIfNeeded(
         resolution: resolution,
         persistedDefault: persistedDefault,
@@ -103,6 +117,7 @@ extension BridgeServiceAppModel {
       guard !Task.isCancelled,
         catalogGeneration == agentModelCatalogGeneration(for: providerID),
         refreshGeneration == agentModelRefreshGeneration(for: providerID),
+        selectedProjectID == projectID,
         defaultRevision == agentModelDefaultRevision(for: providerID)
       else { return }
       applyAgentModelCatalogRefresh(
@@ -211,267 +226,4 @@ extension BridgeServiceAppModel {
     postToast(message, symbol: "arrow.clockwise", tone: .success)
   }
 
-}
-
-extension BridgeServiceAppModel {
-  func consumeAgentModelHydrationSuppression(
-    providerID: String = "opencode",
-    installationID: String?,
-    projectID: String?,
-    modelID: String?
-  ) -> Bool {
-    let hydrationID = AgentModelHydrationID(
-      providerID: providerID,
-      installationID: installationID,
-      projectID: projectID,
-      modelID: modelID
-    )
-    guard agentModelHydrationSuppressions[providerID] == hydrationID else {
-      agentModelHydrationSuppressions.removeValue(forKey: providerID)
-      return false
-    }
-    agentModelHydrationSuppressions.removeValue(forKey: providerID)
-    return true
-  }
-
-  func hydrateAgentModelState(
-    installationID: String?,
-    providerID: String = "opencode"
-  ) async {
-    incrementAgentModelCatalogGeneration(for: providerID)
-    let catalogGeneration = agentModelCatalogGeneration(for: providerID)
-    incrementAgentModelDefaultLoadGeneration(for: providerID)
-    let defaultLoadGeneration = agentModelDefaultLoadGeneration(for: providerID)
-    let projectID = selectedProjectID
-    let normalizedInstallationID = installationID.flatMap { $0.isEmpty ? nil : $0 }
-    let scope = AgentModelCatalogScope(
-      installationID: normalizedInstallationID,
-      projectID: projectID
-    )
-    if agentModelCatalogScopes[providerID] != scope {
-      agentModelCatalogScopes[providerID] = scope
-      setAgentModelOptions([], providerID: providerID)
-    }
-    agentModelHydrationGenerations[providerID] = catalogGeneration
-    setAgentModelsHydrating(true, providerID: providerID)
-    defer {
-      if agentModelHydrationGenerations[providerID] == catalogGeneration {
-        setAgentModelsHydrating(false, providerID: providerID)
-      }
-    }
-
-    if let mutation = agentModelDefaultMutationTasks[providerID] {
-      await mutation.value
-    }
-    guard !Task.isCancelled else { return }
-    let defaultRevision = agentModelDefaultRevision(for: providerID)
-    guard let client = try? currentClient() else { return }
-
-    let persistedDefault = try? await client.agentModelDefault(providerID: providerID)
-    let modelResponse: IPCAgentModelsResponse?
-    if let installationID = normalizedInstallationID {
-      let rawResponse = try? await client.agentModels(
-        installationID: installationID,
-        projectID: projectID,
-        modelID: nil,
-        useStoredDefault: false
-      )
-      if let rawResponse,
-        let defaultModel = persistedDefault?.model,
-        rawResponse.models.first(where: { $0.modelID == defaultModel })?
-          .reasoningCapabilitiesAvailable == false
-      {
-        modelResponse =
-          (try? await client.agentModels(
-            installationID: installationID,
-            projectID: projectID,
-            modelID: defaultModel,
-            useStoredDefault: false
-          )) ?? rawResponse
-      } else {
-        modelResponse = rawResponse
-      }
-    } else {
-      modelResponse = nil
-    }
-
-    guard !Task.isCancelled else { return }
-    if catalogGeneration == agentModelCatalogGeneration(for: providerID), let modelResponse {
-      setAgentModelOptions(modelResponse.models, providerID: providerID)
-    }
-    guard defaultLoadGeneration == agentModelDefaultLoadGeneration(for: providerID),
-      defaultRevision == agentModelDefaultRevision(for: providerID),
-      let persistedDefault
-    else { return }
-    applyAgentModelDefault(persistedDefault, providerID: providerID)
-  }
-
-  func saveAgentModelDefault(_ model: String?, providerID: String = "opencode") {
-    incrementAgentModelCatalogGeneration(for: providerID)
-    agentModelHydrationSuppressions.removeValue(forKey: providerID)
-    let current = agentModelDefault(for: providerID)
-    saveAgentDefaults(
-      providerID: providerID,
-      model: model,
-      permissionMode: current.permissionMode,
-      effort: nil
-    )
-  }
-
-  func saveOpenCodePermissionMode(_ mode: String) {
-    saveAgentPermissionMode(mode, providerID: "opencode")
-  }
-
-  func saveAgentPermissionMode(_ mode: String, providerID: String) {
-    let current = agentModelDefault(for: providerID)
-    saveAgentDefaults(
-      providerID: providerID,
-      model: current.model,
-      permissionMode: mode,
-      effort: current.effort
-    )
-  }
-
-  func saveAgentEffort(_ effort: String?, providerID: String = "opencode") {
-    let current = agentModelDefault(for: providerID)
-    saveAgentDefaults(
-      providerID: providerID,
-      model: current.model,
-      permissionMode: current.permissionMode,
-      effort: effort
-    )
-  }
-
-  func saveAgentDefaults(
-    providerID: String,
-    model: String?,
-    permissionMode: String?,
-    effort: String?
-  ) {
-    let previous = agentModelDefault(for: providerID)
-    incrementAgentModelDefaultRevision(for: providerID)
-    let revision = agentModelDefaultRevision(for: providerID)
-    applyAgentModelDefault(
-      IPCAgentModelDefaultResponse(
-        providerID: providerID,
-        model: model,
-        permissionMode: permissionMode ?? previous.permissionMode,
-        effort: effort
-      ),
-      providerID: providerID
-    )
-    let previousMutation = agentModelDefaultMutationTasks[providerID]
-    let task = Task { [weak self, previousMutation] in
-      await previousMutation?.value
-      guard let self, !Task.isCancelled else { return }
-      defer {
-        if self.agentModelDefaultRevision(for: providerID) == revision {
-          self.agentModelDefaultMutationTasks.removeValue(forKey: providerID)
-        }
-      }
-      do {
-        let client = try self.currentClient()
-        let persisted = try await client.setAgentDefaults(
-          providerID: providerID,
-          model: model,
-          permissionMode: permissionMode,
-          effort: effort
-        )
-        guard self.agentModelDefaultRevision(for: providerID) == revision else { return }
-        self.applyAgentModelDefault(persisted, providerID: providerID)
-        self.postToast(
-          "\(self.agentProviderName(providerID)) 默认设置已保存",
-          symbol: "checkmark.circle.fill",
-          tone: .success
-        )
-      } catch {
-        guard self.agentModelDefaultRevision(for: providerID) == revision else { return }
-        self.applyAgentModelDefault(previous, providerID: providerID)
-        self.errorMessage = Self.message(error)
-      }
-    }
-    agentModelDefaultMutationTasks[providerID] = task
-  }
-
-  private func agentProviderName(_ providerID: String) -> String {
-    agentProviders.first(where: { $0.providerID == providerID })?.displayName ?? providerID
-  }
-
-  private func applyAgentModelDefault(
-    _ value: IPCAgentModelDefaultResponse,
-    providerID: String
-  ) {
-    agentModelDefaults[providerID] = value
-    guard providerID == "opencode" else { return }
-    openCodeDefaultModel = value.model
-    openCodeDefaultPermissionMode = value.permissionMode
-    openCodeDefaultEffort = value.effort
-  }
-
-  private func incrementAgentModelCatalogGeneration(for providerID: String) {
-    agentModelCatalogGenerations[providerID, default: 0] &+= 1
-  }
-  private func agentModelCatalogGeneration(for providerID: String) -> UInt64 {
-    agentModelCatalogGenerations[providerID, default: 0]
-  }
-  private func incrementAgentModelRefreshGeneration(for providerID: String) {
-    agentModelRefreshGenerations[providerID, default: 0] &+= 1
-  }
-  private func agentModelRefreshGeneration(for providerID: String) -> UInt64 {
-    agentModelRefreshGenerations[providerID, default: 0]
-  }
-  private func incrementAgentModelDefaultLoadGeneration(for providerID: String) {
-    agentModelDefaultLoadGenerations[providerID, default: 0] &+= 1
-  }
-  private func agentModelDefaultLoadGeneration(for providerID: String) -> UInt64 {
-    agentModelDefaultLoadGenerations[providerID, default: 0]
-  }
-  private func incrementAgentModelDefaultRevision(for providerID: String) {
-    agentModelDefaultRevisions[providerID, default: 0] &+= 1
-  }
-  private func agentModelDefaultRevision(for providerID: String) -> UInt64 {
-    agentModelDefaultRevisions[providerID, default: 0]
-  }
-
-  private func setAgentModelOptions(
-    _ options: [IPCAgentModelSummary],
-    providerID: String
-  ) {
-    if providerID == "opencode" {
-      agentModelOptions = options
-    } else {
-      agentModelOptionsByProvider[providerID] = options
-    }
-  }
-
-  private func setAgentModelsRefreshing(_ refreshing: Bool, providerID: String) {
-    if refreshing {
-      agentModelRefreshingProviders.insert(providerID)
-    } else {
-      agentModelRefreshingProviders.remove(providerID)
-    }
-    if providerID == "opencode" {
-      isRefreshingAgentModels = refreshing
-    }
-  }
-
-  private func setAgentModelsHydrating(_ hydrating: Bool, providerID: String) {
-    if hydrating {
-      agentModelHydratingProviders.insert(providerID)
-    } else {
-      agentModelHydrationGenerations.removeValue(forKey: providerID)
-      agentModelHydratingProviders.remove(providerID)
-    }
-  }
-
-  private func setAgentModelRefreshError(_ error: String?, providerID: String) {
-    if let error {
-      agentModelRefreshErrorsByProvider[providerID] = error
-    } else {
-      agentModelRefreshErrorsByProvider.removeValue(forKey: providerID)
-    }
-    if providerID == "opencode" {
-      agentModelRefreshError = error
-    }
-  }
 }

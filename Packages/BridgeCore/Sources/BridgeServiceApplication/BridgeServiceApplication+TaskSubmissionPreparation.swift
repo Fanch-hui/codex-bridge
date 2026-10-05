@@ -67,8 +67,8 @@ extension BridgeServiceApplication {
     )
     let taskPrompt = try await taskPrompt(
       for: submission,
-      deadline: deadline,
-      selectedSkills: selectedSkills
+      projectID: project.id.rawValue,
+      deadline: deadline
     )
     return PreparedTaskSubmission(
       projectID: project.id,
@@ -115,8 +115,8 @@ extension BridgeServiceApplication {
 
   func taskPrompt(
     for submission: MCPServiceTaskSubmission,
-    deadline: ContinuousClock.Instant,
-    selectedSkills: [AgentSelectedSkill]
+    projectID: String,
+    deadline: ContinuousClock.Instant
   ) async throws -> String {
     var prompt = Self.prompt(
       submission.prompt,
@@ -128,7 +128,7 @@ extension BridgeServiceApplication {
       for skillName in names where seen.insert(skillName).inserted {
         try Self.checkDeadline(deadline)
         let skill = try await serviceReadSkill(
-          skillName: skillName, projectID: submission.projectID, subpath: "SKILL.md",
+          skillName: skillName, projectID: projectID, subpath: "SKILL.md",
           deadline: deadline)
         let instructions = String(skill.content.prefix(8 * 1_024))
         prompt = "Skill instructions for \(skill.name):\n\n\(instructions)\n\nUser task:\n\(prompt)"

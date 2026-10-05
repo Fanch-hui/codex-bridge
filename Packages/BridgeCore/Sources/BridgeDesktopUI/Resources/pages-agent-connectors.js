@@ -24,6 +24,7 @@
         context.canConnect = !!settings.canConnect;
         context.busy = !!settings.busy;
         context.revision = settings.revision;
+        context.setupOperations = settings.setupOperations || [];
         context.acceptReplacement = settings.acceptReplacement !== false;
         var visible = new Set();
         var position = 0;
@@ -37,8 +38,8 @@
           var matching = S.safeArray(installations).filter(function (item) {
             return item.providerID === provider.providerID;
           });
-          row.update(provider, matching, context);
           place(root, row.root, position);
+          row.update(provider, matching, context);
           position += 1;
         });
         rows.forEach(function (row, providerID) {
