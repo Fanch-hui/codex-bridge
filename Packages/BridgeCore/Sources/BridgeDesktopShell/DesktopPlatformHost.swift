@@ -1,5 +1,6 @@
 #if os(Windows) || os(Linux)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
   import Foundation
 
   enum DesktopPlatformHost {
@@ -120,11 +121,13 @@
   }
 
   enum DesktopServiceLauncher {
-    static func ensureServiceRunning() -> Bool {
+    static func ensureServiceRunning() -> ServiceLaunchOutcome {
       #if os(Windows)
         WindowsServiceLauncher.ensureServiceRunning()
       #else
-        LinuxDesktopService.ensureRunning()
+        // The Linux launcher cannot observe an exited child today, so a
+        // failed readiness check is reported as a plain launch failure.
+        LinuxDesktopService.ensureRunning() ? .ready : .launchFailed(systemError: nil)
       #endif
     }
   }

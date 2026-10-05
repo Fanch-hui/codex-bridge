@@ -225,6 +225,8 @@
     var taskRefreshInProgress = false
     var isWindowVisible = true
     var connectionGeneration: UInt64 = 0
+    var serviceRestartPolicy = ServiceRestartPolicy()
+    var lastServiceLaunchAttemptAt: Date?
 
     public convenience init() {
       self.init(feedback: WindowsDesktopFeedbackStore())

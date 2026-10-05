@@ -6,21 +6,53 @@
   import Foundation
 
   extension WindowsWorkbenchModel {
-    /// Launches the service if needed, then verifies connectivity via
-    /// `status()` and pulls the task list.
+    /// Launches the service if the restart policy allows an attempt, then
+    /// verifies connectivity via `status()` and pulls the task list. A
+    /// service that keeps failing to start is throttled by exponential
+    /// backoff and finally stopped by the policy's circuit breaker.
     public func startServiceAndConnect() async {
       let wasConnected = connectionState == .connected
-      connectionState = .connecting
-      publishDisplay()
-      let launched = await Task.detached(priority: .utility) {
-        DesktopServiceLauncher.ensureServiceRunning()
-      }.value
-      guard launched else {
-        fail("未能连接后台服务：服务启动失败或本机通信未就绪。")
+      let elapsed: Duration? = lastServiceLaunchAttemptAt.map { attempt in
+        Duration.seconds(Date().timeIntervalSince(attempt))
+      }
+      switch serviceRestartPolicy.decision(elapsedSinceLastAttempt: elapsed) {
+      case .circuitOpen:
+        fail("后台服务连续多次启动失败，已暂停自动重启。请检查安装目录或手动启动服务后再试。")
         startTaskPolling()
         return
+      case .deferred:
+        // Keep the previous failure state on screen; the backoff decides
+        // when the next automatic attempt happens.
+        startTaskPolling()
+        return
+      case .allowed:
+        break
       }
-      await connectAndRefresh(notifyOnConnect: !wasConnected)
+      connectionState = .connecting
+      publishDisplay()
+      lastServiceLaunchAttemptAt = Date()
+      let outcome = await Task.detached(priority: .utility) {
+        DesktopServiceLauncher.ensureServiceRunning()
+      }.value
+      switch outcome {
+      case .ready:
+        serviceRestartPolicy.reset()
+        await connectAndRefresh(notifyOnConnect: !wasConnected)
+      case .readinessTimeout:
+        serviceRestartPolicy.recordLaunchFailure()
+        fail("后台服务已启动但长时间未就绪，稍后将自动重试。")
+        startTaskPolling()
+      case .exitedDuringStartup(let exitCode):
+        serviceRestartPolicy.recordLaunchFailure()
+        let detail = exitCode.map { "（退出码 \($0)）" } ?? ""
+        fail("后台服务启动后立即退出\(detail)，稍后将自动重试。")
+        startTaskPolling()
+      case .launchFailed(let systemError):
+        serviceRestartPolicy.recordLaunchFailure()
+        let detail = systemError.map { "（系统错误 \($0)）" } ?? ""
+        fail("无法启动后台服务进程\(detail)，稍后将自动重试。")
+        startTaskPolling()
+      }
     }
 
     /// Verifies the pipe transport with a `status()` round trip, then loads tasks.
@@ -241,7 +273,12 @@
       }
       isWindowVisible = visible
       restartTaskPolling()
-      if visible { userDidInteract() }
+      if visible {
+        // Returning to the foreground is an explicit user signal: give a
+        // tripped crash-loop circuit one fresh set of launch attempts.
+        serviceRestartPolicy.reset()
+        userDidInteract()
+      }
     }
 
     /// Coalesces command-driven refreshes so a batch of UI commands causes one

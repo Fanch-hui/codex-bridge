@@ -118,6 +118,13 @@ public enum ServiceProcessRunner {
     appVersion: String = "1.4.0"
   ) async throws {
     applyDefaultUmask()
+    #if os(Windows)
+      // The service runs detached in the user session; suppress hard-error
+      // and crash-reporter popups for this process and every agent child
+      // process it spawns (the error mode is inherited).
+      _ = SetErrorMode(
+        SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)
+    #endif
     let options = try ServiceProcessOptions.parse(arguments)
     #if os(Linux)
       if options.shutdown || options.shutdownIfIdle {
