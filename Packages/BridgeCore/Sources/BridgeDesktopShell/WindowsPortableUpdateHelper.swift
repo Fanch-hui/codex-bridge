@@ -181,6 +181,7 @@
       $newFiles = @{}
       $oldFiles = @{}
       $backupFiles = @{}
+      $staged = @{}
       $replacementStarted = $false
       try {
         NoReparse $root $root
@@ -210,14 +211,25 @@
           Copy-Item -LiteralPath $source -Destination $destination -Force
           $backupFiles[$relative.ToLowerInvariant()] = $relative
         }
-        $replacementStarted = $true
+        $stagingToken = [Guid]::NewGuid().ToString('N')
         foreach ($key in $newFiles.Keys) {
           $source = Safe $staging $newFiles[$key]
           $destination = Safe $root $newFiles[$key]
           $parent = [IO.Path]::GetDirectoryName($destination)
           NoReparse $root $destination
           [IO.Directory]::CreateDirectory($parent) | Out-Null
-          Copy-Item -LiteralPath $source -Destination $destination -Force
+          $pending = Join-Path $parent (('.' + [IO.Path]::GetFileName($destination)) + '.codexbridge-new-' + $stagingToken)
+          Copy-Item -LiteralPath $source -Destination $pending -Force
+          $staged[$key] = $pending
+        }
+        $replacementStarted = $true
+        foreach ($key in $staged.Keys) {
+          $destination = Safe $root $newFiles[$key]
+          if (Test-Path -LiteralPath $destination -PathType Leaf) {
+            [IO.File]::Replace($staged[$key], $destination, [NullString]::Value)
+          } else {
+            [IO.File]::Move($staged[$key], $destination)
+          }
         }
         foreach ($key in $oldFiles.Keys) {
           if ($newFiles.ContainsKey($key)) { continue }
@@ -229,6 +241,11 @@
       } catch {
         $failureMessage = $_.Exception.Message
         try {
+          foreach ($pending in $staged.Values) {
+            if (Test-Path -LiteralPath $pending -PathType Leaf) {
+              Remove-Item -LiteralPath $pending -Force
+            }
+          }
           if ($replacementStarted) {
             foreach ($key in $newFiles.Keys) {
               if ($backupFiles.ContainsKey($key)) { continue }
