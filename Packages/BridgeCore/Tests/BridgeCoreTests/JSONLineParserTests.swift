@@ -71,6 +71,8 @@ struct JSONLineParserTests {
       _ = try parser.finish()
     } catch let error as CodexRPCError {
       thrown = error
+    } catch {
+      // A non-protocol error still fails the contamination assertion below.
     }
     var contamination = false
     if case .protocolContamination? = thrown { contamination = true }
@@ -102,6 +104,8 @@ struct JSONLineParserTests {
       _ = try parser.ingest(Data("{invalid}\n".utf8))
     } catch let error as CodexRPCError {
       thrown = error
+    } catch {
+      // A non-protocol error still fails the malformed assertion below.
     }
     var malformed = false
     if case .malformedMessage? = thrown { malformed = true }
@@ -112,7 +116,7 @@ struct JSONLineParserTests {
   func rejectsOversizedLines() throws {
     var parser = JSONLineParser(maximumLineBytes: 16)
     expectError(CodexRPCError.protocolLineTooLarge(maximumBytes: 16)) {
-      _ = try parser.ingest(Data(String(repeating: "a", count: 20) + "\n".utf8))
+      _ = try parser.ingest(Data(String(repeating: "a", count: 20).utf8 + "\n".utf8))
     }
     let recovered = try parser.ingest(Data("{\"id\": 1}\n".utf8))
     #expect(recovered.count == 1)

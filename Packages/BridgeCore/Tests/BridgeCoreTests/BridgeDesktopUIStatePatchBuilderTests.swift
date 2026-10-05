@@ -26,7 +26,7 @@ struct BridgeDesktopUIStatePatchBuilderTests {
   }
 
   private func makeState(
-    workbench: BridgeDesktopWorkbenchState = nil,
+    workbench: BridgeDesktopWorkbenchState? = nil,
     overview: BridgeDesktopOverviewState? = nil
   ) -> BridgeDesktopUIState {
     BridgeDesktopUIState(
