@@ -4,7 +4,7 @@ Codex Bridge accepts focused changes that preserve its local-first architecture,
 
 ## Before changing code
 
-1. Read the root `AGENTS.md`, any instructions in the affected directory, and the relevant source and product documentation.
+1. Read `DESIGN.md`, any instructions present in the checkout, and the relevant source and product documentation.
 2. Keep application use cases in `BridgeServiceApplication`, persistence in `BridgeServiceCore`, and platform assembly and IPC routing in `BridgeServiceHost`. Request controllers call the application facade for business operations; provider installation metadata and transport subscriptions remain host responsibilities.
 3. Implement desktop pages in `BridgeDesktopUI`. macOS, Windows and Linux hosts adapt the same page state and commands; platform APIs belong in their host modules.
 4. Preserve API and stored-data compatibility with additive defaults and explicit migrations.
@@ -16,15 +16,21 @@ Run checks appropriate to the affected behavior. All SwiftPM builds and tests us
 
 ```bash
 Scripts/with-xcode.sh swift build --package-path Packages/BridgeCore --build-system swiftbuild
-Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore --build-system swiftbuild --filter '<AffectedTestClass>'
-Scripts/with-xcode.sh xcrun swift-format lint --strict --recursive Packages/BridgeCore/Sources Packages/BridgeCore/Tests App Service UITests
+Scripts/with-xcode.sh xcrun swift-format lint --strict --recursive Packages/BridgeCore/Sources App Service
 ```
 
 Strict Swift formatting is required before committing. Tests should verify state transitions, transactions, filesystem identities, process lifecycle or protocol behavior. Use focused fixtures when native credentials or third-party services are unnecessary. Product UI interaction and final experience are manually accepted by the user.
 
-For shared desktop JavaScript, run the relevant `Scripts/test-desktop-*.cjs` tests with `node --test`. Changes to Pi or Qoder runtime resources also require their resource digest checks and affected Node protocol tests.
+The public `win` branch contains production source. Test suites, fixtures and development verification tools are maintained in the development checkout. When those files are present, run the affected suites and include them in formatting checks:
 
-MCP contract changes use `Scripts/verify-mcp-inspector.sh`. macOS host changes can be built with:
+```bash
+Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore --build-system swiftbuild --filter '<AffectedTestClass>'
+Scripts/with-xcode.sh xcrun swift-format lint --strict --recursive Packages/BridgeCore/Sources Packages/BridgeCore/Tests App Service UITests
+```
+
+In the development checkout, shared desktop JavaScript changes use the relevant `Scripts/test-desktop-*.cjs` tests with `node --test`. Pi and Qoder runtime changes also require their resource digest checks and affected Node protocol tests. MCP contract changes use `Scripts/verify-mcp-inspector.sh`.
+
+macOS host changes can be built with:
 
 ```bash
 Scripts/with-xcode.sh xcodebuild -project CodexBridge.xcodeproj -scheme CodexBridge -configuration Debug -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/Xcode build CODE_SIGNING_ALLOWED=NO
@@ -34,7 +40,14 @@ Set `CODEX_BRIDGE_XCODE_DEVELOPER_DIR` when using another complete Xcode install
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs Swift tests, strict formatting, shared desktop logic tests, MCP contract checks, dependency-lock checks, public-source export checks and unsigned macOS builds and archives. `.github/workflows/windows.yml` and `.github/workflows/linux.yml` use native architecture runners for their platform builds, service checks and installer acceptance. The Linux development workflow also runs its isolated platform test suites.
+The public platform workflows use native architecture runners:
+
+- `macos.yml` builds macOS arm64 and x86_64 release packages on pushes and manual runs.
+- `windows.yml` builds x64 and arm64 portable ZIPs and Inno Setup installers, checks Agent CLI contracts and service startup, and verifies installation, same-version replacement, IPC and uninstall.
+- `linux.yml` builds x64 and arm64 tar.gz and deb packages, then verifies the installed package, service IPC and uninstall. Its development checks run when the corresponding test fixtures are available.
+- `mcp-registry.yml` publishes and verifies the MCP bundle after a release is published.
+
+Development CI additionally runs Swift tests, strict formatting, shared desktop logic tests, MCP contract checks, dependency-lock checks and public-source export checks.
 
 Report local tests, native platform checks, installer checks and CI as separate evidence. A source build alone does not establish installed-app behavior. Release acceptance is described in [RELEASE.md](docs/RELEASE.md).
 
