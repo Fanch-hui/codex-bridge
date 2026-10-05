@@ -6,6 +6,7 @@
   private struct WindowsDesktopRenderSnapshot: Sendable {
     let revision: UInt64
     let state: BridgeDesktopUIState
+    let desktopPatch: WindowsDesktopUIWebView.PreparedPatch?
     let chatSlotEnabled: Bool
     let runningTaskCount: Int
     let pendingApprovalCount: Int
@@ -94,9 +95,12 @@
         feedback: model.feedback.current,
         appUpdate: appUpdateState,
       )
+      let preparedPatch = desktopUI.preparedPatch(
+        for: state, revision: windowsDesktopRenderRevision)
       let snapshot = WindowsDesktopRenderSnapshot(
         revision: windowsDesktopRenderRevision,
         state: state,
+        desktopPatch: preparedPatch,
         chatSlotEnabled: chatSlotEnabled,
         runningTaskCount: display.runningTaskCount,
         pendingApprovalCount: display.pendingApprovalCount,
@@ -118,7 +122,9 @@
       desktopUI: WindowsDesktopUIWebView
     ) {
       WindowsMainWindow.setChatSlotEnabled(snapshot.chatSlotEnabled)
-      desktopUI.setState(snapshot.state, revision: snapshot.revision)
+      if let desktopPatch = snapshot.desktopPatch {
+        desktopUI.post(desktopPatch)
+      }
       WindowsMainWindowChrome.updateStatus(
         connectionLabel: snapshot.state.connectionLabel,
         runningTasks: snapshot.runningTaskCount,

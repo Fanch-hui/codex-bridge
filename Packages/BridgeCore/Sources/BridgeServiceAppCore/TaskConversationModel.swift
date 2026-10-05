@@ -61,6 +61,7 @@ public final class TaskConversationModel: Identifiable {
   static let initialPriorPageCount = 2
   static let conversationPageSize = 200
   static let earlierPageSize = 100
+  static let maximumCurrentTaskEntries = TaskConversationWindowPolicy.defaultMaximumCurrentTaskEntries
   private static let resyncRetryDelays: [Duration] = [
     .milliseconds(100),
     .milliseconds(250),
@@ -416,6 +417,7 @@ public final class TaskConversationModel: Identifiable {
     guard changed else { return }
     entries = updatedEntries
     index = updatedIndex
+    trimOversizedCurrentTaskEntries()
     refreshStreamingState()
     requestAutoScroll()
   }
@@ -494,8 +496,23 @@ public final class TaskConversationModel: Identifiable {
     guard changed else { return }
     entries = refreshedEntries
     index = refreshedIndex
+    trimOversizedCurrentTaskEntries()
     refreshStreamingState()
     requestAutoScroll()
+  }
+
+  /// Caps the active task's conversation window. Trimmed entries remain
+  /// reachable through loadEarlier() paging (see +History).
+  func trimOversizedCurrentTaskEntries() {
+    guard let range = TaskConversationWindowPolicy.currentTaskTrimRange(
+      priorEntryCount: priorEntries.count,
+      entries: entries,
+      maximum: Self.maximumCurrentTaskEntries
+    ) else { return }
+    entries.removeSubrange(range)
+    canLoadEarlierCurrentTask = true
+    rebuildIndex()
+    updateEarlierAvailability()
   }
 
   func rebuildIndex() {

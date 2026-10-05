@@ -11,7 +11,6 @@
     private var providerID: String?
     private var sourceEntries: [TaskConversationModel.Entry] = []
     private var presentations: [BridgeDesktopConversationEntry] = []
-    private var legacyTexts: [String] = []
 
     mutating func update(
       taskID: String,
@@ -25,14 +24,12 @@
         presentations = entries.map {
           WindowsConversationEntryPresenter.make($0, providerID: providerID)
         }
-        legacyTexts = entries.map(WindowsConversationEntryPresenter.legacyText)
         return presentations
       }
 
       guard !entries.isEmpty else {
         sourceEntries.removeAll(keepingCapacity: true)
         presentations.removeAll(keepingCapacity: true)
-        legacyTexts.removeAll(keepingCapacity: true)
         return presentations
       }
 
@@ -42,26 +39,19 @@
       )
       if !updatePlan.needsFullRebuild {
         var next = presentations
-        var nextLegacyTexts = legacyTexts
         for index in updatePlan.changedEntryIndices {
           next[index] = WindowsConversationEntryPresenter.make(
             entries[index], providerID: providerID
           )
-          nextLegacyTexts[index] = WindowsConversationEntryPresenter.legacyText(entries[index])
         }
         if let appendedRange = updatePlan.appendedEntryRange {
           next.append(
             contentsOf: entries[appendedRange].map {
               WindowsConversationEntryPresenter.make($0, providerID: providerID)
             })
-          nextLegacyTexts.append(
-            contentsOf: entries[appendedRange].map(
-              WindowsConversationEntryPresenter.legacyText
-            ))
         }
         sourceEntries = entries
         presentations = next
-        legacyTexts = nextLegacyTexts
         return next
       }
 
@@ -69,21 +59,7 @@
       presentations = entries.map {
         WindowsConversationEntryPresenter.make($0, providerID: providerID)
       }
-      legacyTexts = entries.map(WindowsConversationEntryPresenter.legacyText)
       return presentations
-    }
-
-    func text(isStreaming: Bool, errorMessage: String?) -> String {
-      var text: String
-      if sourceEntries.isEmpty {
-        text = isStreaming ? "等待 Provider 输出…" : "暂无对话记录。"
-      } else {
-        text = legacyTexts.joined(separator: "\r\n\r\n")
-      }
-      if let error = errorMessage?.trimmingCharacters(in: .whitespacesAndNewlines), !error.isEmpty {
-        text += "\r\n\r\n[错误] \(error)"
-      }
-      return text
     }
 
     mutating func reset() {
@@ -91,22 +67,10 @@
       providerID = nil
       sourceEntries.removeAll(keepingCapacity: false)
       presentations.removeAll(keepingCapacity: false)
-      legacyTexts.removeAll(keepingCapacity: false)
     }
   }
 
   enum WindowsConversationEntryPresenter {
-    static func legacyText(_ entry: TaskConversationModel.Entry) -> String {
-      let role = entry.role == "user" ? "用户" : "Agent"
-      var content = entry.displayContent.trimmingCharacters(in: .whitespacesAndNewlines)
-      if let toolName = nonEmpty(entry.toolName) {
-        let tool = nonEmpty(entry.toolStatus).map { "\(toolName)（\($0)）" } ?? toolName
-        let prefix = "[工具：\(tool)]"
-        content = content.isEmpty ? prefix : "\(prefix)\r\n\(content)"
-      }
-      return "\(role)：\(content)"
-    }
-
     static func make(
       _ entry: TaskConversationModel.Entry,
       providerID: String
@@ -164,12 +128,6 @@
         isFinal: entry.isFinal,
         status: entry.isFinal ? "final" : "streaming"
       )
-    }
-
-    private static func nonEmpty(_ value: String?) -> String? {
-      guard let value else { return nil }
-      let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-      return trimmed.isEmpty ? nil : trimmed
     }
   }
 #endif

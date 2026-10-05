@@ -71,16 +71,20 @@ extension TaskConversationModel {
       )
     }
 
-    public init(key: String, role: String, kind: String, content: String, isFinal: Bool) {
+    public init(key: String, role: String, kind: String, content: String, isFinal: Bool, messageID: Int64?) {
       self.key = key
       self.role = role
       self.kind = kind
-      messageID = nil
+      self.messageID = messageID
       self.content = content
-      toolName = nil
-      toolStatus = nil
-      toolArguments = nil
+      self.toolName = nil
+      self.toolStatus = nil
+      self.toolArguments = nil
       self.isFinal = isFinal
+    }
+
+    public init(key: String, role: String, kind: String, content: String, isFinal: Bool) {
+      self.init(key: key, role: role, kind: kind, content: content, isFinal: isFinal, messageID: nil)
     }
 
     private static func removeLegacyToolArgumentPrefix(
