@@ -129,11 +129,11 @@ struct GitStatusParserTests {
     #expect(evidence.entries.last?.kind == .untracked)
   }
 
-  @Test("unmerged entries parse after ten header fields")
+  @Test("unmerged entries follow the porcelain v2 u format")
   func parsesUnmergedEntry() throws {
     let evidence = try parser.parse(
       TestFixtures.porcelain([
-        "u AA N... 000000 100644 100644 000000 000000 100644 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 conflicted.txt",
+        "u AA N... 000000 100644 100644 000000 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 3333333333333333333333333333333333333333 conflicted.txt",
       ]))
     let entry = try #require(evidence.entries.first)
     #expect(entry.kind == .unmerged)

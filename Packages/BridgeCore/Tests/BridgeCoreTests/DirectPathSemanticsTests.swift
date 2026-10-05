@@ -183,6 +183,13 @@ struct DirectPathSemanticsTests {
         [.posixPermissions: 0o755], ofItemAtPath: file.path)
     #endif
     #expect(DirectPathSemantics.isExecutableFile(at: file.path))
-    #expect(!DirectPathSemantics.isExecutableFile(at: directory.path))
+    #if os(Windows)
+      // Only the Windows branch rejects directories outright.
+      #expect(!DirectPathSemantics.isExecutableFile(at: directory.path))
+    #else
+      // POSIX: a searchable directory satisfies FileManager.isExecutableFile;
+      // only the Windows branch rejects directories outright.
+      #expect(DirectPathSemantics.isExecutableFile(at: directory.path))
+    #endif
   }
 }
