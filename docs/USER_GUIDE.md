@@ -1,6 +1,6 @@
 # Codex Bridge 详细使用指南
 
-适用于 macOS Apple Silicon 和 Windows x64。首次使用按需要选择配置流程：
+适用于 macOS 14+ Apple Silicon / Intel、Windows x64 / ARM64，以及 Ubuntu 24.04 LTS x64 / ARM64。首次使用按需要选择配置流程：
 
 - **本地读写文件、运行命令**：安装并启动 Bridge → 登记项目目录 → 配置 Tunnel → 添加并启用插件 → 直接操作项目。无需安装或连接 Agent，也无需配置 Agent 模型。
 - **委派 Agent 任务**：安装并启动 Bridge → 登记项目目录 → 连接 Agent → 配置模型 → 从工作台或已连接的聊天客户端提交任务。
@@ -10,13 +10,14 @@ Qwen Studio 使用本机 HTTP MCP 配置代替 Tunnel 和 ChatGPT 插件，直�
 ## 文档导航
 
 - [ChatGPT、Tunnel 与 OpenAI Runtime API Key](./CHATGPT_DEVELOPER_MODE.md)
-- [DeepSeek Harness 安装、API Key、连接与模型](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
+- [DeepSeek Harness ACP 安装、API Key、连接与模型](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) · [原生桌面连接](./DSH_NATIVE_DESKTOP_GUIDE.md)
+- [Pi 与 Qoder 安装、地区选择与连接](./PI_QODER_CONNECTION_GUIDE.md)
 - [OpenCode 安装与连接](./OPENCODE_CONNECTION_GUIDE.md)
 - [Antigravity 安装、连接与权限](./ANTIGRAVITY_CONNECTION_GUIDE.md)
 
 ## 1. 客户端与 Agent
 
-ChatGPT 和 Qwen Studio 可以通过 Bridge 直接读写文件、运行命令，也可以委派 Agent 任务；Bridge 工作台用于提交和管理 Agent 任务。直接操作由本机 Bridge 服务的 Direct Workspace 执行。Codex、OpenCode、DeepSeek Harness（DSH）和 Antigravity（AGY）是实际执行委派任务的本机 Agent。
+ChatGPT 和 Qwen Studio 可以通过 Bridge 直接读写文件、运行命令，也可以委派 Agent 任务；Bridge 工作台用于提交和管理 Agent 任务。直接操作由本机 Bridge 服务的 Direct Workspace 执行。Codex、OpenCode、DeepSeek Harness（DSH）、Antigravity（AGY）、Pi 和 Qoder 是实际执行委派任务的本机 Agent。
 
 ```text
 ChatGPT ── Secure MCP Tunnel ─┐
@@ -28,24 +29,28 @@ Bridge 工作台 ── 本机 IPC ────┘
 
 ## 2. 安装与启动
 
-### macOS Apple Silicon
+### macOS Apple Silicon / Intel
 
-1. 从 [最新版下载页](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载 `CodexBridge-<版本>-macos-arm64.dmg`。
+1. 从 [最新版下载页](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载对应架构的 DMG：Apple Silicon 使用 `CodexBridge-<版本>-macos-arm64.dmg`，Intel 使用 `CodexBridge-<版本>-macos-x86_64.dmg`。
 2. 打开 DMG，把 `CodexBridge.app` 拖到 Applications。
 3. 从 Applications 启动。当前包使用 ad-hoc 签名、尚未 Apple 公证；若系统拦截，在“系统设置 → 隐私与安全性”允许打开。
 4. 在概览检查 Service。若提示后台项目需批准，按提示打开系统设置并允许 Codex Bridge 后台项目。
 5. 回到 App 刷新状态，确认 Service 和本地 MCP 可用。
 
-### Windows x64
+### Windows x64 / ARM64
 
-1. 下载 `CodexBridge-Windows-x64-<版本>-Setup.exe`。
+1. 下载对应系统架构的 `CodexBridge-Windows-x64-<版本>-Setup.exe` 或 `CodexBridge-Windows-arm64-<版本>-Setup.exe`。
 2. 运行安装器，选择安装目录，完成后启动 Codex Bridge。
 3. 如提示缺少 WebView2 Runtime，按提示安装微软 WebView2 Runtime，然后重新启动 App。
 4. 在概览确认 Service 和本地 MCP 可用。
 
-便携版下载 `codex-bridge-windows-x64.zip`，完整解压后运行目录内的 `codex-bridge-windows-app.exe`。保留旁边的服务、DLL、资源目录和 Helper。
+便携版下载 `codex-bridge-windows-x64.zip` 或 `codex-bridge-windows-arm64.zip`，完整解压后运行目录内的 `codex-bridge-windows-app.exe`。保留旁边的服务、DLL、资源目录和 Helper。
 
 Windows 关闭主窗口会隐藏到托盘；需要退出时使用托盘菜单。升级时保留现有应用数据和浏览器登录态。
+
+### Ubuntu 24.04 LTS x64 / ARM64
+
+按[Linux 安装指南](./LINUX.md)选择对应架构的 `.deb` 并通过 APT 安装，或完整解压便携 `.tar.gz` 后运行 `./codex-bridge`。启动后在概览确认 Service 和本地 MCP 可用。升级通过系统包管理器完成。
 
 ## 3. 页面导航
 
@@ -98,14 +103,23 @@ Bridge 在每次启动 Codex 时按当前系统信息重新发现，安装 Codex
 
 ### DeepSeek Harness
 
-按 [DSH 详细指南](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) 安装 CLI，获取 DeepSeek 或兼容服务的 API Key，然后在 Bridge 的 DSH 连接卡片填写 Base URL 和 API Key。连接成功后获取真实模型目录，选择默认模型和该模型支持的推理强度。
+DSH 提供两种连接方式，已有连接默认使用 ACP：
+
+- **ACP**：按[ACP 指南](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)安装 CLI，或使用 Desktop 附带 CLI，在 DSH 连接卡片填写 Base URL 和 API Key。任务使用独立的 Bridge 配置档案；一键配置准备的也是 ACP。
+- **原生桌面**：按[原生桌面指南](./DSH_NATIVE_DESKTOP_GUIDE.md)显式选择连接模式，安装 Connector 并配对，复用 Desktop 登录、工具和原生会话。首版支持 macOS、Windows x64 的完整权限文本任务，派发时 Desktop Host 必须运行。模型和推理强度选择会同步到 DSH 桌面默认，影响后续新建会话。
+
+连接成功后刷新对应模式的模型目录，选择默认模型和该模型支持的推理选项；ACP 与原生桌面偏好分别保存。
 
 ### OpenCode 与 Antigravity
 
 - [OpenCode](./OPENCODE_CONNECTION_GUIDE.md)：先安装 CLI 并完成模型服务登录，再在 Bridge 连接。
 - [Antigravity](./ANTIGRAVITY_CONNECTION_GUIDE.md)：先安装并登录 CLI，在 Bridge 连接时阅读并确认无头执行权限说明。
 
-Bridge 调用的是协议执行入口：Codex app-server、OpenCode ACP、DSH 的 Node ACP 入口和 AGY headless CLI。使用这些入口可以复用同一 Agent 的原生用户配置，不代表必须另建一套账号配置。OpenCode Desktop/CLI 的标准配置与认证通常共享；Antigravity 2.0/CLI 的核心偏好、权限和安全设置共享，具体边界见对应指南。
+### Pi 与 Qoder
+
+按[Pi 与 Qoder 指南](./PI_QODER_CONNECTION_GUIDE.md)安装或一键配置，并完成原生登录或模型服务配置。Qoder 先选择中国版或国际版，两者分别保存登录态和模型偏好；官方目前未提供 Windows ARM64 运行时。两者接入原生会话目录，可在注册项目中浏览和续写已有会话。
+
+Bridge 使用 Codex app-server、OpenCode ACP、DSH ACP 或原生 Desktop Connector、AGY headless CLI、Pi RPC 和 Qoder SDK 执行任务。OpenCode Desktop/CLI 的标准配置与认证通常共享；Antigravity 2.0/CLI 的核心偏好、权限和安全设置共享，具体边界见对应指南。DSH 的 ACP 配置与原生桌面配置分别管理。
 
 Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片的“可用”表示连接探测通过；第一项真实任务还会验证所用账号、模型和项目是否可执行。
 
@@ -116,10 +130,10 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 1. 在设置中找到目标 Agent 的模型区域。
 2. 点击“获取模型”或“刷新模型列表”。
 3. 选择实际返回的模型 ID。
-4. 直接选择该模型提供的推理强度。首次加载目录时会预取各模型能力，已缓存的选项可立即切换；尚未获取成功的模型会单独补查。
-5. 按当前区域的保存按钮或“选择后自动保存”提示完成设置。
+4. 若该 Agent 提供独立推理选项，选择当前模型返回的值；已缓存的能力可立即切换，尚未获取成功的模型会单独补查。AGY 模型 ID 已包含强度，只需选择模型。
+5. 选择后自动保存；保存失败时，按页面提示处理具体错误。
 
-切换模型后，可选推理强度可能变化。DSH 模型目录来自配置服务的真实 `/models` 响应；接口失败时先解决连接问题。模型 Key、服务地址与套餐应相互匹配。
+切换模型后，可选推理强度可能变化。DSH ACP 目录来自配置服务的真实响应，原生桌面目录来自已配对 Host；原生模式的选择还会同步 Desktop 默认。接口失败时先解决连接问题，模型与所用服务及账号应匹配。
 
 ## 7. 连接 ChatGPT
 
@@ -129,7 +143,7 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 
 完成 Tunnel 配置并在 ChatGPT 添加、启用 Codex Bridge 插件后，即可按第 11 节直接读写已授权项目的文件、运行命令，无需连接 Agent。
 
-OpenAI Runtime Key 用于 Tunnel；使用 DSH 执行任务时，另行配置 DeepSeek Key。Runtime Key 不填入 ChatGPT 对话或 Qwen 配置。
+OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行配置 API Key，原生桌面模式复用 Desktop 账号。Runtime Key 不填入 ChatGPT 对话或 Qwen 配置。
 
 ## 8. 连接 Qwen Studio
 
@@ -246,7 +260,7 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 | --- | --- |
 | App 连不上 Service | 概览中的启动/注册提示；macOS 后台项目授权；Windows 同目录服务文件 |
 | 本地 MCP 端口不可用 | 连接页状态；确需变更时生成新 Endpoint 并更新客户端配置 |
-| Agent 未发现 | CLI 是否安装；重新打开 App，或通过高级路径登记实际入口 |
+| Agent 未发现 | 安装后在连接页点击“扫描 Agent”，或通过高级路径登记实际入口；DSH 原生模式检查官方桌面安装 |
 | Agent 需重新连接 | 已启用 Agent 的程序更新会自动 Probe 并恢复连接；若首页“本机 Agent 引擎”仍提示处理，点击进入连接页查看原因并重连 |
 | 模型获取失败 | API Key、Base URL、账号能力和网络；查看对应 Agent 指南 |
 | 任务写入被拒绝 | 用户是否选择“完整”、Agent 原生权限和项目写入名额 |
@@ -260,7 +274,7 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 
 ### DeepSeek Harness 推理选项
 
-Bridge 展示 DSH ACP 返回的推理选项。当前 DSH DeepSeek 适配器按连接配置提供统一的 `off / low / high / max`，不根据模型名称区分；这些选项不代表 API 目录中每个模型均支持全部档位。模型目录和模型推理能力是不同信息，使用第三方 API 时以该 API 的模型能力为准。
+DSH ACP 的推理选项来自当前所选模型返回的 `thought_level` / `reasoning_effort` 能力；Profile 中的 `off / low / high / max` 只是初始示例，实际值以当前会话返回为准。原生桌面模式使用已配对 Host 的模型能力。切换模型或刷新后选项可能变化，不根据模型名称猜测支持档位。
 
 ### Direct 安全模式命令
 

@@ -53,7 +53,7 @@ The overview shows the background service, local MCP channel, Secure Tunnel, Age
 
 <img src="./docs/assets/overview.png" width="640" alt="Codex Bridge overview">
 
-The Agent settings show models, reasoning levels, and permissions for Codex, Antigravity CLI, and DeepSeek Harness.
+The Agent settings show models and permissions. Reasoning options depend on the model; Antigravity encodes the reasoning level in its model ID.
 
 <img src="./docs/assets/agent-models.png" width="640" alt="Agent models and permissions">
 
@@ -71,7 +71,7 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 
 - [Complete user guide (Chinese)](./docs/USER_GUIDE.md)
 - [ChatGPT / Tunnel / OpenAI Runtime API Key (Chinese)](./docs/CHATGPT_DEVELOPER_MODE.md)
-- [DeepSeek Harness installation and API configuration](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md)
+- [DeepSeek Harness ACP installation and API configuration](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md) · [Native desktop connection (Chinese)](./docs/DSH_NATIVE_DESKTOP_GUIDE.md)
 - [Pi and Qoder installation, regions, and connections](./docs/PI_QODER_CONNECTION_GUIDE_en.md)
 - [OpenCode (Chinese)](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity (Chinese)](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
 - [MCPB client connection and Registry publishing (Chinese)](./docs/MCP_REGISTRY.md)
@@ -95,6 +95,8 @@ To delegate work to Codex, OpenCode, DeepSeek Harness, or another agent, complet
 2. Select a project, agent, and **Read Only** or **Full** in the workbench, and configure its model preferences. Full includes writes and network tools; Read Only allows neither. ChatGPT/Qwen tasks inherit the default task permission selected by the user in the workbench.
 3. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
 
+Existing DSH connections and one-click setup use ACP by default. To share official desktop sessions, explicitly select [native desktop mode (Chinese)](./docs/DSH_NATIVE_DESKTOP_GUIDE.md). It reuses Desktop sign-in and tools and supports Full text tasks on macOS and Windows x64. Model and reasoning selections in this mode also update the DSH Desktop default for future sessions.
+
 Credentials are managed through the operating system credential store. Remove credentials before sharing configuration, logs, or screenshots.
 
 ## Use with OpenAI Dot
@@ -111,8 +113,8 @@ After [connecting the ChatGPT plugin](./docs/CHATGPT_DEVELOPER_MODE.md), enable 
 
 - **Codex:** Thread/Turn, streaming output, approvals, structured questions, steer, and interrupt; macOS recognizes both current and legacy bundled CLI layouts.
 - **OpenCode:** ACP, model and reasoning options, permissions, and conversation continuation.
-- **DeepSeek Harness:** ACP capability probing, live model catalogs, search configuration, MCP servers, and persistent sessions.
-- **Antigravity:** CLI integration, native permission policies, execution progress, and conversation continuation.
+- **DeepSeek Harness:** ACP and native desktop connections, live model catalogs, shared desktop sessions, and opening the corresponding desktop session; ACP search and MCP configuration.
+- **Antigravity:** CLI integration, model IDs that include reasoning levels, native permission policies, execution progress, and conversation continuation.
 - **Pi:** native CLI and sessions, model catalog, MCP, Skills, and task continuation.
 - **Qoder:** native CN/international CLI and SDK integration, region isolation, permission modes, tool approvals, and session continuation.
 - **Workbench:** project sessions grouped by agent, history paging, tool cards, approvals, failed-task retries, and cross-agent handoff.

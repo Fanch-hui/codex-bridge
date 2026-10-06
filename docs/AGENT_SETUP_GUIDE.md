@@ -4,7 +4,7 @@
 
 1. Qoder 先选择中国版或国际版，再点击“一键配置”。其他 Agent 直接点击。
 2. Bridge 检查已有安装并准备运行依赖。发现多个可用安装时，选择本次使用的安装；缺少程序时，从官方来源安装当前官方版本。
-3. 按弹窗完成登录或配置。OpenCode、Pi、Qoder 和 AGY 的“打开登录 / 配置”会打开原生终端；DSH 在弹窗中填写服务地址和 API Key。
+3. 按弹窗完成登录或配置。OpenCode、Pi、Qoder 和 AGY 的“打开登录 / 配置”会打开原生终端；DSH 的 ACP 模式在弹窗中填写服务地址和 API Key。
 4. 完成后点击“我已完成，重新检测”。连接成功后，在设置中选择模型，再提交任务。
 
 AGY 连接需要明确允许将当前用户的全局 Tool Permission 设置为 Always Proceed。该设置也影响使用同一配置的其他 AGY CLI 任务。
@@ -19,9 +19,12 @@ Qoder 的 CLI、SDK 和登录态按地区使用。Bridge 通过接口与模型�
 
 ## DSH 登录与配置
 
-Bridge 支持 DSH CLI 与 Desktop 安装，任务使用独立的 Bridge 配置档案。当前默认 DeepSeek Messages 连接使用 API Key；DSH Desktop 的账号 OAuth 登录属于独立的账号路由，不会自动替代这里的 API Key。DSH 自身的账号路由无需另配 API Key，详见[官方账号插件说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm-deepseek-account/README.zh.md)。
+DSH 提供 ACP 和显式的“原生桌面”两种连接模式，已有连接默认 ACP。
 
-手动登记时使用当前 Bridge 的 `cordis.yml` 模板，保留沙箱与审批配置。DSH 原生配置不能直接作为 Bridge 配置档案。服务自动生成的旧版原始模板会在重新连接时更新；手动文件和编辑过的模板保持原内容。
+- **ACP**：一键配置准备官方 CLI 与运行依赖，也可使用 Desktop 附带 CLI。任务使用独立的 Bridge 配置档案；默认 DeepSeek Messages 连接填写服务地址与 API Key，Desktop 登录不会自动替代该凭据。手动登记使用当前 Bridge 的 `cordis.yml` 模板，保留沙箱与审批配置；Desktop 原生配置不能直接作为 ACP 档案。服务自动生成的旧版原始模板会在重新连接时更新，手动文件和编辑过的模板保持原内容。
+- **原生桌面**：按[原生桌面指南](./DSH_NATIVE_DESKTOP_GUIDE.md)安装 Connector 并完成配对，复用 Desktop 已有账号、工具和会话，不另填 ACP API Key。首版支持 macOS、Windows x64 的完整权限文本任务，派发时 Desktop Host 必须运行。模型和推理强度选择会同步到 DSH 桌面默认，影响后续新建会话。
+
+安装或更新 Connector 前须完全退出 Desktop；npm 一键配置仍用于 ACP。
 
 ## 中断与重试
 

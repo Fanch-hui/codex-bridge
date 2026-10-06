@@ -157,12 +157,6 @@ public enum ServiceAgentProviderPolicyRegistry {
     rawValue: "controlled-readonly"
   )
 
-  #if os(Windows)
-    private static let codexSupportsSupervisor = false
-  #else
-    private static let codexSupportsSupervisor = true
-  #endif
-
   public static let codex = ServiceAgentProviderPolicy(
     providerID: .codex,
     displayName: "Codex",
@@ -174,7 +168,7 @@ public enum ServiceAgentProviderPolicyRegistry {
     supportsModelSelection: true,
     supportsEffortSelection: true,
     supportsSkillSelection: true,
-    supportsSupervisor: codexSupportsSupervisor,
+    supportsSupervisor: false,
     allowsNetworkAccess: true,
     workspaceEnforcement: "provider_native",
     approvalEnforcement: "local_app",

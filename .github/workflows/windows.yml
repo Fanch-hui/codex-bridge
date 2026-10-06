@@ -197,44 +197,24 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node Scripts/verify-agent-runtime-resources.mjs "$env:SWIFT_BIN_PATH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm install --prefix .build/agent-contract --ignore-scripts --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 @qodercn-ai/qoderclicn@1.1.64 @qodercn-ai/qodercn-agent-sdk@1.0.50
+          foreach ($piVersion in @("0.87.1", "1.0.3")) {
+            $piRoot = ".build/pi-contract/$piVersion"
+            npm install --prefix $piRoot --ignore-scripts --no-audit --no-fund "@earendil-works/pi-coding-agent@$piVersion"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            node Scripts/verify-pi-cli-contract.mjs $piRoot $piVersion
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          npm install --prefix .build/agent-contract --ignore-scripts --no-audit --no-fund @qodercn-ai/qoderclicn@1.1.64 @qodercn-ai/qodercn-agent-sdk@1.0.50
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           @'
-          import { spawn, execFileSync } from 'node:child_process';
-          import { readFile, mkdir } from 'node:fs/promises';
-          import { createInterface } from 'node:readline';
+          import { execFileSync } from 'node:child_process';
           import { pathToFileURL } from 'node:url';
           import path from 'node:path';
           import { SDKProcessOwner } from '../../Packages/BridgeCore/Sources/BridgeQoderSDK/Resources/QoderHost/process.mjs';
           const root = path.resolve('.build/agent-contract');
           const modules = path.join(root, 'node_modules');
-          const piRoot = path.join(modules, '@earendil-works/pi-coding-agent');
-          const manifest = JSON.parse(await readFile(path.join(piRoot, 'package.json'), 'utf8'));
-          const piEntry = path.join(piRoot, typeof manifest.bin === 'string' ? manifest.bin : manifest.bin.pi);
           const cli = path.join(modules, '@qodercn-ai/qoderclicn/bundle/qoderclicn.js');
-          console.log('Pi CLI:', execFileSync(process.execPath, [piEntry, '--version'], { encoding: 'utf8' }).trim());
           console.log('Qoder CN CLI:', execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }).trim());
-          const sessionDir = path.join(root, 'sessions');
-          await mkdir(sessionDir, { recursive: true });
-          const pi = spawn(process.execPath, [piEntry, '--mode', 'rpc', '--no-extensions', '--no-skills',
-            '--no-prompt-templates', '--no-themes', '--session-dir', sessionDir], { stdio: ['pipe', 'pipe', 'pipe'] });
-          pi.stderr.resume();
-          const exited = new Promise(resolve => pi.once('exit', resolve));
-          const lines = createInterface({ input: pi.stdout });
-          const timer = setTimeout(() => pi.kill(), 30000);
-          let stateSeen = false;
-          try {
-            pi.stdin.write(JSON.stringify({ id: 'state', type: 'get_state' }) + '\n');
-            for await (const line of lines) {
-              const value = JSON.parse(line);
-              if (value.type === 'response' && value.id === 'state') {
-                if (!value.success) throw new Error('Pi get_state failed');
-                stateSeen = true; break;
-              }
-            }
-          } finally { pi.stdin.end(); pi.kill(); await exited; clearTimeout(timer); lines.close(); }
-          if (!stateSeen) throw new Error('Pi RPC state was not received');
-          console.log('Pi native RPC handshake: passed');
           const sdk = await import(pathToFileURL(path.join(modules, '@qodercn-ai/qodercn-agent-sdk/dist/index.js')));
           const owner = new SDKProcessOwner();
           let authRequired = false;

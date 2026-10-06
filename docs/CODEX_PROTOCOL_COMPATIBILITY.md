@@ -1,6 +1,8 @@
 # Codex app-server Compatibility
 
-This record is version-specific. Authoritative generated schemas are committed under `Schemas/CodexAppServer/<version>/`; code must still negotiate by CLI version and tolerate unknown fields/methods.
+This is the 2026-08-12 verification record for Codex CLI `0.147.0-alpha.6.5`. Protocol fields, model counts, approval limitations and experimental scenarios below describe that baseline. Current product boundaries are maintained in the [compatibility matrix](COMPATIBILITY.md).
+
+Generated schemas, `CodexRPCFixture` and the regression tests described here exist in the full development tree. Public source excludes `Schemas/`, tests and fixtures; these paths are not public-checkout prerequisites. For a public installation, connect the installed Codex runtime in Bridge, refresh its models and manually verify an isolated read-only task and its controls. These checks do not reproduce the historical fixture evidence.
 
 ## Verified runtime
 
@@ -65,7 +67,7 @@ There is no method-discovery response. Capability support is derived from `codex
 - `thread/list.cwd` supports a string or string array and must use exact normalized cwd filtering.
 - `thread/start.sandbox` is a kebab-case mode string such as `read-only` or `workspace-write`.
 - `turn/start.sandboxPolicy` is a structured object. Workspace write requires an explicit type, writable roots, network policy, and temp-directory flags.
-- Current approval policies are `untrusted`, `on-request`, `never`, or a granular object. The plan's `unlessTrusted` spelling is invalid for this version.
+- Current approval policies are `untrusted`, `on-request`, `never`, or a granular object. The `unlessTrusted` spelling is invalid for this version.
 - Text input requires `{"type":"text","text":"...","text_elements":[]}`. Do not apply global snake-case conversion because most protocol fields are camelCase.
 - `turn/steer` binds `threadId`, `expectedTurnId` and input.
 - `turn/interrupt` binds `threadId` and `turnId`; user intent is not terminal state until the server confirms the turn stopped/completed.
@@ -80,17 +82,7 @@ Verified on 2026-08-12 with the production `BridgeCodexRPC` adapter and `CodexRP
 - interrupt: after the matching `turn/started` event, interrupt produced status `interrupted` without treating the local request as the terminal fact;
 - Supervisor: the dynamically discovered Luna model accepted a JSON Schema and returned a valid `{"decision":"pass","reason":"..."}` object in read-only/no-network mode.
 
-This Supervisor fixture proves structured-output protocol compatibility only. The current
-`thread/start` and `turn/start` contracts expose no verified switch that disables core file-reading
-tools. `readOnly`, no network, `approvalPolicy = never`, an empty cwd, and developer instructions do
-not prove evidence-only confinement. `BridgeSupervisor.EvidenceOnlyProcessBoundary` now provides a
-macOS Seatbelt profile that isolates `HOME`/`CODEX_HOME`, denies network access, `/Users`, and the
-registered project root, and was verified with a malicious shell fixture that attempts both reads and
-writes. `CodexSupervisorRuntime` wraps every non-fixture production session with that profile and the
-desktop composition provisions a private `supervisor-home` directory. Production review remains
-disabled until the real Codex login and default configuration can be supplied inside that isolated
-HOME without granting denied paths, then the wrapped live app-server must pass
-initialize/model/turn and credentialed end-to-end tests.
+The historical Supervisor fixture proves structured-output protocol compatibility only. It does not prove evidence-only confinement: read-only mode, no network, an empty cwd and developer instructions do not disable file-reading tools. Supervisor is unavailable in the current product on every platform; this experimental fixture is not a current execution or release gate.
 
 The fixture chooses the current default model and the first currently advertised reasoning effort at runtime; the Supervisor scenario searches the live catalog for Luna. These observed IDs/efforts are evidence, not persisted product defaults.
 
@@ -117,19 +109,19 @@ Responses are method-specific:
 
 Never route these through one generic approve/deny struct. Unknown server requests default to a controlled refusal; Supervisor never approves.
 
-The current approval schema does not provide authoritative argv in command requests. Automatic approval must correlate `threadId + turnId + itemId/approvalId` with a persisted execution event; shell strings and best-effort `commandActions` are display evidence only. File-change item evidence can be normalized into a bounded complete manifest and bound to the registered root identity, but the app-server still applies it by pathname after Bridge responds. Because Bridge cannot make path validation and mutation one atomic operation, command, file-change and permissions approvals remain deny-only in production.
+The current approval schema does not provide authoritative argv in command requests. Automatic approval must correlate `threadId + turnId + itemId/approvalId` with a persisted execution event; shell strings and best-effort `commandActions` are display evidence only. File-change item evidence can be normalized into a bounded complete manifest and bound to the registered root identity, but the app-server still applies it by pathname after Bridge responds. At this verification baseline, command, file-change and permissions approvals were deny-only because Bridge could not make path validation and mutation one atomic operation. Current task modes and approval behavior are described in the [compatibility matrix](COMPATIBILITY.md).
 
 ## Rate limits
 
 `account/rateLimits/read` has no params and returns multiple buckets. `account/rateLimits/updated` can be a sparse single-bucket update keyed by `limitId`; reducers merge it into a known snapshot or re-read rather than replacing the whole catalog.
 
-## Regression gates
+## Development regression checks
 
-Before supporting a new Codex CLI version:
+In the full development tree, when a Codex protocol change affects methods used by Bridge:
 
 1. generate stable and experimental schemas into a new version directory;
 2. diff request methods and all types used by Bridge;
 3. run Fake app-server framing/concurrency/approval tests;
 4. run real initialize/model tests;
-5. run an isolated read-only Thread/turn/steer/interrupt/Supervisor fixture with user-authorized Codex login;
-6. update the compatibility matrix and only then enable write tasks.
+5. run the relevant isolated read-only Thread/turn/steer/interrupt checks with user-authorized Codex login;
+6. record the version-specific evidence and update the compatibility matrix for changed product behavior.

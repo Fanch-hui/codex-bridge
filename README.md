@@ -53,7 +53,7 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 <img src="./docs/assets/overview.png" width="640" alt="Codex Bridge 概览">
 
-Agent 模型设置页展示 Codex、Antigravity CLI 和 DeepSeek Harness 的模型、推理强度与权限。
+Agent 模型设置页展示各 Agent 的模型与权限；推理选项按模型能力显示，Antigravity 的强度包含在模型 ID 中。
 
 <img src="./docs/assets/agent-models.png" width="640" alt="Agent 模型与权限">
 
@@ -95,6 +95,8 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 2. **选择项目和权限**：在工作台选择项目、Agent 及“只读”或“完整”，并设置模型偏好。“完整”包含写入和联网，“只读”不允许写入和工具联网；GPT/Qwen 新任务使用用户在工作台选择的默认任务权限。
 3. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
 
+DSH 已有连接默认使用 ACP，一键配置也准备 ACP。需要共享官方桌面会话时，显式选择[原生桌面模式](./docs/DSH_NATIVE_DESKTOP_GUIDE.md)：复用桌面登录和工具配置，首版支持 macOS、Windows x64 的完整权限文本任务。此模式中的模型与推理强度选择会同步到 DSH 桌面默认，影响后续新建会话。
+
 密钥通过系统凭据存储管理。分享配置、日志或截图前，请移除凭据。
 
 ## 通过 OpenAI Dot 使用
@@ -114,7 +116,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 | Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断；macOS 同时识别新版与旧版 App 内置 CLI 路径 |
 | OpenCode | ACP 连接、模型与推理选项、权限回传、会话继续 |
 | DeepSeek Harness | ACP 与原生桌面连接、模型目录、共享桌面会话与窗口联动；ACP 搜索及 MCP 配置 |
-| Antigravity | CLI 接入、原生权限策略、执行过程与会话继续 |
+| Antigravity | CLI 接入、含推理强度的模型选择、原生权限策略、执行过程与会话继续 |
 | Pi | 原生 CLI 与会话接入、模型目录、MCP、Skills 与任务续写 |
 | Qoder | CN/国际版原生 CLI 与 SDK 接入、地区隔离、权限模式、工具审批与会话续写 |
 | 工作台 | 按 Agent 分组的项目会话、历史分页、工具卡片、审批、失败任务重试与跨 Agent 交接 |

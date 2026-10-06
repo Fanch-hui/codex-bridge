@@ -48,12 +48,17 @@ Bridge 接收所属运行的正文、推理、工具、用量、审批、补充�
 
 ## 验证
 
-针对性 Swift 测试使用项目规定的构建系统：
+公开源码可校验随包 Connector 等 Agent 资源与内置摘要是否一致：
+
+```sh
+node Scripts/verify-agent-runtime-resources.mjs
+```
+
+以下 Swift 测试、Node 测试与 fixture 仅适用于包含 `Packages/BridgeCore/Tests` 的完整开发树；公开仓库不包含这些测试文件。针对性 Swift 测试使用项目规定的构建系统：
 
 ```sh
 Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore --build-system swiftbuild \
   --filter 'BridgeDeepSeekHarnessDesktopTests|DeepSeekDesktop|DeepSeekRuntimeBinding'
-node Scripts/verify-agent-runtime-resources.mjs
 ```
 
 Connector 的真实 Host 测试使用独立 npm prefix、profile、项目和测试模型提供方。它不要求用户账号或凭据：

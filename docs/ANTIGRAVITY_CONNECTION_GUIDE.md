@@ -32,7 +32,7 @@ Bridge 桌面 App 中的设置边界如下：
 
 | 设置 | 作用范围 |
 | --- | --- |
-| `设置 → Antigravity 默认偏好` | 保存 AGY 的模型和推理偏好 |
+| `设置 → Antigravity 默认偏好` | 保存含推理强度的 AGY 模型 ID |
 | `设置 → OpenCode 默认偏好` | 保存 OpenCode 的模型和 effort |
 | `设置 → Codex 执行默认偏好` | 只保存 Codex 的模型、effort、访问模式和快速模式 |
 | 项目登记、任务只读/完整、远程启动批准 | 项目登记授权目录完整访问；用户选择任务权限并审批远程启动 |
@@ -83,7 +83,6 @@ Bridge 根据安装的 CLI 实际接口判断兼容性。Probe 读取 `agy --ver
 - `--mode accept-edits`
 - `--conversation`
 - `--model`
-- `--effort`
 
 必需接口齐全时，CLI 升级后继续通过同一 Probe；缺少必需接口时，Probe 会报告协议能力不兼容。
 其中 `--dangerously-skip-permissions` 只是当前适配器用来确认 CLI 接口完整性的能力项；Bridge 不从 Codex 的访问模式推导它，也不会把 Codex 的 `full-access` 作为 AGY 工具放行设置。
@@ -287,7 +286,7 @@ AGY 原生 Plan 用于分析和规划，但不能保证工具禁网。Bridge 的
 2. 打开 `设置 → 外部 Agent 默认偏好`，找到 `Antigravity` 执行默认偏好。
 3. 有多个安装时选择目标 AGY。
 4. 点击“刷新模型列表”。Bridge 读取当前 AGY 安装实际返回的模型目录，不会补入静态或过期模型。
-5. 选择当前返回的精确 model 和 effort；推理强度只显示所选模型声明支持的值。
+5. 选择当前返回的精确模型 ID。AGY 模型 ID 已包含推理强度，Bridge 原样传给 `--model`，不另选或传入独立 effort；高强度模型也以目录返回的 ID 为准。
 6. 在工作台选择任务权限。AGY 当前支持“完整”。
 
 ChatGPT/Qwen 新任务使用用户在工作台选择的默认任务权限，AI 不选择或覆盖权限。AGY 的原生 plan 模式不能保证任务级工具禁网，因此 Bridge 对只读任务明确返回不支持；需要只读时选择支持该能力的 Agent。
@@ -336,7 +335,7 @@ Bridge 使用 `--mode accept-edits`；同一项目的完整任务进入独占工
 ```text
 list_projects
 list_agents
-list_models
+list_agent_models
 ```
 
 确认：
@@ -346,7 +345,7 @@ list_models
 - `enabled` 与 `task_submission_enabled` 为 `true`；
 - Workbench 已选中正确项目和权限。
 
-有多个 AGY 安装时，使用 `list_agents` 返回的精确 `installation_id`。模型覆盖只在用户明确指定时设置 `model_override=true`，model/effort 必须来自当前 AGY 目录。
+按 `list_agents` 返回的精确 `installation_id` 调用 `list_agent_models` 查询 AGY 目录。模型覆盖只在用户明确指定时设置 `model_override=true`，使用目录返回的精确模型 ID；独立 effort 会在启动前返回能力不支持错误。
 
 远程任务默认先进入：
 

@@ -1,8 +1,9 @@
 # Windows 移植说明（WINDOWS_PORT.md）
 
 Codex Bridge 的核心逻辑（代理引擎、MCP 网关、服务编排、IPC 协议、存储）自
-win 分支起与 macOS 解耦，当前交付 Apple Silicon macOS 与 Windows x64。Windows
-由 GitHub Actions 原生编译并运行测试。
+win 分支起与平台宿主解耦。当前交付 macOS arm64/x86_64、Windows x64/ARM64 与
+Ubuntu 24.04 LTS x64/ARM64；核心逻辑与 `BridgeDesktopUI` 三端共享。Windows
+由 GitHub Actions 在对应架构原生 runner 上编译并验证安装包。
 本文记录平台层的边界、Windows 侧实现与已知限制。
 
 ## 架构
@@ -11,7 +12,7 @@ win 分支起与 macOS 解耦，当前交付 Apple Silicon macOS 与 Windows x64
 ┌────────────────────────┐        ┌──────────────────────────────┐
 │ macOS: CodexBridge.app │        │ Windows: codex-bridge-windows-app │
 │ SwiftUI / AppKit 壳    │        │ Win32 + WebView2 壳          │
-│ BridgeServiceAppShell  │        │ BridgeWindowsShell            │
+│ BridgeServiceAppShell  │        │ BridgeDesktopShell            │
 └──────────┬─────────────┘        └────────────┬─────────────────┘
            │ BridgeIPC                         │ BridgeIPC
            │  · NSXPC (Mach service)           │  · 按安装目录派生的 per-user 命名管道
@@ -20,9 +21,13 @@ win 分支起与 macOS 解耦，当前交付 Apple Silicon macOS 与 Windows x64
 │ 后台服务 codex-bridge-service（macOS: LaunchAgent / Windows: 后台进程）│
 │ BridgeServiceHost → BridgeServiceRequestController（传输无关调度）│
 │ BridgeServiceApplication / BridgeCodexService / BridgeMCP / …  │
-│ —— 与平台无关的核心，两个平台共用同一套二进制逻辑 ——            │
+│ —— 与平台无关的核心，各平台按目标架构编译同一套共享源码 ——      │
 └───────────────────────────────────────────────────────────────┘
 ```
+
+Windows 与 Linux 的共享桌面适配位于 `BridgeDesktopShell`，原生操作由
+`DesktopPlatformHost` 隔离；`BridgeWindowsShell` 保留为模块导出兼容入口。
+Linux 接缝见 [Linux 说明](LINUX.md)。
 
 ### 平台接缝（macOS 专属能力 → 抽象 → Windows 实现）
 
@@ -65,7 +70,8 @@ pwsh -File Scripts\build-windows.ps1 -Installer `
 ├── swift*.dll / 其他 Swift runtime DLL
 ├── sqlite3.dll
 ├── vcruntime*.dll / msvcp*.dll / 其他 VC runtime DLL
-├── BridgeCore_BridgeDeepSeekHarnessACP.bundle（或 .resources）
+├── BridgeCore_<module>.bundle（或 .resources，含 DesktopUI、DSH、Pi、Qoder 等资源）
+├── tunnel-client.exe / tunnel-client.sha256
 ├── LICENSE.txt / NOTICE.txt
 ├── Microsoft.Web.WebView2.LICENSE.txt / Microsoft.Web.WebView2.NOTICE.txt
 ├── BUILD-INFO.json
@@ -113,8 +119,8 @@ Credential Manager 凭据。本项目直接交付 EXE 安装包，不生成 MSI/
 新版本调用壳/服务优雅退出；更早的 Inno EXE 版本由 CloseApplications 关闭占用进程，
 并依据旧 `payload-manifest.json` 安全清除不再属于 Swift payload 的历史文件。
 
-GitHub Actions（`.github/workflows/windows.yml`）在 windows-latest 上构建 x64
-服务、壳、portable ZIP 和 EXE 安装包。门禁通过壳的无界面控制模式从带
+GitHub Actions（`.github/workflows/windows.yml`）在 windows-latest 上原生构建 x64，
+在 windows-11-arm 上原生构建 ARM64；分别生成服务、壳、portable ZIP 和 EXE 安装包。门禁通过壳的无界面控制模式从带
 空格的目录拉起服务，随后执行静默安装、运行中升级、陈旧 payload 清理、卸载及用户数据
 保留验证。CI 产出的 EXE 当前未做 Authenticode 签名，发布签名是
 独立交付步骤。
@@ -132,7 +138,8 @@ npm/pnpm/yarn/bun/Cargo/Volta/scoop/WinGet 等包管理器位置与 `PATH`。发
 子进程启动，而是解析并验证其架构对应的原生 `codex.exe`。
 
 macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
-`Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore`。
+`Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore --build-system swiftbuild`。
+测试命令要求包含 `Packages/BridgeCore/Tests` 的完整开发树；公开源码不含该目录。
 
 本地脚本与 CI 使用 `Scripts/windows-swift-arguments.ps1` 生成同一组 Swift 参数：
 `swiftbuild` 后端、SQLite 编译定义，以及显式的 vcpkg include/lib 路径。
@@ -209,9 +216,7 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
    `RemoveDirectoryW` 移除 reparse point，保留目标目录。
    Windows 上 Node 解释器必须是有效 PE；由 Node 间接执行的 Harness 脚本入口
    仍按正规文件、句柄身份与摘要校验，不误要求脚本本身是 PE。
-8. **Windows 不提供 Supervisor（已确认的产品边界）**。macOS 的 evidence-only
-   Supervisor 依赖 `sandbox-exec` 隔离；Windows 默认关闭、不向 UI 宣称可用，显式启用
-   也会 fail-closed，不会退化成无隔离审查。macOS Supervisor 保持原有行为。
+8. **Supervisor 不可用**。所有平台均不声明该能力，显式启用返回操作不支持。
 9. **Direct 命令的网络隔离边界**。Windows 的 `denyNetwork` 由零网络 Capabilities
    的 AppContainer 执行，工作目录通过显式 DACL 授权，Job Object 在关闭时终止进程树。
    无法创建隔离环境时在启动前报错。Windows safe command 限于已校验的 PE 可执行文件；
@@ -219,30 +224,23 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
 10. **Windows UI 与功能以 macOS 为产品基准**。Windows 使用 Win32/WebView2 承载相同的
    概览、工作台、项目、日志、连接和设置导航；页面状态、文案、操作后果与 Service API
    闭环必须一致，不能用独立工具窗口、占位页或静态指标代替。平台原生控件允许存在渲染
-   差异。Windows Supervisor 按已确认边界保持不可用；Skills 与 macOS 一样只读。主窗口现已统一概览、工作台、项目、
+   差异。Skills 与 macOS 一样只读。主窗口现已统一概览、工作台、项目、
    日志、连接和设置六页；工作台接通项目/权限/任务/Thread/审批与控制动作，项目页接通
    目录授权、Direct、黑名单、Skills、Threads，连接页接通本地 MCP/Qwen 与 Agent，日志和设置
    复用同一 Service API 与状态语义。Swift Windows 的 `MainActor` 与入口线程不绑定；
    `WindowsWebViewThread` 独占 STA COM、消息循环和 WebView2 接口，主窗口只通过线程安全
    命令同步尺寸、显隐和浏览器操作。
-   两个平台从 `BridgeDesktopUI` 加载同一份 HTML/JS/CSS，布局、排版与命令语义共用；
+   三个平台从 `BridgeDesktopUI` 加载同一份 HTML/JS/CSS，布局、排版与命令语义共用；
    Windows 主题只负责字体与组件呈现。会话按项目、Provider 和 session ID 共同分组，
-   续接、重新开始、Steer 与删除使用共享会话语义；工作台只展示当前项目的会话。
+   续接、重新开始、Steer 与删除按宿主能力显示并使用共享会话语义；
+   DSH 原生桌面不提供会话删除，工作台只展示当前项目的会话。
 
 ## 验证路径与 CI 现状
 
-- macOS：全量 `swift test`（所有套件 0 失败为门禁）+ Xcode Debug 构建。
-- Windows：`.github/workflows/windows.yml`（windows-latest）构建 x64；
-  Windows 专属源码（`#if os(Windows)`）由 CI
-  以 release 配置编译；x64 还运行 Domain、AgentCore、Security、Codex RPC、跨平台
-  AppCore，以及 Host/CodexService/Application/ServiceCore/DirectCommand 五组 Windows
-  专属测试，并从 staged portable 目录在隔离 PATH 下启动服务，
-  使用独立数据目录完成 SQLite/服务组装并等待本地 MCP ready；进程已加载的 VC runtime
-  必须来自 portable 目录。随后 x64 还以无界面控制模式验证带空格路径的 App→Service
-  拉起、服务优雅退出，
-  以及 EXE 安装→启动→运行中升级→卸载全链；检查开始菜单、安装目录哈希、陈旧文件清理
-  和用户数据保留。x64 runner 还创建真实 Win32 主窗口，验证六页导航、默认概览、服务拉起
-  与优雅退出；WebView2 Runtime 挂载和业务交互由 Windows 真机验收。
+- macOS：`.github/workflows/macos.yml` 在 arm64 与 x86_64 原生 runner 上构建独立发布包。完整开发树的针对性测试使用 `--build-system swiftbuild`。
+- Windows：`.github/workflows/windows.yml` 使用 windows-latest（x64）与 windows-11-arm（ARM64）原生构建；检查目标架构、依赖锁文件、资源摘要和 portable 运行库。
+- 公开 CI 使用 `Scripts/verify-windows-installer.ps1` 在隔离数据目录验证安装、真实 IPC、同版本覆盖安装和卸载。完整开发树额外运行 Windows 适配套件；公开导出不包含这些测试 target。
+- 可选 `ui_smoke` 只检查原生窗口启动。WebView2 挂载、业务交互与最终体验由用户在对应架构真机手动验收。
 - Windows 的 `swift test --filter` 仍会编译 manifest 在该平台声明的其他 target；
   因此 SwiftUI 壳与 macOS 测试 fixture 只在 macOS 清单中声明，Windows 再由
   filter 选择已适配的冒烟套件。
@@ -267,12 +265,10 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
    必须完整组合；`BOOL` 在 WinSDK Swift 映射里是 `Bool`，不能与 `0` 比较）。
 7. Windows Defender 实时扫描会显著拖慢 Swift 编译，workflow 已对构建目录与
    编译进程加排除项。
-8. **windows-11-arm runner 的 ARM64 Windows 系统库不可用**：Swift/ARM64
-   MSVC 编译器与 vcpkg sqlite 均可用，但链接缺 `kernel32.lib`、
-   `runtimeobject.lib`、`ucrt.lib`，`LIB` 中没有 Windows Kits 的 `um\\arm64` /
-   `ucrt\\arm64`。因此 ARM64 门禁改在 windows-latest 上使用 ARM64 MSVC/Windows
-   Kits 库交叉编译，并在构建前显式预检依赖库；若原生 ARM runner 补齐组件，可再
-   恢复原生构建。交叉编译不替代 ARM64 运行验收。
+8. **ARM64 使用原生 runner**：windows-11-arm 安装 ARM64 Swift 6.3.3、
+   MSVC/Windows SDK 与 ARM64 vcpkg sqlite。`windows-build-environment.ps1` 与
+   `windows-swift-arguments.ps1` 统一本地和 CI 的目标参数，并在构建前预检对应
+   架构的系统库。runner 不保证预装 WiX 3，由固定版本脚本准备运行库提取工具。
 9. 上游 **MCP swift-sdk 0.12.1 不支持 Windows**（对 EventSource 的依赖带
    `.when(platforms:)` 排除 Windows，但源码无条件 `import EventSource`，且
    `URLSession.bytes(for:)` 在 Windows FoundationNetworking 上不存在）→ 已

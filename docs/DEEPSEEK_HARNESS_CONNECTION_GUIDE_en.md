@@ -1,6 +1,8 @@
 # DeepSeek Harness Connection Guide
 
-This guide describes the DeepSeek Harness (DSH) setup supported by Bridge. The [Chinese guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) contains the most detailed troubleshooting and task examples.
+This guide covers the DeepSeek Harness (DSH) ACP connection. Existing connections default to ACP. To use shared sessions in the official Desktop Host, see the [native desktop guide (Chinese)](./DSH_NATIVE_DESKTOP_GUIDE.md). Native mode reuses Desktop sign-in and tools instead of requiring the ACP API Key; it supports Full text tasks on macOS and Windows x64. Model and reasoning selections also update the Desktop default for future sessions. Linux and Windows ARM64 continue to use ACP.
+
+The [Chinese ACP guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) contains detailed troubleshooting and task examples.
 
 Open `Connections → Local Agent Engine Connections → DeepSeek Harness` and click **One-click setup**. Bridge prepares official DSH and Node/npm, then prompts for the Base URL and API Key. See the [setup guide (Chinese)](./AGENT_SETUP_GUIDE.md) for installation locations and retries. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
 
@@ -119,13 +121,13 @@ Most users do not need an external profile or `.env` file. After building DSH, c
 4. Click `Connect` and wait for discovery, configuration, and Probe. A successful Probe enables the installation.
 5. Open Settings, refresh the model catalog, and select a model returned for your account.
 
-Bridge stores the key in macOS Keychain or Windows Credential Manager, clears the field after submission, and injects it only when starting the DSH child process. Read the advanced sections below only for manual registration, an independent Web Search endpoint, or a fixed local profile.
+Bridge stores the key in macOS Keychain, Windows Credential Manager or Linux Secret Service, clears the field after submission, and injects it only when starting the DSH child process. Read the advanced sections below only for manual registration, an independent Web Search endpoint, or a fixed local profile.
 
-## npm and official desktop installations
+## npm and official desktop CLI installations for ACP
 
 Bridge resolves official `@deepseek-ai/dsh` npm/pnpm launchers to their `lib/bin.js` and Node runtime. Official desktop installations pair the bundled Electron executable with `app.asar` and its `dsh-desktop-host/lib/cli.js`. Use Agent discovery or explicitly register the desktop executable.
 
-Desktop execution uses `ELECTRON_RUN_AS_NODE=1`, `--expose-internals`, and isolated `DSH_HOME` and work directories. Electron, the archive, and used unpacked artifacts participate in replacement detection. Bridge API key authentication remains separate from desktop account login.
+ACP execution through the desktop CLI uses `ELECTRON_RUN_AS_NODE=1`, `--expose-internals`, and isolated `DSH_HOME` and work directories. Electron, the archive, and used unpacked artifacts participate in replacement detection. Bridge API key authentication remains separate from desktop account login. Native desktop mode instead connects to the running Desktop Host through its paired Connector; follow the [native desktop guide (Chinese)](./DSH_NATIVE_DESKTOP_GUIDE.md) for installation and pairing.
 
 ## 4. Advanced optional: external profile
 
