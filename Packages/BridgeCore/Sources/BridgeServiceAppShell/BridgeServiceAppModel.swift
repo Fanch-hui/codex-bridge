@@ -80,6 +80,13 @@ public typealias BridgeServiceClientFactory =
 struct AgentModelCatalogScope: Equatable {
   let installationID: String?
   let projectID: String?
+  let runtimeKey: String?
+
+  init(installationID: String?, projectID: String?, runtimeKey: String? = nil) {
+    self.installationID = installationID
+    self.projectID = projectID
+    self.runtimeKey = runtimeKey
+  }
 }
 
 @MainActor
@@ -94,6 +101,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var serviceStatus: IPCServiceStatusResponse?
   @Published public internal(set) var projects: [MCPProjectSummary] = []
   @Published public internal(set) var projectDetails: [String: MCPProjectDetail] = [:]
+  @Published var deepSeekDesktopStates: [String: BridgeDesktopDeepSeekHarnessDesktopState] = [:]
+  @Published var deepSeekDesktopBusy = false
+  var deepSeekDesktopRefreshInFlight = false
   @Published public internal(set) var agentProviders: [IPCAgentProviderSummary] = []
   @Published public internal(set) var agentInstallations: [IPCAgentInstallationSummary] = [] {
     didSet {

@@ -56,6 +56,11 @@
     if (state.statusMessage) container.appendChild(S.node("p", "native-session-status", state.statusMessage));
     if (state.errorMessage) container.appendChild(S.node("p", "native-session-error", state.errorMessage));
 
+    var selected = S.safeArray(state.installations).find(function (item) { return item.installationID === state.installationID; });
+    var legacy = selected && (selected.providerID === "pi" || selected.providerID === "qoder");
+    var operations = selected && selected.operations
+      || (legacy ? ["list", "read", "index", "rename", "delete", "continue"] : []);
+    function supports(operation) { return operations.indexOf(operation) >= 0; }
     var list = S.node("div", "native-session-list");
     S.safeArray(state.sessions).forEach(function (session) {
       var row = S.node("article", "native-session-row");
@@ -66,26 +71,39 @@
       if (session.is_indexed) meta += " · 已导入";
       row.appendChild(S.node("p", "native-session-meta", meta));
       var actions = S.node("div", "native-session-actions");
+      if (supports("read")) {
       actions.appendChild(S.button("查看", null, {}, null, "small", state.isLoading));
       actions.lastChild.addEventListener("click", function () {
         emit(emitCommand, "read", state, session.session_id, { offset: 0, limit: 50 });
       });
+      }
+      if (supports("index")) {
       actions.appendChild(S.button(session.is_indexed ? "已导入" : "导入续写", null, {}, null, "small", session.is_indexed || state.isLoading));
       actions.lastChild.addEventListener("click", function () {
         emit(emitCommand, "index", state, session.session_id);
       });
+      }
+      if (supports("rename")) {
       actions.appendChild(S.button("重命名", null, {}, null, "small", state.isLoading));
       actions.lastChild.addEventListener("click", function () {
         var title = global.prompt("新的会话名称", session.title || "");
         if (title == null || !title.trim()) return;
         emit(emitCommand, "rename", state, session.session_id, { name: title.trim() });
       });
+      }
+      if (supports("delete")) {
       actions.appendChild(S.button("删除原生会话", null, {}, null, "small danger", state.isLoading));
       actions.lastChild.addEventListener("click", function () {
         if (!global.confirm("这会通过 Agent 官方接口永久删除原生会话，无法撤销。继续吗？")) return;
         emit(emitCommand, "delete", state, session.session_id, { confirmed: true });
       });
-      if (session.is_indexed) {
+      }
+      if (supports("open")) {
+        actions.appendChild(S.button("打开对应会话", "openDeepSeekHarnessSession", {
+          projectID: state.projectID, installationID: state.installationID, sessionID: session.session_id
+        }, emitCommand, "small", state.isLoading));
+      }
+      if (session.is_indexed && supports("continue")) {
         actions.appendChild(S.button("续写", null, {}, null, "small primary", state.isLoading));
         actions.lastChild.addEventListener("click", function () {
           var prompt = global.prompt("输入要续写的内容");

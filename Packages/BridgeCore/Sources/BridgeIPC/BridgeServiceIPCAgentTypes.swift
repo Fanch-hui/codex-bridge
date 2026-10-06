@@ -238,6 +238,8 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
   public let updatedAt: String
   public let distribution: String?
   public let isActive: Bool?
+  public let nativeSessionOperations: [String]?
+  public let canOpenNativeSession: Bool?
 
   public init(
     installationID: String,
@@ -256,7 +258,9 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
     lastProbedAt: String? = nil,
     updatedAt: String,
     distribution: String? = nil,
-    isActive: Bool? = nil
+    isActive: Bool? = nil,
+    nativeSessionOperations: [String]? = nil,
+    canOpenNativeSession: Bool? = nil
   ) {
     self.installationID = installationID
     self.providerID = providerID
@@ -275,6 +279,8 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
     self.updatedAt = updatedAt
     self.distribution = distribution
     self.isActive = isActive
+    self.nativeSessionOperations = nativeSessionOperations
+    self.canOpenNativeSession = canOpenNativeSession
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -295,6 +301,8 @@ public struct IPCAgentInstallationSummary: Codable, Equatable, Sendable {
     case updatedAt = "updated_at"
     case distribution
     case isActive = "is_active"
+    case nativeSessionOperations = "native_session_operations"
+    case canOpenNativeSession = "can_open_native_session"
   }
 }
 
@@ -362,6 +370,7 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
   public let alwaysProceedConfirmed: Bool
   public let qoderDistribution: String?
   public let installationID: String?
+  public let connectionMode: String?
 
   public init(
     providerID: String,
@@ -371,7 +380,8 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
     apiKey: String? = nil,
     alwaysProceedConfirmed: Bool = false,
     qoderDistribution: String? = nil,
-    installationID: String? = nil
+    installationID: String? = nil,
+    connectionMode: String? = nil
   ) {
     self.providerID = providerID
     self.baseURL = baseURL
@@ -381,6 +391,7 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
     self.alwaysProceedConfirmed = alwaysProceedConfirmed
     self.qoderDistribution = qoderDistribution
     self.installationID = installationID
+    self.connectionMode = connectionMode
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -392,6 +403,7 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
     case alwaysProceedConfirmed = "always_proceed_confirmed"
     case qoderDistribution = "qoder_distribution"
     case installationID = "installation_id"
+    case connectionMode = "connection_mode"
   }
 
   public init(from decoder: Decoder) throws {
@@ -407,7 +419,8 @@ public struct IPCAgentConnectRequest: Codable, Equatable, Sendable {
         forKey: .alwaysProceedConfirmed
       ) ?? false,
       qoderDistribution: try container.decodeIfPresent(String.self, forKey: .qoderDistribution),
-      installationID: try container.decodeIfPresent(String.self, forKey: .installationID)
+      installationID: try container.decodeIfPresent(String.self, forKey: .installationID),
+      connectionMode: try container.decodeIfPresent(String.self, forKey: .connectionMode)
     )
   }
 }
@@ -575,6 +588,7 @@ public struct IPCAgentModelsRequest: Codable, Equatable, Sendable {
 
 public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
   public let modelID: String
+  public let compatibleModelIDs: [String]
   public let displayName: String
   public let supportedReasoningEfforts: [String]
   public let defaultReasoningEffort: String?
@@ -584,12 +598,14 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
   public init(
     modelID: String,
     displayName: String,
+    compatibleModelIDs: [String] = [],
     supportedReasoningEfforts: [String] = [],
     defaultReasoningEffort: String? = nil,
     reasoningCapabilitiesAvailable: Bool? = nil,
     isDefaultModel: Bool? = nil
   ) {
     self.modelID = modelID
+    self.compatibleModelIDs = compatibleModelIDs
     self.displayName = displayName
     self.supportedReasoningEfforts = supportedReasoningEfforts
     self.defaultReasoningEffort = defaultReasoningEffort
@@ -599,6 +615,7 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case modelID = "model_id"
+    case compatibleModelIDs = "compatible_model_ids"
     case displayName = "display_name"
     case supportedReasoningEfforts = "supported_reasoning_efforts"
     case defaultReasoningEffort = "default_reasoning_effort"
@@ -611,6 +628,8 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
     self.init(
       modelID: try container.decode(String.self, forKey: .modelID),
       displayName: try container.decode(String.self, forKey: .displayName),
+      compatibleModelIDs: try container.decodeIfPresent([String].self, forKey: .compatibleModelIDs)
+        ?? [],
       supportedReasoningEfforts: try container.decodeIfPresent(
         [String].self,
         forKey: .supportedReasoningEfforts
@@ -641,12 +660,14 @@ public struct IPCAgentModelDefaultResponse: Codable, Equatable, Sendable {
   public let model: String?
   public let permissionMode: String
   public let effort: String?
+  public let connectionMode: String?
 
   public init(
     providerID: String = "opencode",
     model: String?,
     permissionMode: String = "full",
-    effort: String? = nil
+    effort: String? = nil,
+    connectionMode: String? = nil
   ) {
     self.providerID = providerID
     self.model = model
@@ -656,6 +677,7 @@ public struct IPCAgentModelDefaultResponse: Codable, Equatable, Sendable {
     default: self.permissionMode = permissionMode
     }
     self.effort = effort
+    self.connectionMode = connectionMode
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -663,6 +685,7 @@ public struct IPCAgentModelDefaultResponse: Codable, Equatable, Sendable {
     case model
     case permissionMode = "permission_mode"
     case effort
+    case connectionMode = "connection_mode"
   }
 
   public init(from decoder: Decoder) throws {
@@ -672,7 +695,8 @@ public struct IPCAgentModelDefaultResponse: Codable, Equatable, Sendable {
       model: try container.decodeIfPresent(String.self, forKey: .model),
       permissionMode: try container.decodeIfPresent(String.self, forKey: .permissionMode)
         ?? "full",
-      effort: try container.decodeIfPresent(String.self, forKey: .effort)
+      effort: try container.decodeIfPresent(String.self, forKey: .effort),
+      connectionMode: try container.decodeIfPresent(String.self, forKey: .connectionMode)
     )
   }
 }

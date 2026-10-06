@@ -43,7 +43,10 @@
       management: WindowsManagementModel,
       auxiliary: WindowsAuxiliaryRuntime
     ) -> Bool {
-      runDesktopWindowCommand(envelope, model: model, management: management, auxiliary: auxiliary)
+      runDesktopDeepSeekCommand(
+        envelope, model: model, management: management, auxiliary: auxiliary)
+        || runDesktopWindowCommand(
+          envelope, model: model, management: management, auxiliary: auxiliary)
         || runDesktopWorkbenchCommand(
           envelope,
           model: model,

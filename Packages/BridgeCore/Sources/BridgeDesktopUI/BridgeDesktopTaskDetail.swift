@@ -24,6 +24,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let canInterrupt: Bool?
   public let canStop: Bool?
   public let canSteer: Bool?
+  public let canOpenNativeSession: Bool?
   public let permissionRemediation: BridgeDesktopPermissionRemediationState?
   public let turnCount: Int
   public let canResume: Bool
@@ -58,6 +59,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     canInterrupt: Bool? = nil,
     canStop: Bool? = nil,
     canSteer: Bool? = nil,
+    canOpenNativeSession: Bool? = nil,
     permissionRemediation: BridgeDesktopPermissionRemediationState? = nil,
     turnCount: Int = 1,
     canResume: Bool = false,
@@ -91,6 +93,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.canInterrupt = canInterrupt
     self.canStop = canStop
     self.canSteer = canSteer
+    self.canOpenNativeSession = canOpenNativeSession
     self.permissionRemediation = permissionRemediation
     self.turnCount = max(1, turnCount)
     self.canResume = canResume

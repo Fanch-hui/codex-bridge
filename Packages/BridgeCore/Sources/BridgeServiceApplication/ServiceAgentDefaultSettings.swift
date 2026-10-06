@@ -9,9 +9,18 @@ struct ServiceAgentDefaultSettings: Sendable {
   let permissionKey: ServiceSettingKey
   let requiresKnownModel: Bool
 
-  static func descriptor(for provider: AgentProviderID, distribution: QoderDistribution? = nil)
+  static func descriptor(
+    for provider: AgentProviderID, distribution: QoderDistribution? = nil,
+    connectionMode: DeepSeekHarnessConnectionMode = .acp
+  )
     throws -> Self
   {
+    if provider == .deepSeekHarness && connectionMode == .nativeDesktop {
+      return Self(
+        modelKey: .deepSeekHarnessDesktopDefaultModel,
+        effortKey: .deepSeekHarnessDesktopDefaultEffort,
+        permissionKey: .deepSeekHarnessDesktopDefaultPermissionMode, requiresKnownModel: true)
+    }
     if provider == .qoder {
       guard let distribution else { throw BridgeMCPQueryError.contractRejected }
       return distribution == .cn ? qoderCN : qoderInternational

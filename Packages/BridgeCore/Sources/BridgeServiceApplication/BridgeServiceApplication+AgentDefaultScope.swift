@@ -8,7 +8,10 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentDefaultSettings {
     guard providerID == .qoder else {
-      return try ServiceAgentDefaultSettings.descriptor(for: providerID)
+      return try await ServiceAgentDefaultSettings.descriptor(
+        for: providerID,
+        connectionMode: providerID == .deepSeekHarness
+          ? settings.deepSeekHarnessConnectionMode() : .acp)
     }
     let runtime = try await serviceQoderRuntimeSettings(deadline: deadline)
     return try ServiceAgentDefaultSettings.descriptor(
@@ -21,6 +24,15 @@ extension BridgeServiceApplication {
     selectable: [ServiceAgentInstallationRecord],
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
+    if providerID == .deepSeekHarness, requested == nil,
+      try await settings.deepSeekHarnessConnectionMode() == .nativeDesktop,
+      let activeID = try await settings.string(for: .deepSeekHarnessDesktopActiveInstallationID)
+    {
+      guard let record = selectable.first(where: { $0.id.rawValue == activeID }) else {
+        throw BridgeMCPQueryError.unavailable
+      }
+      return record
+    }
     guard providerID == .qoder else {
       return try Self.selectAgentInstallation(requested: requested, from: selectable)
     }

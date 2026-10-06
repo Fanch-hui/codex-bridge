@@ -5,6 +5,13 @@
 
   enum WindowsDesktopAgentPresentation {
     static func provider(_ provider: IPCAgentProviderSummary) -> BridgeDesktopAgentProviderRow {
+      self.provider(provider, desktop: nil)
+    }
+
+    static func provider(
+      _ provider: IPCAgentProviderSummary,
+      desktop: BridgeDesktopDeepSeekHarnessDesktopState?
+    ) -> BridgeDesktopAgentProviderRow {
       BridgeDesktopAgentProviderRow(
         providerID: provider.providerID,
         displayName: provider.displayName,
@@ -22,7 +29,8 @@
         supportsEffortSelection: provider.supportsEffortSelection,
         supportsSteer: provider.supportsSteer,
         supportsWorkspaceWrite: provider.supportsWorkspaceWrite,
-        detail: ProjectAgentPresentation.provider(provider).detailText
+        detail: ProjectAgentPresentation.provider(provider).detailText,
+        desktop: desktop
       )
     }
 
@@ -44,8 +52,10 @@
         trustProfile: installation.trustProfile,
         securityProfileID: installation.securityProfileID,
         enabled: installation.isEnabled,
+        isActive: installation.isActive,
         availability: installation.availability,
         effectiveCapabilities: installation.effectiveCapabilities,
+        nativeSessionOperations: installation.nativeSessionOperations,
         lastProbeError: installation.lastProbeError,
         lastProbedAt: installation.lastProbedAt,
         updatedAt: installation.updatedAt,

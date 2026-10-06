@@ -28,10 +28,9 @@ extension BridgeServiceAppModel {
   ) async {
     let projectID = selectedProjectID
     let normalizedInstallationID = installationID.flatMap { $0.isEmpty ? nil : $0 }
-    let scope = AgentModelCatalogScope(
+    let scope = agentModelScope(
       installationID: normalizedInstallationID,
-      projectID: projectID
-    )
+      projectID: projectID, providerID: providerID)
     updateAgentModelScope(scope, providerID: providerID)
     incrementAgentModelCatalogGeneration(for: providerID)
     let catalogGeneration = agentModelCatalogGeneration(for: providerID)
@@ -65,7 +64,8 @@ extension BridgeServiceAppModel {
       )
       if let rawResponse,
         let defaultModel = persistedDefault?.model,
-        rawResponse.models.first(where: { $0.modelID == defaultModel })?
+        AgentModelCatalogResolver.modelForSelection(
+          modelID: defaultModel, models: rawResponse.models)?
           .reasoningCapabilitiesAvailable == false
       {
         modelResponse =
@@ -92,7 +92,39 @@ extension BridgeServiceAppModel {
       defaultRevision == agentModelDefaultRevision(for: providerID),
       let persistedDefault
     else { return }
-    applyAgentModelDefault(persistedDefault, providerID: providerID)
+    if providerID == "pi", let modelID = persistedDefault.model, let modelResponse,
+      let canonical = AgentModelCatalogResolver.modelForSelection(
+        modelID: modelID, models: modelResponse.models),
+      canonical.modelID != modelID
+    {
+      do {
+        let corrected = try await client.setAgentDefaults(
+          providerID: providerID, model: canonical.modelID,
+          permissionMode: persistedDefault.permissionMode,
+          effort: canonical.reasoningCapabilitiesAvailable == false
+            || canonical.supportedReasoningEfforts.contains(persistedDefault.effort ?? "")
+            ? persistedDefault.effort : nil)
+        guard defaultLoadGeneration == agentModelDefaultLoadGeneration(for: providerID),
+          defaultRevision == agentModelDefaultRevision(for: providerID),
+          agentModelCatalogScopes[providerID] == scope, selectedProjectID == projectID
+        else { return }
+        incrementAgentModelDefaultRevision(for: providerID)
+        applyAgentModelDefault(corrected, providerID: providerID)
+      } catch {
+        setAgentModelRefreshError(Self.message(error), providerID: providerID)
+      }
+    } else {
+      applyAgentModelDefault(persistedDefault, providerID: providerID)
+      if providerID == "pi", let modelResponse,
+        AgentModelCatalogResolver.defaultModelWasRemoved(
+          persistedDefault.model, from: modelResponse)
+      {
+        setAgentModelRefreshError(
+          AgentModelDefaultResolutionError.piModelUnavailable(modelID: persistedDefault.model)
+            .errorDescription,
+          providerID: providerID)
+      }
+    }
   }
 
 }

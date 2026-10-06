@@ -10,6 +10,7 @@ const manifests = [
   ["BridgePiRPC", "PiRuntimeResources.swift", "PiBridgeExtension"],
   ["BridgeQoderSDK", "QoderRuntimeResources.swift", "QoderHost"],
   ["BridgePiRPC", "PiNativeHistoryResources.swift", "PiNativeHistory"],
+  ["BridgeDeepSeekHarnessDesktop", "DSHDesktopRuntimeResources.swift", "DSHDesktopConnector"],
 ];
 
 async function packagedDirectory(module, group) {

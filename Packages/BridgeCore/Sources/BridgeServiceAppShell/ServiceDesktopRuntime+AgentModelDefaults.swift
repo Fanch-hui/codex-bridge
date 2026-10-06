@@ -52,7 +52,8 @@ extension BridgeServiceAppModel {
         providerID: providerID,
         model: model,
         permissionMode: permissionMode ?? previous.permissionMode,
-        effort: effort
+        effort: effort,
+        connectionMode: previous.connectionMode
       ),
       providerID: providerID
     )

@@ -16,9 +16,11 @@
     var effort = S.selectField("推理强度", item.effort || "", [{ id: "", title: "Provider 默认" }].concat(S.safeArray(item.effortOptions)), function () {}, "");
     var permission = S.selectField("访问权限", item.permissionMode, S.choices(item.permissionMode, item.permissionOptions), function () {}, "");
     var permissionHint = S.node("p", "hint");
+    var desktopDefaultHint = S.node("p", "hint", "此选择会同步到 DSH 桌面默认，影响后续新建会话。");
     [model, effort, permission].forEach(function (field) { grid.appendChild(field.wrapper); });
     root.appendChild(grid);
     root.appendChild(permissionHint);
+    root.appendChild(desktopDefaultHint);
     var draft = D.bind({ model: model.control, effort: effort.control, permission: permission.control });
     var actions = S.node("div", "form-actions");
     var refresh = S.button("刷新模型列表", null, {}, emit, "small", false);
@@ -53,7 +55,7 @@
       if (state.providerID === "antigravity") message = "模型选项已包含推理强度，选择后自动保存。";
       else if (state.isRefreshingModels || !known) message = "正在获取模型推理强度…";
       else if (efforts.length === 0) message = "当前模型不提供可选推理强度，使用 Provider 默认。";
-      else if (state.providerID === "deepseek-harness") {
+      else if (state.providerID === "deepseek-harness" && state.connectionMode !== "native-desktop") {
         message = "推理选项由 DSH 适配器提供，可能对不同模型返回相同选项；模型实际支持以 API 为准。";
       }
       error.textContent = state.errorMessage || message;
@@ -71,6 +73,7 @@
     function update(next, nextEmit) {
       context.item = next;
       context.emit = nextEmit;
+      desktopDefaultHint.hidden = next.providerID !== "deepseek-harness" || next.connectionMode !== "native-desktop";
       effort.wrapper.hidden = next.providerID === "antigravity";
       title.textContent = next.providerName;
       installation.textContent = next.installationName

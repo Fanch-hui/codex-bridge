@@ -243,7 +243,8 @@ try {
 
   $agentResourceSpecs = @(
     @{ Name = "BridgeCore_BridgePiRPC"; Entry = "PiBridgeExtension/index.mjs" },
-    @{ Name = "BridgeCore_BridgeQoderSDK"; Entry = "QoderHost/index.mjs" }
+    @{ Name = "BridgeCore_BridgeQoderSDK"; Entry = "QoderHost/index.mjs" },
+    @{ Name = "BridgeCore_BridgeDeepSeekHarnessDesktop"; Entry = "DSHDesktopConnector/index.mjs" }
   )
   foreach ($spec in $agentResourceSpecs) {
     $candidates = @(Get-ChildItem -LiteralPath $binFull -Directory -Recurse |

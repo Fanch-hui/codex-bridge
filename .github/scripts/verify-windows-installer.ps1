@@ -70,7 +70,8 @@ function Assert-InstalledPayload {
   if ((Get-Sha256 (Join-Path $installRoot "tunnel-client.exe")) -cne $helperDigest) {
     throw "Installed Tunnel helper digest mismatch."
   }
-  foreach ($module in @("BridgeDesktopUI", "BridgePiRPC", "BridgeQoderSDK", "BridgeDeepSeekHarnessACP")) {
+  foreach ($module in @("BridgeDesktopUI", "BridgePiRPC", "BridgeQoderSDK", "BridgeDeepSeekHarnessACP",
+      "BridgeDeepSeekHarnessDesktop")) {
     $resources = @(Get-ChildItem -LiteralPath $installRoot -Directory | Where-Object {
         $_.Name -in @("BridgeCore_$module.bundle", "BridgeCore_$module.resources")
       })

@@ -90,7 +90,7 @@ public struct ServiceDataPaths: Sendable {
     #endif
   }
 
-  private static func preparePrivateDirectory(
+  static func preparePrivateDirectory(
     _ url: URL,
     createParents: Bool
   ) throws {

@@ -13,7 +13,6 @@ extension AntigravityCLIProvider {
     )
     if request.requestedSessionID != nil { requiredCapabilities.insert(.sessionContinue) }
     if request.model != nil { requiredCapabilities.insert(.modelSelection) }
-    if request.effort != nil { requiredCapabilities.insert(.effortSelection) }
     try require(requiredCapabilities, from: Self.runtimeCapabilities)
     let runDirectory = try makeRunDirectory()
     var execution: AntigravityCLIExecution?
@@ -98,8 +97,8 @@ extension AntigravityCLIProvider {
         throw AgentRuntimeError.invalidRequest("request.model")
       }
     }
-    if let effort = request.effort, !["low", "medium", "high"].contains(effort) {
-      throw AgentRuntimeError.invalidRequest("request.effort")
+    if request.effort != nil {
+      throw AgentRuntimeError.capabilityUnavailable(.effortSelection)
     }
   }
 
@@ -124,7 +123,6 @@ extension AntigravityCLIProvider {
     .workspaceRead,
     .workspaceWriteInPlace,
     .modelSelection,
-    .effortSelection,
     .shell,
     .webSearch,
     .webFetch,
@@ -143,7 +141,6 @@ extension AntigravityCLIProvider {
     .workspaceRead,
     .workspaceWriteInPlace,
     .modelSelection,
-    .effortSelection,
     .shell,
     .webSearch,
     .webFetch,
@@ -162,7 +159,6 @@ extension AntigravityCLIProvider {
       .workspaceRead,
       .workspaceWriteInPlace,
       .modelSelection,
-      .effortSelection,
     ]
   )
 

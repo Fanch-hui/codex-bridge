@@ -23,34 +23,34 @@ extension PiRPCProvider {
         throw AgentRuntimeError.modelUnavailable("pi.no_configured_model")
       }
       let current = state["model"]
-      let selected: PiModelKey?
+      let keys = try Self.modelKeys(values)
+      let requestedID: String?
       if let selectedModelID {
-        selected = try PiModelKey(rawValue: selectedModelID)
+        requestedID = selectedModelID
       } else if let provider = current?["provider"]?.stringValue,
         let id = current?["id"]?.stringValue
       {
-        selected = try PiModelKey(provider: provider, modelID: id)
+        requestedID = try PiModelKey(provider: provider, modelID: id).encoded()
       } else {
-        selected = nil
+        requestedID = nil
       }
-      if let selected { try await selectModel(try selected.encoded(), client: client) }
-      let levels = try await thinkingLevels(client)
-      let descriptors = try values.map { value -> AgentModelDescriptor in
-        guard let provider = value["provider"]?.stringValue, let id = value["id"]?.stringValue
-        else {
-          throw PiRPCError.invalidRecord
-        }
-        let key = try PiModelKey(provider: provider, modelID: id)
+      let selected = try requestedID.flatMap { try Self.resolveModel($0, keys: keys) }
+      if let selected {
+        try await selectModel(try selected.encoded(), client: client, values: values)
+      }
+      let levels = selected == nil ? [] : try await thinkingLevels(client)
+      let descriptors = try zip(values, keys).map { value, key -> AgentModelDescriptor in
         let resolved = key == selected
         let contextWindow = value["contextWindow"]?.integerValue.flatMap { $0 > 0 ? $0 : nil }
         let inputModalities = try modalities(value["input"])
         return try AgentModelDescriptor(
           id: key.encoded(),
-          displayName: provider + " / " + (value["name"]?.stringValue ?? id),
+          displayName: key.provider + " / " + (value["name"]?.stringValue ?? key.modelID),
+          compatibleModelIDs: Self.compatibleModelIDs(for: key, keys: keys),
           supportedReasoningEfforts: resolved ? levels : [],
           reasoningCapabilitiesAvailable: resolved,
-          isDefaultModel: provider == current?["provider"]?.stringValue
-            && id == current?["id"]?.stringValue,
+          isDefaultModel: key.provider == current?["provider"]?.stringValue
+            && key.modelID == current?["id"]?.stringValue,
           contextWindowTokens: contextWindow, inputModalities: inputModalities)
       }
       guard Set(descriptors.map(\.id)).count == descriptors.count else {
@@ -64,8 +64,33 @@ extension PiRPCProvider {
     }
   }
 
-  func selectModel(_ rawValue: String, client: PiRPCClient) async throws {
-    let key = try PiModelKey(rawValue: rawValue)
+  static func modelKeys(_ values: [PiJSONValue]) throws -> [PiModelKey] {
+    try values.map { value in
+      guard let provider = value["provider"]?.stringValue, let id = value["id"]?.stringValue else {
+        throw PiRPCError.invalidRecord
+      }
+      return try PiModelKey(provider: provider, modelID: id)
+    }
+  }
+
+  static func compatibleModelIDs(for key: PiModelKey, keys: [PiModelKey]) throws -> [String] {
+    guard let alternate = key.azureCompatibilityKey, !keys.contains(alternate) else { return [] }
+    return [try alternate.encoded()]
+  }
+
+  static func resolveModel(_ rawValue: String, keys: [PiModelKey]) throws -> PiModelKey? {
+    let requested = try PiModelKey(rawValue: rawValue)
+    if keys.contains(requested) { return requested }
+    guard let alternate = requested.azureCompatibilityKey, keys.contains(alternate) else {
+      return nil
+    }
+    return alternate
+  }
+
+  func selectModel(_ rawValue: String, client: PiRPCClient, values: [PiJSONValue]) async throws {
+    guard let key = try Self.resolveModel(rawValue, keys: Self.modelKeys(values)) else {
+      throw AgentRuntimeError.modelUnavailable(rawValue)
+    }
     let result = try await client.request(
       "set_model",
       fields: [

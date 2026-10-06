@@ -3,6 +3,7 @@ import BridgeAntigravityCLI
 import BridgeCodexRPC
 import BridgeCodexService
 import BridgeDeepSeekHarnessACP
+import BridgeDeepSeekHarnessDesktop
 import BridgeDirectCommand
 import BridgeDomain
 import BridgeLegacyImport
@@ -38,6 +39,7 @@ public actor ServiceComposition {
   private let configuration: ServiceCompositionConfiguration
   private let executionAppServer: CodexAppServerLocator
   private let catalogAppServer: CodexAppServerLocator
+  private let deepSeekDesktop: DeepSeekHarnessDesktopController
   private var mcpServer: MCPBridgeServer?
   private var mcpEndpoint: MCPBridgeEndpoint?
   private var startupAgentRefreshTask: Task<Void, Never>?
@@ -96,6 +98,10 @@ public actor ServiceComposition {
     )
     let qoderEnvironment = ToolDiscoveryEnvironment.current()
     let setupRuntimeBindings = ServiceAgentSetupRuntimeBindings()
+    let deepSeekDesktopInstaller = ServiceDeepSeekDesktopInstallation(paths: paths)
+    let deepSeekDesktopProvider = try ServiceDeepSeekDesktopAssembly.make(
+      paths: paths, store: store, projects: projects, settings: settings,
+      secretStore: secretStore, installer: deepSeekDesktopInstaller)
     let qoderDistribution: @Sendable (AgentInstallation) async throws -> QoderDistribution = {
       [settings] installation in
       if let configured = try await settings.qoderInstallationDistribution(
@@ -176,19 +182,22 @@ public actor ServiceComposition {
           persistentStateBaseDirectory: paths.agentStateURL.path
         )
       ),
-      try DeepSeekHarnessACPProvider(
-        configuration: DeepSeekHarnessACPProviderConfiguration(
-          runtimeBaseDirectory: paths.agentStateURL
-            .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path,
-          persistentStateBaseDirectory: paths.agentStateURL
-            .appendingPathComponent("DeepSeekHarnessSessions", isDirectory: true).path,
-          environmentProvider: { [agentCredentials] installation in
-            try await agentCredentials.runtimeEnvironment(for: installation)
-          },
-          mcpServersProvider: { [deepSeekHarnessMCP] in
-            try await deepSeekHarnessMCP.enabledRuntimeConfigurations()
-          }
-        )
+      try DeepSeekHarnessProvider(
+        acp: DeepSeekHarnessACPProvider(
+          configuration: DeepSeekHarnessACPProviderConfiguration(
+            runtimeBaseDirectory: paths.agentStateURL
+              .appendingPathComponent("DeepSeekHarnessACP", isDirectory: true).path,
+            persistentStateBaseDirectory: paths.agentStateURL
+              .appendingPathComponent("DeepSeekHarnessSessions", isDirectory: true).path,
+            environmentProvider: { [agentCredentials] installation in
+              try await agentCredentials.runtimeEnvironment(for: installation)
+            },
+            mcpServersProvider: { [deepSeekHarnessMCP] in
+              try await deepSeekHarnessMCP.enabledRuntimeConfigurations()
+            }
+          )),
+        desktop: deepSeekDesktopProvider,
+        modeProvider: { _ in try await settings.deepSeekHarnessConnectionMode() }
       ),
     ]
     let agentRegistry = ServiceAgentRegistry(
@@ -249,6 +258,14 @@ public actor ServiceComposition {
         degradations: legacyImport.degradations
       )
     )
+    let installDesktopConnector: (@Sendable (AgentInstallation) async throws -> Void)?
+    if ServiceDeepSeekDesktopInstallation.isSupported {
+      installDesktopConnector = { try await deepSeekDesktopInstaller.install($0) }
+    } else {
+      installDesktopConnector = nil
+    }
+    let desktopController: (any DeepSeekHarnessDesktopControlling)? =
+      ServiceDeepSeekDesktopInstallation.isSupported ? deepSeekDesktopProvider.controller : nil
     let application = BridgeServiceApplication(
       appVersion: configuration.appVersion,
       projects: projects,
@@ -259,6 +276,9 @@ public actor ServiceComposition {
       runtimeStatus: runtimeStatus,
       agentRegistry: agentRegistry,
       agentCredentials: agentCredentials,
+      deepSeekDesktop: desktopController,
+      installDeepSeekDesktopConnector: installDesktopConnector,
+      isDeepSeekDesktopConnectorInstalled: { deepSeekDesktopInstaller.isInstalled($0) },
       directCommands: DirectCommandSessionManager(
         orphanPIDFileURL: paths.supervisorScratchURL.appending(path: "direct-command-pids.txt"),
         historyFileURL: paths.rootURL.appending(path: "direct-command-history.json")
@@ -290,6 +310,7 @@ public actor ServiceComposition {
       configuration: configuration,
       executionAppServer: executionAppServer,
       catalogAppServer: catalogAppServer,
+      deepSeekDesktop: deepSeekDesktopProvider.controller,
       paths: paths,
       store: store,
       projects: projects,
@@ -342,6 +363,7 @@ public actor ServiceComposition {
     configuration: ServiceCompositionConfiguration,
     executionAppServer: CodexAppServerLocator,
     catalogAppServer: CodexAppServerLocator,
+    deepSeekDesktop: DeepSeekHarnessDesktopController,
     paths: ServiceDataPaths,
     store: SimpleServiceStore,
     projects: ServiceProjectService,
@@ -364,6 +386,7 @@ public actor ServiceComposition {
     self.configuration = configuration
     self.executionAppServer = executionAppServer
     self.catalogAppServer = catalogAppServer
+    self.deepSeekDesktop = deepSeekDesktop
     self.paths = paths
     self.store = store
     self.projects = projects
@@ -647,9 +670,10 @@ public actor ServiceComposition {
     _ = await refreshTask?.result
     await tunnel.shutdown()
     await stopMCP()
-    await coordinator.shutdown()
-    await application.shutdownDirectOperations()
     await application.shutdownTaskQueueProcessor()
+    await coordinator.shutdown()
+    await deepSeekDesktop.shutdown()
+    await application.shutdownDirectOperations()
     await runtimeStatus.updateMCP(state: "stopped")
   }
 

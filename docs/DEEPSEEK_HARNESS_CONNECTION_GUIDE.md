@@ -1,6 +1,6 @@
 # DeepSeek Harness 接入指南
 
-本指南说明如何取得 Bridge 支持的 DeepSeek Harness（DSH）、构建现代 ACP 入口、自动发现并一键连接并从 ChatGPT/Qwen 提交任务。
+本指南说明 DeepSeek Harness（DSH）的 ACP 连接、现代入口、自动发现和 ChatGPT/Qwen 任务。调用官方桌面的共享会话请使用[原生桌面连接指南](./DSH_NATIVE_DESKTOP_GUIDE.md)。已有连接默认保持 ACP。
 
 最短路径是：在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 点击“一键配置” → Bridge 准备官方 DSH 与 Node/npm → 按弹窗填写 Base URL 和 API Key 并检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。API Key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
@@ -141,7 +141,7 @@ Bridge 实际执行语义是：
 
 npm/pnpm 安装采用官方 `@deepseek-ai/dsh` 包，Bridge 解析启动器对应的 `lib/bin.js` 与 Node。官方桌面安装使用同一安装包中的 Electron 与 `app.asar` 内 `dsh-desktop-host/lib/cli.js`，不依赖外部 Node。扫描后也可在高级路径登记中选择桌面程序。
 
-桌面入口使用 `ELECTRON_RUN_AS_NODE=1` 与 `--expose-internals`；Bridge 为运行分配独立 `DSH_HOME` 和工作目录，API key 从 Bridge 的正常连接配置注入。Electron、归档与实际使用的解包工件参与身份校验，更新后重新 Probe。桌面账号登录态与 Bridge 的 API key 连接分别管理。
+ACP 模式中的桌面入口使用 `ELECTRON_RUN_AS_NODE=1` 与 `--expose-internals`；Bridge 为运行分配独立 `DSH_HOME` 和工作目录，API key 从 Bridge 的正常连接配置注入。Electron、归档与实际使用的解包工件参与身份校验，更新后重新 Probe。原生桌面模式通过 Connector 调用运行中的 Desktop Host，使用原生账号和会话，安装及配对见[专门指南](./DSH_NATIVE_DESKTOP_GUIDE.md)。
 
 ## 5. 为什么 Bridge 需要完整源码树
 

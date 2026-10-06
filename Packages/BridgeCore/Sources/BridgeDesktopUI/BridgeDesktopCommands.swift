@@ -75,6 +75,8 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case cancelAgentSetup
   case openAgentSetupLogin
   case connectAgent
+  case manageDeepSeekHarnessDesktop
+  case openDeepSeekHarnessSession
   case registerAgent
   case beginAgentRegistration
   case saveQoderRuntimeSettings

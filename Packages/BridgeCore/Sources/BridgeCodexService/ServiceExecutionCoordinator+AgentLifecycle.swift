@@ -57,6 +57,10 @@ extension ServiceExecutionCoordinator {
         || task.executionEffort == serviceDefaultProviderExecutionEffort
         ? nil : task.executionEffort,
       permissionMode: task.permissionMode,
+      runtimeBinding: task.providerID == AgentProviderID.deepSeekHarness.rawValue
+        ? try await tasks.agentRuntimeBinding(taskID: task.id)
+          ?? AgentRuntimeBinding(
+            connectionMode: .acp, requestID: task.id.rawValue) : nil,
       networkAllowed: task.networkAllowed,
       attachments: try await tasks.taskAttachments(taskID: task.id),
       selectedSkills: task.selectedSkills

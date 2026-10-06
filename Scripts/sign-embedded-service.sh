@@ -16,7 +16,8 @@ readonly deepseek_template="${deepseek_bundle}/Contents/Resources/cordis.yml"
 }
 
 for spec in "BridgeCore_BridgePiRPC.bundle:PiBridgeExtension/index.mjs" \
-  "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs"; do
+  "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs" \
+  "BridgeCore_BridgeDeepSeekHarnessDesktop.bundle:DSHDesktopConnector/index.mjs"; do
   bundle="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/${spec%%:*}"
   entry="${bundle}/Contents/Resources/${spec#*:}"
   [[ -d "${bundle}" && ! -L "${bundle}" && -f "${entry}" && ! -L "${entry}" ]] || {

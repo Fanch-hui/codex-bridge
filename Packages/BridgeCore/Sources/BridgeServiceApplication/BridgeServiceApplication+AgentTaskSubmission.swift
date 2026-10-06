@@ -60,7 +60,8 @@ extension BridgeServiceApplication {
         accessMode: .requestApproval,
         queueIfBusy: submission.queueIfBusy == true,
         attachments: attachments,
-        selectedSkills: selectedSkills
+        selectedSkills: selectedSkills,
+        runtimeBinding: context.runtimeBinding
       )
     )
   }

@@ -5,11 +5,14 @@ extension BridgeServiceAppModel {
   func synchronizeAgentModelScopes() {
     let providers = Set(agentProviders.map(\.providerID)).union(agentModelCatalogScopes.keys)
     for providerID in providers {
-      let installationID = agentInstallations.first {
+      let candidates = agentInstallations.filter {
         $0.providerID == providerID && $0.isEnabled && $0.availability == "available"
-      }?.installationID
-      let scope = AgentModelCatalogScope(
-        installationID: installationID, projectID: selectedProjectID)
+      }
+      let installationID = (candidates.first { $0.isActive == true } ?? candidates.first)?
+        .installationID
+      let scope = agentModelScope(
+        installationID: installationID,
+        projectID: selectedProjectID, providerID: providerID)
       guard agentModelCatalogScopes[providerID] != scope else { continue }
       updateAgentModelScope(scope, providerID: providerID)
       guard connectionState == .connected, !stopped else { continue }
@@ -23,6 +26,18 @@ extension BridgeServiceAppModel {
           installationID: installationID, providerID: providerID)
       }
     }
+  }
+
+  func agentModelScope(installationID: String?, projectID: String?, providerID: String)
+    -> AgentModelCatalogScope
+  {
+    let desktop = installationID.flatMap { deepSeekDesktopStates[$0] }
+    let runtimeKey =
+      providerID == "deepseek-harness"
+      ? [desktop?.mode ?? "acp", desktop?.profileID ?? ""].joined(separator: "|") : nil
+    return AgentModelCatalogScope(
+      installationID: installationID,
+      projectID: projectID, runtimeKey: runtimeKey)
   }
 
   func updateAgentModelScope(_ scope: AgentModelCatalogScope, providerID: String) {

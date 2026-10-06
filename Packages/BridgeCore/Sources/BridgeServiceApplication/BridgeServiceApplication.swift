@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeCodexService
 import BridgeDirectCommand
 import BridgeDomain
@@ -27,6 +28,9 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let settings: ServiceSettings
   let agentRegistry: ServiceAgentRegistry?
   let agentCredentials: ServiceAgentCredentialEnvironment?
+  let deepSeekDesktop: (any DeepSeekHarnessDesktopControlling)?
+  let installDeepSeekDesktopConnector: (@Sendable (AgentInstallation) async throws -> Void)?
+  let isDeepSeekDesktopConnectorInstalled: @Sendable (AgentInstallation) -> Bool
   let coordinator: ServiceExecutionCoordinator
   let catalog: ServiceCodexCatalog
   let files: RestrictedProjectFileService
@@ -53,6 +57,11 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     runtimeStatus: ServiceRuntimeStatus,
     agentRegistry: ServiceAgentRegistry? = nil,
     agentCredentials: ServiceAgentCredentialEnvironment? = nil,
+    deepSeekDesktop: (any DeepSeekHarnessDesktopControlling)? = nil,
+    installDeepSeekDesktopConnector: (@Sendable (AgentInstallation) async throws -> Void)? = nil,
+    isDeepSeekDesktopConnectorInstalled: @escaping @Sendable (AgentInstallation) -> Bool = { _ in
+      false
+    },
     files: RestrictedProjectFileService? = nil,
     mutations: RestrictedProjectMutationService? = nil,
     workspaceGate: ServiceWorkspaceMutationGate? = nil,
@@ -68,6 +77,9 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     self.settings = settings
     self.agentRegistry = agentRegistry
     self.agentCredentials = agentCredentials
+    self.deepSeekDesktop = deepSeekDesktop
+    self.installDeepSeekDesktopConnector = installDeepSeekDesktopConnector
+    self.isDeepSeekDesktopConnectorInstalled = isDeepSeekDesktopConnectorInstalled
     self.coordinator = coordinator
     self.catalog = catalog
     self.runtimeStatus = runtimeStatus

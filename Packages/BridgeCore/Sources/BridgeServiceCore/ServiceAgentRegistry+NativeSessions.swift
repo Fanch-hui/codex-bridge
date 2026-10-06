@@ -8,7 +8,20 @@ extension ServiceAgentRegistry {
     AgentInstallation,
     ServiceAgentInstallationRecord
   ) {
-    let record = try await validateForExecution(installationID: installationID)
+    let record: ServiceAgentInstallationRecord
+    if let stored = try await store.agentInstallation(id: installationID),
+      stored.providerID == .deepSeekHarness
+    {
+      let binding = try await selectedRuntimeBinding(for: stored)
+      guard binding?.connectionMode == .nativeDesktop else {
+        throw AgentNativeSessionDirectoryError.unsupported
+      }
+      record = try await validateForRuntimeBinding(
+        installationID: installationID,
+        runtimeBinding: binding)
+    } else {
+      record = try await validateForExecution(installationID: installationID)
+    }
     let provider = try provider(for: record.providerID)
     guard let source = provider as? any AgentNativeSessionDirectoryProviding else {
       throw AgentNativeSessionDirectoryError.unsupported

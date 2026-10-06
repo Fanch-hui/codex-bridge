@@ -18,6 +18,7 @@
         return BridgeDesktopAgentDefaultState(
           providerID: provider.providerID,
           providerName: provider.displayName,
+          connectionMode: defaults?.connectionMode,
           installationID: installation?.installationID,
           installationName: installation?.displayName,
           model: defaults?.model,

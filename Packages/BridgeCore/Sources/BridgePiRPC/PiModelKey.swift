@@ -29,6 +29,16 @@ public struct PiModelKey: Equatable, Sendable {
     guard try encoded() == rawValue else { throw PiRPCError.invalidArgument("model.id") }
   }
 
+  var azureCompatibilityKey: PiModelKey? {
+    let alternate: String
+    switch provider {
+    case "azure": alternate = "azure-openai-responses"
+    case "azure-openai-responses": alternate = "azure"
+    default: return nil
+    }
+    return try? PiModelKey(provider: alternate, modelID: modelID)
+  }
+
   public func encoded() throws -> String {
     "pi:"
       + (try JSONEncoder().encode([provider, modelID])).base64EncodedString()

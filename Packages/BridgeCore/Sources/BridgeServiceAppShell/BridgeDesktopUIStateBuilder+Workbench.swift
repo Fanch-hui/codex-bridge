@@ -54,7 +54,8 @@ extension BridgeDesktopUIStateBuilder {
         displayName: item.displayName,
         region: item.distribution,
         isEnabled: item.isEnabled,
-        availability: item.availability
+        availability: item.availability,
+        operations: item.nativeSessionOperations
       )
     }
     return BridgeDesktopNativeSessionDirectoryPresentation.state(

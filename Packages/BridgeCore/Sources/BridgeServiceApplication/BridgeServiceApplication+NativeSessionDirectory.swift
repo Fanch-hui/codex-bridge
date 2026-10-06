@@ -64,6 +64,11 @@ extension BridgeServiceApplication {
         throw BridgeMCPQueryError.unavailable
       }
       region = distribution.rawValue
+    } else if installation.providerID == .deepSeekHarness {
+      guard try await settings.deepSeekHarnessConnectionMode() == .nativeDesktop,
+        let trust = try await settings.deepSeekHarnessDesktopTrust(installationID: installation.id)
+      else { throw AgentNativeSessionDirectoryError.unsupported }
+      region = trust.profileID
     } else {
       region = nil
     }

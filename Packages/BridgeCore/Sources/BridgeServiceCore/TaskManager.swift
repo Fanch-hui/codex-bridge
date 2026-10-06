@@ -66,7 +66,8 @@ public actor ServiceTaskManager {
         createdAt: date
       ),
       handoffID: handoffID,
-      attachments: request.attachments
+      attachments: request.attachments,
+      runtimeBinding: request.runtimeBinding
     )
     changes.publish()
     return result

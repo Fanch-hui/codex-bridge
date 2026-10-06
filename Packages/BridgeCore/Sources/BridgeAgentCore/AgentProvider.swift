@@ -114,13 +114,18 @@ public struct AgentInstallation: Codable, Equatable, Sendable {
 public struct AgentProbeRequest: Equatable, Sendable {
   public let installation: AgentInstallation
   public let projectRoot: String?
+  public let runtimeBinding: AgentRuntimeBinding?
 
-  public init(installation: AgentInstallation, projectRoot: String? = nil) throws {
+  public init(
+    installation: AgentInstallation, projectRoot: String? = nil,
+    runtimeBinding: AgentRuntimeBinding? = nil
+  ) throws {
     if let projectRoot {
       try AgentValidation.absolutePath(projectRoot, field: "probe.projectRoot")
     }
     self.installation = installation
     self.projectRoot = projectRoot
+    self.runtimeBinding = runtimeBinding
   }
 }
 
@@ -159,6 +164,7 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
   public let contextWindowTokens: Int?
   public let inputModalities: [AgentInputModality]?
   public let id: String
+  public let compatibleModelIDs: [String]
   public let displayName: String
   public let supportedReasoningEfforts: [String]
   public let defaultReasoningEffort: String?
@@ -173,6 +179,7 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
   public init(
     id: String,
     displayName: String,
+    compatibleModelIDs: [String] = [],
     supportedReasoningEfforts: [String] = [],
     defaultReasoningEffort: String? = nil,
     reasoningCapabilitiesAvailable: Bool = true,
@@ -182,6 +189,14 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
   ) throws {
     try AgentValidation.identifier(id, field: "model.id", maximumBytes: 256)
     try AgentValidation.text(displayName, field: "model.displayName", maximumBytes: 512)
+    guard compatibleModelIDs.count <= 64,
+      Set(compatibleModelIDs).count == compatibleModelIDs.count,
+      !compatibleModelIDs.contains(id)
+    else { throw AgentRuntimeError.invalidRequest("model.compatibleModelIDs") }
+    for compatibleID in compatibleModelIDs {
+      try AgentValidation.identifier(
+        compatibleID, field: "model.compatibleModelID", maximumBytes: 256)
+    }
     guard supportedReasoningEfforts.count <= 64,
       Set(supportedReasoningEfforts).count == supportedReasoningEfforts.count
     else {
@@ -209,6 +224,7 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
     self.contextWindowTokens = contextWindowTokens
     self.inputModalities = inputModalities
     self.id = id
+    self.compatibleModelIDs = compatibleModelIDs
     self.displayName = displayName
     self.supportedReasoningEfforts = supportedReasoningEfforts
     self.defaultReasoningEffort = defaultReasoningEffort
@@ -220,6 +236,7 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
     case contextWindowTokens
     case inputModalities
     case id
+    case compatibleModelIDs
     case displayName
     case supportedReasoningEfforts
     case defaultReasoningEffort
@@ -232,6 +249,8 @@ public struct AgentModelDescriptor: Codable, Equatable, Sendable {
     try self.init(
       id: container.decode(String.self, forKey: .id),
       displayName: container.decode(String.self, forKey: .displayName),
+      compatibleModelIDs: container.decodeIfPresent([String].self, forKey: .compatibleModelIDs)
+        ?? [],
       supportedReasoningEfforts: container.decodeIfPresent(
         [String].self,
         forKey: .supportedReasoningEfforts
@@ -275,9 +294,21 @@ public protocol AgentProvider: Sendable {
     _ request: AgentExecutionRequest,
     installation: AgentInstallation
   ) async throws -> AgentExecutionHandle
+
+  func models(
+    installation: AgentInstallation, projectRoot: String?, selectedModelID: String?,
+    runtimeBinding: AgentRuntimeBinding?
+  ) async throws -> [AgentModelDescriptor]
 }
 
 extension AgentProvider {
+  public func models(
+    installation: AgentInstallation, projectRoot: String?, selectedModelID: String?,
+    runtimeBinding: AgentRuntimeBinding?
+  ) async throws -> [AgentModelDescriptor] {
+    try await models(
+      installation: installation, projectRoot: projectRoot, selectedModelID: selectedModelID)
+  }
   public var nativePermissionPolicyManager: (any AgentNativePermissionPolicyManaging)? { nil }
 
   public func models(

@@ -130,9 +130,9 @@ extension BridgeServiceApplication {
       return false
     }
     do {
-      let installation = try await registry.validateForExecution(
-        installationID: AgentInstallationID(rawValue: installationID)
-      )
+      let installation = try await registry.validateForRuntimeBinding(
+        installationID: AgentInstallationID(rawValue: installationID),
+        projectRoot: project.root.canonicalPath, runtimeBinding: runtimeBindingForTask(task))
       guard installation.providerID.rawValue == task.providerID else { throw CancellationError() }
       return true
     } catch {
@@ -171,7 +171,8 @@ extension BridgeServiceApplication {
           installationID: AgentInstallationID(rawValue: installationID),
           projectRoot: project.root.canonicalPath,
           selectedModelID: Self.agentCatalogModelID(providerID: providerID, modelID: modelID),
-          requireSelectedModel: requiresKnownModel)
+          requireSelectedModel: requiresKnownModel,
+          runtimeBinding: runtimeBindingForTask(task))
       } catch AgentRuntimeError.modelUnavailable {
         return .invalid
       } catch {

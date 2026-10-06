@@ -112,6 +112,7 @@ extension BridgeServiceAppModel {
   func applyAgentCatalogSnapshot(_ value: IPCAgentCatalogResponse) {
     if agentProviders != value.providers { agentProviders = value.providers }
     if agentInstallations != value.installations { agentInstallations = value.installations }
+    refreshDeepSeekDesktopStates()
   }
 
   func applyTaskSnapshot(_ value: [MCPServiceTaskSnapshot]) {

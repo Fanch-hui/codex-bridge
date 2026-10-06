@@ -40,6 +40,12 @@ enum BridgeDesktopCommandRouter {
         )
       else { return }
       model.setCodexExecutablePath(path.trimmingCharacters(in: .whitespacesAndNewlines))
+    case .manageDeepSeekHarnessDesktop:
+      guard connected(model) else { return }
+      model.manageDeepSeekDesktop(envelope.payload)
+    case .openDeepSeekHarnessSession:
+      guard connected(model) else { return }
+      model.openDeepSeekDesktopSession(envelope.payload)
     case .scanAgents:
       model.scanAgents()
     case .manageNativeAgentSession:

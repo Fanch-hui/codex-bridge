@@ -111,6 +111,10 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func manageAgentNativeSessionDirectory(
     _ request: MCPNativeSessionDirectoryRequest
   ) async throws -> MCPNativeSessionDirectoryResponse
+  func manageDeepSeekHarnessDesktop(_ request: DeepSeekHarnessDesktopRequest) async throws
+    -> DeepSeekHarnessDesktopState
+  func connectAgentInstallation(_ request: IPCAgentConnectRequest) async throws
+    -> IPCAgentInstallationSummary
   func agentModelDefault() async throws -> IPCAgentModelDefaultResponse
   func agentModelDefault(providerID: String) async throws -> IPCAgentModelDefaultResponse
   func setAgentModelDefault(_ model: String?) async throws
@@ -203,6 +207,24 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func connectAgentInstallation(_ request: IPCAgentConnectRequest) async throws
+    -> IPCAgentInstallationSummary
+  {
+    guard request.connectionMode == nil || request.connectionMode == "acp" else {
+      throw BridgeServiceClientError.unavailable
+    }
+    return try await connectAgentInstallation(
+      providerID: request.providerID,
+      baseURL: request.baseURL, apiKey: request.apiKey,
+      alwaysProceedConfirmed: request.alwaysProceedConfirmed,
+      qoderDistribution: request.qoderDistribution, installationID: request.installationID,
+      inferenceProtocol: request.inferenceProtocol, catalogBaseURL: request.catalogBaseURL)
+  }
+  public func manageDeepSeekHarnessDesktop(_: DeepSeekHarnessDesktopRequest) async throws
+    -> DeepSeekHarnessDesktopState
+  {
+    throw BridgeServiceClientError.unavailable
+  }
   public func manageAgentNativeSessionDirectory(
     _: MCPNativeSessionDirectoryRequest
   ) async throws -> MCPNativeSessionDirectoryResponse {

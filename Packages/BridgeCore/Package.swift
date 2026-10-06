@@ -89,6 +89,7 @@ let package = Package(
     .library(name: "BridgeAgentCore", targets: ["BridgeAgentCore"]),
     .library(name: "BridgeOpenCodeACP", targets: ["BridgeOpenCodeACP"]),
     .library(name: "BridgeDeepSeekHarnessACP", targets: ["BridgeDeepSeekHarnessACP"]),
+    .library(name: "BridgeDeepSeekHarnessDesktop", targets: ["BridgeDeepSeekHarnessDesktop"]),
     .library(name: "BridgeAntigravityCLI", targets: ["BridgeAntigravityCLI"]),
     .library(name: "BridgePiRPC", targets: ["BridgePiRPC"]),
     .library(name: "BridgeQoderSDK", targets: ["BridgeQoderSDK"]),
@@ -262,6 +263,17 @@ let package = Package(
       resources: [.process("Resources")]
     ),
     .target(
+      name: "BridgeDeepSeekHarnessDesktop",
+      dependencies: [
+        "BridgeACP", "BridgeAgentCore", "BridgeDomain", "BridgeSecurity",
+        "BridgeDeepSeekHarnessACP",
+        .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
+      ],
+      resources: [.copy("Resources/DSHDesktopConnector")]
+    ),
+    .target(
       name: "BridgeAntigravityCLI",
       dependencies: [
         "BridgeAgentCore",
@@ -327,6 +339,7 @@ let package = Package(
         "BridgeDirectCommand",
         "BridgeDomain",
         "BridgeDeepSeekHarnessACP",
+        "BridgeDeepSeekHarnessDesktop",
         "BridgeLegacyImport",
         "BridgeIPC",
         "BridgeMCP",

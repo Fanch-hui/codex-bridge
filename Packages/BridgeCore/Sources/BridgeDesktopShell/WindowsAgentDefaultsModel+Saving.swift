@@ -57,7 +57,8 @@
         providerID: providerID,
         model: requestedModel,
         permissionMode: permissionMode,
-        effort: effort.isEmpty ? nil : effort
+        effort: effort.isEmpty ? nil : effort,
+        connectionMode: persistedDefaults[providerID]?.connectionMode
       )
       pendingDefaults[providerID] = optimistic
       applyOptimisticSelection(

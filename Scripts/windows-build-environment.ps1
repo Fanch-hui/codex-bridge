@@ -7,7 +7,8 @@ function Get-WindowsBuildEnvironment {
   if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
     throw "Visual Studio vswhere.exe is required to resolve target libraries."
   }
-  $vsRoot = & $vswhere -latest -property installationPath | Select-Object -First 1
+  $vsOutput = @(& $vswhere -latest -property installationPath)
+  $vsRoot = $vsOutput | Select-Object -First 1
   if ($LASTEXITCODE -ne 0 -or -not $vsRoot) {
     throw "Visual Studio installation was not found."
   }

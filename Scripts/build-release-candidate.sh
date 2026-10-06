@@ -73,6 +73,7 @@ trap 'exit 143' TERM
 
 /bin/mkdir -m 0700 "${candidate_directory}"
 cd "${repository_root}"
+node "${script_directory}/verify-agent-runtime-resources.mjs"
 for architecture in "${architectures[@]}"; do
   archive_path="${temporary_root}/CodexBridge-${architecture}.xcarchive"
   disk_image_directory="${temporary_root}/disk-image-${architecture}"
@@ -98,6 +99,8 @@ for architecture in "${architectures[@]}"; do
     print -u2 "Archive did not contain CodexBridge.app."
     exit 66
   }
+  node "${script_directory}/verify-agent-runtime-resources.mjs" \
+    "${archived_app}/Contents/Resources"
   app_binary="${archived_app}/Contents/MacOS/CodexBridge"
   service_binary="${archived_app}/Contents/Resources/CodexBridgeService"
   bundled_helper="${archived_app}/Contents/Helpers/tunnel-client"

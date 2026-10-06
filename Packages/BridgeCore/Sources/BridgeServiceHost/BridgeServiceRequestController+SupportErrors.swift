@@ -11,6 +11,7 @@ import Foundation
 
 extension BridgeServiceRequestController {
   static func map(_ error: Error) -> BridgeServiceIPCError {
+    if let mapped = mapDeepSeekDesktopError(error) { return mapped }
     if let error = error as? TaskHandoffError {
       return .init(code: "handoff_rejected", message: error.localizedDescription, retryable: false)
     }

@@ -38,7 +38,8 @@ extension BridgeServiceApplication {
       recentActivityAvailable: recentActivityAvailable, queueInfo: queueInfo,
       attachmentPaths: attachments.map(\.relativePath),
       usage: try await tasks.usage(taskID: id),
-      pendingUserInput: pendingUserInput.map(Self.taskUserInput))
+      pendingUserInput: pendingUserInput.map(Self.taskUserInput),
+      canOpenNativeSession: try await canOpenDeepSeekDesktopTask(task))
   }
 
   func taskSnapshot(
@@ -49,7 +50,8 @@ extension BridgeServiceApplication {
     queueInfo: ServiceTaskQueueInfo? = nil,
     attachmentPaths: [String] = [],
     usage: AgentUsageStatistics? = nil,
-    pendingUserInput: MCPServiceTaskUserInput? = nil
+    pendingUserInput: MCPServiceTaskUserInput? = nil,
+    canOpenNativeSession: Bool? = nil
   ) -> MCPServiceTaskSnapshot {
     let recentActivity = activityMessages.enumerated().compactMap {
       taskActivity($0.element, sequence: Int64($0.offset + 1))
@@ -109,7 +111,8 @@ extension BridgeServiceApplication {
       queueOccupantTaskID: queueInfo?.occupyingTaskID?.rawValue,
       queueRequestedAt: queueInfo.map { iso8601.string(from: $0.enqueuedAt) },
       usage: usage,
-      pendingUserInput: pendingUserInput
+      pendingUserInput: pendingUserInput,
+      canOpenNativeSession: canOpenNativeSession
     )
   }
 

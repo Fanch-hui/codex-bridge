@@ -192,6 +192,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
   public let supportsSteer: Bool
   public let supportsWorkspaceWrite: Bool
   public let detail: String?
+  public let desktop: BridgeDesktopDeepSeekHarnessDesktopState?
 
   public init(
     providerID: String,
@@ -210,7 +211,8 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     supportsEffortSelection: Bool = true,
     supportsSteer: Bool = false,
     supportsWorkspaceWrite: Bool = true,
-    detail: String? = nil
+    detail: String? = nil,
+    desktop: BridgeDesktopDeepSeekHarnessDesktopState? = nil
   ) {
     self.providerID = providerID
     self.displayName = displayName
@@ -229,6 +231,7 @@ public struct BridgeDesktopAgentProviderRow: Codable, Equatable, Sendable {
     self.supportsSteer = supportsSteer
     self.supportsWorkspaceWrite = supportsWorkspaceWrite
     self.detail = detail
+    self.desktop = desktop
   }
 }
 
@@ -244,8 +247,10 @@ public struct BridgeDesktopAgentInstallationRow: Codable, Equatable, Sendable {
   public let trustProfile: String
   public let securityProfileID: String?
   public let enabled: Bool
+  public let isActive: Bool?
   public let availability: String
   public let effectiveCapabilities: [String]
+  public let nativeSessionOperations: [String]?
   public let lastProbeError: String?
   public let lastProbedAt: String?
   public let updatedAt: String
@@ -265,8 +270,10 @@ public struct BridgeDesktopAgentInstallationRow: Codable, Equatable, Sendable {
     trustProfile: String,
     securityProfileID: String? = nil,
     enabled: Bool,
+    isActive: Bool? = nil,
     availability: String,
     effectiveCapabilities: [String] = [],
+    nativeSessionOperations: [String]? = nil,
     lastProbeError: String? = nil,
     lastProbedAt: String? = nil,
     updatedAt: String,
@@ -285,8 +292,10 @@ public struct BridgeDesktopAgentInstallationRow: Codable, Equatable, Sendable {
     self.trustProfile = trustProfile
     self.securityProfileID = securityProfileID
     self.enabled = enabled
+    self.isActive = isActive
     self.availability = availability
     self.effectiveCapabilities = effectiveCapabilities
+    self.nativeSessionOperations = nativeSessionOperations
     self.lastProbeError = lastProbeError
     self.lastProbedAt = lastProbedAt
     self.updatedAt = updatedAt

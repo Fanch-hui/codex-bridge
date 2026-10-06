@@ -60,6 +60,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setAgentModelDefault = "set_agent_model_default"
   case setQoderRuntimeSettings = "set_qoder_runtime_settings"
   case manageAgentNativeSessionDirectory = "manage_agent_native_session_directory"
+  case manageDeepSeekHarnessDesktop = "manage_deepseek_harness_desktop"
   case getAgentNativePermissionPolicy = "get_agent_native_permission_policy"
   case updateAgentNativePermissionPolicy = "update_agent_native_permission_policy"
   case getAgentPermissionRemediation = "get_agent_permission_remediation"

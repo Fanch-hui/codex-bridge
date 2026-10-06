@@ -27,6 +27,18 @@ extension BridgeServiceRequestController {
       qoderSnapshot.regions[$0]
     }
     let deepSeekConnection = try await composition.settings.deepSeekHarnessConnectionConfiguration()
+    let deepSeekMode = try await composition.settings.deepSeekHarnessConnectionMode()
+    let deepSeekActiveID: String?
+    if deepSeekMode == .nativeDesktop {
+      deepSeekActiveID = try await composition.settings.string(
+        for: .deepSeekHarnessDesktopActiveInstallationID)
+    } else {
+      deepSeekActiveID =
+        installations.first(where: {
+          $0.providerID == .deepSeekHarness && $0.isEnabled
+            && $0.artifacts.contains(where: { $0.role == .launchConfiguration })
+        })?.id.rawValue
+    }
     let installationDistributionsByPath = try await qoderDistributionsByExecutablePath(
       for: installations)
     var discovery = await composition.agentDiscoveryCatalog.summaries(
@@ -65,7 +77,14 @@ extension BridgeServiceRequestController {
           return Self.agentInstallationSummary(
             installation,
             distribution: distribution?.rawValue,
-            isActive: activeID == installation.id.rawValue
+            isActive: installation.providerID == .deepSeekHarness
+              ? deepSeekActiveID == installation.id.rawValue : activeID == installation.id.rawValue,
+            nativeSessionOperations: installation.providerID == .deepSeekHarness
+              ? (deepSeekMode == .nativeDesktop && deepSeekActiveID == installation.id.rawValue
+                && installation.isSelectable
+                ? ["list", "read", "index", "rename", "continue", "open"] : []) : nil,
+            canOpenNativeSession: installation.providerID == .deepSeekHarness
+              ? deepSeekMode == .nativeDesktop && deepSeekActiveID == installation.id.rawValue : nil
           )
         }
       )
@@ -194,7 +213,9 @@ extension BridgeServiceRequestController {
   static func agentInstallationSummary(
     _ record: ServiceAgentInstallationRecord,
     distribution: String? = nil,
-    isActive: Bool? = nil
+    isActive: Bool? = nil,
+    nativeSessionOperations: [String]? = nil,
+    canOpenNativeSession: Bool? = nil
   ) -> IPCAgentInstallationSummary {
     let formatter = ISO8601DateFormatter()
     return IPCAgentInstallationSummary(
@@ -217,7 +238,9 @@ extension BridgeServiceRequestController {
       updatedAt: formatter.string(from: record.updatedAt),
       distribution: distribution
         ?? QoderDistribution.identify(executablePath: record.executablePath)?.rawValue,
-      isActive: isActive
+      isActive: isActive,
+      nativeSessionOperations: nativeSessionOperations,
+      canOpenNativeSession: canOpenNativeSession
     )
   }
 }
@@ -269,6 +292,7 @@ extension BridgeServiceRequestController {
           IPCAgentModelSummary(
             modelID: $0.modelID,
             displayName: $0.displayName,
+            compatibleModelIDs: $0.compatibleModelIDs,
             supportedReasoningEfforts: $0.supportedReasoningEfforts,
             defaultReasoningEffort: $0.defaultReasoningEffort,
             reasoningCapabilitiesAvailable: $0.reasoningCapabilitiesAvailable,
@@ -299,7 +323,9 @@ extension BridgeServiceRequestController {
         providerID: providerID.rawValue,
         model: persisted.model,
         permissionMode: persisted.permissionMode,
-        effort: persisted.effort
+        effort: persisted.effort,
+        connectionMode: providerID == .deepSeekHarness
+          ? try await composition.settings.deepSeekHarnessConnectionMode().rawValue : nil
       )
     )
   }
@@ -323,7 +349,9 @@ extension BridgeServiceRequestController {
         providerID: providerID.rawValue,
         model: persisted.model,
         permissionMode: persisted.permissionMode,
-        effort: persisted.effort
+        effort: persisted.effort,
+        connectionMode: providerID == .deepSeekHarness
+          ? try await composition.settings.deepSeekHarnessConnectionMode().rawValue : nil
       )
     )
   }

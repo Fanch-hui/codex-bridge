@@ -15,6 +15,7 @@ public struct AgentTaskBrief: Sendable {
   public let effort: String?
   public let permissionMode: ServicePermissionMode
   public let profileID: AgentProfileID?
+  public let runtimeBinding: AgentRuntimeBinding?
   public var networkAllowed: Bool { permissionMode == .full }
   public let attachments: [AgentImageAttachment]
   public let selectedSkills: [AgentSelectedSkill]
@@ -37,6 +38,7 @@ public struct AgentTaskBrief: Sendable {
     effort: String? = nil,
     permissionMode: ServicePermissionMode = .readOnly,
     profileID: AgentProfileID? = nil,
+    runtimeBinding: AgentRuntimeBinding? = nil,
     networkAllowed _: Bool = false,
     accessMode: ServiceAccessMode = .requestApproval,
     attachments: [AgentImageAttachment] = [],
@@ -53,6 +55,7 @@ public struct AgentTaskBrief: Sendable {
     self.effort = effort
     self.permissionMode = permissionMode
     self.profileID = profileID
+    self.runtimeBinding = runtimeBinding
     self.accessMode = accessMode
     self.attachments = attachments
     self.selectedSkills = selectedSkills
@@ -118,11 +121,15 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
     }
     let record: ServiceAgentInstallationRecord
     do {
-      record = try await registry.reprobe(
-        installationID: brief.installationID,
-        acceptReplacement: false,
-        projectRoot: brief.projectRoot
-      )
+      if let runtimeBinding = brief.runtimeBinding {
+        record = try await registry.validateForRuntimeBinding(
+          installationID: brief.installationID,
+          projectRoot: brief.projectRoot, runtimeBinding: runtimeBinding)
+      } else {
+        record = try await registry.reprobe(
+          installationID: brief.installationID,
+          acceptReplacement: false, projectRoot: brief.projectRoot)
+      }
     } catch ServiceAgentRegistryError.installationUnavailable {
       throw AgentRuntimeError.installationUnavailable(brief.installationID)
     } catch ServiceAgentRegistryError.installationNeedsReview {
@@ -156,24 +163,7 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
     }
     // The frozen canonical path from registration time is the only executable
     // identity this runner will launch.
-    let installation = try AgentInstallation(
-      id: record.id,
-      providerID: record.providerID,
-      executablePath: record.executableIdentity.canonicalPath,
-      version: record.version,
-      protocolRevision: record.protocolRevision,
-      artifacts: record.artifacts.map { artifact in
-        AgentInstallationArtifact(
-          role: artifact.role,
-          canonicalPath: artifact.identity.canonicalPath,
-          device: artifact.identity.device,
-          inode: artifact.identity.inode,
-          fileSize: artifact.identity.fileSize,
-          modificationTimeNanoseconds: artifact.identity.modificationTimeNanoseconds,
-          sha256: artifact.identity.sha256
-        )
-      }
-    )
+    let installation = try record.agentInstallation()
     let request = try AgentExecutionRequest(
       taskID: brief.taskID,
       projectID: brief.projectID,
@@ -183,6 +173,7 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
       model: brief.model,
       effort: brief.effort,
       profileID: brief.profileID ?? record.securityProfileID,
+      runtimeBinding: brief.runtimeBinding,
       mutationIntent: brief.permissionMode == .full ? .workspaceWrite : .readOnly,
       workspaceStrategy: brief.permissionMode == .full
         ? .exclusiveProject : .sharedProject,

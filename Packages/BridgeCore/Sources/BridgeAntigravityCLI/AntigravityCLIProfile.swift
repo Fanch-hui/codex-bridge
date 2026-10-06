@@ -77,9 +77,6 @@ struct AntigravityCLIHelpFacts: Equatable, Sendable {
     if supportsModel {
       result.insert(.modelSelection)
     }
-    if supportsEffort {
-      result.insert(.effortSelection)
-    }
     if supportsQueuedTurns {
       result.insert(.steer)
     }

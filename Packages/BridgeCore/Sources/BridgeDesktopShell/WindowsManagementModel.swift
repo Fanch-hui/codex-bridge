@@ -21,10 +21,12 @@
     private var agentLoading = false
     var projectBusy = false
     var agentBusy = false
+    var deepSeekDesktopStates: [String: BridgeDesktopDeepSeekHarnessDesktopState] = [:]
+    var deepSeekDesktopRefreshInFlight = false
     var agentSetupOperations: [IPCAgentSetupState] = []
     var agentSetupRefreshInFlight = false
     var agentSetupRequestGeneration = 0
-    private var agentOperationRevision = 0
+    var agentOperationRevision = 0
     private var projectStatusText = "尚未加载项目。"
     private var agentStatusText = "尚未加载 Agent 目录。"
 
@@ -126,6 +128,7 @@
       }
       agentLoading = false
       publishDisplay()
+      await refreshDeepSeekDesktopStates()
       await refreshAgentSetups()
     }
 
@@ -186,7 +189,14 @@
       let connected = connectionState == .connected
       let projectActions = connected && !projectBusy && !projectLoading
       let agentActions = connected && !agentBusy && !agentLoading
-      let desktopProviderItems = agentProviders.map(WindowsDesktopAgentPresentation.provider)
+      let desktopProviderItems = agentProviders.map { provider in
+        let candidates = agentInstallations.filter { $0.providerID == provider.providerID }
+        let desktop =
+          candidates.first { $0.isActive == true }
+          .flatMap { deepSeekDesktopStates[$0.installationID] }
+          ?? candidates.compactMap { deepSeekDesktopStates[$0.installationID] }.first
+        return WindowsDesktopAgentPresentation.provider(provider, desktop: desktop)
+      }
       let desktopInstallationItems = agentInstallations.map { installation in
         let canToggle =
           agentActions && (installation.isEnabled || installation.availability == "available")

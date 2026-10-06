@@ -188,31 +188,6 @@ extension BridgeServiceApplication {
   }
 }
 
-public struct ServiceAgentModelListItem: Codable, Equatable, Sendable {
-  public let modelID: String
-  public let displayName: String
-  public let supportedReasoningEfforts: [String]
-  public let defaultReasoningEffort: String?
-  public let reasoningCapabilitiesAvailable: Bool
-  public let isDefaultModel: Bool?
-
-  public init(
-    modelID: String,
-    displayName: String,
-    supportedReasoningEfforts: [String] = [],
-    defaultReasoningEffort: String? = nil,
-    reasoningCapabilitiesAvailable: Bool = true,
-    isDefaultModel: Bool? = nil
-  ) {
-    self.modelID = modelID
-    self.displayName = displayName
-    self.supportedReasoningEfforts = supportedReasoningEfforts
-    self.defaultReasoningEffort = defaultReasoningEffort
-    self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
-    self.isDefaultModel = isDefaultModel
-  }
-}
-
 extension BridgeServiceApplication {
   /// Lists models advertised by the registered provider binary itself
   /// (config providers plus subscription catalogs such as Go/Zen).
@@ -260,7 +235,9 @@ extension BridgeServiceApplication {
       requireSelectedModel: modelID != nil
     )
     try Self.checkDeadline(deadline)
-    if installation.providerID == .deepSeekHarness {
+    if installation.providerID == .deepSeekHarness,
+      try await settings.deepSeekHarnessConnectionMode() == .acp
+    {
       try await reconcileDeepSeekHarnessModelDefaults(models: models, deadline: deadline)
     }
     Task { [weak self] in await self?.drainQueuedTasks() }
@@ -268,6 +245,7 @@ extension BridgeServiceApplication {
       ServiceAgentModelListItem(
         modelID: $0.id,
         displayName: $0.displayName,
+        compatibleModelIDs: $0.compatibleModelIDs,
         supportedReasoningEfforts: $0.supportedReasoningEfforts,
         defaultReasoningEffort: $0.defaultReasoningEffort,
         reasoningCapabilitiesAvailable: $0.reasoningCapabilitiesAvailable,
@@ -282,7 +260,8 @@ extension BridgeServiceApplication {
     projectRoot: String?,
     selectedModelID: String?,
     forceRefresh: Bool = false,
-    requireSelectedModel: Bool = true
+    requireSelectedModel: Bool = true,
+    runtimeBinding: AgentRuntimeBinding? = nil
   ) async throws -> [AgentModelDescriptor] {
     guard try await registry.installation(id: installationID) != nil else {
       throw BridgeMCPQueryError.unavailable
@@ -292,7 +271,8 @@ extension BridgeServiceApplication {
       projectRoot: projectRoot,
       selectedModelID: selectedModelID,
       forceRefresh: forceRefresh,
-      requireSelectedModel: requireSelectedModel
+      requireSelectedModel: requireSelectedModel,
+      runtimeBinding: runtimeBinding
     )
   }
 
@@ -319,6 +299,11 @@ extension BridgeServiceApplication {
   ) async throws -> (model: String?, permissionMode: String, effort: String?) {
     try Self.checkDeadline(deadline)
     let descriptor = try await agentDefaultSettings(providerID: providerID, deadline: deadline)
+    if providerID == .deepSeekHarness,
+      try await settings.deepSeekHarnessConnectionMode() == .nativeDesktop
+    {
+      try await refreshDeepSeekDesktopDefaults(installation: deepSeekDesktopDefaultInstallation())
+    }
     return try await agentModelDefaults(providerID: providerID, descriptor: descriptor)
   }
 
@@ -329,7 +314,7 @@ extension BridgeServiceApplication {
     var model = try await settings.string(
       for: descriptor.modelKey
     )
-    if providerID == .deepSeekHarness {
+    if providerID == .deepSeekHarness, descriptor.modelKey == .deepSeekHarnessDefaultModel {
       model = try await migratedDeepSeekModelDefault(model)
     }
     let effort: String?
@@ -380,6 +365,13 @@ extension BridgeServiceApplication {
       policy.supportsEffortSelection || !updateEffort || effort == nil
     else {
       throw BridgeMCPQueryError.contractRejected
+    }
+    if providerID == .deepSeekHarness,
+      try await settings.deepSeekHarnessConnectionMode() == .nativeDesktop
+    {
+      return try await setDeepSeekDesktopDefaults(
+        model: model, permissionMode: permissionMode,
+        effort: effort, updateEffort: updateEffort)
     }
     let descriptor = try await agentDefaultSettings(providerID: providerID, deadline: deadline)
     let validated = try Self.validatedAgentModel(model)

@@ -42,6 +42,10 @@ jobs:
           Scripts/with-xcode.sh xcodebuild -version
           Scripts/with-xcode.sh swift --version
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+
       - name: Prepare Tunnel helper
         run: Scripts/build-tunnel-helper.sh "$RUNNER_TEMP/tunnel-helper"
 

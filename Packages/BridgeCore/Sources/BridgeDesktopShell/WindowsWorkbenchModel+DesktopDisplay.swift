@@ -116,6 +116,7 @@
         canInterrupt: TaskInspectorPresentation.canInterrupt(task),
         canStop: task.isActive,
         canSteer: canSteer,
+        canOpenNativeSession: task.canOpenNativeSession,
         permissionRemediation: permissionRemediation,
         turnCount: resolvedSession.turnCount,
         canResume: canResume,

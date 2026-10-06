@@ -30,6 +30,7 @@ public struct BridgeDesktopModelOption: Codable, Equatable, Sendable {
 
 public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
   public let providerID: String
+  public let connectionMode: String?
   public let providerName: String
   public let installationID: String?
   public let installationName: String?
@@ -50,6 +51,7 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
   public init(
     providerID: String,
     providerName: String,
+    connectionMode: String? = nil,
     installationID: String? = nil,
     installationName: String? = nil,
     model: String? = nil,
@@ -67,6 +69,7 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
     canSelectEffort: Bool? = nil
   ) {
     self.providerID = providerID
+    self.connectionMode = connectionMode
     self.providerName = providerName
     self.installationID = installationID
     self.installationName = installationName

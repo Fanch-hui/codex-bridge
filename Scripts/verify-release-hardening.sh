@@ -26,7 +26,8 @@ done
 
 /usr/bin/codesign --verify --deep --strict --verbose=2 "${app}"
 for spec in "BridgeCore_BridgePiRPC.bundle:PiBridgeExtension/index.mjs" \
-  "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs"; do
+  "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs" \
+  "BridgeCore_BridgeDeepSeekHarnessDesktop.bundle:DSHDesktopConnector/index.mjs"; do
   bundle="${app}/Contents/Resources/${spec%%:*}"
   entry="${bundle}/Contents/Resources/${spec#*:}"
   [[ -d "${bundle}" && ! -L "${bundle}" && -f "${entry}" && ! -L "${entry}" ]] || {

@@ -34,13 +34,19 @@ extension BridgeDesktopCommandRouter {
     guard connected(model),
       let projectID = validatedID(payload.projectID, maximumBytes: 128),
       let providerID = validatedID(payload.providerID, maximumBytes: 128),
-      providerID == "pi" || providerID == "qoder",
       let installationID = validatedID(payload.installationID, maximumBytes: 256),
       let sessionID = validatedID(payload.sessionID, maximumBytes: 256),
       let prompt = BridgeDesktopCommandValue.nonBlankText(
         payload.input,
         maximumUTF8Bytes: BridgeDesktopCommandValue.maximumWorkbenchPromptBytes
       )
+    else { return }
+    guard
+      let installation = model.agentInstallations.first(where: {
+        $0.installationID == installationID && $0.providerID == providerID
+      }),
+      (installation.nativeSessionOperations
+        ?? BridgeDesktopNativeSessionOperations.legacy(for: providerID)).contains("index")
     else { return }
     model.continueNativeAgentSession(
       projectID: projectID, providerID: providerID, installationID: installationID,

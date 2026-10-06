@@ -15,7 +15,8 @@ for path in binaries:
         header = source.read(64)
     if header[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", header, 18)[0] != machine:
         raise SystemExit(f"ELF architecture mismatch: {path.name}")
-for resource in ("BridgeDesktopUI", "BridgeDeepSeekHarnessACP", "BridgePiRPC", "BridgeQoderSDK"):
+for resource in ("BridgeDesktopUI", "BridgeDeepSeekHarnessACP", "BridgePiRPC", "BridgeQoderSDK",
+                 "BridgeDeepSeekHarnessDesktop"):
     if not any(path.is_dir() for path in root.glob(f"BridgeCore_{resource}.*")):
         raise SystemExit(f"Missing Swift resource bundle: {resource}")
 digest = hashlib.sha256((root / "tunnel-client").read_bytes()).hexdigest()

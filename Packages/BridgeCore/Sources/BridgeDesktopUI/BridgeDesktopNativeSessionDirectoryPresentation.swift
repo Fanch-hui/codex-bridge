@@ -5,6 +5,7 @@ public struct BridgeDesktopNativeSessionInstallationCandidate: Equatable, Sendab
   public let region: String?
   public let isEnabled: Bool
   public let availability: String
+  public let operations: [String]?
 
   public init(
     installationID: String,
@@ -12,7 +13,8 @@ public struct BridgeDesktopNativeSessionInstallationCandidate: Equatable, Sendab
     displayName: String,
     region: String?,
     isEnabled: Bool,
-    availability: String
+    availability: String,
+    operations: [String]? = nil
   ) {
     self.installationID = installationID
     self.providerID = providerID
@@ -20,6 +22,7 @@ public struct BridgeDesktopNativeSessionInstallationCandidate: Equatable, Sendab
     self.region = region
     self.isEnabled = isEnabled
     self.availability = availability
+    self.operations = operations
   }
 }
 
@@ -30,14 +33,18 @@ public enum BridgeDesktopNativeSessionDirectoryPresentation {
   ) -> BridgeDesktopNativeSessionDirectoryState {
     let installations: [BridgeDesktopNativeSessionInstallation] = candidates.compactMap {
       candidate in
-      guard candidate.providerID == "pi" || candidate.providerID == "qoder",
+      let operations =
+        candidate.operations
+        ?? BridgeDesktopNativeSessionOperations.legacy(for: candidate.providerID)
+      guard operations.contains("list"),
         candidate.isEnabled, candidate.availability == "available"
       else { return nil }
       return BridgeDesktopNativeSessionInstallation(
         installationID: candidate.installationID,
         providerID: candidate.providerID,
         displayName: candidate.displayName,
-        region: candidate.region
+        region: candidate.region,
+        operations: operations
       )
     }
     return BridgeDesktopNativeSessionDirectoryState(

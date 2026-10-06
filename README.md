@@ -8,22 +8,22 @@ Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 C
 
 macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目目录授权、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 `v1.4.1`。
+当前版本为 [v1.4.2](./docs/RELEASE_NOTES_v1.4.2.md)。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v1.4.1 安装包 | 安装方式 |
+| 平台 | v1.4.2 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-1.4.1-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| macOS 14+，Intel | `CodexBridge-1.4.1-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.4.1-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.1-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-1.4.2-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-1.4.2-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.4.2-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.2-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.1.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.1.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.4.1.tar.gz` / `codex-bridge-linux-arm64-1.4.1.tar.gz` | 完整解压后运行 `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.2.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.2.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.4.2.tar.gz` / `codex-bridge-linux-arm64-1.4.2.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
@@ -71,7 +71,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 - [详细使用指南](./docs/USER_GUIDE.md)：安装、项目授权、Qwen、任务与故障排查
 - [ChatGPT / Tunnel / OpenAI API Key 配置](./docs/CHATGPT_DEVELOPER_MODE.md)
-- [DeepSeek Harness 安装与 API 配置](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md)
+- [DeepSeek Harness 安装与 API 配置](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) · [原生桌面连接](./docs/DSH_NATIVE_DESKTOP_GUIDE.md)
 - [Pi 与 Qoder 安装、地区选择与连接](./docs/PI_QODER_CONNECTION_GUIDE.md)
 - [OpenCode 连接](./docs/OPENCODE_CONNECTION_GUIDE.md) · [Antigravity 连接与权限](./docs/ANTIGRAVITY_CONNECTION_GUIDE.md)
 - [MCPB 客户端连接与 Registry 发布](./docs/MCP_REGISTRY.md)
@@ -113,7 +113,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 | --- | --- |
 | Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断；macOS 同时识别新版与旧版 App 内置 CLI 路径 |
 | OpenCode | ACP 连接、模型与推理选项、权限回传、会话继续 |
-| DeepSeek Harness | ACP 入口与能力探测、真实模型目录、搜索配置、MCP 服务配置与会话持久化 |
+| DeepSeek Harness | ACP 与原生桌面连接、模型目录、共享桌面会话与窗口联动；ACP 搜索及 MCP 配置 |
 | Antigravity | CLI 接入、原生权限策略、执行过程与会话继续 |
 | Pi | 原生 CLI 与会话接入、模型目录、MCP、Skills 与任务续写 |
 | Qoder | CN/国际版原生 CLI 与 SDK 接入、地区隔离、权限模式、工具审批与会话续写 |

@@ -170,13 +170,22 @@
       let payload = envelope.payload
       guard let projectID = BridgeDesktopCommandValue.nonEmpty(payload.projectID),
         let providerID = BridgeDesktopCommandValue.nonEmpty(payload.providerID),
-        ["pi", "qoder"].contains(providerID),
         let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID),
         let sessionID = BridgeDesktopCommandValue.nonEmpty(payload.sessionID),
         let prompt = BridgeDesktopCommandValue.nonBlankText(
           payload.input,
           maximumUTF8Bytes: BridgeDesktopCommandValue.maximumWorkbenchPromptBytes
         )
+      else {
+        rejectWorkbenchCommand(envelope, model: model)
+        return
+      }
+      guard
+        let installation = model.agentInstallations.first(where: {
+          $0.installationID == installationID && $0.providerID == providerID
+        }),
+        (installation.nativeSessionOperations
+          ?? BridgeDesktopNativeSessionOperations.legacy(for: providerID)).contains("index")
       else {
         rejectWorkbenchCommand(envelope, model: model)
         return

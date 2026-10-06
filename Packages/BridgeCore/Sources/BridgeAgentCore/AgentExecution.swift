@@ -63,6 +63,7 @@ public struct AgentExecutionRequest: Equatable, Sendable {
   public let model: String?
   public let effort: String?
   public let profileID: AgentProfileID?
+  public let runtimeBinding: AgentRuntimeBinding?
   public let mutationIntent: AgentMutationIntent
   public let workspaceStrategy: AgentWorkspaceStrategy
   public let networkAccessRequested: Bool
@@ -80,6 +81,7 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     model: String? = nil,
     effort: String? = nil,
     profileID: AgentProfileID? = nil,
+    runtimeBinding: AgentRuntimeBinding? = nil,
     mutationIntent: AgentMutationIntent,
     workspaceStrategy: AgentWorkspaceStrategy,
     networkAccessRequested: Bool,
@@ -135,6 +137,7 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     self.model = model
     self.effort = effort
     self.profileID = profileID
+    self.runtimeBinding = runtimeBinding
     self.mutationIntent = mutationIntent
     self.workspaceStrategy = workspaceStrategy
     self.networkAccessRequested = networkAccessRequested

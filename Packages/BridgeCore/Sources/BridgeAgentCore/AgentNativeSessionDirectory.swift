@@ -20,7 +20,7 @@ public struct AgentNativeSessionDirectoryScope: Codable, Equatable, Sendable {
       installationID.rawValue, field: "history.installation", maximumBytes: 256)
     try AgentValidation.identifier(projectID, field: "history.project", maximumBytes: 128)
     try AgentValidation.absolutePath(projectRoot, field: "history.projectRoot")
-    try AgentValidation.optionalIdentifier(region, field: "history.region", maximumBytes: 64)
+    try AgentValidation.optionalIdentifier(region, field: "history.region", maximumBytes: 256)
     self.providerID = providerID
     self.installationID = installationID
     self.projectID = projectID

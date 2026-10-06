@@ -138,7 +138,9 @@ extension BridgeServiceApplication {
     let usage = try await tasks.usage(taskIDs: records.map(\.id))
     let attachments = try await tasks.taskAttachments(taskIDs: records.map(\.id))
     var queueInfos: [TaskID: ServiceTaskQueueInfo] = [:]
+    var canOpenNative: [TaskID: Bool] = [:]
     for record in records {
+      canOpenNative[record.id] = try await canOpenDeepSeekDesktopTask(record)
       if let info = try await tasks.queueInfo(taskID: record.id) {
         queueInfos[record.id] = info
       }
@@ -152,7 +154,8 @@ extension BridgeServiceApplication {
         recentActivityAvailable: activity.messagesAvailable,
         queueInfo: queueInfos[record.id],
         attachmentPaths: attachments[record.id, default: []].map(\.relativePath),
-        usage: usage[record.id]
+        usage: usage[record.id],
+        canOpenNativeSession: canOpenNative[record.id]
       )
     }
   }

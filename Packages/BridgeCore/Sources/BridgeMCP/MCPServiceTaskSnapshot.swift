@@ -36,6 +36,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
   public let queueOccupantTaskID: String?
   public let queueRequestedAt: String?
   public let waitPolicy: MCPServiceTaskWaitPolicy
+  public let canOpenNativeSession: Bool?
 
   public init(
     taskID: String,
@@ -71,8 +72,10 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
     queueRequestedAt: String? = nil,
     waitPolicy: MCPServiceTaskWaitPolicy? = nil,
     usage: AgentUsageStatistics? = nil,
-    pendingUserInput: MCPServiceTaskUserInput? = nil
+    pendingUserInput: MCPServiceTaskUserInput? = nil,
+    canOpenNativeSession: Bool? = nil
   ) {
+    self.canOpenNativeSession = canOpenNativeSession
     self.usage = usage
     self.pendingUserInput = pendingUserInput
     self.taskID = taskID
@@ -118,6 +121,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case usage
+    case canOpenNativeSession = "can_open_native_session"
     case pendingUserInput = "pending_user_input"
     case taskID = "task_id"
     case projectID = "project_id"
@@ -155,6 +159,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encodeIfPresent(canOpenNativeSession, forKey: .canOpenNativeSession)
     try container.encodeIfPresent(usage, forKey: .usage)
     try container.encodeIfPresent(pendingUserInput, forKey: .pendingUserInput)
     try container.encode(taskID, forKey: .taskID)
@@ -193,6 +198,7 @@ public struct MCPServiceTaskSnapshot: Codable, Equatable, Sendable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    canOpenNativeSession = try container.decodeIfPresent(Bool.self, forKey: .canOpenNativeSession)
     usage = try container.decodeIfPresent(AgentUsageStatistics.self, forKey: .usage)
     pendingUserInput = try container.decodeIfPresent(
       MCPServiceTaskUserInput.self, forKey: .pendingUserInput)

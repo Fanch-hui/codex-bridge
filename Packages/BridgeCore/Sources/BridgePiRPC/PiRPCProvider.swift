@@ -40,7 +40,7 @@ public struct PiRPCProvider: AgentProvider, Sendable {
     self.configuration = configuration
     nativePermissionPolicyManager = PiNativePermissionPolicyManager(
       runtimeBaseDirectory: configuration.runtimeBaseDirectory)
-    descriptor = try AgentProviderDescriptor(providerID: .pi, displayName: "Pi", adapterRevision: 1)
+    descriptor = try AgentProviderDescriptor(providerID: .pi, displayName: "Pi", adapterRevision: 2)
   }
 
   public func probe(_ request: AgentProbeRequest) async -> AgentProbeResult {
@@ -108,7 +108,9 @@ public struct PiRPCProvider: AgentProvider, Sendable {
       guard !modelCatalog.isEmpty else {
         throw AgentRuntimeError.modelUnavailable("pi.no_configured_model")
       }
-      if let model = request.model { try await selectModel(model, client: client) }
+      if let model = request.model {
+        try await selectModel(model, client: client, values: modelCatalog)
+      }
       if let effort = request.effort { try await selectEffort(effort, client: client) }
       let usageAvailable = await Self.supportsSessionStats(client)
       let capabilities = Self.capabilities(usageAvailable: usageAvailable)

@@ -142,6 +142,12 @@
       });
     });
     model.taskRow.appendChild(model.nativeHistory);
+    model.openNativeSession = S.button("打开对应会话", null, {}, null, "small", false);
+    model.openNativeSession.addEventListener("click", function () {
+      var task = model.page && model.page.selectedTask;
+      if (task && task.canOpenNativeSession && model.emit) model.emit("openDeepSeekHarnessSession", { taskID: task.taskID });
+    });
+    model.taskRow.appendChild(model.openNativeSession);
     model.interrupt = S.button("中断", null, {}, null, "small danger", false);
     model.interrupt.addEventListener("click", function () {
       var task = model.page && model.page.selectedTask;
@@ -177,6 +183,7 @@
 
   function updateInspectorHeader(model, page, emit) {
     model.page = page; model.emit = emit;
+    model.openNativeSession.hidden = !(page.selectedTask && page.selectedTask.canOpenNativeSession);
     model.nativeHistory.disabled = !S.safeArray((page.nativeSessions || {}).installations).length;
     var browser = page.browser || {};
     model.toggle.className = "switch-toggle" + (browser.enabled ? " is-active" : "");
@@ -292,7 +299,8 @@
     var header = JSON.stringify([
       page.browser && page.browser.enabled, page.browser && page.browser.canToggle,
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode,
-      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canInterrupt, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
+      (page.nativeSessions || {}).installations,
+      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canOpenNativeSession, detail.canInterrupt, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
       S.safeArray(page.tasks).map(function (t) {
         return [t.taskID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
       })

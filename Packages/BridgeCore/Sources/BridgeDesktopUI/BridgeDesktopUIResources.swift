@@ -29,6 +29,7 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case pagesAgentHeadlessConsentJS = "pages-agent-headless-consent.js"
   case pagesAgentQoderSettingsJS = "pages-agent-qoder-settings.js"
   case pagesAgentSetupJS = "pages-agent-setup.js"
+  case pagesAgentDSHDesktopJS = "pages-agent-dsh-desktop.js"
   case pagesAgentConnectorRowJS = "pages-agent-connector-row.js"
   case pagesAgentConnectorsJS = "pages-agent-connectors.js"
   case pagesCodexConnectionJS = "pages-codex-connection.js"

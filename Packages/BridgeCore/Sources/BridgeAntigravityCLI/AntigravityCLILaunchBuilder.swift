@@ -28,6 +28,9 @@ public struct AntigravityCLILaunchBuilder: Sendable {
     guard installation.providerID == .antigravity else {
       throw AgentRuntimeError.invalidRequest("installation.providerID")
     }
+    guard request.effort == nil else {
+      throw AgentRuntimeError.capabilityUnavailable(.effortSelection)
+    }
     let expectedStrategy: AgentWorkspaceStrategy =
       request.mutationIntent == .readOnly ? .sharedProject : .exclusiveProject
     guard request.workspaceStrategy == expectedStrategy else {

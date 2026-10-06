@@ -3,7 +3,7 @@
   import WinSDK
 
   extension WindowsSecureFile {
-    static func openAbsoluteRegularFileResolving(
+    package static func openAbsoluteRegularFileResolving(
       _ path: String,
       desiredAccess: DWORD
     ) throws -> (HANDLE, Metadata) {

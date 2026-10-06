@@ -137,7 +137,7 @@ struct PiRuntimeProfile: Sendable {
     return tools
   }
 
-  private static func processEnvironment(executable: String, source: [String: String]) throws
+  static func processEnvironment(executable: String, source: [String: String]) throws
     -> [String: String]
   {
     let home = try AgentProviderEnvironment.homeDirectory(source: source)
@@ -157,6 +157,8 @@ struct PiRuntimeProfile: Sendable {
       "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
       "OPENROUTER_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY",
       "MISTRAL_API_KEY", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
+      "AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_RESOURCE_NAME", "AZURE_OPENAI_API_VERSION",
+      "AZURE_OPENAI_DEPLOYMENT_NAME_MAP",
     ]
     for key in keys {
       if let value = source[key], !value.contains("\0"), value.utf8.count <= 32 * 1_024 {

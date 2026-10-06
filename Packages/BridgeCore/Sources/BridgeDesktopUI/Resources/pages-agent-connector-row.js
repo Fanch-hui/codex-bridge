@@ -44,6 +44,8 @@
     var configPanel = S.node("div", "agent-config-panel"); configPanel.appendChild(fields);
     var configSave = S.button("更新配置", null, {}, null, "small", true); configPanel.appendChild(configSave);
     row.appendChild(configPanel);
+    var desktop = global.CodexBridgeDesktopDSHDesktop.create(S, function (command, payload) { context.emit(command, payload); }, refreshAction);
+    row.appendChild(desktop.root);
     var qoderSettings = global.CodexBridgeDesktopQoderRuntimeSettings.create(refreshAction);
     row.appendChild(qoderSettings.root);
 
@@ -104,6 +106,7 @@
     }
 
     function configurationValid() {
+      if (desktop.nativeMode()) return desktop.canConnect();
       if (!currentProvider.requiresConfiguration) return true;
       var base = hasValue(baseURL.control.value);
       var key = hasValue(apiKey.control.value);
@@ -120,6 +123,15 @@
       setup.update(scopedOperation, currentProvider);
       var scoped = scopedInstallations();
       var primary = primaryInstallation(scoped);
+      if (desktop.nativeMode()) {
+        actionBar.hidden = false; action.hidden = false; actionMode = "desktop";
+        configPanel.hidden = true; setupAction.hidden = true; setupProgress.hidden = true; installOptions.hidden = true;
+        action.textContent = desktop.connected() ? "重新连接" : "连接";
+        action.disabled = !context.canConnect || context.busy || !desktop.canConnect();
+        actionHint.textContent = "使用 DSH 桌面的账号和原生会话。";
+        return;
+      }
+      setupAction.hidden = false; installOptions.hidden = false;
       var isConnectedValue = scoped.some(isConnected);
       var review = primary && primary.availability === "needs_review";
       var ready = context.canConnect && !context.busy && configurationValid();
@@ -224,6 +236,7 @@
     function update(nextProvider, installations, nextContext) {
       currentProvider = nextProvider;
       currentInstallations = S.safeArray(installations);
+      desktop.update(nextProvider, currentInstallations, nextContext.busy);
       context.canConnect = !!nextContext.canConnect; context.busy = !!nextContext.busy;
       context.acceptReplacement = nextContext.acceptReplacement !== false;
       qoderSettings.update(nextProvider, currentInstallations, {
@@ -246,9 +259,15 @@
       status.textContent = stateLabel(nextProvider, primary, isConnectedValue);
       status.className = "status-badge " + stateTone(nextProvider, primary, isConnectedValue);
       detail.textContent = operation ? operation.message : rowDetail(nextProvider, scoped, primary, isConnectedValue);
+      if (desktop.nativeMode()) {
+        status.textContent = desktop.connected() ? "已连接" : "等待桌面连接";
+        status.className = "status-badge " + (desktop.connected() ? "success" : "neutral");
+        detail.textContent = "DSH 原生桌面会话";
+      }
       fields.hidden = !nextProvider.requiresConfiguration || (!isConnectedValue && !!nextProvider.discoveredConfigurationPath)
         || (!primary && discoveryState(nextProvider) === "not_found");
-      providerDetail.textContent = providerDetailText(nextProvider, scoped);
+      providerDetail.textContent = desktop.nativeMode()
+        ? "使用 DSH 桌面已登录的账号和原生会话。" : providerDetailText(nextProvider, scoped);
       providerDetail.hidden = !providerDetail.textContent;
       if (isConnectedValue && configPanel.parentNode !== detailsBody) {
         detailsBody.insertBefore(configPanel, detailsBody.firstChild.nextSibling);
@@ -323,7 +342,8 @@
       control.addEventListener("compositionend", refreshAction);
     });
     action.addEventListener("click", function () {
-      if (actionMode === "review") reviewConfirmation.open();
+      if (actionMode === "desktop") desktop.connect();
+      else if (actionMode === "review") reviewConfirmation.open();
       else if (actionMode === "connect") {
         if (HeadlessConsent.required(currentProvider)) headlessConfirmation.open();
         else sendConnect(action, false);
@@ -343,7 +363,8 @@
   function hasValue(value) { return !!value && value.trim().length > 0; }
   function isConnected(item) { return item && item.enabled === true && item.availability === "available"; }
   function primaryInstallation(items) {
-    return items.find(isConnected)
+    return items.find(function (item) { return item.isActive === true; })
+      || items.find(isConnected)
       || items.find(function (item) { return item.availability === "needs_review"; })
       || items.find(function (item) { return item.availability === "available"; })
       || items[0] || null;

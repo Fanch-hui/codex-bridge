@@ -11,6 +11,7 @@ readonly resource_specs=(
   "BridgeCore_BridgeDeepSeekHarnessACP.bundle:cordis.yml"
   "BridgeCore_BridgePiRPC.bundle:PiBridgeExtension/index.mjs"
   "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs"
+  "BridgeCore_BridgeDeepSeekHarnessDesktop.bundle:DSHDesktopConnector/index.mjs"
 )
 temporary_root="$(/usr/bin/mktemp -d "${TARGET_BUILD_DIR}/.codex-bridge-service-resources.XXXXXX")"
 readonly temporary_root

@@ -6,14 +6,17 @@ public struct BridgeDesktopNativeSessionInstallation: Codable, Equatable, Sendab
   public let providerID: String
   public let displayName: String
   public let region: String?
+  public let operations: [String]?
 
   public init(
-    installationID: String, providerID: String, displayName: String, region: String? = nil
+    installationID: String, providerID: String, displayName: String, region: String? = nil,
+    operations: [String]? = nil
   ) {
     self.installationID = installationID
     self.providerID = providerID
     self.displayName = displayName
     self.region = region
+    self.operations = operations
   }
 }
 

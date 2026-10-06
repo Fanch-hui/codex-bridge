@@ -20,12 +20,15 @@ extension ServiceAgentRegistry {
     projectRoot: String? = nil,
     selectedModelID: String? = nil,
     forceRefresh: Bool = false,
-    requireSelectedModel: Bool = true
+    requireSelectedModel: Bool = true,
+    runtimeBinding: AgentRuntimeBinding? = nil
   ) async throws -> [AgentModelDescriptor] {
     guard let stored = try await store.agentInstallation(id: installationID) else {
       throw ServiceStoreError.unknownAgentInstallation(installationID)
     }
-    guard stored.isSelectable else {
+    var runtimeBinding = runtimeBinding
+    if runtimeBinding == nil { runtimeBinding = try await selectedRuntimeBinding(for: stored) }
+    guard stored.isSelectable || (stored.isEnabled && runtimeBinding != nil) else {
       if stored.availability == .needsReview {
         throw ServiceAgentRegistryError.installationNeedsReview(installationID)
       }
@@ -35,7 +38,7 @@ extension ServiceAgentRegistry {
     let storedKey = ServiceAgentModelCatalogCacheKey(
       installationID: installationID,
       projectRoot: projectRoot,
-      fingerprint: modelCatalogFingerprint(for: stored)
+      fingerprint: modelCatalogFingerprint(for: stored, runtimeBinding: runtimeBinding)
     )
     if !forceRefresh,
       let cached = freshModelCatalog(for: storedKey)
@@ -43,25 +46,28 @@ extension ServiceAgentRegistry {
       return try await resolveSelectedModel(
         installationID: installationID, projectRoot: projectRoot,
         selectedModelID: selectedModelID, requireSelectedModel: requireSelectedModel,
-        key: storedKey, models: cached)
+        key: storedKey, models: cached, runtimeBinding: runtimeBinding)
     }
 
-    let record = try await validateForExecution(installationID: installationID)
+    let record = try await validateForRuntimeBinding(
+      installationID: installationID,
+      projectRoot: projectRoot, runtimeBinding: runtimeBinding)
     let key = ServiceAgentModelCatalogCacheKey(
       installationID: installationID,
       projectRoot: projectRoot,
-      fingerprint: modelCatalogFingerprint(for: record)
+      fingerprint: modelCatalogFingerprint(for: record, runtimeBinding: runtimeBinding)
     )
     let models: [AgentModelDescriptor]
     if !forceRefresh, let cached = freshModelCatalog(for: key) {
       models = cached
     } else {
-      models = try await sharedModelCatalog(record: record, projectRoot: projectRoot, key: key)
+      models = try await sharedModelCatalog(
+        record: record, projectRoot: projectRoot, key: key, runtimeBinding: runtimeBinding)
     }
     return try await resolveSelectedModel(
       installationID: installationID, projectRoot: projectRoot,
       selectedModelID: selectedModelID, requireSelectedModel: requireSelectedModel,
-      key: key, models: models)
+      key: key, models: models, runtimeBinding: runtimeBinding)
   }
 
   private func freshModelCatalog(
@@ -76,12 +82,14 @@ extension ServiceAgentRegistry {
   private func sharedModelCatalog(
     record: ServiceAgentInstallationRecord,
     projectRoot: String?,
-    key: ServiceAgentModelCatalogCacheKey
+    key: ServiceAgentModelCatalogCacheKey,
+    runtimeBinding: AgentRuntimeBinding?
   ) async throws -> [AgentModelDescriptor] {
     if let task = modelCatalogInFlight[key] { return try await task.value }
     let task = Task { [self] in
       let fetched = try await providerModels(
-        record: record, projectRoot: projectRoot, selectedModelID: nil)
+        record: record, projectRoot: projectRoot, selectedModelID: nil,
+        runtimeBinding: runtimeBinding)
       let models = mergeModelDescriptors([], fetched)
       modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: models, createdAt: now())
       return models
@@ -97,17 +105,21 @@ extension ServiceAgentRegistry {
     selectedModelID: String?,
     requireSelectedModel: Bool,
     key: ServiceAgentModelCatalogCacheKey,
-    models: [AgentModelDescriptor]
+    models: [AgentModelDescriptor],
+    runtimeBinding: AgentRuntimeBinding?
   ) async throws -> [AgentModelDescriptor] {
     guard let selectedModelID else { return models }
-    let selected = models.first(where: { $0.id == selectedModelID })
+    let selected = AgentModelMatcher.match(selectedModelID, in: models)
     guard
       selected?.reasoningCapabilitiesAvailable == false
         || (selected == nil && requireSelectedModel)
     else { return models }
-    let record = try await validateForExecution(installationID: installationID)
+    let record = try await validateForRuntimeBinding(
+      installationID: installationID,
+      projectRoot: projectRoot, runtimeBinding: runtimeBinding)
     let resolved = try await fetchAndMergeSelectedModel(
-      record: record, projectRoot: projectRoot, selectedModelID: selectedModelID, into: models)
+      record: record, projectRoot: projectRoot, selectedModelID: selected?.id ?? selectedModelID,
+      into: models, runtimeBinding: runtimeBinding)
     // Another caller may have resolved a different selection during this await.
     let merged = mergeModelDescriptors(modelCatalogCache[key]?.models ?? [], resolved)
     modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: merged, createdAt: now())
@@ -118,13 +130,15 @@ extension ServiceAgentRegistry {
     record: ServiceAgentInstallationRecord,
     projectRoot: String?,
     selectedModelID: String,
-    into cached: [AgentModelDescriptor]
+    into cached: [AgentModelDescriptor],
+    runtimeBinding: AgentRuntimeBinding?
   ) async throws -> [AgentModelDescriptor] {
     do {
       let fetched = try await providerModels(
         record: record,
         projectRoot: projectRoot,
-        selectedModelID: selectedModelID
+        selectedModelID: selectedModelID,
+        runtimeBinding: runtimeBinding
       )
       return mergeModelDescriptors(cached, fetched)
     } catch {
@@ -135,13 +149,15 @@ extension ServiceAgentRegistry {
   private func providerModels(
     record: ServiceAgentInstallationRecord,
     projectRoot: String?,
-    selectedModelID: String?
+    selectedModelID: String?,
+    runtimeBinding: AgentRuntimeBinding?
   ) async throws -> [AgentModelDescriptor] {
     let provider = try provider(for: record.providerID)
     return try await provider.models(
       installation: try record.agentInstallation(),
       projectRoot: projectRoot,
-      selectedModelID: selectedModelID
+      selectedModelID: selectedModelID,
+      runtimeBinding: runtimeBinding
     )
   }
 
@@ -149,7 +165,7 @@ extension ServiceAgentRegistry {
     _ modelID: String,
     in models: [AgentModelDescriptor]
   ) throws -> [AgentModelDescriptor] {
-    guard models.contains(where: { $0.id == modelID }) else {
+    guard AgentModelMatcher.match(modelID, in: models) != nil else {
       throw AgentRuntimeError.modelUnavailable(modelID)
     }
     return models
@@ -183,6 +199,7 @@ extension ServiceAgentRegistry {
       (try? AgentModelDescriptor(
         id: incoming.id,
         displayName: incoming.displayName,
+        compatibleModelIDs: incoming.compatibleModelIDs,
         supportedReasoningEfforts: incoming.supportedReasoningEfforts,
         defaultReasoningEffort: incoming.defaultReasoningEffort,
         reasoningCapabilitiesAvailable: incoming.reasoningCapabilitiesAvailable,
@@ -192,7 +209,10 @@ extension ServiceAgentRegistry {
       )) ?? incoming
   }
 
-  private func modelCatalogFingerprint(for record: ServiceAgentInstallationRecord) -> String {
+  private func modelCatalogFingerprint(
+    for record: ServiceAgentInstallationRecord,
+    runtimeBinding: AgentRuntimeBinding?
+  ) -> String {
     let executable = record.executableIdentity
     let artifacts = record.artifacts.map { artifact in
       let identity = artifact.identity
@@ -207,6 +227,8 @@ extension ServiceAgentRegistry {
       ].joined(separator: ":")
     }.joined(separator: "|")
     return [
+      runtimeBinding?.connectionMode.rawValue ?? "",
+      runtimeBinding?.profileID ?? "",
       record.providerID.rawValue,
       String(record.adapterRevision),
       record.lastProbedAt.map { String($0.timeIntervalSince1970) } ?? "",

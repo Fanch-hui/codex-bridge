@@ -8,7 +8,8 @@ extension SimpleServiceStore {
     _ task: ServiceTaskRecord,
     event: ServiceTaskEventDraft,
     handoffID: String? = nil,
-    attachments: [AgentImageAttachment] = []
+    attachments: [AgentImageAttachment] = [],
+    runtimeBinding: AgentRuntimeBinding? = nil
   ) throws -> ServiceTaskCreationResult {
     guard event.kind == .taskCreated,
       event.createdAt == task.updatedAt,
@@ -44,6 +45,7 @@ extension SimpleServiceStore {
           throw ServiceStoreError.activeWriteTaskExists(task.projectID)
         }
         try insertTask(task, in: db)
+        try Self.insertRuntimeBinding(runtimeBinding, taskID: task.id, in: db)
         try Self.insertTaskAttachments(attachments, taskID: task.id, in: db)
         if task.isQueued {
           try db.execute(

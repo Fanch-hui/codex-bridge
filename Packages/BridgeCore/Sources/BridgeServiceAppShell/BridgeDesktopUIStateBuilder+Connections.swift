@@ -25,7 +25,14 @@ extension BridgeDesktopUIStateBuilder {
       canManageDeepSeekHarnessMCP: model.connectionState == .connected,
       selectedAgentMCPScope: model.selectedAgentMCPScope,
       agentMCPScopeOptions: BridgeDesktopAgentMCPScope.allCases.map(\.choice),
-      providers: model.agentProviders.map(providerRow),
+      providers: model.agentProviders.map { provider in
+        let candidates = model.agentInstallations.filter { $0.providerID == provider.providerID }
+        let desktop =
+          candidates.first { $0.isActive == true }
+          .flatMap { model.deepSeekDesktopStates[$0.installationID] }
+          ?? candidates.compactMap { model.deepSeekDesktopStates[$0.installationID] }.first
+        return providerRow(provider, desktop: desktop)
+      },
       installations: model.agentInstallations.map {
         installationRow(
           $0, canManage: model.connectionState == .connected && !model.isManagingAgents)
@@ -34,7 +41,7 @@ extension BridgeDesktopUIStateBuilder {
         && !model.isManagingAgents
         && !model.agentProviders.isEmpty,
       canScanAgents: model.connectionState == .connected,
-      isManagingAgents: model.isManagingAgents,
+      isManagingAgents: model.isManagingAgents || model.deepSeekDesktopBusy,
       agentOperationRevision: model.agentOperationRevision,
       setupOperations: model.agentSetupOperations.map(agentSetupState),
       statusMessage: ServiceStatusPresentation.connectionMessage(
@@ -205,7 +212,8 @@ extension BridgeDesktopUIStateBuilder {
   }
 
   private static func providerRow(
-    _ provider: IPCAgentProviderSummary
+    _ provider: IPCAgentProviderSummary,
+    desktop: BridgeDesktopDeepSeekHarnessDesktopState? = nil
   ) -> BridgeDesktopAgentProviderRow {
     let detail = [
       provider.workspaceEnforcement,
@@ -229,7 +237,8 @@ extension BridgeDesktopUIStateBuilder {
       supportsEffortSelection: provider.supportsEffortSelection,
       supportsSteer: provider.supportsSteer,
       supportsWorkspaceWrite: provider.supportsWorkspaceWrite,
-      detail: detail.isEmpty ? nil : detail
+      detail: detail.isEmpty ? nil : detail,
+      desktop: desktop
     )
   }
 
@@ -249,8 +258,10 @@ extension BridgeDesktopUIStateBuilder {
       trustProfile: installation.trustProfile,
       securityProfileID: installation.securityProfileID,
       enabled: installation.isEnabled,
+      isActive: installation.isActive,
       availability: installation.availability,
       effectiveCapabilities: installation.effectiveCapabilities,
+      nativeSessionOperations: installation.nativeSessionOperations,
       lastProbeError: installation.lastProbeError,
       lastProbedAt: installation.lastProbedAt,
       updatedAt: installation.updatedAt,

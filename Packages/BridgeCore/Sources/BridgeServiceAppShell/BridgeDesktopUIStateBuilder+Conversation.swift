@@ -58,6 +58,7 @@ extension BridgeDesktopUIStateBuilder {
         providerSupportsSteer: model.agentProviders.first { $0.providerID == task.providerID }?
           .supportsSteer == true
       ),
+      canOpenNativeSession: task.canOpenNativeSession,
       permissionRemediation: permissionRemediation(for: task, model: model),
       turnCount: session?.turnCount ?? 1,
       canResume: canResume(task, model: model),

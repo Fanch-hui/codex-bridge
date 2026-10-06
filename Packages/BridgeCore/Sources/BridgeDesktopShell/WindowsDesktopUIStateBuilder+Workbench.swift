@@ -65,7 +65,8 @@
           displayName: item.displayName,
           region: item.distribution,
           isEnabled: item.enabled,
-          availability: item.availability
+          availability: item.availability,
+          operations: item.nativeSessionOperations
         )
       }
       return BridgeDesktopNativeSessionDirectoryPresentation.state(

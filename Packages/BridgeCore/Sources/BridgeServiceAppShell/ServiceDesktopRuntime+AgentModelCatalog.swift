@@ -18,7 +18,8 @@ extension BridgeServiceAppModel {
     }
 
     updateAgentModelScope(
-      AgentModelCatalogScope(installationID: installationID, projectID: selectedProjectID),
+      agentModelScope(
+        installationID: installationID, projectID: selectedProjectID, providerID: providerID),
       providerID: providerID)
     incrementAgentModelCatalogGeneration(for: providerID)
     let catalogGeneration = agentModelCatalogGeneration(for: providerID)
@@ -101,8 +102,8 @@ extension BridgeServiceAppModel {
       guard catalogGeneration == agentModelCatalogGeneration(for: providerID),
         refreshGeneration == agentModelRefreshGeneration(for: providerID),
         agentModelCatalogScopes[providerID]
-          == AgentModelCatalogScope(
-            installationID: installationID, projectID: projectID),
+          == agentModelScope(
+            installationID: installationID, projectID: projectID, providerID: providerID),
         selectedProjectID == projectID
       else { return }
       let correctedDefault = try await correctAgentModelDefaultIfNeeded(
@@ -151,7 +152,8 @@ extension BridgeServiceAppModel {
     )
     let response: IPCAgentModelsResponse
     if let defaultModel, !defaultWasRemoved,
-      catalogResponse.models.first(where: { $0.modelID == defaultModel })?
+      AgentModelCatalogResolver.modelForSelection(
+        modelID: defaultModel, models: catalogResponse.models)?
         .reasoningCapabilitiesAvailable == false
     {
       response = try await client.agentModels(
@@ -180,14 +182,19 @@ extension BridgeServiceAppModel {
     defaultRevision: UInt64,
     client: any BridgeServiceClientProtocol
   ) async throws -> IPCAgentModelDefaultResponse? {
-    guard resolution.defaultWasRemoved || resolution.effortWasRemoved,
+    if providerID == "pi", resolution.defaultWasRemoved { return nil }
+    guard
+      resolution.defaultWasRemoved || resolution.effortWasRemoved
+        || resolution.canonicalDefaultModelID != persistedDefault.model,
       defaultRevision == agentModelDefaultRevision(for: providerID)
     else { return nil }
     return try await client.setAgentDefaults(
       providerID: providerID,
-      model: resolution.defaultWasRemoved ? nil : persistedDefault.model,
+      model: resolution.defaultWasRemoved
+        ? nil : resolution.canonicalDefaultModelID ?? persistedDefault.model,
       permissionMode: persistedDefault.permissionMode,
-      effort: nil
+      effort: resolution.defaultWasRemoved || resolution.effortWasRemoved
+        ? nil : persistedDefault.effort
     )
   }
 
@@ -214,6 +221,13 @@ extension BridgeServiceAppModel {
       incrementAgentModelDefaultRevision(for: providerID)
     }
     applyAgentModelDefault(finalDefault, providerID: providerID)
+    if providerID == "pi", resolution.defaultWasRemoved {
+      setAgentModelRefreshError(
+        AgentModelDefaultResolutionError.piModelUnavailable(modelID: persistedDefault.model)
+          .errorDescription, providerID: providerID
+      )
+      return
+    }
 
     let message: String
     if resolution.addedCount == 0, resolution.removedCount == 0 {

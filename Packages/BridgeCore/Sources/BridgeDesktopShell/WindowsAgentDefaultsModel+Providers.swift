@@ -120,6 +120,14 @@
         )
         catalogScopes[providerID] = ModelCatalogScope(
           installationID: installation?.installationID, projectID: projectID)
+        if providerID == "pi", resolution.defaultWasRemoved {
+          providerErrors[providerID] =
+            AgentModelDefaultResolutionError.piModelUnavailable(modelID: persistedDefault.model)
+            .errorDescription
+          statusText = providerErrors[providerID] ?? "Pi 已保存模型暂不可用。"
+          publishDisplay()
+          return
+        }
         providerErrors[providerID] = nil
         if resolution.addedCount == 0, resolution.removedCount == 0 {
           statusText = "已加载 \(provider.displayName) 的 \(resolution.response.models.count) 个模型。"
@@ -149,7 +157,8 @@
     ) async throws -> IPCAgentModelsResponse {
       guard !defaultWasRemoved,
         let modelID = persistedDefault.model,
-        catalogResponse.models.first(where: { $0.modelID == modelID })?
+        AgentModelCatalogResolver.modelForSelection(
+          modelID: modelID, models: catalogResponse.models)?
           .reasoningCapabilitiesAvailable != true
       else { return catalogResponse }
       let detailed = try await loadModels(
@@ -169,14 +178,20 @@
       persistedDefault: IPCAgentModelDefaultResponse,
       resolution: AgentModelCatalogResolution
     ) async throws -> IPCAgentModelDefaultResponse {
-      guard resolution.defaultWasRemoved || resolution.effortWasRemoved else {
+      if providerID == "pi", resolution.defaultWasRemoved { return persistedDefault }
+      guard
+        resolution.defaultWasRemoved || resolution.effortWasRemoved
+          || resolution.canonicalDefaultModelID != persistedDefault.model
+      else {
         return persistedDefault
       }
       return try await client.setAgentDefaults(
         providerID: providerID,
-        model: resolution.defaultWasRemoved ? nil : persistedDefault.model,
+        model: resolution.defaultWasRemoved
+          ? nil : resolution.canonicalDefaultModelID ?? persistedDefault.model,
         permissionMode: persistedDefault.permissionMode,
-        effort: nil
+        effort: resolution.defaultWasRemoved || resolution.effortWasRemoved
+          ? nil : persistedDefault.effort
       )
     }
 

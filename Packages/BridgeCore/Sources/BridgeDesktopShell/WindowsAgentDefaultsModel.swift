@@ -33,6 +33,7 @@
     var saveTasks: [String: Task<Void, Never>] = [:]
     var savingProviderIDs: Set<String> = []
     var workbenchProjectID: String?
+    var deepSeekDesktopModelScope: String?
     var nativePermissionPolicy: IPCAgentNativePermissionPolicyResponse?
     var nativePermissionInstallationID: String?
     var nativePermissionLoading = false
@@ -88,6 +89,7 @@
         providers = catalog.providers
         installations = catalog.installations
         reconcileSelection()
+        await refreshDeepSeekModelScope()
       } catch {
         statusText = "Agent 默认设置读取失败：\(BridgeServiceErrorMessage.message(error))"
         busy = false
@@ -134,9 +136,10 @@
             && $0.isEnabled && $0.availability == "available" && $0.providerID == target
         })
       }
-      return installations.first {
+      let candidates = installations.filter {
         $0.isEnabled && $0.availability == "available" && $0.providerID == target
       }
+      return candidates.first { $0.isActive == true } ?? candidates.first
     }
 
     private func reconcileSelection() {

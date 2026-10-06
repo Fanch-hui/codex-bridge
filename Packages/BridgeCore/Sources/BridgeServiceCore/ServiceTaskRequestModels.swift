@@ -33,6 +33,7 @@ public struct ServiceTaskRequest: Equatable, Sendable {
   public let queueIfBusy: Bool
   public let attachments: [AgentImageAttachment]
   public let selectedSkills: [AgentSelectedSkill]
+  public let runtimeBinding: AgentRuntimeBinding?
 
   public init(
     projectID: ProjectID,
@@ -54,7 +55,8 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     fastMode: Bool = false,
     queueIfBusy: Bool = false,
     attachments: [AgentImageAttachment] = [],
-    selectedSkills: [AgentSelectedSkill] = []
+    selectedSkills: [AgentSelectedSkill] = [],
+    runtimeBinding: AgentRuntimeBinding? = nil
   ) {
     self.projectID = projectID
     self.source = source
@@ -75,5 +77,6 @@ public struct ServiceTaskRequest: Equatable, Sendable {
     self.queueIfBusy = queueIfBusy
     self.attachments = attachments
     self.selectedSkills = selectedSkills
+    self.runtimeBinding = runtimeBinding
   }
 }

@@ -117,9 +117,10 @@ extension BridgeDesktopUIStateBuilder {
     from model: BridgeServiceAppModel
   ) -> [BridgeDesktopAgentDefaultState] {
     model.agentProviders.map { provider in
-      let installation = model.agentInstallations.first {
+      let candidates = model.agentInstallations.filter {
         $0.providerID == provider.providerID && $0.isEnabled && $0.availability == "available"
       }
+      let installation = candidates.first { $0.isActive == true } ?? candidates.first
       let defaultValue = model.agentModelDefault(for: provider.providerID)
       let options = model.agentModelOptions(for: provider.providerID)
       let selected = model.agentSelectedModel(for: provider.providerID)
@@ -138,6 +139,7 @@ extension BridgeDesktopUIStateBuilder {
       return BridgeDesktopAgentDefaultState(
         providerID: provider.providerID,
         providerName: provider.displayName,
+        connectionMode: defaultValue.connectionMode,
         installationID: installation?.installationID,
         installationName: installation?.displayName,
         model: defaultValue.model,

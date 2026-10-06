@@ -14,6 +14,8 @@ struct ServiceAgentSubmissionContext: Sendable {
   let resolvedModel: String?
   let requestedEffort: String?
   let configuredEffort: String?
+  let runtimeBinding: AgentRuntimeBinding?
+  let preservesNativeSessionModel: Bool
 }
 
 extension BridgeServiceApplication {
@@ -33,14 +35,26 @@ extension BridgeServiceApplication {
     let registry = try requiredAgentRegistry()
     let selectable =
       try await registry.installations(providerID: providerID)
-      .filter { $0.isSelectable }
+      .filter { $0.isSelectable || (providerID == .deepSeekHarness && $0.isEnabled) }
       .sorted { $0.id.rawValue < $1.id.rawValue }
-    let record = try await selectAgentInstallation(
+    var record = try await selectAgentInstallation(
       providerID: providerID,
       requested: submission.installationID,
       selectable: selectable,
       deadline: deadline
     )
+    let runtimeBinding = try await deepSeekSubmissionRuntimeBinding(
+      submission: submission, record: record, project: project)
+    if let runtimeBinding {
+      record = try await registry.validateForRuntimeBinding(
+        installationID: record.id,
+        projectRoot: project.root.canonicalPath, runtimeBinding: runtimeBinding)
+      if runtimeBinding.connectionMode == .nativeDesktop {
+        guard submission.attachmentPaths?.isEmpty != false,
+          submission.skillName == nil, submission.skillNames?.isEmpty != false
+        else { throw BridgeMCPQueryError.contractRejected }
+      }
+    }
     let defaults: ServiceAgentDefaultSettings
     if providerID == .qoder {
       guard let distribution = try await qoderDistribution(for: record) else {
@@ -49,7 +63,12 @@ extension BridgeServiceApplication {
       defaults = try ServiceAgentDefaultSettings.descriptor(
         for: policy.providerID, distribution: distribution)
     } else {
-      defaults = try ServiceAgentDefaultSettings.descriptor(for: policy.providerID)
+      defaults = try ServiceAgentDefaultSettings.descriptor(
+        for: policy.providerID,
+        connectionMode: runtimeBinding?.connectionMode ?? .acp)
+    }
+    if runtimeBinding?.connectionMode == .nativeDesktop {
+      try await refreshDeepSeekDesktopDefaults(installation: record.agentInstallation())
     }
     let configuredModel = try await settings.string(for: defaults.modelKey)
     let configuredEffort =
@@ -69,7 +88,9 @@ extension BridgeServiceApplication {
       policy: policy, registry: registry, record: record, defaults: defaults,
       permission: permission, supportsModelSelection: supportsModelSelection,
       resolvedModel: resolvedModel, requestedEffort: requestedEffort,
-      configuredEffort: configuredEffort)
+      configuredEffort: configuredEffort, runtimeBinding: runtimeBinding,
+      preservesNativeSessionModel: runtimeBinding?.connectionMode == .nativeDesktop
+        && submission.threadID != nil && submission.modelOverride != true)
   }
 
   private static func agentSubmissionOverrides(
