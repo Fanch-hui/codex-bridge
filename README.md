@@ -8,22 +8,22 @@ Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 C
 
 macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目目录授权、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 [v1.4.3](./docs/RELEASE_NOTES_v1.4.3.md)。
+当前版本为 [v1.4.4](./docs/RELEASE_NOTES_v1.4.4.md)。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v1.4.3 安装包 | 安装方式 |
+| 平台 | v1.4.4 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-1.4.3-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| macOS 14+，Intel | `CodexBridge-1.4.3-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-1.4.3-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.3-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-1.4.4-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-1.4.4-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-1.4.4-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-1.4.4-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.3.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.3.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.4.3.tar.gz` / `codex-bridge-linux-arm64-1.4.3.tar.gz` | 完整解压后运行 `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-1.4.4.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-1.4.4.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-1.4.4.tar.gz` / `codex-bridge-linux-arm64-1.4.4.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 

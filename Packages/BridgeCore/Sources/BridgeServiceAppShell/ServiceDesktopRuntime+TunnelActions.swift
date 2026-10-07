@@ -16,6 +16,15 @@ extension BridgeServiceAppModel {
     }
   }
 
+  public func setTunnelHTTPProxy(_ httpProxy: String?) {
+    runMutation { [weak self] client in
+      guard let self else { return }
+      _ = try await client.setTunnelHTTPProxy(IPCTunnelHTTPProxyRequest(httpProxy: httpProxy))
+      await self.refresh(silent: true, includeCatalog: false)
+      self.postToast("Tunnel 代理配置已保存。")
+    }
+  }
+
   public func connectTunnel() {
     runMutation { [weak self] client in
       guard let self else { return }

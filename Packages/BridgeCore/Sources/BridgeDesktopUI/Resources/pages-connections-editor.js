@@ -50,6 +50,38 @@
       }
     };
   }
+  function createTunnelHTTPProxyForm(emit) {
+    var context = { emit: emit, canSetHTTPProxy: false, httpProxy: "" };
+    var form = S.node("div", "form-grid");
+    var proxy = S.textField("Tunnel HTTP(S) 代理（可选）", "", "http://127.0.0.1:7897");
+    proxy.control.autocomplete = "off";
+    form.appendChild(proxy.wrapper);
+    form.appendChild(S.node("div", "form-guide-note full",
+      "留空直接连接。填写 HTTP(S) 代理地址，不含账号、密码、路径、查询参数或片段，仅用于 Tunnel 控制面；系统代理和环境变量不会自动采用。保存后会重新连接已启用的 Tunnel。"));
+    var draft = D.bind({ httpProxy: proxy.control });
+    var actions = S.node("div", "form-actions full");
+    var save = S.button("保存代理", null, {}, null, "small", true);
+    actions.appendChild(save);
+    form.appendChild(actions);
+    function validate() {
+      save.disabled = !context.canSetHTTPProxy || proxy.control.value.trim() === context.httpProxy;
+    }
+    proxy.control.addEventListener("input", validate);
+    proxy.control.addEventListener("compositionend", validate);
+    save.addEventListener("click", function () {
+      if (!save.disabled) {
+        context.emit("setTunnelHTTPProxy", { httpProxy: draft.values().httpProxy.trim() || null });
+      }
+    });
+    return { root: form, update: function (tunnel, nextEmit) {
+      context.emit = nextEmit;
+      context.canSetHTTPProxy = tunnel.canSetHTTPProxy === true;
+      context.httpProxy = tunnel.httpProxy || "";
+      draft.update({ httpProxy: context.httpProxy });
+      proxy.control.disabled = !context.canSetHTTPProxy;
+      validate();
+    } };
+  }
   function createAgentRegistration(emit) {
     var context = { emit: emit, providers: [], enabled: false };
     var wrapper = S.node("div", "page-message");
@@ -208,6 +240,7 @@
   }
   global.CodexBridgeDesktopConnectionsEditors = {
     createTunnelForm: createTunnelForm,
+    createTunnelHTTPProxyForm: createTunnelHTTPProxyForm,
     createClients: global.CodexBridgeDesktopConnectionsClients.create,
     createAgentRegistration: createAgentRegistration
   };

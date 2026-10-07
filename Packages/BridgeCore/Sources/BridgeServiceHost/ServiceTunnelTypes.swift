@@ -10,6 +10,7 @@ public struct ServiceTunnelSnapshot: Equatable, Sendable {
   public let lifecycle: TunnelLifecycle
   public let acceptsRemoteSubmissions: Bool
   public let actionRequired: Bool
+  public let httpProxy: String?
 
   public init(
     configured: Bool,
@@ -18,7 +19,8 @@ public struct ServiceTunnelSnapshot: Equatable, Sendable {
     tunnelID: String?,
     lifecycle: TunnelLifecycle,
     acceptsRemoteSubmissions: Bool,
-    actionRequired: Bool
+    actionRequired: Bool,
+    httpProxy: String? = nil
   ) {
     self.configured = configured
     self.enabled = enabled
@@ -27,9 +29,13 @@ public struct ServiceTunnelSnapshot: Equatable, Sendable {
     self.lifecycle = lifecycle
     self.acceptsRemoteSubmissions = acceptsRemoteSubmissions
     self.actionRequired = actionRequired
+    self.httpProxy = httpProxy
   }
 
-  public static func unconfigured(helperAvailable: Bool) -> ServiceTunnelSnapshot {
+  public static func unconfigured(
+    helperAvailable: Bool,
+    httpProxy: String? = nil
+  ) -> ServiceTunnelSnapshot {
     ServiceTunnelSnapshot(
       configured: false,
       enabled: false,
@@ -37,7 +43,8 @@ public struct ServiceTunnelSnapshot: Equatable, Sendable {
       tunnelID: nil,
       lifecycle: .stopped,
       acceptsRemoteSubmissions: false,
-      actionRequired: false
+      actionRequired: false,
+      httpProxy: httpProxy
     )
   }
 }
@@ -51,6 +58,7 @@ public enum ServiceTunnelError: Error, Equatable, LocalizedError, Sendable {
   case secretStoreUnavailable
   case serviceStopped
   case startFailed
+  case httpProxyUnsupported
 
   public var errorDescription: String? {
     switch self {
@@ -70,6 +78,8 @@ public enum ServiceTunnelError: Error, Equatable, LocalizedError, Sendable {
       "The background Service is stopping."
     case .startFailed:
       "Secure MCP Tunnel could not start."
+    case .httpProxyUnsupported:
+      "The Tunnel manager does not support an HTTP proxy."
     }
   }
 }
@@ -93,4 +103,30 @@ public protocol ServiceTunnelManagerBuilding: Sendable {
     localMCPURL: URL,
     localMCPHeaderSecret: String
   ) async throws -> any ServiceTunnelManaging
+
+  func make(
+    tunnelID: TunnelID,
+    runtimeKeyReference: SecretReference,
+    localMCPURL: URL,
+    localMCPHeaderSecret: String,
+    httpProxy: TunnelHTTPProxy?
+  ) async throws -> any ServiceTunnelManaging
+}
+
+extension ServiceTunnelManagerBuilding {
+  public func make(
+    tunnelID: TunnelID,
+    runtimeKeyReference: SecretReference,
+    localMCPURL: URL,
+    localMCPHeaderSecret: String,
+    httpProxy: TunnelHTTPProxy?
+  ) async throws -> any ServiceTunnelManaging {
+    guard httpProxy == nil else { throw ServiceTunnelError.httpProxyUnsupported }
+    return try await make(
+      tunnelID: tunnelID,
+      runtimeKeyReference: runtimeKeyReference,
+      localMCPURL: localMCPURL,
+      localMCPHeaderSecret: localMCPHeaderSecret
+    )
+  }
 }

@@ -90,7 +90,14 @@ extension BridgeServiceRequestController {
     if let error = error as? BridgeMCPQueryError {
       return mapMCPQueryError(error)
     }
-    if error is TunnelConfigurationError {
+    if let error = error as? TunnelConfigurationError {
+      if error == .invalidHTTPProxy {
+        return .init(
+          code: "invalid_tunnel_http_proxy",
+          message:
+            "The Tunnel HTTP proxy must be an HTTP(S) URL without credentials, path, query, or fragment."
+        )
+      }
       return .init(
         code: "invalid_tunnel_configuration",
         message: "The Tunnel configuration is invalid."
@@ -351,6 +358,8 @@ extension BridgeServiceRequestController {
       return .init(code: "tunnel_not_configured", message: error.localizedDescription)
     case .helperUnavailable:
       return .init(code: "tunnel_helper_unavailable", message: error.localizedDescription)
+    case .httpProxyUnsupported:
+      return .init(code: "tunnel_proxy_unsupported", message: error.localizedDescription)
     case .secretStoreUnavailable:
       return .init(code: "keychain_unavailable", message: error.localizedDescription)
     case .localMCPUnavailable, .serviceStopped, .startFailed:

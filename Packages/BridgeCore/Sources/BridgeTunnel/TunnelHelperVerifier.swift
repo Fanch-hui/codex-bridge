@@ -35,7 +35,13 @@ public protocol TunnelCodeSignatureVerifier: Sendable {
 
     public func verifyStatic(executableDescriptor: Int32) throws -> TunnelCodeIdentity {
       let requirement = try sameTeamRequirement()
-      let descriptorURL = URL(fileURLWithPath: "/dev/fd/\(executableDescriptor)")
+      var metadata = stat()
+      guard fstat(executableDescriptor, &metadata) == 0 else {
+        throw TunnelHelperError.signatureInvalid
+      }
+      // The inode reference keeps validation bound to the opened file. Security
+      // cannot resolve /dev/fd paths for some valid ad hoc signatures on macOS 27.
+      let descriptorURL = URL(fileURLWithPath: "/.vol/\(metadata.st_dev)/\(metadata.st_ino)")
       var code: SecStaticCode?
       guard
         SecStaticCodeCreateWithPath(descriptorURL as CFURL, [], &code) == errSecSuccess,

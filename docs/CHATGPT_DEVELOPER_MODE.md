@@ -1,6 +1,6 @@
 # ChatGPT 与 Secure MCP Tunnel 配置指南
 
-适用于 Codex Bridge v1.2.0 的 macOS 与 Windows 版本。完成顺序：准备 Bridge 并登记项目 → 创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 添加并启用插件 → 直接操作项目。
+适用于 Codex Bridge 的 macOS、Windows 与 Linux 版本。完成顺序：准备 Bridge 并登记项目 → 创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 添加并启用插件 → 直接操作项目。
 
 **如果只需要本地文件读写、运行命令，配置好 Tunnel 并添加、启用 Codex Bridge 插件即可，无需安装或连接 Agent，也无需配置 Agent 模型。** 操作由 Bridge 的 Direct Workspace 执行，按已登记的项目目录、Direct 执行规则与审批设置。需要委派 Agent 执行任务时，再连接相应 Agent。
 
@@ -67,6 +67,27 @@ Runtime Key 由后台 Service 存入 macOS Keychain 或 Windows Credential Manag
 | `stopped` | 需要使用时点击重新连接 |
 
 “Helper 就绪”只说明组件可用；以 Tunnel `ready` 和接收状态判断连接结果。主动断开会停止重连。“清除配置”清除本机配置和密钥，平台上的 Tunnel 与 API Key 仍由平台管理。
+
+### Tunnel 代理
+
+需要代理才能访问 OpenAI 时，在同一连接详情页的 **Tunnel HTTP(S) 代理（可选）** 中填写完整地址，例如 `http://127.0.0.1:7897`，点击 **保存代理**。地址必须对应正在运行的 HTTP 或 HTTPS 代理端口；SOCKS 端口不适用。地址不接受账号、密码、路径、查询参数或片段。留空并保存即可恢复直接连接。
+
+代理配置可在填写 Tunnel ID 与 Runtime Key 前保存，也可单独修改已有连接，无需重新输入 Key。保存会重新连接已启用的 Tunnel；未启用的 Tunnel 保持断开。清除 Tunnel 配置会同时清除代理地址。
+
+Bridge 显式传递 helper 的 `control-plane.http-proxy`，只影响 OpenAI 控制面请求。本机 MCP 仍使用回环直连。三平台均不自动采用系统代理、PAC 或父进程的代理环境变量。参数契约见 [官方 helper 代理配置源码](https://github.com/openai/tunnel-client/blob/v0.0.10/pkg/config/proxy.go) 与 [代理传输源码](https://github.com/openai/tunnel-client/blob/v0.0.10/pkg/transport/proxy.go)。
+
+### 连接失败时的最小诊断
+
+本地 MCP `ready`、helper 的 `doctor` 通过或 `/readyz` 成功，只能证明本地检查通过。Bridge 的远端就绪还要求观测到近期成功轮询；成功时间为 0、缺失或过期时，不允许远端任务接收。
+
+反馈问题时可提供以下字段，保留错误类别并去除凭据：
+
+- Bridge/helper 版本、平台与架构、helper 是否存活、本地 MCP 状态和 Tunnel 状态。
+- 使用直接连接还是显式 HTTP(S) 代理；本机代理端口是否可达，无需公开完整代理地址。
+- 两次相隔约 10 秒的轮询次数、最近成功时间、timeout/other 错误计数，以及确实观测到的 HTTP 状态。
+- 错误属于 DNS、连接、TLS、超时、HTTP 状态错误还是未识别；公开前去除 URL、请求路径、响应正文和凭据。
+
+`last_poll_success=0` 表示本次 helper 尚无成功轮询；`other_errors` 包含多类失败；HTTP 状态为 `none` 表示未取得或未识别状态。单次 DNS/TCP 测试或这些计数均不足以确定代理、认证或服务端故障。不要公开 Runtime Key、本地 MCP Token、完整配置或未经脱敏的日志。
 
 ## 6. 在 ChatGPT 创建连接
 

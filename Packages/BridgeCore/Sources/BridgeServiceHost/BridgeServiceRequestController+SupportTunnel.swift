@@ -15,7 +15,8 @@ extension BridgeServiceRequestController {
       tunnelID: snapshot.tunnelID,
       lifecycle: snapshot.lifecycle.rawValue,
       acceptsRemoteSubmissions: snapshot.acceptsRemoteSubmissions,
-      actionRequired: snapshot.actionRequired
+      actionRequired: snapshot.actionRequired,
+      httpProxy: snapshot.httpProxy
     )
   }
 

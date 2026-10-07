@@ -203,6 +203,12 @@ extension BridgeServiceClient {
     )
   }
 
+  public func setTunnelHTTPProxy(
+    _ request: IPCTunnelHTTPProxyRequest
+  ) async throws -> IPCTunnelStatus {
+    try await call(operation: .setTunnelHTTPProxy, payload: request)
+  }
+
   public func disconnectTunnel() async throws {
     let _: IPCMutationResponse = try await call(
       operation: .disconnectTunnel,

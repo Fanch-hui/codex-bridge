@@ -66,6 +66,14 @@ enum ServiceRemoteFailurePresentation {
       "在连接页核对 Tunnel 配置并保存后重新连接。"
     ),
     (
+      ["invalid_tunnel_http_proxy"], "Tunnel 代理地址无效。",
+      "填写完整的 HTTP(S) 代理地址，不含账号、密码、路径、查询参数或片段；留空使用直接连接。"
+    ),
+    (
+      ["tunnel_proxy_unsupported"], "当前 Tunnel 组件不支持代理配置。",
+      "安装包含 Tunnel 代理支持的 Codex Bridge 版本后重新连接。"
+    ),
+    (
       ["tunnel_helper_unavailable"], "当前安装缺少可用的 Tunnel 组件。",
       "重新安装完整的 Codex Bridge 安装包。"
     ),

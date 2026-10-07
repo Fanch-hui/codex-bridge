@@ -76,6 +76,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case rotateMCPClientCredential = "rotate_mcp_client_credential"
   case rotateLocalMCPEndpoint = "rotate_local_mcp_endpoint"
   case configureTunnel = "configure_tunnel"
+  case setTunnelHTTPProxy = "set_tunnel_http_proxy"
   case connectTunnel = "connect_tunnel"
   case disconnectTunnel = "disconnect_tunnel"
   case clearTunnel = "clear_tunnel"

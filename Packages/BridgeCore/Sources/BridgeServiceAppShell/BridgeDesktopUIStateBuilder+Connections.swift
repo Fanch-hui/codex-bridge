@@ -128,10 +128,12 @@ extension BridgeDesktopUIStateBuilder {
       enabled: tunnel.enabled,
       helperAvailable: tunnel.helperAvailable,
       tunnelID: tunnel.tunnelID,
+      httpProxy: tunnel.httpProxy,
       lifecycle: tunnel.lifecycle,
       acceptsRemoteSubmissions: tunnel.acceptsRemoteSubmissions,
       actionRequired: tunnel.actionRequired,
       canConfigure: connected && tunnel.helperAvailable,
+      canSetHTTPProxy: connected,
       canConnect: connected && tunnel.configured && tunnel.helperAvailable && !tunnel.enabled,
       canDisconnect: connected && tunnel.enabled,
       canClear: connected && tunnel.configured

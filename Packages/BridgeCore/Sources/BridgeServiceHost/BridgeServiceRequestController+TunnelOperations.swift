@@ -3,6 +3,15 @@ import BridgeTunnel
 import Foundation
 
 extension BridgeServiceRequestController {
+  func handleSetTunnelHTTPProxy(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let payload = try BridgeServiceIPCCodec.payload(IPCTunnelHTTPProxyRequest.self, from: request)
+    let status = try await composition.setTunnelHTTPProxy(payload.httpProxy)
+    return try BridgeServiceIPCCodec.success(
+      requestID: request.requestID,
+      payload: Self.tunnelStatus(status)
+    )
+  }
+
   func handleConfigureTunnel(_ request: BridgeServiceIPCRequest) async throws -> Data {
     let payload = try BridgeServiceIPCCodec.payload(
       IPCTunnelConfigurationRequest.self,

@@ -63,6 +63,9 @@ extension BridgeDesktopCommandRouter {
       model.rotateLocalMCPEndpoint()
     case .configureTunnel:
       configureTunnel(payload, model: model)
+    case .setTunnelHTTPProxy:
+      guard connected(model) else { return }
+      model.setTunnelHTTPProxy(payload.httpProxy)
     case .connectTunnel:
       guard connected(model), tunnel(model)?.helperAvailable == true else { return }
       model.connectTunnel()

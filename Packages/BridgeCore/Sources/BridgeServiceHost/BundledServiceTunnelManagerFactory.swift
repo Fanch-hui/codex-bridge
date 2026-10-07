@@ -41,6 +41,22 @@ public struct BundledServiceTunnelManagerFactory: ServiceTunnelManagerBuilding {
     localMCPURL: URL,
     localMCPHeaderSecret: String
   ) async throws -> any ServiceTunnelManaging {
+    try await make(
+      tunnelID: tunnelID,
+      runtimeKeyReference: runtimeKeyReference,
+      localMCPURL: localMCPURL,
+      localMCPHeaderSecret: localMCPHeaderSecret,
+      httpProxy: nil
+    )
+  }
+
+  public func make(
+    tunnelID: TunnelID,
+    runtimeKeyReference: SecretReference,
+    localMCPURL: URL,
+    localMCPHeaderSecret: String,
+    httpProxy: TunnelHTTPProxy?
+  ) async throws -> any ServiceTunnelManaging {
     guard helperAvailable() else { throw ServiceTunnelError.helperUnavailable }
     let digest = try Self.readDigest(from: digestURL)
     let configuration = try TunnelConfiguration(
@@ -50,7 +66,8 @@ public struct BundledServiceTunnelManagerFactory: ServiceTunnelManagerBuilding {
       localMCPURL: localMCPURL,
       localMCPHeaderSecret: localMCPHeaderSecret,
       runtimeDirectory: runtimeDirectory,
-      expectedHelperSHA256: digest
+      expectedHelperSHA256: digest,
+      httpProxy: httpProxy
     )
     return TunnelManager(configuration: configuration, secretStore: secretStore)
   }

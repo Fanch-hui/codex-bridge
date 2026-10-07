@@ -69,6 +69,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setDeepSeekHarnessMCPServerEnabled
   case setAgentMCPScope
   case configureTunnel
+  case setTunnelHTTPProxy
   case connectTunnel
   case disconnectTunnel
   case clearTunnel
@@ -170,6 +171,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let target: String?
   public let toolPermission: String?
   public let runtimeKey: String?
+  public let httpProxy: String?
   public let executionModel: String?
   public let executionEffort: String?
   public let accessMode: String?
@@ -243,6 +245,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     target: String? = nil,
     toolPermission: String? = nil,
     runtimeKey: String? = nil,
+    httpProxy: String? = nil,
     executionModel: String? = nil,
     executionEffort: String? = nil,
     accessMode: String? = nil,
@@ -315,6 +318,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.target = target
     self.toolPermission = toolPermission
     self.runtimeKey = runtimeKey
+    self.httpProxy = httpProxy
     self.executionModel = executionModel
     self.executionEffort = executionEffort
     self.accessMode = accessMode

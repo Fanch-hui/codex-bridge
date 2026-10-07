@@ -5,10 +5,12 @@ public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
   public let enabled: Bool
   public let helperAvailable: Bool
   public let tunnelID: String?
+  public let httpProxy: String?
   public let lifecycle: String
   public let acceptsRemoteSubmissions: Bool
   public let actionRequired: Bool
   public let canConfigure: Bool
+  public let canSetHTTPProxy: Bool
   public let canConnect: Bool
   public let canDisconnect: Bool
   public let canClear: Bool
@@ -18,10 +20,12 @@ public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
     enabled: Bool,
     helperAvailable: Bool,
     tunnelID: String? = nil,
+    httpProxy: String? = nil,
     lifecycle: String,
     acceptsRemoteSubmissions: Bool,
     actionRequired: Bool,
     canConfigure: Bool = true,
+    canSetHTTPProxy: Bool = false,
     canConnect: Bool = false,
     canDisconnect: Bool = false,
     canClear: Bool = false
@@ -30,10 +34,12 @@ public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
     self.enabled = enabled
     self.helperAvailable = helperAvailable
     self.tunnelID = tunnelID
+    self.httpProxy = httpProxy
     self.lifecycle = lifecycle
     self.acceptsRemoteSubmissions = acceptsRemoteSubmissions
     self.actionRequired = actionRequired
     self.canConfigure = canConfigure
+    self.canSetHTTPProxy = canSetHTTPProxy
     self.canConnect = canConnect
     self.canDisconnect = canDisconnect
     self.canClear = canClear

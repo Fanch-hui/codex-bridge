@@ -116,6 +116,7 @@
     var diagnostics = S.node("div"); card.appendChild(diagnostics);
     var editor = E.createTunnelForm(context.emit); card.appendChild(editor.root);
     var actions = S.node("div", "form-actions"); card.appendChild(actions);
+    var proxy = E.createTunnelHTTPProxyForm(context.emit); card.appendChild(proxy.root);
     var clients = E.createClients(context.emit); S.section(root, "客户端工具权限").appendChild(clients.root);
     var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入说明"));
     help.appendChild(S.node("p", null,
@@ -123,6 +124,7 @@
     root.appendChild(help);
     return { root: root, update: function (page, emit) {
       T.render(badge, diagnostics, editor, actions, page.tunnel || {}, context);
+      proxy.update(page.tunnel || {}, emit);
       clients.update(S.safeArray(page.clients).filter(function (item) { return item.clientID !== "qwen.studio"; }), emit);
     } };
   }

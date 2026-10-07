@@ -17,6 +17,8 @@
         Task { @MainActor in
           await connections.configureTunnel(tunnelID: tunnelID, runtimeKey: runtimeKey)
         }
+      case .setTunnelHTTPProxy:
+        Task { @MainActor in await connections.setTunnelHTTPProxy(envelope.payload.httpProxy) }
       case .connectTunnel:
         Task { @MainActor in await connections.connectTunnel() }
       case .disconnectTunnel:

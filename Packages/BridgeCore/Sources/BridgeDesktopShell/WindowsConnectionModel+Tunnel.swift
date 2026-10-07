@@ -13,10 +13,12 @@
         enabled: tunnel.enabled,
         helperAvailable: tunnel.helperAvailable,
         tunnelID: tunnel.tunnelID,
+        httpProxy: tunnel.httpProxy,
         lifecycle: tunnel.lifecycle,
         acceptsRemoteSubmissions: tunnel.acceptsRemoteSubmissions,
         actionRequired: tunnel.actionRequired,
         canConfigure: connected && tunnel.helperAvailable,
+        canSetHTTPProxy: connected,
         canConnect: connected && tunnel.configured && tunnel.helperAvailable && !tunnel.enabled,
         canDisconnect: connected && tunnel.enabled,
         canClear: connected && tunnel.configured
@@ -27,6 +29,14 @@
       await mutate("正在配置 Secure Tunnel…", success: "Secure Tunnel 配置已保存。") {
         _ = try await self.client.configureTunnel(
           IPCTunnelConfigurationRequest(tunnelID: tunnelID, runtimeKey: runtimeKey)
+        )
+      }
+    }
+
+    func setTunnelHTTPProxy(_ httpProxy: String?) async {
+      await mutate("正在保存 Tunnel 代理…", success: "Tunnel 代理配置已保存。") {
+        _ = try await self.client.setTunnelHTTPProxy(
+          IPCTunnelHTTPProxyRequest(httpProxy: httpProxy)
         )
       }
     }

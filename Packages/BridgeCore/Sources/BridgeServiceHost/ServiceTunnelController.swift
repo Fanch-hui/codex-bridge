@@ -9,23 +9,24 @@ public actor ServiceTunnelController {
     rawValue: "service.tunnel-runtime-key"
   )
 
-  private let settings: ServiceSettings
-  private let runtimeStatus: ServiceRuntimeStatus
-  private let secretStore: any SecretStore
-  private let factory: any ServiceTunnelManagerBuilding
+  let settings: ServiceSettings
+  let runtimeStatus: ServiceRuntimeStatus
+  let secretStore: any SecretStore
+  let factory: any ServiceTunnelManagerBuilding
   private let monitorInterval: Duration
   private let restartDelays: [Duration]
 
-  private var tunnelID: TunnelID?
+  var tunnelID: TunnelID?
+  var httpProxy: TunnelHTTPProxy?
   private var localMCPURL: URL?
   private var localMCPHeaderSecret: String?
   private var manager: (any ServiceTunnelManaging)?
-  private var snapshot: ServiceTunnelSnapshot
-  private var enabled = false
+  var snapshot: ServiceTunnelSnapshot
+  var enabled = false
   private var generation: UInt64 = 0
   private var monitorTask: Task<Void, Never>?
   private var restartTask: Task<Void, Never>?
-  private var isShutdown = false
+  var isShutdown = false
 
   public init(
     settings: ServiceSettings,
@@ -60,66 +61,6 @@ public actor ServiceTunnelController {
     Task { [weak self] in
       try? await self?.startConfigured()
     }
-  }
-
-  @discardableResult
-  public func configure(
-    tunnelID rawTunnelID: String,
-    runtimeKey rawRuntimeKey: String
-  ) async throws -> ServiceTunnelSnapshot {
-    guard !isShutdown else { throw ServiceTunnelError.serviceStopped }
-    let tunnelID = try TunnelID(validating: rawTunnelID)
-    let runtimeKey = try Self.validatedRuntimeKey(rawRuntimeKey)
-    try await persist(tunnelID: tunnelID, runtimeKey: runtimeKey, enabled: true)
-    self.tunnelID = tunnelID
-    self.enabled = true
-    snapshot = ServiceTunnelSnapshot(
-      configured: true,
-      enabled: true,
-      helperAvailable: factory.helperAvailable(),
-      tunnelID: tunnelID.rawValue,
-      lifecycle: .stopped,
-      acceptsRemoteSubmissions: false,
-      actionRequired: false
-    )
-    try await startConfigured()
-    return snapshot
-  }
-
-  @discardableResult
-  public func connect() async throws -> ServiceTunnelSnapshot {
-    guard !isShutdown else { throw ServiceTunnelError.serviceStopped }
-    guard tunnelID != nil, hasRuntimeKey() else {
-      throw ServiceTunnelError.notConfigured
-    }
-    try await settings.set("1", for: .tunnelEnabled)
-    enabled = true
-    try await startConfigured()
-    return snapshot
-  }
-
-  public func disconnect() async throws {
-    guard !isShutdown else { throw ServiceTunnelError.serviceStopped }
-    try await settings.set("0", for: .tunnelEnabled)
-    enabled = false
-    await stopCurrent(publishStopped: true)
-  }
-
-  public func clearConfiguration() async throws {
-    guard !isShutdown else { throw ServiceTunnelError.serviceStopped }
-    enabled = false
-    await stopCurrent(publishStopped: false)
-    try await settings.set(nil, for: .tunnelID)
-    try await settings.set(nil, for: .tunnelEnabled)
-    do {
-      try secretStore.remove(Self.runtimeKeyReference)
-    } catch SecretStoreError.notFound {
-    } catch {
-      throw ServiceTunnelError.secretStoreUnavailable
-    }
-    tunnelID = nil
-    snapshot = .unconfigured(helperAvailable: factory.helperAvailable())
-    await publish(snapshot)
   }
 
   public func pauseForMCPRestart() async {
@@ -165,16 +106,20 @@ public actor ServiceTunnelController {
       tunnelID: tunnelID?.rawValue,
       lifecycle: .stopped,
       acceptsRemoteSubmissions: false,
-      actionRequired: snapshot.actionRequired
+      actionRequired: snapshot.actionRequired,
+      httpProxy: httpProxy?.url.absoluteString
     )
     snapshot = final
     await runtimeStatus.updateTunnel(state: TunnelLifecycle.stopped.rawValue)
   }
 
-  private func startConfigured() async throws {
+  func startConfigured() async throws {
     let context = try configuredStartContext()
     if try await currentManagerIsUsable() { return }
     try await requireAvailableHelper(tunnelID: context.tunnelID)
+    guard context.tunnelID == tunnelID, context.httpProxy == httpProxy, !isShutdown else {
+      throw ServiceTunnelError.serviceStopped
+    }
     let runGeneration = await prepareStart(tunnelID: context.tunnelID)
     do {
       try await launchCandidate(context: context, generation: runGeneration)
@@ -190,7 +135,8 @@ public actor ServiceTunnelController {
   private typealias StartContext = (
     tunnelID: TunnelID,
     localMCPURL: URL,
-    localMCPHeaderSecret: String
+    localMCPHeaderSecret: String,
+    httpProxy: TunnelHTTPProxy?
   )
 
   private func configuredStartContext() throws -> StartContext {
@@ -199,7 +145,7 @@ public actor ServiceTunnelController {
     guard let localMCPURL, let localMCPHeaderSecret else {
       throw ServiceTunnelError.localMCPUnavailable
     }
-    return (tunnelID, localMCPURL, localMCPHeaderSecret)
+    return (tunnelID, localMCPURL, localMCPHeaderSecret, httpProxy)
   }
 
   private func currentManagerIsUsable() async throws -> Bool {
@@ -240,7 +186,8 @@ public actor ServiceTunnelController {
         tunnelID: tunnelID.rawValue,
         lifecycle: .failed,
         acceptsRemoteSubmissions: false,
-        actionRequired: true
+        actionRequired: true,
+        httpProxy: httpProxy?.url.absoluteString
       )
       snapshot = failure
       await publish(failure, degradation: "The signed tunnel-client helper is unavailable.")
@@ -250,10 +197,12 @@ public actor ServiceTunnelController {
 
   private func prepareStart(tunnelID: TunnelID) async -> UInt64 {
     generation &+= 1
+    let runGeneration = generation
     cancelBackgroundTasks()
     let previous = manager
     manager = nil
     await previous?.stop()
+    guard runGeneration == generation, !isShutdown else { return runGeneration }
     let starting = ServiceTunnelSnapshot(
       configured: true,
       enabled: enabled,
@@ -261,23 +210,32 @@ public actor ServiceTunnelController {
       tunnelID: tunnelID.rawValue,
       lifecycle: .starting,
       acceptsRemoteSubmissions: false,
-      actionRequired: false
+      actionRequired: false,
+      httpProxy: httpProxy?.url.absoluteString
     )
     snapshot = starting
     await publish(starting)
-    return generation
+    return runGeneration
   }
 
   private func launchCandidate(
     context: StartContext,
     generation runGeneration: UInt64
   ) async throws {
+    guard runGeneration == generation, !isShutdown else {
+      throw ServiceTunnelError.serviceStopped
+    }
     let candidate = try await factory.make(
       tunnelID: context.tunnelID,
       runtimeKeyReference: Self.runtimeKeyReference,
       localMCPURL: context.localMCPURL,
-      localMCPHeaderSecret: context.localMCPHeaderSecret
+      localMCPHeaderSecret: context.localMCPHeaderSecret,
+      httpProxy: context.httpProxy
     )
+    guard runGeneration == generation, !isShutdown else {
+      await candidate.stop()
+      throw ServiceTunnelError.serviceStopped
+    }
     manager = candidate
     try await candidate.start()
     guard runGeneration == generation, !isShutdown else {
@@ -319,7 +277,8 @@ public actor ServiceTunnelController {
       tunnelID: tunnelID?.rawValue,
       lifecycle: .failed,
       acceptsRemoteSubmissions: false,
-      actionRequired: actionRequired
+      actionRequired: actionRequired,
+      httpProxy: httpProxy?.url.absoluteString
     )
     snapshot = failed
     await publish(
@@ -369,7 +328,8 @@ public actor ServiceTunnelController {
       tunnelID: tunnelID?.rawValue,
       lifecycle: lifecycle,
       acceptsRemoteSubmissions: acceptsRemote && !diagnostics.actionRequired,
-      actionRequired: diagnostics.actionRequired
+      actionRequired: diagnostics.actionRequired,
+      httpProxy: httpProxy?.url.absoluteString
     )
     snapshot = current
     await publish(current, degradation: Self.degradation(for: current))
@@ -412,7 +372,8 @@ public actor ServiceTunnelController {
           tunnelID: tunnelID,
           runtimeKeyReference: Self.runtimeKeyReference,
           localMCPURL: localMCPURL,
-          localMCPHeaderSecret: localMCPHeaderSecret
+          localMCPHeaderSecret: localMCPHeaderSecret,
+          httpProxy: httpProxy
         )
         guard generation == self.generation, enabled, !isShutdown else {
           await candidate.stop()
@@ -465,7 +426,8 @@ public actor ServiceTunnelController {
       tunnelID: tunnelID?.rawValue,
       lifecycle: .failed,
       acceptsRemoteSubmissions: false,
-      actionRequired: actionRequired
+      actionRequired: actionRequired,
+      httpProxy: httpProxy?.url.absoluteString
     )
     snapshot = failed
     await publish(
@@ -474,13 +436,14 @@ public actor ServiceTunnelController {
     )
   }
 
-  private func stopCurrent(publishStopped: Bool) async {
+  func stopCurrent(publishStopped: Bool) async {
     generation &+= 1
+    let stoppedGeneration = generation
     cancelBackgroundTasks()
     let current = manager
     manager = nil
     await current?.stop()
-    guard publishStopped else { return }
+    guard publishStopped, stoppedGeneration == generation else { return }
     let stopped = ServiceTunnelSnapshot(
       configured: tunnelID != nil && hasRuntimeKey(),
       enabled: enabled,
@@ -488,7 +451,8 @@ public actor ServiceTunnelController {
       tunnelID: tunnelID?.rawValue,
       lifecycle: .stopped,
       acceptsRemoteSubmissions: false,
-      actionRequired: false
+      actionRequired: false,
+      httpProxy: httpProxy?.url.absoluteString
     )
     snapshot = stopped
     await publish(stopped)
@@ -499,131 +463,6 @@ public actor ServiceTunnelController {
     restartTask?.cancel()
     monitorTask = nil
     restartTask = nil
-  }
-
-  private func loadStoredConfiguration() async {
-    let rawID: String?
-    do {
-      rawID = try await settings.string(for: .tunnelID)
-    } catch {
-      // Keep a previously loaded identity visible when a transient settings
-      // read fails during a service restart.
-      guard tunnelID == nil else {
-        await publish(snapshot, degradation: "The stored Tunnel configuration is unavailable.")
-        return
-      }
-      tunnelID = nil
-      enabled = false
-      snapshot = ServiceTunnelSnapshot(
-        configured: false,
-        enabled: false,
-        helperAvailable: factory.helperAvailable(),
-        tunnelID: nil,
-        lifecycle: .failed,
-        acceptsRemoteSubmissions: false,
-        actionRequired: true
-      )
-      await publish(snapshot, degradation: "The stored Tunnel configuration is invalid.")
-      return
-    }
-
-    enabled = (try? await settings.string(for: .tunnelEnabled)) == "1"
-    guard let rawID else {
-      tunnelID = nil
-      snapshot = .unconfigured(helperAvailable: factory.helperAvailable())
-      return
-    }
-
-    do {
-      tunnelID = try TunnelID(validating: rawID)
-    } catch {
-      tunnelID = nil
-      enabled = false
-      snapshot = ServiceTunnelSnapshot(
-        configured: false,
-        enabled: false,
-        helperAvailable: factory.helperAvailable(),
-        tunnelID: nil,
-        lifecycle: .failed,
-        acceptsRemoteSubmissions: false,
-        actionRequired: true
-      )
-      await publish(snapshot, degradation: "The stored Tunnel configuration is invalid.")
-      return
-    }
-
-    let configured = hasRuntimeKey()
-    snapshot = ServiceTunnelSnapshot(
-      configured: configured,
-      enabled: enabled,
-      helperAvailable: factory.helperAvailable(),
-      tunnelID: rawID,
-      lifecycle: configured ? .stopped : .failed,
-      acceptsRemoteSubmissions: false,
-      actionRequired: !configured
-    )
-    if !configured {
-      await publish(
-        snapshot,
-        degradation: "The stored Tunnel Runtime Key is unavailable."
-      )
-    }
-  }
-
-  private func persist(
-    tunnelID: TunnelID,
-    runtimeKey: Data,
-    enabled: Bool
-  ) async throws {
-    let previousKey = try? secretStore.load(Self.runtimeKeyReference)
-    let previousID = try? await settings.string(for: .tunnelID)
-    let previousEnabled = try? await settings.string(for: .tunnelEnabled)
-    do {
-      try secretStore.store(runtimeKey, for: Self.runtimeKeyReference)
-      try await settings.set(tunnelID.rawValue, for: .tunnelID)
-      try await settings.set(enabled ? "1" : "0", for: .tunnelEnabled)
-    } catch {
-      if let previousKey {
-        try? secretStore.store(previousKey, for: Self.runtimeKeyReference)
-      } else {
-        try? secretStore.remove(Self.runtimeKeyReference)
-      }
-      try? await settings.set(previousID ?? nil, for: .tunnelID)
-      try? await settings.set(previousEnabled ?? nil, for: .tunnelEnabled)
-      throw ServiceTunnelError.secretStoreUnavailable
-    }
-  }
-
-  private func hasRuntimeKey() -> Bool {
-    guard let data = try? secretStore.load(Self.runtimeKeyReference),
-      let value = String(data: data, encoding: .utf8)
-    else {
-      return false
-    }
-    return (try? Self.validatedRuntimeKey(value)) != nil
-  }
-
-  private func publish(
-    _ snapshot: ServiceTunnelSnapshot,
-    degradation: String? = nil
-  ) async {
-    await runtimeStatus.updateTunnel(
-      state: snapshot.lifecycle.rawValue,
-      degradation: degradation
-    )
-  }
-
-  private static func validatedRuntimeKey(_ value: String) throws -> Data {
-    let bytes = Array(value.utf8)
-    guard
-      value == value.trimmingCharacters(in: .whitespacesAndNewlines),
-      !bytes.isEmpty,
-      bytes.count <= 16 * 1_024,
-      bytes.allSatisfy({ (0x21...0x7E).contains($0) })
-    else {
-      throw ServiceTunnelError.invalidRuntimeKey
-    }
-    return Data(bytes)
   }
 
   private static func degradation(for snapshot: ServiceTunnelSnapshot) -> String? {

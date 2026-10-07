@@ -197,6 +197,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func rotateMCPClientCredential(clientID: String) async throws
   func rotateLocalMCPEndpoint() async throws -> String
   func configureTunnel(_ request: IPCTunnelConfigurationRequest) async throws -> IPCTunnelStatus
+  func setTunnelHTTPProxy(_ request: IPCTunnelHTTPProxyRequest) async throws -> IPCTunnelStatus
   func connectTunnel() async throws -> IPCTunnelStatus
   func disconnectTunnel() async throws
   func clearTunnel() async throws

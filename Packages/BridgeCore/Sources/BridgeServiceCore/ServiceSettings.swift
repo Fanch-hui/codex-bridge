@@ -80,6 +80,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case qoderRuntimeState = "agent.qoder.runtime_state"
   case tunnelID = "tunnel.id"
   case tunnelEnabled = "tunnel.enabled"
+  case tunnelHTTPProxy = "tunnel.http_proxy"
 }
 
 public struct ServiceModelPreferences: Codable, Equatable, Sendable {

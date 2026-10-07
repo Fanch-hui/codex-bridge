@@ -298,7 +298,7 @@ public actor TunnelManager {
         expectedPeerPID: child.pid
       )
       guard let timestamp = snapshot.pollTimestamp, timestamp > 0 else {
-        return (snapshot.isReady, snapshot.isReady)
+        return (false, false)
       }
       let age = now().timeIntervalSince1970 - timestamp
       let fresh = age >= -5 && age <= configuration.metricsFreshness.timeInterval
@@ -351,31 +351,12 @@ public actor TunnelManager {
   }
 
   private func helperArguments(command: String, context: RunContext) -> [String] {
-    let directory = context.directory
-    let urlFile = context.healthURLFile.path
-    let pidFile = directory.appendingPathComponent("tunnel.pid").path
-    #if os(Windows)
-      let apiKeyReference = "env:\(WindowsTunnelEnvironment.runtimeKeyVariable)"
-      let headerSecretReference = "env:\(WindowsTunnelEnvironment.headerSecretVariable)"
-    #else
-      let apiKeyReference = "file:/dev/fd/3"
-      let headerSecretReference = "file:/dev/fd/4"
-    #endif
-    return [
-      command,
-      "--control-plane.tunnel-id", configuration.tunnelID.rawValue,
-      "--control-plane.api-key=\(apiKeyReference)",
-      "--mcp.server-url", configuration.helperMCPURL.absoluteString,
-      "--mcp.extra-headers", "X-Codex-Bridge-Token: \(headerSecretReference)",
-      "--harpoon.allow-plaintext-http=true",
-      "--health.listen-addr", "127.0.0.1:0",
-      "--health.url-file", urlFile,
-      "--pid.file", pidFile,
-      "--allow-remote-ui=false",
-      "--open-web-ui=false",
-      "--log.level", "warn",
-      "--log.format", "json",
-    ]
+    TunnelHelperArguments.make(
+      command: command,
+      configuration: configuration,
+      runtimeDirectory: context.directory,
+      healthURLFile: context.healthURLFile
+    )
   }
 
   private func waitForExit(

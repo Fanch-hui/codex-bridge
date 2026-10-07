@@ -230,6 +230,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleRotateLocalMCPEndpoint(request)
     case .configureTunnel:
       return try await handleConfigureTunnel(request)
+    case .setTunnelHTTPProxy:
+      return try await handleSetTunnelHTTPProxy(request)
     case .connectTunnel:
       return try await handleConnectTunnel(request)
     case .disconnectTunnel:

@@ -96,7 +96,7 @@ enum BridgeDesktopCommandRouter {
       .copyLocalMCPEndpoint,
       .rotateMCPClientCredential, .rotateLocalMCPEndpoint,
       .saveDeepSeekHarnessMCPServer, .deleteDeepSeekHarnessMCPServer,
-      .setDeepSeekHarnessMCPServerEnabled, .setAgentMCPScope, .configureTunnel,
+      .setDeepSeekHarnessMCPServerEnabled, .setAgentMCPScope, .configureTunnel, .setTunnelHTTPProxy,
       .connectTunnel, .disconnectTunnel, .clearTunnel, .connectAgent, .registerAgent,
       .beginAgentRegistration, .saveQoderRuntimeSettings,
       .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .cancelAgentSetup,

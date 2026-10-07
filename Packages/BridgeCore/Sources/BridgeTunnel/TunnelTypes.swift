@@ -47,6 +47,7 @@ public struct TunnelConfiguration: Sendable {
   public let processTimeout: Duration
   public let metricsFreshness: Duration
   public let expectedHelperSHA256: String
+  public let httpProxy: TunnelHTTPProxy?
   package let helperMCPURL: URL
   package let localMCPHeaderSecret: String
 
@@ -60,7 +61,8 @@ public struct TunnelConfiguration: Sendable {
     healthInterval: Duration = .seconds(5),
     processTimeout: Duration = .seconds(20),
     metricsFreshness: Duration = .seconds(70),
-    expectedHelperSHA256: String
+    expectedHelperSHA256: String,
+    httpProxy: TunnelHTTPProxy? = nil
   ) throws {
     guard Self.isValidPlatformFileURL(helperExecutable) else {
       throw TunnelConfigurationError.invalidHelperExecutable
@@ -94,6 +96,7 @@ public struct TunnelConfiguration: Sendable {
     self.processTimeout = processTimeout
     self.metricsFreshness = metricsFreshness
     self.expectedHelperSHA256 = expectedHelperSHA256
+    self.httpProxy = httpProxy
   }
 
   public init(
@@ -107,7 +110,8 @@ public struct TunnelConfiguration: Sendable {
     healthInterval: Duration = .seconds(5),
     processTimeout: Duration = .seconds(20),
     metricsFreshness: Duration = .seconds(70),
-    expectedHelperSHA256: String
+    expectedHelperSHA256: String,
+    httpProxy: TunnelHTTPProxy? = nil
   ) throws {
     guard Self.isValidPlatformFileURL(helperExecutable) else {
       throw TunnelConfigurationError.invalidHelperExecutable
@@ -140,6 +144,7 @@ public struct TunnelConfiguration: Sendable {
     self.processTimeout = processTimeout
     self.metricsFreshness = metricsFreshness
     self.expectedHelperSHA256 = expectedHelperSHA256
+    self.httpProxy = httpProxy
     helperMCPURL = localMCPURL
   }
 
@@ -216,6 +221,7 @@ public enum TunnelConfigurationError: Error, Equatable, Sendable {
   case invalidRuntimeDirectory
   case invalidTimeout
   case invalidHelperDigest
+  case invalidHTTPProxy
 }
 
 public struct TunnelDoctorReport: Equatable, Sendable {
