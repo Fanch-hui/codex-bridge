@@ -67,28 +67,9 @@ extension MCPServiceToolCatalog {
       "project_id": stringSchema,
       "name": stringSchema,
       "git_state": stringSchema,
-      "verification_commands": arraySchema(stringSchema),
       "thread_count": integerSchema(minimum: 0),
-      "direct_workspace": objectSchema(
-        properties: [
-          "command_mode": ["type": "string", "enum": ["denied", "safe", "full"]],
-          "commands": arraySchema(projectCommandSchema),
-          "command_blacklist": arraySchema(
-            objectSchema(
-              properties: [
-                "rule_id": stringSchema,
-                "executable": nullableStringSchema(maximum: 1_024),
-                "pattern": nullableStringSchema(maximum: 4_096),
-                "arguments": arraySchema(stringSchema),
-              ],
-              required: ["rule_id"]
-            )
-          ),
-        ],
-        required: ["command_mode", "commands", "command_blacklist"]
-      ),
     ],
-    required: ["project_id", "name", "verification_commands"]
+    required: ["project_id", "name"]
   )
 
   static let searchMatchSchema = objectSchema(
@@ -99,31 +80,6 @@ extension MCPServiceToolCatalog {
       "redacted": boolSchema,
     ],
     required: ["relative_path", "line_number", "preview", "redacted"]
-  )
-
-  static let projectCommandSchema = objectSchema(
-    properties: [
-      "command_id": stringSchema,
-      "name": stringSchema,
-      "executable": stringSchema,
-      "arguments": arraySchema(stringSchema),
-      "working_directory": stringSchema,
-      "requires_network": boolSchema,
-      "risk": ["type": "string", "enum": ["normal", "elevated"]],
-    ],
-    required: ["command_id", "name", "executable", "arguments", "risk"]
-  )
-
-  static let builtInCommandSchema = objectSchema(
-    properties: [
-      "executable": stringSchema,
-      "arguments_prefix": arraySchema(stringSchema),
-      "allows_additional_arguments": boolSchema,
-      "requires_network": boolSchema,
-    ],
-    required: [
-      "executable", "arguments_prefix", "allows_additional_arguments", "requires_network",
-    ]
   )
 
   static let threadSchema = objectSchema(

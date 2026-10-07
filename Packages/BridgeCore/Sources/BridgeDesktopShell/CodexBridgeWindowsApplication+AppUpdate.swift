@@ -32,6 +32,12 @@
           installer.cancelPackage()
           try? await model?.client.cancelAppUpdate()
           model?.resumeAfterAppUpdateCancellation()
+        },
+        acquireInstallationStatus: { [weak model] in
+          guard let model else { throw CancellationError() }
+          let status = try await model.client.prepareAppUpdateStatus()
+          return AppUpdateInstallationReadiness(
+            canInstall: status.canInstall, waitingReason: status.waitingReason)
         }
       )
       updater.onChange = { status in

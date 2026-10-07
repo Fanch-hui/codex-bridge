@@ -174,6 +174,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let selectedProjectID: String?
   public let permissionMode: String
   public let permissionOptions: [BridgeDesktopChoice]
+  public let taskHistorySearch: BridgeDesktopTaskHistorySearchState?
   public let tasks: [BridgeDesktopTaskRow]
   public let selectedTaskID: String?
   public let selectedTask: BridgeDesktopTaskDetail?
@@ -198,6 +199,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     permissionMode: String = "full",
     permissionOptions: [BridgeDesktopChoice] = [],
     tasks: [BridgeDesktopTaskRow] = [],
+    taskHistorySearch: BridgeDesktopTaskHistorySearchState? = nil,
     selectedTaskID: String? = nil,
     selectedTask: BridgeDesktopTaskDetail? = nil,
     history: BridgeDesktopThreadHistoryState = .init(),
@@ -220,6 +222,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     self.permissionMode = permissionMode
     self.permissionOptions = permissionOptions
     self.tasks = tasks
+    self.taskHistorySearch = taskHistorySearch
     self.selectedTaskID = selectedTaskID
     self.selectedTask = selectedTask
     self.history = history

@@ -91,6 +91,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
     switch request.operation {
     case .getDirectConfiguration, .updateDirectConfiguration:
       return try await handleDirectConfiguration(request)
+    case .checkDirectCommand:
+      return try await handleCheckDirectCommand(request)
     case .status:
       await startStateChanges()
       return try await handleStatus(request)

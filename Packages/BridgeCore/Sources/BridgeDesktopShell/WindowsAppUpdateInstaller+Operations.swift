@@ -140,6 +140,7 @@
             "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
             "-File", scriptURL.path, "-Config", configurationURL.path,
           ] + arguments
+        try Task.checkCancellation()
         try await Task.detached(priority: .utility) {
           _ = try WindowsAppUpdateProcessLauncher.launch(
             executable: powerShellPath,
@@ -148,10 +149,9 @@
             waitTimeoutMilliseconds: waitTimeoutMilliseconds
           )
         }.value
+        try Task.checkCancellation()
       } catch let error as WindowsAppUpdateProcessError {
         throw WindowsAppUpdateInstallerError.helperLaunchFailed(error.code)
-      } catch {
-        throw WindowsAppUpdateInstallerError.packageUnavailable
       }
     }
 

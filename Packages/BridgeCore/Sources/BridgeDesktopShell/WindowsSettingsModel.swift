@@ -14,6 +14,14 @@
     var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     var models: [MCPModelSummary] = []
     var directConfiguration: IPCDirectConfiguration?
+    var directCommandProjects: [MCPProjectSummary] = []
+    lazy var directCommandChecker = DirectCommandCheckController(
+      client: { [weak self] in
+        guard let self else { throw BridgeServiceClientError.unavailable }
+        return client
+      },
+      onChange: { [weak self] in self?.publishDisplay() }
+    )
     var preferences: IPCModelPreferences?
     var preferenceQueue = CodexPreferencesSaveQueue()
     var modelCatalogGeneration: UInt64 = 0
@@ -84,7 +92,7 @@
     nonisolated static let accessValues = ["request-approval", "auto-review", "full-access"]
     nonisolated static let approvalValues = ["require", "auto"]
 
-    func refresh() async {
+    func refresh(forceModelRefresh: Bool = false) async {
       guard !busy else { return }
       busy = true
       statusText = "正在读取设置…"
@@ -105,11 +113,16 @@
       var failures: [String] = []
       isRefreshingModels = true
       publishDisplay()
-      if await loadModelCatalog(forceRefresh: false) == nil {
+      if await loadModelCatalog(forceRefresh: forceModelRefresh) == nil {
         failures.append("模型：\(modelError ?? "无法读取模型目录")")
       }
       isRefreshingModels = false
-      directConfiguration = try? await client.directConfiguration()
+      do {
+        directConfiguration = try await client.directConfiguration()
+        directCommandProjects = try await client.projects()
+      } catch {
+        failures.append("Direct 命令规则与项目：\(BridgeServiceErrorMessage.message(error))")
+      }
       do {
         instructions = try await client.customInstructions()
       } catch {
@@ -256,7 +269,13 @@
           BridgeDesktopDirectState(
             commandMode: $0.commandMode, allowedCommands: $0.allowedCommands,
             deniedCommands: $0.deniedCommands, usesProjectDefaults: $0.usesProjectDefaults == true,
-            canSave: connectionState == .connected && !busy)
+            canSave: connectionState == .connected && !busy,
+            check: BridgeDesktopDirectCheckState(
+              projects: directCommandProjects.map {
+                BridgeDesktopChoice(id: $0.projectID, title: $0.name)
+              },
+              canCheck: connectionState == .connected && !busy,
+              status: directCommandChecker.state))
         }
       )
       displayBox.store(value)

@@ -50,7 +50,7 @@
       embedded ? "div" : "section",
       embedded ? "settings-subsection" : "page-card settings-card"
     );
-    card.appendChild(S.node(embedded ? "h4" : "h3", null, "Codex"));
+    if (!embedded) card.appendChild(S.node("h3", null, "Codex"));
     var grid = S.node("div", "form-grid codex-preferences-grid");
     var model = S.selectField(
       "执行模型", page.executionModel,
@@ -79,7 +79,10 @@
     var draft = D.bind(controls);
     var modelStatus = S.node("p", "hint model-refresh-status");
     card.appendChild(modelStatus);
-    var refreshModels = S.button("获取模型", "refreshModels", {}, emit, "small", false);
+    var refreshModels = S.button("获取模型", null, {}, null, "small", false);
+    refreshModels.addEventListener("click", function () {
+      if (!refreshModels.disabled) context.emit("refreshModels", {});
+    });
     var actions = S.node("div", "form-actions");
     actions.appendChild(refreshModels);
     card.appendChild(actions);
@@ -130,7 +133,7 @@
       model.control.disabled = !next.canSavePreferences;
       access.control.disabled = !next.canSavePreferences;
       modelStatus.textContent = modelRefreshStatus(next);
-      modelStatus.hidden = false;
+      modelStatus.hidden = !next.isRefreshingModels && !next.modelError;
       var count = modelCount(next);
       refreshModels.textContent = next.isRefreshingModels ? "获取中…" : count > 0 ? "刷新模型" : "获取模型";
       refreshModels.disabled = next.isRefreshingModels === true || next.canRefreshModels === false;

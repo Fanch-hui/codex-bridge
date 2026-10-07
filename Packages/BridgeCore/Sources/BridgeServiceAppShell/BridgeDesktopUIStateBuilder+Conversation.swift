@@ -12,6 +12,7 @@ extension BridgeDesktopUIStateBuilder {
     else { return nil }
     let sessionTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: model.tasks)
     let session = WorkbenchSessionCatalog.sessions(tasks: sessionTasks).first
+    let failure = task.failurePresentation
     return BridgeDesktopTaskDetail(
       taskID: task.taskID,
       sessionID: session?.sessionID ?? task.taskID,
@@ -32,6 +33,9 @@ extension BridgeDesktopUIStateBuilder {
       usage: task.usage,
       resultSummary: task.resultSummary,
       failureCode: task.failureCode,
+      failureReason: failure?.reason,
+      failureNextAction: failure?.nextAction,
+      failureDiagnostic: failure?.diagnostic,
       changedFiles: task.changedFiles,
       attachmentPaths: task.attachmentPaths,
       activity: taskActivity(task),

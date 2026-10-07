@@ -52,7 +52,7 @@
             + (needsRegion ? " · 按所选地区归类" : ""),
           detail: needsRegion
             ? "该路径未能自动识别地区；保存时使用当前所选地区。"
-            : item.isEnabled ? item.executablePath : "连接前的候选 · " + item.executablePath
+            : item.enabled ? item.executablePath : "连接前的候选 · " + item.executablePath
         });
       });
       return choices;
@@ -83,7 +83,7 @@
         return item.installationID === activeID;
       });
       save.disabled = !context.canEdit || context.busy
-        || (!!activeID && (!selected || !selected.isEnabled));
+        || (!!activeID && (!selected || !selected.enabled));
     }
 
     save.addEventListener("click", function () {

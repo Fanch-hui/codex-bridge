@@ -46,7 +46,7 @@
       if (operation && !login.disabled) context.emit("openAgentSetupLogin", { operationID: operation.operationID });
     });
     docs.addEventListener("click", function () {
-      if (operation && operation.documentationURL) context.emit("openExternalURL", { url: operation.documentationURL });
+      if (operation && operation.documentationURL) context.emit("openExternalURL", { value: operation.documentationURL });
     });
     proceed.addEventListener("click", function () {
       if (!operation || proceed.disabled) return;

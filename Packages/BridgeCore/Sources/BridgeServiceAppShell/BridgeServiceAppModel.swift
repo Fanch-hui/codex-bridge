@@ -141,6 +141,13 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var isManagingAgents = false
   @Published var directConfiguration: IPCDirectConfiguration?
   @Published var isSavingDirectConfiguration = false
+  lazy var directCommandChecker = DirectCommandCheckController(
+    client: { [weak self] in
+      guard let self else { throw BridgeServiceClientError.unavailable }
+      return try currentClient()
+    },
+    onChange: { [weak self] in self?.objectWillChange.send() }
+  )
   @Published var agentSetupOperations: [IPCAgentSetupState] = []
   var agentSetupRefreshInFlight = false
   var agentSetupRequestGeneration = 0
@@ -148,6 +155,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   var didAttemptServiceUpgrade = false
   @Published public internal(set) var isRefreshingAgentModels = false
   @Published public internal(set) var agentModelRefreshError: String?
+  @Published var taskHistorySearch = WorkbenchTaskHistorySearch()
+  var taskHistorySearchGeneration: UInt64 = 0
+  var selectedHistoryTaskID: String?
   @Published public internal(set) var tasks: [MCPServiceTaskSnapshot] = []
   @Published public internal(set) var approvals: [IPCApprovalSummary] = []
   @Published public internal(set) var directApprovals: [IPCPendingDirectApproval] = []
@@ -171,7 +181,10 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var selectedTaskID: String?
   @Published public internal(set) var selectedProjectID: String? {
     didSet {
-      if oldValue != selectedProjectID { synchronizeAgentModelScopes() }
+      if oldValue != selectedProjectID {
+        clearTaskHistorySearch()
+        synchronizeAgentModelScopes()
+      }
     }
   }
   @Published public internal(set) var workbenchPermissionMode = "full"

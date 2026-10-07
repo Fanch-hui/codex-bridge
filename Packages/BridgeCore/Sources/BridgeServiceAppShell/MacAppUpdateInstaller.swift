@@ -17,7 +17,9 @@ final class MacAppUpdateInstaller {
     workspace = root
     let extracted = root.appendingPathComponent("extracted", isDirectory: true)
     try FileManager.default.createDirectory(at: extracted, withIntermediateDirectories: true)
-    try await Self.run("/usr/bin/ditto", ["-x", "-k", archive.path, extracted.path])
+    try await Self.run(
+      "/usr/bin/ditto", ["-x", "-k", archive.path, extracted.path],
+      failureMessage: "更新包解压失败")
     let app = extracted.appendingPathComponent("CodexBridge.app", isDirectory: true)
     guard let bundle = Bundle(url: app),
       bundle.bundleIdentifier == Bundle.main.bundleIdentifier,
@@ -33,14 +35,18 @@ final class MacAppUpdateInstaller {
     #else
       let architecture = "x86_64"
     #endif
-    try await Self.run("/usr/bin/lipo", [executable.path, "-verify_arch", architecture])
+    try await Self.run(
+      "/usr/bin/lipo", [executable.path, "-verify_arch", architecture],
+      failureMessage: "更新包中的应用架构不匹配")
     try await Self.run(
       "/usr/bin/lipo",
       [
         app.appendingPathComponent("Contents/Resources/CodexBridgeService").path,
         "-verify_arch", architecture,
-      ])
-    try await Self.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path])
+      ], failureMessage: "更新包中的服务架构不匹配")
+    try await Self.run(
+      "/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path],
+      failureMessage: "更新包签名验证失败")
     let staged = destination.deletingLastPathComponent()
       .appendingPathComponent(".CodexBridge-update-\(UUID().uuidString).app")
     stagedApp = staged
@@ -98,7 +104,10 @@ final class MacAppUpdateInstaller {
     workspace = nil
   }
 
-  private static func run(_ executable: String, _ arguments: [String]) async throws {
+  private static func run(
+    _ executable: String, _ arguments: [String], failureMessage: String = "更新文件复制失败"
+  ) async throws {
+    try Task.checkCancellation()
     try await Task.detached {
       let process = Process()
       process.executableURL = URL(fileURLWithPath: executable)
@@ -108,9 +117,10 @@ final class MacAppUpdateInstaller {
       try process.run()
       process.waitUntilExit()
       guard process.terminationStatus == 0 else {
-        throw MacAppUpdateError.message("更新包准备失败，请检查安装目录权限后重试。")
+        throw MacAppUpdateError.message("\(failureMessage)（退出码 \(process.terminationStatus)）。")
       }
     }.value
+    try Task.checkCancellation()
   }
 }
 

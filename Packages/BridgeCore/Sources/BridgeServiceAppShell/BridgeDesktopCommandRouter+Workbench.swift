@@ -36,6 +36,10 @@ extension BridgeDesktopCommandRouter {
         connected(model)
       else { return }
       model.setWorkbenchPermissionMode(mode.rawValue)
+    case .searchTaskHistory:
+      model.searchTaskHistory(payload)
+    case .selectTaskHistory:
+      model.selectTaskHistory(payload.taskID)
     case .selectTask:
       guard let taskID = validatedID(payload.taskID),
         model.tasks.contains(where: { $0.taskID == taskID })

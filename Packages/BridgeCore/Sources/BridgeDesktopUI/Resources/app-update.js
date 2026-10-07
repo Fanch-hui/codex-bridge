@@ -4,6 +4,8 @@
   var busyPhases = {
     checking: true,
     downloading: true,
+    verifying: true,
+    cancelling: true,
     waiting: true,
     installing: true
   };
@@ -65,7 +67,9 @@
     if (phase === "checking") return "正在检查更新";
     if (phase === "upToDate") return "已是最新版本";
     if (phase === "downloading") return "正在下载更新";
-    if (phase === "waiting") return "等待任务完成后更新";
+    if (phase === "verifying") return "正在验证更新包";
+    if (phase === "cancelling") return "正在取消更新";
+    if (phase === "waiting") return "等待后台操作完成后更新";
     if (phase === "installing") return "正在安装更新";
     if (phase === "failed") return update.availableVersion ? "更新失败" : "检查更新失败";
     return "应用更新";
@@ -78,7 +82,9 @@
       case "checking": return "正在从发布源读取最新版本。";
       case "upToDate": return "当前版本已经是最新版本。";
       case "downloading": return "下载完成后会继续安装。";
-      case "waiting": return "当前任务结束后会继续安装。";
+      case "verifying": return "正在检查应用标识、版本和程序文件。";
+      case "cancelling": return "正在清理本次更新文件。";
+      case "waiting": return "后台任务、命令和工作区操作完成后会继续安装。";
       case "installing": return "安装完成后 App 会重新启动。";
       case "failed": return update && update.availableVersion
         ? "可以重试下载和安装。" : "可以重试检查更新。";
@@ -134,7 +140,7 @@
     }
     if (state.notes) copy.appendChild(node("p", "app-update-notes", String(state.notes)));
     copy.appendChild(node("p", "app-update-message", messageFor(state)));
-    if (["available", "downloading", "waiting", "installing"].indexOf(phase) !== -1) {
+    if (["available", "downloading", "verifying", "waiting", "installing"].indexOf(phase) !== -1) {
       var reminder = node("div", "app-update-plugin-reminder");
       reminder.appendChild(node("strong", null, "更新后，请刷新 ChatGPT 插件"));
       reminder.appendChild(node("p", null,
@@ -154,6 +160,8 @@
       if (mode !== "settings" || !state.isDeferred) {
         actions.appendChild(action("稍后", "deferAppUpdate", emit, busy, lockActions));
       }
+    } else if (["downloading", "verifying", "waiting"].indexOf(phase) !== -1) {
+      actions.appendChild(action("取消更新", "cancelAppUpdate", emit, false, lockActions));
     } else if (phase === "failed") {
       actions.appendChild(action(
         state.availableVersion ? "重试更新" : "重试检查",
@@ -176,7 +184,7 @@
   function renderOverview(container, update, emit) {
     if (!container) return;
     var phase = phaseOf(update);
-    var visible = update && ["available", "downloading", "waiting", "installing", "failed"].indexOf(phase) !== -1;
+    var visible = update && ["available", "downloading", "verifying", "waiting", "cancelling", "installing", "failed"].indexOf(phase) !== -1;
     if ((phase === "available" || phase === "failed") && update.isDeferred) visible = false;
     var signature = updateSignature(update) + "\u001e" + String(visible);
     if (container.__appUpdateSignature === signature) return;

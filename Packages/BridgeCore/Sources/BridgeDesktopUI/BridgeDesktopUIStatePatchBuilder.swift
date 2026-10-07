@@ -137,6 +137,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.permissionOptions == new.permissionOptions
       && old.selectedTaskID == new.selectedTaskID
       && old.history == new.history
+      && old.taskHistorySearch == new.taskHistorySearch
       && old.nativeSessions == new.nativeSessions
       && old.steerModes == new.steerModes
       && old.projectStatus == new.projectStatus
@@ -171,6 +172,9 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.usage == new.usage
       && old.resultSummary == new.resultSummary
       && old.failureCode == new.failureCode
+      && old.failureReason == new.failureReason
+      && old.failureNextAction == new.failureNextAction
+      && old.failureDiagnostic == new.failureDiagnostic
       && old.changedFiles == new.changedFiles
       && old.activity == new.activity
       && old.canInterrupt == new.canInterrupt

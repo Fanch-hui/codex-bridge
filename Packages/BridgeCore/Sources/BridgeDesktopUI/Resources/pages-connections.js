@@ -32,235 +32,124 @@
   function create(container, emit) {
     S.clear(container);
     var context = { emit: emit };
-    var header = S.node("div");
-    var content = S.node("div");
-    var unavailable = S.node("div");
-    container.appendChild(header);
-    container.appendChild(content);
-    container.appendChild(unavailable);
+    var header = S.node("div"), content = S.node("div"), unavailable = S.node("div");
+    container.appendChild(header); container.appendChild(content); container.appendChild(unavailable);
+    var navigation = global.CodexBridgeDesktopDetailPages.create(content);
+    var N = global.CodexBridgeDesktopConnectionsNavigation;
+    var T = global.CodexBridgeDesktopConnectionsTunnel;
+    var clientsSection = S.section(navigation.overview, "聊天客户端");
+    var clientsList = S.node("div", "page-card connection-list"); clientsSection.appendChild(clientsList);
+    var chat = createChatGPT(context), qwen = createQwen();
+    var chatEntry = navigation.register("chatgpt", "ChatGPT", chat.root);
+    var qwenEntry = navigation.register("qwen", "Qwen Studio", qwen.root);
+    clientsList.appendChild(chatEntry.root); clientsList.appendChild(qwenEntry.root);
 
-    var codex = global.CodexBridgeDesktopCodexConnection.create(emit);
-    content.appendChild(codex.root);
-    var localSection = S.section(content, "本地 MCP 客户端通道");
-    var localCard = S.node("div", "page-card connection-card");
-    localSection.appendChild(localCard);
-    var tunnelSection = S.section(content, "远程 AI 客户端 (OpenAI Secure Tunnel)");
-    var tunnelCard = S.node("div", "page-card connection-card");
-    var tunnelTitle = S.node("div", "section-heading-row");
-    var tunnelHeading = S.node("h3", null, "Secure MCP 隧道");
-    var tunnelBadge = S.badge("unknown", "neutral");
-    tunnelTitle.appendChild(tunnelHeading);
-    tunnelTitle.appendChild(tunnelBadge);
-    tunnelCard.appendChild(tunnelTitle);
-    var tunnelSubtitle = S.node("p", "card-subtitle");
-    tunnelCard.appendChild(tunnelSubtitle);
-    var tunnelFacts = S.node("div", "detail-grid form-grid three tunnel-facts");
-    tunnelCard.appendChild(tunnelFacts);
-    var tunnelDiagnostics = S.node("div");
-    tunnelCard.appendChild(tunnelDiagnostics);
-    var tunnelEditor = E.createTunnelForm(emit);
-    tunnelCard.appendChild(tunnelEditor.root);
-    var tunnelActions = S.node("div", "form-actions");
-    tunnelCard.appendChild(tunnelActions);
-    tunnelSection.appendChild(tunnelCard);
-
-    var clientsSection = S.section(content, "ChatGPT / Qwen 客户端工具权限");
-    var clientsEditor = E.createClients(emit);
-    clientsSection.appendChild(clientsEditor.root);
-    var agentMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
-    var agentsSection = S.section(content, "本机 Agent 引擎连接");
-    var agentsCard = S.node("div", "page-card connection-card");
-    var agentHeading = S.node("div", "section-heading-row");
-    agentHeading.appendChild(S.node("h3", null, "连接本机 Agent"));
+    var agentsSection = S.section(navigation.overview, "Agent 引擎");
+    var agentsHeading = S.node("div", "section-heading-row");
     var scanAgents = S.button("扫描 Agent", null, {}, null, "small", false);
-    scanAgents.type = "button";
     scanAgents.addEventListener("click", function () {
-      scanAgents.disabled = true;
-      context.emit("scanAgents");
+      if (scanAgents.disabled) return;
+      scanAgents.disabled = true; context.emit("scanAgents");
     });
-    agentHeading.appendChild(scanAgents);
-    agentsCard.appendChild(agentHeading);
-    agentsCard.appendChild(S.node(
-      "p",
-      "card-subtitle",
-      "首次使用时自动查找本机安装。安装新的 Agent 后，点击“扫描 Agent”更新列表。"
-    ));
-    var agentConnectors = global.CodexBridgeDesktopAgentConnectors.create(emit);
-    agentsCard.appendChild(agentConnectors.root);
-    agentsCard.appendChild(agentMCP.root);
+    agentsHeading.appendChild(scanAgents); agentsSection.appendChild(agentsHeading);
+    var agentsList = S.node("div", "page-card connection-list"); agentsSection.appendChild(agentsList);
+    var codex = global.CodexBridgeDesktopCodexConnection.create(emit);
+    var codexEntry = navigation.register("codex", "Codex", codex.root);
+    agentsList.appendChild(codexEntry.root);
+    var connectors = global.CodexBridgeDesktopAgentConnectors.create(emit, navigation);
+    agentsList.appendChild(connectors.root);
+    var agentMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
+    var mcpEntry = navigation.register("agent-mcp", "Agent MCP 服务", agentMCP.root);
+    agentsList.appendChild(mcpEntry.root);
     var agentEditor = E.createAgentRegistration(emit);
-    var manual = S.node("details", "agent-manual-registration");
-    manual.appendChild(S.node("summary", null, "高级：按路径登记已有安装"));
-    manual.appendChild(agentEditor.root);
-    agentsCard.appendChild(manual);
-    agentsSection.appendChild(agentsCard);
-
-    var status = S.node("div", "page-message");
-    content.appendChild(status);
+    var manualEntry = navigation.register("agent-registration", "登记已有安装", agentEditor.root);
+    agentsList.appendChild(manualEntry.root);
+    var status = S.node("div", "page-message"); content.appendChild(status);
 
     return {
       update: function (page, nextEmit) {
         context.emit = nextEmit;
-        content.hidden = !page;
-        unavailable.hidden = !!page;
+        content.hidden = !page; unavailable.hidden = !!page;
         if (!page) {
-          S.pageHeader(header, {
-            title: "连接",
-            subtitle: "正在从本机 Service 读取连接状态。",
-            symbol: "point.3.connected.trianglepath.dotted"
-          });
-          S.empty(unavailable, "连接页暂不可用", "连接本机 Service 后，可以管理 MCP 客户端、Codex、Secure Tunnel 与 Agent。");
+          S.pageHeader(header, { title: "连接", symbol: "point.3.connected.trianglepath.dotted" });
+          S.empty(unavailable, "连接页暂不可用", "连接本机 Service 后管理客户端与 Agent。");
           return;
         }
-        S.pageHeader(header, page.header);
-        codex.update(page.codex, nextEmit);
-        var localSignature = JSON.stringify([
-          page.localMCPURL, page.localMCPState, page.canCopyLocalMCPURL, page.canRotateLocalMCPEndpoint
-        ]);
-        var renderLocal = function () { renderLocalMCP(localCard, page, context); };
-        var stable = global.CodexBridgeDesktopStableRender;
-        if (stable) stable(localCard, localSignature, renderLocal); else renderLocal();
-        renderTunnel(
-          tunnelBadge,
-          tunnelSubtitle,
-          tunnelFacts,
-          tunnelDiagnostics,
-          tunnelEditor,
-          tunnelActions,
-          page.tunnel,
-          context
-        );
-        clientsEditor.update(S.safeArray(page.clients), nextEmit);
-        renderAgents(agentConnectors, agentEditor, agentMCP, page, nextEmit);
+        context.statusMessage = page.statusMessage;
+        S.pageHeader(header, Object.assign({}, page.header, { subtitle: "" }));
+        chat.update(page, nextEmit); qwen.update(page, nextEmit); codex.update(page.codex, nextEmit);
+        var tunnel = page.tunnel || {};
+        var tunnelState = T.state(tunnel);
+        N.update(chatEntry, "ChatGPT", "Secure MCP Tunnel", tunnelState.label, tunnelState.tone);
+        var qwenClient = S.safeArray(page.clients).find(function (item) { return item.clientID === "qwen.studio"; });
+        var localReady = page.localMCPState === "ready";
+        N.update(qwenEntry, "Qwen Studio", "本机 MCP", !localReady ? "Endpoint 不可用"
+          : qwenClient && qwenClient.enabled ? "已启用" : "未启用",
+          !localReady ? "warning" : qwenClient && qwenClient.enabled ? "success" : "neutral");
+        var engine = page.codex || {};
+        var connected = typeof engine.isConnected === "boolean" ? engine.isConnected
+          : engine.modelCount > 0 && !engine.modelError;
+        N.update(codexEntry, "Codex", engine.resolvedExecutablePath || "自动发现",
+          engine.modelError ? "连接检查失败" : engine.isRefreshing ? "连接中" : connected ? "已连接" : "未连接",
+          engine.modelError ? "error" : engine.isRefreshing ? "running" : connected ? "success" : "neutral");
+        var providers = S.safeArray(page.providers).filter(function (provider) { return provider.providerID !== "codex"; });
+        connectors.update(providers, page.installations, {
+          canConnect: page.canRegisterAgent, busy: page.isManagingAgents === true,
+          revision: page.agentOperationRevision, setupOperations: page.setupOperations, acceptReplacement: true
+        }, nextEmit);
+        agentEditor.update(providers, page.canRegisterAgent && !page.isManagingAgents, nextEmit);
+        agentMCP.update(page, nextEmit);
+        mcpEntry.update({ value: S.safeArray(page.deepSeekHarnessMCPServers).length + " 个服务" });
+        manualEntry.update({ value: "按路径或选择文件" });
         scanAgents.disabled = !page.canScanAgents || !!page.isManagingAgents;
-        status.textContent = page.statusMessage || "";
-        status.hidden = !page.statusMessage;
+        status.textContent = page.statusMessage || ""; status.hidden = !page.statusMessage;
       }
     };
   }
 
-  function renderLocalMCP(card, page, context) {
-    S.clear(card);
-    card.appendChild(S.node("h3", null, "本机 MCP Endpoint"));
-    card.appendChild(S.node("p", "card-subtitle", "服务地址与客户端凭证由本机 Service 管理。"));
-    card.appendChild(S.node("div", "page-message mono", page.localMCPURL || "Endpoint 尚未就绪"));
-    card.appendChild(S.node("p", "hint", "仅监听 127.0.0.1；凭证由本机安全存储管理，不进明文状态或 SQLite。"));
-    if (page.localMCPState === "local_port_unavailable") {
-      card.appendChild(S.node("div", "page-message warning", "本地 MCP 端口被占用；不会静默更换地址，请主动生成新的 Endpoint。"));
-    }
-    var state = S.node("div", "inline-status");
-    state.appendChild(S.badge(page.localMCPState, page.localMCPState === "ready" ? "success" : "neutral"));
-    if (page.canCopyLocalMCPURL) {
-      var copy = S.button("复制 Endpoint", null, {}, null, "small", false);
-      copy.addEventListener("click", function () {
-        copy.disabled = true; copy.textContent = "已发送";
-        context.emit("copyLocalMCPEndpoint", {});
+  function createChatGPT(context) {
+    var T = global.CodexBridgeDesktopConnectionsTunnel;
+    var root = S.node("div");
+    var section = S.section(root, "Secure MCP Tunnel");
+    var card = S.node("div", "page-card connection-card"); section.appendChild(card);
+    var badge = S.node("span"); card.appendChild(badge);
+    var diagnostics = S.node("div"); card.appendChild(diagnostics);
+    var editor = E.createTunnelForm(context.emit); card.appendChild(editor.root);
+    var actions = S.node("div", "form-actions"); card.appendChild(actions);
+    var clients = E.createClients(context.emit); S.section(root, "客户端工具权限").appendChild(clients.root);
+    var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入说明"));
+    help.appendChild(S.node("p", null,
+      "ChatGPT 需要 Plus 及以上或团队订阅。在“插件 → 添加 → 创建自定义 MCP 服务器”添加 Codex Bridge，再填写 Tunnel ID 和 Runtime Key。"));
+    root.appendChild(help);
+    return { root: root, update: function (page, emit) {
+      T.render(badge, diagnostics, editor, actions, page.tunnel || {}, context);
+      clients.update(S.safeArray(page.clients).filter(function (item) { return item.clientID !== "qwen.studio"; }), emit);
+    } };
+  }
+
+  function createQwen() {
+    var context = { emit: currentEmit };
+    var root = S.node("div"), local = S.node("div", "page-card connection-card");
+    S.section(root, "本机 MCP Endpoint").appendChild(local);
+    var clients = E.createClients(currentEmit); S.section(root, "客户端工具权限").appendChild(clients.root);
+    var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入说明"));
+    help.appendChild(S.node("p", null, "启用 Qwen Studio 并复制 JSON 配置，将配置粘贴到 Qwen Studio 的 MCP 设置中。"));
+    root.appendChild(help);
+    return { root: root, update: function (page, emit) {
+      context.emit = emit;
+      context.statusMessage = page.statusMessage;
+      global.CodexBridgeDesktopConnectionsTunnel.recoverPending(local, context, {
+        rotateLocalMCPEndpoint: page.canRotateLocalMCPEndpoint
       });
-      state.appendChild(copy);
-    }
-    if (page.canRotateLocalMCPEndpoint) {
-      var rotate = S.button("重新生成 Endpoint", null, {}, null, "small danger", false);
-      rotate.addEventListener("click", function () {
-        if (global.confirm("重新生成本地 MCP Endpoint？现有客户端地址将立即失效。")) {
-          rotate.disabled = true; rotate.textContent = "请求中…";
-          context.emit("rotateLocalMCPEndpoint", {});
-        }
-      });
-      state.appendChild(rotate);
-    }
-    card.appendChild(state);
-  }
-
-  function renderTunnel(
-    badge,
-    subtitle,
-    facts,
-    diagnostics,
-    editor,
-    actions,
-    tunnel,
-    context
-  ) {
-    badge.textContent = tunnel.lifecycle || "unknown";
-    badge.className = "status-badge " + tunnelTone(tunnel);
-    subtitle.textContent = tunnel.helperAvailable
-      ? "Helper 已就绪，可按需连接远程通道。"
-      : "当前环境没有可用 Helper，远程隧道不能启动。";
-    S.clear(facts);
-    addFact(facts, "Helper", tunnel.helperAvailable ? "就绪" : "未打包");
-    addFact(facts, "远程任务接收", tunnel.acceptsRemoteSubmissions ? "允许" : "关闭");
-    addFact(facts, "配置状态", tunnel.configured ? "已配置" : "未配置");
-    S.clear(diagnostics);
-    if (!tunnel.helperAvailable) {
-      diagnostics.appendChild(S.node("div", "page-message warning", "Helper 辅助工具缺失，本地 MCP 仍可用，但远程隧道不能启动。"));
-    }
-    if (tunnel.actionRequired) {
-      diagnostics.appendChild(S.node("div", "page-message warning", "Tunnel 需要检查凭据，请核对 Tunnel ID、Runtime Key 以及当前工作区权限。"));
-    }
-    editor.update(tunnel, context.emit);
-    var renderActions = function () {
-      S.clear(actions);
-      if (tunnel.canConnect) {
-        var connect = S.button("连接", null, {}, null, "small primary", false);
-        connect.addEventListener("click", function () {
-          connect.disabled = true; connect.textContent = "请求中…";
-          context.emit("connectTunnel", {});
-        });
-        actions.appendChild(connect);
-      }
-      if (tunnel.canDisconnect) {
-        var disconnect = S.button("断开", null, {}, null, "small", false);
-        disconnect.addEventListener("click", function () {
-          disconnect.disabled = true; disconnect.textContent = "请求中…";
-          context.emit("disconnectTunnel", {});
-        });
-        actions.appendChild(disconnect);
-      }
-      if (tunnel.canClear) {
-        var clear = S.button("清除配置", null, {}, null, "small danger", false);
-        clear.addEventListener("click", function () {
-          if (global.confirm("清除 Secure Tunnel 配置？\n这会移除已保存的 Runtime Key 并重置 Tunnel 绑定。")) {
-            clear.disabled = true; clear.textContent = "请求中…";
-            editor.clearRuntimeKey();
-            context.emit("clearTunnel", {});
-          }
-        });
-        actions.appendChild(clear);
-      }
-    };
-    var stable = global.CodexBridgeDesktopStableRender;
-    var signature = JSON.stringify([
-      tunnel.lifecycle, tunnel.actionRequired, tunnel.enabled, tunnel.configured,
-      tunnel.helperAvailable, tunnel.canConnect, tunnel.canDisconnect, tunnel.canClear
-    ]);
-    if (stable) stable(actions, signature, renderActions); else renderActions();
-  }
-
-  function renderAgents(connectors, editor, agentMCP, page, emit) {
-    var providers = S.safeArray(page.providers).filter(function (provider) { return provider.providerID !== "codex"; });
-    connectors.update(providers, page.installations, {
-      canConnect: page.canRegisterAgent,
-      busy: page.isManagingAgents === true,
-      revision: page.agentOperationRevision,
-      setupOperations: page.setupOperations,
-      acceptReplacement: true
-    }, emit);
-    editor.update(providers, page.canRegisterAgent, emit);
-    agentMCP.update(page, emit);
-  }
-
-  function addFact(container, title, value) {
-    var item = S.node("div", "detail-item");
-    item.appendChild(S.node("dt", null, title));
-    item.appendChild(S.node("dd", null, value));
-    container.appendChild(item);
-  }
-
-  function tunnelTone(tunnel) {
-    if (tunnel.actionRequired) return "warning";
-    if (tunnel.lifecycle === "ready") return "success";
-    if (tunnel.enabled) return "running";
-    return "neutral";
+      var renderLocal = function () {
+        global.CodexBridgeDesktopConnectionsTunnel.renderLocal(local, page, context);
+      };
+      var signature = JSON.stringify([page.localMCPURL, page.localMCPState,
+        page.canCopyLocalMCPURL, page.canRotateLocalMCPEndpoint]);
+      var stable = global.CodexBridgeDesktopStableRender;
+      if (stable) stable(local, signature, renderLocal); else renderLocal();
+      clients.update(S.safeArray(page.clients).filter(function (item) { return item.clientID === "qwen.studio"; }), emit);
+    } };
   }
 
   global.CodexBridgeDesktopConnectionsPage = { render: render, setActive: setActive };

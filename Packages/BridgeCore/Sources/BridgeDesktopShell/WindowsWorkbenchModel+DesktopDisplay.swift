@@ -80,6 +80,7 @@
           projectID: task.projectID,
           tasks: [task]
         )
+      let failure = task.failurePresentation
       return BridgeDesktopTaskDetail(
         taskID: task.taskID,
         sessionID: resolvedSession.sessionID,
@@ -100,6 +101,9 @@
         usage: task.usage,
         resultSummary: task.resultSummary,
         failureCode: task.failureCode,
+        failureReason: failure?.reason,
+        failureNextAction: failure?.nextAction,
+        failureDiagnostic: failure?.diagnostic,
         changedFiles: task.changedFiles,
         attachmentPaths: task.attachmentPaths,
         activity: activity,

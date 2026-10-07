@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="responsive.css">
     <link rel="stylesheet" href="windows-theme.css">
     <link rel="stylesheet" href="windows-components.css">
+    <link rel="stylesheet" href="detail-pages.css">
   </head>
   <body>
     <div class="app-shell" id="app-shell" data-state="loading">
@@ -25,7 +26,7 @@
         </div>
         <nav class="navigation" id="navigation" aria-label="页面导航"></nav>
         <div class="sidebar-footer">
-          <span class="connection-indicator" id="connection-indicator" aria-hidden="true"></span>
+          <span class="connection-indicator" id="connection-indicator" role="img" aria-label="等待连接状态"></span>
           <span id="connection-label">等待连接状态</span>
           <span class="refresh-indicator" id="refresh-indicator" aria-hidden="true"></span>
         </div>
@@ -40,14 +41,7 @@
         </header>
 
         <div class="content-scroll">
-          <section class="overview-page" id="overview-page" aria-labelledby="overview-title">
-            <div class="section-header">
-              <span class="section-icon icon-tile" data-symbol="gauge.with.needle" aria-hidden="true"></span>
-              <div>
-                <h2 id="overview-title">概览</h2>
-              </div>
-            </div>
-
+          <section class="overview-page" id="overview-page" aria-labelledby="page-title">
             <div class="notice-stack" id="notices" aria-live="polite"></div>
             <div class="app-update" id="app-update" aria-live="polite" hidden></div>
 
@@ -56,7 +50,7 @@
             </section>
 
             <section class="content-section" aria-labelledby="services-title">
-              <h3 id="services-title">连接与服务拓扑全景</h3>
+              <h3 id="services-title">连接与服务</h3>
               <div class="surface-card service-card" id="services"></div>
             </section>
 
@@ -90,19 +84,19 @@
             </div>
           </section>
 
-          <section class="page" id="projects-page" hidden aria-labelledby="projects-title">
+          <section class="page" id="projects-page" hidden aria-labelledby="page-title">
             <div id="projects-content"></div>
           </section>
 
-          <section class="page" id="logs-page" hidden aria-labelledby="logs-title">
+          <section class="page" id="logs-page" hidden aria-labelledby="page-title">
             <div id="logs-content"></div>
           </section>
 
-          <section class="page" id="connections-page" hidden aria-labelledby="connections-title">
+          <section class="page" id="connections-page" hidden aria-labelledby="page-title">
             <div id="connections-content"></div>
           </section>
 
-          <section class="page" id="settings-page" hidden aria-labelledby="settings-title">
+          <section class="page" id="settings-page" hidden aria-labelledby="page-title">
             <div id="settings-content"></div>
           </section>
 
@@ -115,6 +109,7 @@
     </div>
     <div class="feedback-layer" id="feedback-layer" hidden></div>
     <script src="pages-common.js"></script>
+    <script src="pages-detail.js"></script>
     <script src="app-update.js"></script>
     <script src="pages-native-permissions.js"></script>
     <script src="pages-workbench-attachments.js"></script>
@@ -126,9 +121,12 @@
     <script src="pages-workbench-process.js"></script>
     <script src="pages-workbench-conversation-incremental.js"></script>
     <script src="pages-workbench-split.js"></script>
+    <script src="pages-workbench-history-search.js"></script>
     <script src="pages-workbench-header.js"></script>
     <script src="pages-native-session-directory.js"></script>
     <script src="pages-workbench-actions.js"></script>
+    <script src="pages-workbench-approvals.js"></script>
+    <script src="pages-workbench-details.js"></script>
     <script src="pages-workbench.js"></script>
     <script src="pages-form-draft.js"></script>
     <script src="pages-agent-connector-details.js"></script>
@@ -139,6 +137,9 @@
     <script src="pages-agent-connector-row.js"></script>
     <script src="pages-agent-connectors.js"></script>
     <script src="pages-codex-connection.js"></script>
+    <script src="pages-connections-navigation.js"></script>
+    <script src="pages-connections-clients.js"></script>
+    <script src="pages-connections-tunnel.js"></script>
     <script src="pages-connections-editor.js"></script>
     <script src="pages-deepseek-harness-mcp-editor.js"></script>
     <script src="pages-deepseek-harness-mcp.js"></script>
@@ -151,6 +152,7 @@
     <script src="pages-settings-qoder-permissions.js"></script>
     <script src="pages-settings-instructions.js"></script>
     <script src="pages-direct.js"></script>
+    <script src="pages-settings-navigation.js"></script>
     <script src="pages-settings.js"></script>
     <script src="pages.js"></script>
     <script src="feedback.js"></script>

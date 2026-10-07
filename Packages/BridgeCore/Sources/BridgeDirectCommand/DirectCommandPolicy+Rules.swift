@@ -83,10 +83,10 @@ extension DirectCommandPolicy {
     #endif
   }
 
-  private func isBlacklisted(
+  private func matchingBlacklistRule(
     rules: [ServiceCommandBlacklistRule],
     argv: [String]
-  ) -> Bool {
+  ) -> String? {
     let executable = argv.first ?? ""
     let executableBasename = DirectPathSemantics.basename(executable)
     #if os(Windows)
@@ -123,16 +123,16 @@ extension DirectCommandPolicy {
         if matchesExecutable,
           rule.arguments.map({ Array(argv.dropFirst()).starts(with: $0) }) ?? true
         {
-          return true
+          return ([ruleExecutable] + (rule.arguments ?? [])).joined(separator: " ")
         }
       }
       if let pattern = rule.pattern, !pattern.isEmpty {
         if argv.contains(where: { $0.localizedCaseInsensitiveContains(pattern) }) {
-          return true
+          return "参数包含：" + pattern
         }
       }
     }
-    return false
+    return nil
   }
 
   public func resolve(
@@ -140,7 +140,7 @@ extension DirectCommandPolicy {
     request: DirectCommandRequest
   ) -> DirectCommandResolution {
     guard project.directCommandMode != .denied else {
-      return .denied(.commandModeDenied)
+      return .denied(.commandModeDenied, ruleSource: "disabled")
     }
     let requestedExecutable = request.argv.first ?? ""
     let executable = request.resolvedExecutable ?? requestedExecutable
@@ -186,8 +186,8 @@ extension DirectCommandPolicy {
       policyArgv = effectiveArgv
     }
 
-    if isBlacklisted(rules: project.commandBlacklist, argv: policyArgv) {
-      return .denied(.blacklisted)
+    if let rule = matchingBlacklistRule(rules: project.commandBlacklist, argv: policyArgv) {
+      return .denied(.blacklisted, ruleSource: "blacklist", matchedRule: rule)
     }
 
     let matchedBuiltInRule = builtInSafeRules.first { matchesSafeRule($0, argv: policyArgv) }
@@ -200,7 +200,7 @@ extension DirectCommandPolicy {
       && (isProjectLocalExecutable || request.isValidatedSkillScript)
     switch project.directCommandMode {
     case .denied:
-      return .denied(.commandModeDenied)
+      return .denied(.commandModeDenied, ruleSource: "disabled")
     case .safe:
       let allowed =
         matched != nil
@@ -215,7 +215,11 @@ extension DirectCommandPolicy {
           workingDirectory: matched?.workingDirectory ?? request.workingDirectory
         )
       {
-        return .denied(.invalidArguments)
+        return .denied(
+          .invalidArguments, ruleSource: "built_in",
+          matchedRule: matchedBuiltInRule.map {
+            ([$0.executable] + $0.argumentsPrefix).joined(separator: " ")
+          })
       }
     case .full:
       break
@@ -244,7 +248,16 @@ extension DirectCommandPolicy {
       argv: executionArgv,
       workingDirectory: matched?.workingDirectory ?? request.workingDirectory,
       requiresNetwork: needsNetwork,
-      reason: nil
+      reason: nil,
+      ruleSource: project.directCommandMode == .full
+        ? "full"
+        : matched != nil ? "whitelist" : matchedBuiltInRule != nil ? "built_in" : "project_local",
+      matchedRule: project.directCommandMode == .full
+        ? nil
+        : matched.map { ([$0.executable] + $0.arguments).joined(separator: " ") }
+          ?? matchedBuiltInRule.map {
+            ([$0.executable] + $0.argumentsPrefix).joined(separator: " ")
+          }
     )
   }
 }

@@ -79,19 +79,16 @@ extension MCPServiceTaskSnapshot {
     return "\(providerDisplayName) 任务"
   }
 
+  public var failurePresentation: TaskFailurePresentation? {
+    TaskFailurePresentation.failure(for: self)
+  }
+
   public var failureDescription: String? {
-    let code = failureCode?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let summary = resultSummary?.trimmingCharacters(in: .whitespacesAndNewlines)
-    switch (code, summary) {
-    case (let code?, let summary?) where !code.isEmpty && !summary.isEmpty:
-      return "\(code)：\(summary)"
-    case (let code?, _) where !code.isEmpty:
-      return code
-    case (_, let summary?) where !summary.isEmpty && status == "failed":
-      return summary
-    default:
-      return nil
-    }
+    guard let failure = failurePresentation else { return nil }
+    var lines = [failure.reason, "处理建议：\(failure.nextAction)"]
+    if let code = failureCode, !code.isEmpty { lines.append("失败代码：\(code)") }
+    if let diagnostic = failure.diagnostic { lines.append("诊断详情：\(diagnostic)") }
+    return lines.joined(separator: "\n")
   }
 
   public var sourceDisplayName: String {

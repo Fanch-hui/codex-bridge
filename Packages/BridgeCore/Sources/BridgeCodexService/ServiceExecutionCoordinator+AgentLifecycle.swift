@@ -5,22 +5,7 @@ import Foundation
 
 extension ServiceExecutionCoordinator {
   private static func agentStartFailureSummary(_ error: Error, provider: String) -> String {
-    if case AgentRuntimeError.capabilityUnavailable(.readOnlyExecution) = error {
-      return
-        "The selected \(provider) agent cannot enforce a read-only task without network tools. Select Full task permission or use an agent that supports read-only execution."
-    }
-    if case AgentRuntimeError.modelUnavailable(let model) = error {
-      let value = String(model.prefix(256))
-      return
-        "The selected \(provider) model is unavailable: \(value). Refresh the model list and choose an available model."
-    }
-    var detail = String(describing: error)
-    if detail.count > 300 { detail = String(detail.prefix(300)) }
-    detail =
-      detail
-      .split(whereSeparator: \.isWhitespace)
-      .joined(separator: " ")
-    return "The \(provider) agent could not start the task: \(detail)"
+    ExecutionStartFailurePresentation.summary(error, provider: provider)
   }
 
   private static func agentStartFailureCode(_ error: Error) -> String {

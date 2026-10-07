@@ -2,6 +2,7 @@
   "use strict";
 
   var S = global.CodexBridgeDesktopPageSupport;
+  var D = global.CodexBridgeDesktopFormDraft;
   var modes = {
     "default": {
       title: "请求批准",
@@ -13,94 +14,65 @@
     },
     "bypass_permissions": {
       title: "允许完全访问",
-      detail: "跳过 Qoder 逐项权限确认；Bridge 仍执行项目读写与网络限制。需要在 Qoder 信任的目录中生效。"
+      detail: "跳过 Qoder 逐项权限确认；Bridge 仍执行任务权限与项目目录边界。需要在 Qoder 信任的目录中生效。"
     }
   };
 
   function create() {
     var root = S.node("section", "settings-subsection");
     root.appendChild(S.node("h4", null, "Qoder 执行权限"));
-    var installation = S.node("div");
-    var permission = S.node("div");
-    var detail = S.node("p", "hint");
-    var scope = S.node("p", "hint");
-    var error = S.node("p", "hint");
-    root.appendChild(installation);
-    root.appendChild(permission);
-    root.appendChild(detail);
-    root.appendChild(scope);
-    root.appendChild(error);
+    var context = { policy: null, emit: null };
+    var installation = S.selectField("Qoder 安装与地区", "", [], function (installationID) {
+      if (installationID !== context.policy.installationID) {
+        context.emit("refreshAgentNativePermission", { installationID: installationID });
+      }
+    }, "");
+    var permission = S.selectField("权限模式", "default", [], function (modeID) {
+      var policy = context.policy;
+      var option = S.safeArray(policy.availableModes).find(function (item) { return item.modeID === modeID; });
+      if (!option || modeID === policy.toolPermission) return;
+      var confirmed = !option.requiresConfirmation || global.confirm(
+        "启用“" + (modes[modeID] ? modes[modeID].title : option.displayName) + "”？\n\n"
+          + policyScope(policy) + "\nBridge 的任务权限与项目目录边界仍然生效。"
+      );
+      if (!confirmed) { permission.control.value = policy.toolPermission; return; }
+      context.emit("setAgentNativePermissionMode", {
+        installationID: policy.installationID, toolPermission: modeID,
+        confirmed: option.requiresConfirmation === true
+      });
+    }, "");
+    var draft = D.bind({ installation: installation.control, permission: permission.control });
+    var detail = S.node("p", "hint"), scope = S.node("p", "hint"), error = S.node("p", "hint");
+    [installation.wrapper, permission.wrapper, detail, scope, error].forEach(function (node) { root.appendChild(node); });
 
     function update(page, emit) {
       var policy = page && page.nativePermissionPolicy;
       root.hidden = !policy || policy.providerID !== "qoder";
       if (root.hidden) return;
-
-      S.clear(installation);
-      S.clear(permission);
+      var identityChanged = context.policy && context.policy.installationID !== policy.installationID;
+      context.policy = policy;
+      context.emit = emit;
       var choices = S.safeArray(policy.availableModes).filter(function (mode) {
         return modes[mode.modeID] || mode.modeID === policy.toolPermission;
       }).map(function (mode) {
-        return {
-          id: mode.modeID,
-          title: modes[mode.modeID] ? modes[mode.modeID].title : mode.displayName
-        };
+        return { id: mode.modeID, title: modes[mode.modeID] ? modes[mode.modeID].title : mode.displayName };
       });
       Object.keys(modes).forEach(function (modeID) {
         if (!choices.some(function (choice) { return choice.id === modeID; })) {
           choices.push({ id: modeID, title: modes[modeID].title });
         }
       });
-
-      var qoderInstallations = S.safeArray(policy.installations);
-      if (qoderInstallations.length > 1) {
-        var selectedInstallation = S.selectField(
-          "Qoder 安装与地区",
-          policy.installationID,
-          qoderInstallations,
-          function (installationID) {
-            if (installationID !== policy.installationID) {
-              emit("refreshAgentNativePermission", { installationID: installationID });
-            }
-          },
-          ""
-        );
-        selectedInstallation.control.disabled = policy.isLoading || policy.isSaving;
-        installation.appendChild(selectedInstallation.wrapper);
-      }
-
+      var installations = S.safeArray(policy.installations);
+      D.selectOptions(installation.control, installations);
+      D.selectOptions(permission.control, choices);
+      var values = { installation: policy.installationID, permission: policy.toolPermission || "default" };
+      if (identityChanged) draft.reset(values); else draft.update(values);
+      installation.wrapper.hidden = installations.length < 2;
+      installation.control.disabled = policy.isLoading || policy.isSaving;
+      permission.control.disabled = !policy.canEdit || policy.isLoading || policy.isSaving;
       var selectedMode = modes[policy.toolPermission];
-      var modeField = S.selectField(
-        "权限模式",
-        policy.toolPermission || "default",
-        choices,
-        function (modeID) {
-          var option = S.safeArray(policy.availableModes).find(function (item) {
-            return item.modeID === modeID;
-          });
-          if (!option || modeID === policy.toolPermission) return;
-          var confirmed = !option.requiresConfirmation || global.confirm(
-            "启用“" + (modes[modeID] ? modes[modeID].title : option.displayName) + "”？\n\n"
-              + policyScope(policy)
-              + "\nBridge 的项目只读、写入和网络限制仍然生效。"
-          );
-          if (!confirmed) {
-            modeField.control.value = policy.toolPermission;
-            return;
-          }
-          emit("setAgentNativePermissionMode", {
-            installationID: policy.installationID,
-            toolPermission: modeID,
-            confirmed: option.requiresConfirmation === true
-          });
-        },
-        ""
-      );
-      modeField.control.disabled = !policy.canEdit;
-      permission.appendChild(modeField.wrapper);
       detail.textContent = selectedMode ? selectedMode.detail : modeDetail(policy.toolPermission);
-      if (policy.toolPermission && policy.toolPermission !== "default"
-        && !selectedMode) {
+      if (policy.toolPermission && policy.toolPermission !== "default" && !selectedMode) {
         detail.textContent += " 需要在 Qoder 信任的目录中生效。";
       }
       scope.textContent = policyScope(policy);

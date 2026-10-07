@@ -1,7 +1,29 @@
 import BridgeServiceCore
 import Foundation
 
+public struct ServiceAppUpdatePreparationStatus: Sendable {
+  public let canInstall: Bool
+  public let waitingReason: String?
+}
+
 extension BridgeServiceApplication {
+  public func prepareAppUpdateStatus() async throws -> ServiceAppUpdatePreparationStatus {
+    let canInstall = try await prepareAppUpdate()
+    guard !canInstall else {
+      return ServiceAppUpdatePreparationStatus(canInstall: true, waitingReason: nil)
+    }
+    let taskCount = try await tasks.nonterminalTasks().count
+    let commandCount = await directCommands.allSessions().filter { $0.status == "running" }.count
+    var reasons: [String] = []
+    if taskCount > 0 { reasons.append("\(taskCount) 个未结束的 Agent 任务") }
+    if commandCount > 0 { reasons.append("\(commandCount) 条运行中的 Direct 命令") }
+    if let workspaceReason = await workspaceGate.appUpdateWaitingReason() {
+      reasons.append(workspaceReason)
+    }
+    let reason = reasons.isEmpty ? "正在等待后台服务空闲。" : "正在等待" + reasons.joined(separator: "、") + "完成。"
+    return ServiceAppUpdatePreparationStatus(canInstall: false, waitingReason: reason)
+  }
+
   public func prepareAppUpdate() async throws -> Bool {
     if let preparation = appUpdatePreparationTask {
       return try await preparation.value

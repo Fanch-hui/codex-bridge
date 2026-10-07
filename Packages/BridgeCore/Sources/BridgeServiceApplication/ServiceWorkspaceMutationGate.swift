@@ -110,6 +110,19 @@ public actor ServiceWorkspaceMutationGate {
     return true
   }
 
+  public func appUpdateWaitingReason() -> String? {
+    let writes =
+      directReservations.values.filter {
+        if case .directCommand = $0.owner { return false }
+        return true
+      }.count + codexAdmissions.values.reduce(0) { $0 + $1.count }
+    var reasons: [String] = []
+    if writes > 0 { reasons.append("\(writes) 项工作区写操作") }
+    if !taskAdmissions.isEmpty { reasons.append("\(taskAdmissions.count) 个任务正在提交") }
+    if serviceShutdown != nil { reasons.append("后台服务正在关闭") }
+    return reasons.isEmpty ? nil : reasons.joined(separator: "、")
+  }
+
   public func appUpdatePrepared() -> Bool {
     expireAppUpdateIfNeeded()
     return appUpdateLeaseExpiresAt != nil

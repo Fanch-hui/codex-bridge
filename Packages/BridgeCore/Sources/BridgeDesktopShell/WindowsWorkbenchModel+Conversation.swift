@@ -9,7 +9,10 @@
       taskLoadInProgress = true
       defer { taskLoadInProgress = false }
       do {
-        let nextTasks = try await client.tasks(IPCTaskListRequest())
+        let recent = try await client.tasks(IPCTaskListRequest())
+        let nextTasks = WorkbenchTaskHistorySearch.retainingSelection(
+          in: recent, prior: tasks, selectedTaskID: selectedTaskID,
+          historyTaskID: selectedHistoryTaskID)
         guard !Task.isCancelled, !isShuttingDown else { return }
         let tasksChanged = tasks != nextTasks
         let stateChanged = connectionState != .connected || errorMessage != nil

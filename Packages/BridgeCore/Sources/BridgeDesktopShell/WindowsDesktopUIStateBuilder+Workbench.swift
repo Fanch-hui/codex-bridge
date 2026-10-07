@@ -28,6 +28,7 @@
         permissionMode: display.permissionMode,
         permissionOptions: BridgeDesktopWorkbenchPermissionMode.choices,
         tasks: display.taskItems,
+        taskHistorySearch: display.taskHistorySearch,
         selectedTaskID: display.selectedTaskID,
         selectedTask: display.selectedTaskDetail,
         history: display.history,

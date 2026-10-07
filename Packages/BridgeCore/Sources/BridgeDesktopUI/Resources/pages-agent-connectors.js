@@ -4,7 +4,7 @@
   var D = global.CodexBridgeDesktopFormDraft;
   var R = global.CodexBridgeDesktopAgentConnectorRow;
 
-  function create(emit) {
+  function create(emit, navigation) {
     var context = {
       emit: emit,
       canConnect: false,
@@ -13,6 +13,7 @@
     };
     var root = S.node("div", "agent-connectors");
     var rows = new Map();
+    var entries = new Map();
     var empty = S.node("div", "list-empty", "暂无可连接的 Agent Provider。");
     root.appendChild(empty);
 
@@ -34,16 +35,26 @@
           if (!row) {
             row = R.create(provider, { S: S, D: D, context: context });
             rows.set(provider.providerID, row);
+            if (navigation) entries.set(provider.providerID, navigation.register(
+              "agent:" + provider.providerID, provider.displayName, row.root));
           }
           var matching = S.safeArray(installations).filter(function (item) {
             return item.providerID === provider.providerID;
           });
-          place(root, row.root, position);
+          var entry = entries.get(provider.providerID);
+          place(root, entry ? entry.root : row.root, position);
           row.update(provider, matching, context);
+          if (entry) {
+            var summary = global.CodexBridgeDesktopConnectionsNavigation.providerSummary(
+              provider, matching, context.setupOperations);
+            global.CodexBridgeDesktopConnectionsNavigation.update(entry, provider.displayName,
+              summary.value, summary.label, summary.tone);
+          }
           position += 1;
         });
         rows.forEach(function (row, providerID) {
           if (!visible.has(providerID)) {
+            if (navigation) { navigation.remove("agent:" + providerID); entries.delete(providerID); }
             row.root.remove();
             rows.delete(providerID);
           }

@@ -25,6 +25,27 @@
     return node("span", "status-badge " + (tone || "neutral"), value || "未知");
   }
 
+  function status(value, tone) {
+    var element = node("span");
+    updateStatus(element, value, tone);
+    return element;
+  }
+
+  function updateStatus(element, value, tone) {
+    var label = value || "未知", kind = tone || "neutral";
+    var actionable = /排队|等待|审批|暂停|取消|失败|不可|异常|未知|未连接/.test(label)
+      || /queued|pending|approval|failed|unavailable|unknown/.test(label);
+    var quiet = !actionable && (kind === "success" || kind === "running");
+    element.className = "status-indicator " + kind + (quiet ? " is-quiet" : "");
+    element.title = label; element.setAttribute("aria-label", label);
+    clear(element);
+    var symbol = kind === "success" ? "checkmark.circle.fill"
+      : kind === "error" ? "xmark.circle.fill"
+      : kind === "warning" ? "exclamationmark.triangle.fill" : "circle.dashed";
+    element.appendChild(icon(symbol, "status-icon"));
+    if (!quiet) element.appendChild(node("span", "status-label", label));
+  }
+
   function gitStateBadge(gitState) {
     if (gitState === null || gitState === undefined || gitState === "") return null;
     switch (gitState) {
@@ -103,14 +124,15 @@
   }
 
   function pageHeader(container, header) {
-    clear(container);
-    var element = node("div", "page-header");
-    element.appendChild(icon(header.symbol, "icon-tile"));
-    var copy = node("div");
-    copy.appendChild(node("h2", null, header.title));
-    copy.appendChild(node("p", null, header.subtitle));
-    element.appendChild(copy);
-    container.appendChild(element);
+    var help = container.__pageHelp;
+    if (!help) {
+      help = container.__pageHelp = node("details", "page-help");
+      help.appendChild(node("summary", null, "说明"));
+      help.appendChild(node("p"));
+      container.appendChild(help);
+    }
+    help.hidden = !header.subtitle;
+    help.lastChild.textContent = header.subtitle || "";
   }
 
   function section(container, title) {
@@ -151,6 +173,8 @@
     clear: clear,
     icon: icon,
     badge: badge,
+    status: status,
+    updateStatus: updateStatus,
     gitStateBadge: gitStateBadge,
     button: button,
     selectField: selectField,

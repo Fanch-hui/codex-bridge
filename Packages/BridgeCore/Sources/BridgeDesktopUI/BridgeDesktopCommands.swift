@@ -7,6 +7,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case checkAppUpdate
   case installAppUpdate
   case deferAppUpdate
+  case cancelAppUpdate
   case refreshModels
   case scanAgents
   case selectPage
@@ -29,6 +30,8 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setWorkbenchPermissionMode
   case selectTask
   case refreshTasks
+  case searchTaskHistory
+  case selectTaskHistory
   case interruptTask
   case stopTask
   case deleteTask
@@ -103,6 +106,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setTaskStartApprovalMode
   case saveSettings
   case saveDirectConfiguration
+  case checkDirectCommand
   case saveCustomInstructions
   case setCodexExecutable
   case registerService

@@ -4,12 +4,12 @@
   import BridgeServiceAppCore
 
   extension WindowsAgentDefaultsModel {
-    func refreshAllProviderModels() async {
+    func refreshAllProviderModels(forceRefresh: Bool = false) async {
       for provider in providers {
         await refreshModels(
           providerID: provider.providerID,
           installationID: availableInstallation(for: provider.providerID)?.installationID,
-          forceRefresh: false
+          forceRefresh: forceRefresh
         )
       }
     }
@@ -69,6 +69,15 @@
         if !locksModelSelection { refreshingProviderIDs.remove(providerID) }
         let persistedDefault = try await client.agentModelDefault(providerID: providerID)
         guard modelRefreshGenerations[providerID] == generation else { return }
+        guard let installation else {
+          persistedDefaults[providerID] = persistedDefault
+          modelCatalogs[providerID] = []
+          catalogScopes[providerID] = ModelCatalogScope(installationID: nil, projectID: projectID)
+          applySelectedProvider(
+            providerID: providerID, installation: nil, defaults: persistedDefault, catalog: [])
+          statusText = "已读取 \(provider.displayName) 的默认设置。"
+          return
+        }
         let catalogResponse: IPCAgentModelsResponse
         if let cached {
           catalogResponse = IPCAgentModelsResponse(models: cached)

@@ -386,37 +386,4 @@ extension MCPServiceToolCatalog {
     )
   )
 
-  static let listProjectCommands = Tool(
-    name: MCPServiceToolName.listProjectCommands.rawValue,
-    title: "List project commands",
-    description:
-      "Read the built-in safe rules, registered Direct commands, and command mode for an approved project. "
-      + "These commands only run when the user explicitly asks the MCP client to execute them locally. "
-      + "Use recommended_usage to copy an allowed argv and command_id when present without guessing executables.",
-    inputSchema: projectIDInput,
-    annotations: readAnnotations,
-    outputSchema: outputSchema(
-      properties: [
-        "command_mode": ["type": "string", "enum": ["denied", "safe", "full"]],
-        "built_in_commands": arraySchema(builtInCommandSchema),
-        "registered_commands": arraySchema(projectCommandSchema),
-        "commands": arraySchema(projectCommandSchema),
-        "recommended_usage": [
-          "type": "object",
-          "additionalProperties": objectSchema(
-            properties: [
-              "command_id": stringSchema,
-              "argv": arraySchema(stringSchema),
-              "working_directory": stringSchema,
-            ],
-            required: ["argv"]
-          ),
-        ],
-      ],
-      required: [
-        "command_mode", "built_in_commands", "registered_commands", "commands",
-        "recommended_usage",
-      ]
-    )
-  )
 }

@@ -112,7 +112,9 @@
       Task {
         if model.connectionState != .connected { await model.startServiceAndConnect() }
         guard model.connectionState == .connected else { return }
-        refresh(page: page, model: model, management: management, auxiliary: auxiliary)
+        refresh(
+          page: page, model: model, management: management, auxiliary: auxiliary,
+          forceModelRefresh: true)
       }
     }
 
@@ -120,7 +122,8 @@
       page: WindowsMainPage,
       model: WindowsWorkbenchModel,
       management: WindowsManagementModel,
-      auxiliary: WindowsAuxiliaryRuntime
+      auxiliary: WindowsAuxiliaryRuntime,
+      forceModelRefresh: Bool = false
     ) {
       switch page {
       case .overview:
@@ -144,8 +147,8 @@
         }
       case .settings:
         Task {
-          await auxiliary.settings.refresh()
-          await auxiliary.agentDefaults.refresh()
+          await auxiliary.settings.refresh(forceModelRefresh: forceModelRefresh)
+          await auxiliary.agentDefaults.refresh(forceModelRefresh: forceModelRefresh)
         }
       }
     }

@@ -12,7 +12,7 @@
   ];
 
   function create(emit) {
-    var card = S.node("div", "connection-card dsh-mcp-card");
+    var card = S.node("div", "page-card connection-card dsh-mcp-card");
     var heading = S.node("div", "section-heading-row");
     var title = S.node("div");
     title.appendChild(S.node("h3", null, "Agent MCP 服务"));
@@ -110,8 +110,7 @@
       row.enabled = !!server.enabled;
       row.root.dataset.serverID = server.id;
       row.title.textContent = server.name;
-      row.badge.textContent = row.enabled ? "已启用" : "已停用";
-      row.badge.className = "status-badge " + (row.enabled ? "success" : "neutral");
+      S.updateStatus(row.badge, row.enabled ? "已启用" : "已停用", row.enabled ? "success" : "neutral");
       var detail = server.transport === "http" ? (server.url || "HTTP") : (server.command || "stdio");
       var configured = S.safeArray(server.environment).concat(S.safeArray(server.headers))
         .filter(function (item) { return typeof item === "string" || item.hasValue !== false; }).length;

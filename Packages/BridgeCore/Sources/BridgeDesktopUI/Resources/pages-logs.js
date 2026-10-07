@@ -14,17 +14,16 @@
     var header = S.node("div");
     var filters = createFilterBar(emit);
     var list = S.node("div", "log-list");
-    var detail = S.node("div", "page-message mono");
+    var entries = new Map();
+    var emptyRow = S.node("div", "empty-state");
     var unavailable = S.node("div");
     container.appendChild(header);
     container.appendChild(filters.root);
     container.appendChild(list);
-    container.appendChild(detail);
     container.appendChild(unavailable);
 
     return {
       update: function (page, nextEmit) {
-        filters.emit = nextEmit;
         if (!page) {
           S.pageHeader(header, {
             title: "日志",
@@ -33,7 +32,6 @@
           });
           filters.root.hidden = true;
           list.hidden = true;
-          detail.hidden = true;
           unavailable.hidden = false;
           S.empty(unavailable, "日志页暂不可用", "连接本机 Service 后，任务事件会显示在这里。");
           return;
@@ -41,26 +39,27 @@
         S.pageHeader(header, page.header);
         filters.root.hidden = false;
         list.hidden = false;
-        detail.hidden = !page.detailText;
         unavailable.hidden = true;
         filters.update(page, nextEmit);
-        var signature = JSON.stringify([page.rows, page.selectedRowID, page.searchText]);
-        var renderList = function () {
-          S.clear(list);
-          S.safeArray(page.rows).forEach(function (row) {
-            list.appendChild(logRow(row, page, filters.emit));
-          });
-          if (!page.rows || page.rows.length === 0) {
-            list.appendChild(S.node(
-              "div",
-              "empty-state",
-              page.searchText ? "没有匹配的日志事件。" : "暂无日志事件。"
-            ));
+        var rows = S.safeArray(page.rows), active = new Set(rows.map(function (row) { return row.id; }));
+        entries.forEach(function (entry, id) {
+          if (!active.has(id)) { entry.root.remove(); entries.delete(id); }
+        });
+        emptyRow.remove();
+        rows.forEach(function (row, index) {
+          var entry = entries.get(row.id);
+          if (!entry) { entry = logRow(); entries.set(row.id, entry); }
+          entry.update(row, page, nextEmit);
+          var atIndex = list.children[index];
+          if (atIndex !== entry.root) {
+            if (atIndex) list.insertBefore(entry.root, atIndex);
+            else list.appendChild(entry.root);
           }
-        };
-        var stable = global.CodexBridgeDesktopStableRender;
-        if (stable) stable(list, signature, renderList); else renderList();
-        detail.textContent = page.detailText || "";
+        });
+        if (!rows.length) {
+          emptyRow.textContent = page.searchText ? "没有匹配的日志事件。" : "暂无日志事件。";
+          list.appendChild(emptyRow);
+        }
       }
     };
   }
@@ -70,6 +69,7 @@
     var bar = S.node("div", "filter-bar");
     var search = S.node("input", "search-field");
     search.type = "search";
+    search.setAttribute("aria-label", "搜索日志");
     search.placeholder = "搜索日志摘要、命令或文件…";
     var searchDirty = false;
     var searchTimer = null;
@@ -120,7 +120,7 @@
       refresh.disabled = !page.canRefresh;
     }
 
-    return { root: bar, emit: context.emit, update: update };
+    return { root: bar, update: update };
   }
 
   function setOptions(control, choices, value, fallback) {
@@ -140,18 +140,36 @@
     control.value = value;
   }
 
-  function logRow(row, page, emit) {
-    var element = S.node("button", "log-row" + (row.id === page.selectedRowID ? " selected" : ""));
+  function logRow() {
+    var current = { row: null, emit: null };
+    var entry = S.node("article", "log-entry");
+    var element = S.node("button", "log-row");
     element.type = "button";
-    element.appendChild(S.node("span", "mono muted", "#" + row.sequence));
-    element.appendChild(S.node("span", "row-detail", row.projectName));
-    element.appendChild(S.badge(row.kindLabel || row.kind, row.kindLabel === "错误" ? "error" : "neutral"));
-    element.appendChild(S.node("span", "log-summary mono", row.summary));
-    element.appendChild(S.node("span", "log-time mono muted", row.timestamp));
+    var sequence = S.node("span", "mono muted"), project = S.node("span", "row-detail");
+    var kind = S.badge("", "neutral"), summary = S.node("span", "log-summary mono");
+    var time = S.node("span", "log-time mono muted");
+    [sequence, project, kind, summary, time].forEach(function (node) { element.appendChild(node); });
     element.addEventListener("click", function () {
-      emit("selectLog", { logID: row.id, taskID: row.taskID });
+      current.emit("selectLog", { logID: current.row.id, taskID: current.row.taskID });
     });
-    return element;
+    entry.appendChild(element);
+    var diagnostic = S.node("pre", "log-diagnostic mono");
+    entry.appendChild(diagnostic);
+    return {
+      root: entry,
+      update: function (row, page, emit) {
+        current.row = row; current.emit = emit;
+        var selected = row.id === page.selectedRowID, expanded = !!(selected && page.detailText);
+        entry.className = "log-entry" + (selected ? " selected" : "");
+        element.className = "log-row" + (selected ? " selected" : "");
+        element.setAttribute("aria-expanded", String(expanded));
+        sequence.textContent = "#" + row.sequence; project.textContent = row.projectName;
+        kind.textContent = row.kindLabel || row.kind;
+        kind.className = "status-badge " + (row.kindLabel === "错误" ? "error" : "neutral");
+        summary.textContent = row.summary; time.textContent = row.timestamp;
+        diagnostic.hidden = !expanded; diagnostic.textContent = expanded ? page.detailText : "";
+      }
+    };
   }
 
   global.CodexBridgeDesktopLogsPage = { render: render };

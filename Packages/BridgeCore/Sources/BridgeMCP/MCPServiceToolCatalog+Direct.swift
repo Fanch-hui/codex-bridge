@@ -210,14 +210,11 @@ extension MCPServiceToolCatalog {
     name: MCPServiceToolName.directExecCommand.rawValue,
     title: "Direct execute project command",
     description:
-      "Explicit Direct Workspace action that runs a user-registered project command (or a "
-      + "built-in safe command) on the local machine. Use only when the user explicitly asks "
-      + "the MCP client to run a command inside the project. For unfamiliar commands, call "
-      + "list_project_commands first and copy the non-empty argv plus command_id when present "
-      + "from recommended_usage. "
-      + "Absolute executable paths and project scripts may be "
-      + "rejected unless registered. After command_not_registered, do not probe alternate "
-      + "executables; follow next_action and list the allowed project commands. The session streams bounded "
+      "Explicit Direct Workspace action that runs a command on the local machine. Use only when the user explicitly asks "
+      + "the MCP client to run a command inside the project. Provide the executable and arguments in argv. "
+      + "Bridge checks each request against the local command policy before execution. "
+      + "If the command is denied, stop that command and do not try alternate executables, paths, "
+      + "or wrappers to bypass the denial. The session streams bounded "
       + "output and can be read with direct_read_command. tty must be false in this version.",
     inputSchema: objectSchema(
       properties: [

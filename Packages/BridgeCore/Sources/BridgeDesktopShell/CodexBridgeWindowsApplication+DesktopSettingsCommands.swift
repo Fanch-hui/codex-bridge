@@ -11,6 +11,8 @@
       case .saveDirectConfiguration:
         guard let value = payload.value else { return true }
         Task { @MainActor in await auxiliary.settings.saveDirectConfiguration(value) }
+      case .checkDirectCommand:
+        auxiliary.settings.checkDirectCommand(envelope)
       case .setDirectApprovalMode:
         guard let mode = BridgeDesktopCommandValue.nonEmpty(payload.mode) else { return true }
         Task { @MainActor in await auxiliary.settings.setDirectApprovalMode(mode) }

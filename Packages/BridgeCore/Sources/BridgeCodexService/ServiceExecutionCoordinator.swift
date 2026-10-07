@@ -124,7 +124,7 @@ public actor ServiceExecutionCoordinator {
         failureCode: conversationPersisted
           ? "execution_start_failed" : "conversation_persistence_failed",
         summary: conversationPersisted
-          ? "Codex could not start the task."
+          ? ExecutionStartFailurePresentation.summary(error, provider: "Codex")
           : "The task conversation could not be persisted."
       )
       throw error

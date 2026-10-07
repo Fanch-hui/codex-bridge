@@ -16,8 +16,12 @@ enum BridgeDesktopCommandRouter {
       model.appUpdater.install()
     case .deferAppUpdate:
       model.appUpdater.deferUpdate()
+    case .cancelAppUpdate:
+      model.appUpdater.cancel()
     case .saveDirectConfiguration:
       model.saveDirectConfiguration(envelope.payload.value)
+    case .checkDirectCommand:
+      model.checkDirectCommand(envelope)
     case .openExternalURL:
       guard let url = BridgeDesktopExternalURL.resolve(envelope.payload.value) else { return }
       NSWorkspace.shared.open(url)
@@ -77,6 +81,7 @@ enum BridgeDesktopCommandRouter {
     case .browserBack, .browserForward, .browserReload, .setBrowserEnabled,
       .openBrowserExternally, .loadEarlierConversation, .refreshConversation,
       .setWorkbenchPermissionMode, .selectTask, .refreshTasks, .interruptTask,
+      .searchTaskHistory, .selectTaskHistory,
       .stopTask, .deleteTask, .deleteSession, .steerTask, .resumeTask, .restartTask, .handoffTask,
       .resolveApproval, .resolveDirectApproval:
       handleWorkbench(envelope, model: model)

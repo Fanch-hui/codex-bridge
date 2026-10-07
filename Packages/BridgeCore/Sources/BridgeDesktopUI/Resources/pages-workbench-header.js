@@ -6,6 +6,7 @@
     if (status === "running" || status === "starting" || status === "运行中" || status === "正在启动") return "running";
     if (status === "completed" || status === "已完成" || status === "已创建" || status === "就绪") return "success";
     if (status === "failed" || status === "失败") return "error";
+    if (/等待|审批|排队|queued|waiting|awaiting/.test(status || "")) return "warning";
     return (status && status.indexOf("approval") >= 0) ? "warning" : "neutral";
   }
 
@@ -35,7 +36,7 @@
     }
     slot.classList.toggle("browser-hidden", !(browser.visible && browser.enabled));
     S.clear(note);
-    note.textContent = browser.status || "由宿主加载真实 ChatGPT 工作区";
+    note.textContent = browser.status || "正在加载 ChatGPT…";
     document.querySelector(".workbench-layout").classList.toggle("browser-collapsed", !browser.enabled);
   }
 
@@ -113,7 +114,6 @@
       if (model.emit) model.emit("setWorkbenchPermissionMode", { mode: "full" });
     });
     seg.appendChild(model.readOnly); seg.appendChild(model.write); row3.appendChild(seg);
-    header.appendChild(row3);
 
     model.taskRow = S.node("div", "inspector-header-row row-tasks");
     var taskWrap = S.node("div", "task-picker-wrap");
@@ -160,6 +160,8 @@
     });
     model.taskRow.appendChild(model.interrupt);
     header.appendChild(model.taskRow);
+    header.appendChild(row3);
+    model.historySearch = global.CodexBridgeDesktopTaskHistorySearch.create(header);
     model.queue = S.node("div", "workbench-queue-status");
     model.queueText = S.node("span", "muted");
     model.queue.appendChild(model.queueText);
@@ -183,6 +185,7 @@
 
   function updateInspectorHeader(model, page, emit) {
     model.page = page; model.emit = emit;
+    global.CodexBridgeDesktopTaskHistorySearch.update(model.historySearch, page, emit);
     model.openNativeSession.hidden = !(page.selectedTask && page.selectedTask.canOpenNativeSession);
     model.nativeHistory.disabled = !S.safeArray((page.nativeSessions || {}).installations).length;
     var browser = page.browser || {};
@@ -199,10 +202,9 @@
       ? currentProject.title : projects.length ? projects[0].title : "选择项目";
     S.clear(model.status);
     if (page.selectedTask) {
-      model.status.appendChild(S.badge(page.selectedTask.provider, "neutral"));
-      model.status.appendChild(S.badge(page.selectedTask.status, toneForStatus(page.selectedTask.status)));
+      model.status.appendChild(S.status(page.selectedTask.status, toneForStatus(page.selectedTask.status)));
     } else {
-      model.status.appendChild(S.badge(page.projectStatus || "就绪", page.projectStatusTone || "success"));
+      model.status.appendChild(S.status(page.projectStatus || "就绪", page.projectStatusTone || "success"));
     }
 
     var queueTask = page.selectedTask;
@@ -210,11 +212,13 @@
     if (queueTask && queueTask.queuePosition) {
       var queueText = "排队第 " + queueTask.queuePosition + " 位";
       if (queueTask.queueOccupantTaskID) queueText += " · 等待 " + queueTask.queueOccupantTaskID;
-      if (queueTask.queueRequestedAt) queueText += " · " + new Date(queueTask.queueRequestedAt).toLocaleString();
+      model.queueText.title = queueTask.queueRequestedAt ? new Date(queueTask.queueRequestedAt).toLocaleString() : "";
       model.queueText.textContent = queueText;
     }
     var readOnly = page.permissionMode === "read-only";
     model.readOnly.className = "segmented-btn" + (readOnly ? " is-active" : "");
+    model.readOnly.setAttribute("aria-pressed", String(readOnly));
+    model.write.setAttribute("aria-pressed", String(!readOnly));
     model.write.className = "segmented-btn" + (readOnly ? "" : " is-active");
 
     var tasks = S.safeArray(page.tasks), choices = [{ id: "", title: "选择 Agent 会话 (" + tasks.length + ")" }];
@@ -300,6 +304,7 @@
       page.browser && page.browser.enabled, page.browser && page.browser.canToggle,
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode,
       (page.nativeSessions || {}).installations,
+      page.taskHistorySearch,
       page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canOpenNativeSession, detail.canInterrupt, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
       S.safeArray(page.tasks).map(function (t) {
         return [t.taskID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];

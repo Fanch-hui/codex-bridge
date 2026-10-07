@@ -175,7 +175,7 @@
         action.disabled = !ready;
         actionHint.textContent = currentProvider.requiresHeadlessAlwaysProceed
           ? "连接前需要同意为 AGY 启用无头模式 Always Proceed。"
-          : "连接成功后会显示在本行状态中。";
+          : "";
       } else {
         action.disabled = true;
         actionHint.textContent = isConnectedValue ? "" : discoveryMessage(currentProvider);
@@ -256,12 +256,12 @@
       title.textContent = nextProvider.displayName;
       var primary = primaryInstallation(scoped);
       var isConnectedValue = scoped.some(isConnected);
-      status.textContent = stateLabel(nextProvider, primary, isConnectedValue);
-      status.className = "status-badge " + stateTone(nextProvider, primary, isConnectedValue);
+      S.updateStatus(status, stateLabel(nextProvider, primary, isConnectedValue),
+        stateTone(nextProvider, primary, isConnectedValue));
       detail.textContent = operation ? operation.message : rowDetail(nextProvider, scoped, primary, isConnectedValue);
       if (desktop.nativeMode()) {
-        status.textContent = desktop.connected() ? "已连接" : "等待桌面连接";
-        status.className = "status-badge " + (desktop.connected() ? "success" : "neutral");
+        S.updateStatus(status, desktop.connected() ? "已连接" : "等待桌面连接",
+          desktop.connected() ? "success" : "neutral");
         detail.textContent = "DSH 原生桌面会话";
       }
       fields.hidden = !nextProvider.requiresConfiguration || (!isConnectedValue && !!nextProvider.discoveredConfigurationPath)
@@ -393,7 +393,7 @@
       : discoveryState(provider) === "discovered" ? "warning" : "neutral";
   }
   function rowDetail(provider, items, primary, connected) {
-    if (connected) return "已连接 · " + primary.displayName
+    if (connected) return (primary.version || primary.displayName)
       + (items.length > 1 ? " · 另有 " + (items.length - 1) + " 个安装" : "");
     if (primary) return primary.displayName + (primary.version ? " · " + primary.version : "");
     return discoveryMessage(provider);

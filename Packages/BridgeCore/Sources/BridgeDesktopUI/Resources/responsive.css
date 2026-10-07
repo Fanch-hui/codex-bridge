@@ -62,7 +62,7 @@
   .inspector-header { gap: 6px; padding: 10px 14px; }
   .inspector-subtitle { display: none; }
   .form-grid, .form-grid.three { grid-template-columns: minmax(0, 1fr); }
-  .recent-task { grid-template-columns: 90px minmax(0, 1fr) 20px; }
+  .recent-task { grid-template-columns: 28px minmax(0, 1fr) 20px; }
   .recent-source, .recent-time { display: none; }
   .service-row { grid-template-columns: 28px minmax(0, 1fr); gap: 6px; padding-block: 10px; }
   .service-row > .status-badge { grid-column: 2; justify-self: start; }

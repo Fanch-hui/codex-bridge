@@ -51,14 +51,14 @@
         changedModel, selected && selected.defaultReasoningEffort);
       effort.control.disabled = !state.canSave || state.isRefreshingModels
         || state.canSelectEffort === false || !known || efforts.length === 0;
-      var message = "选择后自动保存。";
-      if (state.providerID === "antigravity") message = "模型选项已包含推理强度，选择后自动保存。";
-      else if (state.isRefreshingModels || !known) message = "正在获取模型推理强度…";
+      var message = "";
+      if (state.isRefreshingModels || !known) message = "正在获取模型推理强度…";
       else if (efforts.length === 0) message = "当前模型不提供可选推理强度，使用 Provider 默认。";
       else if (state.providerID === "deepseek-harness" && state.connectionMode !== "native-desktop") {
         message = "推理选项由 DSH 适配器提供，可能对不同模型返回相同选项；模型实际支持以 API 为准。";
       }
       error.textContent = state.errorMessage || message;
+      error.hidden = !error.textContent;
       return efforts;
     }
     model.control.addEventListener("change", function () {
@@ -75,18 +75,20 @@
       context.emit = nextEmit;
       desktopDefaultHint.hidden = next.providerID !== "deepseek-harness" || next.connectionMode !== "native-desktop";
       effort.wrapper.hidden = next.providerID === "antigravity";
-      title.textContent = next.providerName;
+      title.textContent = next.installationName || next.providerName;
+      title.hidden = !next.installationName;
       installation.textContent = next.installationName
         ? "安装：" + next.installationName
         : "连接 Agent 后会自动获取模型。";
-      installation.hidden = false;
+      installation.hidden = !!next.installationName;
+      installation.title = next.installationName || "";
       D.selectOptions(model.control, S.choices(next.model || "", modelOptions(next)));
       D.selectOptions(permission.control, S.choices(next.permissionMode, next.permissionOptions));
       var sameModel = model.control.value === (next.model || "");
       draft.update({ model: next.model || "", effort: sameModel ? next.effort || "" : effort.control.value, permission: next.permissionMode });
       sameModel = model.control.value === (next.model || "");
       updateEfforts(next, false);
-      permission.control.disabled = next.supportsWorkspaceWrite === false;
+      permission.control.disabled = !next.canSave || next.isRefreshingModels || next.supportsWorkspaceWrite === false;
       permissionHint.textContent = next.supportsWorkspaceWrite === false
         ? "当前安装的有效能力不包含工作区写入，将按只读执行。" : "";
       permissionHint.hidden = next.supportsWorkspaceWrite !== false;
@@ -94,7 +96,7 @@
       refresh.hidden = !next.canRefreshModels;
       refresh.disabled = !!next.isRefreshingModels;
       refresh.textContent = next.isRefreshingModels ? "刷新中…" : "刷新模型列表";
-      error.hidden = false;
+
     }
     update(item, emit);
     return { root: root, update: update };
@@ -104,35 +106,5 @@
     return [{ id: "", title: "Provider 默认" }].concat(M.modelChoices(item.modelOptions));
   }
 
-  function create(page, emit, embedded) {
-    var root = S.node(
-      embedded ? "div" : "section",
-      embedded ? "settings-subsection" : "page-card settings-card"
-    );
-    if (!embedded) root.appendChild(S.node("h3", null, "Agent模型与权限"));
-    var empty = S.node("div", "list-empty", "尚未读取 Agent 默认偏好。");
-    root.appendChild(empty);
-    var editors = new Map();
-    function update(next, nextEmit) {
-      var items = S.safeArray(next.agentDefaults);
-      var visible = new Set();
-      items.forEach(function (item) {
-        var key = JSON.stringify([item.providerID, item.installationID]);
-        visible.add(key);
-        var current = editors.get(key);
-        if (!current) {
-          current = editor(item, nextEmit);
-          editors.set(key, current);
-          root.appendChild(current.root);
-        }
-        current.root.hidden = false;
-        current.update(item, nextEmit);
-      });
-      editors.forEach(function (current, key) { current.root.hidden = !visible.has(key); });
-      empty.hidden = items.length > 0;
-    }
-    update(page, emit);
-    return { root: root, update: update };
-  }
-  global.CodexBridgeDesktopSettingsAgents = { create: create };
+  global.CodexBridgeDesktopSettingsAgents = { editor: editor };
 }(window));

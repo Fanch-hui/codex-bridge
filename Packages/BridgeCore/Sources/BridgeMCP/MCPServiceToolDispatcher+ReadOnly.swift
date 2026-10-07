@@ -41,8 +41,6 @@ extension MCPServiceToolDispatcher {
       return try await callReadSkill(arguments)
     case .getProjectChanges:
       return try await callGetProjectChanges(arguments)
-    case .listProjectCommands:
-      return try await callListProjectCommands(arguments)
     default:
       throw MCPError.invalidParams("Unknown tool name.")
     }
@@ -341,23 +339,6 @@ extension MCPServiceToolDispatcher {
       try await service.serviceProjectChanges(projectID: projectID, deadline: deadline)
     }
     return try resultEncoder.encode(ServiceProjectChangesOutput(changes: changes))
-
-  }
-
-  private func callListProjectCommands(_ arguments: [String: Value]?) async throws
-    -> CallTool.Result
-  {
-    let values = try StrictToolArguments(
-      arguments,
-      allowed: ["project_id"],
-      required: ["project_id"]
-    )
-    let projectID = try values.requiredIdentifier("project_id", maximumUTF8Bytes: 128)
-    let deadline = clock.now.advanced(by: deadlines.read)
-    let commands = try await withToolDeadline(until: deadline) {
-      try await service.serviceProjectCommands(projectID: projectID, deadline: deadline)
-    }
-    return try resultEncoder.encode(ServiceProjectCommandsOutput(commands: commands))
 
   }
 

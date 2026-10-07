@@ -359,6 +359,7 @@ let package = Package(
         "BridgeAgentCore",
         "BridgeIPC",
         "BridgeMCP",
+        "BridgeSecurity",
         .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),

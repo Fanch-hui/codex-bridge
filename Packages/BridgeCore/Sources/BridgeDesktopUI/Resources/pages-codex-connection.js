@@ -6,7 +6,6 @@
   function create(emit) {
     var context = { emit: emit };
     var section = S.node("section", "page-section");
-    section.appendChild(S.node("h3", null, "Codex 执行引擎"));
     var card = S.node("div", "page-card connection-card");
     section.appendChild(card);
     var titleRow = S.node("div", "section-heading-row");
@@ -28,6 +27,7 @@
       "",
       "留空自动发现；也可填写 codex.exe 或 npm 的 codex.cmd 绝对路径"
     );
+    var draft = global.CodexBridgeDesktopFormDraft.bind({ path: path.control });
     var pathActions = S.node("div", "form-actions");
     var savePath = S.node("button", "button small", "保存路径");
     savePath.type = "button";
@@ -52,17 +52,10 @@
       context.emit = nextEmit;
       var codex = page || {};
       var count = typeof codex.modelCount === "number" ? Math.max(0, codex.modelCount) : 0;
-      var state = codex.connectionState || "未知";
-      badge.textContent = statusLabel(codex, count);
-      badge.className = "status-badge " + statusTone(codex, count);
+      S.updateStatus(badge, statusLabel(codex, count), statusTone(codex, count));
       S.clear(facts);
-      addFact(facts, "Service", state);
-      addFact(facts, "模型目录", count + " 个");
       addFact(facts, "当前使用", resolvedLabel(codex));
-      if (document.activeElement !== path.control) {
-        var value = typeof codex.executablePath === "string" ? codex.executablePath : "";
-        if (path.control.value !== value) path.control.value = value;
-      }
+      draft.update({ path: typeof codex.executablePath === "string" ? codex.executablePath : "" });
       var editable = executableEditable(codex);
       path.control.disabled = !editable;
       savePath.disabled = !editable;
@@ -89,7 +82,7 @@
           );
         }
       }
-      refresh.textContent = codex.isRefreshing ? "刷新中…" : isConnected(codex, count) ? "刷新模型" : "连接";
+      refresh.textContent = codex.isRefreshing ? "刷新中…" : isConnected(codex, count) ? "重新连接" : "连接";
       refresh.disabled = codex.isRefreshing === true || codex.canRefresh !== true;
     }
 

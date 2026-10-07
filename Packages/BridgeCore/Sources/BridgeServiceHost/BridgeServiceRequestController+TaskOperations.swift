@@ -66,6 +66,8 @@ extension BridgeServiceRequestController {
     let snapshots = try await composition.application.serviceTasks(
       projectID: payload.projectID,
       limit: payload.limit,
+      search: payload.search, providerID: payload.providerID, status: payload.status,
+      offset: payload.offset ?? 0,
       deadline: Self.deadline()
     )
     return try BridgeServiceIPCCodec.success(

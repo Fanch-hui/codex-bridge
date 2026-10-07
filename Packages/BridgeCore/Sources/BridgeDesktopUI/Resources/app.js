@@ -102,14 +102,13 @@
     value.appendChild(elementWithText("span", "metric-number", metric.value));
     if (metric.destination) value.appendChild(elementWithText("span", "metric-chevron", "›"));
     button.appendChild(value);
-    button.appendChild(elementWithText("span", "metric-subtitle", metric.subtitle));
+    button.title = metric.subtitle || metric.title;
     if (metric.destination) button.addEventListener("click", function () { emit("selectPage", { navigation: metric.destination }); });
     return button;
   }
 
   function renderOverview(overview) {
     if (!overview) return;
-    document.getElementById("overview-title").textContent = overview.title;
     var metrics = document.getElementById("metrics");
     metrics.innerHTML = "";
     (overview.metrics || []).forEach(function (metric) { metrics.appendChild(renderMetric(metric)); });
@@ -135,7 +134,7 @@
       if (row.destination) { element.type = "button"; element.addEventListener("click", function () { emit("selectPage", { navigation: row.destination }); }); }
       element.appendChild(iconElement(row.symbol, "service-icon"));
       element.appendChild(elementWithText("span", "service-title", row.title));
-      element.appendChild(elementWithText("span", "status-badge " + toneClass(row.tone), row.value));
+      element.appendChild(window.CodexBridgeDesktopPageSupport.status(row.value, toneClass(row.tone)));
       container.appendChild(element);
     });
     if (actions && actions.length) {
@@ -171,7 +170,9 @@
       var row = document.createElement("button");
       row.type = "button";
       row.className = "recent-task";
-      row.appendChild(elementWithText("span", "status-badge " + recentTaskTone(task.status) + " recent-status", task.status));
+      var status = window.CodexBridgeDesktopPageSupport.status(task.status, recentTaskTone(task.status));
+      status.className += " recent-status";
+      row.appendChild(status);
       row.appendChild(elementWithText("span", "recent-source", task.source));
       var copy = document.createElement("span");
       copy.appendChild(elementWithText("span", "recent-title", task.title));
@@ -237,7 +238,11 @@
       ? state.overview.title : pageState && pageState.header ? pageState.header.title : selectedItem.title || "Codex Bridge";
     var indicator = document.getElementById("connection-indicator");
     indicator.className = "connection-indicator " + toneClass(state.connectionTone);
-    document.getElementById("connection-label").textContent = state.connectionLabel;
+    indicator.title = state.connectionLabel;
+    indicator.setAttribute("aria-label", state.connectionLabel);
+    var connectionLabel = document.getElementById("connection-label");
+    connectionLabel.textContent = state.connectionLabel;
+    connectionLabel.hidden = toneClass(state.connectionTone) === "success";
     document.getElementById("refresh-indicator").classList.toggle("is-visible", !!state.isRefreshing);
     document.querySelector(".refresh-button").classList.toggle("is-refreshing", !!state.isRefreshing);
     document.querySelector(".refresh-button").disabled = !!state.isRefreshing;

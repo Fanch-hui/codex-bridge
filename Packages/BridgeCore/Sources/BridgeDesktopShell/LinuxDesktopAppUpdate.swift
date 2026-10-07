@@ -61,9 +61,14 @@
           state.notes = release?.manifest.notes
           state.phase = release == nil ? "upToDate" : "available"
         } catch {
-          guard !Task.isCancelled else { return }
-          state.phase = automatically ? "idle" : "failed"
-          state.message = automatically ? nil : error.localizedDescription
+          if Task.isCancelled {
+            state.phase = release == nil ? "idle" : "available"
+            state.message = nil
+          } else {
+            state.phase = automatically ? "idle" : "failed"
+            state.message =
+              automatically ? nil : AppUpdateFailurePresentation.message(error, phase: "checking")
+          }
         }
         publish()
       }
@@ -84,7 +89,10 @@
       publish()
     }
 
-    func cancel() { operation?.cancel() }
+    func cancel() {
+      guard operation != nil else { return }
+      operation?.cancel()
+    }
 
     private func publish() {
       CodexBridgeDesktopApplication.appUpdateState = BridgeDesktopAppUpdateState(status: state)

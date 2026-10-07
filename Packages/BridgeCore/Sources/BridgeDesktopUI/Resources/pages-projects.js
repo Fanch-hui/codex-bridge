@@ -9,11 +9,11 @@
     var header = S.node("div"), toolbar = S.node("div", "page-toolbar");
     var add = S.button("添加项目", null, {}, null, "primary");
     add.addEventListener("click", function () { context.emit("registerProject", {}); });
-    toolbar.appendChild(S.node("span", "muted", "注册项目即授权读写该目录；Agent 任务权限由你选择。"));
+    toolbar.appendChild(S.node("span", "muted", "添加项目将授权读取、写入该目录。"));
     toolbar.appendChild(S.node("span", "toolbar-spacer")); toolbar.appendChild(add);
     var layout = S.node("div", "split-layout"), list = S.node("section", "list-panel");
     var detailHost = S.node("div", "project-detail-host"), empty = S.node("section", "detail-panel");
-    S.empty(empty, "请选择一个项目", "从左侧列表选择目录后，可以查看项目资源。");
+    S.empty(empty, "选择项目", "从左侧选择一个目录。");
     detailHost.appendChild(empty); layout.appendChild(list); layout.appendChild(detailHost);
     container.appendChild(header); container.appendChild(toolbar); container.appendChild(layout);
     return { header: header, add: add, layout: layout, list: list, detailHost: detailHost, empty: empty };
@@ -51,7 +51,7 @@
       S.clear(shell.list);
       var header = S.node("div", "list-panel-header"), copy = S.node("div");
       copy.appendChild(S.node("h3", null, "已注册项目"));
-      copy.appendChild(S.node("p", null, "共 " + S.safeArray(page.rows).length + " 个目录"));
+      copy.appendChild(S.node("span", "muted", String(S.safeArray(page.rows).length)));
       header.appendChild(copy); shell.list.appendChild(header);
       var body = S.node("div", "list-body");
       S.safeArray(page.rows).forEach(function (project) {
@@ -62,7 +62,7 @@
         text.appendChild(S.node("div", "row-detail", project.detail || project.projectID));
         row.appendChild(text);
         var gitState = S.gitStateBadge(project.gitState);
-        if (gitState) row.appendChild(S.badge(gitState.label, gitState.tone));
+        if (gitState) row.appendChild(S.status(gitState.label, gitState.tone));
         row.addEventListener("click", function () { context.emit("selectProject", { projectID: project.projectID }); });
         body.appendChild(row);
       });
@@ -77,7 +77,7 @@
     var current = { project: null, emit: null }, collectionsSignature = null;
     var root = S.node("section", "detail-panel"), header = S.node("div", "detail-panel-header");
     var title = S.node("div"), name = S.node("h3");
-    title.appendChild(name); title.appendChild(S.node("p", "muted mono", projectID)); header.appendChild(title);
+    title.appendChild(name); header.appendChild(title);
     var remove = S.button("移除项目", null, {}, null, "small danger", true);
     remove.addEventListener("click", function () {
       if (remove.disabled || !global.confirm("从 Codex Bridge 移除项目“" + current.project.name + "”？\n本地磁盘文件不会受到影响。")) return;

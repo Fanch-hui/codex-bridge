@@ -65,7 +65,11 @@ extension BridgeDesktopUIStateBuilder {
         BridgeDesktopDirectState(
           commandMode: $0.commandMode, allowedCommands: $0.allowedCommands,
           deniedCommands: $0.deniedCommands, usesProjectDefaults: $0.usesProjectDefaults == true,
-          canSave: model.connectionState == .connected && !model.isSavingDirectConfiguration)
+          canSave: model.connectionState == .connected && !model.isSavingDirectConfiguration,
+          check: BridgeDesktopDirectCheckState(
+            projects: model.projects.map { BridgeDesktopChoice(id: $0.projectID, title: $0.name) },
+            canCheck: model.connectionState == .connected && !model.isSavingDirectConfiguration,
+            status: model.directCommandChecker.state))
       }
     )
   }
@@ -156,7 +160,7 @@ extension BridgeDesktopUIStateBuilder {
         canRefreshModels: provider.supportsModelSelection
           && installation?.effectiveCapabilities.contains("selection.model") == true,
         isRefreshingModels: model.isRefreshingAgentModels(for: provider.providerID),
-        errorMessage: model.agentModelRefreshError(for: provider.providerID) ?? model.errorMessage,
+        errorMessage: model.agentModelRefreshError(for: provider.providerID),
         canSelectModel: provider.supportsModelSelection
           && installation?.effectiveCapabilities.contains("selection.model") == true,
         canSelectEffort: provider.supportsEffortSelection && installation != nil

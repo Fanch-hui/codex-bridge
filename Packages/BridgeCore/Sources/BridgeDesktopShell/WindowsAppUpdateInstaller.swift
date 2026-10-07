@@ -150,7 +150,7 @@
         packageURL = nil
         packageKind = nil
         pendingRelease = nil
-        throw WindowsAppUpdateInstallerError.packageUnavailable
+        throw error
       }
     }
 

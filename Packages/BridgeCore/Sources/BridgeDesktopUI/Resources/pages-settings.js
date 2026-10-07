@@ -2,15 +2,6 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var D = global.CodexBridgeDesktopFormDraft;
-  var M = global.CodexBridgeDesktopSettingsModels;
-
-  function group(container, title, className) {
-    var section = S.section(container, title);
-    if (className) section.className += " " + className;
-    var stack = S.node("div", "settings-stack");
-    section.appendChild(stack);
-    return stack;
-  }
 
   function create(container, page, emit, updateState) {
     S.clear(container);
@@ -18,45 +9,29 @@
     container.appendChild(header);
     var content = S.node("div", "settings-content-stack");
     container.appendChild(content);
+    var navigation = global.CodexBridgeDesktopSettingsNavigation.create(content, page, emit);
+    var approvalEditor = approvalCard(page, emit);
+    navigation.execution.appendChild(approvalEditor.root);
+    var serviceEditor = serviceCard(page, emit);
+    navigation.application.appendChild(serviceEditor.root);
     var appUpdate = global.CodexBridgeDesktopAppUpdate
       ? global.CodexBridgeDesktopAppUpdate.createSettings(updateState, emit) : null;
-    if (appUpdate) content.appendChild(appUpdate.root);
-    var models = group(content, "Agent模型与权限", "page-card settings-card");
-    var preferences = M.preferences(page, emit, true);
-    var agents = global.CodexBridgeDesktopSettingsAgents.create(page, emit, true);
-    var qoderPermissions = global.CodexBridgeDesktopSettingsQoderPermissions.create();
-    models.appendChild(preferences.root);
-    models.appendChild(agents.root);
-    models.appendChild(qoderPermissions.root);
-    var direct = global.CodexBridgeDesktopDirect.create();
-    content.appendChild(direct.root);
-    var safety = group(content, "GPT/Qwen的mcp插件权限与指令");
-    var approvals = S.node("div");
-    safety.appendChild(approvals);
-    var approvalEditor = approvalCard(page, emit);
-    approvals.appendChild(approvalEditor.root);
-    var instructions = global.CodexBridgeDesktopSettingsInstructions.create(page, emit);
-    safety.appendChild(instructions.root);
-    var service = group(content, "退出 App 后继续运行服务", "page-card settings-card");
+    if (appUpdate) navigation.application.appendChild(appUpdate.root);
     var status = S.node("div", "page-message");
-    content.appendChild(status);
-    var serviceEditor = serviceCard(page, emit);
-    service.appendChild(serviceEditor.root);
+    status.setAttribute("role", "status");
+    container.appendChild(status);
     var unavailable = S.node("div");
     S.empty(unavailable, "设置页暂不可用", "连接本机 Service 后，可以配置模型、安全审批与后台服务。");
     container.appendChild(unavailable);
     return {
+      details: navigation.details,
       update: function (next, nextEmit, nextUpdateState) {
         content.hidden = !next;
         unavailable.hidden = !!next;
-        S.pageHeader(header, next ? next.header : { title: "设置", subtitle: "正在从本机 Service 读取偏好设置。", symbol: "gearshape" });
+        S.pageHeader(header, next ? next.header : { title: "设置", symbol: "gearshape" });
         if (appUpdate) appUpdate.update(nextUpdateState, nextEmit);
-        if (!next) return;
-        direct.update(next.direct, nextEmit);
-        preferences.update(next, nextEmit);
-        agents.update(next, nextEmit);
-        qoderPermissions.update(next, nextEmit);
-        instructions.update(next, nextEmit);
+        if (!next) { status.hidden = true; return; }
+        navigation.update(next, nextEmit);
         approvalEditor.update(next, nextEmit);
         serviceEditor.update(next, nextEmit);
         status.textContent = next.statusMessage || "";
@@ -87,14 +62,13 @@
     }, "");
     card.appendChild(direct.wrapper);
     card.appendChild(task.wrapper);
-    card.appendChild(S.node("p", "hint", "策略仍由本机 Service 和项目权限强制执行。"));
+    var draft = D.bind({ direct: direct.control, task: task.control });
     function update(next, nextEmit) {
       context.page = next;
       context.emit = nextEmit;
       D.selectOptions(direct.control, S.choices(next.directApprovalMode, next.directApprovalOptions));
       D.selectOptions(task.control, S.choices(next.taskStartApprovalMode, next.taskStartApprovalOptions));
-      direct.control.value = next.directApprovalMode || "";
-      task.control.value = next.taskStartApprovalMode || "";
+      draft.update({ direct: next.directApprovalMode || "", task: next.taskStartApprovalMode || "" });
       direct.control.disabled = !next.canSaveApprovalModes;
       task.control.disabled = !next.canSaveApprovalModes;
     }
@@ -104,11 +78,9 @@
 
   function serviceCard(page, emit) {
     var context = { page: page, emit: emit };
-    var card = S.node("div", "settings-subsection");
+    var card = S.node("section", "settings-subsection");
+    card.appendChild(S.node("h3", null, "退出 App 后继续运行服务"));
     var description = S.node("p", "hint");
-    var platform = S.node("p", "hint");
-    card.appendChild(description);
-    card.appendChild(platform);
     var keepRow = S.node("div", "check-field");
     var keep = S.node("button", "switch-toggle");
     keep.type = "button";
@@ -131,6 +103,7 @@
       context.emit("setKeepServiceRunning", { keepServiceRunningAfterExit: keep.value === "true" });
     });
     card.appendChild(keepRow);
+    card.appendChild(description);
     var badge = S.badge("未注册", "warning");
     card.appendChild(badge);
     var serviceStatus = S.node("p", "hint");
@@ -140,9 +113,7 @@
     function update(next, nextEmit) {
       context.page = next;
       context.emit = nextEmit;
-      description.textContent = next.serviceDescription
-        || "开启后，即使退出 App，仍可通过 ChatGPT 的 Codex Bridge 插件远程使用本机。请配置好客户端与项目权限；需要无人值守运行时，将相关审批策略设为“自动批准”。";
-      platform.textContent = "平台：" + (next.servicePlatform || "未知");
+      description.textContent = "退出后仍可通过 ChatGPT / Qwen 使用本机。无人值守运行需将相关审批设为自动批准。";
       keepDraft.update({ keep: next.keepServiceRunningAfterExit ? "true" : "false" });
       updateSwitch();
       var needsAttention = next.serviceStatus

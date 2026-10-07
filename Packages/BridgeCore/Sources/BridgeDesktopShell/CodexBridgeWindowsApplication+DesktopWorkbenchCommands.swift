@@ -53,6 +53,10 @@
         synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
         selectedPage = .workbench
         onUI { DesktopPlatformHost.selectPage(.workbench) }
+      case .searchTaskHistory:
+        Task { @MainActor in await model.searchTaskHistory(payload) }
+      case .selectTaskHistory:
+        model.selectTaskHistory(payload.taskID)
       case .selectTask:
         guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID) else { return true }
         model.selectTask(id: taskID)

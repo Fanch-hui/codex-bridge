@@ -6,10 +6,11 @@ extension BridgeServiceRequestController {
     guard request.payload == nil else {
       throw BridgeServiceIPCCodecError.invalidMessage
     }
-    let canInstall = try await composition.application.prepareAppUpdate()
+    let status = try await composition.application.prepareAppUpdateStatus()
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
-      payload: IPCAppUpdatePreparationResponse(canInstall: canInstall)
+      payload: IPCAppUpdatePreparationResponse(
+        canInstall: status.canInstall, waitingReason: status.waitingReason)
     )
   }
 

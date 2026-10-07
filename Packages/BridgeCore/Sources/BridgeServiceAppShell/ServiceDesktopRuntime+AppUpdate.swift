@@ -46,6 +46,12 @@ extension BridgeServiceAppModel {
           await self.enableBackgroundService()
         }
         self.startPolling()
+      },
+      acquireInstallationStatus: { [weak self] in
+        guard let self else { throw CancellationError() }
+        let status = try await self.currentClient().prepareAppUpdateStatus()
+        return AppUpdateInstallationReadiness(
+          canInstall: status.canInstall, waitingReason: status.waitingReason)
       }
     )
     updater.onChange = { [weak self] status in

@@ -1,4 +1,3 @@
-import BridgeAgentCore
 import BridgeDirectCommand
 import BridgeMCP
 import BridgeSecurity
@@ -56,37 +55,9 @@ extension BridgeServiceApplication {
       throw BridgeMCPQueryError.contractRejected
     }
     let project = try await applyingDirectConfiguration(to: writableProject(request.projectID))
-    let unresolvedPolicyRequest = DirectCommandRequest(
-      projectID: project.id,
-      commandID: request.commandID,
-      argv: request.argv,
-      workingDirectory: request.workingDirectory,
-      requiresNetwork: requiresNetwork,
-      isValidatedSkillScript: isValidatedSkillScript
-    )
-    let resolvedExecutable: String?
-    if let builtInExecutable = commandPolicy.preferredSystemBuiltInExecutable(
-      project: project,
-      request: unresolvedPolicyRequest
-    ) {
-      resolvedExecutable = builtInExecutable
-    } else {
-      resolvedExecutable = try Self.resolvedExecutableForPolicy(
-        request: request,
-        project: project
-      )
-    }
-    let resolution = commandPolicy.resolve(
-      project: project,
-      request: DirectCommandRequest(
-        projectID: project.id,
-        commandID: request.commandID,
-        argv: request.argv,
-        resolvedExecutable: resolvedExecutable,
-        workingDirectory: request.workingDirectory,
-        requiresNetwork: requiresNetwork,
-        isValidatedSkillScript: isValidatedSkillScript
-      )
+    let resolution = try resolveDirectCommandPolicy(
+      request, project: project,
+      isValidatedSkillScript: isValidatedSkillScript, requiresNetwork: requiresNetwork
     )
     guard resolution.allowed else {
       throw BridgeMCPQueryError.commandDenied(
@@ -168,27 +139,6 @@ extension BridgeServiceApplication {
 
   private func stopDirectSession(_ sessionID: String) async {
     try? await directCommands.interrupt(sessionID: sessionID)
-  }
-
-  private static func resolvedExecutableForPolicy(
-    request: MCPDirectExecRequest,
-    project: ServiceProjectRecord
-  ) throws -> String? {
-    let requestedExecutable =
-      request.argv.first
-      ?? request.commandID.flatMap { commandID in
-        project.workspaceCommands.first(where: { $0.id == commandID })?.executable
-      }
-    guard let requestedExecutable, !requestedExecutable.isEmpty else { return nil }
-    guard
-      let resolved = try resolvedLaunchArgv(
-        [requestedExecutable],
-        project: project,
-        allowUnresolvedBareExecutable: true
-      ).first,
-      AgentPathSemantics.isAbsolute(resolved, style: .current)
-    else { return nil }
-    return resolved
   }
 
   private func receipt(for sessionID: String) async throws -> MCPDirectCommandReceipt {

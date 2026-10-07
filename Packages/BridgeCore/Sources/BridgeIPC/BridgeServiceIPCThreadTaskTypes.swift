@@ -55,15 +55,27 @@ public struct IPCThreadReadRequest: Codable, Equatable, Sendable {
 public struct IPCTaskListRequest: Codable, Equatable, Sendable {
   public let projectID: String?
   public let limit: Int
+  public let search: String?
+  public let providerID: String?
+  public let status: String?
+  public let offset: Int?
 
-  public init(projectID: String? = nil, limit: Int = 100) {
+  public init(
+    projectID: String? = nil, limit: Int = 100, search: String? = nil,
+    providerID: String? = nil, status: String? = nil, offset: Int? = nil
+  ) {
     self.projectID = projectID
     self.limit = limit
+    self.search = search
+    self.providerID = providerID
+    self.status = status
+    self.offset = offset
   }
 
   private enum CodingKeys: String, CodingKey {
     case projectID = "project_id"
-    case limit
+    case limit, search, status, offset
+    case providerID = "provider_id"
   }
 }
 

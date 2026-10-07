@@ -52,6 +52,8 @@ public struct DirectCommandResolution: Equatable, Sendable {
   public let workingDirectory: String?
   public let requiresNetwork: Bool
   public let reason: DirectCommandDenialReason?
+  public let ruleSource: String?
+  public let matchedRule: String?
 
   public init(
     allowed: Bool,
@@ -59,7 +61,9 @@ public struct DirectCommandResolution: Equatable, Sendable {
     argv: [String],
     workingDirectory: String? = nil,
     requiresNetwork: Bool,
-    reason: DirectCommandDenialReason?
+    reason: DirectCommandDenialReason?,
+    ruleSource: String? = nil,
+    matchedRule: String? = nil
   ) {
     self.allowed = allowed
     self.requiresApproval = requiresApproval
@@ -67,16 +71,22 @@ public struct DirectCommandResolution: Equatable, Sendable {
     self.workingDirectory = workingDirectory
     self.requiresNetwork = requiresNetwork
     self.reason = reason
+    self.ruleSource = ruleSource
+    self.matchedRule = matchedRule
   }
 
-  public static func denied(_ reason: DirectCommandDenialReason) -> DirectCommandResolution {
+  public static func denied(
+    _ reason: DirectCommandDenialReason, ruleSource: String? = nil, matchedRule: String? = nil
+  ) -> DirectCommandResolution {
     DirectCommandResolution(
       allowed: false,
       requiresApproval: false,
       argv: [],
       workingDirectory: nil,
       requiresNetwork: false,
-      reason: reason
+      reason: reason,
+      ruleSource: ruleSource,
+      matchedRule: matchedRule
     )
   }
 }

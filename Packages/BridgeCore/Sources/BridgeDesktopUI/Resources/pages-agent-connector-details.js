@@ -82,8 +82,8 @@
       update: function (next, context, pending) {
         current = next;
         name.textContent = next.displayName;
-        badge.textContent = availabilityLabel(next.availability, next.enabled);
-        badge.className = "status-badge " + availabilityTone(next.availability, next.enabled);
+        S.updateStatus(badge, availabilityLabel(next.availability, next.enabled),
+          availabilityTone(next.availability, next.enabled));
         path.textContent = next.executablePath || "未提供可执行路径";
         metadata.textContent = (next.version || "未识别")
           + " · ACP " + (next.protocolRevision || "未协商")

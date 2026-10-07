@@ -26,6 +26,8 @@ extension BridgeDesktopUIStateBuilder {
       permissionMode: model.workbenchPermissionMode,
       permissionOptions: permissionOptions,
       tasks: sessions.map { session in taskRow(session, model: model) },
+      taskHistorySearch: BridgeDesktopTaskHistorySearchState(
+        model.taskHistorySearch, providers: model.taskHistoryProviderChoices),
       selectedTaskID: model.selectedTaskID,
       selectedTask: selectedTask(from: model),
       history: threadHistory(from: model),

@@ -16,6 +16,9 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let currentStep: String?
   public let resultSummary: String?
   public let failureCode: String?
+  public let failureReason: String?
+  public let failureNextAction: String?
+  public let failureDiagnostic: String?
   public let changedFiles: [String]
   public let attachmentPaths: [String]?
   public let activity: [BridgeDesktopActivityRow]
@@ -51,6 +54,9 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     usage: AgentUsageStatistics? = nil,
     resultSummary: String? = nil,
     failureCode: String? = nil,
+    failureReason: String? = nil,
+    failureNextAction: String? = nil,
+    failureDiagnostic: String? = nil,
     changedFiles: [String] = [],
     attachmentPaths: [String]? = nil,
     activity: [BridgeDesktopActivityRow] = [],
@@ -85,6 +91,9 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.usage = usage
     self.resultSummary = resultSummary
     self.failureCode = failureCode
+    self.failureReason = failureReason
+    self.failureNextAction = failureNextAction
+    self.failureDiagnostic = failureDiagnostic
     self.changedFiles = changedFiles
     self.attachmentPaths = attachmentPaths
     self.activity = activity

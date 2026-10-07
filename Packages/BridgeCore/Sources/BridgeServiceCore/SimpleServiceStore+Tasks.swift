@@ -232,46 +232,6 @@ extension SimpleServiceStore {
     }
   }
 
-  public func tasks(projectID: ProjectID? = nil, limit: Int = 100) throws
-    -> [ServiceTaskRecord]
-  {
-    guard (1...500).contains(limit) else {
-      throw ServiceStoreError.invalidArgument("tasks.limit")
-    }
-    do {
-      return try database.read { db in
-        let rows: [Row]
-        if let projectID {
-          rows = try Row.fetchAll(
-            db,
-            sql: """
-              SELECT * FROM bridge_service_tasks
-              WHERE project_id = ?
-              ORDER BY updated_at DESC, task_id
-              LIMIT ?
-              """,
-            arguments: [projectID.rawValue, limit]
-          )
-        } else {
-          rows = try Row.fetchAll(
-            db,
-            sql: """
-              SELECT * FROM bridge_service_tasks
-              ORDER BY updated_at DESC, task_id
-              LIMIT ?
-              """,
-            arguments: [limit]
-          )
-        }
-        return try rows.map(Self.decodeTask)
-      }
-    } catch let error as ServiceStoreError {
-      throw error
-    } catch {
-      throw ServiceStoreError.storageFailure
-    }
-  }
-
   public func events(taskID: TaskID, limit: Int = 100) throws -> [ServiceTaskEventRecord] {
     guard (1...500).contains(limit) else {
       throw ServiceStoreError.invalidArgument("taskEvents.limit")

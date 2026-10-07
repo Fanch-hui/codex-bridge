@@ -72,6 +72,7 @@
     public var approvalDenyEnabled: Bool
     public var approvalStatusText: String?
     public var detailText: String?
+    public var taskHistorySearch: BridgeDesktopTaskHistorySearchState? = nil
     public var taskItems: [BridgeDesktopTaskRow] = []
     public var selectedTaskDetail: BridgeDesktopTaskDetail?
     public var history: BridgeDesktopThreadHistoryState = .init()
@@ -172,12 +173,18 @@
     var agentInstallations: [IPCAgentInstallationSummary] = [] {
       didSet { workbenchDisplayCache.installationsDidChange() }
     }
+    var taskHistorySearch = WorkbenchTaskHistorySearch()
+    var taskHistorySearchGeneration: UInt64 = 0
+    var selectedHistoryTaskID: String?
     var tasks: [MCPServiceTaskSnapshot] = [] {
       didSet { workbenchDisplayCache.tasksDidChange() }
     }
     var threads: [MCPThreadSummary] = []
     var selectedProjectID: String? {
-      didSet { workbenchDisplayCache.selectedProjectDidChange() }
+      didSet {
+        if oldValue != selectedProjectID { clearTaskHistorySearch() }
+        workbenchDisplayCache.selectedProjectDidChange()
+      }
     }
     var selectedThreadID: String?
     var selectedThreadPage: MCPThreadReadPage?

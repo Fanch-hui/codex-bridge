@@ -4,7 +4,7 @@
   function create() {
     var root = S.node("section", "page-card settings-card direct-settings-card");
     root.appendChild(S.node("h3", null, "Direct 工作区"));
-    root.appendChild(S.node("p", "hint", "规则适用于所有项目。优先级：黑名单 → 白名单 → 安全模式内置规则。命令按参数前缀匹配；项目访问权限和操作审批仍生效。"));
+    root.appendChild(S.node("p", "hint", "所有项目共用。黑名单优先于白名单，再检查安全模式规则；命令按参数前缀匹配。项目目录边界和本机审批仍生效。"));
     var context = { value: null, emit: null };
     var pending = Object.create(null);
     var mode = S.selectField("命令模式", "safe", [
@@ -13,7 +13,9 @@
     root.appendChild(mode.wrapper);
     var allowed = list("白名单", "allowedCommands", "例如：git status"), denied = list("黑名单", "deniedCommands", "例如：git push");
     root.appendChild(allowed.root); root.appendChild(denied.root);
-    root.appendChild(S.node("p", "hint", "输入一条命令后点击添加，例如 git status 或 npm test。带空格的参数使用引号，不支持管道和重定向。"));
+    root.appendChild(S.node("p", "hint", "带空格的参数使用引号，不支持管道和重定向。"));
+    var checker = commandChecker();
+    root.appendChild(checker.root);
     function save(change) {
       if (!context.value || !context.value.canSave) return;
       Object.keys(change).forEach(function (key) { pending[key] = change[key]; });
@@ -87,14 +89,108 @@
         rows.hidden = commands.length === 0;
       }};
     }
+    function commandChecker() {
+      var section = S.node("section"), previousProjects = null;
+      section.appendChild(S.node("h4", null, "命令校验"));
+      var help = S.node("p", "hint", "选择项目并输入命令，查看当前规则是否允许。校验不会执行命令；实际运行仍检查审批、目录和程序状态。");
+      help.id = "direct-command-check-help";
+      section.appendChild(help);
+      var project = S.selectField("项目", "", [], renderResult, "");
+      var command = S.textField("待校验命令", "", "例如：git status --short");
+      var directory = S.textField("工作目录", "", "项目内相对路径，留空使用项目根目录");
+      [project.control, command.control, directory.control].forEach(function (control, index) {
+        control.setAttribute("aria-label", ["命令校验项目", "待校验命令", "命令校验工作目录"][index]);
+        control.setAttribute("aria-describedby", help.id);
+      });
+      command.control.required = true;
+      command.control.maxLength = 4096;
+      directory.control.maxLength = 1024;
+      section.appendChild(project.wrapper);
+      section.appendChild(command.wrapper);
+      section.appendChild(directory.wrapper);
+      var checkButton = S.button("校验命令", null, {}, null, "small primary", true);
+      var result = S.node("div", "page-message");
+      result.setAttribute("role", "status");
+      result.setAttribute("aria-live", "polite");
+      result.style.whiteSpace = "pre-wrap";
+      result.hidden = true;
+      checkButton.addEventListener("click", function () {
+        if (checkButton.disabled || !context.emit) return;
+        result.hidden = false;
+        result.textContent = "正在校验命令…";
+        checkButton.disabled = true;
+        context.emit("checkDirectCommand", {
+          projectID: project.control.value,
+          input: command.control.value.trim(),
+          workingDirectory: directory.control.value.trim()
+        });
+      });
+      command.control.addEventListener("input", renderResult);
+      directory.control.addEventListener("input", renderResult);
+      section.appendChild(checkButton);
+      section.appendChild(result);
+      function renderResult() {
+        var state = context.value && context.value.check;
+        var available = state && state.canCheck && S.safeArray(state.projects).length > 0;
+        project.control.disabled = !available;
+        checkButton.disabled = !available || state.isChecking || !command.control.value.trim();
+        section.setAttribute("aria-busy", state && state.isChecking ? "true" : "false");
+        result.hidden = false;
+        result.className = "page-message";
+        if (!available) {
+          result.textContent = S.safeArray(state && state.projects).length === 0
+            ? "登记项目并连接后台服务后即可校验命令。" : "等待后台服务连接或当前设置保存完成后再校验。";
+          return;
+        }
+        var matches = state.projectID === project.control.value
+          && state.commandLine === command.control.value.trim()
+          && state.workingDirectory === directory.control.value.trim();
+        if (!matches) { result.hidden = true; return; }
+        if (state.isChecking) { result.textContent = "正在校验命令…"; return; }
+        if (state.errorMessage) {
+          result.className = "page-message warning";
+          result.textContent = state.errorMessage;
+          return;
+        }
+        var outcome = state.result;
+        if (!outcome) { result.hidden = true; return; }
+        var lines = [outcome.message];
+        if (outcome.matchedRule) lines.push("命中规则：" + outcome.matchedRule);
+        if (outcome.executable) lines.push("执行文件：" + outcome.executable);
+        if (outcome.workingDirectory) lines.push("工作目录：" + outcome.workingDirectory);
+        if (outcome.allowed) lines.push(outcome.requiresApproval ? "实际执行需要本机批准。" : "当前 Direct 审批设置为自动批准。");
+        if (outcome.nextAction) lines.push(outcome.nextAction);
+        result.className = "page-message " + (outcome.allowed ? "success" : "warning");
+        result.textContent = lines.join("\n");
+      }
+      return { root: section, update: function (state) {
+        section.hidden = !state;
+        if (!state) return;
+        var choices = S.safeArray(state.projects), signature = JSON.stringify(choices);
+        if (signature !== previousProjects) {
+          previousProjects = signature;
+          var selected = project.control.value;
+          S.clear(project.control);
+          choices.forEach(function (choice) {
+            var option = S.node("option", null, choice.title);
+            option.value = choice.id;
+            project.control.appendChild(option);
+          });
+          project.control.value = choices.some(function (choice) { return choice.id === selected; })
+            ? selected : (choices[0] ? choices[0].id : "");
+        }
+        renderResult();
+      }};
+    }
     return { root: root, update: function (value, emit) {
-      if (context.value) acknowledge(value);
+      if (context.value && value) acknowledge(value);
       context = { value: value, emit: emit };
       root.hidden = !value;
       if (!value) return;
       var effective = effectiveValue(value);
       mode.control.value = effective.commandMode; mode.control.disabled = !effective.canSave;
       allowed.update(value); denied.update(value);
+      checker.update(value.check);
     }};
   }
   global.CodexBridgeDesktopDirect = { create: create };

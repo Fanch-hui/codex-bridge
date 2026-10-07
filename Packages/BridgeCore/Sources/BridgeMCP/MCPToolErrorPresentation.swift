@@ -195,12 +195,12 @@ extension BridgeMCPQueryError {
         return commandError(structuredReason)
       }
       return error(
-        "command_denied", .policyDenied, false, "list_project_commands",
-        "The requested command was denied: \(OutboundContentSecurity.redacted(reason, maximumUTF8Bytes: 2 * 1_024))"
+        "command_denied", .policyDenied, false, "do_not_retry_command",
+        "The command is not allowed."
       )
     case .processLaunchFailed:
       return error(
-        "process_launch_failed", .capabilityUnavailable, true, "list_project_commands",
+        "process_launch_failed", .capabilityUnavailable, true, "check_command_environment",
         "The command could not be launched from the approved Direct environment."
       )
     case .gitOperationFailed(let summary):
@@ -271,22 +271,14 @@ extension BridgeMCPQueryError {
     let nextAction: String
     let message: String
     switch reason {
-    case .commandNotRegistered:
+    case .commandNotRegistered, .commandModeDenied, .blacklisted:
       category = .policyDenied
-      nextAction = "list_project_commands"
-      message = "The command is not registered or available in this project's Direct policy."
+      nextAction = "do_not_retry_command"
+      message = "The command is not allowed."
     case .invalidArguments:
       category = .callerError
       nextAction = "fix_command_arguments"
-      message = "The command arguments do not match the registered command contract."
-    case .commandModeDenied:
-      category = .policyDenied
-      nextAction = "do_not_run_direct_commands"
-      message = "Direct command execution is disabled for this project."
-    case .blacklisted:
-      category = .policyDenied
-      nextAction = "do_not_retry_command"
-      message = "The command is blacklisted by the project policy."
+      message = "The command arguments are invalid."
     }
     return error(reason.rawValue, category, false, nextAction, message)
   }

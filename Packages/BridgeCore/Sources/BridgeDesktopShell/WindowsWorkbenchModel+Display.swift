@@ -183,6 +183,8 @@
           approvalDenyEnabled: approvalActionsEnabled,
           approvalStatusText: approvalStatusText,
           detailText: errorMessage ?? projectLoadError,
+          taskHistorySearch: BridgeDesktopTaskHistorySearchState(
+            taskHistorySearch, providers: taskHistoryProviderChoices),
           taskItems: taskItems,
           selectedTaskDetail: selectedTaskDetail,
           history: BridgeDesktopThreadHistoryState(),

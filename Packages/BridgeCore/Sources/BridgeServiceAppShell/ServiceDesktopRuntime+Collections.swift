@@ -115,7 +115,10 @@ extension BridgeServiceAppModel {
     refreshDeepSeekDesktopStates()
   }
 
-  func applyTaskSnapshot(_ value: [MCPServiceTaskSnapshot]) {
+  func applyTaskSnapshot(_ refreshed: [MCPServiceTaskSnapshot]) {
+    let value = WorkbenchTaskHistorySearch.retainingSelection(
+      in: refreshed, prior: tasks, selectedTaskID: selectedTaskID,
+      historyTaskID: selectedHistoryTaskID)
     let selectedTaskBeforeRefresh = selectedTaskID.flatMap { selectedTaskID in
       tasks.first(where: { $0.taskID == selectedTaskID })
     }

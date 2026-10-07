@@ -17,9 +17,12 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func directConfiguration() async throws -> IPCDirectConfiguration
   func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
     -> IPCDirectConfiguration
+  func checkDirectCommand(_ request: IPCDirectCommandCheckRequest) async throws
+    -> IPCDirectCommandCheckResult
 
   func status() async throws -> IPCServiceStatusResponse
   func prepareAppUpdate() async throws -> Bool
+  func prepareAppUpdateStatus() async throws -> IPCAppUpdatePreparationResponse
   func cancelAppUpdate() async throws
   func projects() async throws -> [MCPProjectSummary]
   func registerProject(_ request: IPCProjectRegistrationRequest) async throws -> MCPProjectDetail
@@ -242,6 +245,10 @@ extension BridgeServiceClientProtocol {
     throw BridgeServiceClientError.serviceRestartRequired
   }
 
+  public func prepareAppUpdateStatus() async throws -> IPCAppUpdatePreparationResponse {
+    IPCAppUpdatePreparationResponse(canInstall: try await prepareAppUpdate())
+  }
+
   public func cancelAppUpdate() async throws {
     throw BridgeServiceClientError.serviceRestartRequired
   }
@@ -252,6 +259,9 @@ extension BridgeServiceClientProtocol {
   public func updateDirectConfiguration(_ value: IPCDirectConfiguration) async throws
     -> IPCDirectConfiguration
   { throw BridgeServiceClientError.unavailable }
+  public func checkDirectCommand(_ request: IPCDirectCommandCheckRequest) async throws
+    -> IPCDirectCommandCheckResult
+  { throw BridgeServiceClientError.serviceRestartRequired }
 
   public func modelCatalog(forceRefresh: Bool) async throws -> IPCModelCatalogResponse {
     guard !forceRefresh else { throw BridgeServiceClientError.unavailable }

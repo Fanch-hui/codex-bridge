@@ -29,7 +29,6 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case steerTask = "steer_task"
   case interruptTask = "interrupt_task"
   case getProjectChanges = "get_project_changes"
-  case listProjectCommands = "list_project_commands"
   case directWriteProjectFile = "direct_write_project_file"
   case directEditProjectFile = "direct_edit_project_file"
   case directApplyProjectPatch = "direct_apply_project_patch"
@@ -108,7 +107,6 @@ public struct MCPServiceToolCatalog: Sendable {
     contract(.getTask, getTask, exposure: .readOnly, route: .task),
     contract(.waitTask, waitTask, exposure: .readOnly, route: .task),
     contract(.getProjectChanges, getProjectChanges, exposure: .readOnly, route: .readOnly),
-    contract(.listProjectCommands, listProjectCommands, exposure: .readOnly, route: .readOnly),
     contract(
       .indexAgentNativeSession, indexAgentNativeSession, exposure: .full,
       route: .nativeSessionDirectory),

@@ -104,24 +104,37 @@ extension BridgeServiceAppModel {
   }
 
   private func refreshSettingsCollections(client: any BridgeServiceClientProtocol) async {
-    let preferenceGeneration = codexModelCatalogRequests.preferenceGeneration
     async let configurationResult = try? await client.directConfiguration()
     async let approvalModeResult = try? await client.directApprovalMode()
     async let taskStartModeResult = try? await client.taskStartApprovalMode()
     async let instructionsResult = try? await client.customInstructions()
-    async let preferencesResult = try? await client.modelPreferences()
+    async let modelsResult: Void = refreshSettingsModels(client: client)
     if let value = await configurationResult { directConfiguration = value }
     if let value = await approvalModeResult { directApprovalMode = value }
     if let value = await taskStartModeResult { taskStartApprovalMode = value }
     if let value = await instructionsResult { customInstructions = value }
-    if let value = await preferencesResult,
-      preferenceGeneration == codexModelCatalogRequests.preferenceGeneration,
-      !codexModelCatalogRequests.isSavingPreferences
-    {
-      modelPreferences = value
-    }
+    await modelsResult
     if let installationID = focusedAgentNativePermissionInstallationID {
       await loadNativePermissionPolicy(installationID: installationID)
     }
   }
+
+  private func refreshSettingsModels(client: any BridgeServiceClientProtocol) async {
+    if let catalog = try? await client.agentCatalog() { applyAgentCatalogSnapshot(catalog) }
+    let refreshes: [Task<Void, Never>?] = agentProviders.map { provider in
+      let candidates = agentInstallations.filter {
+        $0.providerID == provider.providerID && $0.isEnabled && $0.availability == "available"
+      }
+      if let installation = candidates.first(where: { $0.isActive == true }) ?? candidates.first {
+        return refreshAgentModelCatalog(
+          installationID: installation.installationID, providerID: provider.providerID)
+      }
+      return Task {
+        await hydrateAgentModelState(installationID: nil, providerID: provider.providerID)
+      }
+    }
+    await refreshCodexModels()
+    for refresh in refreshes { await refresh?.value }
+  }
+
 }

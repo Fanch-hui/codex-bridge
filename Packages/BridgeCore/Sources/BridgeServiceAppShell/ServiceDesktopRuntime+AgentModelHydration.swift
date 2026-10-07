@@ -55,6 +55,7 @@ extension BridgeServiceAppModel {
 
     let persistedDefault = try? await client.agentModelDefault(providerID: providerID)
     let modelResponse: IPCAgentModelsResponse?
+    let modelReadSucceeded: Bool
     if let installationID = normalizedInstallationID {
       let rawResponse = try? await client.agentModels(
         installationID: installationID,
@@ -68,18 +69,21 @@ extension BridgeServiceAppModel {
           modelID: defaultModel, models: rawResponse.models)?
           .reasoningCapabilitiesAvailable == false
       {
-        modelResponse =
-          (try? await client.agentModels(
-            installationID: installationID,
-            projectID: projectID,
-            modelID: defaultModel,
-            useStoredDefault: false
-          )) ?? rawResponse
+        let detailedResponse = try? await client.agentModels(
+          installationID: installationID,
+          projectID: projectID,
+          modelID: defaultModel,
+          useStoredDefault: false
+        )
+        modelResponse = detailedResponse ?? rawResponse
+        modelReadSucceeded = detailedResponse != nil
       } else {
         modelResponse = rawResponse
+        modelReadSucceeded = rawResponse != nil
       }
     } else {
       modelResponse = nil
+      modelReadSucceeded = false
     }
 
     guard !Task.isCancelled,
@@ -92,6 +96,9 @@ extension BridgeServiceAppModel {
       defaultRevision == agentModelDefaultRevision(for: providerID),
       let persistedDefault
     else { return }
+    if modelReadSucceeded, catalogGeneration == agentModelCatalogGeneration(for: providerID) {
+      setAgentModelRefreshError(nil, providerID: providerID)
+    }
     if providerID == "pi", let modelID = persistedDefault.model, let modelResponse,
       let canonical = AgentModelCatalogResolver.modelForSelection(
         modelID: modelID, models: modelResponse.models),

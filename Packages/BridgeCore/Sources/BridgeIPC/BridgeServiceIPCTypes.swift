@@ -5,6 +5,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case status
   case getDirectConfiguration = "get_direct_configuration"
   case updateDirectConfiguration = "update_direct_configuration"
+  case checkDirectCommand = "check_direct_command"
   case listProjects = "list_projects"
   case registerProject = "register_project"
   case removeProject = "remove_project"
@@ -200,12 +201,16 @@ public struct IPCServiceShutdownResponse: Codable, Equatable, Sendable {
 public struct IPCAppUpdatePreparationResponse: Codable, Equatable, Sendable {
   public let canInstall: Bool
 
-  public init(canInstall: Bool) {
+  public let waitingReason: String?
+
+  public init(canInstall: Bool, waitingReason: String? = nil) {
     self.canInstall = canInstall
+    self.waitingReason = waitingReason
   }
 
   private enum CodingKeys: String, CodingKey {
     case canInstall = "can_install"
+    case waitingReason = "waiting_reason"
   }
 }
 

@@ -20,12 +20,12 @@ extension ServiceExecutionCoordinator {
     do {
       _ = try await start(taskID: taskID)
     } catch {
-      await failScheduledStart(taskID: taskID)
+      await failScheduledStart(taskID: taskID, error: error)
     }
     scheduledStarts.removeValue(forKey: taskID)
   }
 
-  private func failScheduledStart(taskID: TaskID) async {
+  private func failScheduledStart(taskID: TaskID, error: any Error) async {
     guard !isShuttingDown, !finishedRuns.contains(taskID),
       let task = try? await tasks.task(id: taskID), task.state.status == .starting
     else { return }
@@ -37,7 +37,7 @@ extension ServiceExecutionCoordinator {
           ? "execution_start_failed" : "agent_start_failed")
         : "conversation_persistence_failed",
       summary: persisted
-        ? "The approved task could not start its provider execution."
+        ? ExecutionStartFailurePresentation.summary(error, provider: task.providerID)
         : "The task conversation could not be persisted."
     )
   }

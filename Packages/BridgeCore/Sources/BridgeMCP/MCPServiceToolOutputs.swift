@@ -1,16 +1,6 @@
 import BridgeFiles
 import Foundation
 
-struct ServiceGetProjectOutput: Codable, Sendable {
-  let schemaVersion = 1
-  let project: MCPProjectDetail
-
-  private enum CodingKeys: String, CodingKey {
-    case schemaVersion = "schema_version"
-    case project
-  }
-}
-
 struct ListSkillsOutput: Codable, Sendable {
   let schemaVersion = 1
   let skills: [MCPServiceSkill]
@@ -202,61 +192,6 @@ struct ServiceMutateTaskOutput: Codable, Sendable {
     case taskID = "task_id"
     case status
     case accepted
-  }
-}
-
-struct ServiceProjectChangesOutput: Codable, Sendable {
-  let schemaVersion = 1
-  let changedFiles: [String]
-  let diff: String
-  let additions: Int
-  let deletions: Int
-  let truncated: Bool
-  let notGitRepository: Bool
-
-  init(changes: MCPProjectChanges) {
-    changedFiles = changes.changedFiles
-    diff = changes.diff
-    additions = changes.additions
-    deletions = changes.deletions
-    truncated = changes.truncated
-    notGitRepository = changes.notGitRepository
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case schemaVersion = "schema_version"
-    case changedFiles = "changed_files"
-    case diff
-    case additions
-    case deletions
-    case truncated
-    case notGitRepository = "not_git_repository"
-  }
-}
-
-struct ServiceProjectCommandsOutput: Codable, Sendable {
-  let schemaVersion = 1
-  let commandMode: String
-  let builtInCommands: [MCPBuiltInCommand]
-  let registeredCommands: [MCPProjectCommand]
-  let commands: [MCPProjectCommand]
-  let recommendedUsage: [String: MCPRecommendedCommandUsage]
-
-  init(commands: MCPProjectCommands) {
-    commandMode = commands.commandMode
-    builtInCommands = commands.builtInCommands
-    registeredCommands = commands.commands
-    self.commands = commands.commands
-    recommendedUsage = commands.recommendedUsage
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case schemaVersion = "schema_version"
-    case commandMode = "command_mode"
-    case builtInCommands = "built_in_commands"
-    case registeredCommands = "registered_commands"
-    case commands
-    case recommendedUsage = "recommended_usage"
   }
 }
 

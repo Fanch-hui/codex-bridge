@@ -85,6 +85,8 @@
         appUpdater?.install()
       case .deferAppUpdate:
         appUpdater?.deferUpdate()
+      case .cancelAppUpdate:
+        appUpdater?.cancel()
       case .refreshModels:
         Task { @MainActor in await auxiliary.refreshModels(model: model) }
       case .setCodexExecutable:

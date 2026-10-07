@@ -76,7 +76,7 @@
       }
     }
 
-    func refresh() async {
+    func refresh(forceModelRefresh: Bool = false) async {
       guard !busy else { return }
       busy = true
       statusText = "正在读取 Agent 目录…"
@@ -97,7 +97,7 @@
         return
       }
       busy = false
-      await refreshAllProviderModels()
+      await refreshAllProviderModels(forceRefresh: forceModelRefresh)
       await refreshNativePermissionPolicy()
     }
 

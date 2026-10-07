@@ -2,12 +2,16 @@ import Foundation
 
 extension BridgeServiceClient {
   public func prepareAppUpdate() async throws -> Bool {
+    try await prepareAppUpdateStatus().canInstall
+  }
+
+  public func prepareAppUpdateStatus() async throws -> IPCAppUpdatePreparationResponse {
     do {
       let response: IPCAppUpdatePreparationResponse = try await call(
         operation: .prepareAppUpdate,
         payload: Optional<IPCMutationResponse>.none
       )
-      return response.canInstall
+      return response
     } catch {
       throw Self.mapAppUpdateCompatibilityError(error)
     }

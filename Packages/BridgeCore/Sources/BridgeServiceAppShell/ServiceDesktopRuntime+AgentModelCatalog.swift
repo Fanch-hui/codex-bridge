@@ -3,18 +3,19 @@ import BridgeServiceAppCore
 import Foundation
 
 extension BridgeServiceAppModel {
+  @discardableResult
   func refreshAgentModelCatalog(
     installationID: String?,
     providerID: String = "opencode",
     forceRefresh: Bool = true
-  ) {
-    guard !agentModelRefreshingProviders.contains(providerID) else { return }
+  ) -> Task<Void, Never>? {
+    guard !agentModelRefreshingProviders.contains(providerID) else { return nil }
     guard let installationID, !installationID.isEmpty else {
       setAgentModelRefreshError(
         "暂无已启用且可用的 \(agentProviderName(providerID)) 安装。",
         providerID: providerID
       )
-      return
+      return nil
     }
 
     updateAgentModelScope(
@@ -33,7 +34,7 @@ extension BridgeServiceAppModel {
       forceRefresh || agentModelOptions(for: providerID).isEmpty, providerID: providerID)
     setAgentModelRefreshError(nil, providerID: providerID)
 
-    Task { [weak self, previousMutation] in
+    return Task { [weak self, previousMutation] in
       guard let self else { return }
       await self.performAgentModelCatalogRefresh(
         installationID: installationID,

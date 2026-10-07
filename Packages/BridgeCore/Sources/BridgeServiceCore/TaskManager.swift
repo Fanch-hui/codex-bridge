@@ -367,10 +367,13 @@ public actor ServiceTaskManager {
     )
   }
 
-  public func tasks(projectID: ProjectID? = nil, limit: Int = 100) async throws
-    -> [ServiceTaskRecord]
-  {
-    try await store.tasks(projectID: projectID, limit: limit)
+  public func tasks(
+    projectID: ProjectID? = nil, limit: Int = 100, search: String? = nil,
+    providerID: String? = nil, status: String? = nil, offset: Int = 0
+  ) async throws -> [ServiceTaskRecord] {
+    try await store.tasks(
+      projectID: projectID, limit: limit, search: search,
+      providerID: providerID, status: status, offset: offset)
   }
 
   public func nonterminalTasks() async throws -> [ServiceTaskRecord] {

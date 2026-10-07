@@ -132,7 +132,7 @@
 
 :root[data-platform="windows"] .metric-card,
 :root[data-platform="windows"] .surface-card {
-  box-shadow: var(--shadow-surface);
+  box-shadow: none;
 }
 
 @media (prefers-color-scheme: dark) {

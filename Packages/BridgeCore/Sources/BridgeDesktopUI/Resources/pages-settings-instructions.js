@@ -5,8 +5,7 @@
 
   function create(page, emit) {
     var context = { page: page, emit: emit };
-    var card = S.node("section", "page-card settings-card");
-    card.appendChild(S.node("h3", null, "全局自定义指令"));
+    var card = S.node("section", "settings-subsection");
     var field = S.node("div", "field");
     field.appendChild(S.node("label", null, "给 GPT / Qwen 的指令"));
     var text = S.node("textarea");
@@ -24,6 +23,7 @@
       var bytes = new TextEncoder().encode(text.value).length;
       var valid = text.value.indexOf("\u0000") < 0 && bytes <= 32768;
       counter.textContent = bytes + " / 32768 字节" + (valid ? "" : " · 内容过长或包含 NUL 字符");
+      counter.hidden = valid && bytes < 24576;
       save.disabled = !context.page.canSaveInstructions || !valid;
     }
     text.addEventListener("input", validate);

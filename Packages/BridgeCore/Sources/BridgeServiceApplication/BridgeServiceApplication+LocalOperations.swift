@@ -124,6 +124,7 @@ extension BridgeServiceApplication {
   public func serviceTasks(
     projectID: String?,
     limit: Int,
+    search: String? = nil, providerID: String? = nil, status: String? = nil, offset: Int = 0,
     deadline: ContinuousClock.Instant
   ) async throws -> [MCPServiceTaskSnapshot] {
     try Self.checkDeadline(deadline)
@@ -132,7 +133,7 @@ extension BridgeServiceApplication {
     }
     let records = try await tasks.tasks(
       projectID: projectID.map { ProjectID(rawValue: $0) },
-      limit: limit
+      limit: limit, search: search, providerID: providerID, status: status, offset: offset
     )
     let activity = try await tasks.listActivity(taskIDs: records.map(\.id))
     let usage = try await tasks.usage(taskIDs: records.map(\.id))
