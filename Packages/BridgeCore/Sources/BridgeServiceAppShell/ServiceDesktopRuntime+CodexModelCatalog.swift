@@ -64,7 +64,9 @@ extension BridgeServiceAppModel {
   ) async {
     let generation = codexModelCatalogRequests.beginCatalog()
     do {
-      let catalog = try await client.modelCatalog(forceRefresh: forceRefresh)
+      let catalog = try await CodexModelCatalogLoad.load(
+        client: client, forceRefresh: forceRefresh, recoverInitialFailure: models.isEmpty,
+        isCurrent: { generation == self.codexModelCatalogRequests.catalogGeneration })
       guard generation == codexModelCatalogRequests.catalogGeneration else { return }
       models = catalog.models
       if !codexModelCatalogRequests.isSavingPreferences {

@@ -7,10 +7,9 @@ Bridge 的 DSH ACP 与 DSH 桌面是两个独立连接，可以同时使用。AC
 ## 安装与配对
 
 1. 从 [DSH 官方发布入口](https://github.com/deepseek-ai/deepseek-harness/releases)取得官方桌面安装，启动一次完成初始化和账号配置。
-2. 在 Bridge 的“连接 → DSH 桌面”点击“连接”发现本机桌面安装。
-3. 完全退出 DSH Desktop，点击“安装 Connector”。Bridge 使用桌面附带 CLI 将经过摘要校验的插件安装到 `desktop` profile。
-4. 启动 DSH Desktop，在 Bridge 点击“连接”。核对两边相同的配对确认码，在 DSH 的 Codex Bridge 插件面板中允许连接。
-5. 回到 Bridge 点击“检测桌面连接”。配对验证成功后，选择注册项目、模型和“完整”权限执行任务。
+2. Bridge 会发现本机桌面安装。完全退出 DSH Desktop，在“连接 → DSH 桌面”点击“安装连接器”。Bridge 使用桌面附带 CLI 将经过摘要校验的插件安装到 `desktop` profile。
+3. 点击“连接”，Bridge 打开 DSH Desktop。核对两边相同的配对确认码，在 DSH 的 Codex Bridge 插件面板中允许连接。
+4. Bridge 自动确认配对并显示“已连接”。选择注册项目、模型和“完整”权限执行任务。
 
 原生模式使用 Desktop 已有配置。ACP 的 API Key 与此连接分别管理。
 
@@ -42,7 +41,7 @@ Bridge 接收所属运行的正文、推理、工具、用量、审批、补充�
 | 系统凭据存储拒绝访问 | 完成系统授权后重新检测；保留原 API 配置 |
 | 安装要求退出 Desktop | 从桌面菜单或托盘完全退出后重试 |
 | 安装提示需要初始化 | 先启动一次官方桌面，再退出并安装 |
-| 配对等待确认 | 在 DSH 插件面板核对确认码并允许连接，再检测 |
+| 配对等待确认 | 在 DSH 插件面板核对确认码并允许连接，Bridge 自动更新状态 |
 | profile 或身份变化 | 等所属 Bridge 任务结束后重新配对 |
 | 模型保存失败 | 查看错误并检测连接；按回读结果核对桌面默认与会话模型 |
 | 原生会话忙碌 | 等待桌面或 Bridge 的当前运行结束后续写 |

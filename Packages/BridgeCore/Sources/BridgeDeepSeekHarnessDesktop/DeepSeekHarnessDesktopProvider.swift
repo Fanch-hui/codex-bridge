@@ -80,7 +80,7 @@ public struct DeepSeekHarnessDesktopProvider: AgentProvider, AgentNativeSessionD
     } catch {
       return AgentProbeResult(
         installation: request.installation, available: false,
-        capabilities: .empty, unavailableReason: String(describing: error))
+        capabilities: .empty, unavailableReason: error.localizedDescription)
     }
   }
 

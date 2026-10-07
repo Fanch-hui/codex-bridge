@@ -8,7 +8,9 @@
       modelCatalogGeneration &+= 1
       let generation = modelCatalogGeneration
       do {
-        let catalog = try await client.modelCatalog(forceRefresh: forceRefresh)
+        let catalog = try await CodexModelCatalogLoad.load(
+          client: client, forceRefresh: forceRefresh, recoverInitialFailure: models.isEmpty,
+          isCurrent: { generation == self.modelCatalogGeneration })
         guard generation == modelCatalogGeneration else { return nil }
         models = catalog.models
         if preferenceQueue.active == nil { preferences = catalog.preferences }

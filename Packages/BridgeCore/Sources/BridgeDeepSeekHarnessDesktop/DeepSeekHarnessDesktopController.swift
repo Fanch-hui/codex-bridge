@@ -88,7 +88,8 @@ public actor DeepSeekHarnessDesktopController: DeepSeekHarnessDesktopControlling
       return DeepSeekHarnessDesktopStatus(
         connected: false, paired: trust != nil,
         profileID: trust?.profileID,
-        unavailableReason: "DSH Desktop Connector 未连接：\(error.localizedDescription)")
+        unavailableReason: "DSH Desktop Connector 未连接：\(error.localizedDescription)",
+        errorCode: (error as? DeepSeekHarnessDesktopRPCError)?.code ?? "desktop_connection_failed")
     }
   }
 

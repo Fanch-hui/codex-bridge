@@ -17,14 +17,20 @@
           .init(installationID: installation.installationID))
         {
           applyDeepSeekDesktop(value, installationID: installation.installationID)
+          if deepSeekDesktopPairingTask == nil {
+            observeDeepSeekDesktopPairing(value, installationID: installation.installationID)
+          }
         }
       }
       publishDisplay()
     }
 
     func manageDeepSeekDesktop(_ payload: BridgeDesktopCommandPayload) async {
-      if payload.action == "discover" {
-        await discoverDeepSeekDesktop()
+      if payload.action == "discover"
+        || (payload.action == "installConnector"
+          && BridgeDesktopCommandValue.nonEmpty(payload.installationID) == nil)
+      {
+        await discoverDeepSeekDesktop(installConnector: payload.action == "installConnector")
         return
       }
       guard !agentBusy, connectionState == .connected,
@@ -36,6 +42,7 @@
       else { return }
       let mode = payload.mode.flatMap(DeepSeekHarnessConnectionMode.init(rawValue:))
       guard action != .setMode || mode != nil else { return }
+      if action != .status { cancelDeepSeekDesktopPairing() }
       agentBusy = true
       publishDisplay()
       do {
@@ -43,6 +50,9 @@
           .init(installationID: installationID, action: action, mode: mode), client: client,
           launchApplication: { try DesktopPlatformHost.openDeepSeekDesktop(executablePath: $0) })
         applyDeepSeekDesktop(value, installationID: installationID)
+        if action == .connect || action == .pair {
+          observeDeepSeekDesktopPairing(value, installationID: installationID)
+        }
         agentBusy = false
         agentOperationRevision &+= 1
         await refreshAgents()
@@ -58,9 +68,10 @@
       publishDisplay()
     }
 
-    private func discoverDeepSeekDesktop() async {
+    private func discoverDeepSeekDesktop(installConnector: Bool = false) async {
       guard !agentBusy, connectionState == .connected else { return }
       agentBusy = true
+      cancelDeepSeekDesktopPairing()
       publishDisplay()
       do {
         let installation = try await client.connectAgentInstallation(
@@ -68,7 +79,8 @@
             providerID: "deepseek-harness-desktop", connectionMode: "native-desktop"))
         let value = try await client.manageDeepSeekHarnessDesktop(
           .init(
-            installationID: installation.installationID))
+            installationID: installation.installationID,
+            action: installConnector ? .installConnector : .status))
         applyDeepSeekDesktop(value, installationID: installation.installationID)
         agentBusy = false
         agentOperationRevision &+= 1
@@ -115,13 +127,13 @@
       } catch { reportAgentFailure(BridgeServiceErrorMessage.message(error)) }
     }
 
-    private func applyDeepSeekDesktop(_ value: DeepSeekHarnessDesktopState, installationID: String)
-    {
+    func applyDeepSeekDesktop(_ value: DeepSeekHarnessDesktopState, installationID: String) {
       deepSeekDesktopStates[installationID] = .init(
         installationID: installationID,
         mode: value.mode.rawValue, connected: value.desktop.connected, paired: value.desktop.paired,
         pairingCode: value.desktop.pairingCode, profileID: value.desktop.profileID,
         message: value.desktop.unavailableReason,
+        errorCode: value.desktop.errorCode,
         executablePath: value.executablePath, connectorInstalled: value.connectorInstalled,
         canInstallConnector: value.canInstallConnector)
     }

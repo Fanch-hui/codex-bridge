@@ -380,6 +380,7 @@ extension BridgeServiceAppModel {
   }
 
   func closeClient() async {
+    cancelDeepSeekDesktopPairing()
     codexModelCatalogRequests.invalidate()
     stateChangesTask?.cancel()
     stateChangesTask = nil

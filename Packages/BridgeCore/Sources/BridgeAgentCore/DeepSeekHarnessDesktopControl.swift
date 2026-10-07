@@ -8,10 +8,12 @@ public struct DeepSeekHarnessDesktopStatus: Codable, Equatable, Sendable {
   public let pairingCode: String?
   public let protocolRevision: String?
   public let unavailableReason: String?
+  public let errorCode: String?
 
   public init(
     connected: Bool, paired: Bool, profileID: String? = nil, instanceID: String? = nil,
-    pairingCode: String? = nil, protocolRevision: String? = nil, unavailableReason: String? = nil
+    pairingCode: String? = nil, protocolRevision: String? = nil, unavailableReason: String? = nil,
+    errorCode: String? = nil
   ) {
     self.connected = connected
     self.paired = paired
@@ -20,6 +22,7 @@ public struct DeepSeekHarnessDesktopStatus: Codable, Equatable, Sendable {
     self.pairingCode = pairingCode
     self.protocolRevision = protocolRevision
     self.unavailableReason = unavailableReason
+    self.errorCode = errorCode
   }
 }
 

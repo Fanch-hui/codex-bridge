@@ -162,7 +162,9 @@ extension BridgeServiceApplication {
       let trust = try? await settings.deepSeekHarnessDesktopTrust(installationID: installation.id)
       return DeepSeekHarnessDesktopStatus(
         connected: false, paired: trust != nil,
-        profileID: trust?.profileID, unavailableReason: "DSH Desktop Connector 不可用，请安装插件并启动桌面。")
+        profileID: trust?.profileID,
+        unavailableReason: "DSH Desktop 连接失败：\(error.localizedDescription)",
+        errorCode: "desktop_connection_failed")
     }
   }
 

@@ -237,17 +237,25 @@ public actor ServiceCodexCatalog {
     configuration: ServiceCodexCatalogConfiguration,
     deadline: ContinuousClock.Instant
   ) async throws -> MCPModelList {
-    for _ in 0..<2 {
-      let models = try await withClient(configuration: configuration, deadline: deadline) {
+    var refreshFailure: String?
+    for attempt in 0..<2 {
+      let outcome = try await withClient(configuration: configuration, deadline: deadline) {
         client in
         try await ServiceCodexCatalogModelFetch.models(client: client, deadline: deadline)
       }
-      if let models {
+      switch outcome {
+      case .models(let models):
         return MCPModelList(models: try models.map(Self.model))
+      case .refreshFailed(let detail):
+        refreshFailure = detail
+        if attempt == 0 {
+          try await Task.sleep(for: .milliseconds(500))
+          try checkDeadline(deadline)
+        }
       }
     }
     throw BridgeMCPQueryError.codexAppServerUnavailable(
-      "Codex could not refresh its model catalog. Check the Codex connection and try fetching models again."
+      "Codex could not refresh its model catalog. \(refreshFailure ?? "No native refresh diagnostic was provided.")"
     )
   }
 

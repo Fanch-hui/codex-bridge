@@ -34,10 +34,20 @@
         tone: operation.state === "failed" ? "error" : "warning" };
     }
     if (provider.providerID === "deepseek-harness-desktop") {
-      var connected = provider.desktop && provider.desktop.connected && provider.desktop.paired
-        && (!primary || primary.availability !== "needs_review");
-      return { value: "原生桌面", label: connected ? "已连接" : "等待桌面连接",
-        tone: connected ? "success" : "neutral" };
+      var desktop = provider.desktop;
+      if (primary && primary.availability === "needs_review") {
+        return { value: "原生桌面", label: "需确认更新", tone: "warning" };
+      }
+      var connected = desktop && desktop.connected && desktop.paired;
+      var failed = desktop && desktop.errorCode && desktop.errorCode !== "desktop_connector_not_ready"
+        && desktop.errorCode !== "desktop_pairing_required";
+      var found = desktop && desktop.executablePath || primary || provider.discoveredExecutablePath
+        || provider.discoveryState === "discovered";
+      return { value: "原生桌面", label: connected ? "已连接" : failed ? "连接失败"
+        : desktop && desktop.pairingCode && !desktop.paired ? "等待配对"
+        : found ? desktop && desktop.connectorInstalled ? "待连接" : "待安装连接器"
+        : provider.discoveryState === "not_found" ? "未发现" : "正在查找",
+        tone: connected ? "success" : failed ? "error" : "neutral" };
     }
     if (primary) {
       return { value: primary.version || primary.displayName || "",

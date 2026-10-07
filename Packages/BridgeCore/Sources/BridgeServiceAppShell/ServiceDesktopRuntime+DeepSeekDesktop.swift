@@ -22,14 +22,20 @@ extension BridgeServiceAppModel {
           .init(installationID: installation.installationID))
         {
           applyDeepSeekDesktop(value, installationID: installation.installationID)
+          if deepSeekDesktopPairingTask == nil {
+            observeDeepSeekDesktopPairing(value, installationID: installation.installationID)
+          }
         }
       }
     }
   }
 
   func manageDeepSeekDesktop(_ payload: BridgeDesktopCommandPayload) {
-    if payload.action == "discover" {
-      discoverDeepSeekDesktop()
+    if payload.action == "discover"
+      || (payload.action == "installConnector"
+        && BridgeDesktopCommandValue.nonEmpty(payload.installationID) == nil)
+    {
+      discoverDeepSeekDesktop(installConnector: payload.action == "installConnector")
       return
     }
     guard !deepSeekDesktopBusy,
@@ -41,6 +47,7 @@ extension BridgeServiceAppModel {
     else { return }
     let mode = payload.mode.flatMap(DeepSeekHarnessConnectionMode.init(rawValue:))
     guard action != .setMode || mode != nil else { return }
+    if action != .status { cancelDeepSeekDesktopPairing() }
     deepSeekDesktopBusy = true
     Task { [weak self] in
       guard let self else { return }
@@ -51,6 +58,9 @@ extension BridgeServiceAppModel {
           .init(installationID: installationID, action: action, mode: mode), client: client,
           launchApplication: { try await DeepSeekDesktopApplicationHost.open(executablePath: $0) })
         applyDeepSeekDesktop(value, installationID: installationID)
+        if action == .connect || action == .pair {
+          observeDeepSeekDesktopPairing(value, installationID: installationID)
+        }
         applyAgentCatalogSnapshot(try await client.agentCatalog())
         if action == .setMode || value.desktop.paired {
           refreshAgentModelCatalog(
@@ -68,9 +78,10 @@ extension BridgeServiceAppModel {
     }
   }
 
-  private func discoverDeepSeekDesktop() {
+  private func discoverDeepSeekDesktop(installConnector: Bool = false) {
     guard !deepSeekDesktopBusy else { return }
     deepSeekDesktopBusy = true
+    cancelDeepSeekDesktopPairing()
     Task { [weak self] in
       guard let self else { return }
       defer { deepSeekDesktopBusy = false }
@@ -81,7 +92,8 @@ extension BridgeServiceAppModel {
             providerID: "deepseek-harness-desktop", connectionMode: "native-desktop"))
         let value = try await client.manageDeepSeekHarnessDesktop(
           .init(
-            installationID: installation.installationID))
+            installationID: installation.installationID,
+            action: installConnector ? .installConnector : .status))
         applyDeepSeekDesktop(value, installationID: installation.installationID)
         applyAgentCatalogSnapshot(try await client.agentCatalog())
       } catch { errorMessage = Self.message(error) }
@@ -146,12 +158,13 @@ extension BridgeServiceAppModel {
     }
   }
 
-  private func applyDeepSeekDesktop(_ value: DeepSeekHarnessDesktopState, installationID: String) {
+  func applyDeepSeekDesktop(_ value: DeepSeekHarnessDesktopState, installationID: String) {
     deepSeekDesktopStates[installationID] = .init(
       installationID: installationID,
       mode: value.mode.rawValue, connected: value.desktop.connected, paired: value.desktop.paired,
       pairingCode: value.desktop.pairingCode, profileID: value.desktop.profileID,
       message: value.desktop.unavailableReason,
+      errorCode: value.desktop.errorCode,
       executablePath: value.executablePath, connectorInstalled: value.connectorInstalled,
       canInstallConnector: value.canInstallConnector)
     synchronizeAgentModelScopes()

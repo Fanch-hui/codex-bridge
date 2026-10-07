@@ -104,6 +104,8 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published var deepSeekDesktopStates: [String: BridgeDesktopDeepSeekHarnessDesktopState] = [:]
   @Published var deepSeekDesktopBusy = false
   var deepSeekDesktopRefreshInFlight = false
+  var deepSeekDesktopPairingTask: Task<Void, Never>?
+  var deepSeekDesktopPairingGeneration: UInt64 = 0
   @Published public internal(set) var agentProviders: [IPCAgentProviderSummary] = []
   @Published public internal(set) var agentInstallations: [IPCAgentInstallationSummary] = [] {
     didSet {

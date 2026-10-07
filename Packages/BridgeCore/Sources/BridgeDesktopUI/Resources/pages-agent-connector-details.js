@@ -79,18 +79,20 @@
 
     return {
       root: root,
-      update: function (next, context, pending) {
+      update: function (next, context, pending, desktop) {
         current = next;
         name.textContent = next.displayName;
-        S.updateStatus(badge, availabilityLabel(next.availability, next.enabled),
-          availabilityTone(next.availability, next.enabled));
+        var review = next.availability === "needs_review";
+        S.updateStatus(badge, desktop && !review ? desktop.label : availabilityLabel(next.availability, next.enabled),
+          desktop && !review ? desktop.tone : availabilityTone(next.availability, next.enabled));
         path.textContent = next.executablePath || "未提供可执行路径";
         metadata.textContent = (next.version || "未识别")
-          + " · ACP " + (next.protocolRevision || "未协商")
+          + (desktop ? " · 原生桌面" : " · ACP " + (next.protocolRevision || "未协商"))
           + " · Adapter r" + next.adapterRevision
           + " · 有效能力 " + S.safeArray(next.effectiveCapabilities).length + " 项";
-        error.textContent = next.lastProbeError || "";
-        error.hidden = !next.lastProbeError;
+        error.textContent = desktop && !review ? desktop.error : next.lastProbeError || "";
+        error.hidden = !error.textContent;
+        probe.hidden = !!desktop && desktop.waiting;
         probe.disabled = context.busy || pending || !next.canReprobe;
         accept.hidden = next.availability !== "needs_review";
         accept.disabled = context.busy || pending || !next.canReprobe;

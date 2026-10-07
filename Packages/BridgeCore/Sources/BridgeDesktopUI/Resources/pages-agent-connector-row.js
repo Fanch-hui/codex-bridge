@@ -90,6 +90,7 @@
     var detailsBody = S.node("div", "agent-details-body");
     var providerDetail = S.node("p", "agent-provider-detail");
     detailsBody.appendChild(providerDetail);
+    detailsBody.appendChild(desktop.maintenanceRoot);
     details.appendChild(summary);
     details.appendChild(detailsBody);
     row.appendChild(details);
@@ -106,7 +107,7 @@
     }
 
     function configurationValid() {
-      if (desktop.isDesktop()) return desktop.canConnect();
+      if (desktop.isDesktop()) return desktop.presentation().canAct;
       if (!currentProvider.requiresConfiguration) return true;
       var base = hasValue(baseURL.control.value);
       var key = hasValue(apiKey.control.value);
@@ -126,9 +127,18 @@
       if (desktop.isDesktop()) {
         actionBar.hidden = false; action.hidden = false; actionMode = "desktop";
         configPanel.hidden = true; setupAction.hidden = true; setupProgress.hidden = true; installOptions.hidden = true;
-        action.textContent = desktop.connected() ? "重新连接" : "连接";
-        action.disabled = !context.canConnect || context.busy || !desktop.canConnect();
-        actionHint.textContent = "使用 DSH 桌面的账号和原生会话。";
+        var native = desktop.presentation();
+        S.updateStatus(status, native.label, native.tone);
+        if (primary && primary.availability === "needs_review") {
+          actionMode = "review";
+          action.textContent = primary.enabled ? "确认更新并连接" : "确认更新并检查";
+          action.disabled = !context.canConnect || context.busy || !primary.canReprobe || !!pending;
+        } else {
+          action.hidden = native.actionHidden;
+          action.textContent = native.actionTitle;
+          action.disabled = !context.canConnect || context.busy || !native.canAct;
+        }
+        actionHint.textContent = native.actionHint;
         return;
       }
       setupAction.hidden = false; installOptions.hidden = false;
@@ -260,8 +270,8 @@
         stateTone(nextProvider, primary, isConnectedValue));
       detail.textContent = operation ? operation.message : rowDetail(nextProvider, scoped, primary, isConnectedValue);
       if (desktop.isDesktop()) {
-        S.updateStatus(status, desktop.connected() ? "已连接" : "等待桌面连接",
-          desktop.connected() ? "success" : "neutral");
+        var native = desktop.presentation();
+        S.updateStatus(status, native.label, native.tone);
         detail.textContent = "DSH 原生桌面会话";
       }
       fields.hidden = !nextProvider.requiresConfiguration || (!isConnectedValue && !!nextProvider.discoveredConfigurationPath)
@@ -310,7 +320,8 @@
         item.update(
           installation,
           context,
-          !!pending && (!pending.installationID || pending.installationID === installation.installationID)
+          !!pending && (!pending.installationID || pending.installationID === installation.installationID),
+          desktop.isDesktop() ? desktop.presentation() : null
         );
         place(detailsBody, item.root, detailsBody.contains(configPanel) ? index + 2 : index + 1);
         visible.add(installation.installationID);
@@ -331,7 +342,8 @@
           message = S.node("p", "agent-discovery-message");
           detailsBody.appendChild(message);
         }
-        message.textContent = discoveryMessage(nextProvider);
+        message.textContent = desktop.isDesktop() && discoveryState(nextProvider) === "discovered"
+          ? "已发现 DSH 桌面，安装连接器后即可配对。" : discoveryMessage(nextProvider);
       } else if (message) {
         message.remove();
       }
@@ -342,7 +354,7 @@
       control.addEventListener("compositionend", refreshAction);
     });
     action.addEventListener("click", function () {
-      if (actionMode === "desktop") desktop.connect();
+      if (actionMode === "desktop") { desktop.connect(); refreshAction(); }
       else if (actionMode === "review") reviewConfirmation.open();
       else if (actionMode === "connect") {
         if (HeadlessConsent.required(currentProvider)) headlessConfirmation.open();

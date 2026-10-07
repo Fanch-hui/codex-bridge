@@ -23,6 +23,8 @@
     var agentBusy = false
     var deepSeekDesktopStates: [String: BridgeDesktopDeepSeekHarnessDesktopState] = [:]
     var deepSeekDesktopRefreshInFlight = false
+    var deepSeekDesktopPairingTask: Task<Void, Never>?
+    var deepSeekDesktopPairingGeneration: UInt64 = 0
     var agentSetupOperations: [IPCAgentSetupState] = []
     var agentSetupRefreshInFlight = false
     var agentSetupRequestGeneration = 0
