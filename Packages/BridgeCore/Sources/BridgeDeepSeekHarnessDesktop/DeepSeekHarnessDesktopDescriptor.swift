@@ -23,22 +23,42 @@ public struct DeepSeekHarnessDesktopDescriptor: Codable, Equatable, Sendable {
   public let connectorVersion: String
 
   public static func load(path: String, installation: AgentInstallation) throws -> Self {
+    let data: Data
+    do {
+      data = try readDescriptor(path: path)
+    } catch {
+      let failure = error as NSError
+      if (failure.domain == NSCocoaErrorDomain
+        && failure.code == CocoaError.fileReadNoSuchFile.rawValue)
+        || (failure.domain == NSPOSIXErrorDomain && failure.code == 2)
+      {
+        throw DeepSeekHarnessDesktopRPCError(
+          code: "desktop_connector_not_ready",
+          message: "DSH Desktop Connector 尚未就绪。请启动 DSH 桌面；若仍无法连接，请完全退出桌面后重新安装 Connector。")
+      }
+      throw error
+    }
+    let value = try JSONDecoder().decode(Self.self, from: data)
+    try value.validate(installation: installation)
+    return value
+  }
+
+  private static func readDescriptor(path: String) throws -> Data {
     #if canImport(Darwin) || canImport(Glibc)
       let attributes = try FileManager.default.attributesOfItem(atPath: path)
       guard (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
         let mode = (attributes[.posixPermissions] as? NSNumber)?.uint16Value,
         mode & 0o077 == 0
       else { throw SecureFileArtifactError.unsafePermissions }
+    #else
+      _ = try FileManager.default.attributesOfItem(atPath: path)
     #endif
     #if os(Windows)
-      let data = try DeepSeekHarnessDesktopWindowsIdentity.readDescriptor(
+      return try DeepSeekHarnessDesktopWindowsIdentity.readDescriptor(
         at: path, maximumBytes: 16 * 1_024)
     #else
-      let data = try SecureFileArtifactReader.read(at: path, maximumBytes: 16 * 1_024)
+      return try SecureFileArtifactReader.read(at: path, maximumBytes: 16 * 1_024)
     #endif
-    let value = try JSONDecoder().decode(Self.self, from: data)
-    try value.validate(installation: installation)
-    return value
   }
 
   public func validate(installation: AgentInstallation) throws {
@@ -47,7 +67,7 @@ public struct DeepSeekHarnessDesktopDescriptor: Codable, Equatable, Sendable {
       [profileID, instanceID].allSatisfy({
         !$0.isEmpty && $0.utf8.count <= 256 && !$0.contains("\n")
       }), Data(base64Encoded: publicKey)?.count == 32,
-      installation.providerID == .deepSeekHarness,
+      [.deepSeekHarness, .deepSeekHarnessDesktop].contains(installation.providerID),
       let runningPath = Self.processPath(pid),
       AgentPathSemantics.isContained(runningPath, in: executablePath),
       AgentPathSemantics.isContained(executablePath, in: runningPath)

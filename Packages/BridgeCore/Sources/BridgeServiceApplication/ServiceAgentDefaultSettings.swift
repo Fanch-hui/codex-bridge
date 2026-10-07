@@ -15,7 +15,9 @@ struct ServiceAgentDefaultSettings: Sendable {
   )
     throws -> Self
   {
-    if provider == .deepSeekHarness && connectionMode == .nativeDesktop {
+    if provider == .deepSeekHarnessDesktop
+      || (provider == .deepSeekHarness && connectionMode == .nativeDesktop)
+    {
       return Self(
         modelKey: .deepSeekHarnessDesktopDefaultModel,
         effortKey: .deepSeekHarnessDesktopDefaultEffort,

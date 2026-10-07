@@ -138,7 +138,9 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
   }
 
   public func registrationArtifactRolesMatch(_ roles: Set<AgentInstallationArtifactRole>) -> Bool {
-    guard providerID == .deepSeekHarness else { return roles == requiredArtifactRoles }
+    guard providerID == .deepSeekHarness || providerID == .deepSeekHarnessDesktop else {
+      return roles == requiredArtifactRoles
+    }
     // DSH validates the layout-specific manifest, lock or Desktop archive during Probe.
     return requiredArtifactRoles.isSubset(of: roles)
       && (!roles.contains(.dependencyLock) || roles.contains(.runtimeManifest))
@@ -254,7 +256,7 @@ public enum ServiceAgentProviderPolicyRegistry {
   )
 
   public static let all: [ServiceAgentProviderPolicy] =
-    [codex, openCode, deepSeekHarness, antigravity, pi, qoder]
+    [codex, openCode, deepSeekHarness, deepSeekHarnessDesktop, antigravity, pi, qoder]
 
   public static let qoder = ServiceAgentProviderPolicy(
     providerID: .qoder,

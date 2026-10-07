@@ -1,7 +1,26 @@
+import BridgeAgentCore
 import BridgeDeepSeekHarnessACP
+import BridgeServiceCore
 import Foundation
 
 extension ServiceAgentAutoDiscovery {
+  static func deepSeekDesktopRequests(existingPaths: [String], environment: [String: String]) throws
+    -> [ServiceAgentRegistrationRequest]
+  {
+    guard ServiceDeepSeekDesktopInstallation.isSupported else { return [] }
+    var paths: Set<String> = []
+    return try (existingPaths + deepSeekDesktopCandidates(environment: environment)).compactMap {
+      path in
+      guard let executable = DeepSeekHarnessACPRuntimeLayout.desktop(at: path)?.runtimePath,
+        paths.insert(executable).inserted
+      else { return nil }
+      return try .init(
+        providerID: .deepSeekHarnessDesktop, displayName: "DSH 桌面",
+        executablePath: executable, trustProfile: .userTrusted, enableOnSuccess: false,
+        artifacts: [.init(role: .nodeInterpreter, path: executable)])
+    }
+  }
+
   static func deepSeekDesktopCandidates(environment: [String: String]) -> [String] {
     var candidates: [String] = []
     #if os(Windows)

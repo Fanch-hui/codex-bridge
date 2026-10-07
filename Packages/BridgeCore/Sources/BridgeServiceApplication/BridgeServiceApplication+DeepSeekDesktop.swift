@@ -22,21 +22,26 @@ extension BridgeServiceApplication {
       throw AgentRuntimeError.unsupportedProtocol("dsh_desktop_platform_unsupported")
     }
     let registry = try requiredAgentRegistry()
-    guard candidate.providerID == .deepSeekHarness, candidate.configurationPath == nil else {
+    guard [.deepSeekHarness, .deepSeekHarnessDesktop].contains(candidate.providerID),
+      candidate.configurationPath == nil
+    else {
       throw BridgeMCPQueryError.contractRejected
     }
-    let records = try await registry.installations(providerID: .deepSeekHarness)
+    let records = try await registry.installations(providerID: .deepSeekHarnessDesktop)
     for record in records { try await requireIdleDeepSeekDesktopInstallation(record.id) }
-    try await settings.set(
-      DeepSeekHarnessConnectionMode.nativeDesktop.rawValue,
-      for: .deepSeekHarnessConnectionMode)
-    if let matching = records.first(where: {
+    let matching = records.first(where: {
       AgentPathSemantics.relativePath($0.executablePath, from: candidate.executablePath) == ""
-    }) {
-      try await settings.set(matching.id.rawValue, for: .deepSeekHarnessDesktopActiveInstallationID)
-      return try await registry.reprobe(installationID: matching.id, acceptReplacement: false)
+    })
+    let record: ServiceAgentInstallationRecord
+    if let matching {
+      record = try await registry.reprobe(installationID: matching.id, acceptReplacement: false)
+    } else {
+      let native = try ServiceAgentRegistrationRequest(
+        providerID: .deepSeekHarnessDesktop, displayName: "DSH 桌面",
+        executablePath: candidate.executablePath, trustProfile: .userTrusted,
+        enableOnSuccess: false, artifacts: candidate.artifacts)
+      record = try await registry.registerAndProbe(native)
     }
-    let record = try await registry.registerAndProbe(candidate)
     try await settings.set(record.id.rawValue, for: .deepSeekHarnessDesktopActiveInstallationID)
     return record
   }
@@ -65,14 +70,21 @@ extension BridgeServiceApplication {
     case "setMode":
       guard let mode else { throw BridgeMCPQueryError.contractRejected }
       try await requireIdleDeepSeekDesktopInstallation(record.id)
-      try await settings.set(mode.rawValue, for: .deepSeekHarnessConnectionMode)
-      if mode == .nativeDesktop {
-        try await settings.set(record.id.rawValue, for: .deepSeekHarnessDesktopActiveInstallationID)
+      if record.providerID == .deepSeekHarnessDesktop {
+        guard mode == .nativeDesktop else { throw BridgeMCPQueryError.contractRejected }
+        state = await deepSeekDesktopStatus(controller, installation: installation)
+        break
       }
-      if mode == .acp {
-        _ = try await registry.reprobe(installationID: record.id, acceptReplacement: false)
+      return try await withDeepSeekDesktopSelection(
+        mode: mode, installationID: mode == .nativeDesktop ? record.id.rawValue : nil
+      ) {
+        if mode == .acp {
+          _ = try await registry.reprobe(installationID: record.id, acceptReplacement: false)
+        }
+        let state = await self.deepSeekDesktopStatus(controller, installation: installation)
+        return try await self.deepSeekDesktopResult(
+          installation: installation, state: state, action: action)
       }
-      state = await deepSeekDesktopStatus(controller, installation: installation)
     case "installConnector":
       try await requireIdleDeepSeekDesktopInstallation(record.id)
       guard let installer = installDeepSeekDesktopConnector else {
@@ -82,7 +94,11 @@ extension BridgeServiceApplication {
       state = await deepSeekDesktopStatus(controller, installation: installation)
     case "connect", "pair":
       try await requireIdleDeepSeekDesktopInstallation(record.id)
-      state = try await controller.pair(installation: installation)
+      let pairedState = try await controller.pair(installation: installation)
+      if pairedState.connected && pairedState.paired, record.providerID == .deepSeekHarnessDesktop {
+        try await settings.set(record.id.rawValue, for: .deepSeekHarnessDesktopActiveInstallationID)
+      }
+      state = pairedState
     case "revoke":
       try await requireIdleDeepSeekDesktopInstallation(record.id)
       try await controller.revoke(installation: installation)
@@ -105,7 +121,7 @@ extension BridgeServiceApplication {
   ) async throws -> ServiceAgentInstallationRecord {
     if action == "connect" {
       guard let stored = try await registry.installation(id: installationID),
-        stored.providerID == .deepSeekHarness,
+        [.deepSeekHarness, .deepSeekHarnessDesktop].contains(stored.providerID),
         stored.runtimeArtifacts.contains(where: { $0.role == .archive })
       else { throw BridgeMCPQueryError.unavailable }
       try await requireIdleDeepSeekDesktopInstallation(installationID)
@@ -118,8 +134,10 @@ extension BridgeServiceApplication {
     installation: AgentInstallation, state: DeepSeekHarnessDesktopStatus, action: String
   ) async throws -> ServiceDeepSeekDesktopState {
     let registry = try requiredAgentRegistry()
-    let currentMode = try await settings.deepSeekHarnessConnectionMode()
-    if state.paired && state.connected && currentMode == .nativeDesktop,
+    let currentMode: DeepSeekHarnessConnectionMode =
+      installation.providerID == .deepSeekHarnessDesktop
+      ? .nativeDesktop : try await settings.deepSeekHarnessConnectionMode()
+    if state.paired && state.connected && installation.providerID == .deepSeekHarnessDesktop,
       action == "connect" || action == "pair" || action == "status" || action == "setMode"
     {
       let probe = try await registry.reprobe(
@@ -151,12 +169,19 @@ extension BridgeServiceApplication {
   private func requireIdleDeepSeekDesktopInstallation(_ installationID: AgentInstallationID)
     async throws
   {
-    guard
-      try await tasks.nonterminalTasks().allSatisfy({
-        $0.providerID != AgentProviderID.deepSeekHarness.rawValue
-          || $0.installationID != installationID.rawValue
-      })
-    else { throw BridgeMCPQueryError.invalidTaskState }
+    let namespace = try await settings.deepSeekHarnessDesktopNamespace(for: installationID)
+    for task in try await tasks.nonterminalTasks()
+    where [
+      AgentProviderID.deepSeekHarness.rawValue, AgentProviderID.deepSeekHarnessDesktop.rawValue,
+    ]
+    .contains(task.providerID) {
+      guard let id = task.installationID else { continue }
+      let binding = try await tasks.agentRuntimeBinding(taskID: task.id)
+      guard binding?.connectionMode == .nativeDesktop else { continue }
+      if try await settings.deepSeekHarnessDesktopNamespace(for: .init(rawValue: id)) == namespace {
+        throw BridgeMCPQueryError.invalidTaskState
+      }
+    }
   }
 
   private func deepSeekDesktopSessionAddress(
@@ -169,7 +194,8 @@ extension BridgeServiceApplication {
     guard let trust else { throw BridgeMCPQueryError.unavailable }
     if let taskID {
       guard let task = try await tasks.task(id: TaskID(rawValue: taskID)),
-        task.providerID == AgentProviderID.deepSeekHarness.rawValue,
+        [AgentProviderID.deepSeekHarness.rawValue, AgentProviderID.deepSeekHarnessDesktop.rawValue]
+          .contains(task.providerID),
         task.installationID == installationID.rawValue,
         let binding = try await tasks.agentRuntimeBinding(taskID: task.id),
         binding.connectionMode == .nativeDesktop, binding.profileID == trust.profileID,

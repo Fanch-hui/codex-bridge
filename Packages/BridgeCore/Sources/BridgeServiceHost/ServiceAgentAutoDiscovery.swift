@@ -78,6 +78,8 @@ enum ServiceAgentAutoDiscovery {
         environment: environment,
         allowGeneratedConfiguration: allowGeneratedConfiguration
       )
+    case .deepSeekHarnessDesktop:
+      return try deepSeekDesktopRequests(existingPaths: existingPaths, environment: environment)
     case .codex:
       return []
     default:

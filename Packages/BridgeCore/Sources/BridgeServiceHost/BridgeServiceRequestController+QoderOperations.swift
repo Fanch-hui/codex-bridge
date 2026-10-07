@@ -64,8 +64,9 @@ extension BridgeServiceRequestController {
   func handleConnectAgentInstallation(_ request: BridgeServiceIPCRequest) async throws -> Data {
     let payload = try BridgeServiceIPCCodec.payload(IPCAgentConnectRequest.self, from: request)
     let providerID = AgentProviderID(rawValue: payload.providerID)
-    if providerID == .deepSeekHarness,
-      payload.connectionMode == DeepSeekHarnessConnectionMode.nativeDesktop.rawValue
+    if providerID == .deepSeekHarnessDesktop
+      || (providerID == .deepSeekHarness
+        && payload.connectionMode == DeepSeekHarnessConnectionMode.nativeDesktop.rawValue)
     {
       return try await connectNativeDeepSeekDesktop(request: request, payload: payload)
     }

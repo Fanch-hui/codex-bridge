@@ -77,6 +77,7 @@ extension BridgeServiceAppModel {
         selectedProjectID == projectID,
         defaultRevision == agentModelDefaultRevision(for: providerID)
       else { return }
+      applyAgentModelDefault(persistedDefault, providerID: providerID)
       let rawResponse = try await client.agentModels(
         installationID: installationID,
         projectID: projectID,

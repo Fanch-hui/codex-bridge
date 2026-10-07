@@ -1,5 +1,4 @@
 import BridgeAgentCore
-import BridgeSecurity
 import Foundation
 
 public struct DeepSeekHarnessProvider: AgentProvider, AgentNativeSessionDirectoryProviding,
@@ -24,7 +23,7 @@ public struct DeepSeekHarnessProvider: AgentProvider, AgentNativeSessionDirector
     self.acp = acp
     self.desktop = desktop
     self.modeProvider = modeProvider
-    descriptor = desktop.descriptor
+    descriptor = acp.descriptor
   }
 
   public var nativeSessionDirectoryManager: (any AgentNativeSessionDirectoryManaging)? {
@@ -37,15 +36,7 @@ public struct DeepSeekHarnessProvider: AgentProvider, AgentNativeSessionDirector
     -> [AgentInstallationArtifact]
   {
     if try await modeProvider(installation.id) == .nativeDesktop {
-      for artifact in installation.artifacts where artifact.role == .nodeInterpreter {
-        let current = try SecureFileArtifactSnapshot.capture(
-          at: artifact.canonicalPath,
-          requiresExecutable: true)
-        guard current.sha256 == artifact.sha256 else {
-          throw AgentRuntimeError.installationUnavailable(installation.id)
-        }
-      }
-      return installation.artifacts
+      return try await desktop.installationArtifacts(for: installation)
     }
     if let provider = acp as? any AgentInstallationArtifactProviding {
       return try await provider.installationArtifacts(for: installation)

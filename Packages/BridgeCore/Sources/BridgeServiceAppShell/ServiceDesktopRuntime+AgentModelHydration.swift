@@ -53,38 +53,27 @@ extension BridgeServiceAppModel {
     let defaultRevision = agentModelDefaultRevision(for: providerID)
     guard let client = try? currentClient() else { return }
 
-    let persistedDefault = try? await client.agentModelDefault(providerID: providerID)
-    let modelResponse: IPCAgentModelsResponse?
-    let modelReadSucceeded: Bool
-    if let installationID = normalizedInstallationID {
-      let rawResponse = try? await client.agentModels(
-        installationID: installationID,
-        projectID: projectID,
-        modelID: nil,
-        useStoredDefault: false
-      )
-      if let rawResponse,
-        let defaultModel = persistedDefault?.model,
-        AgentModelCatalogResolver.modelForSelection(
-          modelID: defaultModel, models: rawResponse.models)?
-          .reasoningCapabilitiesAvailable == false
-      {
-        let detailedResponse = try? await client.agentModels(
-          installationID: installationID,
-          projectID: projectID,
-          modelID: defaultModel,
-          useStoredDefault: false
-        )
-        modelResponse = detailedResponse ?? rawResponse
-        modelReadSucceeded = detailedResponse != nil
-      } else {
-        modelResponse = rawResponse
-        modelReadSucceeded = rawResponse != nil
-      }
-    } else {
-      modelResponse = nil
-      modelReadSucceeded = false
+    let persistedDefault: IPCAgentModelDefaultResponse?
+    let defaultReadError: String?
+    do {
+      persistedDefault = try await client.agentModelDefault(providerID: providerID)
+      defaultReadError = nil
+    } catch {
+      persistedDefault = nil
+      defaultReadError = Self.message(error)
     }
+    guard !Task.isCancelled,
+      agentModelCatalogScopes[providerID] == scope, selectedProjectID == projectID
+    else { return }
+    if defaultLoadGeneration == agentModelDefaultLoadGeneration(for: providerID),
+      defaultRevision == agentModelDefaultRevision(for: providerID), let persistedDefault
+    {
+      applyAgentModelDefault(persistedDefault, providerID: providerID)
+    }
+    let hydration = await loadAgentModelHydration(
+      client: client, installationID: normalizedInstallationID, projectID: projectID,
+      persistedDefault: persistedDefault)
+    let modelResponse = hydration.response
 
     guard !Task.isCancelled,
       agentModelCatalogScopes[providerID] == scope, selectedProjectID == projectID
@@ -93,12 +82,16 @@ extension BridgeServiceAppModel {
       setAgentModelOptions(modelResponse.models, providerID: providerID)
     }
     guard defaultLoadGeneration == agentModelDefaultLoadGeneration(for: providerID),
-      defaultRevision == agentModelDefaultRevision(for: providerID),
-      let persistedDefault
+      defaultRevision == agentModelDefaultRevision(for: providerID)
     else { return }
-    if modelReadSucceeded, catalogGeneration == agentModelCatalogGeneration(for: providerID) {
-      setAgentModelRefreshError(nil, providerID: providerID)
+    if catalogGeneration == agentModelCatalogGeneration(for: providerID) {
+      if let error = defaultReadError ?? hydration.error {
+        setAgentModelRefreshError(error, providerID: providerID)
+      } else if normalizedInstallationID == nil || modelResponse != nil {
+        setAgentModelRefreshError(nil, providerID: providerID)
+      }
     }
+    guard let persistedDefault else { return }
     if providerID == "pi", let modelID = persistedDefault.model, let modelResponse,
       let canonical = AgentModelCatalogResolver.modelForSelection(
         modelID: modelID, models: modelResponse.models),
@@ -131,6 +124,33 @@ extension BridgeServiceAppModel {
             .errorDescription,
           providerID: providerID)
       }
+    }
+  }
+
+  private func loadAgentModelHydration(
+    client: any BridgeServiceClientProtocol,
+    installationID: String?,
+    projectID: String?,
+    persistedDefault: IPCAgentModelDefaultResponse?
+  ) async -> (response: IPCAgentModelsResponse?, error: String?) {
+    guard let installationID else { return (nil, nil) }
+    var response: IPCAgentModelsResponse?
+    do {
+      let catalog = try await client.agentModels(
+        installationID: installationID, projectID: projectID, modelID: nil,
+        useStoredDefault: false)
+      response = catalog
+      if let defaultModel = persistedDefault?.model,
+        AgentModelCatalogResolver.modelForSelection(
+          modelID: defaultModel, models: catalog.models)?.reasoningCapabilitiesAvailable == false
+      {
+        response = try await client.agentModels(
+          installationID: installationID, projectID: projectID, modelID: defaultModel,
+          useStoredDefault: false)
+      }
+      return (response, nil)
+    } catch {
+      return (response, Self.message(error))
     }
   }
 

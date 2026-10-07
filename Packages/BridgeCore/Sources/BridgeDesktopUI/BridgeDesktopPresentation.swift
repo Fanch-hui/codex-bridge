@@ -37,9 +37,12 @@ public enum BridgeDesktopPresentation {
   }
 
   public static func agentPermissionOptions(
-    for _: String?
+    for providerID: String?
   ) -> [BridgeDesktopChoice] {
-    [
+    if providerID == "deepseek-harness-desktop" {
+      return [BridgeDesktopChoice(id: "full", title: "完整", detail: "允许读取、写入和联网")]
+    }
+    return [
       BridgeDesktopChoice(id: "full", title: "完整", detail: "允许读取、写入和联网"),
       BridgeDesktopChoice(id: "read-only", title: "只读", detail: "允许读取，禁止写入和联网"),
     ]

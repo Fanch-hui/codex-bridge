@@ -35,21 +35,28 @@ struct ServiceDeepSeekDesktopInstallation: Sendable {
   }
 
   let root: URL
+  let namespaces: [String: String]
   let io: any ServiceAgentSetupInstallIO
   let environment: [String: String]
 
   init(
     paths: ServiceDataPaths,
+    namespaces: [String: String] = [:],
     io: any ServiceAgentSetupInstallIO = ServiceAgentSetupInstallSystemIO(),
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) {
     root = paths.agentStateURL.appendingPathComponent("DSHDesktop", isDirectory: true)
+    self.namespaces = namespaces
     self.io = io
     self.environment = environment
   }
 
   func descriptorPath(for installationID: AgentInstallationID) -> String {
     installationRoot(installationID).appendingPathComponent("endpoint.json").path
+  }
+
+  func namespaceID(for installationID: AgentInstallationID) -> AgentInstallationID {
+    .init(rawValue: namespaces[installationID.rawValue] ?? installationID.rawValue)
   }
 
   func isInstalled(_ installation: AgentInstallation) -> Bool {
@@ -129,7 +136,8 @@ struct ServiceDeepSeekDesktopInstallation: Sendable {
   }
 
   private func installationRoot(_ id: AgentInstallationID) -> URL {
-    let hash = SHA256.hash(data: Data(id.rawValue.utf8)).map { String(format: "%02x", $0) }.joined()
+    let hash = SHA256.hash(data: Data(namespaceID(for: id).rawValue.utf8))
+      .map { String(format: "%02x", $0) }.joined()
     return root.appendingPathComponent(hash, isDirectory: true)
   }
 

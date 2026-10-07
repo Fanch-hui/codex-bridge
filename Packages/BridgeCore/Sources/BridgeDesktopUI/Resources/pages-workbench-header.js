@@ -307,7 +307,7 @@
       page.taskHistorySearch,
       page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canOpenNativeSession, detail.canInterrupt, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
       S.safeArray(page.tasks).map(function (t) {
-        return [t.taskID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
+        return [t.taskID, t.providerID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
       })
     ]);
     if (header !== headerSignature) {

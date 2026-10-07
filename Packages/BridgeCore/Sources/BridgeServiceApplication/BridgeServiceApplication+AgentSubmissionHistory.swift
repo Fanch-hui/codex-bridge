@@ -20,7 +20,7 @@ extension BridgeServiceApplication {
       guard previous.state.status.isTerminal else { throw BridgeMCPQueryError.invalidTaskState }
       return previous
     }
-    guard providerID == .pi || providerID == .qoder || providerID == .deepSeekHarness else {
+    guard providerID == .pi || providerID == .qoder || providerID == .deepSeekHarnessDesktop else {
       throw BridgeMCPQueryError.taskNotFound
     }
     let (directory, installation, verifiedRecord) =

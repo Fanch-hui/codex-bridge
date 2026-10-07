@@ -6,6 +6,7 @@ public enum ServiceAgentRegistryError: Error, Equatable, LocalizedError, Sendabl
   case installationUnavailable(AgentInstallationID)
   case installationNeedsReview(AgentInstallationID)
   case connectionProbeFailed(AgentInstallationID)
+  case connectionProbeFailedWithReason(AgentInstallationID, reason: String)
   case replacementProbeFailed(AgentInstallationID, reason: String)
   case registrationInProgress(AgentProviderID)
 
@@ -19,7 +20,7 @@ public enum ServiceAgentRegistryError: Error, Equatable, LocalizedError, Sendabl
       "The Agent installation changed and requires local review."
     case .connectionProbeFailed:
       "The Agent installation did not pass the connection Probe."
-    case .replacementProbeFailed(_, let reason):
+    case .connectionProbeFailedWithReason(_, let reason), .replacementProbeFailed(_, let reason):
       reason
     case .registrationInProgress:
       "The Agent executable is already being registered."

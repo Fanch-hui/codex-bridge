@@ -11,7 +11,11 @@ extension BridgeServiceRequestController {
     request: BridgeServiceIPCRequest,
     payload: IPCAgentConnectRequest
   ) async throws -> Data {
-    let existing = try await composition.agentRegistry.installations(providerID: .deepSeekHarness)
+    guard ServiceDeepSeekDesktopInstallation.isSupported else {
+      throw AgentRuntimeError.unsupportedProtocol("dsh_desktop_platform_unsupported")
+    }
+    let existing = try await composition.agentRegistry.installations(
+      providerID: .deepSeekHarnessDesktop)
     let candidates =
       existing.map(\.executablePath)
       + ServiceAgentAutoDiscovery.deepSeekDesktopCandidates(
@@ -20,8 +24,8 @@ extension BridgeServiceRequestController {
       let path = candidates.first(where: { DeepSeekHarnessACPRuntimeLayout.desktop(at: $0) != nil })
     else { throw ServiceAgentConnectionError.installationNotFound }
     let candidate = try ServiceAgentRegistrationRequest(
-      providerID: .deepSeekHarness,
-      displayName: "DeepSeek Harness", executablePath: path, trustProfile: .userTrusted,
+      providerID: .deepSeekHarnessDesktop,
+      displayName: "DSH 桌面", executablePath: path, trustProfile: .userTrusted,
       enableOnSuccess: false,
       artifacts: [ServiceAgentInstallationArtifactRequest(role: .nodeInterpreter, path: path)])
     let record = try await composition.application.serviceConnectDeepSeekDesktop(

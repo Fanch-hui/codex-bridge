@@ -6,7 +6,10 @@ import Foundation
 
 extension BridgeServiceApplication {
   func canOpenDeepSeekDesktopTask(_ task: ServiceTaskRecord) async throws -> Bool? {
-    guard task.providerID == AgentProviderID.deepSeekHarness.rawValue else { return nil }
+    guard
+      task.providerID == AgentProviderID.deepSeekHarness.rawValue
+        || task.providerID == AgentProviderID.deepSeekHarnessDesktop.rawValue
+    else { return nil }
     guard let binding = try await tasks.agentRuntimeBinding(taskID: task.id),
       binding.connectionMode == .nativeDesktop,
       let installationID = task.installationID,
@@ -17,9 +20,15 @@ extension BridgeServiceApplication {
       && (task.state.providerSessionID ?? task.requestedThreadID) != nil
   }
   func runtimeBindingForTask(_ task: ServiceTaskRecord) async throws -> AgentRuntimeBinding? {
-    guard task.providerID == AgentProviderID.deepSeekHarness.rawValue else { return nil }
-    return try await tasks.agentRuntimeBinding(taskID: task.id)
-      ?? AgentRuntimeBinding(connectionMode: .acp, requestID: task.id.rawValue)
+    guard
+      task.providerID == AgentProviderID.deepSeekHarness.rawValue
+        || task.providerID == AgentProviderID.deepSeekHarnessDesktop.rawValue
+    else { return nil }
+    if let binding = try await tasks.agentRuntimeBinding(taskID: task.id) { return binding }
+    guard task.providerID == AgentProviderID.deepSeekHarness.rawValue else {
+      throw BridgeMCPQueryError.contractRejected
+    }
+    return AgentRuntimeBinding(connectionMode: .acp, requestID: task.id.rawValue)
   }
   func deepSeekSubmissionRuntimeBinding(
     submission: MCPServiceTaskSubmission,
@@ -27,7 +36,8 @@ extension BridgeServiceApplication {
   ) async throws
     -> AgentRuntimeBinding?
   {
-    guard record.providerID == .deepSeekHarness else { return nil }
+    guard record.providerID == .deepSeekHarness || record.providerID == .deepSeekHarnessDesktop
+    else { return nil }
     let source: ServiceTaskRecord?
     if let sourceID = submission.attachmentSourceTaskID {
       source = try await tasks.task(id: TaskID(rawValue: sourceID))
@@ -45,11 +55,15 @@ extension BridgeServiceApplication {
         source.providerID == record.providerID.rawValue
       else { throw BridgeMCPQueryError.contractRejected }
       let existing = try await tasks.agentRuntimeBinding(taskID: source.id)
+      guard existing != nil || record.providerID == .deepSeekHarness else {
+        throw BridgeMCPQueryError.contractRejected
+      }
       return AgentRuntimeBinding(
         connectionMode: existing?.connectionMode ?? .acp,
         profileID: existing?.profileID, requestID: requestID)
     }
-    let mode = try await settings.deepSeekHarnessConnectionMode()
+    let mode: DeepSeekHarnessConnectionMode =
+      record.providerID == .deepSeekHarnessDesktop ? .nativeDesktop : .acp
     let profileID: String?
     if mode == .nativeDesktop {
       guard let trust = try await settings.deepSeekHarnessDesktopTrust(installationID: record.id)
@@ -68,14 +82,22 @@ extension BridgeServiceApplication {
     try await settings.set(defaults.effort, for: .deepSeekHarnessDesktopDefaultEffort)
   }
 
+  func refreshAvailableDeepSeekDesktopDefaults() async throws {
+    guard let controller = deepSeekDesktop,
+      let installation = try? await deepSeekDesktopDefaultInstallation(),
+      let status = try? await controller.status(installation: installation),
+      status.connected && status.paired
+    else { return }
+    try await refreshDeepSeekDesktopDefaults(installation: installation)
+  }
+
   func deepSeekDesktopDefaultInstallation() async throws -> AgentInstallation {
     let registry = try requiredAgentRegistry()
-    let records = try await registry.installations(providerID: .deepSeekHarness)
-      .filter({ $0.isEnabled }).sorted(by: { $0.id.rawValue < $1.id.rawValue })
+    let records = try await registry.installations(providerID: .deepSeekHarnessDesktop)
     let activeID = try await settings.string(for: .deepSeekHarnessDesktopActiveInstallationID)
     guard
-      let record = activeID.flatMap({ id in records.first(where: { $0.id.rawValue == id }) })
-        ?? records.first
+      let record = ServiceDeepSeekHarnessInstallationSelection.desktopInstallation(
+        in: records, activeID: activeID)
     else {
       throw BridgeMCPQueryError.unavailable
     }
@@ -90,8 +112,7 @@ extension BridgeServiceApplication {
     guard let controller = deepSeekDesktop else { throw BridgeMCPQueryError.unavailable }
     let installation = try await deepSeekDesktopDefaultInstallation()
     let descriptor = try ServiceAgentDefaultSettings.descriptor(
-      for: .deepSeekHarness,
-      connectionMode: .nativeDesktop)
+      for: .deepSeekHarnessDesktop)
     let validated = try Self.validatedAgentModel(model)
     let permission: String
     if let permissionMode {

@@ -27,10 +27,12 @@ extension SimpleServiceStore {
   ) throws {
     guard let binding else { return }
     guard
-      try String.fetchOne(
+      let providerID = try String.fetchOne(
         db,
         sql: "SELECT provider_id FROM bridge_service_tasks WHERE task_id = ?",
-        arguments: [taskID.rawValue]) == AgentProviderID.deepSeekHarness.rawValue
+        arguments: [taskID.rawValue]),
+      [AgentProviderID.deepSeekHarness.rawValue, AgentProviderID.deepSeekHarnessDesktop.rawValue]
+        .contains(providerID)
     else {
       throw ServiceStoreError.invalidArgument("task.runtimeBinding")
     }
@@ -68,7 +70,8 @@ extension SimpleServiceStore {
     scope: AgentNativeSessionDirectoryScope,
     sessionID: String, profileID: String
   ) throws {
-    guard scope.providerID == .deepSeekHarness, scope.region == profileID,
+    guard [.deepSeekHarness, .deepSeekHarnessDesktop].contains(scope.providerID),
+      scope.region == profileID,
       !sessionID.isEmpty, sessionID.utf8.count <= 256
     else {
       throw ServiceStoreError.invalidArgument("history.binding")

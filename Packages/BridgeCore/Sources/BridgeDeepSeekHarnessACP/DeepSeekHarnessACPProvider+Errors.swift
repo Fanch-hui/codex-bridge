@@ -1,8 +1,12 @@
 import BridgeAgentCore
+import BridgeSecurity
+import Foundation
 
 extension DeepSeekHarnessACPProvider {
   static func probeReason(_ error: any Error) -> String {
     switch error {
+    case let error as AgentModelCatalogError:
+      return error.localizedDescription
     case DeepSeekHarnessACPError.templateMismatch:
       return
         "DeepSeek Harness configuration changed outside the managed model and reasoning fields."
@@ -29,6 +33,17 @@ extension DeepSeekHarnessACPProvider {
       return "DeepSeek Harness installation artifacts are unavailable or changed."
     default:
       return "DeepSeek Harness ACP probe failed."
+    }
+  }
+
+  static func credentialResolutionReason(_ error: any Error) -> String {
+    switch error {
+    case SecretStoreError.accessDenied:
+      return "系统凭据存储拒绝访问 DSH 连接凭据，请检查系统授权后重新验证。"
+    case SecretStoreError.keychainFailure(let status):
+      return "无法读取 DSH 连接凭据（系统错误 \(status)），请检查系统授权后重新验证。"
+    default:
+      return "无法准备 DSH 连接环境，请检查连接配置与系统凭据访问。"
     }
   }
 

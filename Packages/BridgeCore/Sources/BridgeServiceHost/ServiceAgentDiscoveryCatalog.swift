@@ -139,6 +139,10 @@ extension ServiceAgentAutoDiscovery {
         existingInstallations: existingInstallations,
         environment: environment
       )
+    case .deepSeekHarnessDesktop:
+      return discoveredSummary(
+        from: try deepSeekDesktopRequests(
+          existingPaths: existingInstallations.map(\.executablePath), environment: environment))
     default:
       return .notFound
     }

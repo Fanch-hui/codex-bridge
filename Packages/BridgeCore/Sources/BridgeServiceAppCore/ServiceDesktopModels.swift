@@ -118,6 +118,7 @@ public enum AgentProviderPresentation {
     case "codex": return "Codex"
     case "opencode": return "OpenCode"
     case "deepseek-harness": return "DeepSeek Harness"
+    case "deepseek-harness-desktop": return "DSH 桌面"
     case "antigravity": return "Antigravity"
     case "pi": return "Pi"
     case "qoder": return "Qoder"
@@ -131,7 +132,7 @@ public enum AgentProviderPresentation {
     switch identifier(providerID) {
     case "codex": return "cpu.fill"
     case "opencode": return "chevron.left.forwardslash.chevron.right"
-    case "deepseek-harness": return "gearshape.2.fill"
+    case "deepseek-harness", "deepseek-harness-desktop": return "gearshape.2.fill"
     case "antigravity": return "sparkles"
     case "pi": return "terminal.fill"
     case "qoder": return "chevron.left.forwardslash.chevron.right"

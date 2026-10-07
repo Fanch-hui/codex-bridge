@@ -33,8 +33,8 @@
       return { value: operation.message || "", label: operation.state === "failed" ? "配置失败" : "配置中断",
         tone: operation.state === "failed" ? "error" : "warning" };
     }
-    if (provider.desktop && provider.desktop.mode === "native-desktop") {
-      var connected = provider.desktop.connected && provider.desktop.paired
+    if (provider.providerID === "deepseek-harness-desktop") {
+      var connected = provider.desktop && provider.desktop.connected && provider.desktop.paired
         && (!primary || primary.availability !== "needs_review");
       return { value: "原生桌面", label: connected ? "已连接" : "等待桌面连接",
         tone: connected ? "success" : "neutral" };

@@ -136,7 +136,8 @@ public struct DeepSeekHarnessDesktopSessionDirectory: AgentNativeSessionDirector
   )
     async throws -> DeepSeekHarnessDesktopClient
   {
-    guard scope.providerID == .deepSeekHarness, installation.providerID == .deepSeekHarness,
+    guard scope.providerID == installation.providerID,
+      [.deepSeekHarness, .deepSeekHarnessDesktop].contains(installation.providerID),
       scope.installationID == installation.id
     else { throw AgentNativeSessionDirectoryError.scopeMismatch }
     let client = try await controller.client(installation, profileID: scope.region)

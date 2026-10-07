@@ -29,7 +29,7 @@ public struct AgentInstallationRuntimeArtifact: Codable, Equatable, Sendable {
   }
 
   public static func validate(_ artifacts: [Self]) throws {
-    guard artifacts.count <= 256,
+    guard artifacts.count <= 4_096,
       Set(artifacts.map(\.canonicalPath)).count == artifacts.count,
       artifacts.allSatisfy({
         AgentPathSemantics.isAbsolute($0.canonicalPath)

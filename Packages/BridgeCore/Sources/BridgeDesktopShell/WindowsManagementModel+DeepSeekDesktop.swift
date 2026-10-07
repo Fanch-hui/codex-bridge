@@ -11,7 +11,7 @@
       guard !deepSeekDesktopRefreshInFlight else { return }
       deepSeekDesktopRefreshInFlight = true
       defer { deepSeekDesktopRefreshInFlight = false }
-      let installations = agentInstallations.filter { $0.providerID == "deepseek-harness" }
+      let installations = agentInstallations.filter { $0.providerID == "deepseek-harness-desktop" }
       for installation in installations {
         if let value = try? await client.manageDeepSeekHarnessDesktop(
           .init(installationID: installation.installationID))
@@ -30,7 +30,7 @@
       guard !agentBusy, connectionState == .connected,
         let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID),
         agentInstallations.contains(where: {
-          $0.installationID == installationID && $0.providerID == "deepseek-harness"
+          $0.installationID == installationID && $0.providerID == "deepseek-harness-desktop"
         }), let action = DeepSeekHarnessDesktopAction(rawValue: payload.action ?? "status"),
         action != .openSession
       else { return }
@@ -39,8 +39,9 @@
       agentBusy = true
       publishDisplay()
       do {
-        let value = try await client.manageDeepSeekHarnessDesktop(
-          .init(installationID: installationID, action: action, mode: mode))
+        let value = try await DeepSeekDesktopConnection.perform(
+          .init(installationID: installationID, action: action, mode: mode), client: client,
+          launchApplication: { try DesktopPlatformHost.openDeepSeekDesktop(executablePath: $0) })
         applyDeepSeekDesktop(value, installationID: installationID)
         agentBusy = false
         agentOperationRevision &+= 1
@@ -48,6 +49,11 @@
       } catch {
         agentBusy = false
         reportAgentFailure(BridgeServiceErrorMessage.message(error))
+        if let current = try? await client.manageDeepSeekHarnessDesktop(
+          .init(installationID: installationID))
+        {
+          applyDeepSeekDesktop(current, installationID: installationID)
+        }
       }
       publishDisplay()
     }
@@ -59,7 +65,7 @@
       do {
         let installation = try await client.connectAgentInstallation(
           .init(
-            providerID: "deepseek-harness", connectionMode: "native-desktop"))
+            providerID: "deepseek-harness-desktop", connectionMode: "native-desktop"))
         let value = try await client.manageDeepSeekHarnessDesktop(
           .init(
             installationID: installation.installationID))
@@ -83,7 +89,9 @@
       let sessionID = task?.threadID ?? payload.sessionID
       guard let installationID, let projectID, task != nil || sessionID != nil,
         agentInstallations.contains(where: {
-          $0.installationID == installationID && $0.providerID == "deepseek-harness"
+          $0.installationID == installationID
+            && ($0.providerID == "deepseek-harness-desktop"
+              || (task != nil && $0.providerID == "deepseek-harness"))
         })
       else { return }
       do {

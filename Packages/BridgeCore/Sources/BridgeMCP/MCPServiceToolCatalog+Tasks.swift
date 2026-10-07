@@ -117,7 +117,7 @@ extension MCPServiceToolCatalog {
       + "Task permissions are selected by the local user in the Workbench: read-only or full. "
       + "Full includes file writes and network access. This tool uses that selection and cannot override it. "
       + "Set provider_id to route the task to another registered agent provider (for example "
-      + "opencode, deepseek-harness, pi, or qoder). Qoder uses its registered regional SDK and CLI. "
+      + "opencode, deepseek-harness, deepseek-harness-desktop, pi, or qoder). Qoder uses its registered regional SDK and CLI. "
       + "For an image-capable Pi or Qoder model, attachment_paths may list up to eight image paths "
       + "relative to the selected project. Include only files the user explicitly chose; Bridge "
       + "validates and binds their content before scheduling. Do not send image bytes or base64. "
@@ -174,7 +174,7 @@ extension MCPServiceToolCatalog {
         "provider_id": nullableStringSchema(
           maximum: 64,
           description:
-            "Omit for Codex. Set to opencode, deepseek-harness, antigravity, pi, or qoder only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
+            "Omit for Codex. Set to opencode, deepseek-harness, deepseek-harness-desktop, antigravity, pi, or qoder only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
         ),
         "installation_id": nullableStringSchema(
           maximum: 256,

@@ -8,7 +8,7 @@ import Foundation
 extension BridgeServiceAppModel {
   func refreshDeepSeekDesktopStates() {
     guard !deepSeekDesktopRefreshInFlight, connectionState == .connected else { return }
-    let installations = agentInstallations.filter { $0.providerID == "deepseek-harness" }
+    let installations = agentInstallations.filter { $0.providerID == "deepseek-harness-desktop" }
     guard !installations.isEmpty else {
       deepSeekDesktopStates = [:]
       return
@@ -35,7 +35,7 @@ extension BridgeServiceAppModel {
     guard !deepSeekDesktopBusy,
       let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID),
       agentInstallations.contains(where: {
-        $0.installationID == installationID && $0.providerID == "deepseek-harness"
+        $0.installationID == installationID && $0.providerID == "deepseek-harness-desktop"
       }), let action = DeepSeekHarnessDesktopAction(rawValue: payload.action ?? "status"),
       action != .openSession
     else { return }
@@ -47,15 +47,24 @@ extension BridgeServiceAppModel {
       defer { deepSeekDesktopBusy = false }
       do {
         let client = try currentClient()
-        let value = try await client.manageDeepSeekHarnessDesktop(
-          .init(installationID: installationID, action: action, mode: mode))
+        let value = try await DeepSeekDesktopConnection.perform(
+          .init(installationID: installationID, action: action, mode: mode), client: client,
+          launchApplication: { try await DeepSeekDesktopApplicationHost.open(executablePath: $0) })
         applyDeepSeekDesktop(value, installationID: installationID)
         applyAgentCatalogSnapshot(try await client.agentCatalog())
         if action == .setMode || value.desktop.paired {
-          refreshAgentModelCatalog(installationID: installationID, providerID: "deepseek-harness")
+          refreshAgentModelCatalog(
+            installationID: installationID, providerID: "deepseek-harness-desktop")
           await refresh(silent: true, includeCatalog: true)
         }
-      } catch { errorMessage = Self.message(error) }
+      } catch {
+        errorMessage = Self.message(error)
+        if let current = try? await currentClient().manageDeepSeekHarnessDesktop(
+          .init(installationID: installationID))
+        {
+          applyDeepSeekDesktop(current, installationID: installationID)
+        }
+      }
     }
   }
 
@@ -69,7 +78,7 @@ extension BridgeServiceAppModel {
         let client = try currentClient()
         let installation = try await client.connectAgentInstallation(
           .init(
-            providerID: "deepseek-harness", connectionMode: "native-desktop"))
+            providerID: "deepseek-harness-desktop", connectionMode: "native-desktop"))
         let value = try await client.manageDeepSeekHarnessDesktop(
           .init(
             installationID: installation.installationID))
@@ -86,7 +95,9 @@ extension BridgeServiceAppModel {
     let sessionID = task?.threadID ?? payload.sessionID
     guard let installationID, let projectID, task != nil || sessionID != nil,
       agentInstallations.contains(where: {
-        $0.installationID == installationID && $0.providerID == "deepseek-harness"
+        $0.installationID == installationID
+          && ($0.providerID == "deepseek-harness-desktop"
+            || (task != nil && $0.providerID == "deepseek-harness"))
       })
     else { return }
     Task { [weak self] in

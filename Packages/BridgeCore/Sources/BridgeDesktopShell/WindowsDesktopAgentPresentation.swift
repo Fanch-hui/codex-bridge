@@ -30,7 +30,7 @@
         supportsSteer: provider.supportsSteer,
         supportsWorkspaceWrite: provider.supportsWorkspaceWrite,
         detail: ProjectAgentPresentation.provider(provider).detailText,
-        desktop: desktop
+        desktop: provider.providerID == "deepseek-harness-desktop" ? desktop : nil
       )
     }
 

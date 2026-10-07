@@ -22,6 +22,7 @@
     struct ModelCatalogScope: Equatable {
       let installationID: String?
       let projectID: String?
+      var runtimeKey: String? = nil
     }
     var catalogScopes: [String: ModelCatalogScope] = [:]
     var persistedDefaults: [String: IPCAgentModelDefaultResponse] = [:]

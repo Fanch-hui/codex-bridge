@@ -48,6 +48,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessDesktopTrust = "agent.deepseek-harness.desktop.trust"
   case deepSeekHarnessDesktopActiveInstallationID =
     "agent.deepseek-harness.desktop.active_installation_id"
+  case deepSeekHarnessDesktopNamespaces = "agent.deepseek-harness.desktop.connector_namespaces"
   case deepSeekHarnessProtocol = "agent.deepseek-harness.protocol"
   case deepSeekHarnessCatalogBaseURL = "agent.deepseek-harness.catalog_base_url"
   case deepSeekHarnessBaseURL = "agent.deepseek-harness.base_url"
@@ -110,8 +111,8 @@ public struct ServiceModelPreferences: Codable, Equatable, Sendable {
 
 public actor ServiceSettings {
   public static let maximumCustomInstructionsBytes = 32_768
-  private let store: SimpleServiceStore
-  private let now: @Sendable () -> Date
+  let store: SimpleServiceStore
+  let now: @Sendable () -> Date
 
   public init(
     store: SimpleServiceStore,

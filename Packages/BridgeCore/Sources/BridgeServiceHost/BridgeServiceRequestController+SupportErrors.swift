@@ -4,6 +4,7 @@ import BridgeDeepSeekHarnessACP
 import BridgeDomain
 import BridgeIPC
 import BridgeMCP
+import BridgeSecurity
 import BridgeServiceApplication
 import BridgeServiceCore
 import BridgeTunnel
@@ -53,6 +54,12 @@ extension BridgeServiceRequestController {
     }
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
+    }
+    if let error = error as? SecretStoreError {
+      return mapSecretStoreError(error)
+    }
+    if let error = error as? AgentRuntimeError {
+      return mapAgentRuntimeError(error)
     }
     if let error = error as? AgentModelCatalogError {
       return .init(
@@ -140,41 +147,6 @@ extension BridgeServiceRequestController {
       return .init(code: "invalid_client", message: "The MCP client is unsupported.")
     case .clientDisabled:
       return .init(code: "client_disabled", message: "The MCP client is disabled.")
-    }
-  }
-
-  private static func mapAgentRegistryError(
-    _ error: ServiceAgentRegistryError
-  ) -> BridgeServiceIPCError {
-    switch error {
-    case .providerUnavailable:
-      return .init(
-        code: "agent_provider_unavailable",
-        message: "The Agent Provider adapter is unavailable."
-      )
-    case .installationUnavailable:
-      return .init(
-        code: "agent_installation_unavailable",
-        message: "The Agent installation must pass Probe before it can be enabled."
-      )
-    case .installationNeedsReview:
-      return .init(
-        code: "agent_installation_needs_review",
-        message: "The Agent executable changed and requires explicit local review."
-      )
-    case .connectionProbeFailed:
-      return .init(
-        code: "agent_connection_probe_failed",
-        message: "The Agent installation did not pass the connection Probe."
-      )
-    case .replacementProbeFailed(_, let reason):
-      return .init(code: "agent_connection_probe_failed", message: reason)
-    case .registrationInProgress:
-      return .init(
-        code: "agent_registration_in_progress",
-        message: "This Agent executable is already being registered.",
-        retryable: true
-      )
     }
   }
 

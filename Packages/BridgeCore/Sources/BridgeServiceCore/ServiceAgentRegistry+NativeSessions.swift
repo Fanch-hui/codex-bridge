@@ -10,7 +10,7 @@ extension ServiceAgentRegistry {
   ) {
     let record: ServiceAgentInstallationRecord
     if let stored = try await store.agentInstallation(id: installationID),
-      stored.providerID == .deepSeekHarness
+      stored.providerID == .deepSeekHarness || stored.providerID == .deepSeekHarnessDesktop
     {
       let binding = try await selectedRuntimeBinding(for: stored)
       guard binding?.connectionMode == .nativeDesktop else {

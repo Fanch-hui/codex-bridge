@@ -84,7 +84,7 @@ extension DeepSeekHarnessACPProvider {
       return unavailableProbe(
         request.installation,
         reason: resolvingCredentials
-          ? "无法读取 DSH 连接凭据，请检查系统钥匙串访问权限。"
+          ? Self.credentialResolutionReason(error)
           : Self.probeReason(error) + (stderr.isEmpty ? "" : " \(stderr)"),
         reviewRequired: Self.requiresReview(error)
       )

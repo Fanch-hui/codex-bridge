@@ -22,7 +22,7 @@ extension CodexTranscriptPresentation {
     switch provider {
     case "opencode":
       return openCodeCategory(values: values, tokens: tokens)
-    case "deepseek-harness":
+    case "deepseek-harness", "deepseek-harness-desktop":
       return deepSeekCategory(values: values, tokens: tokens)
     case "antigravity":
       return antigravityCategory(values: values, tokens: tokens)

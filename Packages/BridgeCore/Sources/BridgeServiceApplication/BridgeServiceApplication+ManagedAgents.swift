@@ -235,9 +235,7 @@ extension BridgeServiceApplication {
       requireSelectedModel: modelID != nil
     )
     try Self.checkDeadline(deadline)
-    if installation.providerID == .deepSeekHarness,
-      try await settings.deepSeekHarnessConnectionMode() == .acp
-    {
+    if installation.providerID == .deepSeekHarness {
       try await reconcileDeepSeekHarnessModelDefaults(models: models, deadline: deadline)
     }
     Task { [weak self] in await self?.drainQueuedTasks() }
@@ -299,10 +297,8 @@ extension BridgeServiceApplication {
   ) async throws -> (model: String?, permissionMode: String, effort: String?) {
     try Self.checkDeadline(deadline)
     let descriptor = try await agentDefaultSettings(providerID: providerID, deadline: deadline)
-    if providerID == .deepSeekHarness,
-      try await settings.deepSeekHarnessConnectionMode() == .nativeDesktop
-    {
-      try await refreshDeepSeekDesktopDefaults(installation: deepSeekDesktopDefaultInstallation())
+    if providerID == .deepSeekHarnessDesktop {
+      try await refreshAvailableDeepSeekDesktopDefaults()
     }
     return try await agentModelDefaults(providerID: providerID, descriptor: descriptor)
   }
@@ -366,9 +362,7 @@ extension BridgeServiceApplication {
     else {
       throw BridgeMCPQueryError.contractRejected
     }
-    if providerID == .deepSeekHarness,
-      try await settings.deepSeekHarnessConnectionMode() == .nativeDesktop
-    {
+    if providerID == .deepSeekHarnessDesktop {
       return try await setDeepSeekDesktopDefaults(
         model: model, permissionMode: permissionMode,
         effort: effort, updateEffort: updateEffort)

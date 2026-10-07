@@ -47,7 +47,7 @@ actor DeepSeekHarnessDesktopExecution {
       request.requestedSessionID.map({ $0 == sessionID }) ?? true
     else { throw AgentRuntimeError.sessionMismatch }
     let binding = try AgentBinding(
-      providerID: .deepSeekHarness, installationID: installation.id,
+      providerID: installation.providerID, installationID: installation.id,
       providerSessionID: sessionID, providerRunID: runtime.requestID)
     self.binding = binding
     normalizer = DeepSeekHarnessDesktopEventNormalizer(request: request, binding: binding)
@@ -239,7 +239,7 @@ actor DeepSeekHarnessDesktopExecution {
     sequence += 1
     guard
       let envelope = try? AgentEventEnvelope(
-        taskID: request.taskID, providerID: .deepSeekHarness,
+        taskID: request.taskID, providerID: binding.providerID,
         providerSessionID: binding.providerSessionID, providerRunID: binding.providerRunID,
         providerSequence: sequence, event: event)
     else { return }

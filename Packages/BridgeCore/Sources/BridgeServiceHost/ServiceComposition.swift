@@ -98,7 +98,10 @@ public actor ServiceComposition {
     )
     let qoderEnvironment = ToolDiscoveryEnvironment.current()
     let setupRuntimeBindings = ServiceAgentSetupRuntimeBindings()
-    let deepSeekDesktopInstaller = ServiceDeepSeekDesktopInstallation(paths: paths)
+    let desktopNamespaces = try await ServiceDeepSeekDesktopMigration.prepare(
+      store: store, settings: settings)
+    let deepSeekDesktopInstaller = ServiceDeepSeekDesktopInstallation(
+      paths: paths, namespaces: desktopNamespaces)
     let deepSeekDesktopProvider = try ServiceDeepSeekDesktopAssembly.make(
       paths: paths, store: store, projects: projects, settings: settings,
       secretStore: secretStore, installer: deepSeekDesktopInstaller)
@@ -197,8 +200,9 @@ public actor ServiceComposition {
             }
           )),
         desktop: deepSeekDesktopProvider,
-        modeProvider: { _ in try await settings.deepSeekHarnessConnectionMode() }
+        modeProvider: { _ in .acp }
       ),
+      deepSeekDesktopProvider,
     ]
     let agentRegistry = ServiceAgentRegistry(
       store: store,

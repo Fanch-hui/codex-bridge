@@ -1,4 +1,5 @@
 import BridgeAgentCore
+import BridgeSecurity
 import Foundation
 
 extension ServiceAgentRegistry {
@@ -71,10 +72,16 @@ extension ServiceAgentRegistry {
         existing: captureArtifacts(request.artifactRequests, at: now()), at: now()
       )
     } catch {
-      if existing.availability == .available {
-        throw ServiceAgentRegistryError.connectionProbeFailed(existing.id)
-      }
-      throw error
+      guard existing.availability == .available else { throw error }
+      if error is SecretStoreError || error is AgentRuntimeError { throw error }
+      let diagnostic = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+      throw ServiceAgentRegistryError.connectionProbeFailedWithReason(
+        existing.id,
+        reason: OutboundContentSecurity.redactedSecrets(
+          "Agent 安装工件无法验证，请检查安装文件并重新检测连接。诊断：" + diagnostic,
+          maximumUTF8Bytes: 2_048
+        )
+      )
     }
     let candidate = try await probeRecord(
       id: existing.id,
@@ -91,7 +98,13 @@ extension ServiceAgentRegistry {
     )
     guard candidate.availability == .available else {
       if existing.availability == .available {
-        throw ServiceAgentRegistryError.connectionProbeFailed(existing.id)
+        throw ServiceAgentRegistryError.connectionProbeFailedWithReason(
+          existing.id,
+          reason: OutboundContentSecurity.redactedSecrets(
+            candidate.lastProbeError ?? "The Agent installation did not pass the connection Probe.",
+            maximumUTF8Bytes: 2_048
+          )
+        )
       }
       let unavailable = try candidate.replacingEnabled(existing.isEnabled, updatedAt: now())
       try await store.updateAgentInstallation(unavailable)

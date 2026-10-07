@@ -12,7 +12,8 @@ public enum TaskHandoffSummary {
     {
       guard !result.contains(where: { $0.id == installation.providerID }) else { continue }
       let names = [
-        "opencode": "OpenCode", "deepseek-harness": "DeepSeek Harness",
+        "opencode": "OpenCode", "deepseek-harness": "DSH ACP",
+        "deepseek-harness-desktop": "DSH 桌面",
         "antigravity": "Antigravity", "pi": "Pi", "qoder": "Qoder",
       ]
       result.append(

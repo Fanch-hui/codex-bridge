@@ -55,6 +55,8 @@
       }
 
       do {
+        await saveTasks[providerID]?.value
+        guard modelRefreshGenerations[providerID] == generation else { return }
         let status = try await client.status()
         guard modelRefreshGenerations[providerID] == generation else { return }
         let projectID = status.workbenchProjectID
@@ -69,10 +71,16 @@
         if !locksModelSelection { refreshingProviderIDs.remove(providerID) }
         let persistedDefault = try await client.agentModelDefault(providerID: providerID)
         guard modelRefreshGenerations[providerID] == generation else { return }
+        persistedDefaults[providerID] = persistedDefault
+        applySelectedProvider(
+          providerID: providerID, installation: installation, defaults: persistedDefault,
+          catalog: cached ?? modelCatalogs[providerID] ?? [])
+        publishDisplay()
         guard let installation else {
           persistedDefaults[providerID] = persistedDefault
           modelCatalogs[providerID] = []
-          catalogScopes[providerID] = ModelCatalogScope(installationID: nil, projectID: projectID)
+          catalogScopes[providerID] = modelCatalogScope(
+            providerID: providerID, installationID: nil, projectID: projectID)
           applySelectedProvider(
             providerID: providerID, installation: nil, defaults: persistedDefault, catalog: [])
           statusText = "已读取 \(provider.displayName) 的默认设置。"
@@ -112,6 +120,13 @@
           persistedEffort: persistedDefault.effort,
           defaultWasRemoved: defaultWasRemoved
         )
+        if defaultNeedsCorrection(
+          providerID: providerID, defaults: persistedDefault, resolution: resolution)
+        {
+          locksModelSelection = true
+          refreshingProviderIDs.insert(providerID)
+          publishDisplay()
+        }
         let finalDefault = try await correctDefaultIfNeeded(
           providerID: providerID,
           persistedDefault: persistedDefault,
@@ -127,8 +142,8 @@
           defaults: finalDefault,
           catalog: resolution.response.models
         )
-        catalogScopes[providerID] = ModelCatalogScope(
-          installationID: installation.installationID, projectID: projectID)
+        catalogScopes[providerID] = modelCatalogScope(
+          providerID: providerID, installationID: installation.installationID, projectID: projectID)
         if providerID == "pi", resolution.defaultWasRemoved {
           providerErrors[providerID] =
             AgentModelDefaultResolutionError.piModelUnavailable(modelID: persistedDefault.model)
@@ -187,10 +202,9 @@
       persistedDefault: IPCAgentModelDefaultResponse,
       resolution: AgentModelCatalogResolution
     ) async throws -> IPCAgentModelDefaultResponse {
-      if providerID == "pi", resolution.defaultWasRemoved { return persistedDefault }
       guard
-        resolution.defaultWasRemoved || resolution.effortWasRemoved
-          || resolution.canonicalDefaultModelID != persistedDefault.model
+        defaultNeedsCorrection(
+          providerID: providerID, defaults: persistedDefault, resolution: resolution)
       else {
         return persistedDefault
       }
@@ -202,6 +216,15 @@
         effort: resolution.defaultWasRemoved || resolution.effortWasRemoved
           ? nil : persistedDefault.effort
       )
+    }
+
+    private func defaultNeedsCorrection(
+      providerID: String, defaults: IPCAgentModelDefaultResponse,
+      resolution: AgentModelCatalogResolution
+    ) -> Bool {
+      if providerID == "pi", resolution.defaultWasRemoved { return false }
+      return resolution.defaultWasRemoved || resolution.effortWasRemoved
+        || resolution.canonicalDefaultModelID != defaults.model
     }
 
     func loadModels(
@@ -228,8 +251,8 @@
     ) -> [IPCAgentModelSummary]? {
       guard
         catalogScopes[providerID]
-          == ModelCatalogScope(
-            installationID: installationID, projectID: projectID)
+          == modelCatalogScope(
+            providerID: providerID, installationID: installationID, projectID: projectID)
       else { return nil }
       return modelCatalogs[providerID]
     }

@@ -44,7 +44,7 @@
     var configPanel = S.node("div", "agent-config-panel"); configPanel.appendChild(fields);
     var configSave = S.button("更新配置", null, {}, null, "small", true); configPanel.appendChild(configSave);
     row.appendChild(configPanel);
-    var desktop = global.CodexBridgeDesktopDSHDesktop.create(S, function (command, payload) { context.emit(command, payload); }, refreshAction);
+    var desktop = global.CodexBridgeDesktopDSHDesktop.create(S, function (command, payload) { context.emit(command, payload); });
     row.appendChild(desktop.root);
     var qoderSettings = global.CodexBridgeDesktopQoderRuntimeSettings.create(refreshAction);
     row.appendChild(qoderSettings.root);
@@ -106,7 +106,7 @@
     }
 
     function configurationValid() {
-      if (desktop.nativeMode()) return desktop.canConnect();
+      if (desktop.isDesktop()) return desktop.canConnect();
       if (!currentProvider.requiresConfiguration) return true;
       var base = hasValue(baseURL.control.value);
       var key = hasValue(apiKey.control.value);
@@ -123,7 +123,7 @@
       setup.update(scopedOperation, currentProvider);
       var scoped = scopedInstallations();
       var primary = primaryInstallation(scoped);
-      if (desktop.nativeMode()) {
+      if (desktop.isDesktop()) {
         actionBar.hidden = false; action.hidden = false; actionMode = "desktop";
         configPanel.hidden = true; setupAction.hidden = true; setupProgress.hidden = true; installOptions.hidden = true;
         action.textContent = desktop.connected() ? "重新连接" : "连接";
@@ -259,14 +259,14 @@
       S.updateStatus(status, stateLabel(nextProvider, primary, isConnectedValue),
         stateTone(nextProvider, primary, isConnectedValue));
       detail.textContent = operation ? operation.message : rowDetail(nextProvider, scoped, primary, isConnectedValue);
-      if (desktop.nativeMode()) {
+      if (desktop.isDesktop()) {
         S.updateStatus(status, desktop.connected() ? "已连接" : "等待桌面连接",
           desktop.connected() ? "success" : "neutral");
         detail.textContent = "DSH 原生桌面会话";
       }
       fields.hidden = !nextProvider.requiresConfiguration || (!isConnectedValue && !!nextProvider.discoveredConfigurationPath)
         || (!primary && discoveryState(nextProvider) === "not_found");
-      providerDetail.textContent = desktop.nativeMode()
+      providerDetail.textContent = desktop.isDesktop()
         ? "使用 DSH 桌面已登录的账号和原生会话。" : providerDetailText(nextProvider, scoped);
       providerDetail.hidden = !providerDetail.textContent;
       if (isConnectedValue && configPanel.parentNode !== detailsBody) {

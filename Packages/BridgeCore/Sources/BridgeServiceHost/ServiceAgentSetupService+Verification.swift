@@ -97,7 +97,7 @@ extension ServiceAgentSetupService {
       }
       return record
     } catch {
-      throw Self.present(error, providerID: providerID)
+      throw ServiceAgentSetupErrorPresentation.present(error, providerID: providerID)
     }
   }
 
@@ -110,7 +110,7 @@ extension ServiceAgentSetupService {
         throw ServiceAgentSetupError.userAction("运行时已连接，当前没有可用模型，请完成原生登录或服务商配置。")
       }
     } catch {
-      throw Self.present(error, providerID: record.providerID)
+      throw ServiceAgentSetupErrorPresentation.present(error, providerID: record.providerID)
     }
   }
 
@@ -153,18 +153,4 @@ extension ServiceAgentSetupService {
       == "always-proceed"
   }
 
-  private static func present(_ error: any Error, providerID: AgentProviderID) -> any Error {
-    let message = error.localizedDescription
-    let text = (message + " " + String(describing: error)).lowercased()
-    if [
-      "auth", "credential", "api key", "login", "未登录", "unauthorized", "401", "403",
-      "model_not_configured", "没有可用模型",
-    ].contains(where: text.contains) {
-      return ServiceAgentSetupError.userAction(
-        providerID == .deepSeekHarness
-          ? "请检查 DSH API Key 和服务地址，然后重新验证。"
-          : "请完成原生登录或 API 配置后重新验证。")
-    }
-    return error
-  }
 }

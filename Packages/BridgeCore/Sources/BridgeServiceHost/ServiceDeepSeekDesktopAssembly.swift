@@ -31,9 +31,18 @@ enum ServiceDeepSeekDesktopAssembly {
             }, installationID: installationID)
         },
         indexLookup: { scope, profileID, sessionID in
-          try await store.isDeepSeekDesktopSessionIndexed(
-            scope: scope,
-            sessionID: sessionID, profileID: profileID)
+          if try await store.isDeepSeekDesktopSessionIndexed(
+            scope: scope, sessionID: sessionID, profileID: profileID)
+          {
+            return true
+          }
+          let namespace = installer.namespaceID(for: scope.installationID)
+          guard namespace != scope.installationID else { return false }
+          let previous = try AgentNativeSessionDirectoryScope(
+            providerID: .deepSeekHarness, installationID: namespace,
+            projectID: scope.projectID, projectRoot: scope.projectRoot, region: scope.region)
+          return try await store.isDeepSeekDesktopSessionIndexed(
+            scope: previous, sessionID: sessionID, profileID: profileID)
         },
         indexSave: { scope, profileID, sessionID in
           try await store.indexDeepSeekDesktopSession(
@@ -51,6 +60,6 @@ enum ServiceDeepSeekDesktopAssembly {
           return DeepSeekHarnessDesktopStatus(
             connected: false, paired: false,
             unavailableReason: "连接器已安装，请启动 DSH Desktop 并完成配对。")
-        }))
+        }), providerID: .deepSeekHarnessDesktop)
   }
 }

@@ -1,24 +1,54 @@
 import BridgeACP
 import BridgeAgentCore
+import BridgeDeepSeekHarnessACP
+import BridgeSecurity
 import Foundation
 
 public struct DeepSeekHarnessDesktopProvider: AgentProvider, AgentNativeSessionDirectoryProviding,
-  Sendable
+  AgentInstallationArtifactProviding, AgentInstallationRuntimeArtifactProviding, Sendable
 {
   public let descriptor: AgentProviderDescriptor
   public let controller: DeepSeekHarnessDesktopController
   let configuration: DeepSeekHarnessDesktopConfiguration
+  private let runtimeArtifactProvider: any AgentInstallationRuntimeArtifactProviding
 
-  public init(configuration: DeepSeekHarnessDesktopConfiguration) throws {
+  public init(
+    configuration: DeepSeekHarnessDesktopConfiguration,
+    providerID: AgentProviderID = .deepSeekHarness,
+    runtimeArtifactProvider: (any AgentInstallationRuntimeArtifactProviding)? = nil
+  ) throws {
+    guard providerID == .deepSeekHarness || providerID == .deepSeekHarnessDesktop else {
+      throw AgentRuntimeError.providerUnavailable(providerID)
+    }
     self.configuration = configuration
+    self.runtimeArtifactProvider = try runtimeArtifactProvider ?? DeepSeekHarnessACPProvider()
     controller = DeepSeekHarnessDesktopController(configuration: configuration)
     descriptor = try AgentProviderDescriptor(
-      providerID: .deepSeekHarness,
-      displayName: "DeepSeek Harness", adapterRevision: 10)
+      providerID: providerID,
+      displayName: "DSH 桌面", adapterRevision: 11)
   }
 
   public var nativeSessionDirectoryManager: (any AgentNativeSessionDirectoryManaging)? {
     DeepSeekHarnessDesktopSessionDirectory(controller: controller, configuration: configuration)
+  }
+
+  public func installationArtifacts(for installation: AgentInstallation) async throws
+    -> [AgentInstallationArtifact]
+  {
+    for artifact in installation.artifacts where artifact.role == .nodeInterpreter {
+      let current = try SecureFileArtifactSnapshot.capture(
+        at: artifact.canonicalPath, requiresExecutable: true)
+      guard current.sha256 == artifact.sha256 else {
+        throw AgentRuntimeError.installationUnavailable(installation.id)
+      }
+    }
+    return installation.artifacts
+  }
+
+  public func installationRuntimeArtifacts(for installation: AgentInstallation) async throws
+    -> [AgentInstallationRuntimeArtifact]
+  {
+    try await runtimeArtifactProvider.installationRuntimeArtifacts(for: installation)
   }
 
   static let capabilities: Set<AgentCapability> = [

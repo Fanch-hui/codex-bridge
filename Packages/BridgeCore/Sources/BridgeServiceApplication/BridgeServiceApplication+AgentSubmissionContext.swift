@@ -35,7 +35,11 @@ extension BridgeServiceApplication {
     let registry = try requiredAgentRegistry()
     let selectable =
       try await registry.installations(providerID: providerID)
-      .filter { $0.isSelectable || (providerID == .deepSeekHarness && $0.isEnabled) }
+      .filter {
+        $0.isSelectable
+          || ((providerID == .deepSeekHarness || providerID == .deepSeekHarnessDesktop)
+            && $0.isEnabled)
+      }
       .sorted { $0.id.rawValue < $1.id.rawValue }
     var record = try await selectAgentInstallation(
       providerID: providerID,

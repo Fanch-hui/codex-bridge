@@ -33,8 +33,8 @@ extension BridgeServiceAppModel {
   {
     let desktop = installationID.flatMap { deepSeekDesktopStates[$0] }
     let runtimeKey =
-      providerID == "deepseek-harness"
-      ? [desktop?.mode ?? "acp", desktop?.profileID ?? ""].joined(separator: "|") : nil
+      providerID == "deepseek-harness-desktop"
+      ? ["native-desktop", desktop?.profileID ?? ""].joined(separator: "|") : nil
     return AgentModelCatalogScope(
       installationID: installationID,
       projectID: projectID, runtimeKey: runtimeKey)

@@ -8,7 +8,10 @@ extension BridgeServiceRequestController {
     if let error = error as? DeepSeekHarnessDesktopRPCError {
       return .init(
         code: error.code, message: error.message,
-        retryable: ["desktop_unavailable", "desktop_client_unavailable"].contains(error.code))
+        retryable: [
+          "desktop_unavailable", "desktop_client_unavailable", "desktop_connector_not_ready",
+        ]
+        .contains(error.code))
     }
     if let error = error as? ServiceDeepSeekDesktopInstallError {
       let code: String
@@ -33,6 +36,11 @@ extension BridgeServiceRequestController {
       return .init(
         code: detail,
         message: "DSH 原生桌面当前支持 macOS 和 Windows x64；此平台请使用 ACP。")
+    }
+    if case .unsupportedProtocol("dsh_desktop_identity") = error as? AgentRuntimeError {
+      return .init(
+        code: "dsh_desktop_identity_invalid",
+        message: "DSH Desktop Connector 的运行身份校验失败。请完全退出 DSH 桌面后重新检测安装与连接。")
     }
     return nil
   }

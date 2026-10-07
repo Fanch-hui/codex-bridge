@@ -117,6 +117,9 @@
       if (id.indexOf("antigravity") >= 0) {
         return "Antigravity CLI 引擎。无需配置文件。点击“弹窗选择文件登记…”选中 agy.exe（通常位于 PATH 或自定义安装目录）。";
       }
+      if (id === "deepseek-harness-desktop") {
+        return "DSH 桌面。选择已安装桌面的可执行文件，然后安装 Connector 并在桌面中确认配对。";
+      }
       if (id.indexOf("deepseek") >= 0) {
         return "DeepSeek Harness。需要可执行文件及只读 cordis.yml 配置文件。点击“弹窗选择文件登记…”将依次弹出系统窗口指导选择。";
       }

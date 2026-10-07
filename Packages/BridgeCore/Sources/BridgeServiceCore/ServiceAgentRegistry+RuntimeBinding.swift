@@ -6,7 +6,7 @@ extension ServiceAgentRegistry {
     -> ServiceAgentInstallationRecord
   {
     guard let record = try await store.agentInstallation(id: installationID),
-      record.providerID == .deepSeekHarness
+      record.providerID == .deepSeekHarness || record.providerID == .deepSeekHarnessDesktop
     else {
       throw ServiceAgentRegistryError.installationUnavailable(installationID)
     }
@@ -29,6 +29,10 @@ extension ServiceAgentRegistry {
       return try await validateForExecution(installationID: installationID)
     }
     let record = try await validateDesktopInstallation(installationID: installationID)
+    guard
+      record.providerID != .deepSeekHarnessDesktop
+        || runtimeBinding.connectionMode == .nativeDesktop
+    else { throw AgentRuntimeError.invalidRequest("dsh.desktop.runtimeBinding") }
     guard record.isEnabled else {
       throw ServiceAgentRegistryError.installationUnavailable(installationID)
     }
@@ -59,12 +63,14 @@ extension ServiceAgentRegistry {
   func selectedRuntimeBinding(for record: ServiceAgentInstallationRecord) async throws
     -> AgentRuntimeBinding?
   {
-    guard record.providerID == .deepSeekHarness else { return nil }
+    guard record.providerID == .deepSeekHarness || record.providerID == .deepSeekHarnessDesktop
+    else { return nil }
     let settings = ServiceSettings(store: store)
     return AgentRuntimeBinding(
-      connectionMode: try await settings.deepSeekHarnessConnectionMode(),
-      profileID: try await settings.deepSeekHarnessDesktopTrust(installationID: record.id)?
-        .profileID,
+      connectionMode: record.providerID == .deepSeekHarnessDesktop ? .nativeDesktop : .acp,
+      profileID: record.providerID == .deepSeekHarnessDesktop
+        ? try await settings.deepSeekHarnessDesktopTrust(installationID: record.id)?.profileID
+        : nil,
       requestID: "catalog")
   }
 }

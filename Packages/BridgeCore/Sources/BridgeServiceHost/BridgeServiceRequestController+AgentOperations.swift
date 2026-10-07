@@ -27,18 +27,12 @@ extension BridgeServiceRequestController {
       qoderSnapshot.regions[$0]
     }
     let deepSeekConnection = try await composition.settings.deepSeekHarnessConnectionConfiguration()
-    let deepSeekMode = try await composition.settings.deepSeekHarnessConnectionMode()
-    let deepSeekActiveID: String?
-    if deepSeekMode == .nativeDesktop {
-      deepSeekActiveID = try await composition.settings.string(
-        for: .deepSeekHarnessDesktopActiveInstallationID)
-    } else {
-      deepSeekActiveID =
-        installations.first(where: {
-          $0.providerID == .deepSeekHarness && $0.isEnabled
-            && $0.artifacts.contains(where: { $0.role == .launchConfiguration })
-        })?.id.rawValue
-    }
+    let deepSeekActiveID = ServiceDeepSeekHarnessInstallationSelection.acpInstallation(
+      in: installations)?.id.rawValue
+    let storedDesktopActiveID = try await composition.settings.string(
+      for: .deepSeekHarnessDesktopActiveInstallationID)
+    let desktopActiveID = ServiceDeepSeekHarnessInstallationSelection.desktopInstallation(
+      in: installations, activeID: storedDesktopActiveID)?.id.rawValue
     let installationDistributionsByPath = try await qoderDistributionsByExecutablePath(
       for: installations)
     var discovery = await composition.agentDiscoveryCatalog.summaries(
@@ -78,13 +72,16 @@ extension BridgeServiceRequestController {
             installation,
             distribution: distribution?.rawValue,
             isActive: installation.providerID == .deepSeekHarness
-              ? deepSeekActiveID == installation.id.rawValue : activeID == installation.id.rawValue,
-            nativeSessionOperations: installation.providerID == .deepSeekHarness
-              ? (deepSeekMode == .nativeDesktop && deepSeekActiveID == installation.id.rawValue
+              ? deepSeekActiveID == installation.id.rawValue
+              : installation.providerID == .deepSeekHarnessDesktop
+                ? desktopActiveID == installation.id.rawValue
+                : activeID == installation.id.rawValue,
+            nativeSessionOperations: installation.providerID == .deepSeekHarnessDesktop
+              ? (desktopActiveID == installation.id.rawValue
                 && installation.isSelectable
                 ? ["list", "read", "index", "rename", "continue", "open"] : []) : nil,
-            canOpenNativeSession: installation.providerID == .deepSeekHarness
-              ? deepSeekMode == .nativeDesktop && deepSeekActiveID == installation.id.rawValue : nil
+            canOpenNativeSession: installation.providerID == .deepSeekHarnessDesktop
+              ? desktopActiveID == installation.id.rawValue : nil
           )
         }
       )
@@ -96,6 +93,12 @@ extension BridgeServiceRequestController {
     executablePath: String,
     configurationPath: String?
   ) throws -> [ServiceAgentInstallationArtifactRequest] {
+    if providerID == .deepSeekHarnessDesktop {
+      guard configurationPath == nil else {
+        throw AgentRuntimeError.invalidRequest("registration.configurationPath")
+      }
+      return [try .init(role: .nodeInterpreter, path: executablePath)]
+    }
     guard providerID == .deepSeekHarness else { return [] }
     guard let configurationPath else {
       throw AgentRuntimeError.invalidRequest("registration.configurationPath")
@@ -324,8 +327,9 @@ extension BridgeServiceRequestController {
         model: persisted.model,
         permissionMode: persisted.permissionMode,
         effort: persisted.effort,
-        connectionMode: providerID == .deepSeekHarness
-          ? try await composition.settings.deepSeekHarnessConnectionMode().rawValue : nil
+        connectionMode: providerID == .deepSeekHarnessDesktop
+          ? DeepSeekHarnessConnectionMode.nativeDesktop.rawValue
+          : (providerID == .deepSeekHarness ? DeepSeekHarnessConnectionMode.acp.rawValue : nil)
       )
     )
   }
@@ -350,8 +354,9 @@ extension BridgeServiceRequestController {
         model: persisted.model,
         permissionMode: persisted.permissionMode,
         effort: persisted.effort,
-        connectionMode: providerID == .deepSeekHarness
-          ? try await composition.settings.deepSeekHarnessConnectionMode().rawValue : nil
+        connectionMode: providerID == .deepSeekHarnessDesktop
+          ? DeepSeekHarnessConnectionMode.nativeDesktop.rawValue
+          : (providerID == .deepSeekHarness ? DeepSeekHarnessConnectionMode.acp.rawValue : nil)
       )
     )
   }

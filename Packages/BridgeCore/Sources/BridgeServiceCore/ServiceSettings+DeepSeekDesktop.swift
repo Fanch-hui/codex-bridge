@@ -11,6 +11,37 @@ public struct ServiceDeepSeekDesktopTrust: Codable, Equatable, Sendable {
 }
 
 extension ServiceSettings {
+  public func deepSeekHarnessConnectionSelection() async throws
+    -> (mode: String?, activeInstallationID: String?)
+  {
+    let values = try await store.settingValues(keys: [
+      ServiceSettingKey.deepSeekHarnessConnectionMode.rawValue,
+      ServiceSettingKey.deepSeekHarnessDesktopActiveInstallationID.rawValue,
+    ])
+    return (
+      values[ServiceSettingKey.deepSeekHarnessConnectionMode.rawValue].flatMap {
+        $0.isEmpty ? nil : $0
+      },
+      values[ServiceSettingKey.deepSeekHarnessDesktopActiveInstallationID.rawValue].flatMap {
+        $0.isEmpty ? nil : $0
+      }
+    )
+  }
+
+  public func setDeepSeekHarnessConnectionSelection(
+    mode: String?, activeInstallationID: String?
+  ) async throws {
+    let updatedAt = now()
+    try await store.setSettings([
+      .init(
+        key: ServiceSettingKey.deepSeekHarnessConnectionMode.rawValue,
+        value: mode ?? "", updatedAt: updatedAt),
+      .init(
+        key: ServiceSettingKey.deepSeekHarnessDesktopActiveInstallationID.rawValue,
+        value: activeInstallationID ?? "", updatedAt: updatedAt),
+    ])
+  }
+
   public func deepSeekHarnessConnectionMode() async throws -> DeepSeekHarnessConnectionMode {
     guard let raw = try await string(for: .deepSeekHarnessConnectionMode) else { return .acp }
     guard let mode = DeepSeekHarnessConnectionMode(rawValue: raw) else {
@@ -22,15 +53,17 @@ extension ServiceSettings {
   public func deepSeekHarnessDesktopTrust(installationID: AgentInstallationID) async throws
     -> ServiceDeepSeekDesktopTrust?
   {
-    try await deepSeekDesktopTrusts()[installationID.rawValue]
+    let namespace = try await deepSeekHarnessDesktopNamespace(for: installationID)
+    return try await deepSeekDesktopTrusts()[namespace.rawValue]
   }
 
   public func setDeepSeekHarnessDesktopTrust(
     _ trust: ServiceDeepSeekDesktopTrust?,
     installationID: AgentInstallationID
   ) async throws {
+    let namespace = try await deepSeekHarnessDesktopNamespace(for: installationID)
     var trusts = try await deepSeekDesktopTrusts()
-    trusts[installationID.rawValue] = trust
+    trusts[namespace.rawValue] = trust
     let value = try JSONEncoder().encode(trusts)
     try await set(String(decoding: value, as: UTF8.self), for: .deepSeekHarnessDesktopTrust)
   }

@@ -51,6 +51,7 @@
         )
       else { return }
 
+      modelRefreshGenerations[providerID, default: 0] &+= 1
       saveGenerations[providerID, default: 0] &+= 1
       let generation = saveGenerations[providerID, default: 0]
       let optimistic = IPCAgentModelDefaultResponse(

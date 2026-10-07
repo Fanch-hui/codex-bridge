@@ -240,7 +240,7 @@ extension BridgeDesktopUIStateBuilder {
       supportsSteer: provider.supportsSteer,
       supportsWorkspaceWrite: provider.supportsWorkspaceWrite,
       detail: detail.isEmpty ? nil : detail,
-      desktop: desktop
+      desktop: provider.providerID == "deepseek-harness-desktop" ? desktop : nil
     )
   }
 

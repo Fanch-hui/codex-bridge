@@ -1,18 +1,8 @@
 (function (global) {
   "use strict";
-  function create(S, emit, changed) {
-    var state = null, busy = false, installationID = null, needsReview = false;
+  function create(S, emit) {
+    var state = null, busy = false, installationID = null, needsReview = false, desktopProvider = false;
     var root = S.node("div", "agent-config-panel");
-    var mode = S.selectField("DSH 连接方式", "acp", [
-      { id: "acp", title: "ACP" }, { id: "native-desktop", title: "原生桌面" }
-    ], function () {
-      if (busy) return;
-      if (!state) { changed(); return; }
-      emit("manageDeepSeekHarnessDesktop", { installationID: installationID,
-        action: "setMode", mode: mode.control.value });
-      changed();
-    });
-    root.appendChild(mode.wrapper);
     var panel = S.node("div", "agent-desktop-connection");
     var status = S.node("p", "hint"); status.setAttribute("role", "status");
     var code = S.node("p", "mono");
@@ -34,7 +24,8 @@
     refresh.addEventListener("click", function () { send("status"); });
     revoke.addEventListener("click", function () { send("revoke"); });
     function update(provider, installations, nextBusy) {
-      root.hidden = provider.providerID !== "deepseek-harness";
+      desktopProvider = provider.providerID === "deepseek-harness-desktop";
+      root.hidden = !desktopProvider;
       if (root.hidden) return;
       busy = nextBusy;
       state = provider.desktop || null;
@@ -42,9 +33,6 @@
       needsReview = installations.some(function (item) {
         return item.installationID === installationID && item.availability === "needs_review";
       });
-      if (state) mode.control.value = state.mode;
-      mode.control.disabled = busy;
-      panel.hidden = !nativeMode();
       download.hidden = !!(state && state.executablePath);
       code.hidden = !(state && state.pairingCode);
       code.textContent = state && state.pairingCode ? "配对确认码：" + state.pairingCode : "";
@@ -61,10 +49,9 @@
         : state.paired ? "已配对，请启动 DSH 桌面后检测连接。"
         : "启动 DSH 桌面，点击连接并在桌面中确认配对。");
     }
-    function nativeMode() { return mode.control.value === "native-desktop"; }
-    return { root: root, update: update, nativeMode: nativeMode,
+    return { root: root, update: update, isDesktop: function () { return desktopProvider; },
       connect: function () {
-        if (!state) emit("manageDeepSeekHarnessDesktop", { action: "discover" });
+        if (!state) emit("manageDeepSeekHarnessDesktop", { providerID: "deepseek-harness-desktop", action: "discover" });
         else send("connect");
       },
       connected: function () { return !!(state && state.connected && state.paired && !needsReview); },
