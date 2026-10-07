@@ -128,7 +128,7 @@
           catalog: resolution.response.models
         )
         catalogScopes[providerID] = ModelCatalogScope(
-          installationID: installation?.installationID, projectID: projectID)
+          installationID: installation.installationID, projectID: projectID)
         if providerID == "pi", resolution.defaultWasRemoved {
           providerErrors[providerID] =
             AgentModelDefaultResolutionError.piModelUnavailable(modelID: persistedDefault.model)
