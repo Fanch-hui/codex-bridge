@@ -37,6 +37,9 @@ public enum TunnelLifecycle: String, Codable, Equatable, Sendable {
 }
 
 public struct TunnelConfiguration: Sendable {
+  // An empty helper poll can wait 30 seconds, followed by a 5-second guardrail.
+  public static let defaultReadinessTimeout: Duration = .seconds(45)
+
   public let helperExecutable: URL
   public let tunnelID: TunnelID
   public let runtimeKeyReference: SecretReference
@@ -57,7 +60,7 @@ public struct TunnelConfiguration: Sendable {
     runtimeKeyReference: SecretReference,
     localMCPURL: URL,
     runtimeDirectory: URL,
-    readinessTimeout: Duration = .seconds(30),
+    readinessTimeout: Duration = Self.defaultReadinessTimeout,
     healthInterval: Duration = .seconds(5),
     processTimeout: Duration = .seconds(20),
     metricsFreshness: Duration = .seconds(70),
@@ -106,7 +109,7 @@ public struct TunnelConfiguration: Sendable {
     localMCPURL: URL,
     localMCPHeaderSecret: String,
     runtimeDirectory: URL,
-    readinessTimeout: Duration = .seconds(30),
+    readinessTimeout: Duration = Self.defaultReadinessTimeout,
     healthInterval: Duration = .seconds(5),
     processTimeout: Duration = .seconds(20),
     metricsFreshness: Duration = .seconds(70),

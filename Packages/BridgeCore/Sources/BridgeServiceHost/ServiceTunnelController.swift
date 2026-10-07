@@ -161,7 +161,10 @@ public actor ServiceTunnelController {
   }
 
   private func waitForCurrentManager() async throws -> Bool {
-    for _ in 0..<150 {
+    let clock = ContinuousClock()
+    let startupTimeout = TunnelConfiguration.defaultReadinessTimeout + .seconds(20)
+    let deadline = clock.now.advanced(by: startupTimeout)
+    while clock.now < deadline {
       try await Task.sleep(for: .milliseconds(200))
       guard !isShutdown, let active = manager else { return false }
       switch await active.state() {
