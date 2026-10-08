@@ -73,7 +73,7 @@ extension DeepSeekHarnessACPExecution {
       return nil
     }
 
-    try emitFinalizedContent(finalizedContent)
+    try await emitFinalizedContent(finalizedContent)
 
     if interruptRequested {
       await finishInterrupted()
@@ -92,7 +92,7 @@ extension DeepSeekHarnessACPExecution {
     guard claimTerminal() else { return nil }
     do {
       let completed = try await normalizer.completed(stopReason: stopReason)
-      guard emit(completed) else { throw DeepSeekHarnessACPError.transportClosed }
+      guard await emit(completed) else { throw DeepSeekHarnessACPError.transportClosed }
       await closeStream()
     } catch {
       await closeStream(throwing: error)
@@ -100,9 +100,9 @@ extension DeepSeekHarnessACPExecution {
     return nil
   }
 
-  private func emitFinalizedContent(_ events: [AgentEventEnvelope]) throws {
+  private func emitFinalizedContent(_ events: [AgentEventEnvelope]) async throws {
     for event in events {
-      guard emit(event) else { throw DeepSeekHarnessACPError.transportClosed }
+      guard await emit(event) else { throw DeepSeekHarnessACPError.transportClosed }
     }
   }
 

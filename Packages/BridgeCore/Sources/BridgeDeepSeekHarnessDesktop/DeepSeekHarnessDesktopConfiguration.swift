@@ -28,6 +28,7 @@ public struct DeepSeekHarnessDesktopConfiguration: Sendable {
   public let indexLookup: IndexLookup
   public let indexSave: IndexSave
   public let registeredProjectPaths: @Sendable () async throws -> [String]
+  public let desktopRunning: @Sendable (AgentInstallation) async throws -> Bool?
   public let installConnector:
     @Sendable (AgentInstallation) async throws -> DeepSeekHarnessDesktopStatus
   public let requestTimeout: Duration
@@ -43,6 +44,7 @@ public struct DeepSeekHarnessDesktopConfiguration: Sendable {
     indexLookup: @escaping IndexLookup,
     indexSave: @escaping IndexSave,
     registeredProjectPaths: @escaping @Sendable () async throws -> [String],
+    desktopRunning: @escaping @Sendable (AgentInstallation) async throws -> Bool? = { _ in nil },
     descriptorProvider:
       @escaping @Sendable (String, AgentInstallation) throws -> DeepSeekHarnessDesktopDescriptor = {
         try DeepSeekHarnessDesktopDescriptor.load(path: $0, installation: $1)
@@ -64,6 +66,7 @@ public struct DeepSeekHarnessDesktopConfiguration: Sendable {
     self.indexLookup = indexLookup
     self.indexSave = indexSave
     self.registeredProjectPaths = registeredProjectPaths
+    self.desktopRunning = desktopRunning
     self.installConnector = installConnector
     self.requestTimeout = requestTimeout
     self.transportFactory = transportFactory

@@ -55,7 +55,8 @@
     var draft = draftFor(detail.taskID);
     if (draft.pending) return;
     if (action === "prepare") {
-      if (!canPrepare(draft) || invalidInput(draft) || !draft.providerID) return;
+      if (!canPrepare(draft) || invalidInput(draft) || !draft.providerID
+        || draft.providerID === "deepseek-harness") return;
       if (draft.operation && draft.operation.submitted
         && !global.confirm("原交接已有接手任务。准备新的交接会在确认后再次执行，是否继续？")) return;
       draft.operation = { id: identifier(), providerID: draft.providerID,
@@ -127,14 +128,18 @@
     ensureRoot();
     if (!root) return;
     if (!detail || !detail.handoffPrompt) { root.hidden = true; currentKey = null; return; }
-    var draft = draftFor(detail.taskID), providers = S.safeArray(detail.handoffProviders).slice();
+    var draft = draftFor(detail.taskID), providers = S.safeArray(detail.handoffProviders).filter(function (provider) {
+      return provider.id !== "deepseek-harness";
+    });
     if (draft.operation && !providers.some(function (p) { return p.id === draft.operation.providerID; })) {
       providers.push({ id: draft.operation.providerID, title: draft.operation.providerID + "（仅恢复交接）" });
     }
     if (!providers.length) { root.hidden = true; return; }
     root.hidden = false;
     root.__detail = detail;
-    if (!draft.providerID) draft.providerID = providers[0].id;
+    if (!draft.providerID || (!draft.operation && !providers.some(function (provider) {
+      return provider.id === draft.providerID;
+    }))) draft.providerID = providers[0].id;
     var key = JSON.stringify([detail.taskID, providers]);
     if (key === currentKey) { update(detail); return; }
     currentKey = key;
@@ -192,7 +197,8 @@
     var locked = !!draft.operation && draft.operation.submitted && !canPrepare(draft);
     root.__provider.disabled = busy || locked;
     root.__input.disabled = busy || locked;
-    root.__prepare.disabled = !canPrepare(draft) || invalidInput(draft) || !draft.providerID;
+    root.__prepare.disabled = !canPrepare(draft) || invalidInput(draft) || !draft.providerID
+      || draft.providerID === "deepseek-harness";
     root.__submit.disabled = !canSubmit(detail, draft);
     root.__query.disabled = busy || !draft.operation;
     root.__open.disabled = !preview || !preview.targetTaskID || preview.phase === "target_deleted";

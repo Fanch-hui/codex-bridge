@@ -11,7 +11,8 @@ extension BridgeServiceAppModel {
     accepted: Bool,
     message: String? = nil,
     handoff: WorkbenchHandoffPreview? = nil,
-    resultingTaskID: String? = nil
+    resultingTaskID: String? = nil,
+    canEditInput: Bool? = nil
   ) {
     guard let requestID, !requestID.isEmpty else { return }
     if !accepted { errorMessage = message }
@@ -23,7 +24,8 @@ extension BridgeServiceAppModel {
       accepted: accepted,
       message: message,
       handoff: handoff,
-      resultingTaskID: resultingTaskID
+      resultingTaskID: resultingTaskID,
+      canEditInput: canEditInput
     )
   }
 
@@ -32,7 +34,8 @@ extension BridgeServiceAppModel {
     command: String,
     taskID: String?,
     input: String?,
-    message: String
+    message: String,
+    canEditInput: Bool? = nil
   ) {
     recordWorkbenchCommandReceipt(
       requestID: requestID,
@@ -40,7 +43,8 @@ extension BridgeServiceAppModel {
       taskID: taskID,
       input: input,
       accepted: false,
-      message: message
+      message: message,
+      canEditInput: canEditInput
     )
   }
 
@@ -82,7 +86,8 @@ extension BridgeServiceAppModel {
           taskID: taskID,
           input: input,
           accepted: false,
-          message: message
+          message: message,
+          canEditInput: DSHWorkbenchTaskSubmission.canEditInput(after: error)
         )
       }
     }

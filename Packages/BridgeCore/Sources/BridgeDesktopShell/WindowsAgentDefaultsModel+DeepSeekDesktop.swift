@@ -11,11 +11,13 @@
     }
 
     func refreshDeepSeekModelScope() async {
+      deepSeekDesktopConnectionErrorCode = nil
       let candidates = installations.filter { $0.providerID == "deepseek-harness-desktop" }
       guard let installation = candidates.first(where: { $0.isActive == true }) ?? candidates.first,
         let value = try? await client.manageDeepSeekHarnessDesktop(
           .init(installationID: installation.installationID))
       else { return }
+      deepSeekDesktopConnectionErrorCode = value.desktop.errorCode
       let scope = [installation.installationID, "native-desktop", value.desktop.profileID ?? ""]
         .joined(separator: "|")
       guard scope != deepSeekDesktopModelScope else { return }

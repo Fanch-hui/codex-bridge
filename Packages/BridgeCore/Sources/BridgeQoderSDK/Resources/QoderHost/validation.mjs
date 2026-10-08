@@ -49,10 +49,10 @@ export function canonical(value) {
 export function digest(value) {
   return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 }
-export function bounded(value, bytes = 240 * 1024) {
+export function bounded(value, bytes = 240 * 1024, suffix = '\n[输出已截断]') {
   const content = typeof value === 'string' ? value : JSON.stringify(value ?? null);
   if (Buffer.byteLength(content) <= bytes) return content;
-  const suffix = '\n[输出已截断]';
+  if (bytes < Buffer.byteLength(suffix) + 3) return '';
   return Buffer.from(content).subarray(0, bytes - Buffer.byteLength(suffix) - 3).toString('utf8') + suffix;
 }
 export function deadline(promise, milliseconds = 30000) {

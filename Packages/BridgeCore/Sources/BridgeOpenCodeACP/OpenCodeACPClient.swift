@@ -88,6 +88,7 @@ public struct OpenCodeACPPromptResult: Equatable, Sendable {
 }
 
 public actor OpenCodeACPClient {
+  let eventDelivery: AgentEventStreamDelivery<OpenCodeACPClientEventEnvelope>
   public nonisolated let events: AsyncStream<OpenCodeACPClientEventEnvelope>
 
   private let transport: any OpenCodeACPTransport
@@ -115,13 +116,14 @@ public actor OpenCodeACPClient {
       bufferingPolicy: .bufferingOldest(max(1, eventBufferLimit))
     )
     self.transport = transport
-    requestBroker = BridgeACP.ACPRequestBroker(
-      transport: transport,
-      requestTimeout: requestTimeout
-    )
     self.clientInfo = clientInfo
     events = pair.stream
     eventContinuation = pair.continuation
+    let delivery = AgentEventStreamDelivery(pair.continuation)
+    eventDelivery = delivery
+    requestBroker = BridgeACP.ACPRequestBroker(
+      transport: transport, requestTimeout: requestTimeout,
+      timeoutSuspended: { await delivery.hasPendingDelivery })
   }
 
   public var initialization: OpenCodeACPInitialization? {

@@ -150,6 +150,13 @@ public final class BridgeServiceAppModel: ObservableObject {
     },
     onChange: { [weak self] in self?.objectWillChange.send() }
   )
+  lazy var workspaceModel = WorkbenchWorkspaceModel(
+    client: { [weak self] in
+      guard let self else { throw BridgeServiceClientError.unavailable }
+      return try self.currentClient()
+    },
+    onChange: { [weak self] in self?.objectWillChange.send() }
+  )
   @Published var agentSetupOperations: [IPCAgentSetupState] = []
   var agentSetupRefreshInFlight = false
   var agentSetupRequestGeneration = 0
@@ -185,6 +192,7 @@ public final class BridgeServiceAppModel: ObservableObject {
     didSet {
       if oldValue != selectedProjectID {
         clearTaskHistorySearch()
+        workspaceModel.selectProject(selectedProjectID)
         synchronizeAgentModelScopes()
       }
     }

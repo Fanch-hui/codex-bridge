@@ -77,6 +77,7 @@ extension TaskConversationBuffer {
       if canEvict {
         excess -= 1
         state.persistedKeys.remove(entry.key)
+        state.omittedContentKeys.remove(entry.key)
       } else {
         retained.append(entry)
       }

@@ -1,3 +1,4 @@
+import BridgeServiceAppCore
 import Foundation
 
 public enum BridgeDesktopCommand: String, Codable, Sendable {
@@ -30,6 +31,8 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setWorkbenchPermissionMode
   case selectTask
   case refreshTasks
+  case submitDSHTask
+  case workbenchWorkspace
   case searchTaskHistory
   case selectTaskHistory
   case interruptTask
@@ -165,6 +168,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let modelID: String?
   public let effort: String?
   public let permissionMode: String?
+  public let executionSelection: DSHConversationExecutionSelection?
   public let messageKey: String?
   public let effect: String?
   public let action: String?
@@ -239,6 +243,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     modelID: String? = nil,
     effort: String? = nil,
     permissionMode: String? = nil,
+    executionSelection: DSHConversationExecutionSelection? = nil,
     messageKey: String? = nil,
     effect: String? = nil,
     action: String? = nil,
@@ -312,6 +317,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.modelID = modelID
     self.effort = effort
     self.permissionMode = permissionMode
+    self.executionSelection = executionSelection
     self.messageKey = messageKey
     self.effect = effect
     self.action = action

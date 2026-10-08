@@ -1,4 +1,5 @@
 import BridgeCodexRPC
+import BridgeSecurity
 
 extension ExecutionSession {
   func conversationToolCall(
@@ -102,14 +103,15 @@ extension ExecutionSession {
       ExecutionValidation.commandDisplay(command.displayCommand, maximumBytes: 8 * 1_024)
       ?? "命令内容不可用"
     lines.append("命令：\(displayCommand)")
-    return lines.joined(separator: "\n")
+    return OutboundContentSecurity.redactedToolArguments(
+      lines.joined(separator: "\n"), maximumUTF8Bytes: 64 * 1_024)
   }
 
   private static func fileChangeDetails(
     _ changes: [CodexFileUpdateEvidence],
     projectRoot: String
   ) throws -> String {
-    try changes.map { change in
+    let lines = try changes.map { change in
       let path = try ExecutionValidation.relativePath(change.path, root: projectRoot)
       switch change.kind {
       case .add: return "新增 \(path)"
@@ -119,7 +121,9 @@ extension ExecutionSession {
         let destination = try ExecutionValidation.relativePath(movePath, root: projectRoot)
         return "移动 \(path) → \(destination)"
       }
-    }.joined(separator: "\n")
+    }
+    return OutboundContentSecurity.redactedToolArguments(
+      lines.joined(separator: "\n"), maximumUTF8Bytes: 64 * 1_024)
   }
 
   private static func safeDisplayPath(

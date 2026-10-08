@@ -14,6 +14,7 @@ struct StoredDirectMutation: Sendable {
   let prepared: PreparedProjectMutation
   let createdAt: Date
   var state: State
+  var appliedClientRequestID: String? = nil
 
   var byteCount: Int {
     prepared.changedFiles.reduce(0) { total, file in
@@ -64,11 +65,12 @@ actor DirectMutationOperationStore {
     return operations[operationID]
   }
 
-  func markApplied(_ operationID: String) -> StoredDirectMutation? {
+  func markApplied(_ operationID: String, clientRequestID: String? = nil) -> StoredDirectMutation? {
     guard var operation = operations[operationID], case .pending = operation.state else {
       return nil
     }
     operation.state = .applied
+    operation.appliedClientRequestID = clientRequestID
     operations[operationID] = operation
     return operation
   }

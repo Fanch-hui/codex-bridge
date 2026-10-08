@@ -111,6 +111,7 @@ public actor TaskConversationBuffer {
   final class TaskState {
     var entries: [Entry] = []
     var index: [String: Int] = [:]
+    var omittedContentKeys: Set<String> = []
     var dirtyRevisions: [String: Int] = [:]
     var persistedKeys: Set<String> = []
     var nextRevision = 0

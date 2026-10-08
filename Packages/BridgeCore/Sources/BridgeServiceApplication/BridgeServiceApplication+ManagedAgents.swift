@@ -247,7 +247,8 @@ extension BridgeServiceApplication {
         supportedReasoningEfforts: $0.supportedReasoningEfforts,
         defaultReasoningEffort: $0.defaultReasoningEffort,
         reasoningCapabilitiesAvailable: $0.reasoningCapabilitiesAvailable,
-        isDefaultModel: $0.isDefaultModel
+        isDefaultModel: $0.isDefaultModel,
+        inputModalities: $0.inputModalities?.map(\.rawValue)
       )
     }
   }

@@ -290,10 +290,13 @@
     ) -> String? {
       ProjectAgentPresentation.reconnectSummary(
         names: management.agent.installationItems.compactMap { installation in
-          ProjectAgentPresentation.requiresReconnect(
-            isEnabled: installation.enabled,
-            availability: installation.availability
-          ) ? installation.displayName : nil
+          let desktop = management.agent.providerItems.compactMap(\.desktop).first {
+            $0.installationID == installation.installationID
+          }
+          return BridgeDesktopAgentAvailability.resolve(
+            providerID: installation.providerID, enabled: installation.enabled,
+            availability: installation.availability, desktop: desktop) == .requiresReconnect
+            ? installation.displayName : nil
         }
       )
     }

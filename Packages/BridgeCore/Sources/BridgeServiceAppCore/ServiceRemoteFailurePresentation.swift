@@ -89,6 +89,19 @@ enum ServiceRemoteFailurePresentation {
       ["busy", "service_busy", "project_busy"], "服务或项目当前被其他操作占用。",
       "等待当前任务、命令或文件操作结束，再执行本次操作。"
     ),
+    (
+      ["path_denied", "path_forbidden"], "此路径受项目安全规则保护或超出注册项目范围。",
+      "选择项目内的普通文件；敏感配置和越界路径无法通过工作台访问。"
+    ),
+    (["path_not_found"], "文件已移动或删除。", "刷新项目文件列表后重新选择。"),
+    (
+      ["workbench_binary_file", "binary_content_unsupported"], "此文件不支持文本编辑。",
+      "使用对应格式的本机应用打开；工作台文本编辑器支持 UTF-8 文本文件。"
+    ),
+    (
+      ["workbench_file_too_large"], "此文件超过当前文本读取上限。",
+      "使用本机编辑器打开较大文件；可在诊断详情中查看当前容量上限。"
+    ),
     (["timeout"], "本机操作未能在期限内完成。", "查看连接状态和诊断，确认操作结果后重试。"),
   ]
 }

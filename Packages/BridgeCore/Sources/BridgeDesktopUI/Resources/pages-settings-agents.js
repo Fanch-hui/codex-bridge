@@ -59,7 +59,8 @@
       else if (state.providerID === "deepseek-harness") {
         message = "推理选项由 DSH 适配器提供，可能对不同模型返回相同选项；模型实际支持以 API 为准。";
       }
-      error.textContent = state.errorMessage || message;
+      error.textContent = desktopNotRunning(state)
+        ? "DSH 桌面版未打开。打开后保持在后台运行即可获取模型。" : state.errorMessage || message;
       error.hidden = !error.textContent;
       return efforts;
     }
@@ -82,7 +83,7 @@
       installation.textContent = next.installationName
         ? "安装：" + next.installationName
         : "连接 Agent 后会自动获取模型。";
-      installation.hidden = !!next.installationName;
+      installation.hidden = !!next.installationName || desktopNotRunning(next);
       installation.title = next.installationName || "";
       D.selectOptions(model.control, S.choices(next.model || "", modelOptions(next)));
       D.selectOptions(permission.control, permissionChoices(next));
@@ -116,5 +117,9 @@
     return [{ id: "", title: "Provider 默认" }].concat(M.modelChoices(item.modelOptions));
   }
 
-  global.CodexBridgeDesktopSettingsAgents = { editor: editor };
+  function desktopNotRunning(item) {
+    return item.providerID === "deepseek-harness-desktop" && item.connectionErrorCode === "desktop_not_running";
+  }
+
+  global.CodexBridgeDesktopSettingsAgents = { editor: editor, desktopNotRunning: desktopNotRunning };
 }(window));

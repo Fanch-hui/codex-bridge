@@ -3,6 +3,7 @@ import BridgeAgentCore
 import Foundation
 
 public actor DeepSeekHarnessACPClient {
+  let eventDelivery: AgentEventStreamDelivery<DeepSeekHarnessACPClientEventEnvelope>
   public nonisolated let events: AsyncStream<DeepSeekHarnessACPClientEventEnvelope>
 
   let broker: ACPRequestBroker
@@ -33,11 +34,15 @@ public actor DeepSeekHarnessACPClient {
       bufferingPolicy: .bufferingOldest(max(1, eventBufferLimit))
     )
     self.transport = transport
-    broker = ACPRequestBroker(transport: transport, requestTimeout: requestTimeout)
     self.clientInfo = clientInfo
     self.requestTimeout = requestTimeout
     events = pair.stream
     eventContinuation = pair.continuation
+    let delivery = AgentEventStreamDelivery(pair.continuation)
+    eventDelivery = delivery
+    broker = ACPRequestBroker(
+      transport: transport, requestTimeout: requestTimeout,
+      timeoutSuspended: { await delivery.hasPendingDelivery })
   }
 
   public var initialization: DeepSeekHarnessACPInitialization? {

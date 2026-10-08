@@ -12,6 +12,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case getProjectCommands = "get_project_commands"
   case updateProjectCommands = "update_project_commands"
   case setProjectCommandMode = "set_project_command_mode"
+  case workbenchWorkspace = "workbench_workspace"
   case setWorkbenchProject = "set_workbench_project"
   case setWorkbenchPermissionMode = "set_workbench_permission_mode"
   case getAgentCatalog = "get_agent_catalog"

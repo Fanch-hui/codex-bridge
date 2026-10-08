@@ -26,6 +26,8 @@ public actor BridgeServiceClient {
   let streamHub = CodexBridgeTaskStreamHub()
   var invalidated = false
   var conversationStreamTokens: [String: [Int: UUID]] = [:]
+  var activeModelReads = 0
+  var pendingModelReads: [ModelReadWaiter] = []
 
   public init(transport: any ServiceRequestTransport) {
     self.transport = transport
@@ -49,6 +51,7 @@ public actor BridgeServiceClient {
   public func invalidate() {
     guard !invalidated else { return }
     invalidated = true
+    failPendingModelReads()
     transport.invalidate()
     conversationStreamTokens.removeAll(keepingCapacity: false)
     streamHub.clear()
@@ -66,6 +69,11 @@ public actor BridgeServiceClient {
       payload: payload,
       requestID: requestID
     )
+    if operation == .listModels || operation == .getModelCatalog || operation == .listAgentModels
+      || operation == .getAgentModelDefault
+    {
+      return try await performModelRead(data, requestID: requestID)
+    }
     let response = try await perform(data)
     return try BridgeServiceIPCCodec.decodeResponse(
       Response.self,
@@ -74,7 +82,7 @@ public actor BridgeServiceClient {
     )
   }
 
-  private func perform(_ data: Data) async throws -> Data {
+  func perform(_ data: Data) async throws -> Data {
     try await transport.perform(data)
   }
 }

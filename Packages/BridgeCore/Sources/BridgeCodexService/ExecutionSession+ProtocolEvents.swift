@@ -138,7 +138,10 @@ extension ExecutionSession {
         return
       }
     } catch {
-      await fail(code: "invalid_semantic_event", summary: "Codex emitted invalid task progress.")
+      await fail(
+        code: "invalid_semantic_event",
+        summary: Self.semanticFailureSummary(method: notification.method, error: error)
+      )
       return
     }
 
@@ -150,7 +153,10 @@ extension ExecutionSession {
       }
       await yield(event)
     } catch {
-      await fail(code: "invalid_semantic_event", summary: "Codex emitted invalid task progress.")
+      await fail(
+        code: "invalid_semantic_event",
+        summary: Self.semanticFailureSummary(method: notification.method, error: error)
+      )
     }
   }
 }

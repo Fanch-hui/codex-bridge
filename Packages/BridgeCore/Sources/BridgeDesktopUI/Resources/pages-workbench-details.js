@@ -25,11 +25,22 @@
       metadata.appendChild(S.node("summary", "disclosure-summary", "会话详情"));
       var grid = S.node("dl", "detail-grid"); metadata.appendChild(grid);
       var files = S.node("div", "task-detail-files"); metadata.appendChild(files);
+      var copy = S.button("复制结果", null, {}, null, "small");
+      var copyStatus = S.node("span", "hint"); copyStatus.setAttribute("role", "status");
+      copy.addEventListener("click", function () {
+        var text = copy.__text;
+        copyResult(text).then(function () {
+          if (copy.__text === text) copyStatus.textContent = "已复制";
+        }, function () {
+          if (copy.__text === text) copyStatus.textContent = "复制失败，请选择结果文字复制。";
+        });
+      });
+      metadata.appendChild(copy); metadata.appendChild(copyStatus);
       metadata.addEventListener("toggle", function () { expanded.set(metadata.__taskKey, !!metadata.open); });
       [summary, actions, failure, metadata].forEach(function (node) { header.appendChild(node); });
       header.__presentation = {
         title: title, step: step, stepText: stepText, actions: actions, failure: failure,
-        metadata: metadata, grid: grid, files: files, conversation: conversation
+        metadata: metadata, grid: grid, files: files, conversation: conversation, copy: copy, copyStatus: copyStatus
       };
     }
     return header.__presentation;
@@ -51,6 +62,7 @@
     S.clear(view.grid);
     addDetail(view.grid, "项目", detail.projectName);
     addDetail(view.grid, "Agent", detail.provider);
+    addDetail(view.grid, "来源", detail.source);
     addDetail(view.grid, "更新时间", detail.updatedAt);
     addDetail(view.grid, "模型", detail.model || "未记录");
     addDetail(view.grid, "权限", detail.permissionMode || "未记录");
@@ -58,12 +70,37 @@
     addUsage(view.grid, detail.usage);
     if (detail.failureCode) addDetail(view.grid, "失败代码", detail.failureCode);
     if (detail.failureDiagnostic) addDetail(view.grid, "诊断详情", detail.failureDiagnostic);
+    var copyText = detail.providerID === "deepseek-harness" ? detail.resultSummary || "" : "";
+    if (view.copy.__text !== copyText) view.copyStatus.textContent = "";
+    view.copy.__text = copyText; view.copy.hidden = !copyText; view.copyStatus.hidden = !copyText;
     S.clear(view.files);
     var files = S.safeArray(detail.changedFiles);
     view.files.hidden = !files.length;
     if (files.length) {
       view.files.appendChild(S.node("h4", "subsection-title", "变更文件"));
       files.forEach(function (file) { view.files.appendChild(S.node("div", "path-row mono", file)); });
+    }
+  }
+
+  async function copyResult(text) {
+    if (global.navigator && global.navigator.clipboard && global.navigator.clipboard.writeText) {
+      try { await global.navigator.clipboard.writeText(text); return; } catch (_) {}
+    }
+    var active = document.activeElement;
+    var selection = active && typeof active.selectionStart === "number"
+      ? [active.selectionStart, active.selectionEnd, active.selectionDirection] : null;
+    var field = S.node("textarea"); field.value = text;
+    field.style.position = "fixed"; field.style.opacity = "0";
+    field.setAttribute("aria-hidden", "true"); document.body.appendChild(field);
+    try {
+      field.focus(); field.select();
+      if (!document.execCommand("copy")) throw new Error("copy_failed");
+    } finally {
+      field.remove();
+      if (active && active.focus) {
+        active.focus({ preventScroll: true });
+        if (selection) active.setSelectionRange(selection[0], selection[1], selection[2]);
+      }
     }
   }
 

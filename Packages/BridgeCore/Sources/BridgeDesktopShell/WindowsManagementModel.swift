@@ -250,7 +250,9 @@
         WindowsManagementDisplay(
           connectionState: connectionState,
           availableAgentCount: agentInstallations.filter {
-            $0.isEnabled && $0.availability == "available"
+            BridgeDesktopAgentAvailability.resolve(
+              providerID: $0.providerID, enabled: $0.isEnabled, availability: $0.availability,
+              desktop: deepSeekDesktopStates[$0.installationID]) == .available
           }.count,
           project: projectDisplay,
           agent: agentDisplay

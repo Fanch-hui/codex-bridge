@@ -13,6 +13,14 @@ import Foundation
 extension BridgeServiceRequestController {
   static func map(_ error: Error) -> BridgeServiceIPCError {
     if let mapped = mapDeepSeekDesktopError(error) { return mapped }
+    if let error = error as? WorkbenchFileReadError {
+      let code: String
+      switch error {
+      case .binaryFile: code = "workbench_binary_file"
+      case .fileTooLarge: code = "workbench_file_too_large"
+      }
+      return .init(code: code, message: error.localizedDescription)
+    }
     if let error = error as? TaskHandoffError {
       return .init(code: "handoff_rejected", message: error.localizedDescription, retryable: false)
     }

@@ -50,10 +50,16 @@ extension BridgeServiceApplication {
       ) {
         try await self.mutations.apply(operation.prepared)
       }
-      guard let applied = await directMutationOperations.markApplied(request.operationID) else {
+      guard
+        let applied = await directMutationOperations.markApplied(
+          request.operationID, clientRequestID: request.clientRequestID
+        )
+      else {
         throw BridgeMCPQueryError.contractRejected
       }
       return Self.mutationReceipt(applied, status: "applied")
+    } catch let error as BridgeMCPQueryError {
+      throw error
     } catch {
       throw Self.publicMutationError(error)
     }
@@ -179,7 +185,7 @@ extension BridgeServiceApplication {
     }
   }
 
-  private static func mutationReceipt(
+  static func mutationReceipt(
     _ operation: StoredDirectMutation,
     status: String
   ) -> MCPDirectMutationReceipt {

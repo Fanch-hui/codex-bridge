@@ -42,18 +42,13 @@ struct AntigravityToolContext: Equatable, Sendable {
 }
 
 public actor AntigravityCLIEventNormalizer {
-  private struct ContentState: Sendable {
-    var content: String
-  }
-
   private let taskID: TaskID
   private let binding: AgentBinding
   private let projectRoot: String
   private var sequence: Int64 = 0
   private var turnOrdinal = 0
   private var turnSummaries: [String] = []
-  private var contents: [String: ContentState] = [:]
-  private static let maximumContentBytes = 256 * 1_024
+  private var contents: [String: AgentProgressTextBuffer] = [:]
   private static let maximumContentStreams = 64
   private static let maximumLocations = 128
 
@@ -205,25 +200,12 @@ public actor AntigravityCLIEventNormalizer {
     guard let delta = update.textDelta, !delta.isEmpty else { return nil }
     let key = "message:step:\(update.stepIndex)"
     if contents[key] == nil, contents.count >= Self.maximumContentStreams {
-      throw AntigravityCLIError.oversizedFrame
+      return nil
     }
-    let existing = contents[key]?.content ?? ""
-    let combined = existing + delta
-    guard combined.utf8.count <= Self.maximumContentBytes else {
-      throw AntigravityCLIError.oversizedFrame
-    }
-    contents[key] = ContentState(content: combined)
-    return try envelope(
-      .content(
-        AgentContentUpdate(
-          key: key,
-          role: .assistant,
-          kind: .message,
-          mode: .delta,
-          content: delta
-        )
-      )
-    )
+    var buffer = contents[key] ?? AgentProgressTextBuffer()
+    let content = try buffer.append(delta, key: key, role: .assistant, kind: .message)
+    contents[key] = buffer
+    return try content.map { try envelope(.content($0)) }
   }
 
   private func tool(_ update: AntigravityStepUpdate) throws -> AgentEventEnvelope {
@@ -456,7 +438,8 @@ public actor AntigravityCLIEventNormalizer {
   }
 
   private static func safeContent(_ value: String) -> String {
-    OutboundContentSecurity.redacted(value, maximumUTF8Bytes: maximumContentBytes)
+    OutboundContentSecurity.redacted(
+      value, maximumUTF8Bytes: AgentProgressText.maximumContentBytes)
   }
 
   private static func summary(_ value: String?, fallback: String) -> String {

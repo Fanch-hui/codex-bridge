@@ -57,7 +57,7 @@ extension OpenCodeACPClient {
         throw AgentRuntimeError.approvalUnavailable(request.approvalID)
       }
       pendingPermissions[request.approvalID] = request
-      yield(.permissionRequested(request))
+      await yield(.permissionRequested(request))
     } catch {
       try? await send(
         ACPWireMessage(

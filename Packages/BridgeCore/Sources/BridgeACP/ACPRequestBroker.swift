@@ -18,24 +18,31 @@ public final class ACPRequestBroker: @unchecked Sendable {
 
   private let transport: any ACPTransport
   private let requestTimeout: Duration
+  private let timeoutSuspended: @Sendable () async -> Bool
   private let lock = NSLock()
   private var nextRequestID: Int64 = 1
   private var pending: [ACPRequestID: Pending] = [:]
   private var closed = false
 
-  public init(transport: any ACPTransport, requestTimeout: Duration = .seconds(30)) {
+  public init(
+    transport: any ACPTransport,
+    requestTimeout: Duration = .seconds(30),
+    timeoutSuspended: @escaping @Sendable () async -> Bool = { false }
+  ) {
     self.transport = transport
     self.requestTimeout = requestTimeout
+    self.timeoutSuspended = timeoutSuspended
   }
 
   public func request(
     method: String,
     params: ACPJSONValue,
-    timeout override: Duration? = nil
+    timeout override: Duration? = nil,
+    suspendsTimeout: Bool = true
   ) async throws -> ACPRequestResponse {
     let id = try allocateRequestID()
     let message = ACPWireMessage(id: id, method: method, params: params)
-    let data = try JSONEncoder().encode(message)
+    let data = try Self.encode(message)
     let timeout = override ?? requestTimeout
 
     return try await withTaskCancellationHandler {
@@ -59,7 +66,7 @@ public final class ACPRequestBroker: @unchecked Sendable {
 
         let timeoutTask = Task { [weak self] in
           do {
-            try await Task.sleep(for: timeout)
+            try await self?.waitForTimeout(timeout, suspending: suspendsTimeout)
           } catch {
             return
           }
@@ -91,9 +98,15 @@ public final class ACPRequestBroker: @unchecked Sendable {
   }
 
   public func send(_ message: ACPWireMessage) async throws {
-    let data = try JSONEncoder().encode(message)
+    let data = try Self.encode(message)
     guard lock.withLock({ !closed }) else { throw ACPError.transportClosed }
     try await transport.send(data)
+  }
+
+  private static func encode(_ message: ACPWireMessage) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .withoutEscapingSlashes
+    return try encoder.encode(message)
   }
 
   @discardableResult
@@ -174,6 +187,17 @@ public final class ACPRequestBroker: @unchecked Sendable {
       guard let value = pending.removeValue(forKey: id) else { return nil }
       value.timeoutTask?.cancel()
       return value
+    }
+  }
+
+  private func waitForTimeout(_ duration: Duration, suspending: Bool) async throws {
+    while true {
+      try await Task.sleep(for: duration)
+      guard suspending, await timeoutSuspended() else { return }
+      repeat {
+        try await Task.sleep(for: .milliseconds(10))
+      } while await timeoutSuspended()
+      // The reader needs a response window after delivering the queued progress.
     }
   }
 

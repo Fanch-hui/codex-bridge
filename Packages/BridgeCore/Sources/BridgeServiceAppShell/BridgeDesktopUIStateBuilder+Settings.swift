@@ -125,6 +125,13 @@ extension BridgeDesktopUIStateBuilder {
         $0.providerID == provider.providerID && $0.isEnabled && $0.availability == "available"
       }
       let installation = candidates.first { $0.isActive == true } ?? candidates.first
+      let desktopCandidates = model.agentInstallations.filter {
+        $0.providerID == "deepseek-harness-desktop"
+      }
+      let desktop =
+        desktopCandidates.first { $0.isActive == true }
+        .flatMap { model.deepSeekDesktopStates[$0.installationID] }
+        ?? desktopCandidates.compactMap { model.deepSeekDesktopStates[$0.installationID] }.first
       let defaultValue = model.agentModelDefault(for: provider.providerID)
       let options = model.agentModelOptions(for: provider.providerID)
       let selected = model.agentSelectedModel(for: provider.providerID)
@@ -137,7 +144,8 @@ extension BridgeDesktopUIStateBuilder {
           },
           defaultReasoningEffort: item.defaultReasoningEffort,
           reasoningCapabilitiesAvailable: item.reasoningCapabilitiesAvailable,
-          isDefaultModel: item.isDefaultModel
+          isDefaultModel: item.isDefaultModel,
+          inputModalities: item.inputModalities
         )
       }
       return BridgeDesktopAgentDefaultState(
@@ -163,7 +171,9 @@ extension BridgeDesktopUIStateBuilder {
         errorMessage: model.agentModelRefreshError(for: provider.providerID),
         canSelectModel: provider.supportsModelSelection
           && installation?.effectiveCapabilities.contains("selection.model") == true,
-        canSelectEffort: provider.supportsEffortSelection && installation != nil
+        canSelectEffort: provider.supportsEffortSelection && installation != nil,
+        connectionErrorCode: provider.providerID == "deepseek-harness-desktop"
+          ? desktop?.errorCode : nil
       )
     }
   }

@@ -81,6 +81,14 @@
         manageNativeSession(payload, model: model)
       case .continueNativeAgentSession:
         continueNativeSession(envelope, model: model)
+      case .submitDSHTask:
+        Task { @MainActor in
+          if await model.submitDSHTask(envelope) {
+            synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
+          }
+        }
+      case .workbenchWorkspace:
+        Task { @MainActor in await model.performWorkbenchWorkspace(envelope) }
       case .steerTask:
         steerTask(envelope, model: model)
       case .resumeTask:
@@ -95,7 +103,8 @@
             requestID: envelope.requestID,
             queueIfBusy: payload.queueIfBusy ?? false,
             skillNames: payload.skillNames,
-            attachmentPaths: payload.attachmentPaths ?? []
+            attachmentPaths: payload.attachmentPaths ?? [],
+            executionSelection: payload.executionSelection
           )
         }
       case .handoffTask:
@@ -210,7 +219,9 @@
       model: WindowsWorkbenchModel
     ) {
       let payload = envelope.payload
-      guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID),
+      guard payload.executionSelection == nil, payload.modelID == nil, payload.effort == nil,
+        payload.permissionMode == nil, payload.attachmentPaths?.isEmpty != false,
+        let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID),
         let input = payload.input,
         let mode = BridgeDesktopCommandValue.nonEmpty(payload.mode),
         ["queued", "interrupt-current-then-continue"].contains(mode),

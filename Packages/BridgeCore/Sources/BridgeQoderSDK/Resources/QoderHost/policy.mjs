@@ -1,6 +1,6 @@
 import { lstat, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { requireValue, text, identifier, object, absolute, samePath, contained, digest, HostError } from './validation.mjs';
+import { requireValue, text, identifier, object, absolute, samePath, contained, digest, bounded, HostError } from './validation.mjs';
 
 const reads = ['Read', 'Glob', 'Grep'];
 const writes = ['Write', 'Edit', 'NotebookEdit'];
@@ -64,7 +64,10 @@ export async function createPolicy(config, requestPermission, requestUserInput, 
       }
       if (relative) payload.relativePaths.push(scope.display + relative.split(path.sep).join('/'));
     }
-    if (tool === 'Bash') payload.command = text(input.command, 8192);
+    if (tool === 'Bash') {
+      const command = text(input.command, Infinity);
+      payload.command = bounded(command, 8192, '\n[命令展示已省略；审批绑定完整命令]');
+    }
     if (tool === 'WebSearch') payload.networkTarget = 'web search';
     if (tool === 'WebFetch') {
       const url = new URL(text(input.url, 4096));

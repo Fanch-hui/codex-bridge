@@ -115,6 +115,7 @@ public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
     guard closeState.0 else { return }
     let task = closeState.1
 
+    state.prepareToClose()
     process.closeStdin()
     if inputEOFGracePeriod > .zero, process.isRunning {
       let process = process
@@ -162,20 +163,13 @@ public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
 }
 
 private final class ProcessTransportState: @unchecked Sendable {
-  let stream: AsyncThrowingStream<Data, any Error>
-  private let continuation: AsyncThrowingStream<Data, any Error>.Continuation
+  var stream: AsyncThrowingStream<Data, any Error> { delivery.stream }
+  private let delivery = ProcessFrameDelivery(capacity: 256)
   private let lock = NSLock()
   private var decoder: ACPLineDecoder
   private var finished = false
 
   init(maximumFrameBytes: Int) {
-    let pair = AsyncThrowingStream.makeStream(
-      of: Data.self,
-      throwing: (any Error).self,
-      bufferingPolicy: .bufferingOldest(256)
-    )
-    stream = pair.stream
-    continuation = pair.continuation
     decoder = ACPLineDecoder(maximumFrameBytes: maximumFrameBytes)
   }
 
@@ -189,15 +183,12 @@ private final class ProcessTransportState: @unchecked Sendable {
       let frames = try decoder.append(data)
       lock.unlock()
       for frame in frames {
-        if case .dropped = continuation.yield(frame) {
-          finish(throwing: ACPError.transportClosed)
-          return
-        }
+        guard delivery.yield(frame) else { return }
       }
     } catch {
       finished = true
       lock.unlock()
-      continuation.finish(throwing: error)
+      delivery.finish(throwing: error)
     }
   }
 
@@ -213,15 +204,17 @@ private final class ProcessTransportState: @unchecked Sendable {
       remaining = try decoder.finish()
     } catch {
       lock.unlock()
-      continuation.finish(throwing: error)
+      delivery.finish(throwing: error)
       return
     }
     lock.unlock()
-    for frame in remaining { _ = continuation.yield(frame) }
-    if let error {
-      continuation.finish(throwing: error)
-    } else {
-      continuation.finish()
+    for frame in remaining {
+      if !delivery.yield(frame) { break }
     }
+    delivery.finish(throwing: error)
+  }
+
+  func prepareToClose() {
+    delivery.disableBackpressure()
   }
 }

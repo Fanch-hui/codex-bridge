@@ -89,6 +89,7 @@
           turnCount: resolvedSession.turnCount
         ),
         projectName: projectName,
+        source: task.sourceDisplayName,
         status: desktopStatusLabel(
           task, canContinue: canResume, pendingUserInput: pendingUserInput
         ),
@@ -96,6 +97,9 @@
         provider: task.providerDisplayName,
         providerID: task.providerIdentifier,
         model: taskModelLabel(task),
+        installationID: task.installationID,
+        executionModel: task.executionModel,
+        executionEffort: task.executionEffort,
         permissionMode: task.permissionMode,
         currentStep: task.currentStep,
         usage: task.usage,

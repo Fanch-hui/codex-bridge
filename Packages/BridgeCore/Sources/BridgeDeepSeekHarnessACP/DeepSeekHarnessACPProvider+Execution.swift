@@ -68,6 +68,9 @@ extension DeepSeekHarnessACPProvider {
       {
         try await applyRequestedSelection(request: request, session: session, client: connected)
       }
+      let imageInputs = try DeepSeekHarnessACPImageInput.capture(
+        request.attachments, projectRoot: request.projectRoot,
+        supportsImagePrompt: initialization.supportsImagePrompt)
       let binding = try AgentBinding(
         providerID: .deepSeekHarness,
         installationID: installation.id,
@@ -85,6 +88,7 @@ extension DeepSeekHarnessACPProvider {
         normalizer: normalizer,
         sessionID: session.id,
         prompt: request.prompt,
+        images: imageInputs,
         initialClientEventSequence: initialSequence,
         inactivityTimeout: configuration.inactivityTimeout,
         eventBufferLimit: configuration.eventBufferLimit,

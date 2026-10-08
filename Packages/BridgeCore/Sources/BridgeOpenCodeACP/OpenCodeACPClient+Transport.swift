@@ -18,7 +18,8 @@ extension OpenCodeACPClient {
       let response = try await requestBroker.request(
         method: method,
         params: params,
-        timeout: override
+        timeout: override,
+        suspendsTimeout: method != "session/prompt" && method != "session/close"
       )
       return ACPClientResponse(
         value: response.value,
@@ -58,22 +59,20 @@ extension OpenCodeACPClient {
           eventSequenceBarrier: nextEventSequence
         )
       case .notification(let method, let params):
-        yield(.notification(OpenCodeACPNotification(method: method, params: params)))
+        await yield(.notification(OpenCodeACPNotification(method: method, params: params)))
       }
     } catch {
       await failConnection(Self.compatibilityError(for: error))
     }
   }
 
-  func yield(_ event: OpenCodeACPClientEvent) {
+  func yield(_ event: OpenCodeACPClientEvent) async {
     let envelope = OpenCodeACPClientEventEnvelope(
       sequence: nextEventSequence,
       event: event
     )
     nextEventSequence += 1
-    if case .dropped = eventContinuation.yield(envelope) {
-      Task { [weak self] in await self?.failConnection(OpenCodeACPError.transportClosed) }
-    }
+    _ = await eventDelivery.enqueue(envelope)
   }
 
   func transportEnded(error: (any Error)?) async {

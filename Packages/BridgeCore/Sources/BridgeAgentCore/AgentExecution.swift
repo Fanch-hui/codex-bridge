@@ -184,7 +184,7 @@ public struct AgentContentUpdate: Codable, Equatable, Sendable {
     authoritative: Bool = false
   ) throws {
     try AgentValidation.identifier(key, field: "content.key", maximumBytes: 256)
-    try AgentValidation.streamText(content, field: "content.content", maximumBytes: 256 * 1_024)
+    try AgentValidation.streamText(content, field: "content.content", maximumBytes: Int.max)
     if let baseContentLength, baseContentLength < 0 {
       throw AgentRuntimeError.invalidRequest("content.baseContentLength")
     }
@@ -192,7 +192,7 @@ public struct AgentContentUpdate: Codable, Equatable, Sendable {
     self.role = role
     self.kind = kind
     self.mode = mode
-    self.content = content
+    self.content = AgentProgressText.bounded(content, maximumBytes: 256 * 1_024)
     self.baseContentLength = baseContentLength
     self.isFinal = isFinal
     self.authoritative = authoritative
@@ -235,11 +235,11 @@ public struct AgentToolUpdate: Codable, Equatable, Sendable {
     childRuns: [AgentChildRun] = []
   ) throws {
     try AgentValidation.identifier(key, field: "tool.key", maximumBytes: 256)
-    try AgentValidation.text(name, field: "tool.name", maximumBytes: 256)
-    try AgentValidation.optionalText(title, field: "tool.title", maximumBytes: 1_024)
+    try AgentValidation.text(name, field: "tool.name", maximumBytes: Int.max)
+    try AgentValidation.optionalText(title, field: "tool.title", maximumBytes: Int.max)
     try AgentValidation.optionalIdentifier(kind, field: "tool.kind", maximumBytes: 128)
-    try AgentValidation.optionalText(arguments, field: "tool.arguments", maximumBytes: 64 * 1_024)
-    try AgentValidation.optionalText(output, field: "tool.output", maximumBytes: 256 * 1_024)
+    try AgentValidation.optionalText(arguments, field: "tool.arguments", maximumBytes: Int.max)
+    try AgentValidation.optionalText(output, field: "tool.output", maximumBytes: Int.max)
     guard locations.count <= 128 else {
       throw AgentRuntimeError.invalidRequest("tool.locations")
     }
@@ -252,12 +252,14 @@ public struct AgentToolUpdate: Codable, Equatable, Sendable {
       throw AgentRuntimeError.invalidRequest("tool.childRuns")
     }
     self.key = key
-    self.name = name
-    self.title = title
+    self.name = AgentProgressText.bounded(name, maximumBytes: 256)
+    self.title = title.map { AgentProgressText.bounded($0, maximumBytes: 1_024) }
     self.kind = kind
     self.status = status
-    self.arguments = arguments
-    self.output = output
+    self.arguments = arguments.map {
+      $0.utf8.count > 64 * 1_024 ? AgentProgressText.omissionMarker : $0
+    }
+    self.output = output.map { AgentProgressText.bounded($0, maximumBytes: 256 * 1_024) }
     self.locations = locations
     self.childRuns = childRuns
   }
@@ -284,10 +286,10 @@ public struct AgentPlanEntry: Codable, Equatable, Sendable {
   public let status: String?
 
   public init(content: String, priority: String? = nil, status: String? = nil) throws {
-    try AgentValidation.text(content, field: "plan.content", maximumBytes: 4 * 1_024)
+    try AgentValidation.text(content, field: "plan.content", maximumBytes: Int.max)
     try AgentValidation.optionalIdentifier(priority, field: "plan.priority", maximumBytes: 64)
     try AgentValidation.optionalIdentifier(status, field: "plan.status", maximumBytes: 64)
-    self.content = content
+    self.content = AgentProgressText.bounded(content, maximumBytes: 4 * 1_024)
     self.priority = priority
     self.status = status
   }

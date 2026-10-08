@@ -276,7 +276,8 @@
     public func resumeTask(
       id taskID: String, input: String?, requestID: String? = nil, queueIfBusy: Bool = false,
       skillNames: [String]? = nil,
-      attachmentPaths: [String] = []
+      attachmentPaths: [String] = [],
+      executionSelection: DSHConversationExecutionSelection? = nil
     ) async {
       guard connectionState == .connected, let task = task(id: taskID),
         TaskInspectorPresentation.canResume(
@@ -304,7 +305,7 @@
         receiptInput: input ?? "", queueIfBusy: queueIfBusy,
         skillNames: skillNames,
         attachmentPaths: attachmentPaths,
-        attachmentSourceTaskID: nil
+        attachmentSourceTaskID: nil, executionSelection: executionSelection
       )
     }
 
@@ -378,24 +379,22 @@
       requestID: String?,
       command: String,
       receiptInput: String?, queueIfBusy: Bool, skillNames: [String]?, attachmentPaths: [String],
-      attachmentSourceTaskID: String?
+      attachmentSourceTaskID: String?,
+      executionSelection: DSHConversationExecutionSelection? = nil
     ) async {
-      let request = IPCAgentSubmitRequest(
-        projectID: task.projectID,
-        providerID: task.providerIdentifier,
-        installationID: task.installationID,
-        model: task.executionModel,
-        effort: TaskRetrySubmission.effort(for: task),
-        permissionMode: task.permissionMode,
-        prompt: prompt,
-        threadID: threadID,
-        skillNames: skillNames,
-        modelOverride: TaskRetrySubmission.modelOverride(for: task),
-        clientRequestID: requestID, queueIfBusy: queueIfBusy,
-        attachmentPaths: attachmentSourceTaskID == nil && attachmentPaths.isEmpty
-          ? nil : attachmentPaths,
-        attachmentSourceTaskID: attachmentSourceTaskID
-      )
+      let request: IPCAgentSubmitRequest
+      do {
+        request = try TaskRetrySubmission.request(
+          for: task, prompt: prompt, threadID: threadID,
+          requestID: requestID, queueIfBusy: queueIfBusy, skillNames: skillNames,
+          attachmentPaths: attachmentPaths, attachmentSourceTaskID: attachmentSourceTaskID,
+          executionSelection: executionSelection)
+      } catch {
+        rejectWorkbenchCommand(
+          requestID: requestID, command: command, taskID: task.taskID, input: receiptInput,
+          message: BridgeServiceErrorMessage.message(error), canEditInput: true)
+        return
+      }
       setActionTextIfSelected(progress, taskID: task.taskID)
       do {
         let response = try await client.submitAgentTask(request)

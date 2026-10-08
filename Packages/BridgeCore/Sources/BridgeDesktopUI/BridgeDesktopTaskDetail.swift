@@ -6,11 +6,15 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let sessionID: String
   public let title: String
   public let projectName: String
+  public let source: String?
   public let isTerminal: Bool?
   public let status: String
   public let provider: String
   public let providerID: String
   public let model: String?
+  public let installationID: String?
+  public let executionModel: String?
+  public let executionEffort: String?
   public let permissionMode: String?
   public let usage: AgentUsageStatistics?
   public let currentStep: String?
@@ -44,11 +48,15 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     sessionID: String? = nil,
     title: String,
     projectName: String,
+    source: String? = nil,
     status: String,
     isTerminal: Bool? = nil,
     provider: String,
     providerID: String = "codex",
     model: String? = nil,
+    installationID: String? = nil,
+    executionModel: String? = nil,
+    executionEffort: String? = nil,
     permissionMode: String? = nil,
     currentStep: String? = nil,
     usage: AgentUsageStatistics? = nil,
@@ -81,11 +89,15 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.sessionID = sessionID ?? taskID
     self.title = title
     self.projectName = projectName
+    self.source = source
     self.status = status
     self.isTerminal = isTerminal
     self.provider = provider
     self.providerID = providerID
     self.model = model
+    self.installationID = installationID
+    self.executionModel = executionModel
+    self.executionEffort = executionEffort
     self.permissionMode = permissionMode
     self.currentStep = currentStep
     self.usage = usage

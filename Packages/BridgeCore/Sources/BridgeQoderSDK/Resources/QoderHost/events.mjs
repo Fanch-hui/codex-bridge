@@ -1,8 +1,14 @@
 import { bounded, deadline, identifier, requireValue } from './validation.mjs';
 
+function argumentDisplay(value) {
+  const content = JSON.stringify(value ?? null);
+  return Buffer.byteLength(content) > 60000 ? '[工具参数过长，已省略展示]' : content;
+}
+
 export class MessageProjection {
   constructor(emit) {
     this.emit = emit; this.streams = new Map(); this.tools = new Map(); this.children = new Map(); this.plan = new Map();
+    this.blockBytes = new Map();
     this.childrenSettled = null;
   }
   async message(value) {
@@ -15,34 +21,41 @@ export class MessageProjection {
     const event = value.event;
     const parent = value.parent_tool_use_id ?? 'main';
     if (event?.type === 'message_start') {
-      requireValue(this.streams.has(parent) || this.streams.size < 64, 'stream_limit');
       this.streams.set(parent, identifier(event.message.id, 180));
     }
     const root = this.streams.get(parent);
     if (!root || event?.type !== 'content_block_delta') return;
-    requireValue(Number.isSafeInteger(event.index) && event.index >= 0 && event.index < 256, 'invalid_content_index');
+    requireValue(Number.isSafeInteger(event.index) && event.index >= 0, 'invalid_content_index');
     const delta = event.delta;
     if (delta?.type !== 'text_delta' && delta?.type !== 'thinking_delta') return;
-    this.emit({ kind: 'content', key: root + '-' + event.index, contentKind: delta.type === 'thinking_delta' ? 'reasoning' : 'message',
-      mode: 'delta', text: bounded(delta.text ?? delta.thinking ?? ''), final: false });
+    const key = root + '-' + event.index;
+    const lengths = this.blockBytes.get(root) ?? new Map();
+    const remaining = 240 * 1024 - (lengths.get(event.index) ?? 0);
+    if (remaining <= 0) return;
+    const text = bounded(delta.text ?? delta.thinking ?? '', remaining);
+    if (!text) return;
+    lengths.set(event.index, (lengths.get(event.index) ?? 0) + Buffer.byteLength(text));
+    this.blockBytes.set(root, lengths);
+    this.emit({ kind: 'content', key, contentKind: delta.type === 'thinking_delta' ? 'reasoning' : 'message',
+      mode: 'delta', text, final: false });
   }
   assistant(value) {
-    requireValue(Array.isArray(value.message?.content) && value.message.content.length <= 256, 'invalid_assistant_message');
+    requireValue(Array.isArray(value.message?.content), 'invalid_assistant_message');
     const parent = value.parent_tool_use_id ?? 'main';
     const root = identifier(value.message.id ?? this.streams.get(parent) ?? value.uuid, 180);
     value.message.content.forEach((block, index) => {
       if (block.type === 'tool_use') {
         identifier(block.id, 200); identifier(block.name);
-        requireValue(this.tools.size < 128 || this.tools.has(block.id), 'tool_limit');
         this.tools.set(block.id, { name: block.name, input: block.input });
         this.emit({ kind: 'tool', key: block.id, name: block.name, status: 'in_progress',
-          arguments: bounded(block.input, 60000) });
+          arguments: argumentDisplay(block.input) });
       }
       if (block.type === 'text' || block.type === 'thinking') this.emit({ kind: 'content', key: root + '-' + index,
         contentKind: block.type === 'thinking' ? 'reasoning' : 'message', mode: 'full',
         text: bounded(block.text ?? block.thinking ?? ''), final: true });
     });
     this.streams.delete(parent);
+    this.blockBytes.delete(root);
   }
   toolResults(value) {
     const content = value.message?.content;
@@ -52,7 +65,7 @@ export class MessageProjection {
       const tool = this.tools.get(block.tool_use_id);
       if (!tool) continue;
       this.emit({ kind: 'tool', key: block.tool_use_id, name: tool.name,
-        status: block.is_error ? 'failed' : 'completed', arguments: bounded(tool.input, 60000), output: bounded(block.content) });
+        status: block.is_error ? 'failed' : 'completed', arguments: argumentDisplay(tool.input), output: bounded(block.content) });
       if (!block.is_error) this.planResult(tool, structuredResult(value.tool_use_result, index), block.content);
       this.tools.delete(block.tool_use_id);
     }
@@ -103,7 +116,7 @@ export class MessageProjection {
   }
   background(value) {
     if (value.subtype === 'background_tasks_changed') {
-      requireValue(Array.isArray(value.tasks) && value.tasks.length <= 32, 'invalid_background_tasks');
+      requireValue(Array.isArray(value.tasks), 'invalid_background_tasks');
       const current = new Set(value.tasks.map(item => item.task_id));
       for (const [id, item] of this.children) {
         if (!current.has(id) && !['completed', 'failed', 'stopped'].includes(item.status)) {
@@ -118,12 +131,12 @@ export class MessageProjection {
   child(value) {
     if (typeof value.task_id !== 'string') return;
     identifier(value.task_id, 200);
-    requireValue(this.children.has(value.task_id) || this.children.size < 32, 'child_limit');
     const previous = this.children.get(value.task_id) ?? {};
     const status = childStatus(value, previous.status);
     const child = { ...previous, id: value.task_id, status,
-      name: value.description ?? previous.name ?? value.task_type ?? 'Qoder task',
-      toolID: value.tool_use_id ?? previous.toolID, summary: value.summary ?? previous.summary,
+      name: bounded(value.description ?? previous.name ?? value.task_type ?? 'Qoder task', 512),
+      toolID: value.tool_use_id ?? previous.toolID,
+      summary: value.summary === undefined ? previous.summary : bounded(value.summary, 4096),
       outputFile: value.output_file ?? previous.outputFile };
     this.children.set(child.id, child);
     this.emit({ kind: 'child', ...child });

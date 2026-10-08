@@ -35,6 +35,12 @@
     var header = S.node("div"), content = S.node("div"), unavailable = S.node("div");
     container.appendChild(header); container.appendChild(content); container.appendChild(unavailable);
     var navigation = global.CodexBridgeDesktopDetailPages.create(content);
+    var openDetail = navigation.open;
+    navigation.open = function (id) {
+      if (id === "agent:deepseek-harness" && global.CodexBridgeDesktopDSHWorkbench) {
+        global.CodexBridgeDesktopDSHWorkbench.openSettings();
+      } else openDetail(id);
+    };
     var N = global.CodexBridgeDesktopConnectionsNavigation;
     var T = global.CodexBridgeDesktopConnectionsTunnel;
     var clientsSection = S.section(navigation.overview, "聊天客户端");
@@ -58,7 +64,9 @@
     agentsList.appendChild(codexEntry.root);
     var connectors = global.CodexBridgeDesktopAgentConnectors.create(emit, navigation);
     agentsList.appendChild(connectors.root);
-    var agentMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit);
+    var agentMCP = global.CodexBridgeDesktopDeepSeekHarnessMCP.create(emit, {
+      excludedScopes: ["deepseek-harness"]
+    });
     var mcpEntry = navigation.register("agent-mcp", "Agent MCP 服务", agentMCP.root);
     agentsList.appendChild(mcpEntry.root);
     var agentEditor = E.createAgentRegistration(emit);
@@ -67,6 +75,7 @@
     var status = S.node("div", "page-message"); content.appendChild(status);
 
     return {
+      details: navigation,
       update: function (page, nextEmit) {
         context.emit = nextEmit;
         content.hidden = !page; unavailable.hidden = !!page;
@@ -92,14 +101,17 @@
         N.update(codexEntry, "Codex", engine.resolvedExecutablePath || "自动发现",
           engine.modelError ? "连接检查失败" : engine.isRefreshing ? "连接中" : connected ? "已连接" : "未连接",
           engine.modelError ? "error" : engine.isRefreshing ? "running" : connected ? "success" : "neutral");
-        var providers = S.safeArray(page.providers).filter(function (provider) { return provider.providerID !== "codex"; });
+        var providers = S.safeArray(page.providers).filter(function (provider) {
+          return provider.providerID !== "codex" && provider.providerID !== "deepseek-harness";
+        });
         connectors.update(providers, page.installations, {
           canConnect: page.canRegisterAgent, busy: page.isManagingAgents === true,
           revision: page.agentOperationRevision, setupOperations: page.setupOperations, acceptReplacement: true
         }, nextEmit);
         agentEditor.update(providers, page.canRegisterAgent && !page.isManagingAgents, nextEmit);
         agentMCP.update(page, nextEmit);
-        mcpEntry.update({ value: S.safeArray(page.deepSeekHarnessMCPServers).length + " 个服务" });
+        mcpEntry.update({ value: page.selectedAgentMCPScope === "deepseek-harness"
+          ? "选择 Agent" : S.safeArray(page.deepSeekHarnessMCPServers).length + " 个服务" });
         manualEntry.update({ value: "按路径或选择文件" });
         scanAgents.disabled = !page.canScanAgents || !!page.isManagingAgents;
         status.textContent = page.statusMessage || ""; status.hidden = !page.statusMessage;

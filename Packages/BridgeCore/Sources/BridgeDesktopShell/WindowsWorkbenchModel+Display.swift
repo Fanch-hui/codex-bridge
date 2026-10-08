@@ -199,7 +199,8 @@
             ?? models.first?.modelID,
           availableModelCount: models.count,
           modelError: modelError,
-          commandReceipt: workbenchCommandReceipt
+          commandReceipt: workbenchCommandReceipt,
+          workspace: workspaceModel.state
         )
       )
     }

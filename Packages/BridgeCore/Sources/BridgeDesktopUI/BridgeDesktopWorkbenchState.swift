@@ -191,6 +191,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let isRefreshingModels: Bool?
   public let modelError: String?
   public let commandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+  public let workspace: WorkbenchWorkspaceState?
 
   public init(
     header: BridgeDesktopPageHeader,
@@ -214,7 +215,8 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     canRefreshModels: Bool? = nil,
     isRefreshingModels: Bool? = nil,
     modelError: String? = nil,
-    commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil
+    commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil,
+    workspace: WorkbenchWorkspaceState? = nil
   ) {
     self.header = header
     self.projects = projects
@@ -238,5 +240,6 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     self.isRefreshingModels = isRefreshingModels
     self.modelError = modelError
     self.commandReceipt = commandReceipt
+    self.workspace = workspace
   }
 }

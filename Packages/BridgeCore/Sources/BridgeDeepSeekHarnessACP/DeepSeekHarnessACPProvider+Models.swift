@@ -71,6 +71,8 @@ extension DeepSeekHarnessACPProvider {
         return fallback
       }
       let catalog = Self.modelCatalog(from: modelOption)
+      // Initialization describes the startup route, not later model selections.
+      let promptModelID = Self.currentModelID(in: modelOption, catalog: catalog)
       let selected = selectedModelID.flatMap { Self.model(for: $0, in: catalog) }
       if let selected {
         let options = try await connected.setSessionConfigOption(
@@ -84,7 +86,9 @@ extension DeepSeekHarnessACPProvider {
           from: options,
           selectedModelID: selected.modelID,
           fallback: fallback,
-          defaultModelID: Self.currentModelID(in: modelOption, catalog: catalog)
+          defaultModelID: Self.currentModelID(in: modelOption, catalog: catalog),
+          promptModelID: promptModelID,
+          supportsImagePrompt: initialization.supportsImagePrompt
         )
       }
 
@@ -97,7 +101,9 @@ extension DeepSeekHarnessACPProvider {
           from: session.configOptions,
           selectedModelID: effectiveModelID,
           fallback: fallback,
-          defaultModelID: effectiveModelID
+          defaultModelID: effectiveModelID,
+          promptModelID: promptModelID,
+          supportsImagePrompt: initialization.supportsImagePrompt
         )
       }
 
@@ -105,7 +111,9 @@ extension DeepSeekHarnessACPProvider {
         from: session.configOptions,
         selectedModelID: nil,
         fallback: fallback,
-        defaultModelID: effectiveModelID
+        defaultModelID: effectiveModelID,
+        promptModelID: promptModelID,
+        supportsImagePrompt: initialization.supportsImagePrompt
       )
       for entry in catalog {
         do {
@@ -118,7 +126,9 @@ extension DeepSeekHarnessACPProvider {
             from: options,
             selectedModelID: entry.modelID,
             fallback: fallback,
-            defaultModelID: effectiveModelID
+            defaultModelID: effectiveModelID,
+            promptModelID: promptModelID,
+            supportsImagePrompt: initialization.supportsImagePrompt
           )
           if let descriptor = resolved.first(where: { $0.id == entry.modelID }) {
             models = Self.replacingModel(descriptor, in: models)
@@ -161,7 +171,9 @@ extension DeepSeekHarnessACPProvider {
     from options: [DeepSeekHarnessACPConfigOption],
     selectedModelID: String?,
     fallback: [AgentModelDescriptor],
-    defaultModelID: String? = nil
+    defaultModelID: String? = nil,
+    promptModelID: String? = nil,
+    supportsImagePrompt: Bool = false
   ) throws -> [AgentModelDescriptor] {
     guard
       let modelOption = options.first(where: {
@@ -177,7 +189,9 @@ extension DeepSeekHarnessACPProvider {
       options: options,
       selectedModelID: effectiveModelID,
       fallback: fallback,
-      defaultModelID: defaultModelID ?? effectiveModelID
+      defaultModelID: defaultModelID ?? effectiveModelID,
+      promptModelID: promptModelID,
+      supportsImagePrompt: supportsImagePrompt
     )
   }
 
@@ -186,7 +200,9 @@ extension DeepSeekHarnessACPProvider {
     options: [DeepSeekHarnessACPConfigOption],
     selectedModelID: String?,
     fallback: [AgentModelDescriptor],
-    defaultModelID: String?
+    defaultModelID: String?,
+    promptModelID: String?,
+    supportsImagePrompt: Bool
   ) throws -> [AgentModelDescriptor] {
     let modern = catalog.contains(where: \.modernRoute)
     let thoughtLevel = options.first {
@@ -206,7 +222,9 @@ extension DeepSeekHarnessACPProvider {
         supportedReasoningEfforts: useDynamic ? dynamicEfforts : modern ? [] : fallbackEfforts,
         defaultReasoningEffort: useDynamic ? dynamicDefault : modern ? nil : fallbackDefault,
         reasoningCapabilitiesAvailable: !modern || useDynamic,
-        isDefaultModel: defaultModelID.map { $0 == entry.modelID }
+        isDefaultModel: defaultModelID.map { $0 == entry.modelID },
+        inputModalities: entry.modelID == promptModelID
+          ? (supportsImagePrompt ? [.text, .image] : [.text]) : nil
       )
     }
   }
@@ -228,7 +246,8 @@ extension DeepSeekHarnessACPProvider {
         id: model.id,
         displayName: model.displayName,
         reasoningCapabilitiesAvailable: false,
-        isDefaultModel: model.isDefaultModel
+        isDefaultModel: model.isDefaultModel,
+        inputModalities: model.inputModalities
       )
     }
   }

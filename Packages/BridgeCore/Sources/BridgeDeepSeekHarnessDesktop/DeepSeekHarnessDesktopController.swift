@@ -69,6 +69,13 @@ public actor DeepSeekHarnessDesktopController: DeepSeekHarnessDesktopControlling
 
   public func status(installation: AgentInstallation) async throws -> DeepSeekHarnessDesktopStatus {
     do {
+      if try await configuration.desktopRunning(installation) == false {
+        let trust = try await configuration.trustProvider(installation.id)
+        return DeepSeekHarnessDesktopStatus(
+          connected: false, paired: trust != nil, profileID: trust?.profileID,
+          unavailableReason: "DSH 桌面版未打开。打开后保持在后台运行即可连接。",
+          errorCode: "desktop_not_running")
+      }
       let client = try await client(installation, allowUnpaired: true)
       let value = try await client.call("pairing/state")
       let candidate = DeepSeekHarnessDesktopTrust(

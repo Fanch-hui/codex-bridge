@@ -13,6 +13,7 @@ actor QoderSDKExecution {
   }
 
   nonisolated let events: AsyncThrowingStream<AgentEventEnvelope, any Error>
+  private let eventDelivery: AgentEventStreamDelivery<AgentEventEnvelope>
   private let continuation: AsyncThrowingStream<AgentEventEnvelope, any Error>.Continuation
   private let client: QoderSDKClient
   private let request: AgentExecutionRequest
@@ -40,6 +41,7 @@ actor QoderSDKExecution {
       bufferingPolicy: .bufferingOldest(128))
     events = stream.stream
     continuation = stream.continuation
+    eventDelivery = AgentEventStreamDelivery(stream.continuation)
   }
 
   func start() {
@@ -151,7 +153,7 @@ actor QoderSDKExecution {
     guard !terminal else { return }
     switch event {
     case .permission(let id, let value): try await permission(id, value: value)
-    case .userInput(let id, let value): try userInput(id, value: value)
+    case .userInput(let id, let value): try await userInput(id, value: value)
     case .update(let value):
       guard value["sessionID"]?.stringValue == binding.providerSessionID,
         value["distribution"]?.stringValue == distribution.rawValue
@@ -171,20 +173,20 @@ actor QoderSDKExecution {
         guard let id = value["inputID"]?.stringValue, let text = inputs.removeValue(forKey: id),
           value["text"]?.stringValue == text
         else { throw ACPError.invalidMessage }
-        if id != firstInputID { try emit(.steerDispatched(text)) }
+        if id != firstInputID { try await emit(.steerDispatched(text)) }
         return
       }
       if let normalized = try normalizer.normalize(value) {
         switch normalized {
         case .completed, .failed, .interrupted:
           await finish(with: normalized)
-        default: try emit(normalized)
+        default: try await emit(normalized)
         }
       }
     }
   }
 
-  private func userInput(_ wireID: ACPRequestID, value: QoderJSONValue) throws {
+  private func userInput(_ wireID: ACPRequestID, value: QoderJSONValue) async throws {
     guard userInputs.count < 16, let itemID = value["toolUseID"]?.stringValue,
       let values = value["questions"]?.arrayValue, (1...4).contains(values.count)
     else { throw ACPError.invalidMessage }
@@ -219,7 +221,7 @@ actor QoderSDKExecution {
     userInputs[inputID] = PendingUserInput(
       wireID: wireID, questionText: questionText,
       optionLabels: optionLabels, multiple: multiple)
-    try emit(.userInputRequested(userRequest))
+    try await emit(.userInputRequested(userRequest))
   }
 
   private func permission(_ wireID: ACPRequestID, value: QoderJSONValue) async throws {
@@ -247,17 +249,17 @@ actor QoderSDKExecution {
         AgentApprovalOption(id: "deny", name: "拒绝", kind: "reject_once"),
       ])
     permissions[id] = (wireID, digest)
-    try emit(.approvalRequested(approval))
+    try await emit(.approvalRequested(approval))
   }
 
-  private func emit(_ event: AgentEvent) throws {
+  private func emit(_ event: AgentEvent) async throws {
     guard sequence < Int64.max else { throw ACPError.invalidMessage }
     let envelope = try AgentEventEnvelope(
       taskID: request.taskID, providerID: .qoder,
       providerSessionID: binding.providerSessionID, providerRunID: binding.providerRunID,
       providerSequence: sequence, event: event)
     sequence += 1
-    if case .dropped = continuation.yield(envelope) { throw ACPError.oversizedFrame }
+    guard await eventDelivery.enqueue(envelope) else { throw ACPError.transportClosed }
   }
 
   private func fail() async {
@@ -276,7 +278,7 @@ actor QoderSDKExecution {
     userInputs.removeAll()
     inputs.removeAll()
     do {
-      if let event { try emit(event) }
+      if let event { try await emit(event) }
       continuation.finish()
     } catch {
       continuation.finish(throwing: error)
@@ -285,6 +287,7 @@ actor QoderSDKExecution {
   }
 
   func shutdown() async {
+    continuation.finish()
     await finish()
   }
 }

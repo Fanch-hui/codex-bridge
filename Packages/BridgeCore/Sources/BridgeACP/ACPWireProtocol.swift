@@ -1,3 +1,4 @@
+import BridgeProcess
 import Foundation
 
 public enum ACPError: Error, Equatable, Sendable {
@@ -127,36 +128,18 @@ public enum ACPMessageDispatcher {
 
 public struct ACPLineDecoder: Sendable {
   public let maximumFrameBytes: Int
-  private var buffer = Data()
+  private var decoder: ProgressJSONLineDecoder
 
   public init(maximumFrameBytes: Int = 1_048_576) {
     self.maximumFrameBytes = max(1, maximumFrameBytes)
+    decoder = ProgressJSONLineDecoder(dialect: .acp, maximumFrameBytes: self.maximumFrameBytes)
   }
 
   public mutating func append(_ data: Data) throws -> [Data] {
-    guard !data.isEmpty else { return [] }
-    buffer.append(data)
-    var frames: [Data] = []
-
-    while let newline = buffer.firstIndex(of: 0x0A) {
-      var frame = Data(buffer[..<newline])
-      buffer.removeSubrange(...newline)
-      if frame.last == 0x0D { frame.removeLast() }
-      if frame.isEmpty { continue }
-      guard frame.count <= maximumFrameBytes else { throw ACPError.oversizedFrame }
-      frames.append(frame)
-    }
-
-    guard buffer.count <= maximumFrameBytes else { throw ACPError.oversizedFrame }
-    return frames
+    do { return try decoder.append(data) } catch { throw ACPError.oversizedFrame }
   }
 
   public mutating func finish() throws -> [Data] {
-    guard !buffer.isEmpty else { return [] }
-    var frame = buffer
-    buffer.removeAll(keepingCapacity: false)
-    if frame.last == 0x0D { frame.removeLast() }
-    guard frame.count <= maximumFrameBytes else { throw ACPError.oversizedFrame }
-    return frame.isEmpty ? [] : [frame]
+    do { return try decoder.finish() } catch { throw ACPError.oversizedFrame }
   }
 }

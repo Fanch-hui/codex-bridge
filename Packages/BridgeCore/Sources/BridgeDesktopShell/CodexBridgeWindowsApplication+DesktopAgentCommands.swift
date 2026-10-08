@@ -92,11 +92,18 @@
           let installationID = BridgeDesktopCommandValue.nonEmpty(payload.installationID)
         else { return true }
         Task { @MainActor in
-          await auxiliary.agentDefaults.refreshModels(
-            providerID: providerID,
-            installationID: installationID,
-            forceRefresh: true
-          )
+          if providerID == "deepseek-harness",
+            let modelID = BridgeDesktopCommandValue.nonEmpty(payload.modelID)
+          {
+            await auxiliary.agentDefaults.refreshDSHModelCapabilities(
+              installationID: installationID, modelID: modelID)
+          } else {
+            await auxiliary.agentDefaults.refreshModels(
+              providerID: providerID,
+              installationID: installationID,
+              forceRefresh: true
+            )
+          }
         }
       case .saveAgentDefault:
         guard let providerID = BridgeDesktopCommandValue.nonEmpty(payload.providerID),

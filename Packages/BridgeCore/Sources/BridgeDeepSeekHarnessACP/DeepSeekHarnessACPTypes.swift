@@ -14,7 +14,7 @@ public enum DeepSeekHarnessACPConstants {
   public static let pnpmVersion = "11.7.0"
   public static let acpSDKVersion = "0.25.1"
 
-  public static let maximumFrameBytes = 1_048_576
+  public static let maximumFrameBytes = 12 * 1_024 * 1_024
   public static let maximumStandardErrorBytes = 256 * 1_024
   public static let maximumFinalTextBytes = 256 * 1_024
   public static let maximumPendingPermissions = 32
@@ -72,6 +72,7 @@ public struct DeepSeekHarnessACPInitialization: Equatable, Sendable {
   public let supportsResumeSession: Bool
   public let supportsCloseSession: Bool
   public let supportsMCPHTTP: Bool
+  public let supportsImagePrompt: Bool
 
   public init(
     protocolVersion: Int,
@@ -80,7 +81,8 @@ public struct DeepSeekHarnessACPInitialization: Equatable, Sendable {
     agentVersion: String?,
     supportsResumeSession: Bool = false,
     supportsCloseSession: Bool = false,
-    supportsMCPHTTP: Bool = false
+    supportsMCPHTTP: Bool = false,
+    supportsImagePrompt: Bool = false
   ) {
     self.protocolVersion = protocolVersion
     self.agentName = agentName
@@ -89,6 +91,7 @@ public struct DeepSeekHarnessACPInitialization: Equatable, Sendable {
     self.supportsResumeSession = supportsResumeSession
     self.supportsCloseSession = supportsCloseSession
     self.supportsMCPHTTP = supportsMCPHTTP
+    self.supportsImagePrompt = supportsImagePrompt
   }
 }
 

@@ -270,7 +270,8 @@ extension ExecutionSession {
           paths.append(try ExecutionValidation.relativePath(movePath, root: projectRoot))
         }
       }
-      return .filesChanged(relativePaths: Array(Set(paths)).sorted(), status: status)
+      return .filesChanged(
+        relativePaths: Array(Set(paths).sorted().prefix(256)), status: status)
     }
   }
 

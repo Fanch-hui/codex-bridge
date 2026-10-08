@@ -42,10 +42,11 @@
     state.signature = signature;
   }
 
-  function renderContent(page, emit) {
+  function renderContent(page, emit, development) {
     var content = document.getElementById("workbench-inspector-content");
     var inputs = Object.assign({}, page, {
-      browser: page.browser && page.browser.canLoadEarlierConversation
+      browser: page.browser && page.browser.canLoadEarlierConversation,
+      development: !!development
     });
     var keys = Object.keys(inputs), previous = content.__contentInputs, revision = P.revision();
     if (previous && content.__submissionRevision === revision
@@ -55,7 +56,10 @@
     content.__submissionRevision = revision;
     renderStable(content, JSON.stringify([inputs, revision]), function () {
       var restore = global.CodexBridgeDesktopWorkbenchConversation.captureViewport(content, page);
-      try { renderContentBody(content, page, emit); } finally { restore(); }
+      try {
+        if (development) global.CodexBridgeDesktopDSHConversation.render(content, page, emit);
+        else renderContentBody(content, page, emit);
+      } finally { restore(); }
     }, true);
   }
 
@@ -107,20 +111,28 @@
     if ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page)) {
       global.CodexBridgeDesktopWorkbenchConversation.render(
         sections.conversation, detail.conversation || [], page, emit, { owner: content });
+      if (content.__windowsConversationBlock) content.__windowsConversationBlock.heading.hidden = false;
     }
     if (card.parentNode !== content) content.appendChild(card);
     else if (content.lastChild !== card) content.appendChild(card);
   }
 
-  function render(page, emit) {
+  function renderShared(page, emit, development) {
+    var footer = document.getElementById("workbench-inspector-footer");
+    if (footer) footer.hidden = !!development;
     P.bind(page, function (follow) {
-      renderContent(page, emit);
+      renderContent(page, emit, development);
       if (!follow) return;
       var content = document.getElementById("workbench-inspector-content");
       content.scrollTop = content.scrollHeight;
       if (content.__conversationFollow) content.__conversationFollow.following = true;
     });
     if (!page) {
+      if (development) {
+        renderContent({}, emit, true);
+        global.CodexBridgeDesktopWorkbenchApprovals.render({}, emit);
+        return;
+      }
       global.CodexBridgeDesktopWorkbenchActions.reset();
       global.CodexBridgeDesktopWorkbenchHeader.reset();
       global.CodexBridgeDesktopWorkbenchControls.render(null, emit);
@@ -128,12 +140,19 @@
       document.getElementById("browser-slot-note").textContent = "等待本机 Service 提供浏览器状态";
       return;
     }
-    global.CodexBridgeDesktopWorkbenchHeader.render(page, emit);
+    if (!development) global.CodexBridgeDesktopWorkbenchHeader.render(page, emit);
     global.CodexBridgeDesktopWorkbenchApprovals.render(page, emit);
-    renderContent(page, emit);
-    global.CodexBridgeDesktopWorkbenchControls.render(page, emit);
+    renderContent(page, emit, development);
+    if (!development) global.CodexBridgeDesktopWorkbenchControls.render(page, emit);
   }
 
   global.CodexBridgeDesktopStableRender = renderStable;
-  global.CodexBridgeDesktopWorkbenchPage = { render: render };
+  global.CodexBridgeDesktopWorkbenchPage = {
+    render: function (page, emit, appUpdate, state) {
+      if (global.CodexBridgeDesktopDSHWorkbench) {
+        global.CodexBridgeDesktopDSHWorkbench.render(page, emit, state, renderShared);
+      } else renderShared(page, emit);
+    },
+    renderShared: renderShared
+  };
 }(window));

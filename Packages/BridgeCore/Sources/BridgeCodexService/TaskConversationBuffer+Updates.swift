@@ -265,101 +265,13 @@ extension TaskConversationBuffer {
     }
   }
 
-  private func mergeDelta(
-    taskID: TaskID,
-    key: String,
-    delta: String,
-    kind: ServiceTaskMessageKind,
-    in state: TaskState
-  ) -> ConversationChange? {
-    if let index = state.index[key], state.entries.indices.contains(index) {
-      let entry = state.entries[index]
-      guard !entry.isFinal else { return nil }
-      let content = entry.content + delta
-      guard content != entry.content else { return nil }
-      state.entries[index] = Entry(
-        key: entry.key,
-        role: .agent,
-        kind: kind,
-        content: content,
-        isFinal: false,
-        createdAt: entry.createdAt,
-        updatedAt: Date()
-      )
-      return ConversationChange(
-        taskID: taskID,
-        key: entry.key,
-        role: .agent,
-        kind: kind,
-        delta: delta,
-        baseContentLength: entry.content.count,
-        fullContent: nil,
-        final: false
-      )
-    }
-
-    let content = delta
-    append(
-      Entry(key: key, role: .agent, kind: kind, content: content, isFinal: false),
-      in: state
-    )
-    return ConversationChange(
-      taskID: taskID,
-      key: key,
-      role: .agent,
-      kind: kind,
-      delta: nil,
-      baseContentLength: 0,
-      fullContent: content,
-      final: false
-    )
-  }
-
-  private func mergeToolCallProgress(
-    taskID: TaskID,
-    key: String,
-    progress: String,
-    in state: TaskState
-  ) -> ConversationChange? {
-    guard let index = state.index[key], state.entries.indices.contains(index) else { return nil }
-    let existing = state.entries[index]
-    guard !existing.isFinal else { return nil }
-    let line = existing.content.isEmpty ? progress : "\n" + progress
-    let content = existing.content + line
-    guard content != existing.content else { return nil }
-    state.entries[index] = Entry(
-      key: key,
-      role: .agent,
-      kind: .toolCall,
-      content: content,
-      toolName: existing.toolName,
-      toolStatus: existing.toolStatus,
-      toolArguments: existing.toolArguments,
-      isFinal: false,
-      createdAt: existing.createdAt,
-      updatedAt: Date()
-    )
-    return ConversationChange(
-      taskID: taskID,
-      key: key,
-      role: .agent,
-      kind: .toolCall,
-      delta: line,
-      baseContentLength: existing.content.count,
-      fullContent: nil,
-      final: false,
-      toolName: existing.toolName,
-      toolStatus: existing.toolStatus,
-      toolArguments: existing.toolArguments
-    )
-  }
-
-  private func append(_ entry: Entry, in state: TaskState) {
+  func append(_ entry: Entry, in state: TaskState) {
     state.index[entry.key] = state.entries.count
     state.entries.append(entry)
   }
 
   private func apply(_ entry: Entry, in state: TaskState) -> Bool {
+    state.omittedContentKeys.remove(entry.key)
     if let index = state.index[entry.key] {
       let existing = state.entries[index]
       guard !existing.isFinal else { return false }

@@ -84,8 +84,9 @@ extension DeepSeekHarnessACPClient {
     return try Self.parseConfigOptions(response.value["configOptions"])
   }
 
-  public func prompt(sessionID: String, text: String) async throws -> DeepSeekHarnessACPPromptResult
-  {
+  public func prompt(
+    sessionID: String, text: String, images: [DeepSeekHarnessACPImageInput] = []
+  ) async throws -> DeepSeekHarnessACPPromptResult {
     try requireInitialized()
     try validateIdentifier(sessionID, field: "session.id")
     try requireSession(sessionID)
@@ -95,18 +96,22 @@ extension DeepSeekHarnessACPClient {
     else {
       throw AgentRuntimeError.invalidRequest("prompt.text")
     }
+    guard images.isEmpty || initializationStorage?.supportsImagePrompt == true else {
+      throw AgentRuntimeError.invalidRequest("deepseek_harness.model_image_input_unsupported")
+    }
     try beginSessionOperation()
     defer { endSessionOperation() }
     let response = try await request(
       method: "session/prompt",
       params: .object([
         "sessionId": .string(sessionID),
-        "prompt": .array([
-          .object([
-            "type": .string("text"),
-            "text": .string(text),
-          ])
-        ]),
+        "prompt": .array(
+          [
+            .object([
+              "type": .string("text"),
+              "text": .string(text),
+            ])
+          ] + images.map(\.block)),
       ]),
       timeout: DeepSeekHarnessACPConstants.maximumProcessLifetime
     )
@@ -180,7 +185,8 @@ extension DeepSeekHarnessACPClient {
         try? await broker.request(
           method: "session/close",
           params: .object(["sessionId": .string(activeSessionID)]),
-          timeout: .seconds(3)
+          timeout: .seconds(3),
+          suspendsTimeout: false
         )
       }.value
     }

@@ -11,7 +11,8 @@
       accepted: Bool,
       message: String? = nil,
       handoff: WorkbenchHandoffPreview? = nil,
-      resultingTaskID: String? = nil
+      resultingTaskID: String? = nil,
+      canEditInput: Bool? = nil
     ) {
       guard let requestID, !requestID.isEmpty else { return }
       if !accepted { errorMessage = message }
@@ -23,7 +24,8 @@
         accepted: accepted,
         message: message,
         handoff: handoff,
-        resultingTaskID: resultingTaskID
+        resultingTaskID: resultingTaskID,
+        canEditInput: canEditInput
       )
       publishDisplay()
     }
@@ -33,7 +35,8 @@
       command: String,
       taskID: String?,
       input: String?,
-      message: String
+      message: String,
+      canEditInput: Bool? = nil
     ) {
       recordWorkbenchCommandReceipt(
         requestID: requestID,
@@ -41,7 +44,8 @@
         taskID: taskID,
         input: input,
         accepted: false,
-        message: message
+        message: message,
+        canEditInput: canEditInput
       )
     }
   }

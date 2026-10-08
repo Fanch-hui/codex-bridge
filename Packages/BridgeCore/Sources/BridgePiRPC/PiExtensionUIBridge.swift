@@ -20,7 +20,7 @@ enum PiExtensionUIBridge {
     guard let id = value["id"]?.stringValue, !id.isEmpty, id.utf8.count <= 128,
       let rawOptions = value["options"]?.arrayValue, rawOptions.count == 3,
       let options = value["options"]?.arrayValue?.compactMap(\.stringValue),
-      options == ["allow_once", "allow_for_session", "deny"], title.utf8.count <= 16 * 1_024,
+      options == ["allow_once", "allow_for_session", "deny"], title.utf8.count <= 64 * 1_024,
       let payload = try? JSONDecoder().decode(
         PiJSONValue.self, from: Data(title.dropFirst(prefix.count).utf8)),
       payload["revision"]?.integerValue == 1, payload["nonce"]?.stringValue == nonce,

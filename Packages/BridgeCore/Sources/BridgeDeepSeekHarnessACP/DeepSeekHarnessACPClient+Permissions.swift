@@ -62,7 +62,7 @@ extension DeepSeekHarnessACPClient {
         throw AgentRuntimeError.approvalUnavailable(permission.approvalID)
       }
       pendingPermissions[permission.approvalID] = permission
-      yield(.permissionRequested(permission))
+      await yield(.permissionRequested(permission))
     } catch {
       try? await broker.send(
         ACPWireMessage(

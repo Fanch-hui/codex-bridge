@@ -55,6 +55,7 @@ enum ServiceDeepSeekDesktopAssembly {
             return project.root.canonicalPath
           }
         },
+        desktopRunning: { try await installer.desktopRunning($0) },
         installConnector: { installation in
           try await installer.install(installation)
           return DeepSeekHarnessDesktopStatus(

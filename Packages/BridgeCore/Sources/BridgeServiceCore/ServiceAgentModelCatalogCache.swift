@@ -46,7 +46,9 @@ extension ServiceAgentRegistry {
       return try await resolveSelectedModel(
         installationID: installationID, projectRoot: projectRoot,
         selectedModelID: selectedModelID, requireSelectedModel: requireSelectedModel,
-        key: storedKey, models: cached, runtimeBinding: runtimeBinding)
+        key: storedKey, models: cached, runtimeBinding: runtimeBinding,
+        resolveInputModalities: stored.providerID == .deepSeekHarness
+          && runtimeBinding?.connectionMode != .nativeDesktop)
     }
 
     let record = try await validateForRuntimeBinding(
@@ -67,7 +69,9 @@ extension ServiceAgentRegistry {
     return try await resolveSelectedModel(
       installationID: installationID, projectRoot: projectRoot,
       selectedModelID: selectedModelID, requireSelectedModel: requireSelectedModel,
-      key: key, models: models, runtimeBinding: runtimeBinding)
+      key: key, models: models, runtimeBinding: runtimeBinding,
+      resolveInputModalities: record.providerID == .deepSeekHarness
+        && runtimeBinding?.connectionMode != .nativeDesktop)
   }
 
   private func freshModelCatalog(
@@ -106,23 +110,28 @@ extension ServiceAgentRegistry {
     requireSelectedModel: Bool,
     key: ServiceAgentModelCatalogCacheKey,
     models: [AgentModelDescriptor],
-    runtimeBinding: AgentRuntimeBinding?
+    runtimeBinding: AgentRuntimeBinding?,
+    resolveInputModalities: Bool
   ) async throws -> [AgentModelDescriptor] {
     guard let selectedModelID else { return models }
     let selected = AgentModelMatcher.match(selectedModelID, in: models)
     guard
       selected?.reasoningCapabilitiesAvailable == false
         || (selected == nil && requireSelectedModel)
+        || (resolveInputModalities && selected?.inputModalities == nil)
     else { return models }
     let record = try await validateForRuntimeBinding(
       installationID: installationID,
       projectRoot: projectRoot, runtimeBinding: runtimeBinding)
     let resolved = try await fetchAndMergeSelectedModel(
       record: record, projectRoot: projectRoot, selectedModelID: selected?.id ?? selectedModelID,
-      into: models, runtimeBinding: runtimeBinding)
+      into: models, runtimeBinding: runtimeBinding,
+      preserveDefault: resolveInputModalities,
+      propagateErrors: resolveInputModalities && selected?.inputModalities == nil)
     // Another caller may have resolved a different selection during this await.
     let merged = mergeModelDescriptors(modelCatalogCache[key]?.models ?? [], resolved)
-    modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: merged, createdAt: now())
+    modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(
+      models: merged, createdAt: modelCatalogCache[key]?.createdAt ?? now())
     return requireSelectedModel ? try requireModel(selectedModelID, in: merged) : merged
   }
 
@@ -131,7 +140,9 @@ extension ServiceAgentRegistry {
     projectRoot: String?,
     selectedModelID: String,
     into cached: [AgentModelDescriptor],
-    runtimeBinding: AgentRuntimeBinding?
+    runtimeBinding: AgentRuntimeBinding?,
+    preserveDefault: Bool,
+    propagateErrors: Bool
   ) async throws -> [AgentModelDescriptor] {
     do {
       let fetched = try await providerModels(
@@ -140,8 +151,25 @@ extension ServiceAgentRegistry {
         selectedModelID: selectedModelID,
         runtimeBinding: runtimeBinding
       )
+      if preserveDefault {
+        guard let selected = AgentModelMatcher.match(selectedModelID, in: fetched) else {
+          return cached
+        }
+        let previous = AgentModelMatcher.match(selectedModelID, in: cached)
+        let resolved = try AgentModelDescriptor(
+          id: selected.id, displayName: selected.displayName,
+          compatibleModelIDs: selected.compatibleModelIDs,
+          supportedReasoningEfforts: selected.supportedReasoningEfforts,
+          defaultReasoningEffort: selected.defaultReasoningEffort,
+          reasoningCapabilitiesAvailable: selected.reasoningCapabilitiesAvailable,
+          isDefaultModel: previous?.isDefaultModel,
+          contextWindowTokens: selected.contextWindowTokens,
+          inputModalities: selected.inputModalities)
+        return mergeModelDescriptors(cached, [resolved])
+      }
       return mergeModelDescriptors(cached, fetched)
     } catch {
+      if propagateErrors { throw error }
       return cached
     }
   }
@@ -192,9 +220,6 @@ extension ServiceAgentRegistry {
     _ incoming: AgentModelDescriptor,
     with existing: AgentModelDescriptor
   ) -> AgentModelDescriptor {
-    guard incoming.isDefaultModel == nil, let existingDefault = existing.isDefaultModel else {
-      return incoming
-    }
     return
       (try? AgentModelDescriptor(
         id: incoming.id,
@@ -203,9 +228,9 @@ extension ServiceAgentRegistry {
         supportedReasoningEfforts: incoming.supportedReasoningEfforts,
         defaultReasoningEffort: incoming.defaultReasoningEffort,
         reasoningCapabilitiesAvailable: incoming.reasoningCapabilitiesAvailable,
-        isDefaultModel: existingDefault,
+        isDefaultModel: incoming.isDefaultModel ?? existing.isDefaultModel,
         contextWindowTokens: incoming.contextWindowTokens,
-        inputModalities: incoming.inputModalities
+        inputModalities: incoming.inputModalities ?? existing.inputModalities
       )) ?? incoming
   }
 

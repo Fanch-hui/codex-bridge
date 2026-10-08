@@ -593,8 +593,8 @@ public actor ServiceTaskManager {
       status: patch.status ?? current.status,
       supervisorStatus: patch.supervisorStatus.applying(to: task),
       currentStep: patch.currentStep.applying(to: current.currentStep),
-      changedFiles: patch.changedFiles
-        ?? Array(Set(current.changedFiles + patch.changedFilesToAppend)).sorted(),
+      changedFiles: try ServiceTaskProgressProjection.changedFiles(
+        patch.changedFiles ?? (current.changedFiles + patch.changedFilesToAppend)),
       resultSummary: patch.resultSummary.applying(to: current.resultSummary),
       supervisorSummary: patch.supervisorSummary.applying(to: current.supervisorSummary),
       failureCode: patch.failureCode.applying(to: current.failureCode)

@@ -10,11 +10,13 @@ public actor DeepSeekHarnessACPExecution {
   }
 
   public nonisolated let events: AsyncThrowingStream<AgentEventEnvelope, any Error>
+  private let eventDelivery: AgentEventStreamDelivery<AgentEventEnvelope>
 
   let client: DeepSeekHarnessACPClient
   let normalizer: DeepSeekHarnessACPEventNormalizer
   let sessionID: String
   private let prompt: String
+  private let images: [DeepSeekHarnessACPImageInput]
   private let initialClientEventSequence: Int64
   private let inactivityTimeout: Duration
   let requiresExecutionEvidence: Bool
@@ -40,6 +42,7 @@ public actor DeepSeekHarnessACPExecution {
     normalizer: DeepSeekHarnessACPEventNormalizer,
     sessionID: String,
     prompt: String,
+    images: [DeepSeekHarnessACPImageInput] = [],
     initialClientEventSequence: Int64,
     inactivityTimeout: Duration = DeepSeekHarnessACPConstants.inactivityTimeout,
     eventBufferLimit: Int = DeepSeekHarnessACPConstants.maximumEventBuffer,
@@ -54,6 +57,7 @@ public actor DeepSeekHarnessACPExecution {
     self.normalizer = normalizer
     self.sessionID = sessionID
     self.prompt = prompt
+    self.images = images
     self.initialClientEventSequence = max(0, initialClientEventSequence)
     consumedClientEventBarrier = max(0, initialClientEventSequence)
     self.inactivityTimeout = inactivityTimeout
@@ -61,6 +65,7 @@ public actor DeepSeekHarnessACPExecution {
     self.cleanup = cleanup
     events = pair.stream
     continuation = pair.continuation
+    eventDelivery = AgentEventStreamDelivery(pair.continuation)
   }
 
   public func start() {
@@ -88,13 +93,20 @@ public actor DeepSeekHarnessACPExecution {
   }
 
   public func shutdown() async {
-    guard claimTerminal() else { return }
+    let claimed = claimTerminal()
+    if claimed, !(await eventDelivery.hasPendingDelivery),
+      let event = try? await normalizer.interrupted()
+    {
+      _ = continuation.yield(event)
+    }
+    continuation.finish()
+    guard claimed else {
+      await closeStream()
+      return
+    }
     interruptRequested = true
     clearSteers()
     try? await client.cancel(sessionID: sessionID)
-    if let event = try? await normalizer.interrupted() {
-      _ = emit(event)
-    }
     await closeStream()
   }
 
@@ -108,7 +120,7 @@ public actor DeepSeekHarnessACPExecution {
     do {
       let normalized = try await normalizer.normalizeForExecution(envelope)
       for event in normalized {
-        guard emit(event) else {
+        guard await emit(event) else {
           await failStream(DeepSeekHarnessACPError.transportClosed)
           return
         }
@@ -139,6 +151,7 @@ public actor DeepSeekHarnessACPExecution {
   private func runPrompt() async {
     do {
       var nextPrompt = prompt
+      var nextImages = images
       while true {
         if interruptRequested {
           await finishInterrupted()
@@ -146,7 +159,9 @@ public actor DeepSeekHarnessACPExecution {
         }
         let toolEvidenceBeforePrompt = await normalizer.toolEvidence()
         promptPhase = .running
-        let result = try await client.prompt(sessionID: sessionID, text: nextPrompt)
+        let result = try await client.prompt(
+          sessionID: sessionID, text: nextPrompt, images: nextImages)
+        nextImages = []
         promptPhase = .settling
         try await waitUntilConsumed(result.eventSequenceBarrier)
         guard !terminal else { return }
@@ -217,23 +232,19 @@ public actor DeepSeekHarnessACPExecution {
   func finishInterrupted() async {
     guard claimTerminal() else { return }
     if let interrupted = try? await normalizer.interrupted() {
-      _ = emit(interrupted)
+      _ = await emit(interrupted)
     }
     await closeStream()
   }
 
-  func emit(_ event: AgentEventEnvelope) -> Bool {
-    switch continuation.yield(event) {
-    case .enqueued: true
-    case .dropped, .terminated: false
-    @unknown default: false
-    }
+  func emit(_ event: AgentEventEnvelope) async -> Bool {
+    await eventDelivery.enqueue(event)
   }
 
   func failExecution(code: String, summary: String) async {
     guard claimTerminal() else { return }
     if let event = try? await normalizer.failed(code: code, summary: summary) {
-      _ = emit(event)
+      _ = await emit(event)
     }
     await closeStream()
   }
@@ -265,6 +276,11 @@ public actor DeepSeekHarnessACPExecution {
   }
 
   private func inactivityTimedOut() async {
+    guard !terminal else { return }
+    if await eventDelivery.hasPendingDelivery {
+      armWatchdog()
+      return
+    }
     try? await client.cancel(sessionID: sessionID)
     await failExecution(
       code: "deepseek_harness_inactivity_timeout",

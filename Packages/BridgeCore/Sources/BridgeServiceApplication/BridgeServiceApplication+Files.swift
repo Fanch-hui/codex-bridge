@@ -54,29 +54,24 @@ extension BridgeServiceApplication {
   ) async throws -> MCPProjectFileReadPage {
     try Self.checkDeadline(deadline)
     do {
-      let result = try await files.read(
-        ProjectFileReadRequest(
-          projectID: ProjectID(rawValue: projectID),
-          relativePath: relativePath,
-          lineRange: try FileLineRange(startLine: startLine, lineCount: lineCount)
-        )
-      )
-      return MCPProjectFileReadPage(
-        relativePath: result.relativePath,
-        startLine: result.startLine,
-        endLine: result.endLine,
-        content: result.content,
-        redactedLineCount: result.redactedLineCount,
-        truncated: result.truncated,
-        nextStartLine: result.nextStartLine,
-        sha256: result.sha256,
-        byteCount: result.byteCount
-      )
+      return try await readProjectFilePage(
+        projectID: projectID, relativePath: relativePath,
+        startLine: startLine, lineCount: lineCount)
     } catch is CancellationError {
       throw CancellationError()
     } catch {
       throw Self.publicFileError(error)
     }
+  }
+
+  func readProjectFilePage(
+    projectID: String, relativePath: String, startLine: Int, lineCount: Int
+  ) async throws -> MCPProjectFileReadPage {
+    let result = try await files.read(
+      ProjectFileReadRequest(
+        projectID: ProjectID(rawValue: projectID), relativePath: relativePath,
+        lineRange: try FileLineRange(startLine: startLine, lineCount: lineCount)))
+    return Self.mcpFileReadPage(result)
   }
 
   public func serviceListProjectDirectory(

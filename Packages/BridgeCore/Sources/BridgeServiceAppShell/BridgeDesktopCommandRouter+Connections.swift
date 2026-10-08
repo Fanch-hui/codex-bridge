@@ -290,7 +290,13 @@ extension BridgeDesktopCommandRouter {
     {
       return
     }
-    model.refreshAgentModelCatalog(installationID: installationID, providerID: providerID)
+    if providerID == "deepseek-harness", let installationID,
+      let modelID = validatedID(payload.modelID, maximumBytes: 256)
+    {
+      model.refreshDSHModelCapabilities(installationID: installationID, modelID: modelID)
+    } else {
+      model.refreshAgentModelCatalog(installationID: installationID, providerID: providerID)
+    }
   }
 
   private static func beginAgentRegistration(

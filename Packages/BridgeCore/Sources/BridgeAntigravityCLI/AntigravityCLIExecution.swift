@@ -4,6 +4,7 @@ import Foundation
 
 public actor AntigravityCLIExecution {
   public nonisolated let events: AsyncThrowingStream<AgentEventEnvelope, any Error>
+  private let eventDelivery: AgentEventStreamDelivery<AgentEventEnvelope>
   public nonisolated let bindings: AsyncThrowingStream<AgentBinding, any Error>
 
   private let taskID: TaskID
@@ -107,6 +108,7 @@ public actor AntigravityCLIExecution {
     self.beforeResultNormalization = beforeResultNormalization
     events = eventPair.stream
     eventContinuation = eventPair.continuation
+    eventDelivery = AgentEventStreamDelivery(eventPair.continuation)
     bindings = bindingPair.stream
     bindingContinuation = bindingPair.continuation
   }
@@ -175,12 +177,19 @@ public actor AntigravityCLIExecution {
   }
 
   public func shutdown() async {
-    guard claimTerminal() else { return }
+    let claimed = claimTerminal()
+    if claimed, !(await eventDelivery.hasPendingDelivery),
+      let normalizer, let event = try? await normalizer.interrupted()
+    {
+      _ = eventContinuation.yield(event)
+    }
+    eventContinuation.finish()
+    guard claimed else {
+      await closeStream()
+      return
+    }
     interruptRequested = true
     await transport.interrupt()
-    if let normalizer, let event = try? await normalizer.interrupted() {
-      _ = emit(event)
-    }
     await closeStream()
   }
 
@@ -209,7 +218,7 @@ public actor AntigravityCLIExecution {
         }
         for event in try await normalizer.normalize(update) {
           guard !terminal else { return }
-          guard emit(event) else { throw AntigravityCLIError.transportClosed }
+          guard await emit(event) else { throw AntigravityCLIError.transportClosed }
         }
       case "result":
         guard let result = envelope.result, let normalizer else {
@@ -310,10 +319,10 @@ public actor AntigravityCLIExecution {
         terminal: false
       ) {
         guard !terminal else { return }
-        guard emit(event) else { throw AntigravityCLIError.transportClosed }
+        guard await emit(event) else { throw AntigravityCLIError.transportClosed }
       }
       guard claimTerminal() else { return }
-      guard emit(try await normalizer.interrupted()) else {
+      guard await emit(try await normalizer.interrupted()) else {
         throw AntigravityCLIError.transportClosed
       }
       await closeStream()
@@ -336,11 +345,11 @@ public actor AntigravityCLIExecution {
     ) {
       guard !terminal else { return }
       if interruptRequested, Self.isTerminalEvent(event.event) { continue }
-      guard emit(event) else { throw AntigravityCLIError.transportClosed }
+      guard await emit(event) else { throw AntigravityCLIError.transportClosed }
     }
     if interruptRequested {
       guard claimTerminal() else { return }
-      guard emit(try await normalizer.interrupted()) else {
+      guard await emit(try await normalizer.interrupted()) else {
         throw AntigravityCLIError.transportClosed
       }
       await closeStream()
@@ -349,7 +358,7 @@ public actor AntigravityCLIExecution {
     if canContinue, let nextPrompt = dequeueSteer() {
       guard !terminal, !interruptRequested else { return }
       try await sendPrompt(nextPrompt)
-      guard emit(try await normalizer.steerDispatched(nextPrompt)) else {
+      guard await emit(try await normalizer.steerDispatched(nextPrompt)) else {
         throw AntigravityCLIError.transportClosed
       }
       return
@@ -399,7 +408,7 @@ public actor AntigravityCLIExecution {
     guard !terminal else { return }
     if interruptRequested, let normalizer {
       guard claimTerminal() else { return }
-      if let event = try? await normalizer.interrupted() { _ = emit(event) }
+      if let event = try? await normalizer.interrupted() { _ = await emit(event) }
       await closeStream()
       return
     }
@@ -413,12 +422,8 @@ public actor AntigravityCLIExecution {
     )
   }
 
-  private func emit(_ event: AgentEventEnvelope) -> Bool {
-    switch eventContinuation.yield(event) {
-    case .enqueued: true
-    case .dropped, .terminated: false
-    @unknown default: false
-    }
+  private func emit(_ event: AgentEventEnvelope) async -> Bool {
+    await eventDelivery.enqueue(event)
   }
 
   private func failExecution(
@@ -430,7 +435,7 @@ public actor AntigravityCLIExecution {
     let streamError = cause ?? AntigravityCLIError.transportClosed
     bindingContinuation.finish(throwing: streamError)
     if let normalizer, let event = try? await normalizer.failed(code: code, summary: summary) {
-      _ = emit(event)
+      _ = await emit(event)
       await closeStream()
     } else {
       await closeStream(throwing: streamError)
@@ -468,6 +473,11 @@ public actor AntigravityCLIExecution {
   }
 
   private func inactivityTimedOut() async {
+    guard !terminal else { return }
+    if await eventDelivery.hasPendingDelivery {
+      armWatchdog()
+      return
+    }
     await transport.interrupt()
     await failExecution(
       code: "antigravity_inactivity_timeout",

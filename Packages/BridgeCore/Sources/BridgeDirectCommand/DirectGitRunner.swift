@@ -72,7 +72,8 @@ public struct DirectGitRunner: Sendable {
     workingDirectory: String,
     timeout: Duration? = nil,
     environment overrides: [String: String]? = nil,
-    maximumOutputBytes: Int = 256 * 1_024
+    maximumOutputBytes: Int = 256 * 1_024,
+    restrictedEnvironment: Bool = false
   ) async throws -> DirectGitResult {
     guard let executable = argv.first, !executable.isEmpty, argv.count <= 128,
       maximumOutputBytes > 0, maximumOutputBytes <= 20 * 1_024 * 1_024
@@ -84,7 +85,7 @@ public struct DirectGitRunner: Sendable {
       try await execute(
         argv: launchArgv, workingDirectory: workingDirectory,
         timeout: timeout ?? defaultTimeout, overrides: overrides,
-        maximumOutputBytes: maximumOutputBytes
+        maximumOutputBytes: maximumOutputBytes, restrictedEnvironment: restrictedEnvironment
       )
     }
     return try await withTaskCancellationHandler {
@@ -96,11 +97,17 @@ public struct DirectGitRunner: Sendable {
 
   private func execute(
     argv: [String], workingDirectory: String, timeout: Duration,
-    overrides: [String: String]?, maximumOutputBytes: Int
+    overrides: [String: String]?, maximumOutputBytes: Int, restrictedEnvironment: Bool
   ) async throws -> DirectGitResult {
     try Task.checkCancellation()
-    var environment = Self.environmentOverrides()
-    if let overrides { environment.merge(overrides) { _, replacement in replacement } }
+    // Inspection relies on the process whitelist and excludes Git repository/config redirection.
+    var environment = restrictedEnvironment ? [:] : Self.environmentOverrides()
+    if let overrides {
+      let permitted =
+        restrictedEnvironment
+        ? overrides.filter { !$0.key.uppercased().hasPrefix("GIT_") } : overrides
+      environment.merge(permitted) { _, replacement in replacement }
+    }
     let collector = DirectCommandOutputCollector(maximumBytes: maximumOutputBytes)
     let process: DirectProcessLifetime
     do {

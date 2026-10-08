@@ -44,6 +44,7 @@ struct PiEventNormalizer: Sendable {
     let remaining = 240 * 1_024 - (blockLengths[key] ?? 0)
     guard remaining > 0 else { return [] }
     let content = Self.bounded(delta, bytes: remaining)
+    guard !content.isEmpty else { return [] }
     blockLengths[key, default: 0] += content.utf8.count
     return [
       .content(
@@ -56,7 +57,7 @@ struct PiEventNormalizer: Sendable {
 
   private mutating func messageEnd(_ value: PiJSONValue) throws -> [AgentEvent] {
     guard let message = value["message"], message["role"]?.stringValue == "assistant",
-      let blocks = message["content"]?.arrayValue, blocks.count <= 256
+      let blocks = message["content"]?.arrayValue
     else { return [] }
     stopReason = message["stopReason"]?.stringValue
     failure = message["errorMessage"]?.stringValue.map { Self.bounded($0, bytes: 4 * 1_024) }
@@ -80,13 +81,18 @@ struct PiEventNormalizer: Sendable {
 
   private mutating func toolStart(_ value: PiJSONValue) throws -> [AgentEvent] {
     let id = try toolID(value)
-    guard tools[id] == nil, tools.count < 128,
-      let name = value["toolName"]?.stringValue, !name.isEmpty, name.utf8.count <= 256
+    guard tools[id] == nil,
+      let name = value["toolName"]?.stringValue, !name.isEmpty, !name.contains("\0")
     else { throw PiRPCError.invalidRecord }
-    let arguments = (try value["args"]?.text()).map { Self.bounded($0, bytes: 60 * 1_024) }
-    tools[id] = Tool(name: name, arguments: arguments)
+    let arguments = (try value["args"]?.text()).map {
+      $0.utf8.count > 60 * 1_024 ? AgentProgressText.omissionMarker : $0
+    }
+    let displayedName = Self.bounded(name, bytes: 256)
+    tools[id] = Tool(name: displayedName, arguments: arguments)
     return [
-      .tool(try AgentToolUpdate(key: id, name: name, status: .inProgress, arguments: arguments))
+      .tool(
+        try AgentToolUpdate(key: id, name: displayedName, status: .inProgress, arguments: arguments)
+      )
     ]
   }
 
@@ -95,7 +101,6 @@ struct PiEventNormalizer: Sendable {
     guard let tool = tools[id] else { throw PiRPCError.invalidRecord }
     let result = value[final ? "result" : "partialResult"]
     let content = result?["content"]?.arrayValue ?? []
-    guard content.count <= 256 else { throw PiRPCError.invalidRecord }
     let output = Self.bounded(
       content.compactMap { $0["text"]?.stringValue }.joined(separator: "\n"),
       bytes: 240 * 1_024)
@@ -116,9 +121,18 @@ struct PiEventNormalizer: Sendable {
   private func childRuns(_ details: PiJSONValue?, toolName: String) throws -> [AgentChildRun] {
     guard toolName == "bridge_subtask" else { return [] }
     guard let value = details?["codexBridgeChildRuns"] else { return [] }
-    guard let encoded = try? value.encoded(), encoded.count <= 64 * 1_024,
-      let children = try? JSONDecoder().decode([AgentChildRun].self, from: encoded),
-      children.count <= 32, Set(children.map(\.id)).count == children.count
+    guard let values = value.arrayValue else { throw PiRPCError.invalidRecord }
+    let children = try values.prefix(32).map { item in
+      guard let id = item["id"]?.stringValue else { throw PiRPCError.invalidRecord }
+      return try AgentChildRun(
+        id: id, sessionID: item["sessionID"]?.stringValue,
+        name: item["name"]?.stringValue.map { Self.bounded($0, bytes: 512) },
+        status: item["status"]?.stringValue,
+        summary: item["summary"]?.stringValue.map { Self.bounded($0, bytes: 4 * 1_024) },
+        workspaceURLs: Array((item["workspaceURLs"]?.arrayValue ?? []).prefix(32))
+          .compactMap(\.stringValue))
+    }
+    guard Set(children.map(\.id)).count == children.count
     else { throw PiRPCError.invalidRecord }
     return children
   }

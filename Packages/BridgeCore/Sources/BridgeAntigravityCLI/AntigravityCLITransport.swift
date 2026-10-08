@@ -108,6 +108,7 @@ public final class AntigravityCLIProcessTransport: AntigravityCLITransport, @unc
     guard closeState.0 else { return }
     let task = closeState.1
 
+    state.prepareToClose()
     process.closeStdin()
     let exited = await Task.detached(priority: .utility) { [process] in
       process.waitForExit(timeout: .seconds(2))
@@ -145,21 +146,14 @@ public final class AntigravityCLIProcessTransport: AntigravityCLITransport, @unc
 }
 
 private final class AntigravityProcessTransportState: @unchecked Sendable {
-  let stream: AsyncThrowingStream<Data, any Error>
-  private let continuation: AsyncThrowingStream<Data, any Error>.Continuation
+  var stream: AsyncThrowingStream<Data, any Error> { delivery.stream }
+  private let delivery = ProcessFrameDelivery(capacity: 256)
   private let lock = NSLock()
-  private var decoder: BoundedLineDecoder
+  private var decoder: ProgressJSONLineDecoder
   private var finished = false
 
   init(maximumFrameBytes: Int) {
-    let pair = AsyncThrowingStream.makeStream(
-      of: Data.self,
-      throwing: (any Error).self,
-      bufferingPolicy: .bufferingOldest(256)
-    )
-    stream = pair.stream
-    continuation = pair.continuation
-    decoder = BoundedLineDecoder(maximumFrameBytes: maximumFrameBytes)
+    decoder = ProgressJSONLineDecoder(dialect: .antigravity, maximumFrameBytes: maximumFrameBytes)
   }
 
   func receive(_ data: Data) {
@@ -170,28 +164,14 @@ private final class AntigravityProcessTransportState: @unchecked Sendable {
     }
     do {
       let frames = try decoder.append(data)
-      var dropped = false
-      for frame in frames {
-        switch continuation.yield(frame) {
-        case .enqueued:
-          continue
-        case .dropped, .terminated:
-          finished = true
-          dropped = true
-        @unknown default:
-          finished = true
-          dropped = true
-        }
-        break
-      }
       lock.unlock()
-      if dropped {
-        continuation.finish(throwing: AntigravityCLIError.transportClosed)
+      for frame in frames {
+        guard delivery.yield(frame) else { return }
       }
     } catch {
       finished = true
       lock.unlock()
-      continuation.finish(throwing: AntigravityCLIError.oversizedFrame)
+      delivery.finish(throwing: AntigravityCLIError.oversizedFrame)
     }
   }
 
@@ -207,15 +187,17 @@ private final class AntigravityProcessTransportState: @unchecked Sendable {
       remaining = try decoder.finish()
     } catch {
       lock.unlock()
-      continuation.finish(throwing: AntigravityCLIError.oversizedFrame)
+      delivery.finish(throwing: AntigravityCLIError.oversizedFrame)
       return
     }
     lock.unlock()
-    for frame in remaining { _ = continuation.yield(frame) }
-    if let error {
-      continuation.finish(throwing: error)
-    } else {
-      continuation.finish()
+    for frame in remaining {
+      if !delivery.yield(frame) { break }
     }
+    delivery.finish(throwing: error)
+  }
+
+  func prepareToClose() {
+    delivery.disableBackpressure()
   }
 }

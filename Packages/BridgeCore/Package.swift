@@ -10,6 +10,9 @@ var macOSOnlyTargets: [Target] = []
 #if !os(Windows)
 #endif
 
+#if !os(macOS)
+#endif
+
 var linuxOnlyProducts: [Product] = []
 var linuxOnlyTargets: [Target] = []
 var linuxDesktopDependencies: [Target.Dependency] = []

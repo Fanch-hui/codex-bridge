@@ -10,7 +10,9 @@ extension DeepSeekHarnessACPClient {
   ) async throws -> ACPRequestResponse {
     guard started, !closed else { throw DeepSeekHarnessACPError.transportClosed }
     do {
-      return try await broker.request(method: method, params: params, timeout: timeout)
+      return try await broker.request(
+        method: method, params: params, timeout: timeout,
+        suspendsTimeout: method != "session/prompt" && method != "session/close")
     } catch {
       throw Self.map(error)
     }
@@ -39,7 +41,7 @@ extension DeepSeekHarnessACPClient {
           return
         }
       case .notification(let method, let params):
-        try handleNotification(method: method, params: params)
+        try await handleNotification(method: method, params: params)
       case .serverRequest(let id, let method, let params):
         await handleServerRequest(id: id, method: method, params: params)
       }
@@ -48,7 +50,7 @@ extension DeepSeekHarnessACPClient {
     }
   }
 
-  private func handleNotification(method: String, params: ACPJSONValue?) throws {
+  private func handleNotification(method: String, params: ACPJSONValue?) async throws {
     guard method == "session/update",
       let object = params?.objectValue,
       let sessionID = object["sessionId"]?.stringValue,
@@ -60,15 +62,15 @@ extension DeepSeekHarnessACPClient {
     try requireSession(sessionID)
     switch updateType {
     case "agent_message_chunk":
-      try handleTextUpdate(sessionID: sessionID, update: update)
+      try await handleTextUpdate(sessionID: sessionID, update: update)
     case "agent_thought_chunk":
-      try handleTextUpdate(sessionID: sessionID, update: update, reasoning: true)
+      try await handleTextUpdate(sessionID: sessionID, update: update, reasoning: true)
     case "usage_update":
-      try handleUsageUpdate(sessionID: sessionID, update: update)
+      try await handleUsageUpdate(sessionID: sessionID, update: update)
     case "config_option_update":
-      yield(.configurationUpdated(sessionID: sessionID))
+      await yield(.configurationUpdated(sessionID: sessionID))
     case "tool_call", "tool_call_update":
-      try handleToolUpdate(sessionID: sessionID, update: update)
+      try await handleToolUpdate(sessionID: sessionID, update: update)
     default:
       // ACP permits providers to add session update variants. They are not
       // part of the Bridge presentation contract, so preserve the session
@@ -81,7 +83,7 @@ extension DeepSeekHarnessACPClient {
     sessionID: String,
     update: [String: ACPJSONValue],
     reasoning: Bool = false
-  ) throws {
+  ) async throws {
     guard
       let content = update["content"]?.objectValue,
       content["type"]?.stringValue == "text",
@@ -89,23 +91,22 @@ extension DeepSeekHarnessACPClient {
     else {
       throw DeepSeekHarnessACPError.invalidMessage
     }
-    guard text.utf8.count <= DeepSeekHarnessACPConstants.maximumFinalTextBytes,
-      !text.contains("\0")
+    guard !text.contains("\0")
     else {
       throw DeepSeekHarnessACPError.oversizedFrame
     }
     guard !text.isEmpty else { return }
     if reasoning {
-      yield(.reasoningDelta(sessionID: sessionID, text: text))
+      await yield(.reasoningDelta(sessionID: sessionID, text: text))
     } else {
-      yield(.textDelta(sessionID: sessionID, text: text))
+      await yield(.textDelta(sessionID: sessionID, text: text))
     }
   }
 
   private func handleUsageUpdate(
     sessionID: String,
     update: [String: ACPJSONValue]
-  ) throws {
+  ) async throws {
     guard let usedTokens = update["used"]?.intValue,
       let contextSize = update["size"]?.intValue,
       usedTokens >= 0,
@@ -113,7 +114,7 @@ extension DeepSeekHarnessACPClient {
     else {
       throw DeepSeekHarnessACPError.invalidMessage
     }
-    yield(
+    await yield(
       .usageUpdated(
         sessionID: sessionID,
         usedTokens: usedTokens,
@@ -125,7 +126,7 @@ extension DeepSeekHarnessACPClient {
   private func handleToolUpdate(
     sessionID: String,
     update: [String: ACPJSONValue]
-  ) throws {
+  ) async throws {
     guard let toolCallID = update["toolCallId"]?.stringValue,
       let statusValue = update["status"]?.stringValue,
       let status = Self.toolStatus(statusValue)
@@ -135,18 +136,18 @@ extension DeepSeekHarnessACPClient {
     try validateIdentifier(toolCallID, field: "tool.toolCallID")
     let title = update["title"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
     if let title {
-      guard title.utf8.count <= 1_024, !title.contains("\0") else {
+      guard !title.contains("\0") else {
         throw DeepSeekHarnessACPError.oversizedFrame
       }
     }
     let kind = update["kind"]?.stringValue
     if let kind { try validateIdentifier(kind, field: "tool.kind") }
-    yield(
+    await yield(
       .toolUpdated(
         DeepSeekHarnessACPToolUpdate(
           sessionID: sessionID,
           toolCallID: toolCallID,
-          title: title,
+          title: title.map { AgentProgressText.bounded($0, maximumBytes: 1_024) },
           kind: kind,
           status: status,
           rawInput: update["rawInput"]
@@ -208,17 +209,13 @@ extension DeepSeekHarnessACPClient {
     }
   }
 
-  func yield(_ event: DeepSeekHarnessACPClientEvent) {
+  func yield(_ event: DeepSeekHarnessACPClientEvent) async {
     let envelope = DeepSeekHarnessACPClientEventEnvelope(
       sequence: nextEventSequence,
       event: event
     )
     nextEventSequence += 1
-    if case .dropped = eventContinuation.yield(envelope) {
-      Task { [weak self] in
-        await self?.failConnection(DeepSeekHarnessACPError.transportClosed)
-      }
-    }
+    _ = await eventDelivery.enqueue(envelope)
   }
 
   static func map(_ error: any Error) -> any Error {

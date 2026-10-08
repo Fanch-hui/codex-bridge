@@ -7,7 +7,6 @@ extension CodexApprovalWireDecoder {
     guard notification.method == "item/started" else {
       throw CodexApprovalWireError.unsupportedRequestMethod(notification.method)
     }
-    try validateEvidenceSize(notification.params)
     let params = try object(notification.params, field: "params")
     let item = try object(params["item"], field: "item")
     let type = try requiredString(item, key: "type", maximumBytes: 64)
@@ -24,7 +23,6 @@ extension CodexApprovalWireDecoder {
   public static func decodeSemanticNotification(
     _ notification: RPCNotification
   ) throws -> CodexSemanticExecutionEvidence {
-    try validateEvidenceSize(notification.params)
     let params = try object(notification.params, field: "params")
     switch notification.method {
     case "turn/plan/updated":
@@ -49,15 +47,12 @@ extension CodexApprovalWireDecoder {
     _ params: [String: JSONValue]
   ) throws -> CodexPlanUpdateEvidence {
     let values = try array(params["plan"], field: "plan")
-    guard !values.isEmpty, values.count <= 128 else {
-      throw CodexApprovalWireError.arrayTooLarge(field: "plan", maximumCount: 128)
-    }
     let steps = try values.enumerated().map { index, value in
       let field = "plan[\(index)]"
       let step = try object(value, field: field)
       try requireOnlyKeys(step, allowed: ["step", "status"], context: field)
       return CodexPlanStepEvidence(
-        text: try requiredString(step, key: "step"),
+        text: try progressString(step, key: "step"),
         status: try enumValue(
           try requiredString(step, key: "status", maximumBytes: 32),
           field: "\(field).status",
@@ -68,8 +63,8 @@ extension CodexApprovalWireDecoder {
     return CodexPlanUpdateEvidence(
       threadID: try identifier(params, key: "threadId"),
       turnID: try identifier(params, key: "turnId"),
-      steps: steps,
-      explanation: try optionalString(params, key: "explanation", maximumBytes: 8_192)
+      steps: Array(steps.prefix(128)),
+      explanation: try optionalProgressString(params, key: "explanation")
     )
   }
 
@@ -87,7 +82,7 @@ extension CodexApprovalWireDecoder {
     return CodexCompletedCommandEvidence(
       item: reference.item,
       completedAtMilliseconds: reference.completedAt,
-      displayCommand: try requiredString(item, key: "command", maximumBytes: 4_096),
+      displayCommand: try progressString(item, key: "command"),
       exitCode: try optionalInt32(item, key: "exitCode"),
       status: status
     )
@@ -105,7 +100,6 @@ extension CodexApprovalWireDecoder {
     )
     guard status != .inProgress else { throw CodexApprovalWireError.invalidField("item.status") }
     let values = try array(item["changes"], field: "item.changes")
-    try validateArray(values, field: "item.changes")
     return CodexCompletedFileChangeEvidence(
       item: reference.item,
       completedAtMilliseconds: reference.completedAt,
@@ -147,10 +141,9 @@ extension CodexApprovalWireDecoder {
     return CodexCommandExecutionEvidence(
       item: reference.item,
       startedAtMilliseconds: reference.startedAt,
-      displayCommand: try requiredString(
-        item, key: "command", maximumBytes: CodexApprovalWireLimits.commandBytes),
+      displayCommand: try progressString(item, key: "command"),
       workingDirectory: try requiredCWD(item, key: "cwd"),
-      displayActions: try commandActions(item["commandActions"], required: true) ?? [],
+      displayActions: try progressCommandActions(item["commandActions"]),
       status: status
     )
   }
@@ -166,7 +159,6 @@ extension CodexApprovalWireDecoder {
       as: CodexFileChangeStatus.self
     )
     let values = try array(item["changes"], field: "item.changes")
-    try validateArray(values, field: "item.changes")
     return CodexFileChangeEvidence(
       item: reference.item,
       startedAtMilliseconds: reference.startedAt,
@@ -199,8 +191,7 @@ extension CodexApprovalWireDecoder {
   ) throws -> CodexFileUpdateEvidence {
     let update = try object(value, field: field)
     let path = try requiredString(update, key: "path")
-    let diff = try requiredString(
-      update, key: "diff", maximumBytes: CodexApprovalWireLimits.diffBytes)
+    let diff = try progressString(update, key: "diff")
     let kindObject = try object(update["kind"], field: "\(field).kind")
     let discriminator = try requiredString(kindObject, key: "type", maximumBytes: 32)
     let kind: CodexFileChangeKind

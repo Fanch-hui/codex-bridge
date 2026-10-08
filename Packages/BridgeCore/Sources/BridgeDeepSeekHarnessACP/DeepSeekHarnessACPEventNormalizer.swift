@@ -15,7 +15,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
   private let taskID: TaskID
   private let binding: AgentBinding
   private let projectRoot: String?
-  private var content = ""
+  private var content = AgentProgressTextBuffer()
   private var reasoning = DeepSeekHarnessACPReasoningBuffer()
   private var completedTurnContents: [String] = []
   private var assistantMessageIndex: UInt64 = 0
@@ -23,7 +23,6 @@ public actor DeepSeekHarnessACPEventNormalizer {
   private var tools: [String: ToolState] = [:]
 
   private static let maximumAssistantMessageIndex: UInt64 = 1_000_000
-  private static let maximumTools = 1_024
 
   public init(taskID: TaskID, binding: AgentBinding, projectRoot: String? = nil) {
     self.taskID = taskID
@@ -37,23 +36,10 @@ public actor DeepSeekHarnessACPEventNormalizer {
     switch clientEnvelope.event {
     case .textDelta(let sessionID, let text):
       try validateSession(sessionID)
-      guard !text.isEmpty else { return nil }
-      let baseLength = content.utf8.count
-      let (next, overflow) = content.utf8.count.addingReportingOverflow(text.utf8.count)
-      guard !overflow, next <= DeepSeekHarnessACPConstants.maximumFinalTextBytes else {
-        throw DeepSeekHarnessACPError.oversizedFrame
-      }
-      content.append(text)
-      let update = try AgentContentUpdate(
-        key: assistantMessageKey,
-        role: .assistant,
-        kind: .message,
-        mode: .delta,
-        content: text,
-        baseContentLength: baseLength,
-        isFinal: false,
-        authoritative: false
-      )
+      guard
+        let update = try content.append(
+          text, key: assistantMessageKey, role: .assistant, kind: .message)
+      else { return nil }
       return try envelope(.content(update))
     case .reasoningDelta(let sessionID, let text):
       try validateSession(sessionID)
@@ -100,7 +86,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
   }
 
   func finalizeCurrentContent() throws -> AgentEventEnvelope? {
-    guard !content.isEmpty else { return nil }
+    guard !content.content.isEmpty else { return nil }
     guard assistantMessageIndex < Self.maximumAssistantMessageIndex else {
       throw DeepSeekHarnessACPError.oversizedFrame
     }
@@ -109,20 +95,20 @@ public actor DeepSeekHarnessACPEventNormalizer {
       role: .assistant,
       kind: .message,
       mode: .full,
-      content: content,
+      content: content.content,
       baseContentLength: nil,
       isFinal: true,
       authoritative: true
     )
-    completedTurnContents.append(content)
-    content = ""
+    completedTurnContents.append(content.content)
+    content = AgentProgressTextBuffer()
     assistantMessageIndex += 1
     return try envelope(.content(update))
   }
 
   public func completed(stopReason: String) throws -> AgentEventEnvelope {
     let summary =
-      AgentTurnSummary.combined(completedTurnContents + [content])
+      AgentTurnSummary.combined(completedTurnContents + [content.content])
       ?? "DeepSeek Harness turn completed."
     return try envelope(.completed(summary: summary, stopReason: stopReason))
   }
@@ -181,7 +167,7 @@ public actor DeepSeekHarnessACPEventNormalizer {
     _ request: DeepSeekHarnessACPPermissionRequest
   ) throws -> AgentEventEnvelope {
     let tool = tools[request.toolCallID]
-    let input = request.rawInput ?? tool?.rawInput
+    let input = request.rawInput ?? tool?.rawInput?.originalProgressInput
     let title =
       request.title == "DeepSeek Harness permission request"
       ? tool?.title ?? request.title : request.title
@@ -208,20 +194,15 @@ public actor DeepSeekHarnessACPEventNormalizer {
     _ update: DeepSeekHarnessACPToolUpdate
   ) throws -> AgentEventEnvelope {
     try validateIdentifier(update.toolCallID, field: "tool.toolCallID")
-    if tools[update.toolCallID] == nil, tools.count >= Self.maximumTools {
-      throw DeepSeekHarnessACPError.oversizedFrame
-    }
     var state = tools[update.toolCallID] ?? ToolState()
     if let title = update.title, !title.isEmpty { state.title = title }
     if let kind = update.kind { state.kind = kind }
     if let rawInput = update.rawInput {
       state.rawInput = rawInput
-      state.childRuns = Self.childRuns(
-        from: rawInput,
-        title: state.title,
-        kind: state.kind,
-        status: update.status
-      )
+      state.childRuns =
+        rawInput.originalProgressInput.map {
+          Self.childRuns(from: $0, title: state.title, kind: state.kind, status: update.status)
+        } ?? []
     }
     state.status = update.status
     let payload = try AgentToolUpdate(
@@ -230,11 +211,15 @@ public actor DeepSeekHarnessACPEventNormalizer {
       title: state.title,
       kind: state.kind,
       status: state.status,
-      arguments: state.rawInput?.encodedString(),
+      arguments: state.rawInput?.progressOmissionDisplay ?? state.rawInput?.encodedString(),
       locations: Self.absoluteLocations(from: state.rawInput, projectRoot: projectRoot),
       childRuns: state.childRuns
     )
-    tools[update.toolCallID] = state
+    if state.status == .pending || state.status == .inProgress {
+      tools[update.toolCallID] = state
+    } else {
+      tools[update.toolCallID] = ToolState(status: state.status)
+    }
     return try envelope(.tool(payload))
   }
 

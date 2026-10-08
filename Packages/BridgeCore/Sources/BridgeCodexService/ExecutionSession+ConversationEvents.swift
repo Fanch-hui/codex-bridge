@@ -1,4 +1,5 @@
 import BridgeCodexRPC
+import BridgeSecurity
 
 extension ExecutionSession {
   func receiveAgentMessageDelta(_ notification: RPCNotification) async {
@@ -9,11 +10,13 @@ extension ExecutionSession {
       }
       try requireActiveEvidence(threadID: delta.threadId, turnID: delta.turnId)
       guard isPrimaryBinding(threadID: delta.threadId, turnID: delta.turnId) else { return }
+      try ExecutionValidation.streamDelta(
+        delta.delta, field: "agentMessageDelta.delta", maximumBytes: Int.max)
       let event = try ExecutionAgentMessageDelta(
         threadID: delta.threadId,
         turnID: delta.turnId,
         itemID: delta.itemId,
-        delta: delta.delta
+        delta: OutboundContentSecurity.redacted(delta.delta, maximumUTF8Bytes: 64 * 1_024)
       )
       await yield(.agentMessageDelta(event))
     } catch {
@@ -32,11 +35,13 @@ extension ExecutionSession {
       }
       try requireActiveEvidence(threadID: delta.threadId, turnID: delta.turnId)
       guard isPrimaryBinding(threadID: delta.threadId, turnID: delta.turnId) else { return }
+      try ExecutionValidation.streamDelta(
+        delta.delta, field: "reasoningDelta.delta", maximumBytes: Int.max)
       let event = try ExecutionReasoningDelta(
         threadID: delta.threadId,
         turnID: delta.turnId,
         itemID: delta.itemId,
-        delta: delta.delta
+        delta: OutboundContentSecurity.redacted(delta.delta, maximumUTF8Bytes: 64 * 1_024)
       )
       await yield(.reasoningDelta(event))
     } catch {
@@ -58,7 +63,11 @@ extension ExecutionSession {
       guard Self.isSafeWireIdentifier(progress.itemId) else {
         throw ExecutionServiceError.protocolViolation("tool call progress item")
       }
-      await yield(.toolCallProgress(itemID: progress.itemId, progress: progress.message))
+      await yield(
+        .toolCallProgress(
+          itemID: progress.itemId,
+          progress: OutboundContentSecurity.redacted(progress.message, maximumUTF8Bytes: 64 * 1_024)
+        ))
     } catch {
       await fail(
         code: "invalid_tool_progress",

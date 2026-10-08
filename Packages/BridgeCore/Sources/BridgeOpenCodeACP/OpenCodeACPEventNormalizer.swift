@@ -7,7 +7,7 @@ public actor OpenCodeACPEventNormalizer {
   private struct ContentState: Sendable {
     let role: AgentContentRole
     let kind: AgentContentKind
-    var content: String
+    var buffer = AgentProgressTextBuffer()
   }
 
   private struct ToolState: Sendable {
@@ -28,9 +28,7 @@ public actor OpenCodeACPEventNormalizer {
   private var contents: [String: ContentState] = [:]
   private var completedTurnSummaries: [String] = []
   private var tools: [String: ToolState] = [:]
-  private static let maximumContentBytes = 256 * 1_024
   private static let maximumContentStreams = 64
-  private static let maximumTools = 256
 
   public init(taskID: TaskID, binding: AgentBinding, projectRoot: String? = nil) {
     self.taskID = taskID
@@ -66,7 +64,7 @@ public actor OpenCodeACPEventNormalizer {
   public func finalizeContent() throws -> [AgentEventEnvelope] {
     let events = try contentOrder.compactMap { key -> AgentEventEnvelope? in
       guard let state = contents[key], state.role == .assistant, state.kind == .message,
-        !state.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !state.buffer.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       else {
         return nil
       }
@@ -75,7 +73,7 @@ public actor OpenCodeACPEventNormalizer {
         role: state.role,
         kind: state.kind,
         mode: .full,
-        content: state.content,
+        content: state.buffer.content,
         baseContentLength: nil,
         isFinal: true,
         authoritative: true
@@ -157,35 +155,19 @@ public actor OpenCodeACPEventNormalizer {
     if let existing, existing.role != role || existing.kind != kind {
       throw OpenCodeACPError.invalidMessage
     }
-    if existing == nil, contents.count >= Self.maximumContentStreams {
-      throw OpenCodeACPError.oversizedFrame
+    if existing == nil, contents.count >= Self.maximumContentStreams { return nil }
+    var state = existing ?? ContentState(role: role, kind: kind)
+    guard let payload = try state.buffer.append(text, key: key, role: role, kind: kind) else {
+      return nil
     }
-    let base = existing?.content.count ?? 0
-    let combined = (existing?.content ?? "") + text
-    guard combined.utf8.count <= Self.maximumContentBytes else {
-      throw OpenCodeACPError.oversizedFrame
-    }
-    let payload = try AgentContentUpdate(
-      key: key,
-      role: role,
-      kind: kind,
-      mode: .delta,
-      content: text,
-      baseContentLength: base,
-      isFinal: false,
-      authoritative: false
-    )
     if existing == nil { contentOrder.append(key) }
-    contents[key] = ContentState(role: role, kind: kind, content: combined)
+    contents[key] = state
     return try envelope(.content(payload))
   }
 
   private func tool(_ update: [String: ACPJSONValue]) throws -> AgentEventEnvelope? {
     guard let toolCallID = update["toolCallId"]?.stringValue, !toolCallID.isEmpty else {
       throw OpenCodeACPError.invalidMessage
-    }
-    if tools[toolCallID] == nil, tools.count >= Self.maximumTools {
-      throw OpenCodeACPError.oversizedFrame
     }
     var state = tools[toolCallID] ?? ToolState()
     if let title = update["title"]?.stringValue { state.title = title }
@@ -196,13 +178,15 @@ public actor OpenCodeACPEventNormalizer {
       state.status = normalizedStatus
     }
     if let rawInput = update["rawInput"] {
-      state.arguments = rawInput.encodedString()
-      state.childRuns = Self.childRuns(
-        from: rawInput,
-        title: state.title,
-        kind: state.kind,
-        status: state.status
-      )
+      state.arguments =
+        rawInput.progressOmissionDisplay
+        ?? rawInput.encodedString().map {
+          $0.utf8.count > 64 * 1_024 ? AgentProgressText.omissionMarker : $0
+        }
+      state.childRuns =
+        rawInput.originalProgressInput.map {
+          Self.childRuns(from: $0, title: state.title, kind: state.kind, status: state.status)
+        } ?? []
       if let input = rawInput.objectValue {
         state.locations = Array(
           Set(state.locations + Self.absoluteLocations(from: input, projectRoot: projectRoot))
@@ -210,11 +194,10 @@ public actor OpenCodeACPEventNormalizer {
       }
     }
     if let output = Self.toolOutput(update["content"]) {
-      state.output = output
+      state.output = AgentProgressText.bounded(output, maximumBytes: 256 * 1_024)
     }
     if let locations = update["locations"]?.arrayValue {
-      guard locations.count <= 128 else { throw OpenCodeACPError.oversizedFrame }
-      state.locations = locations.compactMap { value in
+      state.locations = locations.prefix(128).compactMap { value in
         guard let path = value["path"]?.stringValue,
           let absolute = Self.absolutePath(path, projectRoot: projectRoot)
         else { return nil }
@@ -234,7 +217,11 @@ public actor OpenCodeACPEventNormalizer {
       locations: state.locations,
       childRuns: state.childRuns
     )
-    tools[toolCallID] = state
+    if state.status == .pending || state.status == .inProgress {
+      tools[toolCallID] = state
+    } else {
+      tools[toolCallID] = ToolState(status: state.status)
+    }
     return try envelope(.tool(payload))
   }
 
@@ -332,8 +319,8 @@ public actor OpenCodeACPEventNormalizer {
 
   private func plan(_ update: [String: ACPJSONValue]) throws -> AgentEventEnvelope? {
     guard let rawEntries = update["entries"]?.arrayValue else { return nil }
-    guard rawEntries.count <= 64 else { throw OpenCodeACPError.oversizedFrame }
-    let entries = try rawEntries.compactMap { value -> AgentPlanEntry? in
+    var entries = try rawEntries.prefix(rawEntries.count > 64 ? 63 : 64).compactMap {
+      value -> AgentPlanEntry? in
       guard let object = value.objectValue,
         let content = object["content"]?.stringValue,
         !content.isEmpty
@@ -343,6 +330,9 @@ public actor OpenCodeACPEventNormalizer {
         priority: object["priority"]?.stringValue,
         status: object["status"]?.stringValue
       )
+    }
+    if rawEntries.count > 64 {
+      entries.append(try AgentPlanEntry(content: "[…计划过长，后续已省略]"))
     }
     return entries.isEmpty ? nil : try envelope(.plan(entries))
   }
@@ -398,7 +388,7 @@ public actor OpenCodeACPEventNormalizer {
       guard let state = contents[key], state.role == .assistant, state.kind == .message else {
         continue
       }
-      let trimmed = state.content.trimmingCharacters(in: .whitespacesAndNewlines)
+      let trimmed = state.buffer.content.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty else { continue }
       return String(decoding: trimmed.utf8.prefix(4 * 1_024), as: UTF8.self)
     }

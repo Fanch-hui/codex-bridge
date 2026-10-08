@@ -8,6 +8,7 @@ public struct ServiceAgentModelListItem: Codable, Equatable, Sendable {
   public let defaultReasoningEffort: String?
   public let reasoningCapabilitiesAvailable: Bool
   public let isDefaultModel: Bool?
+  public let inputModalities: [String]?
 
   public init(
     modelID: String,
@@ -16,7 +17,8 @@ public struct ServiceAgentModelListItem: Codable, Equatable, Sendable {
     supportedReasoningEfforts: [String] = [],
     defaultReasoningEffort: String? = nil,
     reasoningCapabilitiesAvailable: Bool = true,
-    isDefaultModel: Bool? = nil
+    isDefaultModel: Bool? = nil,
+    inputModalities: [String]? = nil
   ) {
     self.modelID = modelID
     self.compatibleModelIDs = compatibleModelIDs
@@ -25,10 +27,11 @@ public struct ServiceAgentModelListItem: Codable, Equatable, Sendable {
     self.defaultReasoningEffort = defaultReasoningEffort
     self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
     self.isDefaultModel = isDefaultModel
+    self.inputModalities = inputModalities
   }
   private enum CodingKeys: String, CodingKey {
     case modelID, displayName, compatibleModelIDs, supportedReasoningEfforts
-    case defaultReasoningEffort, reasoningCapabilitiesAvailable, isDefaultModel
+    case defaultReasoningEffort, reasoningCapabilitiesAvailable, isDefaultModel, inputModalities
   }
 
   public init(from decoder: Decoder) throws {
@@ -44,6 +47,7 @@ public struct ServiceAgentModelListItem: Codable, Equatable, Sendable {
         String.self, forKey: .defaultReasoningEffort),
       reasoningCapabilitiesAvailable: try values.decodeIfPresent(
         Bool.self, forKey: .reasoningCapabilitiesAvailable) ?? true,
-      isDefaultModel: try values.decodeIfPresent(Bool.self, forKey: .isDefaultModel))
+      isDefaultModel: try values.decodeIfPresent(Bool.self, forKey: .isDefaultModel),
+      inputModalities: try values.decodeIfPresent([String].self, forKey: .inputModalities))
   }
 }

@@ -85,6 +85,7 @@
     public var availableModelCount: Int = 0
     public var modelError: String? = nil
     public var commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil
+    public var workspace: WorkbenchWorkspaceState? = nil
   }
 
   /// Lock-guarded bridge between main-actor model updates and the
@@ -162,6 +163,9 @@
 
     let client: any BridgeServiceClientProtocol
     let feedback: WindowsDesktopFeedbackStore
+    lazy var workspaceModel = WorkbenchWorkspaceModel(client: client) { [weak self] in
+      self?.publishDisplay()
+    }
     var workbenchDisplayCache = WindowsWorkbenchPresentationCache()
     var serviceStatus: IPCServiceStatusResponse?
     var projects: [MCPProjectSummary] = [] {
@@ -182,8 +186,11 @@
     var threads: [MCPThreadSummary] = []
     var selectedProjectID: String? {
       didSet {
-        if oldValue != selectedProjectID { clearTaskHistorySearch() }
         workbenchDisplayCache.selectedProjectDidChange()
+        if oldValue != selectedProjectID {
+          clearTaskHistorySearch()
+          workspaceModel.selectProject(selectedProjectID)
+        }
       }
     }
     var selectedThreadID: String?

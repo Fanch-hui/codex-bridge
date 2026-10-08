@@ -8,6 +8,7 @@ public struct BridgeDesktopModelOption: Codable, Equatable, Sendable {
   public let supportsFastMode: Bool?
   public let reasoningCapabilitiesAvailable: Bool?
   public let isDefaultModel: Bool?
+  public let inputModalities: [String]?
 
   public init(
     modelID: String,
@@ -16,7 +17,8 @@ public struct BridgeDesktopModelOption: Codable, Equatable, Sendable {
     defaultReasoningEffort: String? = nil,
     supportsFastMode: Bool? = nil,
     reasoningCapabilitiesAvailable: Bool? = nil,
-    isDefaultModel: Bool? = nil
+    isDefaultModel: Bool? = nil,
+    inputModalities: [String]? = nil
   ) {
     self.modelID = modelID
     self.displayName = displayName
@@ -25,6 +27,7 @@ public struct BridgeDesktopModelOption: Codable, Equatable, Sendable {
     self.supportsFastMode = supportsFastMode
     self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
     self.isDefaultModel = isDefaultModel
+    self.inputModalities = inputModalities
   }
 }
 
@@ -47,6 +50,7 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
   public let canRefreshModels: Bool
   public let isRefreshingModels: Bool
   public let errorMessage: String?
+  public let connectionErrorCode: String?
 
   public init(
     providerID: String,
@@ -66,7 +70,8 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
     isRefreshingModels: Bool = false,
     errorMessage: String? = nil,
     canSelectModel: Bool? = nil,
-    canSelectEffort: Bool? = nil
+    canSelectEffort: Bool? = nil,
+    connectionErrorCode: String? = nil
   ) {
     self.providerID = providerID
     self.connectionMode = connectionMode
@@ -86,6 +91,7 @@ public struct BridgeDesktopAgentDefaultState: Codable, Equatable, Sendable {
     self.canRefreshModels = canRefreshModels
     self.isRefreshingModels = isRefreshingModels
     self.errorMessage = errorMessage
+    self.connectionErrorCode = connectionErrorCode
   }
 }
 

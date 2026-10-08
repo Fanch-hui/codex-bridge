@@ -34,6 +34,8 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   ) async throws -> MCPProjectDetail
   func setProjectCommandMode(projectID: String, commandMode: String) async throws
     -> MCPProjectDetail
+  func workbenchWorkspace(_ request: IPCWorkbenchWorkspaceRequest) async throws
+    -> IPCWorkbenchWorkspaceResponse
   func setWorkbenchProject(projectID: String?) async throws
   func setWorkbenchPermissionMode(_ mode: String) async throws
   func agentCatalog() async throws -> IPCAgentCatalogResponse

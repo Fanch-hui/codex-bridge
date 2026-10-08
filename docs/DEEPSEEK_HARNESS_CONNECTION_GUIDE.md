@@ -2,7 +2,7 @@
 
 本指南说明 DeepSeek Harness（DSH）的 ACP 连接、现代入口、自动发现和 ChatGPT/Qwen 任务。调用官方桌面的共享会话请使用[原生桌面连接指南](./DSH_NATIVE_DESKTOP_GUIDE.md)。已有连接默认保持 ACP。
 
-最短路径是：在 Bridge 的 `连接 → 本机 Agent 引擎连接 → DeepSeek Harness` 点击“一键配置” → Bridge 准备官方 DSH 与 Node/npm → 按弹窗填写 Base URL 和 API Key 并检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。API Key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
+最短路径是：在 Bridge 的 `工作台 → DSH 开发台 → 引擎设置` 点击“一键配置” → Bridge 准备官方 DSH 与 Node/npm → 按弹窗填写 Base URL 和 API Key 并检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。API Key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
 DSH 的 Provider ID 固定为：
 
@@ -11,6 +11,16 @@ deepseek-harness
 ```
 
 省略 `provider_id` 时 Bridge 使用 Codex，不会自动改用 DSH。
+
+## 使用开发台
+
+在项目页登记目录后，进入 `工作台 → DSH 开发台`，选择项目并新建会话。模型和推理强度可按会话选择；当前 ACP 执行要求明确选择完整权限。会话列表显示任务来源，并可搜索 Bridge 保存的历史、继续会话、处理审批和复制执行结果。
+
+右侧“文件 / 变更”提供目录浏览、带行号的文本预览和 Git Diff。完整且未脱敏的 UTF-8 文件支持编辑，保存前展示修改预览；确认后沿用 Direct 审批与工作区互斥，按原内容摘要检查冲突。每次保存最多 256 KiB，并保留常规 LF/CRLF 换行和尾换行。Git 区展示项目当前全部变更，包含已有修改。
+
+新会话可填写项目 Skill 名称；支持图片的模型可从文件树逐张添加项目内 PNG、JPEG、WebP 图片，最多 8 张、合计 8 MiB。Bridge 按所选模型查询能力，并在执行时再次核对 ACP 的图片声明与原图片内容。协议依据官方 [ACP 内容实现](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts)，发送实际图像字节。
+
+ChatGPT/Qwen 继续使用同一个 `deepseek-harness` Provider 和既有任务工具；开发台与协作视图共享任务记录和审批。
 
 ## 1. 兼容边界
 
@@ -90,7 +100,7 @@ Test-Path .\apps\cli\lib\bin.js
 
 ### 在 Bridge 中发现安装
 
-首次使用 Bridge 时会自动扫描并保存本机 Agent 目录。若 DSH 是后来安装的，打开 `连接 → 本机 Agent 引擎连接`，点击“扫描 Agent”；发现后填写 Base URL 与 API key，再点击“连接”。App 和后台服务重启会保留发现结果，日常状态刷新和切页使用已保存的目录。
+首次使用 Bridge 时会自动扫描并保存本机 Agent 目录。若 DSH 是后来安装的，打开 `工作台 → DSH 开发台 → 引擎设置`，点击“扫描 Agent”；发现后填写 Base URL 与 API key，再点击“连接”。App 和后台服务重启会保留发现结果，日常状态刷新和切页使用已保存的目录。
 
 Bridge 优先读取已知启动入口和标准包管理器安装位置，再在本地开发目录进行有界源码索引；源码候选必须有已构建的入口、DSH 包标识和依赖锁文件。保留完整源码目录供 Node 加载依赖。
 
@@ -105,7 +115,7 @@ Windows PowerShell，在 DSH 源码根执行：
 [Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
 ```
 
-然后回到连接页点击“扫描 Agent”。Windows Service 会读取新设置。
+然后回到 DSH 开发台的引擎设置点击“扫描 Agent”。Windows Service 会读取新设置。
 
 macOS 终端可为从该终端启动的进程设置：
 
@@ -160,10 +170,10 @@ ACP 模式中的桌面入口使用 `ELECTRON_RUN_AS_NODE=1` 与 `--expose-intern
 大多数用户不需要创建外部 Profile 或 `.env`。完成 DSH 构建后，直接在 App 中配置主模型连接：
 
 1. 登录 [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys)，创建一个新的 API key，并在页面显示时立即复制。
-2. 进入 `连接 → 本机 Agent 引擎连接`，找到 DeepSeek Harness。
+2. 进入 `工作台 → DSH 开发台 → 引擎设置`。
 3. 在连接行填写协议、主模型 Base URL 和 API key；官方 API 选择 DeepSeek Messages，可继续填写 `https://api.deepseek.com`，Bridge 在新版运行时归一化为 Messages 地址。
 4. 点击“连接”，等待自动发现、配置和 Probe；Probe 成功后安装会启用。
-5. 进入设置刷新模型目录并选择当前账号实际返回的模型。
+5. 在引擎设置刷新模型目录并选择当前账号实际返回的模型。
 
 Bridge 会把 API key 保存到 macOS 钥匙串或 Windows 凭据管理器，提交后清空输入框，并仅在启动 DSH 子进程时注入。只有需要手动登记已有安装、单独的 Web Search 端点或固定本机 Profile 时，才继续阅读下面的高级章节。
 
@@ -260,7 +270,7 @@ chmod 600 /path/to/dsh-profile/.env
 
 ## 8. 推理、模型目录与搜索地址
 
-连接页提供两种协议，并允许单独填写模型目录地址。现有官方根地址在新版 Messages 运行时自动迁移；自定义网关地址保持原输入，旧自定义连接按 OpenAI Chat Completions 继续使用。明确选择的协议与目录地址随连接保存，API key 仍保存在系统凭据存储中。
+开发台引擎设置提供两种协议，并允许单独填写模型目录地址。现有官方根地址在新版 Messages 运行时自动迁移；自定义网关地址保持原输入，旧自定义连接按 OpenAI Chat Completions 继续使用。明确选择的协议与目录地址随连接保存，API key 仍保存在系统凭据存储中。
 
 | 连接 | 推理 Base URL | 模型目录 Base URL | 实际请求 |
 | --- | --- | --- | --- |
@@ -285,7 +295,7 @@ Probe 验证本地安装、协议和基础 ACP Session。模型刷新还会访�
 ## 10. 刷新模型和设置默认值
 
 1. 先在 `工作台` 选择任务项目。
-2. 打开 `设置 → DeepSeek Harness 执行默认偏好`。
+2. 打开 `工作台 → DSH 开发台 → 引擎设置`，查看执行默认偏好。
 3. 有多个 DSH 安装时，选择目标安装实例。
 4. 点击“刷新模型列表”。
 5. 选择 DSH 当前 ACP Session 返回的精确模型 ID。
@@ -444,7 +454,7 @@ waiting_for_codex_approval
 
 ### 13.5 MCP 服务
 
-在 `连接 → DeepSeek Harness → MCP 服务` 添加、编辑、停用或删除服务：
+在 `工作台 → DSH 开发台 → 引擎设置 → MCP 服务` 添加、编辑、停用或删除服务：
 
 - 本地命令（stdio）：填写可执行文件的绝对路径与参数，参数逐行填写。
 - HTTP：填写 Streamable HTTP MCP 地址；任务允许网络访问时才接入。

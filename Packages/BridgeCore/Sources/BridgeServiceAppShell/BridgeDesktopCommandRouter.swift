@@ -83,6 +83,7 @@ enum BridgeDesktopCommandRouter {
       .setWorkbenchPermissionMode, .selectTask, .refreshTasks, .interruptTask,
       .searchTaskHistory, .selectTaskHistory,
       .stopTask, .deleteTask, .deleteSession, .steerTask, .resumeTask, .restartTask, .handoffTask,
+      .submitDSHTask, .workbenchWorkspace,
       .resolveApproval, .resolveDirectApproval:
       handleWorkbench(envelope, model: model)
     case .selectProject, .refreshProjects, .registerProject, .removeProject,

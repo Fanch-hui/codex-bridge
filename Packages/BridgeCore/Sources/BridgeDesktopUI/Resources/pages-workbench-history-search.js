@@ -21,8 +21,8 @@
     select.value = value;
   }
 
-  function create(parent) {
-    var model = { page: null, emit: null };
+  function create(parent, fixedProviderID) {
+    var model = { page: null, emit: null, fixedProviderID: fixedProviderID || null };
     var panel = S.node("details", "workbench-history-search");
     model.panel = panel;
     panel.appendChild(S.node("summary", null, "搜索历史会话"));
@@ -32,6 +32,7 @@
     model.input.setAttribute("aria-label", "历史会话关键词");
     model.input.maxLength = 1024;
     model.provider = S.node("select"); model.provider.setAttribute("aria-label", "历史会话 Agent");
+    model.provider.hidden = !!model.fixedProviderID;
     model.status = S.node("select"); model.status.setAttribute("aria-label", "历史会话状态");
     setOptions(model.status, statuses);
     model.search = S.node("button", "small", "搜索"); model.search.type = "submit";
@@ -46,7 +47,7 @@
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       if (model.emit) model.emit("searchTaskHistory", {
-        input: model.input.value, providerID: model.provider.value, mode: model.status.value, offset: 0
+        input: model.input.value, providerID: model.fixedProviderID || model.provider.value, mode: model.status.value, offset: 0
       });
     });
     panel.appendChild(form);
@@ -57,7 +58,9 @@
     model.more = S.node("button", "small", "加载更多"); model.more.type = "button";
     model.more.addEventListener("click", function () {
       var state = model.page && model.page.taskHistorySearch || {};
-      if (model.emit && !state.isLoading) model.emit("searchTaskHistory", { offset: state.nextOffset });
+      if (model.emit && !state.isLoading) model.emit("searchTaskHistory", model.fixedProviderID
+        ? { input: model.input.value, providerID: model.fixedProviderID, mode: model.status.value, offset: state.nextOffset }
+        : { offset: state.nextOffset });
     });
     panel.appendChild(model.more); parent.appendChild(panel);
     return model;
@@ -66,6 +69,7 @@
   function update(model, page, emit) {
     model.page = page; model.emit = emit;
     var state = page.taskHistorySearch || {};
+    if (model.fixedProviderID && state.providerID !== model.fixedProviderID) state = {};
     setOptions(model.provider, [["", "全部 Agent"]].concat(S.safeArray(state.providers).map(function (item) {
       return [item.id, item.title];
     })));
@@ -73,7 +77,7 @@
     if (model.__query !== querySignature) {
       model.__query = querySignature;
       model.input.value = state.search || "";
-      model.provider.value = state.providerID || "";
+      model.provider.value = model.fixedProviderID || state.providerID || "";
       model.status.value = state.status || "";
     }
     var results = S.safeArray(state.results);

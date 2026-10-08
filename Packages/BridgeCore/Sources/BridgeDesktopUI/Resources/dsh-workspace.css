@@ -1,0 +1,38 @@
+.dsh-workspace-pane { grid-column: 3; grid-row: 1; min-width: 0; min-height: 0; overflow-y: auto; background: var(--canvas); padding: 12px; }
+.dsh-workspace-pane[hidden] { display: none; }
+.dsh-workspace-summary { cursor: pointer; font-weight: 600; padding-block: 8px; }
+.dsh-workspace-heading { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-block: 12px; }
+.dsh-workspace-heading h3 { margin: 0; font-size: 13px; text-wrap: balance; }
+.dsh-workspace-error-details { margin-block: 8px 12px; font-size: 12px; color: var(--text-secondary); }
+.dsh-workspace-error-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.dsh-file-tree, .dsh-git-changes { display: flex; flex-direction: column; gap: 2px; max-height: 240px; overflow: auto; }
+.dsh-file-entry { display: flex; flex: 0 0 auto; align-items: center; min-width: 0; }
+.dsh-file-entry .dsh-file-row { flex: 1; min-width: 0; }
+.dsh-file-add-image { flex: 0 0 auto; }
+.button.dsh-file-row { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-width: 0; padding: 7px 8px; border: 0; background: transparent; text-align: left; font-weight: 400; }
+.button.dsh-file-row.is-active { background: var(--surface-muted); }
+.dsh-file-icon { flex: 0 0 auto; order: -1; }
+.dsh-file-name { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-git-status { flex: 0 0 auto; margin-left: auto; font-family: var(--font-mono, monospace); white-space: pre; font-variant-numeric: tabular-nums; }
+.dsh-source-pane { margin-block: 14px 24px; min-width: 0; }
+.dsh-source-pane[hidden] { display: none; }
+.dsh-source-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dsh-source-title { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.button.dsh-source-close { flex: 0 0 auto; }
+.dsh-source-body { display: flex; height: 360px; min-height: 160px; background: var(--surface); border-radius: 6px; overflow: hidden; }
+.dsh-source-body[hidden] { display: none; }
+.dsh-line-numbers, .dsh-source-input { font-family: var(--font-mono, monospace); font-size: 12px; line-height: 20px; padding: 10px 8px; margin: 0; border: 0; font-variant-numeric: tabular-nums; }
+.dsh-line-numbers { flex: 0 0 auto; text-align: right; color: var(--text-secondary); background: var(--surface-muted); overflow: hidden; user-select: none; }
+.dsh-source-input { flex: 1; min-width: 0; height: 100%; resize: none; border-radius: 0; background: var(--surface); color: var(--text); tab-size: 2; }
+.dsh-source-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.dsh-source-diff, .dsh-git-diff { font-family: var(--font-mono, monospace); font-size: 12px; line-height: 1.6; white-space: pre; overflow: auto; max-height: 360px; background: var(--surface); padding: 10px; border-radius: 6px; }
+.dsh-source-diff[hidden], .dsh-source-actions .button[hidden] { display: none; }
+.dsh-git-diff:empty { display: none; }
+.dsh-workspace-pane .hint { text-wrap: pretty; }
+@media (max-width: 1100px) {
+  .dsh-workspace-pane { grid-column: 1 / -1; grid-row: 2; max-height: 45dvh; padding-block: 8px; }
+  .dsh-workspace-disclosure:not([open]) > :not(summary) { display: none; }
+}
+@media (max-width: 700px) {
+  .dsh-workspace-pane { padding-inline: 12px; }
+}

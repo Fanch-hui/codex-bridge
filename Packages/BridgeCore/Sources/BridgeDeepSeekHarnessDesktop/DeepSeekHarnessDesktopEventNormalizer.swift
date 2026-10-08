@@ -55,7 +55,8 @@ struct DeepSeekHarnessDesktopEventNormalizer: Sendable {
       else { return nil }
       let key = data["messageID"]?.stringValue ?? "message-\(cursor)"
       if messages[key] == nil { messageOrder.append(key) }
-      messages[key] = content
+      messages[key] = AgentProgressText.bounded(
+        content, maximumBytes: AgentProgressText.maximumContentBytes)
       return .content(
         try AgentContentUpdate(
           key: key, role: .assistant, kind: .message,

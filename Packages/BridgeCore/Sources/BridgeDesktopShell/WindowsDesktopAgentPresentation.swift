@@ -74,7 +74,8 @@
         },
         defaultReasoningEffort: model.defaultReasoningEffort,
         reasoningCapabilitiesAvailable: model.reasoningCapabilitiesAvailable,
-        isDefaultModel: model.isDefaultModel
+        isDefaultModel: model.isDefaultModel,
+        inputModalities: model.inputModalities
       )
     }
   }

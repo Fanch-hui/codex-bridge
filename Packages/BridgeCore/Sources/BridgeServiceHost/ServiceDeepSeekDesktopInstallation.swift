@@ -71,6 +71,13 @@ struct ServiceDeepSeekDesktopInstallation: Sendable {
     return true
   }
 
+  func desktopRunning(_ installation: AgentInstallation) async throws -> Bool? {
+    guard Self.isSupported,
+      let layout = DeepSeekHarnessACPRuntimeLayout.desktop(at: installation.executablePath)
+    else { return nil }
+    return try await isRunning(layout)
+  }
+
   func install(_ installation: AgentInstallation) async throws {
     #if os(macOS) || (os(Windows) && arch(x86_64))
       guard let layout = DeepSeekHarnessACPRuntimeLayout.desktop(at: installation.executablePath)

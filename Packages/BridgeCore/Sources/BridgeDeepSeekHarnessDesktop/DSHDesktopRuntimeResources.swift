@@ -18,9 +18,10 @@ public enum DSHDesktopRuntimeResources {
     "package.json": "b713b6ef4aaf57fa76c36ddaf8af0f9d24d9cc7afdbad9fb3a4c75740c2c18a2",
     "pairing.mjs": "fce6f74cfd9bc9e22666203d296877040eaf34f870234759ef9a1fa2ea869d65",
     "project-grants.mjs": "8a0005aabba2506a723c86ce2cefa6582b15f96ae395f77ad22161845b036a87",
+    "progress.mjs": "f595d2501decf58927a21b14efc20a11289f2a26dc968e292e5ea55c2c60ddfd",
     "protocol.mjs": "79a2232644aaf3c4719559288566f9c468b0ff1189d0a2c394f0d3321d693b14",
     "run-store.mjs": "0ed133151ac80f34f25e36a1979e46c72a3beadd3bf30b15f8ecf9a556cbb678",
-    "runs.mjs": "4582932e39d85ebea459398d74f61742f6e6401cf9e01dc418738fd19975818f",
+    "runs.mjs": "bf963797d16d403925e9abe17003d823b46ab9f1d9e6b3f881344b8c91346be1",
     "transport.mjs": "539f659754e1095cd3f93fe978525ab20991b5e4cc1fe853af8fc22d5699f276",
     "ui-channel.mjs": "746a37b93bb5c9c54057954873f4731a6568fbd5be6e9ea0afa3948c4b306ee3",
   ]

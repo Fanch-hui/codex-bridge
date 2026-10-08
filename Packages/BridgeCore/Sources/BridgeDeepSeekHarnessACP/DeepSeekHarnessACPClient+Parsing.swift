@@ -33,7 +33,8 @@ extension DeepSeekHarnessACPClient {
       agentVersion: agentInfo?["version"]?.stringValue,
       supportsResumeSession: sessionCapabilities["resume"]?.objectValue != nil,
       supportsCloseSession: sessionCapabilities["close"]?.objectValue != nil,
-      supportsMCPHTTP: mcpCapabilities["http"]?.boolValue == true
+      supportsMCPHTTP: mcpCapabilities["http"]?.boolValue == true,
+      supportsImagePrompt: capabilities["promptCapabilities"]?["image"]?.boolValue == true
     )
   }
 

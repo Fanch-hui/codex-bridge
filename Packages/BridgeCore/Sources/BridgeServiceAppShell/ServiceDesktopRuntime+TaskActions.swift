@@ -69,7 +69,8 @@ extension BridgeServiceAppModel {
     requestID: String? = nil,
     queueIfBusy: Bool = false,
     skillNames: [String]? = nil,
-    attachmentPaths: [String] = []
+    attachmentPaths: [String] = [],
+    executionSelection: DSHConversationExecutionSelection? = nil
   ) {
     let supportsContinuation = TaskInspectorPresentation.supportsSessionContinuation(
       for: task, providers: agentProviders, installations: agentInstallations
@@ -103,7 +104,7 @@ extension BridgeServiceAppModel {
       receiptInput: prompt ?? "", queueIfBusy: queueIfBusy,
       skillNames: skillNames,
       attachmentPaths: attachmentPaths,
-      attachmentSourceTaskID: nil
+      attachmentSourceTaskID: nil, executionSelection: executionSelection
     )
   }
 
@@ -149,24 +150,22 @@ extension BridgeServiceAppModel {
     queueIfBusy: Bool,
     skillNames: [String]?,
     attachmentPaths: [String],
-    attachmentSourceTaskID: String?
+    attachmentSourceTaskID: String?,
+    executionSelection: DSHConversationExecutionSelection? = nil
   ) {
-    let request = IPCAgentSubmitRequest(
-      projectID: task.projectID,
-      providerID: task.providerIdentifier,
-      installationID: task.installationID,
-      model: task.executionModel,
-      effort: TaskRetrySubmission.effort(for: task),
-      permissionMode: task.permissionMode,
-      prompt: prompt,
-      threadID: threadID,
-      skillNames: skillNames,
-      modelOverride: TaskRetrySubmission.modelOverride(for: task),
-      clientRequestID: requestID, queueIfBusy: queueIfBusy,
-      attachmentPaths: attachmentSourceTaskID == nil && attachmentPaths.isEmpty
-        ? nil : attachmentPaths,
-      attachmentSourceTaskID: task.isCodexTask ? nil : attachmentSourceTaskID
-    )
+    let request: IPCAgentSubmitRequest
+    do {
+      request = try TaskRetrySubmission.request(
+        for: task, prompt: prompt, threadID: threadID,
+        requestID: requestID, queueIfBusy: queueIfBusy, skillNames: skillNames,
+        attachmentPaths: attachmentPaths, attachmentSourceTaskID: attachmentSourceTaskID,
+        executionSelection: executionSelection)
+    } catch {
+      rejectWorkbenchCommand(
+        requestID: requestID, command: command, taskID: task.taskID, input: receiptInput,
+        message: BridgeServiceErrorMessage.message(error), canEditInput: true)
+      return
+    }
     runWorkbenchMutation(
       requestID: requestID,
       command: command,

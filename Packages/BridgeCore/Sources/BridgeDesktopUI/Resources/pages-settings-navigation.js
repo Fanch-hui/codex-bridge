@@ -37,16 +37,24 @@
 
   function agentStatus(status, item) {
     var label = "就绪", tone = "success";
-    if (!item.installationID) { label = "未连接"; tone = "warning"; }
+    var desktopNotRunning = global.CodexBridgeDesktopSettingsAgents.desktopNotRunning(item);
+    if (desktopNotRunning) { label = "DSH 桌面版未打开"; tone = "neutral"; }
+    else if (!item.installationID) { label = "未连接"; tone = "warning"; }
     else if (item.isRefreshingModels) { label = "正在获取模型"; tone = "running"; }
     else if (item.errorMessage) { label = "设置异常"; tone = "error"; }
     status.hidden = tone === "success";
     S.updateStatus(status, label, tone);
-    if (item.errorMessage && tone !== "running") status.title = item.errorMessage;
+    if (item.errorMessage && tone !== "running" && !desktopNotRunning) status.title = item.errorMessage;
   }
 
   function create(container, page, emit) {
     var details = global.CodexBridgeDesktopDetailPages.create(container);
+    var openDetail = details.open;
+    details.open = function (id) {
+      if (id === "agent:deepseek-harness" && global.CodexBridgeDesktopDSHWorkbench) {
+        global.CodexBridgeDesktopDSHWorkbench.openSettings();
+      } else openDetail(id);
+    };
     var agentsGroup = group(details.overview, "Agent");
     var execution = group(details.overview, "执行策略");
     var clients = group(details.overview, "客户端指令");
@@ -91,6 +99,7 @@
       instructionsEntry.update({ value: next.customInstructions ? "已设置" : "未设置" });
       var visible = new Set(), keys = new Map();
       S.safeArray(next.agentDefaults).forEach(function (item) {
+        if (item.providerID === "deepseek-harness") return;
         visible.add(item.providerID);
         var current = provider(item.providerID, item.providerName);
         var key = item.installationID || "default";

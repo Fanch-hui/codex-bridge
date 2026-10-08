@@ -76,6 +76,7 @@ public final class PiRPCProcessTransport: PiRPCTransport, @unchecked Sendable {
       await state.1?.value
       return
     }
+    output.prepareToClose()
     await Task.detached { [process] in process.closeStdin() }.value
     _ = await Task.detached { [process] in process.waitForExit(timeout: .seconds(2)) }.value
     state.1?.cancel()
@@ -85,44 +86,58 @@ public final class PiRPCProcessTransport: PiRPCTransport, @unchecked Sendable {
 }
 
 private final class PiProcessOutput: @unchecked Sendable {
-  let stream: AsyncThrowingStream<Data, any Error>
-  private let continuation: AsyncThrowingStream<Data, any Error>.Continuation
+  var stream: AsyncThrowingStream<Data, any Error> { delivery.stream }
+  private let delivery = ProcessFrameDelivery(capacity: 64)
   private let lock = NSLock()
-  private var decoder: BoundedLineDecoder
+  private var decoder: ProgressJSONLineDecoder
   private var finished = false
 
   init(maximumRecordBytes: Int) {
-    decoder = BoundedLineDecoder(maximumFrameBytes: maximumRecordBytes)
-    let values = AsyncThrowingStream.makeStream(
-      of: Data.self, throwing: (any Error).self, bufferingPolicy: .bufferingOldest(64))
-    stream = values.stream
-    continuation = values.continuation
+    decoder = ProgressJSONLineDecoder(dialect: .pi, maximumFrameBytes: maximumRecordBytes)
   }
 
   func receive(_ data: Data) {
-    lock.withLock {
-      guard !finished else { return }
-      do {
-        for frame in try decoder.append(data) {
-          if case .dropped = continuation.yield(frame) { throw PiRPCError.oversizedFrame }
-        }
-      } catch {
-        finished = true
-        continuation.finish(throwing: error)
+    lock.lock()
+    guard !finished else {
+      lock.unlock()
+      return
+    }
+    do {
+      let frames = try decoder.append(data)
+      lock.unlock()
+      for frame in frames {
+        guard delivery.yield(frame) else { return }
       }
+    } catch {
+      finished = true
+      lock.unlock()
+      delivery.finish(throwing: error)
     }
   }
 
   func finish(error: (any Error)?) {
-    lock.withLock {
-      guard !finished else { return }
-      finished = true
-      do {
-        for frame in try decoder.finish() {
-          if case .dropped = continuation.yield(frame) { throw PiRPCError.oversizedFrame }
-        }
-        if let error { continuation.finish(throwing: error) } else { continuation.finish() }
-      } catch { continuation.finish(throwing: error) }
+    lock.lock()
+    guard !finished else {
+      lock.unlock()
+      return
     }
+    finished = true
+    let remaining: [Data]
+    do {
+      remaining = try decoder.finish()
+    } catch {
+      lock.unlock()
+      delivery.finish(throwing: error)
+      return
+    }
+    lock.unlock()
+    for frame in remaining {
+      if !delivery.yield(frame) { break }
+    }
+    delivery.finish(throwing: error)
+  }
+
+  func prepareToClose() {
+    delivery.disableBackpressure()
   }
 }

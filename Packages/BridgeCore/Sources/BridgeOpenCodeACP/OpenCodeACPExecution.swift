@@ -3,6 +3,7 @@ import Foundation
 
 public actor OpenCodeACPExecution {
   public nonisolated let events: AsyncThrowingStream<AgentEventEnvelope, any Error>
+  private let eventDelivery: AgentEventStreamDelivery<AgentEventEnvelope>
 
   private let client: OpenCodeACPClient
   private let normalizer: OpenCodeACPEventNormalizer
@@ -52,6 +53,7 @@ public actor OpenCodeACPExecution {
     self.cleanup = cleanup
     events = pair.stream
     continuation = pair.continuation
+    eventDelivery = AgentEventStreamDelivery(pair.continuation)
   }
 
   public func start() {
@@ -106,12 +108,19 @@ public actor OpenCodeACPExecution {
   }
 
   public func shutdown() async {
-    guard claimTerminal() else { return }
+    let claimed = claimTerminal()
+    if claimed, !(await eventDelivery.hasPendingDelivery),
+      let event = try? await normalizer.interrupted()
+    {
+      _ = continuation.yield(event)
+    }
+    continuation.finish()
+    guard claimed else {
+      await closeStream()
+      return
+    }
     interruptRequested = true
     try? await client.cancel(sessionID: sessionID)
-    if let event = try? await normalizer.interrupted() {
-      _ = emit(event)
-    }
     await closeStream()
   }
 
@@ -123,7 +132,8 @@ public actor OpenCodeACPExecution {
     }
     guard envelope.sequence >= initialClientEventSequence else { return }
     do {
-      if let normalized = try await normalizer.normalize(envelope.event), !emit(normalized) {
+      if let normalized = try await normalizer.normalize(envelope.event), !(await emit(normalized))
+      {
         await failStream(OpenCodeACPError.transportClosed)
       }
     } catch {
@@ -167,7 +177,7 @@ public actor OpenCodeACPExecution {
     } catch is CancellationError {
       guard claimTerminal() else { return }
       if let interrupted = try? await normalizer.interrupted() {
-        _ = emit(interrupted)
+        _ = await emit(interrupted)
       }
       await closeStream()
     } catch {
@@ -210,7 +220,7 @@ public actor OpenCodeACPExecution {
       await finishInterrupted()
       return nil
     }
-    try emitFinalizedContent(finalizedContent)
+    try await emitFinalizedContent(finalizedContent)
     // Queue and interrupt checks must follow all normalizer awaits so accepted
     // input cannot be lost while terminal evidence is being collected.
     if let nextPrompt = dequeueSteer() {
@@ -243,7 +253,7 @@ public actor OpenCodeACPExecution {
     guard claimTerminal() else { return nil }
     do {
       let final = try await normalizer.completed(stopReason: stopReason)
-      guard emit(final) else {
+      guard await emit(final) else {
         throw OpenCodeACPError.transportClosed
       }
       await closeStream()
@@ -253,9 +263,9 @@ public actor OpenCodeACPExecution {
     return nil
   }
 
-  private func emitFinalizedContent(_ events: [AgentEventEnvelope]) throws {
+  private func emitFinalizedContent(_ events: [AgentEventEnvelope]) async throws {
     for event in events {
-      guard emit(event) else {
+      guard await emit(event) else {
         throw OpenCodeACPError.transportClosed
       }
     }
@@ -264,7 +274,7 @@ public actor OpenCodeACPExecution {
   /// Recorded before the next prompt is sent so the queued instruction always
   /// keeps a lower provider sequence than the events of the turn it starts.
   private func emitSteerDispatched(_ text: String) async throws {
-    guard emit(try await normalizer.steerDispatched(text)) else {
+    guard await emit(try await normalizer.steerDispatched(text)) else {
       throw OpenCodeACPError.transportClosed
     }
   }
@@ -272,7 +282,7 @@ public actor OpenCodeACPExecution {
   private func finishInterrupted() async {
     guard claimTerminal() else { return }
     if let interrupted = try? await normalizer.interrupted() {
-      _ = emit(interrupted)
+      _ = await emit(interrupted)
     }
     await closeStream()
   }
@@ -291,18 +301,14 @@ public actor OpenCodeACPExecution {
     }
   }
 
-  private func emit(_ event: AgentEventEnvelope) -> Bool {
-    switch continuation.yield(event) {
-    case .enqueued: true
-    case .dropped, .terminated: false
-    @unknown default: false
-    }
+  private func emit(_ event: AgentEventEnvelope) async -> Bool {
+    await eventDelivery.enqueue(event)
   }
 
   private func failExecution(code: String, summary: String) async {
     guard claimTerminal() else { return }
     if let event = try? await normalizer.failed(code: code, summary: summary) {
-      _ = emit(event)
+      _ = await emit(event)
     }
     await closeStream()
   }
@@ -332,6 +338,11 @@ public actor OpenCodeACPExecution {
   }
 
   private func inactivityTimedOut() async {
+    guard !terminal else { return }
+    if await eventDelivery.hasPendingDelivery {
+      armWatchdog()
+      return
+    }
     try? await client.cancel(sessionID: sessionID)
     await failExecution(
       code: "opencode_inactivity_timeout",

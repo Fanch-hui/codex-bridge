@@ -14,11 +14,11 @@ extension BridgeServiceAppModel {
     let managementVisible =
       includeCatalog || includeProjectResources
       || navigation == .settings || navigation == .connections
-    async let directConfigurationResult = optional(when: managementVisible) {
+    let directConfigurationResult = await optional(when: managementVisible) {
       try await client.directConfiguration()
     }
     async let projectResult = optional { try await client.projects() }
-    async let agentCatalogResult = optional(when: managementVisible) {
+    let agentCatalogResult = await optional(when: managementVisible) {
       try await client.agentCatalog()
     }
     async let taskResult = optional {
@@ -26,22 +26,22 @@ extension BridgeServiceAppModel {
     }
     async let approvalResult = optional { try await client.approvals(taskID: nil) }
     async let directApprovalResult = optional { try await client.pendingDirectApprovals() }
-    async let directApprovalModeResult = optional { try await client.directApprovalMode() }
-    async let taskStartApprovalModeResult = optional {
+    let directApprovalModeResult = await optional { try await client.directApprovalMode() }
+    let taskStartApprovalModeResult = await optional {
       try await client.taskStartApprovalMode()
     }
-    async let mcpClientResult = optional(when: managementVisible) { try await client.mcpClients() }
+    let mcpClientResult = await optional(when: managementVisible) { try await client.mcpClients() }
     let agentMCPScope = selectedAgentMCPScope
-    async let deepSeekHarnessMCPResult = optional(when: managementVisible) {
+    let deepSeekHarnessMCPResult = await optional(when: managementVisible) {
       try await client.deepSeekHarnessMCPServers(scope: agentMCPScope)
     }
 
-    if let value = await directConfigurationResult { directConfiguration = value }
+    if let value = directConfigurationResult { directConfiguration = value }
     if let value = await projectResult {
       applyProjectSnapshot(value)
     }
 
-    if let value = await agentCatalogResult {
+    if let value = agentCatalogResult {
       applyAgentCatalogSnapshot(value)
     }
 
@@ -69,16 +69,16 @@ extension BridgeServiceAppModel {
     if let value = await directApprovalResult {
       applyDirectApprovalSnapshot(value)
     }
-    if let value = await directApprovalModeResult, directApprovalMode != value {
+    if let value = directApprovalModeResult, directApprovalMode != value {
       directApprovalMode = value
     }
-    if let value = await taskStartApprovalModeResult, taskStartApprovalMode != value {
+    if let value = taskStartApprovalModeResult, taskStartApprovalMode != value {
       taskStartApprovalMode = value
     }
-    if let value = await mcpClientResult, mcpClients != value {
+    if let value = mcpClientResult, mcpClients != value {
       mcpClients = value
     }
-    if let value = await deepSeekHarnessMCPResult,
+    if let value = deepSeekHarnessMCPResult,
       selectedAgentMCPScope == agentMCPScope,
       deepSeekHarnessMCPServers != value.servers
     {

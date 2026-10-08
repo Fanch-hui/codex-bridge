@@ -23,6 +23,12 @@ export function digest(value) {
   return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 }
 
+function commandPreview(command) {
+  if (Buffer.byteLength(command) <= 8192) return command;
+  const marker = "\n[命令展示已省略；审批绑定完整命令]";
+  return Buffer.from(command).subarray(0, 8192 - Buffer.byteLength(marker) - 3).toString("utf8") + marker;
+}
+
 export function validateContext(value) {
   if (!value || value.revision !== 1 || typeof value.nonce !== "string"
       || !/^[a-z0-9-]{36}$/.test(value.nonce) || !path.isAbsolute(value.projectRoot ?? "")
@@ -178,9 +184,10 @@ export function createPolicy(context) {
         throw new Error("Shell tools require Write mode and explicit network-capable execution.");
       }
       const command = event.input.command;
-      if (typeof command !== "string" || !command.trim() || command.includes("\0")
-          || Buffer.byteLength(command) > 8192) throw new Error("Invalid shell command.");
-      envelope.command = command;
+      if (typeof command !== "string" || !command.trim() || command.includes("\0")) {
+        throw new Error("Invalid shell command.");
+      }
+      envelope.command = commandPreview(command);
       const effect = permissionEffect(event.toolName, command);
       if (effect === "deny") return { allowed: false, denied: true, reason: "A saved Pi permission rule denied this command." };
       if (effect === "allow") return { allowed: true, envelope };

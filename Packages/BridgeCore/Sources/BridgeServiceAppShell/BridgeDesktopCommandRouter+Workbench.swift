@@ -48,6 +48,10 @@ extension BridgeDesktopCommandRouter {
       model.selection = .workbench
     case .refreshTasks:
       model.refresh()
+    case .workbenchWorkspace:
+      model.performWorkbenchWorkspace(envelope)
+    case .submitDSHTask:
+      model.submitDSHTask(envelope)
     case .interruptTask:
       guard let task = task(payload.taskID, in: model),
         connected(model),
@@ -98,7 +102,8 @@ extension BridgeDesktopCommandRouter {
         selectedTask, prompt: payload.input, requestID: envelope.requestID,
         queueIfBusy: payload.queueIfBusy ?? false,
         skillNames: payload.skillNames,
-        attachmentPaths: payload.attachmentPaths ?? [])
+        attachmentPaths: payload.attachmentPaths ?? [],
+        executionSelection: payload.executionSelection)
     case .handoffTask:
       guard let selectedTask = task(payload.taskID, in: model), connected(model),
         let providerID = payload.providerID, let prompt = payload.input
@@ -182,7 +187,9 @@ extension BridgeDesktopCommandRouter {
     requestID: String,
     model: BridgeServiceAppModel
   ) {
-    guard let task = task(payload.taskID, in: model), connected(model),
+    guard payload.executionSelection == nil, payload.modelID == nil, payload.effort == nil,
+      payload.permissionMode == nil, payload.attachmentPaths?.isEmpty != false,
+      let task = task(payload.taskID, in: model), connected(model),
       TaskInspectorPresentation.canSteer(
         task,
         providerSupportsSteer: task.isCodexTask

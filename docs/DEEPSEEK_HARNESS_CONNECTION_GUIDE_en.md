@@ -4,7 +4,7 @@ This guide covers the DeepSeek Harness (DSH) ACP connection. Existing connection
 
 The [Chinese ACP guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) contains detailed troubleshooting and task examples.
 
-Open `Connections → Local Agent Engine Connections → DeepSeek Harness` and click **One-click setup**. Bridge prepares official DSH and Node/npm, then prompts for the Base URL and API Key. See the [setup guide (Chinese)](./AGENT_SETUP_GUIDE.md) for installation locations and retries. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
+Open `Workbench → DSH Workbench → Engine Settings` and click **One-click setup**. Bridge prepares official DSH and Node/npm, then prompts for the Base URL and API Key. See the [setup guide (Chinese)](./AGENT_SETUP_GUIDE.md) for installation locations and retries. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
 
 The provider ID is:
 
@@ -13,6 +13,16 @@ deepseek-harness
 ```
 
 Omitting `provider_id` selects Codex, not DSH.
+
+## Use the workbench
+
+Register a project, then open `Workbench → DSH Workbench` and create a session. Select its model, reasoning effort, and Full permission. The session list shows task sources, searches Bridge history, and reuses conversation, approval, continuation, and result-copy controls.
+
+The file pane provides directory browsing, line-numbered text editing, and Git Diff. Complete, unredacted UTF-8 files support previewed saves up to 256 KiB. Saves use Direct approval and the workspace gate, check the original SHA-256, and preserve ordinary LF/CRLF and trailing newlines. Git shows all current project changes, including existing edits.
+
+New sessions accept project Skill names and project PNG/JPEG/WebP images for models that declare image input: up to eight images and 8 MiB total. Add individual images from the file tree. Bridge queries the selected model and rechecks the ACP declaration and image identity at execution. The wire content follows the official [ACP implementation](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts).
+
+ChatGPT/Qwen retain the same `deepseek-harness` provider and task tools. Both workbench views share task records and approvals.
 
 ## 1. Compatibility boundary
 
@@ -80,7 +90,7 @@ Test-Path .\apps\cli\lib\bin.js
 
 ### Discover the installation in Bridge
 
-Bridge scans for local Agents on first use and saves the results. If DSH was installed later, open `Connections → Local Agent Engine Connections` and click **Scan Agents**. Once discovered, enter the Base URL and API key, then connect. App and Service restarts, page changes, and regular status refreshes reuse the saved catalog.
+Bridge scans for local Agents on first use and saves the results. If DSH was installed later, open `Workbench → DSH Workbench → Engine Settings` and click **Scan Agents**. Once discovered, enter the Base URL and API key, then connect. App and Service restarts, page changes, and regular status refreshes reuse the saved catalog.
 
 Discovery checks known launchers and standard package-manager locations before a bounded source search in local development directories. Source candidates require a built entry, the DSH package identity, and a dependency lockfile. Keep the complete source tree so Node can load its dependencies.
 
@@ -95,7 +105,7 @@ In Windows PowerShell, from the DSH source root:
 [Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
 ```
 
-Then click **Scan Agents** in Connections. The Windows Service reads the updated setting directly.
+Then click **Scan Agents** in DSH Engine Settings. The Windows Service reads the updated setting directly.
 
 For processes launched from a macOS terminal:
 
@@ -116,10 +126,10 @@ The entry point commonly uses `#!/usr/bin/env node`. Bridge resolves the real No
 Most users do not need an external profile or `.env` file. After building DSH, configure the main model connection in the app:
 
 1. Sign in to [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys), create a new API key, and copy it when it is shown.
-2. Open `Connections → Local Agent Engine Connections` and find DeepSeek Harness.
+2. Open `Workbench → DSH Workbench → Engine Settings`.
 3. Enter the main model Base URL (default `https://api.deepseek.com`) and the API key in the connection row.
 4. Click `Connect` and wait for discovery, configuration, and Probe. A successful Probe enables the installation.
-5. Open Settings, refresh the model catalog, and select a model returned for your account.
+5. In Engine Settings, refresh the model catalog, and select a model returned for your account.
 
 Bridge stores the key in macOS Keychain, Windows Credential Manager or Linux Secret Service, clears the field after submission, and injects it only when starting the DSH child process. Read the advanced sections below only for manual registration, an independent Web Search endpoint, or a fixed local profile.
 
@@ -208,7 +218,7 @@ Probe validates the local installation, protocol, and basic ACP session. Model r
 ## 7. Refresh models and defaults
 
 1. Select the task project in Workbench.
-2. Open the DeepSeek Harness execution defaults in Settings.
+2. Open execution defaults in DSH Engine Settings.
 3. Select the installation if more than one exists.
 4. Refresh the model list.
 5. Select an exact model ID returned by the current provider. Effort values come from the selected model's current ACP session `thought_level`/`reasoning_effort` options; the bundled profile's `off`, `low`, `high`, and `max` values are only initial examples, and the current ACP session is authoritative.
@@ -292,7 +302,7 @@ Queued steer sends a second prompt after the current prompt finishes. DSH also s
 
 ## 10. MCP configuration and continuation
 
-Use the DSH MCP section on Connections to manage stdio and Streamable HTTP servers. Stdio commands require absolute paths; enter arguments one per line. HTTP servers are attached only to tasks with network access enabled. Environment and header values use the system credential store and are never returned to the editor. Leave a saved value blank to retain it, or remove its row to delete it. Changes apply to the next task or continuation.
+Use the DSH MCP section in Engine Settings to manage stdio and Streamable HTTP servers. Stdio commands require absolute paths; enter arguments one per line. HTTP servers are attached only to tasks with network access enabled. Environment and header values use the system credential store and are never returned to the editor. Leave a saved value blank to retain it, or remove its row to delete it. Changes apply to the next task or continuation.
 
 Choose Continue conversation on an ended task to retain its context after a Service restart. Resume requires the same project and installation, an ACP `resume` capability, and persistent session data. Sessions cleared by older temporary-runtime versions cannot be recovered.
 

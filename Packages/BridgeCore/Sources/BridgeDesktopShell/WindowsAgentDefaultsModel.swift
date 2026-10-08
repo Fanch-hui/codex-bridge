@@ -35,6 +35,7 @@
     var savingProviderIDs: Set<String> = []
     var workbenchProjectID: String?
     var deepSeekDesktopModelScope: String?
+    var deepSeekDesktopConnectionErrorCode: String?
     var nativePermissionPolicy: IPCAgentNativePermissionPolicyResponse?
     var nativePermissionInstallationID: String?
     var nativePermissionLoading = false

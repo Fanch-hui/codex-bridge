@@ -40,7 +40,9 @@
           errorMessage: providerErrors[provider.providerID],
           canSelectModel: provider.supportsModelSelection
             && installation?.effectiveCapabilities.contains("selection.model") == true,
-          canSelectEffort: provider.supportsEffortSelection && installation != nil
+          canSelectEffort: provider.supportsEffortSelection && installation != nil,
+          connectionErrorCode: provider.providerID == "deepseek-harness-desktop"
+            ? deepSeekDesktopConnectionErrorCode : nil
         )
       }
     }

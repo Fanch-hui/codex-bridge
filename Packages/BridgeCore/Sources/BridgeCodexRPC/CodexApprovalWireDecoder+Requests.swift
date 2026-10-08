@@ -172,27 +172,30 @@ extension CodexApprovalWireDecoder {
 
   static func commandAction(
     _ value: JSONValue,
-    field: String
+    field: String,
+    progress: Bool = false
   ) throws -> CodexCommandAction {
     let object = try object(value, field: field)
     let type = try requiredString(object, key: "type", maximumBytes: 32)
+    let textBytes = progress ? Int.max : CodexApprovalWireLimits.stringBytes
     let command = try requiredString(
-      object, key: "command", maximumBytes: CodexApprovalWireLimits.commandBytes)
+      object, key: "command",
+      maximumBytes: progress ? Int.max : CodexApprovalWireLimits.commandBytes)
     switch type {
     case "read":
       return .read(
         displayCommand: command,
-        name: try requiredString(object, key: "name"),
-        path: try requiredString(object, key: "path"))
+        name: try requiredString(object, key: "name", maximumBytes: textBytes),
+        path: try requiredString(object, key: "path", maximumBytes: textBytes))
     case "listFiles":
       return .listFiles(
         displayCommand: command,
-        path: try optionalString(object, key: "path"))
+        path: try optionalString(object, key: "path", maximumBytes: textBytes))
     case "search":
       return .search(
         displayCommand: command,
-        path: try optionalString(object, key: "path"),
-        query: try optionalString(object, key: "query"))
+        path: try optionalString(object, key: "path", maximumBytes: textBytes),
+        query: try optionalString(object, key: "query", maximumBytes: textBytes))
     case "unknown":
       return .unknown(displayCommand: command)
     default:

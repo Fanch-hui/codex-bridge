@@ -1,43 +1,33 @@
+import BridgeProcess
 import Foundation
 
 struct JSONLineParser: Sendable {
-  private var buffer = Data()
+  private var decoder: ProgressJSONLineDecoder
   private let maximumLineBytes: Int
 
   init(maximumLineBytes: Int = 8 * 1024 * 1024) {
     self.maximumLineBytes = maximumLineBytes
+    decoder = ProgressJSONLineDecoder(dialect: .codex, maximumFrameBytes: maximumLineBytes)
   }
 
   mutating func ingest(_ data: Data) throws -> [JSONValue] {
-    buffer.append(data)
-    var messages: [JSONValue] = []
-
-    while let newline = buffer.firstIndex(of: 0x0A) {
-      guard newline <= maximumLineBytes else {
-        buffer.removeAll(keepingCapacity: false)
-        throw CodexRPCError.protocolLineTooLarge(maximumBytes: maximumLineBytes)
-      }
-      let line = Data(buffer[..<newline])
-      buffer.removeSubrange(...newline)
-      if let message = try decode(line) {
-        messages.append(message)
-      }
-    }
-
-    guard buffer.count <= maximumLineBytes else {
-      buffer.removeAll(keepingCapacity: false)
-      throw CodexRPCError.protocolLineTooLarge(maximumBytes: maximumLineBytes)
-    }
-    return messages
+    try frames { try $0.append(data) }
   }
 
   mutating func finish() throws -> [JSONValue] {
-    defer { buffer.removeAll(keepingCapacity: false) }
-    guard buffer.count <= maximumLineBytes else {
+    try frames { try $0.finish() }
+  }
+
+  private mutating func frames(
+    _ operation: (inout ProgressJSONLineDecoder) throws -> [Data]
+  ) throws -> [JSONValue] {
+    let values: [Data]
+    do {
+      values = try operation(&decoder)
+    } catch {
       throw CodexRPCError.protocolLineTooLarge(maximumBytes: maximumLineBytes)
     }
-    guard let message = try decode(buffer) else { return [] }
-    return [message]
+    return try values.compactMap { try decode($0) }
   }
 
   private func decode(_ line: Data) throws -> JSONValue? {

@@ -148,6 +148,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.isRefreshingModels == new.isRefreshingModels
       && old.modelError == new.modelError
       && old.commandReceipt == new.commandReceipt
+      && old.workspace == new.workspace
   }
 
   /// Equality for the content of the selected task. `updatedAt` is
@@ -162,6 +163,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.sessionID == new.sessionID
       && old.title == new.title
       && old.projectName == new.projectName
+      && old.source == new.source
       && old.isTerminal == new.isTerminal
       && old.status == new.status
       && old.provider == new.provider

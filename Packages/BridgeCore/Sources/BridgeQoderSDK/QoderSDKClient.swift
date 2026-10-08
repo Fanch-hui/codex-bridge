@@ -1,4 +1,5 @@
 import BridgeACP
+import BridgeAgentCore
 import Foundation
 
 public typealias QoderJSONValue = ACPJSONValue
@@ -10,6 +11,7 @@ public enum QoderHostEvent: Sendable {
 }
 
 public actor QoderSDKClient {
+  private let eventDelivery: AgentEventStreamDelivery<QoderHostEvent>
   public nonisolated let events: AsyncThrowingStream<QoderHostEvent, any Error>
   private let continuation: AsyncThrowingStream<QoderHostEvent, any Error>.Continuation
   private let broker: ACPRequestBroker
@@ -24,12 +26,16 @@ public actor QoderSDKClient {
 
   public init(transport: any ACPTransport, requestTimeout: Duration = .seconds(45)) {
     self.transport = transport
-    broker = ACPRequestBroker(transport: transport, requestTimeout: requestTimeout)
     let stream = AsyncThrowingStream.makeStream(
       of: QoderHostEvent.self, throwing: (any Error).self,
       bufferingPolicy: .bufferingOldest(128))
     events = stream.stream
     continuation = stream.continuation
+    let delivery = AgentEventStreamDelivery(stream.continuation)
+    eventDelivery = delivery
+    broker = ACPRequestBroker(
+      transport: transport, requestTimeout: requestTimeout,
+      timeoutSuspended: { await delivery.hasPendingDelivery })
   }
 
   public func request(
@@ -41,7 +47,10 @@ public actor QoderSDKClient {
     requestCount += 1
     defer { requestCount -= 1 }
     do {
-      return try await broker.request(method: method, params: params, timeout: timeout).value
+      return try await broker.request(
+        method: method, params: params, timeout: timeout,
+        suspendsTimeout: method != "qoder/interrupt" && method != "qoder/close"
+      ).value
     } catch {
       if case ACPError.remote = error { throw error }
       await shutdown()
@@ -92,27 +101,23 @@ public actor QoderSDKClient {
         sequence >= 0, Int64(sequence) == lastSequence + 1
       else { throw ACPError.invalidMessage }
       lastSequence = Int64(sequence)
-      try yield(.update(params))
+      try await yield(.update(params))
     case .serverRequest(let id, let method, let params):
       guard let params, pendingPermissions.count + pendingUserInputs.count < 32 else {
         throw ACPError.invalidMessage
       }
       if method == "qoder/permission", pendingPermissions.insert(id).inserted {
-        try yield(.permission(id, params))
+        try await yield(.permission(id, params))
       } else if method == "qoder/question", pendingUserInputs.insert(id).inserted {
-        try yield(.userInput(id, params))
+        try await yield(.userInput(id, params))
       } else {
         throw ACPError.invalidMessage
       }
     }
   }
 
-  private func yield(_ event: QoderHostEvent) throws {
-    switch continuation.yield(event) {
-    case .enqueued: return
-    case .dropped, .terminated: throw ACPError.oversizedFrame
-    @unknown default: throw ACPError.transportClosed
-    }
+  private func yield(_ event: QoderHostEvent) async throws {
+    guard await eventDelivery.enqueue(event) else { throw ACPError.transportClosed }
   }
 
   private func fail(_ error: any Error) async {

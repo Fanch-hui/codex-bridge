@@ -1,6 +1,7 @@
 import { fault, text } from './errors.mjs';
 import { hash } from './protocol.mjs';
 import { mapNativeEvent, promptRequestID } from './event-mapping.mjs';
+import { observationPage, projectProgress } from './progress.mjs';
 
 const requestFingerprint = params => hash(JSON.stringify([params.projectPath, params.sessionID ?? null, params.text, params.modelID ?? null, params.effort ?? null, params.accessMode]));
 const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
@@ -73,7 +74,7 @@ export class Runs {
   }
   view(run) { return { requestID: run.requestID, sessionID: run.sessionID, status: run.status, cursor: run.cursor }; }
   append(run, eventType, data) {
-    const event = { requestID: run.requestID, eventType, data, cursor: ++run.cursor };
+    const event = { requestID: run.requestID, eventType, data: projectProgress(eventType, data), cursor: ++run.cursor };
     run.events.push(event);
     if (TERMINAL.has(eventType)) {
       run.status = eventType;
@@ -127,7 +128,7 @@ export class Runs {
     await this.recover(run);
     const cursor = params.cursor ?? 0;
     if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > run.cursor) throw fault('invalid_cursor', 'Invalid Bridge event cursor');
-    return { ...this.view(run), events: run.events.filter(event => event.cursor > cursor) };
+    return { ...this.view(run), ...observationPage(run, cursor) };
   }
   currentRun(agent) {
     return [...this.store.runs.values()].find(run => run.sessionID === agent.id && !TERMINAL.has(run.status) && run.turn !== undefined && run.turn === this.turns.get(agent.id));

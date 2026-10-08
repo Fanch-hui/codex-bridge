@@ -51,7 +51,7 @@ extension DeepSeekHarnessACPExecution {
     immediateCancelTask = nil
     promptPhase = .notStarted
     for event in try await normalizer.finalizeContent() {
-      guard emit(event) else { throw DeepSeekHarnessACPError.transportClosed }
+      guard await emit(event) else { throw DeepSeekHarnessACPError.transportClosed }
     }
     return prompt
   }
@@ -66,7 +66,7 @@ extension DeepSeekHarnessACPExecution {
   /// Recorded before the prompt is sent so the queued instruction always keeps
   /// a lower provider sequence than the events of the turn it starts.
   func emitSteerDispatched(_ text: String) async throws {
-    guard emit(try await normalizer.steerDispatched(text)) else {
+    guard await emit(try await normalizer.steerDispatched(text)) else {
       throw DeepSeekHarnessACPError.transportClosed
     }
   }

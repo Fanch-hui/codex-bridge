@@ -108,6 +108,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleUpdateProjectCommands(request)
     case .setProjectCommandMode:
       return try await handleSetProjectCommandMode(request)
+    case .workbenchWorkspace:
+      return try await handleWorkbenchWorkspace(request)
     case .setWorkbenchProject:
       return try await handleSetWorkbenchProject(request)
     case .setWorkbenchPermissionMode:

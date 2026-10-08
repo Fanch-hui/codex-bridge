@@ -594,6 +594,7 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
   public let defaultReasoningEffort: String?
   public let reasoningCapabilitiesAvailable: Bool?
   public let isDefaultModel: Bool?
+  public let inputModalities: [String]?
 
   public init(
     modelID: String,
@@ -602,7 +603,8 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
     supportedReasoningEfforts: [String] = [],
     defaultReasoningEffort: String? = nil,
     reasoningCapabilitiesAvailable: Bool? = nil,
-    isDefaultModel: Bool? = nil
+    isDefaultModel: Bool? = nil,
+    inputModalities: [String]? = nil
   ) {
     self.modelID = modelID
     self.compatibleModelIDs = compatibleModelIDs
@@ -611,6 +613,7 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
     self.defaultReasoningEffort = defaultReasoningEffort
     self.reasoningCapabilitiesAvailable = reasoningCapabilitiesAvailable
     self.isDefaultModel = isDefaultModel
+    self.inputModalities = inputModalities
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -621,6 +624,7 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
     case defaultReasoningEffort = "default_reasoning_effort"
     case reasoningCapabilitiesAvailable = "reasoning_capabilities_available"
     case isDefaultModel = "is_default_model"
+    case inputModalities = "input_modalities"
   }
 
   public init(from decoder: Decoder) throws {
@@ -642,7 +646,8 @@ public struct IPCAgentModelSummary: Codable, Equatable, Sendable {
         Bool.self,
         forKey: .reasoningCapabilitiesAvailable
       ),
-      isDefaultModel: try container.decodeIfPresent(Bool.self, forKey: .isDefaultModel)
+      isDefaultModel: try container.decodeIfPresent(Bool.self, forKey: .isDefaultModel),
+      inputModalities: try container.decodeIfPresent([String].self, forKey: .inputModalities)
     )
   }
 }

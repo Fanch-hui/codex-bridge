@@ -1,6 +1,8 @@
+import BridgeAgentCore
 import Foundation
 
 public actor PiRPCClient {
+  private let eventDelivery: AgentEventStreamDelivery<PiRPCEvent>
   public nonisolated let events: AsyncThrowingStream<PiRPCEvent, any Error>
   private let continuation: AsyncThrowingStream<PiRPCEvent, any Error>.Continuation
   private let transport: any PiRPCTransport
@@ -33,6 +35,7 @@ public actor PiRPCClient {
       bufferingPolicy: .bufferingOldest(max(1, eventBufferLimit)))
     events = stream.stream
     continuation = stream.continuation
+    eventDelivery = AgentEventStreamDelivery(stream.continuation)
   }
 
   public var eventSequence: Int64 { sequence }
@@ -80,7 +83,8 @@ public actor PiRPCClient {
         }
         let timer = Task { [weak self] in
           do { try await Task.sleep(for: duration) } catch { return }
-          await self?.requestExpired(id)
+          await self?.requestExpired(
+            id, timeout: duration, suspending: command != "abort" && command != "clear_queue")
         }
         pending[id] = Pending(command: command, continuation: reply, timeout: timer)
         let write = enqueue(bytes)
@@ -141,7 +145,7 @@ public actor PiRPCClient {
       guard sequence < Int64.max else { throw PiRPCError.invalidRecord }
       let event = PiRPCEvent(sequence: sequence, value: .object(record))
       sequence += 1
-      if case .dropped = continuation.yield(event) { throw PiRPCError.oversizedFrame }
+      _ = await eventDelivery.enqueue(event)
     } catch {
       await finish(error)
     }
@@ -175,9 +179,20 @@ public actor PiRPCClient {
     if statusRecords[key] != nil || statusRecords.count < 32 { statusRecords[key] = value }
   }
 
-  private func requestExpired(_ id: String) async {
-    guard pending[id] != nil else { return }
-    await finish(PiRPCError.timedOut)
+  private func requestExpired(_ id: String, timeout: Duration, suspending: Bool) async {
+    while pending[id] != nil, !closed {
+      guard suspending, await eventDelivery.hasPendingDelivery else {
+        guard pending[id] != nil, !closed else { return }
+        await finish(PiRPCError.timedOut)
+        return
+      }
+      do {
+        repeat {
+          try await Task.sleep(for: .milliseconds(10))
+        } while await eventDelivery.hasPendingDelivery
+        try await Task.sleep(for: timeout)
+      } catch { return }
+    }
   }
 
   private func cancelRequest(_ id: String) async {

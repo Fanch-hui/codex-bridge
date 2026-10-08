@@ -4,6 +4,7 @@ import Foundation
 
 actor PiRPCExecution {
   nonisolated let events: AsyncThrowingStream<AgentEventEnvelope, any Error>
+  private let eventDelivery: AgentEventStreamDelivery<AgentEventEnvelope>
   let client: PiRPCClient
   let request: AgentExecutionRequest
   var initialImages: [PiJSONValue]
@@ -53,6 +54,7 @@ actor PiRPCExecution {
       throwing: (any Error).self, bufferingPolicy: .bufferingOldest(256))
     events = stream.stream
     continuation = stream.continuation
+    eventDelivery = AgentEventStreamDelivery(stream.continuation)
   }
 
   func start() {
@@ -106,12 +108,12 @@ actor PiRPCExecution {
         if let entries = try PiExtensionPlanBridge.plan(
           event.value, nonce: nonce, taskID: request.taskID
         ) {
-          try emit(.plan(entries))
+          try await emit(.plan(entries))
         }
-      case "message_start": try observeUserInput(event.value)
+      case "message_start": try await observeUserInput(event.value)
       default: break
       }
-      for normalized in try normalizer.normalize(event.value) { try emit(normalized) }
+      for normalized in try normalizer.normalize(event.value) { try await emit(normalized) }
       if isAssistantMessageEnd(event.value) { scheduleUsageRefresh() }
     } catch { await fail(error) }
   }
@@ -133,14 +135,14 @@ actor PiRPCExecution {
       guard phase == .active, let statistics = try PiUsageNormalizer.normalize(response.data),
         statistics != lastUsage
       else { return }
-      try emit(.usageStatistics(statistics))
+      try await emit(.usageStatistics(statistics))
       lastUsage = statistics
     } catch {
       // Usage is optional telemetry; the execution stream remains authoritative.
     }
   }
 
-  private func observeUserInput(_ event: PiJSONValue) throws {
+  private func observeUserInput(_ event: PiJSONValue) async throws {
     guard let message = event["message"], message["role"]?.stringValue == "user" else { return }
     let text =
       message["content"]?.stringValue
@@ -154,7 +156,7 @@ actor PiRPCExecution {
     guard let expected = pendingInputs.first, expected == text else { return }
     pendingInputs.removeFirst()
     pendingInputBytes -= expected.utf8.count
-    try emit(.steerDispatched(text))
+    try await emit(.steerDispatched(text))
   }
 
   private func handleUI(_ value: PiJSONValue) async throws {
@@ -171,7 +173,7 @@ actor PiRPCExecution {
         throw PiRPCError.invalidRecord
       }
       approvals[approval.request.approvalID] = approval
-      try emit(.approvalRequested(approval.request))
+      try await emit(.approvalRequested(approval.request))
       return
     }
     if let input = try PiExtensionUserInputBridge.request(
@@ -185,7 +187,7 @@ actor PiRPCExecution {
         userInputs[input.request.inputID] == nil
       else { throw PiRPCError.invalidRecord }
       userInputs[input.request.inputID] = input
-      try emit(.userInputRequested(input.request))
+      try await emit(.userInputRequested(input.request))
     }
   }
 
@@ -229,23 +231,22 @@ actor PiRPCExecution {
   }
 
   func waitForEvents(_ barrier: Int64) async throws {
-    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
     while consumedSequence < barrier {
-      guard phase == .active || phase == .stopping, ContinuousClock.now < deadline else {
+      guard phase == .active || phase == .stopping else {
         throw PiRPCError.closed
       }
       try await Task.sleep(for: .milliseconds(2))
     }
   }
 
-  func emit(_ event: AgentEvent) throws {
+  func emit(_ event: AgentEvent) async throws {
     guard sequence < Int64.max else { throw PiRPCError.invalidRecord }
     let value = try AgentEventEnvelope(
       taskID: request.taskID, providerID: .pi,
       providerSessionID: binding.providerSessionID, providerRunID: binding.providerRunID,
       providerSequence: sequence, event: event)
     sequence += 1
-    if case .dropped = continuation.yield(value) { throw PiRPCError.oversizedFrame }
+    guard await eventDelivery.enqueue(value) else { throw PiRPCError.closed }
   }
 
   func fail(_ error: any Error) async {
@@ -260,6 +261,7 @@ actor PiRPCExecution {
   }
 
   private func checkActivity() async {
+    guard !(await eventDelivery.hasPendingDelivery) else { return }
     guard phase == .active, approvals.isEmpty, userInputs.isEmpty,
       ContinuousClock.now - lastActivity > .seconds(10 * 60)
     else { return }
@@ -284,11 +286,14 @@ actor PiRPCExecution {
     pendingInputs.removeAll()
     pendingInputBytes = 0
     if let event {
-      do { try emit(event) } catch { continuation.finish(throwing: error) }
+      do { try await emit(event) } catch { continuation.finish(throwing: error) }
     }
     phase = .closed
     continuation.finish()
   }
 
-  func shutdown() async { await finish(nil) }
+  func shutdown() async {
+    continuation.finish()
+    await finish(nil)
+  }
 }

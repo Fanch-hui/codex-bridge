@@ -9,6 +9,7 @@ actor DeepSeekHarnessDesktopExecution {
   private var client: DeepSeekHarnessDesktopClient
   private var binding: AgentBinding?
   private var continuation: AsyncThrowingStream<AgentEventEnvelope, any Error>.Continuation?
+  private var eventDelivery: AgentEventStreamDelivery<AgentEventEnvelope>?
   private var observing: Task<Void, Never>?
   private var cursor: Int64 = 0
   private var sequence: Int64 = 0
@@ -54,6 +55,7 @@ actor DeepSeekHarnessDesktopExecution {
     let stream = AsyncThrowingStream<AgentEventEnvelope, any Error>.makeStream(
       bufferingPolicy: .bufferingOldest(1_024))
     continuation = stream.continuation
+    eventDelivery = AgentEventStreamDelivery(stream.continuation)
     observing = Task { await self.observe() }
     return AgentExecutionHandle(
       taskID: request.taskID, binding: binding,
@@ -136,7 +138,7 @@ actor DeepSeekHarnessDesktopExecution {
           params: [
             "requestID": .string(runtime.requestID), "cursor": .integer(cursor),
           ])
-        do { try consume(value, requestID: runtime.requestID) } catch {
+        do { try await consume(value, requestID: runtime.requestID) } catch {
           let state = try await client.call(
             "run/cancel",
             params: [
@@ -146,13 +148,13 @@ actor DeepSeekHarnessDesktopExecution {
           else {
             throw error
           }
-          finish(.failed(code: "desktop_event_invalid", summary: "DSH 原生事件无法解析。"))
+          await finish(.failed(code: "desktop_event_invalid", summary: "DSH 原生事件无法解析。"))
         }
         if !terminal { try await Task.sleep(for: .milliseconds(200)) }
       } catch {
         guard !terminal else { return }
         if !client.descriptor.isRunning {
-          finish(.failed(code: "desktop_host_exited", summary: "DSH Desktop Host 已退出。"))
+          await finish(.failed(code: "desktop_host_exited", summary: "DSH Desktop Host 已退出。"))
           return
         }
         // The task and write lease remain active until its owner confirms a terminal state.
@@ -161,7 +163,8 @@ actor DeepSeekHarnessDesktopExecution {
         do {
           let replacement = try await controller.client(installation, profileID: runtime.profileID)
           guard replacement.descriptor.instanceID == client.descriptor.instanceID else {
-            finish(.failed(code: "desktop_host_restarted", summary: "DSH Desktop Host 已重新启动。"))
+            await finish(
+              .failed(code: "desktop_host_restarted", summary: "DSH Desktop Host 已重新启动。"))
             return
           }
           client = replacement
@@ -170,7 +173,7 @@ actor DeepSeekHarnessDesktopExecution {
     }
   }
 
-  private func consume(_ value: ACPJSONValue, requestID: String) throws {
+  private func consume(_ value: ACPJSONValue, requestID: String) async throws {
     guard value["requestID"]?.stringValue == requestID,
       value["sessionID"]?.stringValue == binding?.providerSessionID,
       let events = value["events"]?.arrayValue
@@ -187,18 +190,18 @@ actor DeepSeekHarnessDesktopExecution {
       }
       cursor = Int64(position)
       if Self.isTerminal(mapped) {
-        finish(mapped)
+        await finish(mapped)
         return
       }
-      emit(mapped)
+      await emit(mapped)
     }
     if let next = value["cursor"]?.intValue { cursor = max(cursor, Int64(next)) }
     switch value["status"]?.stringValue {
     case "completed":
-      finish(.completed(summary: normalizer?.summary ?? "", stopReason: "completed"))
-    case "cancelled": finish(.interrupted)
+      await finish(.completed(summary: normalizer?.summary ?? "", stopReason: "completed"))
+    case "cancelled": await finish(.interrupted)
     case "failed":
-      finish(
+      await finish(
         .failed(
           code: "desktop_run_failed",
           summary: value["message"]?.stringValue ?? "DSH 原生任务执行失败。"))
@@ -210,7 +213,7 @@ actor DeepSeekHarnessDesktopExecution {
     guard !terminal, let runtime = request.runtimeBinding else { return }
     let value = try await client.call(
       "run/cancel", params: ["requestID": .string(runtime.requestID)])
-    if value["status"]?.stringValue == "cancelled" { finish(.interrupted) }
+    if value["status"]?.stringValue == "cancelled" { await finish(.interrupted) }
   }
 
   private func shutdown() async {
@@ -234,8 +237,8 @@ actor DeepSeekHarnessDesktopExecution {
     try await answer(id: id, answer: normalizer.answer(inputID: id, response: response))
   }
 
-  private func emit(_ event: AgentEvent) {
-    guard let binding else { return }
+  private func emit(_ event: AgentEvent) async {
+    guard let binding, let eventDelivery else { return }
     sequence += 1
     guard
       let envelope = try? AgentEventEnvelope(
@@ -243,13 +246,13 @@ actor DeepSeekHarnessDesktopExecution {
         providerSessionID: binding.providerSessionID, providerRunID: binding.providerRunID,
         providerSequence: sequence, event: event)
     else { return }
-    continuation?.yield(envelope)
+    _ = await eventDelivery.enqueue(envelope)
   }
 
-  private func finish(_ event: AgentEvent) {
+  private func finish(_ event: AgentEvent) async {
     guard !terminal else { return }
     terminal = true
-    emit(event)
+    await emit(event)
     continuation?.finish()
     continuation = nil
   }

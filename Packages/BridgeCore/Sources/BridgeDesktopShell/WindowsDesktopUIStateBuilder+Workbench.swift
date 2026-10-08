@@ -51,7 +51,8 @@
         canRefreshModels: canRefreshModels,
         isRefreshingModels: modelRefreshInProgress,
         modelError: display.modelError,
-        commandReceipt: display.commandReceipt
+        commandReceipt: display.commandReceipt,
+        workspace: display.workspace
       )
     }
 

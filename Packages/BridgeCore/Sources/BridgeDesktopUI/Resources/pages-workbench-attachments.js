@@ -8,11 +8,12 @@
     pathsKey = pathsKey || "attachmentPaths";
     var errorKey = pathsKey === "attachmentPaths" ? "attachmentError" : pathsKey + "Error";
     if (!Array.isArray(draft[pathsKey])) draft[pathsKey] = [];
-    var canChoose = detail.providerID === "pi" || detail.providerID === "qoder";
+    var canChoose = detail.providerID === "pi" || detail.providerID === "qoder"
+      || detail.providerID === "deepseek-harness" && detail.canAttachImages === true;
     if (!canChoose && draft[pathsKey].length === 0) return null;
     var wrapper = S.node("div", "workbench-attachments");
     var actions = S.node("div", "form-actions workbench-attachment-actions");
-    var input = null;
+    var input = null, choose = null, disabled = false;
     if (canChoose) {
       input = S.node("input");
       input.type = "file";
@@ -20,7 +21,7 @@
       input.setAttribute("webkitdirectory", "");
       input.multiple = true;
       input.hidden = true;
-      var choose = S.button(label || "选择项目图片", null, {}, null, "small", false);
+      choose = S.button(label || "选择项目图片", null, {}, null, "small", false);
       choose.addEventListener("click", function () { input.click(); });
       actions.appendChild(choose);
     }
@@ -62,11 +63,13 @@
           ? "请选择项目根目录；仅提交项目内相对路径，服务会校验图像内容和模型能力。"
           : "保留原图片路径以按原内容重开，或清除后重新开始；服务会校验原图片未变化。");
       hint.hidden = !draft[errorKey] && draft[pathsKey].length === 0;
-      clear.disabled = draft[pathsKey].length === 0 && !draft[errorKey];
+      clear.disabled = disabled || draft[pathsKey].length === 0 && !draft[errorKey];
+      if (choose) choose.disabled = disabled;
+      if (input) input.disabled = disabled;
     }
 
     update();
-    return { wrapper: wrapper, update: update };
+    return { wrapper: wrapper, update: update, setDisabled: function (value) { disabled = !!value; update(); } };
   }
 
   function pathsFromDirectory(files) {

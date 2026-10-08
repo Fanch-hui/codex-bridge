@@ -40,10 +40,18 @@ enum BridgeDesktopUIStateBuilder {
   }
 
   private static func overview(from model: BridgeServiceAppModel) -> BridgeDesktopOverviewState {
-    let enabledAgents = model.agentInstallations.filter {
-      $0.isEnabled && $0.availability == "available"
-    }.count
-    let reconnectSummary = agentReconnectSummary(from: model)
+    let agentStates = model.agentInstallations.map { installation in
+      (
+        installation.displayName,
+        BridgeDesktopAgentAvailability.resolve(
+          providerID: installation.providerID, enabled: installation.isEnabled,
+          availability: installation.availability,
+          desktop: model.deepSeekDesktopStates[installation.installationID])
+      )
+    }
+    let enabledAgents = agentStates.filter { $0.1 == .available }.count
+    let reconnectSummary = ProjectAgentPresentation.reconnectSummary(
+      names: agentStates.compactMap { $0.1 == .requiresReconnect ? $0.0 : nil })
     let approvalCount = model.approvals.count + model.directApprovals.count
     let metrics = [
       BridgeDesktopMetric(
@@ -150,17 +158,6 @@ enum BridgeDesktopUIStateBuilder {
         destination: .connections
       ),
     ]
-  }
-
-  private static func agentReconnectSummary(from model: BridgeServiceAppModel) -> String? {
-    ProjectAgentPresentation.reconnectSummary(
-      names: model.agentInstallations.compactMap { installation in
-        ProjectAgentPresentation.requiresReconnect(
-          isEnabled: installation.isEnabled,
-          availability: installation.availability
-        ) ? installation.displayName : nil
-      }
-    )
   }
 
   private static func mcpRow(from model: BridgeServiceAppModel) -> BridgeDesktopServiceRow {
