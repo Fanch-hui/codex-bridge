@@ -16,6 +16,7 @@ export class Runs {
     this.sessionAdmissions = new Set();
     this.terminals = new Map();
     this.recovered = new Set();
+    this.recoveries = new Map();
     this.cancellations = new Map();
   }
   owned(requestID, key) {
@@ -26,17 +27,17 @@ export class Runs {
   async start(params, key) {
     const requestID = text(params.requestID, 'requestID');
     const fingerprint = requestFingerprint(params);
+    const starting = this.starts.get(requestID);
+    if (starting) {
+      if (starting.owner !== key || starting.fingerprint !== fingerprint) throw fault('request_identity_conflict', 'Request ID refers to another admission');
+      return starting.promise;
+    }
     const existing = this.store.get(requestID);
     if (existing) {
       const run = this.owned(requestID, key);
       if (run.fingerprint !== fingerprint) throw fault('request_identity_conflict', 'Request ID refers to different native input');
       await this.recover(run);
       return this.view(run);
-    }
-    const starting = this.starts.get(requestID);
-    if (starting) {
-      if (starting.owner !== key || starting.fingerprint !== fingerprint) throw fault('request_identity_conflict', 'Request ID refers to another admission');
-      return starting.promise;
     }
     if (params.sessionID && this.sessionAdmissions.has(params.sessionID)) throw fault('native_session_busy', 'Session admission is already in progress');
     if (params.sessionID) this.sessionAdmissions.add(params.sessionID);
@@ -101,7 +102,15 @@ export class Runs {
     return this.consume(session.id, event) ? this.store.save() : Promise.resolve();
   }
   async recover(run) {
+    const starting = this.starts.get(run.requestID);
+    if (starting) { await starting.promise; return; }
     if (TERMINAL.has(run.status) || this.recovered.has(run.requestID)) return;
+    if (this.recoveries.has(run.requestID)) return this.recoveries.get(run.requestID);
+    const work = this.recoverRun(run).finally(() => this.recoveries.delete(run.requestID));
+    this.recoveries.set(run.requestID, work);
+    return work;
+  }
+  async recoverRun(run) {
     const history = await this.native.records(run.sessionID);
     let accepted = false;
     for (const record of history.records) {

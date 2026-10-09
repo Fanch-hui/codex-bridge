@@ -17,9 +17,14 @@ enum ServiceCodexCatalogModelFetch {
     var models: [CodexModel] = []
     for _ in 0..<8 {
       guard ContinuousClock.now < deadline else { throw BridgeMCPQueryError.timeout }
-      let page = try await client.listModels(
-        ModelListParams(cursor: cursor, limit: 100, includeHidden: false)
-      )
+      let page: ModelListResponse
+      do {
+        page = try await client.listModels(
+          ModelListParams(cursor: cursor, limit: 100, includeHidden: false)
+        )
+      } catch let error as DecodingError {
+        throw ServiceCodexModelCatalogDiagnostics.decodingFailure(error)
+      }
       // Codex can report refresh failure on stderr while returning its bundled catalog successfully.
       // That process retains the fallback; recovery requires a fresh app-server process.
       let diagnostics = String(decoding: await client.stderrSnapshot(), as: UTF8.self)
@@ -29,7 +34,8 @@ enum ServiceCodexCatalogModelFetch {
       models.append(contentsOf: page.data)
       guard let next = page.nextCursor, !next.isEmpty, next != cursor else {
         guard Set(models.map(\.id)).count == models.count else {
-          throw BridgeMCPQueryError.unavailable
+          throw BridgeMCPQueryError.codexAppServerUnavailable(
+            "Codex model/list catalog validation failed (duplicate_identifier at data.id).")
         }
         return .models(models)
       }

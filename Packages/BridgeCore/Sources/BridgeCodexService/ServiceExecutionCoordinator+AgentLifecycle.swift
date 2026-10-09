@@ -18,6 +18,19 @@ extension ServiceExecutionCoordinator {
     return "agent_start_failed"
   }
 
+  private func agentRuntimeBinding(for task: ServiceTaskRecord) async throws -> AgentRuntimeBinding?
+  {
+    switch AgentProviderID(rawValue: task.providerID) {
+    case .deepSeekHarness:
+      return try await tasks.agentRuntimeBinding(taskID: task.id)
+        ?? AgentRuntimeBinding(connectionMode: .acp, requestID: task.id.rawValue)
+    case .deepSeekHarnessDesktop:
+      return try await tasks.agentRuntimeBinding(taskID: task.id)
+    default:
+      return nil
+    }
+  }
+
   func startAgentTask(
     _ task: ServiceTaskRecord,
     project: ServiceProjectRecord
@@ -42,10 +55,7 @@ extension ServiceExecutionCoordinator {
         || task.executionEffort == serviceDefaultProviderExecutionEffort
         ? nil : task.executionEffort,
       permissionMode: task.permissionMode,
-      runtimeBinding: task.providerID == AgentProviderID.deepSeekHarness.rawValue
-        ? try await tasks.agentRuntimeBinding(taskID: task.id)
-          ?? AgentRuntimeBinding(
-            connectionMode: .acp, requestID: task.id.rawValue) : nil,
+      runtimeBinding: try await agentRuntimeBinding(for: task),
       networkAllowed: task.networkAllowed,
       attachments: try await tasks.taskAttachments(taskID: task.id),
       selectedSkills: task.selectedSkills

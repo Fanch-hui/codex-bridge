@@ -21,7 +21,7 @@ public enum DSHDesktopRuntimeResources {
     "progress.mjs": "f595d2501decf58927a21b14efc20a11289f2a26dc968e292e5ea55c2c60ddfd",
     "protocol.mjs": "79a2232644aaf3c4719559288566f9c468b0ff1189d0a2c394f0d3321d693b14",
     "run-store.mjs": "0ed133151ac80f34f25e36a1979e46c72a3beadd3bf30b15f8ecf9a556cbb678",
-    "runs.mjs": "bf963797d16d403925e9abe17003d823b46ab9f1d9e6b3f881344b8c91346be1",
+    "runs.mjs": "95db278c70e6bd9aa0d379574d49547777e869ae5bf24523d14ff7d88957b184",
     "transport.mjs": "539f659754e1095cd3f93fe978525ab20991b5e4cc1fe853af8fc22d5699f276",
     "ui-channel.mjs": "746a37b93bb5c9c54057954873f4731a6568fbd5be6e9ea0afa3948c4b306ee3",
   ]
