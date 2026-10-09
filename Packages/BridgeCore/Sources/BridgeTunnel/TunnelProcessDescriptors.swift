@@ -61,36 +61,52 @@ import Foundation
   }
 
   final class TunnelDescriptorReader: @unchecked Sendable {
-    private let fileHandle: FileHandle
+    private let descriptor: Int32
     private let buffer: RedactedOutputBuffer
-    private let lock = NSLock()
+    private let completion = NSCondition()
     private var finished = false
 
     init(descriptor: Int32, buffer: RedactedOutputBuffer) {
-      fileHandle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+      self.descriptor = descriptor
       self.buffer = buffer
     }
 
     func start() {
-      fileHandle.readabilityHandler = { [weak self] handle in
-        let data = handle.availableData
-        guard !data.isEmpty else {
-          self?.finish()
-          return
-        }
-        self?.buffer.append(data)
+      Thread.detachNewThread { [self] in
+        readUntilEOF()
       }
     }
 
     func finish() {
-      lock.withLock {
-        guard !finished else { return }
-        finished = true
-        fileHandle.readabilityHandler = nil
-        buffer.append(fileHandle.readDataToEndOfFile())
-        buffer.finish()
-        try? fileHandle.close()
+      completion.lock()
+      defer { completion.unlock() }
+      while !finished {
+        completion.wait()
       }
+    }
+
+    private func readUntilEOF() {
+      // One reader owns draining and closing the pipe, including the EOF path.
+      // Corelibs FileHandle.close() synchronizes with its readability callback queue.
+      var bytes = [UInt8](repeating: 0, count: 16 * 1_024)
+      while true {
+        let count = bytes.withUnsafeMutableBytes { raw in
+          #if os(Linux)
+            Glibc.read(descriptor, raw.baseAddress, raw.count)
+          #else
+            Darwin.read(descriptor, raw.baseAddress, raw.count)
+          #endif
+        }
+        if count < 0, errno == EINTR { continue }
+        guard count > 0 else { break }
+        buffer.append(Data(bytes.prefix(count)))
+      }
+      buffer.finish()
+      close(descriptor)
+      completion.lock()
+      finished = true
+      completion.broadcast()
+      completion.unlock()
     }
   }
 #endif

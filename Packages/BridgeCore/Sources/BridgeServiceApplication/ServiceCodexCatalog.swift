@@ -245,7 +245,10 @@ public actor ServiceCodexCatalog {
       }
       switch outcome {
       case .models(let models):
-        return MCPModelList(models: try models.map(Self.model))
+        return MCPModelList(
+          models: try models.enumerated().map {
+            try ServiceCodexCatalogModelProjection.model($0.element, index: $0.offset)
+          })
       case .refreshFailed(let detail):
         refreshFailure = detail
         if attempt == 0 {
@@ -412,51 +415,6 @@ public actor ServiceCodexCatalog {
       value.objectValue?["text"]?.stringValue
     }.joined(separator: "\n")
     return text.isEmpty ? nil : text
-  }
-
-  private static func model(_ source: CodexModel) throws -> MCPModelSummary {
-    try validateIdentifier(source.id, maximum: 256)
-    let displayName = OutboundContentSecurity.redacted(
-      source.displayName,
-      maximumUTF8Bytes: 1_024
-    )
-    guard !displayName.isEmpty else { throw BridgeMCPQueryError.unavailable }
-    let efforts = source.supportedReasoningEfforts.map(\.reasoningEffort)
-    guard !efforts.isEmpty, Set(efforts).count == efforts.count else {
-      throw BridgeMCPQueryError.unavailable
-    }
-    for effort in efforts { try validateIdentifier(effort, maximum: 64) }
-    var tiers: [String] = []
-    for tier in source.serviceTiers ?? [] {
-      try validateIdentifier(tier.id, maximum: 64)
-      guard !tiers.contains(tier.id) else { throw BridgeMCPQueryError.unavailable }
-      tiers.append(tier.id)
-    }
-    var speedTiers: [String] = []
-    for tier in source.additionalSpeedTiers ?? [] {
-      try validateIdentifier(tier, maximum: 64)
-      guard !speedTiers.contains(tier) else { throw BridgeMCPQueryError.unavailable }
-      speedTiers.append(tier)
-    }
-    let defaultEffort: String?
-    if source.defaultReasoningEffort.isEmpty {
-      defaultEffort = nil
-    } else {
-      try validateIdentifier(source.defaultReasoningEffort, maximum: 64)
-      guard efforts.contains(source.defaultReasoningEffort) else {
-        throw BridgeMCPQueryError.unavailable
-      }
-      defaultEffort = source.defaultReasoningEffort
-    }
-    return MCPModelSummary(
-      modelID: source.id,
-      displayName: displayName,
-      isDefault: source.isDefault,
-      reasoningEfforts: efforts,
-      defaultReasoningEffort: defaultEffort,
-      serviceTiers: tiers,
-      additionalSpeedTiers: speedTiers
-    )
   }
 
   private static func decodeCursor(_ cursor: String?, maximum: Int) throws -> Int {
