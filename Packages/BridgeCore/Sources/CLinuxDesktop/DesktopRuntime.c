@@ -92,6 +92,7 @@ static gpointer desktop_thread(gpointer raw) {
     gtk_container_add(GTK_CONTAINER(bridge_desktop.window), overlay);
     bridge_desktop.layout = gtk_fixed_new();
     gtk_overlay_add_overlay(GTK_OVERLAY(overlay), bridge_desktop.layout);
+    gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(overlay), bridge_desktop.layout, TRUE);
     bridge_desktop.desktop = make_view(options->data, "Desktop");
     bridge_desktop.browser = make_view(options->data, "ChatGPT");
     gtk_container_add(GTK_CONTAINER(overlay), GTK_WIDGET(bridge_desktop.desktop));
