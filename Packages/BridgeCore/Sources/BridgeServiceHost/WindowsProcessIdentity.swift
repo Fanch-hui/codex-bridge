@@ -83,8 +83,8 @@
       return matches
     }
 
-    private static func basename(of path: String) -> String {
-      path.split(separator: "\\").last.map(String.init) ?? path
+    static func basename(of path: String) -> String {
+      path.split(whereSeparator: { $0 == "\\" || $0 == "/" }).last.map(String.init) ?? path
     }
 
     private static func basename(of entry: PROCESSENTRY32W) -> String {
