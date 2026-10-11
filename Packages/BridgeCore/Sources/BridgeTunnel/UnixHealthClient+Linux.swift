@@ -19,8 +19,7 @@
       guard !sockets.isEmpty else { return false }
       for table in ["tcp", "tcp6"] {
         guard
-          let contents = try? String(
-            contentsOfFile: "/proc/\(processID)/net/\(table)", encoding: .utf8)
+          let contents = try? readSocketTable(path: "/proc/\(processID)/net/\(table)")
         else { continue }
         for line in contents.split(separator: "\n").dropFirst() {
           let fields = line.split(whereSeparator: \.isWhitespace)
@@ -33,6 +32,17 @@
         }
       }
       return false
+    }
+
+    private static func readSocketTable(path: String) throws -> String {
+      let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+      defer { try? handle.close() }
+      var contents = Data()
+      // procfs can return a short read before EOF; String(contentsOfFile:) stops there on Linux.
+      while let bytes = try handle.read(upToCount: 64 * 1_024), !bytes.isEmpty {
+        contents.append(bytes)
+      }
+      return String(decoding: contents, as: UTF8.self)
     }
   }
 #endif

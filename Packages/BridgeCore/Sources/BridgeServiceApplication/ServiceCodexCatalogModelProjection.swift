@@ -14,12 +14,14 @@ enum ServiceCodexCatalogModelProjection {
     guard !displayName.isEmpty else {
       throw invalid("\(path).displayName", reason: "empty_display_name")
     }
-    let efforts = source.supportedReasoningEfforts.map(\.reasoningEffort)
-    guard !efforts.isEmpty, Set(efforts).count == efforts.count else {
-      throw invalid("\(path).supportedReasoningEfforts", reason: "empty_or_duplicate_efforts")
+    guard !source.supportedReasoningEfforts.isEmpty else {
+      throw invalid("\(path).supportedReasoningEfforts", reason: "empty_efforts")
     }
-    for effort in efforts {
+    var efforts: [String] = []
+    for option in source.supportedReasoningEfforts {
+      let effort = option.reasoningEffort
       try validateIdentifier(effort, maximum: 64, field: "\(path).supportedReasoningEfforts")
+      if !efforts.contains(effort) { efforts.append(effort) }
     }
     var tiers: [String] = []
     for tier in source.serviceTiers ?? [] {
