@@ -40,7 +40,11 @@ enum AntigravityCLILaunchRuntime {
       environment["TMP"] = temporary
       AgentProviderEnvironment.applyWindowsSystemEnvironment(to: &environment, from: source)
     #endif
-    for key in ["USER", "LOGNAME", "LANG", "LC_ALL", "SHELL"] {
+    for key in [
+      "USER", "LOGNAME", "LANG", "LC_ALL", "SHELL",
+      "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+      "http_proxy", "https_proxy", "all_proxy", "no_proxy",
+    ] {
       if let value = source[key], !value.isEmpty, !value.contains("\0") {
         environment[key] = value
       }
