@@ -127,6 +127,7 @@ extension BridgeServiceAppModel {
       resolvedTaskApprovalKeys = []
       resolvedDirectApprovalKeys = []
       mcpClients = []
+      geminiCloudStatus = nil
       deepSeekHarnessMCPServers = []
       models = []
       modelPreferences = nil
@@ -257,52 +258,6 @@ extension BridgeServiceAppModel {
       !hiddenKeys.contains(WorkbenchApprovalResolutionKey.direct($0.approvalID))
     }
     if directApprovals != visible { directApprovals = visible }
-  }
-
-  func updateChatBrowserVisibility() {
-    if selection != .workbench, chatBrowserViewport != nil {
-      chatBrowserViewport = nil
-    }
-    cancelChatBrowserSleep()
-    guard isChatBrowserEnabled, selection != .workbench, chatWebView != nil else { return }
-    let delay = chatBrowserSleepDelay
-    chatWebViewSleepTask = Task { [weak self] in
-      do {
-        try await Task.sleep(for: delay)
-      } catch {
-        return
-      }
-      guard let self,
-        self.selection != .workbench,
-        self.isChatBrowserEnabled
-      else { return }
-      self.chatWebViewSleepTask = nil
-      self.releaseChatWebView()
-    }
-  }
-
-  func cancelChatBrowserSleep() {
-    chatWebViewSleepTask?.cancel()
-    chatWebViewSleepTask = nil
-  }
-
-  func reloadChatBrowser() {
-    guard isChatBrowserEnabled else { return }
-    cancelChatBrowserSleep()
-    chatBrowserReloadRequest &+= 1
-  }
-
-  func releaseChatWebView() {
-    if let url = chatWebView?.url,
-      url.scheme?.lowercased() == "https",
-      url.host?.lowercased() == "chatgpt.com"
-    {
-      chatBrowserResumeURL = url
-    }
-    chatWebView?.stopLoading()
-    chatWebView?.navigationDelegate = nil
-    chatWebView?.uiDelegate = nil
-    chatWebView = nil
   }
 
   func currentClient() throws -> any BridgeServiceClientProtocol {

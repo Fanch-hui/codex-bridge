@@ -4,7 +4,7 @@
   var D = global.CodexBridgeDesktopFormDraft;
   function createTunnelForm(emit) {
     var context = { canConfigure: false, emit: emit };
-    var form = S.node("div", "form-grid");
+    var form = S.node("div", "form-grid tunnel-credentials");
     var id = S.textField("Tunnel ID", "", "输入 Tunnel ID");
     var key = S.textField("Runtime Key", "", "不会写入 UI 状态");
     key.control.type = "password";
@@ -52,7 +52,7 @@
   }
   function createTunnelHTTPProxyForm(emit) {
     var context = { emit: emit, canSetHTTPProxy: false, httpProxy: "" };
-    var form = S.node("div", "form-grid");
+    var form = S.node("div", "form-grid tunnel-proxy");
     var proxy = S.textField("Tunnel HTTP(S) 代理（可选）", "", "http://127.0.0.1:7897");
     proxy.control.autocomplete = "off";
     form.appendChild(proxy.wrapper);
@@ -84,8 +84,7 @@
   }
   function createAgentRegistration(emit) {
     var context = { emit: emit, providers: [], enabled: false };
-    var wrapper = S.node("div", "page-message");
-    wrapper.appendChild(S.node("h4", null, "登记 Agent"));
+    var wrapper = S.node("div", "page-card connection-card agent-registration");
     var provider = S.selectField("Provider", "", [], function () {}, "");
     var qoderDistribution = S.selectField("Qoder 地区", "cn", [], function () {}, "");
     var name = S.textField("显示名称", "", "Agent 名称");

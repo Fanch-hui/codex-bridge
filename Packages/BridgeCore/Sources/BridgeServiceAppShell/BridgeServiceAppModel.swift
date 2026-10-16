@@ -174,6 +174,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var directApprovalMode = "require"
   @Published public internal(set) var taskStartApprovalMode = "require"
   @Published public internal(set) var mcpClients: [IPCMCPClientStatus] = []
+  @Published var geminiCloudStatus: IPCGeminiCloudStatus?
   @Published public internal(set) var deepSeekHarnessMCPServers:
     [IPCDeepSeekHarnessMCPServerSummary] = []
   @Published public internal(set) var selectedAgentMCPScope =
@@ -204,13 +205,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published var desktopLogKind = "all"
   @Published var desktopSelectedLogID: String?
   @Published var chatBrowserViewport: BridgeDesktopBrowserViewport?
-  @Published public var chatWebView: WKWebView? {
-    didSet {
-      if chatWebView != nil {
-        updateChatBrowserVisibility()
-      }
-    }
-  }
+  let chatBrowserSessions: ChatBrowserSessions
   @Published public internal(set) var chatBrowserReloadRequest: UInt64 = 0
   @Published public internal(set) var isRefreshing = false
   @Published public internal(set) var isRefreshingModels = false
@@ -275,7 +270,6 @@ public final class BridgeServiceAppModel: ObservableObject {
   var agentNativePermissionGenerations: [String: UInt64] = [:]
   var resolvedTaskApprovalKeys: Set<String> = []
   var resolvedDirectApprovalKeys: Set<String> = []
-  var chatBrowserResumeURL = URL(string: "https://chatgpt.com")!
   var lastThreadCatalogRefreshAt: Date?
   var started = false
   var stopped = false
@@ -308,6 +302,7 @@ public final class BridgeServiceAppModel: ObservableObject {
     self.maximumConnectionAttempts = maximumConnectionAttempts
     self.chatBrowserSleepDelay = chatBrowserSleepDelay
     self.userDefaults = userDefaults
+    self.chatBrowserSessions = ChatBrowserSessions(defaults: userDefaults)
     registrationStatus = registration.status
     isChatBrowserEnabled =
       userDefaults.object(forKey: Self.chatBrowserEnabledKey)

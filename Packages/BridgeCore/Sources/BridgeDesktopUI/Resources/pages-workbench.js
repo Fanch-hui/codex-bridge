@@ -102,7 +102,7 @@
     }) || {};
     var remediationCard = N && N.remediationCard(detail, emit);
     if (remediationCard) content.appendChild(remediationCard);
-    var card = retained.card || S.node("div", "page-card task-detail-card");
+    var card = retained.card || S.node("div", "task-detail-card");
     var sections = global.CodexBridgeDesktopWorkbenchDetails.sections(card);
     if (retained.keep) content.__windowsDetailCard = card;
     global.CodexBridgeDesktopWorkbenchDetails.update(sections, detail);

@@ -78,7 +78,7 @@ enum BridgeDesktopCommandRouter {
       else { return }
       model.openTask(taskID)
       model.selection = .workbench
-    case .browserBack, .browserForward, .browserReload, .setBrowserEnabled,
+    case .browserBack, .browserForward, .browserReload, .selectBrowserSite, .setBrowserEnabled,
       .openBrowserExternally, .loadEarlierConversation, .refreshConversation,
       .setWorkbenchPermissionMode, .selectTask, .refreshTasks, .interruptTask,
       .searchTaskHistory, .selectTaskHistory,
@@ -94,6 +94,7 @@ enum BridgeDesktopCommandRouter {
       .setLogKindFilter, .copyLogs:
       handleLogs(envelope, model: model)
     case .setMCPClientEnabled, .setMCPClientExposure, .copyMCPClientConfiguration,
+      .configureGeminiCloud, .copyGeminiCloudConfiguration, .refreshGeminiCloud,
       .copyLocalMCPEndpoint,
       .rotateMCPClientCredential, .rotateLocalMCPEndpoint,
       .saveDeepSeekHarnessMCPServer, .deleteDeepSeekHarnessMCPServer,

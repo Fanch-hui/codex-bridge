@@ -21,24 +21,61 @@
     select.value = value;
   }
 
+  function createDialog(parent) {
+    var dialog = S.node("dialog", "component-dialog workbench-history-dialog");
+    dialog.id = "workbench-history-dialog";
+    dialog.setAttribute("aria-labelledby", "workbench-history-dialog-title");
+    var heading = S.node("div", "dialog-header");
+    var title = S.node("h2", null, "搜索历史会话");
+    title.id = "workbench-history-dialog-title";
+    heading.appendChild(title); dialog.appendChild(heading);
+    var body = S.node("div", "dialog-body");
+    var model = create(body);
+    model.panel.open = true;
+    model.panel.querySelector("summary").hidden = true;
+    model.input.autofocus = true;
+    dialog.appendChild(body);
+    var footer = S.node("div", "dialog-footer");
+    var close = S.button("关闭", null, {}, null, "small");
+    close.addEventListener("click", function () { dialog.close(); });
+    footer.appendChild(close); dialog.appendChild(footer);
+    model.trigger = S.button("搜索", null, {}, null, "small");
+    model.trigger.title = "搜索历史会话";
+    model.trigger.setAttribute("aria-label", "搜索历史会话");
+    model.trigger.setAttribute("aria-haspopup", "dialog");
+    model.trigger.setAttribute("aria-controls", dialog.id);
+    model.trigger.addEventListener("click", function () { dialog.showModal(); });
+    model.results.addEventListener("click", function (event) {
+      if (event.target.closest(".history-search-result")) dialog.close();
+    });
+    parent.appendChild(model.trigger); parent.appendChild(dialog);
+    return model;
+  }
+
   function create(parent, fixedProviderID) {
     var model = { page: null, emit: null, fixedProviderID: fixedProviderID || null };
     var panel = S.node("details", "workbench-history-search");
     model.panel = panel;
     panel.appendChild(S.node("summary", null, "搜索历史会话"));
     var form = S.node("form", "history-search-form");
-    model.input = S.node("input"); model.input.type = "search";
+    var keyword = S.textField("历史会话关键词", "", "", "history-search-keyword");
+    model.input = keyword.control; model.input.type = "search";
+    keyword.wrapper.querySelector("label").hidden = true;
     model.input.placeholder = "搜索标题或原始要求";
     model.input.setAttribute("aria-label", "历史会话关键词");
     model.input.maxLength = 1024;
-    model.provider = S.node("select"); model.provider.setAttribute("aria-label", "历史会话 Agent");
-    model.provider.hidden = !!model.fixedProviderID;
-    model.status = S.node("select"); model.status.setAttribute("aria-label", "历史会话状态");
+    var provider = S.selectField("历史会话 Agent", "", [], function () {}, "");
+    model.provider = provider.control;
+    provider.wrapper.querySelector("label").hidden = true;
+    provider.wrapper.hidden = !!model.fixedProviderID;
+    var status = S.selectField("历史会话状态", "", [], function () {}, "");
+    model.status = status.control;
+    status.wrapper.querySelector("label").hidden = true;
     setOptions(model.status, statuses);
-    model.search = S.node("button", "small", "搜索"); model.search.type = "submit";
-    form.appendChild(model.input); form.appendChild(model.provider); form.appendChild(model.status);
+    model.search = S.node("button", "button small", "搜索"); model.search.type = "submit";
+    form.appendChild(keyword.wrapper); form.appendChild(provider.wrapper); form.appendChild(status.wrapper);
     form.appendChild(model.search);
-    model.clear = S.node("button", "small", "清除"); model.clear.type = "button";
+    model.clear = S.node("button", "button small", "清除"); model.clear.type = "button";
     model.clear.addEventListener("click", function () {
       model.input.value = model.provider.value = model.status.value = "";
       if (model.emit) model.emit("searchTaskHistory", { action: "clear" });
@@ -55,7 +92,7 @@
     model.note.setAttribute("role", "status");
     model.note.setAttribute("aria-live", "polite"); panel.appendChild(model.note);
     model.results = S.node("div", "history-search-results"); panel.appendChild(model.results);
-    model.more = S.node("button", "small", "加载更多"); model.more.type = "button";
+    model.more = S.node("button", "button small", "加载更多"); model.more.type = "button";
     model.more.addEventListener("click", function () {
       var state = model.page && model.page.taskHistorySearch || {};
       if (model.emit && !state.isLoading) model.emit("searchTaskHistory", model.fixedProviderID
@@ -82,6 +119,7 @@
     }
     var results = S.safeArray(state.results);
     model.panel.setAttribute("aria-busy", String(!!state.isLoading));
+    if (model.trigger) model.trigger.disabled = !page.selectedProjectID;
     model.search.disabled = !page.selectedProjectID;
     model.more.hidden = !state.canLoadMore;
     model.more.disabled = !!state.isLoading;
@@ -103,5 +141,5 @@
     });
   }
 
-  global.CodexBridgeDesktopTaskHistorySearch = { create: create, update: update };
+  global.CodexBridgeDesktopTaskHistorySearch = { create: create, createDialog: createDialog, update: update };
 }(window));

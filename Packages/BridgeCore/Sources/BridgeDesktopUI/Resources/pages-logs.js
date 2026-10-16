@@ -67,7 +67,8 @@
   function createFilterBar(emit) {
     var context = { emit: emit };
     var bar = S.node("div", "filter-bar");
-    var search = S.node("input", "search-field");
+    var searchField = S.textField("搜索日志", "", "搜索日志摘要、命令或文件…", "search-field");
+    var search = searchField.control;
     search.type = "search";
     search.setAttribute("aria-label", "搜索日志");
     search.placeholder = "搜索日志摘要、命令或文件…";
@@ -80,7 +81,7 @@
         context.emit("setLogSearch", { searchText: search.value });
       }, 180);
     });
-    bar.appendChild(search);
+    bar.appendChild(searchField.wrapper);
 
     var project = S.selectField("项目", "all", [], function (value) {
       context.emit("setLogProjectFilter", { projectID: value === "all" ? null : value });
@@ -91,6 +92,7 @@
     }, "");
     bar.appendChild(kind.wrapper);
 
+    var actions = S.node("div", "filter-actions");
     var copy = S.button("复制日志", null, {}, null, "small", true);
     copy.addEventListener("click", function () {
       context.emit("copyLogs", {});
@@ -101,10 +103,11 @@
         copy.textContent = "复制日志";
       }, 1500);
     });
-    bar.appendChild(copy);
+    actions.appendChild(copy);
     var refresh = S.button("刷新", null, {}, null, "small primary", true);
     refresh.addEventListener("click", function () { context.emit("refreshLogs", {}); });
-    bar.appendChild(refresh);
+    actions.appendChild(refresh);
+    bar.appendChild(actions);
 
     function update(page, nextEmit) {
       if (nextEmit) context.emit = nextEmit;

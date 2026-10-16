@@ -4,7 +4,7 @@
   var D = global.CodexBridgeDesktopFormDraft;
   function createClients(emit) {
     var context = { emit: emit };
-    var card = S.node("div", "page-card connection-card");
+    var card = S.node("div", "page-card connection-card client-settings-card");
     var rows = new Map();
     function createRow(client) {
       var row = S.node("div", "client-row");
@@ -18,8 +18,8 @@
       var detail = S.node("p", "card-subtitle");
       main.appendChild(detail);
       row.appendChild(main);
-      var controls = S.node("div", "client-controls");
-      var exposure = S.selectField("客户端工具权限", client.exposureMode, client.exposureOptions, function (value) {
+      var controls = S.node("div", "client-settings-controls");
+      var exposure = S.selectField("工具权限", client.exposureMode, client.exposureOptions, function (value) {
         context.emit("setMCPClientExposure", {
           clientID: row.dataset.clientID,
           exposureMode: value
@@ -40,19 +40,24 @@
       });
       toggle.appendChild(checkbox);
       toggle.appendChild(toggleText);
-      controls.appendChild(toggle);
+      heading.insertBefore(toggle, state);
+      var actions = S.node("div", "client-settings-actions");
       var copy = S.button("复制 Qwen JSON 配置", null, {}, null, "small", true);
       copy.addEventListener("click", function () {
         context.emit("copyMCPClientConfiguration", { clientID: row.dataset.clientID });
       });
-      controls.appendChild(copy);
+      actions.appendChild(copy);
       var rotate = S.button("重新生成凭证", null, {}, null, "small danger", true);
       rotate.addEventListener("click", function () {
-        if (global.confirm("重新生成这个 MCP 客户端的凭证？现有配置将立即失效。")) {
+        var confirmation = row.dataset.clientID === "google.gemini"
+          ? "重置 Gemini 连接？现有会话将断开，请在 Gemini 中重新连接。"
+          : "重新生成这个 MCP 客户端的凭证？现有配置将立即失效。";
+        if (global.confirm(confirmation)) {
           context.emit("rotateMCPClientCredential", { clientID: row.dataset.clientID });
         }
       });
-      controls.appendChild(rotate);
+      actions.appendChild(rotate);
+      controls.appendChild(actions);
       row.appendChild(controls);
       var hint = S.node("p", "client-exposure-hint");
       row.appendChild(hint);
@@ -67,15 +72,20 @@
         draft: draft,
         copy: copy,
         rotate: rotate,
+        actions: actions,
         hint: hint
       };
     }
-    function updateRow(row, client, nextEmit) {
+    function updateRow(row, client, nextEmit, singleClient) {
       row.root.dataset.clientID = client.clientID;
       row.name.textContent = client.displayName;
+      row.name.hidden = singleClient;
       S.updateStatus(row.state,
         client.enabled ? "已启用" : "已停用", client.enabled ? "success" : "neutral");
-      row.detail.textContent = client.activeSessionCount ? "活动会话 " + client.activeSessionCount : "";
+      var details = [];
+      if (client.activeSessionCount) details.push("活动会话 " + client.activeSessionCount);
+      if (client.lastConnectedAt) details.push("最近连接：" + client.lastConnectedAt);
+      row.detail.textContent = details.join(" · ");
       row.detail.hidden = !row.detail.textContent;
       D.selectOptions(row.exposure, client.exposureOptions || [], false);
       row.draft.update({ exposure: client.exposureMode || "full", enabled: !!client.enabled });
@@ -84,9 +94,13 @@
       row.exposure.setAttribute("aria-busy", "false");
       row.checkbox.setAttribute("aria-busy", "false");
       row.toggle.hidden = !client.canToggle;
-      row.toggleText.textContent = client.clientID === "qwen.studio" ? "启用 Qwen Studio" : "启用";
+      var gemini = client.clientID === "google.gemini";
+      row.toggleText.textContent = singleClient ? "启用连接" : "启用 " + client.displayName;
+      row.copy.textContent = gemini ? "复制本地启动命令" : "复制 Qwen JSON 配置";
+      row.rotate.textContent = gemini ? "重置连接" : "重新生成凭证";
       row.copy.hidden = !client.canCopyConfiguration;
       row.rotate.hidden = !client.canRotateCredential;
+      row.actions.hidden = row.copy.hidden && row.rotate.hidden;
       row.copy.disabled = !client.enabled || !client.canCopyConfiguration;
       row.rotate.disabled = !client.enabled || !client.canRotateCredential;
       row.hint.textContent = "客户端工具权限决定可用的 MCP 工具；Agent 任务权限在工作台选择。";
@@ -111,7 +125,7 @@
             row = createRow(client);
             rows.set(client.clientID, row);
           }
-          updateRow(row, client, nextEmit);
+          updateRow(row, client, nextEmit, S.safeArray(clients).length === 1);
           placeRow(card, row, position);
           position += 1;
         });

@@ -61,7 +61,7 @@ def is_public_path(path):
                 "Package.swift", "Package@swift-6.0.swift", "Package.resolved", "LICENSE", "NOTICE"
             }
         )
-    if parts[:2] == ("Integrations", "MCPB"):
+    if parts[:2] in {("Integrations", "MCPB"), ("Integrations", "GeminiSites")}:
         return True
     if parts[:2] == (".github", "workflows"):
         return pure.name in {"windows.yml", "macos.yml", "linux.yml", "mcp-registry.yml"}

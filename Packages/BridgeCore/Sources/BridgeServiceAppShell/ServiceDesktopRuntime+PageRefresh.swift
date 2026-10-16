@@ -95,9 +95,11 @@ extension BridgeServiceAppModel {
     async let agentResult = try? await client.agentCatalog()
     await refreshAgentSetups(client: client)
     async let mcpResult = try? await client.mcpClients()
+    async let cloudResult = try? await client.geminiCloudStatus()
     async let serverResult = try? await client.deepSeekHarnessMCPServers(scope: scope)
     if let value = await agentResult { applyAgentCatalogSnapshot(value) }
     if let value = await mcpResult { mcpClients = value }
+    if let value = await cloudResult { geminiCloudStatus = value }
     if let value = await serverResult, selectedAgentMCPScope == scope {
       deepSeekHarnessMCPServers = value.servers
     }

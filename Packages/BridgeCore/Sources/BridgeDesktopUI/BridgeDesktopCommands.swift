@@ -22,6 +22,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case browserBack
   case browserForward
   case browserReload
+  case selectBrowserSite
   case setBrowserEnabled
   case openExternalURL
   case copyTunnelID
@@ -64,6 +65,9 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setMCPClientEnabled
   case setMCPClientExposure
   case copyMCPClientConfiguration
+  case configureGeminiCloud
+  case copyGeminiCloudConfiguration
+  case refreshGeminiCloud
   case copyLocalMCPEndpoint
   case rotateMCPClientCredential
   case rotateLocalMCPEndpoint

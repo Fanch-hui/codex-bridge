@@ -121,6 +121,8 @@ public struct BridgeDesktopConversationEntry: Codable, Equatable, Sendable {
 }
 
 public struct BridgeDesktopBrowserSlot: Codable, Equatable, Sendable {
+  public let site: ChatBrowserSite
+  public let sites: [BridgeDesktopChoice]
   public let visible: Bool
   public let enabled: Bool
   public let url: String?
@@ -133,6 +135,7 @@ public struct BridgeDesktopBrowserSlot: Codable, Equatable, Sendable {
   public let canLoadEarlierConversation: Bool
 
   public init(
+    site: ChatBrowserSite = .chatGPT,
     visible: Bool = true,
     enabled: Bool = true,
     url: String? = nil,
@@ -144,6 +147,10 @@ public struct BridgeDesktopBrowserSlot: Codable, Equatable, Sendable {
     canReload: Bool = true,
     canLoadEarlierConversation: Bool = false
   ) {
+    self.site = site
+    self.sites = ChatBrowserSite.allCases.map {
+      BridgeDesktopChoice(id: $0.rawValue, title: $0.displayName)
+    }
     self.visible = visible
     self.enabled = enabled
     self.url = url
@@ -154,6 +161,28 @@ public struct BridgeDesktopBrowserSlot: Codable, Equatable, Sendable {
     self.canGoForward = canGoForward
     self.canReload = canReload
     self.canLoadEarlierConversation = canLoadEarlierConversation
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case site, sites, visible, enabled, url, status, canToggle, canOpenExternally
+    case canGoBack, canGoForward, canReload, canLoadEarlierConversation
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      site: try values.decodeIfPresent(ChatBrowserSite.self, forKey: .site) ?? .chatGPT,
+      visible: try values.decode(Bool.self, forKey: .visible),
+      enabled: try values.decode(Bool.self, forKey: .enabled),
+      url: try values.decodeIfPresent(String.self, forKey: .url),
+      status: try values.decode(String.self, forKey: .status),
+      canToggle: try values.decode(Bool.self, forKey: .canToggle),
+      canOpenExternally: try values.decode(Bool.self, forKey: .canOpenExternally),
+      canGoBack: try values.decode(Bool.self, forKey: .canGoBack),
+      canGoForward: try values.decode(Bool.self, forKey: .canGoForward),
+      canReload: try values.decode(Bool.self, forKey: .canReload),
+      canLoadEarlierConversation: try values.decode(Bool.self, forKey: .canLoadEarlierConversation)
+    )
   }
 }
 

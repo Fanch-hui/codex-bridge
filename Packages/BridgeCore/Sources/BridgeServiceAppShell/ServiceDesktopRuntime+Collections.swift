@@ -31,6 +31,9 @@ extension BridgeServiceAppModel {
       try await client.taskStartApprovalMode()
     }
     let mcpClientResult = await optional(when: managementVisible) { try await client.mcpClients() }
+    let cloudResult = await optional(when: managementVisible) {
+      try await client.geminiCloudStatus()
+    }
     let agentMCPScope = selectedAgentMCPScope
     let deepSeekHarnessMCPResult = await optional(when: managementVisible) {
       try await client.deepSeekHarnessMCPServers(scope: agentMCPScope)
@@ -75,6 +78,7 @@ extension BridgeServiceAppModel {
     if let value = taskStartApprovalModeResult, taskStartApprovalMode != value {
       taskStartApprovalMode = value
     }
+    if let value = cloudResult, geminiCloudStatus != value { geminiCloudStatus = value }
     if let value = mcpClientResult, mcpClients != value {
       mcpClients = value
     }

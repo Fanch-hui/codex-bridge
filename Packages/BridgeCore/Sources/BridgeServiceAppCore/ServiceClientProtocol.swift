@@ -185,6 +185,10 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func taskStartApprovalMode() async throws -> String
   func setTaskStartApprovalMode(_ mode: String) async throws
   func setExposureMode(_ mode: MCPServiceExposureMode) async throws
+  func geminiCloudStatus() async throws -> IPCGeminiCloudStatus
+  func configureGeminiCloud(_ value: IPCGeminiCloudConfiguration) async throws
+    -> IPCGeminiCloudStatus
+  func exportGeminiCloudConfiguration(kind: IPCGeminiCloudExportKind) async throws -> String
   func mcpClients() async throws -> [IPCMCPClientStatus]
   func deepSeekHarnessMCPServers() async throws -> IPCDeepSeekHarnessMCPListResponse
   func deepSeekHarnessMCPServers(scope: String?) async throws -> IPCDeepSeekHarnessMCPListResponse

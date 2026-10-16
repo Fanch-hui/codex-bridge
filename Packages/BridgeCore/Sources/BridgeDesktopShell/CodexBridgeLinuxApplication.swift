@@ -1,6 +1,7 @@
 #if os(Linux)
   import BridgeDesktopUI
   import BridgeIPC
+  import BridgeServiceAppCore
   import Foundation
 
   extension CodexBridgeDesktopApplication {
@@ -58,7 +59,9 @@
     }
 
     nonisolated static func openChatExternally() {
-      LinuxDesktopHost.openExternalURL("https://chatgpt.com/")
+      let preferences = ChatBrowserPreferences(defaults: .standard)
+      LinuxDesktopHost.openExternalURL(
+        preferences.resumeURL(for: preferences.selectedSite).absoluteString)
     }
   }
 
@@ -108,6 +111,7 @@
           agentDefaults: snapshot.agentDefaults,
           selectedNavigation: nextPage.desktopNavigation,
           browserAvailable: browser.state != "failed",
+          browserSite: browser.site,
           browserURL: browser.url,
           browserStatus: browser.error ?? (browser.state == "loading" ? "正在加载聊天页…" : browser.url),
           browserCanGoBack: browser.canGoBack, browserCanGoForward: browser.canGoForward,

@@ -10,11 +10,8 @@
     static func requestExit(_ window: HWND?) {
       guard !isExiting, let window else { return }
       isExiting = true
-      if WindowsMainWindow.chat?.beginShutdown(notifying: window, message: chatStoppedMessage)
-        == true
-      {
-        pendingSurfaces += 1
-      }
+      pendingSurfaces +=
+        WindowsMainWindow.chat?.beginShutdown(notifying: window, message: chatStoppedMessage) ?? 0
       if WindowsMainWindow.desktopUI?.beginShutdown(
         notifying: window, message: desktopStoppedMessage) == true
       {

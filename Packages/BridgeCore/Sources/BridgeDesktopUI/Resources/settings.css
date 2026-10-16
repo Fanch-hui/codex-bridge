@@ -1,0 +1,82 @@
+.settings-content-stack, .settings-stack { display: grid; gap: 24px; }
+.settings-group { min-width: 0; }
+.settings-group-body { display: grid; gap: 0; padding: 16px; }
+.settings-group-body.detail-list { display: block; padding: 0; }
+.settings-group-body:not(.detail-list) > .detail-row { padding: 0 0 16px; }
+.settings-group-body > .settings-subsection + .settings-subsection,
+.settings-group-body > .detail-row + .settings-subsection { padding-top: 16px; border-top: 1px solid var(--separator); }
+.settings-group-body > .settings-subsection + .settings-subsection { margin-top: 16px; }
+.settings-subsection { display: grid; gap: 16px; min-width: 0; }
+.settings-subsection > h3, .settings-subsection > h4,
+.settings-section-heading h3 { margin: 0; color: var(--text); font-size: 14px; font-weight: 500; line-height: 22px; }
+.settings-subsection > .hint, .settings-subsection .field > .hint,
+.agent-preferences > .hint { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.settings-subsection > .form-grid, .agent-preferences > .form-grid { width: 100%; gap: 16px; }
+.settings-subsection > .form-actions, .agent-preferences > .form-actions { justify-content: flex-start; margin-top: 0; }
+.settings-policy-grid { align-items: end; }
+.settings-service { gap: 12px; }
+.settings-service .status-badge { justify-self: start; }
+.settings-section-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+.settings-section-heading > .app-update-version { margin: 0; }
+.settings-card { min-width: 0; }
+.settings-card h3 { margin: 0 0 16px; }
+.settings-card .hint { margin: 12px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.agent-preferences { display: grid; gap: 16px; min-width: 0; }
+.agent-preferences > h4 { margin: 0; font-size: 14px; font-weight: 500; line-height: 22px; }
+.settings-provider-detail > .agent-preferences + .agent-preferences,
+.settings-provider-detail > .settings-subsection + .agent-preferences { padding-top: 24px; border-top: 1px solid var(--separator); }
+.codex-preferences-grid { align-items: end; }
+.native-permission-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.native-permission-header h3, .native-permission-header h4 { margin: 0; }
+.native-permission-header > div { min-width: 0; }
+.native-permission-header + .form-grid { margin-top: 12px; }
+.settings-instructions > .field { width: 100%; max-width: none; }
+.settings-instructions textarea { min-height: 280px; height: clamp(280px, calc(100vh - 320px), 560px); line-height: 1.7; }
+.direct-settings-card > .field { max-width: 320px; }
+.direct-rule-section { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--separator); }
+.direct-rule-section > h4 { margin: 0; font-size: 14px; font-weight: 500; line-height: 22px; }
+.direct-rule-section > .hint { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.direct-command-input { display: flex; align-items: flex-end; gap: 8px; }
+.direct-command-input > .field { flex: 1; min-width: 0; }
+.direct-command-input > .button { flex: none; min-height: var(--control-height); }
+.direct-rule-section .list-body { padding: 0; }
+.direct-rule-section .list-row { padding: 8px 0; cursor: default; }
+.direct-rule-section .list-row + .list-row { border-top: 1px solid var(--separator); border-radius: 0; }
+.direct-rule-section .list-row:hover { background: transparent; }
+.direct-rule-section > .form-actions { margin-top: 0; }
+.direct-rule-section > .page-message { margin-top: 0; }
+.direct-check-fields > .field:first-child { max-width: 320px; }
+
+.app-update { margin-bottom: 24px; }
+.app-update-card, .app-update-state { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: start; gap: 12px; text-align: left; }
+.app-update-card { padding: 16px; border-radius: var(--radius); color: var(--accent); background: var(--accent-soft); }
+.app-update-card.app-update-phase-available, .app-update-card.app-update-phase-waiting { color: var(--warning); background: var(--warning-soft); }
+.app-update-card.app-update-phase-failed { color: var(--error); background: var(--error-soft); }
+.app-update-state { padding: 0; color: var(--text-secondary); }
+.app-update-state.app-update-phase-available, .app-update-state.app-update-phase-waiting { color: var(--warning); }
+.app-update-state.app-update-phase-failed { color: var(--error); }
+.app-update-state.app-update-phase-upToDate > .icon { color: var(--success); }
+.app-update-copy { min-width: 0; }
+.app-update-heading { margin: 0; color: var(--text); font-size: 13px; font-weight: 500; line-height: 20px; }
+.app-update-version, .app-update-notes, .app-update-message { margin: 4px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.app-update-notes { white-space: pre-wrap; }
+.app-update-plugin-reminder { display: grid; gap: 8px; margin-top: 16px; padding: 12px 16px; border-left: 3px solid var(--warning); background: var(--warning-soft); }
+.app-update-plugin-reminder strong { color: var(--warning-strong, #8a5000); font-size: 16px; font-weight: 700; line-height: 1.5; }
+.app-update-plugin-reminder p { margin: 0; color: var(--text); font-size: 14px; line-height: 1.6; }
+.app-update-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.app-update-dismiss { width: 28px; height: 28px; border-radius: 8px; font-size: 20px; }
+.app-update-card .app-update-actions .button:not(.primary) { color: var(--text); }
+.app-update-progress-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--text-secondary); font-size: 12px; }
+.app-update-progress { width: min(280px, 100%); height: 6px; accent-color: var(--accent); }
+.app-update-progress-label { min-width: 34px; font-variant-numeric: tabular-nums; }
+.app-update-spinner { width: 13px; height: 13px; flex: 0 0 13px; border: 2px solid var(--separator); border-top-color: var(--accent); border-radius: 50%; animation: rotate .8s linear infinite; }
+
+@media (max-width: 700px) {
+  .settings-grid, .settings-subsection > .form-grid, .agent-preferences > .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .app-update-card, .app-update-state { grid-template-columns: 20px minmax(0, 1fr); }
+  .app-update-actions { grid-column: 2; justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-update-spinner { animation: none; }
+}

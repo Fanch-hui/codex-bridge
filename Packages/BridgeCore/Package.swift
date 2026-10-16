@@ -3,6 +3,13 @@
 import Foundation
 import PackageDescription
 
+var localMCPTestDependencies: [Target.Dependency] = [
+  "BridgeLocalMCP", "BridgeMCP", "BridgeIPC", .product(name: "MCP", package: "swift-sdk"),
+]
+#if os(macOS)
+  localMCPTestDependencies += ["BridgeServiceHost", "BridgeSecurity", "BridgeCodexRPC"]
+#endif
+
 
 var macOSOnlyProducts: [Product] = []
 var macOSOnlyTargets: [Target] = []
@@ -27,7 +34,8 @@ var linuxDesktopDependencies: [Target.Dependency] = []
       providers: [.apt(["libwebkit2gtk-4.1-dev"])]
     ),
     .target(name: "CLinuxDesktop", dependencies: ["CWebKitGTK"]),
-    .executableTarget(name: "CodexBridgeLinuxApp", dependencies: ["BridgeDesktopShell"]),
+    .executableTarget(
+      name: "CodexBridgeLinuxApp", dependencies: ["BridgeDesktopShell", "BridgeLocalMCP"]),
   ]
 #endif
 
@@ -100,6 +108,7 @@ let package = Package(
     .library(name: "BridgeServiceApplication", targets: ["BridgeServiceApplication"]),
     .library(name: "BridgeDirectCommand", targets: ["BridgeDirectCommand"]),
     .library(name: "BridgeIPC", targets: ["BridgeIPC"]),
+    .library(name: "BridgeLocalMCP", targets: ["BridgeLocalMCP"]),
     .library(name: "BridgeServiceHost", targets: ["BridgeServiceHost"]),
     .library(name: "BridgeServiceAppCore", targets: ["BridgeServiceAppCore"]),
     .library(name: "BridgeWindowsShell", targets: ["BridgeWindowsShell"]),
@@ -183,6 +192,7 @@ let package = Package(
         "BridgeFiles",
         "BridgeSkills",
         "BridgeSecurity",
+        .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "Logging", package: "swift-log"),
         .product(name: "MCP", package: "swift-sdk"),
         .product(name: "NIOCore", package: "swift-nio"),
@@ -331,6 +341,14 @@ let package = Package(
       dependencies: ["BridgeMCP"]
     ),
     .target(
+      name: "BridgeLocalMCP",
+      dependencies: [
+        "BridgeIPC",
+        .product(name: "MCP", package: "swift-sdk"),
+        .product(name: "Logging", package: "swift-log"),
+      ]
+    ),
+    .target(
       name: "BridgeServiceHost",
       dependencies: [
         "BridgeAgentCore",
@@ -385,6 +403,7 @@ let package = Package(
       dependencies: [
         "BridgeWindowsShell",
         "BridgeIPC",
+        "BridgeLocalMCP",
       ],
       linkerSettings: [
         .unsafeFlags(

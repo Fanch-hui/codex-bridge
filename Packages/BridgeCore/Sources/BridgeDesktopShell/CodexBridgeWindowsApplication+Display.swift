@@ -1,5 +1,6 @@
 #if os(Windows)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
   import Foundation
   import WinSDK
 
@@ -24,6 +25,7 @@
     let page: WindowsMainPage
     let feedback: BridgeDesktopFeedback?
     let chatState: WindowsChatWebView.State
+    let chatSite: ChatBrowserSite
     let chatURL: String?
     let chatError: String?
     let canGoBack: Bool
@@ -63,7 +65,8 @@
         ],
         page: selectedPage,
         feedback: model.feedback.current,
-        chatState: chat.state, chatURL: chat.currentURL, chatError: chat.errorDetail,
+        chatState: chat.state, chatSite: chat.site,
+        chatURL: chat.currentURL, chatError: chat.errorDetail,
         canGoBack: chat.canGoBack, canGoForward: chat.canGoForward,
         desktopState: desktopUI.state, desktopError: desktopUI.errorDetail,
         desktopReady: desktopUI.isReady, desktopLoadStalled: desktopUI.loadStalled
@@ -88,6 +91,7 @@
         agentDefaults: auxiliarySnapshot.agentDefaults,
         selectedNavigation: selectedPage.desktopNavigation,
         browserAvailable: chat.state == .active,
+        browserSite: chat.site,
         browserURL: chat.currentURL,
         browserStatus: browserStatus(for: chat),
         browserCanGoBack: chat.canGoBack,
@@ -155,7 +159,10 @@
     }
 
     nonisolated static func openChatExternally() {
-      let chatURL = WindowsUIThread.shared.chatWebView()?.currentURL ?? WindowsChatWebView.chatURL
+      let chat = WindowsUIThread.shared.chatWebView()
+      let site = chat?.site ?? ChatBrowserPreferences(defaults: .standard).selectedSite
+      let currentURL = (chat?.currentURL).flatMap(URL.init(string:))
+      let chatURL = (site.validatedURL(currentURL) ?? site.homeURL).absoluteString
       "open".withCString(encodedAs: UTF16.self) { operation in
         chatURL.withCString(encodedAs: UTF16.self) { url in
           _ = ShellExecuteW(

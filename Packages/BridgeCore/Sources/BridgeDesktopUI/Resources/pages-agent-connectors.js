@@ -33,7 +33,7 @@
           visible.add(provider.providerID);
           var row = rows.get(provider.providerID);
           if (!row) {
-            row = R.create(provider, { S: S, D: D, context: context });
+            row = R.create(provider, { S: S, D: D, context: context, detail: !!navigation });
             rows.set(provider.providerID, row);
             if (navigation) entries.set(provider.providerID, navigation.register(
               "agent:" + provider.providerID, provider.displayName, row.root));

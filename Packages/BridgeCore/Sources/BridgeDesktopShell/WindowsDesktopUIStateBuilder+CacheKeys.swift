@@ -1,5 +1,6 @@
 #if os(Windows) || os(Linux)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
 
   struct WindowsDesktopNavigationCacheKey: Equatable {
     let runningTaskCount: Int
@@ -27,6 +28,7 @@
     let management: WindowsManagementDisplay
     let settings: WindowsSettingsDisplay?
     let browserAvailable: Bool
+    let browserSite: ChatBrowserSite
     let browserURL: String?
     let browserStatus: String?
     let browserCanGoBack: Bool

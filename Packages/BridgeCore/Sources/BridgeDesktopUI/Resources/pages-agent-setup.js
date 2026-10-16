@@ -2,16 +2,20 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var runningStates = ["checking", "installing", "configuring", "verifying"];
+  var dialogCount = 0;
   function running(operation) { return !!operation && runningStates.indexOf(operation.state) >= 0; }
   function create(context, providerValue, onRetry) {
-    var operation = null, provider = providerValue, dismissed = null, lastAction = null, returnFocus = null;
-    var root = S.node("dialog", "agent-setup-dialog");
-    root.setAttribute("aria-label", "Agent 一键配置");
-    var heading = S.node("h3", null, "一键配置"); root.appendChild(heading);
-    var message = S.node("p"); message.setAttribute("role", "status"); root.appendChild(message);
-    var location = S.node("p", "row-detail"); root.appendChild(location);
-    var instructions = S.node("p", "agent-setup-instructions"); root.appendChild(instructions);
-    var credentials = S.node("div", "form-grid"); root.appendChild(credentials);
+    var operation = null, provider = providerValue, lastAction = null;
+    var root = S.node("dialog", "component-dialog agent-setup-dialog");
+    var header = S.node("header", "dialog-header"); root.appendChild(header);
+    var heading = S.node("h2", null, "一键配置"); header.appendChild(heading);
+    heading.id = "agent-setup-title-" + (++dialogCount);
+    root.setAttribute("aria-labelledby", heading.id);
+    var body = S.node("div", "dialog-body"); root.appendChild(body);
+    var message = S.node("p", "agent-setup-status"); message.setAttribute("role", "status"); body.appendChild(message);
+    var location = S.node("p", "row-detail"); body.appendChild(location);
+    var instructions = S.node("p", "agent-setup-instructions"); body.appendChild(instructions);
+    var credentials = S.node("div", "form-grid"); body.appendChild(credentials);
     var protocol = S.selectField("推理协议", "deepseek-messages", [
       { id: "deepseek-messages", title: "DeepSeek Messages" },
       { id: "openai-completions", title: "OpenAI Chat Completions" }
@@ -21,25 +25,24 @@
     var key = S.textField("API key", "", "输入 API key");
     key.control.type = "password"; key.control.autocomplete = "off";
     [protocol, base, catalog, key].forEach(function (field) { credentials.appendChild(field.wrapper); });
-    var candidate = S.selectField("选择已有安装", "", [], function () {}); root.appendChild(candidate.wrapper);
+    var candidate = S.selectField("选择已有安装", "", [], function () {}); body.appendChild(candidate.wrapper);
     var permission = S.node("p", "agent-setup-instructions",
       "AGY 无头任务需要自动通过工具执行。确认后会将本机 AGY 全局工具策略设为 Always Proceed（总是通过），这会影响使用同一配置的其他 AGY CLI 任务。");
-    root.appendChild(permission);
-    var actions = S.node("div", "form-actions"); root.appendChild(actions);
+    body.appendChild(permission);
+    var actions = S.node("footer", "dialog-footer form-actions"); root.appendChild(actions);
     var login = S.button("打开登录 / 配置", null, {}, null, "small primary", false);
     var docs = S.button("官方登录说明", null, {}, null, "small", false);
     var proceed = S.button("我已完成，重新检测", null, {}, null, "small primary", false);
     var cancel = S.button("取消配置", null, {}, null, "small", false);
     var retry = S.button("重试配置", null, {}, null, "small primary", false);
     var close = S.button("关闭", null, {}, null, "small", false);
+    close.autofocus = true;
     [login, proceed, docs, retry, cancel, close].forEach(function (button) { actions.appendChild(button); });
     function closeDialog() {
-      dismissed = operation && operation.operationID;
       key.control.value = "";
       if (root.open) root.close();
-      if (returnFocus && returnFocus.isConnected) returnFocus.focus();
     }
-    root.addEventListener("cancel", function (event) { event.preventDefault(); closeDialog(); });
+    root.addEventListener("close", function () { key.control.value = ""; });
     close.addEventListener("click", closeDialog);
     retry.addEventListener("click", function () { closeDialog(); onRetry(); });
     login.addEventListener("click", function () {
@@ -76,14 +79,13 @@
     });
     function open() {
       if (!operation || root.open) return;
-      dismissed = null; returnFocus = document.activeElement;
-      root.showModal(); close.focus();
+      root.showModal();
     }
     function update(value, nextProvider) {
       provider = nextProvider;
       var changed = value && (!operation || operation.operationID !== value.operationID);
       operation = value;
-      if (!value) { if (root.open) root.close(); return; }
+      if (!value) { closeDialog(); return; }
       if (changed) {
         base.control.value = provider.configuredBaseURL || "";
         protocol.control.value = provider.configuredInferenceProtocol || "deepseek-messages";
@@ -118,7 +120,6 @@
       retry.disabled = !context.canConnect;
       cancel.hidden = ["ready", "failed", "cancelled", "interrupted"].indexOf(value.state) >= 0;
       cancel.disabled = !context.canConnect;
-      if (needs && dismissed !== value.operationID && (changed || lastAction !== value.userAction)) open();
       lastAction = value.userAction;
     }
     return { root: root, update: update, open: open, operation: function () { return operation; } };

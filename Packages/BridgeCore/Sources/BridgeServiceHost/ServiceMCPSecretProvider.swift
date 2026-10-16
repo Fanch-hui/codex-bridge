@@ -14,6 +14,10 @@ public actor ServiceMCPSecretProvider {
     rawValue: "service.mcp.client.qwen-studio"
   )
 
+  public static let geminiReference = SecretReference(
+    rawValue: "service.mcp.client.gemini"
+  )
+
   private let store: any SecretStore
   private let randomBytes: @Sendable (Int) throws -> Data
 
@@ -64,6 +68,7 @@ public actor ServiceMCPSecretProvider {
     switch clientID {
     case .chatGPT: reference
     case .qwenStudio: qwenStudioReference
+    case .gemini: geminiReference
     default: throw ServiceMCPSecretError.unsupportedClient
     }
   }

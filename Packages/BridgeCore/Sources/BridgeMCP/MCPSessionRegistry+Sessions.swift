@@ -118,7 +118,7 @@ extension MCPSessionRegistry {
     guard isAdmissionCurrent(admissionToken, for: clientID) else {
       return .error(statusCode: 503, .internalError("MCP client unavailable"))
     }
-    let retiredServers = retireQwenSessionsForAdmission(clientID: clientID)
+    let retiredServers = retireLocalClientSessionsForAdmission(clientID: clientID)
     let clientSessionCount = sessions.values.lazy.filter { $0.clientID == clientID }.count
     let pendingForClient = pendingSessionCreationsByClient[clientID, default: 0]
     guard !isStopped,
@@ -193,12 +193,12 @@ extension MCPSessionRegistry {
     }
   }
 
-  func retireQwenSessionsForAdmission(clientID: MCPClientID) -> [Server] {
-    guard clientID == .qwenStudio else { return [] }
+  func retireLocalClientSessionsForAdmission(clientID: MCPClientID) -> [Server] {
+    guard clientID == .qwenStudio || clientID == .gemini else { return [] }
     var retiredServers: [Server] = []
     while sessionCapacityReached(for: clientID) {
       guard
-        let oldest = sessions.lazy.filter({ $0.value.clientID == .qwenStudio }).min(by: {
+        let oldest = sessions.lazy.filter({ $0.value.clientID == clientID }).min(by: {
           $0.value.lastAccessedAt < $1.value.lastAccessedAt
         }),
         let retired = sessions.removeValue(forKey: oldest.key)

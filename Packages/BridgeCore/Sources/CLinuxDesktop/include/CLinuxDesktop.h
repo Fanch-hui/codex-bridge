@@ -6,6 +6,7 @@ char *bridge_linux_next_event(void);
 void bridge_linux_free(void *value);
 void bridge_linux_script(const char *script);
 void bridge_linux_browser_action(int action);
+void bridge_linux_browser_select(const char *site, const char *resume_uri);
 void bridge_linux_browser_viewport(double x, double y, double width, double height, int visible);
 void bridge_linux_browser_enabled(int enabled);
 void bridge_linux_copy(const char *text);

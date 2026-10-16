@@ -2,8 +2,7 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   function create() {
-    var root = S.node("section", "page-card settings-card direct-settings-card");
-    root.appendChild(S.node("h3", null, "Direct 工作区"));
+    var root = S.node("section", "settings-subsection direct-settings-card");
     root.appendChild(S.node("p", "hint", "所有项目共用。黑名单优先于白名单，再检查安全模式规则；命令按参数前缀匹配。项目目录边界和本机审批仍生效。"));
     var context = { value: null, emit: null };
     var pending = Object.create(null);
@@ -45,7 +44,7 @@
       });
     }
     function list(title, key, placeholder) {
-      var section = S.node("section"), rows = S.node("div", "list-body");
+      var section = S.node("section", "direct-rule-section"), rows = S.node("div", "list-body");
       section.appendChild(S.node("h4", null, title)); section.appendChild(rows);
       var field = S.textField("命令行", "", placeholder);
       var add = S.button("添加", null, {}, null, "small primary", true);
@@ -90,7 +89,7 @@
       }};
     }
     function commandChecker() {
-      var section = S.node("section"), previousProjects = null;
+      var section = S.node("section", "direct-rule-section direct-command-checker"), previousProjects = null;
       section.appendChild(S.node("h4", null, "命令校验"));
       var help = S.node("p", "hint", "选择项目并输入命令，查看当前规则是否允许。校验不会执行命令；实际运行仍检查审批、目录和程序状态。");
       help.id = "direct-command-check-help";
@@ -105,9 +104,13 @@
       command.control.required = true;
       command.control.maxLength = 4096;
       directory.control.maxLength = 1024;
-      section.appendChild(project.wrapper);
-      section.appendChild(command.wrapper);
-      section.appendChild(directory.wrapper);
+      var fields = S.node("div", "form-grid direct-check-fields");
+      command.wrapper.classList.add("full");
+      directory.wrapper.classList.add("full");
+      fields.appendChild(project.wrapper);
+      fields.appendChild(command.wrapper);
+      fields.appendChild(directory.wrapper);
+      section.appendChild(fields);
       var checkButton = S.button("校验命令", null, {}, null, "small primary", true);
       var result = S.node("div", "page-message");
       result.setAttribute("role", "status");
@@ -127,7 +130,9 @@
       });
       command.control.addEventListener("input", renderResult);
       directory.control.addEventListener("input", renderResult);
-      section.appendChild(checkButton);
+      var actions = S.node("div", "form-actions");
+      actions.appendChild(checkButton);
+      section.appendChild(actions);
       section.appendChild(result);
       function renderResult() {
         var state = context.value && context.value.check;

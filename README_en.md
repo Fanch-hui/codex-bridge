@@ -8,22 +8,22 @@ Codex Bridge is a self-hosted desktop app and background service that connects C
 
 macOS, Windows, and Linux share the Swift core and desktop UI. Project directory authorizations, configuration, and task history are stored locally. Requests are sent to the services you choose when using ChatGPT or a model API.
 
-The current release is [v2.0.4](./docs/RELEASE_NOTES_v2.0.4.md).
+The current release is [v2.1.0](./docs/RELEASE_NOTES_v2.1.0.md).
 
 ## Download and install
 
 Get the latest version from [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest).
 
-| Platform | v2.0.4 package | Installation |
+| Platform | v2.1.0 package | Installation |
 | --- | --- | --- |
-| macOS 14+, Apple Silicon | `CodexBridge-2.0.4-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
-| macOS 14+, Intel | `CodexBridge-2.0.4-macos-x86_64.dmg` | Open the DMG and drag the app to Applications |
-| Windows x64 | `CodexBridge-Windows-x64-2.0.4-Setup.exe` | Run the installer and choose an installation folder |
-| Windows ARM64 | `CodexBridge-Windows-arm64-2.0.4-Setup.exe` | Run the installer and choose an installation folder |
+| macOS 14+, Apple Silicon | `CodexBridge-2.1.0-macos-arm64.dmg` | Open the DMG and drag the app to Applications |
+| macOS 14+, Intel | `CodexBridge-2.1.0-macos-x86_64.dmg` | Open the DMG and drag the app to Applications |
+| Windows x64 | `CodexBridge-Windows-x64-2.1.0-Setup.exe` | Run the installer and choose an installation folder |
+| Windows ARM64 | `CodexBridge-Windows-arm64-2.1.0-Setup.exe` | Run the installer and choose an installation folder |
 | Windows x64 / ARM64, portable | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | Extract the complete archive and run `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-2.0.4.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-2.0.4.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64, portable | `codex-bridge-linux-x64-2.0.4.tar.gz` / `codex-bridge-linux-arm64-2.0.4.tar.gz` | Extract the complete archive and run `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-2.1.0.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-2.1.0.deb` | Install with APT; see the [Linux guide](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64, portable | `codex-bridge-linux-x64-2.1.0.tar.gz` / `codex-bridge-linux-arm64-2.1.0.tar.gz` | Extract the complete archive and run `./codex-bridge` |
 
 The macOS package is ad-hoc signed and is not Apple-notarized. If macOS blocks the app, allow it in System Settings → Privacy & Security. Windows requires WebView2 Runtime; the app reports a missing runtime.
 
@@ -70,6 +70,7 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 ## User guides
 
 - [Complete user guide (Chinese)](./docs/USER_GUIDE.md)
+- [Gemini local MCP](./docs/USER_GUIDE.md#81-连接-gemini-本地-mcp) · [Cloud MCP through public ChatGPT Sites or ngrok](./docs/USER_GUIDE.md#82-连接-gemini-云-mcp) (Chinese; includes a copyable Sites setup prompt for Codex)
 - [ChatGPT / Tunnel / OpenAI Runtime API Key (Chinese)](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness ACP installation and API configuration](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE_en.md) · [Native desktop connection (Chinese)](./docs/DSH_NATIVE_DESKTOP_GUIDE.md)
 - [Pi and Qoder installation, regions, and connections](./docs/PI_QODER_CONNECTION_GUIDE_en.md)

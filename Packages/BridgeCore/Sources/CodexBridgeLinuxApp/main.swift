@@ -1,8 +1,10 @@
 #if os(Linux)
   import BridgeDesktopShell
+  import BridgeLocalMCP
   import Dispatch
   import Glibc
 
+  MCPStdioEntryPoint.runIfRequested()
   let arguments = Array(CommandLine.arguments.dropFirst())
   Task { @MainActor in
     if arguments == ["--ensure-service"] {

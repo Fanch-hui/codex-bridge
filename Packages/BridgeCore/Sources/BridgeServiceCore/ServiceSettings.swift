@@ -21,6 +21,9 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case mcpLocalPort = "mcp.local_port"
   case qwenStudioEnabled = "mcp.client.qwen-studio.enabled"
   case qwenStudioExposureMode = "mcp.client.qwen-studio.exposure_mode"
+  case geminiEnabled = "mcp.client.gemini.enabled"
+  case geminiExposureMode = "mcp.client.gemini.exposure_mode"
+  case geminiCloudConfiguration = "mcp.client.gemini.cloud_configuration"
   case directConfiguration = "direct.configuration"
   case directApprovalMode = "direct.approval_mode"
   case taskStartApprovalMode = "tasks.start_approval_mode"
@@ -195,28 +198,6 @@ public actor ServiceSettings {
       throw ServiceStoreError.invalidArgument("mcp.localPort")
     }
     try await set(String(port), for: .mcpLocalPort)
-  }
-
-  public func qwenStudioEnabled() async throws -> Bool {
-    guard let value = try await string(for: .qwenStudioEnabled) else { return false }
-    guard let enabled = Bool(value) else { throw ServiceStoreError.corruptRecord }
-    return enabled
-  }
-
-  public func setQwenStudioEnabled(_ enabled: Bool) async throws {
-    try await set(String(enabled), for: .qwenStudioEnabled)
-  }
-
-  public func qwenStudioExposureMode() async throws -> ServiceMCPExposureMode {
-    guard let value = try await string(for: .qwenStudioExposureMode) else { return .full }
-    guard let mode = ServiceMCPExposureMode(rawValue: value) else {
-      throw ServiceStoreError.corruptRecord
-    }
-    return mode
-  }
-
-  public func setQwenStudioExposureMode(_ mode: ServiceMCPExposureMode) async throws {
-    try await set(mode.rawValue, for: .qwenStudioExposureMode)
   }
 
   public func directApprovalMode() async throws -> ServiceDirectApprovalMode {

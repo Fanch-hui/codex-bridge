@@ -52,7 +52,7 @@
 
   function approvalCard(page, emit) {
     var context = { page: page, emit: emit };
-    var card = S.node("section", "page-card settings-card");
+    var card = S.node("section", "settings-subsection settings-approval");
     card.appendChild(S.node("h3", null, "安全审批策略"));
     var direct = S.selectField("Direct 操作", page.directApprovalMode, S.choices(page.directApprovalMode, page.directApprovalOptions), function (value) {
       context.emit("setDirectApprovalMode", { mode: value });
@@ -60,8 +60,10 @@
     var task = S.selectField("远程任务启动", page.taskStartApprovalMode, S.choices(page.taskStartApprovalMode, page.taskStartApprovalOptions), function (value) {
       context.emit("setTaskStartApprovalMode", { mode: value });
     }, "");
-    card.appendChild(direct.wrapper);
-    card.appendChild(task.wrapper);
+    var fields = S.node("div", "form-grid settings-policy-grid");
+    fields.appendChild(direct.wrapper);
+    fields.appendChild(task.wrapper);
+    card.appendChild(fields);
     var draft = D.bind({ direct: direct.control, task: task.control });
     function update(next, nextEmit) {
       context.page = next;
@@ -78,7 +80,7 @@
 
   function serviceCard(page, emit) {
     var context = { page: page, emit: emit };
-    var card = S.node("section", "settings-subsection");
+    var card = S.node("section", "settings-subsection settings-service");
     card.appendChild(S.node("h3", null, "退出 App 后继续运行服务"));
     var description = S.node("p", "hint");
     var keepRow = S.node("div", "check-field");
@@ -91,7 +93,7 @@
     thumb.setAttribute("aria-hidden", "true");
     keep.appendChild(thumb);
     keepRow.appendChild(keep);
-    keepRow.appendChild(S.node("span", null, "退出 App 后继续运行"));
+    keepRow.appendChild(S.node("span", null, "继续运行后台服务"));
     var keepDraft = D.bind({ keep: keep });
     function updateSwitch() {
       keep.className = "switch-toggle" + (keep.value === "true" ? " is-active" : "");
@@ -113,7 +115,7 @@
     function update(next, nextEmit) {
       context.page = next;
       context.emit = nextEmit;
-      description.textContent = "退出后仍可通过 ChatGPT / Qwen 使用本机。无人值守运行需将相关审批设为自动批准。";
+      description.textContent = "退出后仍可通过 ChatGPT / Qwen / Gemini 使用本机。无人值守运行需将相关审批设为自动批准。";
       keepDraft.update({ keep: next.keepServiceRunningAfterExit ? "true" : "false" });
       updateSwitch();
       var needsAttention = next.serviceStatus

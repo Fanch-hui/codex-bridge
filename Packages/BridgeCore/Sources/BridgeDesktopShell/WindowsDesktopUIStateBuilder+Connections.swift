@@ -55,6 +55,7 @@
         tunnel: tunnel,
         codex: codexState(workbench: workbench, settings: settings, connections: connections),
         clients: connections.clientItems,
+        geminiCloud: connections.geminiCloud,
         deepSeekHarnessMCPServers: connections.deepSeekHarnessMCPItems,
         canManageDeepSeekHarnessMCP: connections.connectionState == .connected,
         selectedAgentMCPScope: connections.selectedAgentMCPScope,

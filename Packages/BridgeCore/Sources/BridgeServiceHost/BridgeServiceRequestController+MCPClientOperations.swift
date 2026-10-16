@@ -28,10 +28,8 @@ extension BridgeServiceRequestController {
       IPCMCPClientEnabledRequest.self,
       from: request
     )
-    guard payload.clientID == MCPClientID.qwenStudio.rawValue else {
-      throw ServiceMCPClientRegistryError.unsupportedClient
-    }
-    try await composition.setQwenStudioEnabled(payload.enabled)
+    let clientID = try localMCPClientID(payload.clientID)
+    try await composition.setMCPClientEnabled(payload.enabled, for: clientID)
     return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
   }
 
@@ -43,8 +41,9 @@ extension BridgeServiceRequestController {
     switch payload.clientID {
     case MCPClientID.chatGPT.rawValue:
       _ = try await composition.setExposureMode(payload.exposureMode)
-    case MCPClientID.qwenStudio.rawValue:
-      try await composition.setQwenStudioExposureMode(payload.exposureMode)
+    case MCPClientID.qwenStudio.rawValue, MCPClientID.gemini.rawValue:
+      let clientID = try localMCPClientID(payload.clientID)
+      try await composition.setMCPClientExposureMode(payload.exposureMode, for: clientID)
     default:
       throw ServiceMCPClientRegistryError.unsupportedClient
     }
@@ -69,10 +68,8 @@ extension BridgeServiceRequestController {
     _ request: BridgeServiceIPCRequest
   ) async throws -> Data {
     let payload = try BridgeServiceIPCCodec.payload(IPCMCPClientRequest.self, from: request)
-    guard payload.clientID == MCPClientID.qwenStudio.rawValue else {
-      throw ServiceMCPClientRegistryError.unsupportedClient
-    }
-    try await composition.rotateQwenStudioCredential()
+    let clientID = try localMCPClientID(payload.clientID)
+    try await composition.rotateMCPClientCredential(for: clientID)
     return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
   }
 
@@ -85,4 +82,12 @@ extension BridgeServiceRequestController {
       payload: IPCLocalMCPEndpointResponse(localMCPURL: endpoint.localURL.absoluteString)
     )
   }
+  private func localMCPClientID(_ rawValue: String) throws -> MCPClientID {
+    switch rawValue {
+    case MCPClientID.qwenStudio.rawValue: .qwenStudio
+    case MCPClientID.gemini.rawValue: .gemini
+    default: throw ServiceMCPClientRegistryError.unsupportedClient
+    }
+  }
+
 }

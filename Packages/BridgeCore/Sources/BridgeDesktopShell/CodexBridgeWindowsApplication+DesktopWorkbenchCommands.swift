@@ -18,6 +18,11 @@
         onUI { DesktopPlatformHost.browserForward() }
       case .browserReload:
         onUI { DesktopPlatformHost.browserReload() }
+      case .selectBrowserSite:
+        guard let value = payload.value, let site = ChatBrowserSite(rawValue: value) else {
+          return true
+        }
+        onUI { DesktopPlatformHost.selectBrowserSite(site) }
       case .setBrowserEnabled:
         guard let enabled = payload.enabled else { return true }
         model.setChatBrowserEnabled(enabled)

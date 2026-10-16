@@ -1,41 +1,37 @@
 .detail-overview { display: grid; gap: 24px; }
 .detail-overview > .page-section { margin-top: 0; }
-.detail-overview .page-card { padding: 4px 16px; }
-.detail-overview .shared-settings-group { padding: 16px; border-radius: var(--radius); background: var(--surface); }
-.detail-row { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 56px; padding: 12px 0; border: 0; border-radius: 8px; color: var(--text); background: transparent; font: inherit; text-align: left; cursor: pointer; transition: background-color 150ms ease; }
-.detail-row:hover { background: var(--surface-muted); }
-.detail-row:active { background: var(--accent-soft); }
+.detail-list { padding: 0; overflow: hidden; }
+.detail-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 14px; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 16px; border: 0; border-radius: 0; color: var(--text); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.detail-row + .detail-row { border-top: 1px solid var(--separator); }
 .detail-row-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
-.detail-row-title { font-size: 14px; font-weight: 600; }
+.detail-row-title { font-size: 14px; }
 .detail-row-value { color: var(--text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.detail-row-accessory { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.detail-row-accessory { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 240px; text-align: right; }
+.detail-row-accessory:empty { display: none; }
+.detail-row:has(> .detail-row-accessory:empty) { grid-template-columns: minmax(0, 1fr) 14px; }
 .detail-row-chevron { width: 14px; height: 14px; color: var(--text-tertiary); }
-.detail-header { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 16px; padding: 12px 0 20px; background: var(--canvas); }
-.detail-heading { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.02em; }
+.detail-header { position: sticky; top: 0; z-index: var(--z-detail-header); display: flex; align-items: center; gap: 12px; padding: 4px 0 16px; background: var(--canvas); }
+.detail-heading { margin: 0; }
 .detail-back { gap: 4px; background: transparent; }
-.detail-content { display: grid; gap: 16px; max-width: 960px; margin: 0 auto; }
+.detail-content { display: grid; gap: 24px; min-width: 0; }
+.detail-content > * { min-width: 0; }
 .detail-content .page-section:first-child { margin-top: 0; }
-.detail-content .agent-connect-row { padding: 16px; border: 0; border-radius: var(--radius); background: var(--surface); }
-.detail-content .agent-preferences { margin: 0; padding: 0; border: 0; }
+.page:has([data-detail-open="true"]) .page-help { display: none; }
 .page-help { margin: 0 0 16px; color: var(--text-secondary); font-size: 12px; }
 .page-help summary { width: fit-content; cursor: pointer; }
 .page-help p { margin: 8px 0 0; max-width: 72ch; line-height: 1.5; }
-.connection-help { color: var(--text-secondary); font-size: 12px; }
-.connection-help > summary { cursor: pointer; }
 .task-metadata { margin: 12px 0; }
 .task-metadata > summary { color: var(--text-secondary); font-size: 12px; cursor: pointer; }
 .task-failure-summary { margin: 12px 0; padding: 12px; border-radius: 8px; background: var(--error-soft); }
 .task-failure-summary .error-text { margin: 0; }
 .log-entry { min-width: 0; }
-.log-diagnostic { margin: 0; padding: 12px 16px; border-radius: 8px; color: var(--text-secondary); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere; }
+.log-diagnostic { margin: 0; padding: 12px 16px; border-top: 1px solid var(--separator); border-radius: 0; color: var(--text-secondary); background: var(--surface-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .workbench-provider, .collection-count { color: var(--text-secondary); font-size: 12px; }
-.page-section > .page-card > .page-card { padding-inline: 0; }
 
 @media (max-width: 700px) {
-  .detail-row { gap: 12px; }
-  .detail-row-accessory { max-width: 45%; flex-wrap: wrap; justify-content: flex-end; }
-  .detail-header { padding-bottom: 16px; }
-  .detail-content { max-width: 100%; }
+  .detail-row { gap: 8px; }
+  .detail-row-accessory { max-width: 140px; }
+  .detail-row-accessory .status-label { white-space: normal; }
 }
 
 @media (prefers-reduced-motion: reduce) {

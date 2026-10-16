@@ -3,10 +3,10 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var M = global.CodexBridgeDesktopSettingsModels;
 
-  function group(container, title) {
+  function group(container, title, listOnly) {
     var section = S.section(container, title);
-    section.className += " shared-settings-group";
-    var stack = S.node("div", "settings-stack");
+    section.className += " settings-group";
+    var stack = S.node("div", "page-card settings-group-body" + (listOnly ? " detail-list" : ""));
     section.appendChild(stack);
     return stack;
   }
@@ -55,9 +55,9 @@
         global.CodexBridgeDesktopDSHWorkbench.openSettings();
       } else openDetail(id);
     };
-    var agentsGroup = group(details.overview, "Agent");
+    var agentsGroup = group(details.overview, "Agent", true);
     var execution = group(details.overview, "执行策略");
-    var clients = group(details.overview, "客户端指令");
+    var clients = group(details.overview, "客户端指令", true);
     var application = group(details.overview, "应用运行");
     var codex = M.preferences(page, emit, true);
     var codexEntry = details.register("codex", "Codex", codex.root);
@@ -76,7 +76,7 @@
     function provider(id, title) {
       var current = providers.get(id);
       if (current) return current;
-      var body = S.node("div", "settings-stack");
+      var body = S.node("div", "settings-stack settings-provider-detail");
       current = { body: body, editors: new Map(), keys: new Set(), entry: details.register("agent:" + id, title, body) };
       current.status = S.status("就绪", "success");
       current.entry.accessory.appendChild(current.status);

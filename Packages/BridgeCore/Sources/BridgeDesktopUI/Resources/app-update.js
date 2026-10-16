@@ -131,7 +131,9 @@
     var cardClass = mode === "settings" ? "app-update-state" : "app-update-card";
     var card = node("div", cardClass + " app-update-phase-" + phase);
     card.setAttribute("role", "status");
-    card.appendChild(icon(phase === "failed" ? "exclamationmark.triangle.fill" : "arrow.down.circle"));
+    var symbol = phase === "failed" ? "exclamationmark.triangle.fill"
+      : phase === "upToDate" ? "checkmark.circle" : "arrow.down.circle";
+    card.appendChild(icon(symbol));
 
     var copy = node("div", "app-update-copy");
     copy.appendChild(node("h4", "app-update-heading", titleFor(state)));
@@ -195,10 +197,12 @@
   }
 
   function createSettings(initial, emit) {
-    var root = node("section", "page-card settings-card app-update-settings-card");
-    root.appendChild(node("h3", null, "应用更新"));
+    var root = node("section", "settings-subsection app-update-settings-card");
+    var header = node("div", "settings-section-heading");
+    header.appendChild(node("h3", null, "应用更新"));
     var versionLabel = node("p", "app-update-version");
-    root.appendChild(versionLabel);
+    header.appendChild(versionLabel);
+    root.appendChild(header);
     var stateContainer = node("div", "app-update-settings-state");
     root.appendChild(stateContainer);
     var lastSignature = null;

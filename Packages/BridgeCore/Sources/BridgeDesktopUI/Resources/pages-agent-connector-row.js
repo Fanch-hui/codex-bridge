@@ -13,9 +13,9 @@
     var currentInstallations = [];
     var rowsForInstallation = new Map();
 
-    var row = S.node("article", "agent-connect-row");
+    var row = S.node("article", "page-card connection-card agent-connect-row");
     var header = S.node("div", "agent-connect-header");
-    header.appendChild(S.icon("cpu.fill", "service-icon"));
+    if (!dependencies.detail) header.appendChild(S.icon("cpu.fill", "service-icon"));
     var main = S.node("div", "agent-connect-main");
     var heading = S.node("div", "client-heading");
     var title = S.node("div", "row-title");
@@ -263,7 +263,7 @@
       }).slice(-1)[0] || null;
       setup.update(operation, nextProvider);
       var scoped = scopedInstallations();
-      title.textContent = nextProvider.displayName;
+      title.textContent = dependencies.detail ? "连接状态" : nextProvider.displayName;
       var primary = primaryInstallation(scoped);
       var isConnectedValue = scoped.some(isConnected);
       S.updateStatus(status, stateLabel(nextProvider, primary, isConnectedValue),

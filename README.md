@@ -4,26 +4,26 @@
 
 [Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Fanch-hui%2Fcodex-bridge/versions/latest)
 
-Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、[OpenAI Dot](#通过-openai-dot-使用)、Qwen Studio 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
+Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、[OpenAI Dot](#通过-openai-dot-使用)、Qwen Studio、Gemini 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
 
 macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目目录授权、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 [v2.0.4](./docs/RELEASE_NOTES_v2.0.4.md)。
+当前版本为 [v2.1.0](./docs/RELEASE_NOTES_v2.1.0.md)。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v2.0.4 安装包 | 安装方式 |
+| 平台 | v2.1.0 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-2.0.4-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| macOS 14+，Intel | `CodexBridge-2.0.4-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-2.0.4-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows ARM64 | `CodexBridge-Windows-arm64-2.0.4-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-2.1.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-2.1.0-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-2.1.0-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-2.1.0-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-2.0.4.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-2.0.4.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-2.0.4.tar.gz` / `codex-bridge-linux-arm64-2.0.4.tar.gz` | 完整解压后运行 `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-2.1.0.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-2.1.0.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-2.1.0.tar.gz` / `codex-bridge-linux-arm64-2.1.0.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
@@ -70,6 +70,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 ## 使用指南
 
 - [详细使用指南](./docs/USER_GUIDE.md)：安装、项目授权、Qwen、任务与故障排查
+- [Gemini 本地 MCP](./docs/USER_GUIDE.md#81-连接-gemini-本地-mcp) · [云 MCP：ChatGPT Sites 与 ngrok](./docs/USER_GUIDE.md#82-连接-gemini-云-mcp)（含「让 Codex 帮你配置」提示词）
 - [ChatGPT / Tunnel / OpenAI API Key 配置](./docs/CHATGPT_DEVELOPER_MODE.md)
 - [DeepSeek Harness 安装与 API 配置](./docs/DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) · [原生桌面连接](./docs/DSH_NATIVE_DESKTOP_GUIDE.md)
 - [Pi 与 Qoder 安装、地区选择与连接](./docs/PI_QODER_CONNECTION_GUIDE.md)
@@ -84,7 +85,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
 2. **添加项目**：登记本地目录即授权完整访问。
-3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置，在 ChatGPT **插件 → 添加 → 创建自定义 MCP 服务器** 中添加 Codex Bridge，并在对话中启用插件（ChatGPT 使用 Secure MCP Tunnel 需要 Plus 及以上订阅或团队订阅）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。
+3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置，在 ChatGPT **插件 → 添加 → 创建自定义 MCP 服务器** 中添加 Codex Bridge，并在对话中启用插件（ChatGPT 使用 Secure MCP Tunnel 需要 Plus 及以上订阅或团队订阅）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。Gemini 在 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**选择本地 MCP 或 Cloud MCP；能启动本机程序的桌面客户端可使用[本地命令接入](./docs/USER_GUIDE.md#81-连接-gemini-本地-mcp)，网页版使用 [ChatGPT Sites（公开）或 ngrok](./docs/USER_GUIDE.md#82-连接-gemini-云-mcp)。
 4. **直接操作项目**：在已启用插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
 
 ### 委派 Agent 任务（可选）
@@ -121,6 +122,7 @@ DSH 提供两个独立连接：DSH ACP 使用 API 配置，一键配置准备 AC
 | Qoder | CN/国际版原生 CLI 与 SDK 接入、地区隔离、权限模式、工具审批与会话续写 |
 | 工作台 | 按 Agent 分组的项目会话、历史分页、工具卡片、审批、失败任务重试与跨 Agent 交接 |
 | Direct Workspace | 受控文件读写、Patch、命令执行与 Git 操作 |
+| Gemini | 本地 MCP 命令接入；ChatGPT Sites（公开）或 ngrok 云 MCP，客户端权限独立管理 |
 | Skills | 本机技能发现、只读查看与显式 Action 调用 |
 
 可用能力由实际 Agent、连接探测和用户选择的任务权限共同决定。远程请求省略 `project_id` 时使用工作台默认项目；省略 `provider_id` 时使用 Codex。

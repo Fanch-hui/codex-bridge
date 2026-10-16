@@ -5,11 +5,11 @@
 
   function create(emit) {
     var context = { emit: emit };
-    var section = S.node("section", "page-section");
+    var section = S.node("section", "connection-detail");
     var card = S.node("div", "page-card connection-card");
     section.appendChild(card);
     var titleRow = S.node("div", "section-heading-row");
-    var title = S.node("h3", null, "Codex");
+    var title = S.node("h3", null, "执行引擎");
     var badge = S.badge("未知", "neutral");
     titleRow.appendChild(title);
     titleRow.appendChild(badge);
@@ -20,7 +20,7 @@
       "Codex 由 Bridge 自动发现；安装在非常规位置时，可在此指定可执行文件。"
     );
     card.appendChild(subtitle);
-    var facts = S.node("div", "detail-grid");
+    var facts = S.node("div", "detail-grid connection-runtime");
     card.appendChild(facts);
     var path = S.textField(
       "可执行文件路径（可选）",
@@ -37,7 +37,7 @@
     pathActions.appendChild(clearPath);
     card.appendChild(path.wrapper);
     card.appendChild(pathActions);
-    var diagnostics = S.node("div");
+    var diagnostics = S.node("div", "connection-diagnostics");
     card.appendChild(diagnostics);
     var actions = S.node("div", "form-actions");
     var refresh = S.button("连接 Codex", null, {}, null, "small primary", true);

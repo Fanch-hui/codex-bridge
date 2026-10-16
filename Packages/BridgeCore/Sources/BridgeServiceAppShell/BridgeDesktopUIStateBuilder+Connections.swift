@@ -21,6 +21,7 @@ extension BridgeDesktopUIStateBuilder {
       tunnel: tunnelState(tunnel, connection: model.connectionState),
       codex: codexState(from: model),
       clients: clientRows(from: model),
+      geminiCloud: geminiCloudState(from: model),
       deepSeekHarnessMCPServers: deepSeekHarnessMCPRows(from: model),
       canManageDeepSeekHarnessMCP: model.connectionState == .connected,
       selectedAgentMCPScope: model.selectedAgentMCPScope,
@@ -137,54 +138,6 @@ extension BridgeDesktopUIStateBuilder {
       canConnect: connected && tunnel.configured && tunnel.helperAvailable && !tunnel.enabled,
       canDisconnect: connected && tunnel.enabled,
       canClear: connected && tunnel.configured
-    )
-  }
-
-  private static let exposureOptions = [
-    BridgeDesktopChoice(id: MCPServiceExposureMode.readOnly.rawValue, title: "只读"),
-    BridgeDesktopChoice(id: MCPServiceExposureMode.full.rawValue, title: "完整"),
-  ]
-
-  private static func clientRows(
-    from model: BridgeServiceAppModel
-  ) -> [BridgeDesktopMCPClientRow] {
-    let chat =
-      model.mcpClients.first { $0.clientID == MCPClientID.chatGPT.rawValue }
-      ?? IPCMCPClientStatus(
-        clientID: MCPClientID.chatGPT.rawValue,
-        displayName: "ChatGPT / OpenAI Tunnel",
-        enabled: true,
-        exposureMode: model.exposureMode,
-        activeSessionCount: 0
-      )
-    let qwen =
-      model.mcpClients.first { $0.clientID == MCPClientID.qwenStudio.rawValue }
-      ?? IPCMCPClientStatus(
-        clientID: MCPClientID.qwenStudio.rawValue,
-        displayName: "Qwen Studio",
-        enabled: false,
-        exposureMode: .readOnly,
-        activeSessionCount: 0
-      )
-    return [clientRow(chat, canToggle: false), clientRow(qwen, canToggle: true)]
-  }
-
-  private static func clientRow(
-    _ client: IPCMCPClientStatus,
-    canToggle: Bool
-  ) -> BridgeDesktopMCPClientRow {
-    let qwen = client.clientID == MCPClientID.qwenStudio.rawValue
-    return BridgeDesktopMCPClientRow(
-      clientID: client.clientID,
-      displayName: client.displayName,
-      enabled: client.enabled,
-      exposureMode: client.exposureMode.rawValue,
-      exposureOptions: exposureOptions,
-      activeSessionCount: client.activeSessionCount,
-      lastConnectedAt: client.lastConnectedAt,
-      canToggle: canToggle,
-      canCopyConfiguration: qwen,
-      canRotateCredential: qwen
     )
   }
 

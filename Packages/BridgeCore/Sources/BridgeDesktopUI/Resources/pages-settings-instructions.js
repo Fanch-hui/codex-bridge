@@ -5,14 +5,11 @@
 
   function create(page, emit) {
     var context = { page: page, emit: emit };
-    var card = S.node("section", "settings-subsection");
-    var field = S.node("div", "field");
-    field.appendChild(S.node("label", null, "给 GPT / Qwen 的指令"));
-    var text = S.node("textarea");
-    text.value = page.customInstructions || "";
-    text.placeholder = "可选。保存后由本机 Service 应用。";
-    field.appendChild(text);
-    field.appendChild(S.node("p", "hint", "用于指导 GPT / Qwen 理解和处理请求；Agent 任务应只包含你交代的具体工作。"));
+    var card = S.node("section", "settings-subsection settings-instructions");
+    var editor = S.textAreaField("给 ChatGPT / Qwen / Gemini 的指令",
+      page.customInstructions || "", "可选。保存后由本机 Service 应用。");
+    var field = editor.wrapper, text = editor.control;
+    field.appendChild(S.node("p", "hint", "用于指导客户端理解和处理请求；Agent 任务只包含你交代的具体工作。"));
     var counter = S.node("div", "hint");
     field.appendChild(counter);
     card.appendChild(field);

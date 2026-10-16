@@ -18,6 +18,7 @@
     let rotateEndpointEnabled: Bool
     let statusText: String
     var clientItems: [BridgeDesktopMCPClientRow] = []
+    var geminiCloud: BridgeDesktopGeminiCloudState? = nil
     var deepSeekHarnessMCPItems: [BridgeDesktopDeepSeekHarnessMCPRow] = []
     var selectedAgentMCPScope: String? = nil
     var agentMCPScopeOptions: [BridgeDesktopChoice]? = nil

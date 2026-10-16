@@ -52,6 +52,14 @@
       #endif
     }
 
+    static func selectBrowserSite(_ site: ChatBrowserSite) {
+      #if os(Windows)
+        WindowsMainWindow.chat?.selectSite(site)
+      #else
+        LinuxDesktopHost.selectBrowserSite(site)
+      #endif
+    }
+
     static func browserForward() {
       #if os(Windows)
         WindowsMainWindow.chat?.goForward()

@@ -9,6 +9,9 @@
       management: WindowsManagementModel,
       auxiliary: WindowsAuxiliaryRuntime
     ) -> Bool {
+      if runDesktopGeminiCloudCommand(envelope, connections: auxiliary.connections) {
+        return true
+      }
       if runDesktopAgentCommand(envelope, management: management, auxiliary: auxiliary) {
         return true
       }
@@ -56,7 +59,7 @@
             )
           else { return }
           auxiliary.connections.didCopyConfiguration(
-            DesktopPlatformHost.copy(configuration))
+            DesktopPlatformHost.copy(configuration), clientID: clientID)
         }
       case .copyLocalMCPEndpoint:
         guard let endpoint = auxiliary.connections.localMCPEndpoint else { return true }

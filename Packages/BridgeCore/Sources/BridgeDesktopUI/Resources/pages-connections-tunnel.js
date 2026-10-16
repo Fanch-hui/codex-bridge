@@ -26,11 +26,11 @@
 
   function renderLocalMCP(card, page, context) {
     S.clear(card);
-    card.appendChild(S.node("div", "page-message mono", page.localMCPURL || "Endpoint 尚未就绪"));
+    card.appendChild(S.node("code", "connection-endpoint-value mono", page.localMCPURL || "Endpoint 尚未就绪"));
     if (page.localMCPState === "local_port_unavailable") {
       card.appendChild(S.node("div", "page-message warning", "本地 MCP 端口被占用；不会静默更换地址，请主动生成新的 Endpoint。"));
     }
-    var state = S.node("div", "inline-status");
+    var state = S.node("div", "connection-endpoint-actions");
     state.appendChild(S.status(page.localMCPState === "ready" ? "已就绪" : page.localMCPState,
       page.localMCPState === "ready" ? "success" : "neutral"));
     if (page.canCopyLocalMCPURL) {

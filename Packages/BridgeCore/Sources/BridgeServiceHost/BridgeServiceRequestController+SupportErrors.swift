@@ -12,6 +12,9 @@ import Foundation
 
 extension BridgeServiceRequestController {
   static func map(_ error: Error) -> BridgeServiceIPCError {
+    if let error = error as? GeminiCloudError {
+      return .init(code: "gemini_cloud_configuration", message: error.localizedDescription)
+    }
     if let mapped = mapDeepSeekDesktopError(error) { return mapped }
     if let error = error as? WorkbenchFileReadError {
       let code: String

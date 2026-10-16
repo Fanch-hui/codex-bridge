@@ -15,6 +15,7 @@
     var connectionState = WindowsWorkbenchDisplay.ConnectionState.idle
     var serviceStatus: IPCServiceStatusResponse?
     var clients: [IPCMCPClientStatus] = []
+    var geminiCloudStatus: IPCGeminiCloudStatus?
     var deepSeekHarnessMCPServers: [IPCDeepSeekHarnessMCPServerSummary] = []
     var selectedAgentMCPScope = BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
     private var pendingAgentMCPScopeRefresh = false
@@ -62,11 +63,13 @@
       do {
         async let statusRequest = client.status()
         async let clientsRequest = client.mcpClients()
+        async let cloudRequest = try? await client.geminiCloudStatus()
         async let deepSeekHarnessMCPRequest = client.deepSeekHarnessMCPServers(
           scope: requestedMCPScope
         )
         serviceStatus = try await statusRequest
         clients = try await clientsRequest
+        geminiCloudStatus = await cloudRequest
         if let deepSeekHarnessMCPResponse = try? await deepSeekHarnessMCPRequest,
           selectedAgentMCPScope == requestedMCPScope
         {
@@ -97,68 +100,6 @@
       publishDisplay()
       if !busy {
         Task { @MainActor [weak self] in await self?.refresh() }
-      }
-    }
-
-    func toggleSelectedClient(clientID: String? = nil) async {
-      guard let profile = profile(clientID: clientID),
-        profile.clientID == MCPClientID.qwenStudio.rawValue
-      else {
-        return
-      }
-      let enabled = !profile.enabled
-      await mutate(
-        "正在更新 Qwen Studio 状态…",
-        success: enabled ? "Qwen Studio 已启用。" : "Qwen Studio 已停用。"
-      ) {
-        try await self.client.setMCPClientEnabled(
-          clientID: profile.clientID,
-          enabled: enabled
-        )
-      }
-    }
-
-    func setSelectedExposure(at index: Int, clientID: String? = nil) async {
-      guard Self.exposureModes.indices.contains(index), let profile = profile(clientID: clientID)
-      else { return }
-      let mode = Self.exposureModes[index]
-      await mutate(
-        "正在保存工具权限…",
-        success: "工具权限已设置为：\(mode == .full ? "完整" : "只读")。"
-      ) {
-        if profile.clientID == MCPClientID.chatGPT.rawValue {
-          try await self.client.setExposureMode(mode)
-        } else {
-          try await self.client.setMCPClientExposureMode(clientID: profile.clientID, mode: mode)
-        }
-      }
-    }
-
-    func exportSelectedConfiguration(clientID: String? = nil) async -> String? {
-      guard let profile = profile(clientID: clientID),
-        profile.clientID == MCPClientID.qwenStudio.rawValue,
-        profile.enabled
-      else { return nil }
-      do {
-        let value = try await client.exportMCPClientConfiguration(clientID: profile.clientID)
-        statusText = "Qwen JSON 配置已生成。"
-        publishDisplay()
-        return value
-      } catch {
-        statusText = "生成 Qwen 配置失败：\(BridgeServiceErrorMessage.message(error))"
-        feedback.postAlert(statusText, title: "配置生成失败")
-        publishDisplay()
-        return nil
-      }
-    }
-
-    func rotateSelectedCredential(clientID: String? = nil) async {
-      guard let profile = profile(clientID: clientID),
-        profile.clientID == MCPClientID.qwenStudio.rawValue,
-        profile.enabled
-      else { return }
-      await mutate("正在重新生成 Qwen 凭证…", success: "Qwen 凭证已重新生成。") {
-        try await self.client.rotateMCPClientCredential(clientID: profile.clientID)
       }
     }
 
@@ -221,16 +162,6 @@
       await saveDeepSeekHarnessMCPServer(request)
     }
 
-    func didCopyConfiguration(_ success: Bool) {
-      statusText = success ? "已复制 Qwen Studio JSON 配置。" : "复制 Qwen 配置失败。"
-      if success {
-        feedback.postToast(statusText)
-      } else {
-        feedback.postAlert(statusText, title: "复制失败")
-      }
-      publishDisplay()
-    }
-
     var localMCPEndpoint: String? {
       Self.safeLocalMCPDescription(from: serviceStatus?.localMCPURL)
     }
@@ -281,7 +212,7 @@
 
     private var selectedClient: IPCMCPClientStatus? { profile(clientID: nil) }
 
-    private func profile(clientID: String?) -> IPCMCPClientStatus? {
+    func profile(clientID: String?) -> IPCMCPClientStatus? {
       guard let id = clientID ?? selectedClientID else { return nil }
       return clients.first { $0.clientID == id }
     }
@@ -293,12 +224,12 @@
       selectedClientID = clients.first?.clientID
     }
 
-    private func publishDisplay() {
+    func publishDisplay() {
       let profile = selectedClient
       let selectedIndex = selectedClientID.flatMap { id in
         clients.firstIndex { $0.clientID == id }
       }
-      let isQwen = profile?.clientID == MCPClientID.qwenStudio.rawValue
+      let localClient = Self.isLocalClient(profile?.clientID)
       let enabled = profile?.enabled == true
       let desktopClients = clients.map { client in
         BridgeDesktopMCPClientRow(
@@ -311,10 +242,10 @@
           },
           activeSessionCount: client.activeSessionCount,
           lastConnectedAt: client.lastConnectedAt,
-          canToggle: client.clientID == MCPClientID.qwenStudio.rawValue && !busy,
-          canCopyConfiguration: client.clientID == MCPClientID.qwenStudio.rawValue
+          canToggle: Self.isLocalClient(client.clientID) && !busy,
+          canCopyConfiguration: Self.isLocalClient(client.clientID)
             && client.enabled && !busy,
-          canRotateCredential: client.clientID == MCPClientID.qwenStudio.rawValue
+          canRotateCredential: Self.isLocalClient(client.clientID)
             && client.enabled && !busy
         )
       }
@@ -331,19 +262,20 @@
           selectedExposureIndex: profile.flatMap {
             Self.exposureModes.firstIndex(of: $0.exposureMode)
           },
-          toggleTitle: isQwen
-            ? (enabled ? "停用 Qwen Studio" : "启用 Qwen Studio")
+          toggleTitle: localClient
+            ? (enabled ? "停用 \(profile?.displayName ?? "")" : "启用 \(profile?.displayName ?? "")")
             : "ChatGPT 保持启用",
-          toggleEnabled: isQwen && !busy,
+          toggleEnabled: localClient && !busy,
           saveExposureEnabled: enabled && !busy,
-          copyConfigurationEnabled: isQwen && enabled && !busy,
-          rotateCredentialEnabled: isQwen && enabled && !busy,
+          copyConfigurationEnabled: localClient && enabled && !busy,
+          rotateCredentialEnabled: localClient && enabled && !busy,
           rotateEndpointEnabled: connectionState == .connected && !busy,
           statusText: ServiceStatusPresentation.connectionMessage(
             status: serviceStatus?.status,
             currentMessage: statusText
           ) ?? statusText,
           clientItems: desktopClients,
+          geminiCloud: projectedGeminiCloud,
           deepSeekHarnessMCPItems: deepSeekHarnessMCPServers.map { server in
             BridgeDesktopDeepSeekHarnessMCPRow(
               id: server.id,

@@ -34,13 +34,14 @@ public actor ServiceComposition {
   public let application: BridgeServiceApplication
   public let tunnel: ServiceTunnelController
   public let mcpClients: ServiceMCPClientRegistry
+  let geminiCloud: ServiceGeminiCloudController
   public let legacyImportReport: LegacyImportReport?
 
   private let configuration: ServiceCompositionConfiguration
   private let executionAppServer: CodexAppServerLocator
   private let catalogAppServer: CodexAppServerLocator
   private let deepSeekDesktop: DeepSeekHarnessDesktopController
-  private var mcpServer: MCPBridgeServer?
+  var mcpServer: MCPBridgeServer?
   private var mcpEndpoint: MCPBridgeEndpoint?
   private var startupAgentRefreshTask: Task<Void, Never>?
   private var tunnelBootstrapped = false
@@ -415,6 +416,7 @@ public actor ServiceComposition {
     self.application = application
     self.tunnel = tunnel
     self.mcpClients = mcpClients
+    geminiCloud = ServiceGeminiCloudController(settings: settings, clients: mcpClients)
     self.legacyImportReport = legacyImportReport
   }
 
@@ -440,6 +442,7 @@ public actor ServiceComposition {
         },
         httpConfiguration: try MCPHTTPConfiguration(
           clientAuthenticator: mcpClients.authenticator,
+          geminiCloudAccessGate: geminiCloud.accessGate,
           port: requestedPort
         ),
         clientAdmission: mcpClients.admission
@@ -456,6 +459,7 @@ public actor ServiceComposition {
       }
       mcpServer = activeServer
       mcpEndpoint = endpoint
+      await geminiCloud.synchronize(endpoint: endpoint.localURL)
       await runtimeStatus.updateMCP(state: "ready")
       if tunnelBootstrapped {
         await tunnel.localMCPDidChange(
@@ -498,76 +502,6 @@ public actor ServiceComposition {
     try await settings.setExposureMode(Self.serviceExposureMode(mode))
     await mcpServer?.terminateSessions(for: .chatGPT)
     return try await startLocalMCP()
-  }
-
-  public func refreshMCPInstructions() async {
-    await mcpServer?.terminateSessions(for: .chatGPT)
-    await mcpServer?.terminateSessions(for: .qwenStudio)
-  }
-
-  public func mcpClientStatuses() async throws -> [ServiceMCPClientStatus] {
-    let profiles = try await mcpClients.profiles()
-    var statuses: [ServiceMCPClientStatus] = []
-    statuses.reserveCapacity(profiles.count)
-    for profile in profiles {
-      statuses.append(
-        ServiceMCPClientStatus(
-          profile: profile,
-          activeSessionCount: await mcpServer?.activeSessionCount(for: profile.clientID) ?? 0,
-          lastConnectedAt: mcpClients.authenticator.lastAuthenticationDate(
-            for: profile.clientID
-          )
-        )
-      )
-    }
-    return statuses
-  }
-
-  public func setQwenStudioEnabled(_ enabled: Bool) async throws {
-    do {
-      try await mcpClients.setQwenStudioEnabled(enabled)
-    } catch {
-      await mcpServer?.terminateSessions(for: .qwenStudio)
-      throw error
-    }
-    await mcpServer?.terminateSessions(for: .qwenStudio)
-  }
-
-  public func setQwenStudioExposureMode(_ mode: MCPServiceExposureMode) async throws {
-    try await mcpClients.setQwenStudioExposureMode(mode)
-    await mcpServer?.terminateSessions(for: .qwenStudio)
-  }
-
-  public func rotateQwenStudioCredential() async throws {
-    do {
-      try await mcpClients.rotateQwenStudioCredential()
-    } catch {
-      await mcpServer?.terminateSessions(for: .qwenStudio)
-      throw error
-    }
-    await mcpServer?.terminateSessions(for: .qwenStudio)
-  }
-
-  public func exportQwenStudioConfiguration() async throws -> String {
-    let endpoint = try await startLocalMCP()
-    let credential = try await mcpClients.qwenStudioCredential()
-    let configuration: [String: Any] = [
-      "mcpServers": [
-        "Codex Bridge": [
-          "type": "streamable-http",
-          "url": endpoint.localURL.absoluteString,
-          "headers": [MCPHTTPConfiguration.tunnelAuthenticationHeader: credential],
-        ]
-      ]
-    ]
-    let data = try JSONSerialization.data(
-      withJSONObject: configuration,
-      options: [.prettyPrinted, .sortedKeys]
-    )
-    guard let value = String(data: data, encoding: .utf8) else {
-      throw ServiceMCPClientRegistryError.unsupportedClient
-    }
-    return value
   }
 
   public func rotateLocalMCPEndpoint() async throws -> MCPBridgeEndpoint {
@@ -673,6 +607,7 @@ public actor ServiceComposition {
     refreshTask?.cancel()
     _ = await refreshTask?.result
     await tunnel.shutdown()
+    await geminiCloud.shutdown()
     await stopMCP()
     await application.shutdownTaskQueueProcessor()
     await coordinator.shutdown()
@@ -682,6 +617,7 @@ public actor ServiceComposition {
   }
 
   private func stopMCP() async {
+    await geminiCloud.shutdown()
     let server = mcpServer
     mcpServer = nil
     mcpEndpoint = nil

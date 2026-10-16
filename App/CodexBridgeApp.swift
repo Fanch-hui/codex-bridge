@@ -1,4 +1,5 @@
 import AppKit
+import BridgeLocalMCP
 import BridgeServiceAppShell
 import SwiftUI
 
@@ -8,6 +9,7 @@ struct CodexBridgeApp: App {
   @StateObject private var model: BridgeServiceAppModel
 
   init() {
+    MCPStdioEntryPoint.runIfRequested()
     MacAppUpdateHelper.runIfRequested()
     let model = BridgeServiceAppModel()
     _model = StateObject(wrappedValue: model)

@@ -1,11 +1,13 @@
 #if os(Windows) || os(Linux)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
 
   extension WindowsDesktopUIStateBuilder {
     static func workbenchPage(
       _ display: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
       browserAvailable: Bool,
+      browserSite: ChatBrowserSite = .chatGPT,
       browserURL: String? = nil,
       browserStatus: String? = nil,
       browserCanGoBack: Bool = false,
@@ -20,7 +22,7 @@
       return BridgeDesktopWorkbenchState(
         header: header(
           "工作台",
-          "在 ChatGPT 与本机任务证据之间保持同一工作上下文。",
+          "在聊天网页与本机任务证据之间保持同一工作上下文。",
           "bubble.left.and.text.bubble.right.fill"
         ),
         projects: projects,
@@ -38,6 +40,7 @@
         steerModes: steerModes(for: display),
         browser: browserSlot(
           for: display,
+          site: browserSite,
           available: browserAvailable,
           url: browserURL,
           status: browserStatus,
@@ -138,19 +141,21 @@
 
     private static func browserSlot(
       for display: WindowsWorkbenchDisplay,
+      site: ChatBrowserSite,
       available: Bool,
       url: String?,
       status: String?,
       canGoBack: Bool,
       canGoForward: Bool
     ) -> BridgeDesktopBrowserSlot {
-      let enabled = available && display.browserEnabled
+      let enabled = display.browserEnabled
       return BridgeDesktopBrowserSlot(
+        site: site,
         visible: true,
         enabled: enabled,
         url: url,
-        status: status ?? (available ? "由宿主加载真实 ChatGPT 工作区" : "内置 WebView2 浏览器不可用"),
-        canToggle: available,
+        status: status ?? (available ? "正在加载 \(site.displayName)…" : "内置浏览器不可用"),
+        canToggle: true,
         canOpenExternally: true,
         canGoBack: enabled && canGoBack,
         canGoForward: enabled && canGoForward,

@@ -27,6 +27,7 @@
       if (selected === null) parentScroll = scroll.scrollTop || 0;
       else storage.appendChild(entries.get(selected).body);
       selected = id;
+      container.dataset.detailOpen = "true";
       overview.hidden = true; detail.hidden = false;
       title.textContent = entry.title;
       detail.setAttribute("aria-label", entry.title);
@@ -40,6 +41,7 @@
       var entry = entries.get(selected);
       storage.appendChild(entry.body);
       selected = null; detail.hidden = true; overview.hidden = false;
+      delete container.dataset.detailOpen;
       scrollHost().scrollTop = parentScroll;
       (restoreFocus === false ? overview : entry.root).focus({ preventScroll: true });
     }

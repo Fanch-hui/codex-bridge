@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeServiceAppCore
   import Foundation
   import WinSDK
 
@@ -10,163 +11,173 @@
       case failed
     }
 
-    static let chatURL = "https://chatgpt.com"
-    private static let resumeURLDefaultsKey = "chatBrowserResumeURL"
+    static let chatURL = ChatBrowserSite.chatGPT.homeURL.absoluteString
 
     private let lock = NSLock()
-    private var snapshot = Snapshot(
-      state: .loading,
-      errorDetail: nil,
-      canGoBack: false,
-      canGoForward: false,
-      currentURL: WindowsChatWebView.storedResumeURL()
-    )
-    private var worker: WindowsWebViewThread?
+    private let preferences: ChatBrowserPreferences
+    private var selectedSite: ChatBrowserSite
+    private var snapshots: [ChatBrowserSite: Snapshot] = [:]
+    private var workers: [ChatBrowserSite: WindowsWebViewThread] = [:]
+    private var parentWindow: HWND?
+    private var bounds = RECT()
+    private var visible = false
     private var lowMemoryUsage = false
+    private var stopping = false
 
-    var state: State {
-      lock.withLock { snapshot.state }
+    init(defaults: UserDefaults = .standard) {
+      preferences = ChatBrowserPreferences(defaults: defaults)
+      selectedSite = preferences.selectedSite
     }
 
-    var errorDetail: String? {
-      lock.withLock { snapshot.errorDetail }
-    }
-
-    var canGoBack: Bool {
-      lock.withLock { snapshot.canGoBack }
-    }
-
-    var canGoForward: Bool {
-      lock.withLock { snapshot.canGoForward }
-    }
-
-    var currentURL: String? {
-      lock.withLock { snapshot.currentURL }
-    }
+    var site: ChatBrowserSite { lock.withLock { selectedSite } }
+    var state: State { lock.withLock { currentSnapshot.state } }
+    var errorDetail: String? { lock.withLock { currentSnapshot.errorDetail } }
+    var canGoBack: Bool { lock.withLock { currentSnapshot.canGoBack } }
+    var canGoForward: Bool { lock.withLock { currentSnapshot.canGoForward } }
+    var currentURL: String? { lock.withLock { currentSnapshot.currentURL } }
 
     func attach(to window: HWND?) {
       guard let window else { return }
-      let initialURL = currentURL ?? Self.chatURL
-      let next = WindowsWebViewThread(
-        parentWindow: window,
-        configuration: .chatBrowser(initialURL: initialURL),
+      let next = lock.withLock { () -> WindowsWebViewThread? in
+        guard parentWindow == nil, !stopping else { return nil }
+        parentWindow = window
+        return createWorker(for: selectedSite)
+      }
+      next?.start()
+    }
+
+    func selectSite(_ site: ChatBrowserSite) {
+      let next = lock.withLock { () -> WindowsWebViewThread? in
+        guard !stopping, selectedSite != site else { return nil }
+        selectedSite = site
+        preferences.selectedSite = site
+        let next = createWorker(for: site)
+        applyWorkerLayout()
+        return next
+      }
+      next?.start()
+    }
+
+    func resize(to bounds: RECT) {
+      lock.withLock {
+        self.bounds = bounds
+        applyWorkerLayout()
+      }
+    }
+
+    func setVisible(_ visible: Bool) {
+      lock.withLock {
+        self.visible = visible
+        applyWorkerLayout()
+      }
+    }
+
+    func setLowMemoryUsage(_ low: Bool) {
+      lock.withLock {
+        lowMemoryUsage = low
+        applyWorkerLayout()
+      }
+    }
+
+    func applyLayout(to bounds: RECT, visible: Bool) {
+      lock.withLock {
+        self.bounds = bounds
+        self.visible = visible
+        applyWorkerLayout()
+      }
+    }
+
+    func goBack() { lock.withLock { workers[selectedSite] }?.goBack() }
+    func goForward() { lock.withLock { workers[selectedSite] }?.goForward() }
+    func reload() { lock.withLock { workers[selectedSite] }?.reload() }
+
+    func beginShutdown(notifying window: HWND, message: UINT) -> Int {
+      let active = lock.withLock { () -> [WindowsWebViewThread] in
+        stopping = true
+        return Array(workers.values)
+      }
+      return active.reduce(0) { count, worker in
+        count + (worker.beginShutdown(notifying: window, message: message) ? 1 : 0)
+      }
+    }
+
+    func shutdown() {
+      let active = lock.withLock { () -> [WindowsWebViewThread] in
+        stopping = true
+        defer { workers.removeAll() }
+        return Array(workers.values)
+      }
+      for worker in active { worker.shutdown() }
+    }
+
+    private var currentSnapshot: Snapshot {
+      snapshots[selectedSite] ?? Snapshot(url: preferences.resumeURL(for: selectedSite))
+    }
+
+    private func createWorker(for site: ChatBrowserSite) -> WindowsWebViewThread? {
+      guard workers[site] == nil, let parentWindow else { return nil }
+      let initialURL = preferences.resumeURL(for: site)
+      snapshots[site] = Snapshot(url: initialURL)
+      let worker = WindowsWebViewThread(
+        parentWindow: parentWindow,
+        configuration: .chatBrowser(site: site, initialURL: initialURL.absoluteString),
         updateState: { [weak self] state, detail in
-          self?.store(state: state, errorDetail: detail)
+          self?.store(state: state, errorDetail: detail, for: site)
         },
         onWebMessage: nil,
         onNavigationChanged: { [weak self] canGoBack, canGoForward, currentURL in
           self?.storeNavigation(
-            canGoBack: canGoBack,
-            canGoForward: canGoForward,
-            currentURL: currentURL
+            canGoBack: canGoBack, canGoForward: canGoForward,
+            currentURL: currentURL, for: site
           )
         }
       )
-      guard
-        lock.withLock({
-          guard worker == nil else { return false }
-          worker = next
-          next.setLowMemoryUsage(lowMemoryUsage)
-          return true
-        })
-      else { return }
-      next.start()
+      workers[site] = worker
+      worker.applyLayout(to: bounds, visible: visible && site == selectedSite)
+      worker.setLowMemoryUsage(lowMemoryUsage || site != selectedSite)
+      return worker
     }
 
-    func resize(to bounds: RECT) {
-      lock.withLock { worker }?.resize(to: bounds)
-    }
-
-    func setVisible(_ visible: Bool) {
-      lock.withLock { worker }?.setVisible(visible)
-    }
-
-    func setLowMemoryUsage(_ low: Bool) {
-      let active = lock.withLock { () -> WindowsWebViewThread? in
-        lowMemoryUsage = low
-        return worker
+    private func applyWorkerLayout() {
+      for (site, worker) in workers {
+        worker.applyLayout(to: bounds, visible: visible && site == selectedSite)
+        worker.setLowMemoryUsage(lowMemoryUsage || site != selectedSite)
       }
-      active?.setLowMemoryUsage(low)
     }
 
-    func applyLayout(to bounds: RECT, visible: Bool) {
-      lock.withLock { worker }?.applyLayout(to: bounds, visible: visible)
-    }
-
-    func goBack() {
-      lock.withLock { worker }?.goBack()
-    }
-
-    func goForward() {
-      lock.withLock { worker }?.goForward()
-    }
-
-    func reload() {
-      lock.withLock { worker }?.reload()
-    }
-
-    func beginShutdown(notifying window: HWND, message: UINT) -> Bool {
-      lock.withLock { worker }?.beginShutdown(notifying: window, message: message) ?? false
-    }
-
-    func shutdown() {
-      let active = lock.withLock { () -> WindowsWebViewThread? in
-        defer { worker = nil }
-        return worker
-      }
-      active?.shutdown()
-    }
-
-    private func store(state: State, errorDetail: String?) {
+    private func store(state: State, errorDetail: String?, for site: ChatBrowserSite) {
       lock.withLock {
-        snapshot = Snapshot(
-          state: state,
-          errorDetail: errorDetail,
-          canGoBack: snapshot.canGoBack,
-          canGoForward: snapshot.canGoForward,
-          currentURL: snapshot.currentURL
-        )
+        guard var snapshot = snapshots[site] else { return }
+        snapshot.state = state
+        snapshot.errorDetail = errorDetail
+        snapshots[site] = snapshot
       }
     }
 
     private func storeNavigation(
-      canGoBack: Bool,
-      canGoForward: Bool,
-      currentURL: String?
+      canGoBack: Bool, canGoForward: Bool, currentURL: String?, for site: ChatBrowserSite
     ) {
-      let safeURL = Self.validatedChatURL(currentURL)
+      let safeURL = site.validatedURL(currentURL.flatMap(URL.init(string:)))
       lock.withLock {
-        snapshot = Snapshot(
-          state: snapshot.state,
-          errorDetail: snapshot.errorDetail,
-          canGoBack: canGoBack,
-          canGoForward: canGoForward,
-          currentURL: safeURL ?? snapshot.currentURL
-        )
+        guard var snapshot = snapshots[site] else { return }
+        snapshot.canGoBack = canGoBack
+        snapshot.canGoForward = canGoForward
+        if let safeURL {
+          snapshot.currentURL = safeURL.absoluteString
+          preferences.remember(safeURL, for: site)
+        }
+        snapshots[site] = snapshot
       }
-      if let safeURL {
-        UserDefaults.standard.set(safeURL, forKey: Self.resumeURLDefaultsKey)
-      }
-    }
-
-    private static func storedResumeURL() -> String? {
-      validatedChatURL(UserDefaults.standard.string(forKey: resumeURLDefaultsKey))
-    }
-
-    private static func validatedChatURL(_ value: String?) -> String? {
-      guard let value, let url = URL(string: value),
-        url.scheme?.lowercased() == "https",
-        url.host?.lowercased() == "chatgpt.com"
-      else { return nil }
-      return url.absoluteString
     }
 
     private struct Snapshot {
-      let state: State
-      let errorDetail: String?
-      let canGoBack: Bool
-      let canGoForward: Bool
-      let currentURL: String?
+      var state = State.loading
+      var errorDetail: String?
+      var canGoBack = false
+      var canGoForward = false
+      var currentURL: String?
+
+      init(url: URL) { currentURL = url.absoluteString }
     }
   }
 #endif

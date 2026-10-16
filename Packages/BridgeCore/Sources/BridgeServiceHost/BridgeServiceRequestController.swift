@@ -226,6 +226,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleSetMCPClientExposureMode(request)
     case .exportMCPClientConfiguration:
       return try await handleExportMCPClientConfiguration(request)
+    case .getLocalMCPConnection:
+      return try await handleGetLocalMCPConnection(request)
+    case .getGeminiCloudStatus, .configureGeminiCloud, .exportGeminiCloudConfiguration:
+      return try await handleGeminiCloud(request)
     case .rotateMCPClientCredential:
       return try await handleRotateMCPClientCredential(request)
     case .rotateLocalMCPEndpoint:

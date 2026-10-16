@@ -19,10 +19,12 @@ public struct BridgeServiceRootView: View {
         model.isChatBrowserEnabled
       {
         ChatGPTWebView(
+          site: model.chatBrowserSite,
           initialURL: model.chatBrowserResumeURL,
           reloadRequest: model.chatBrowserReloadRequest,
-          webViewReference: $model.chatWebView
+          webViewReference: model.chatWebViewBinding(for: model.chatBrowserSite)
         )
+        .id(model.chatBrowserSite.rawValue)
         .frame(width: viewport.width, height: viewport.height)
         .offset(x: viewport.x, y: viewport.y)
         .zIndex(10)

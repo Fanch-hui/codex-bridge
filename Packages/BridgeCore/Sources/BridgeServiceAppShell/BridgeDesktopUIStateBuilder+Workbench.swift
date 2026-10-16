@@ -14,7 +14,7 @@ extension BridgeDesktopUIStateBuilder {
     return BridgeDesktopWorkbenchState(
       header: BridgeDesktopPageHeader(
         title: "工作台",
-        subtitle: "在本机 ChatGPT 工作区旁查看任务、审批与实时执行状态。",
+        subtitle: "在本机 \(model.chatBrowserSite.displayName) 工作区旁查看任务、审批与实时执行状态。",
         symbol: BridgeServiceNavigation.workbench.symbol
       ),
       projects: model.projects.map {
@@ -303,9 +303,10 @@ extension BridgeDesktopUIStateBuilder {
     let visible = model.navigation == .workbench && model.isChatBrowserEnabled
     let status =
       model.isChatBrowserEnabled
-      ? (model.chatWebView?.url?.absoluteString ?? "由宿主加载真实 ChatGPT 工作区")
+      ? (model.chatWebView?.url?.absoluteString ?? "由宿主加载 \(model.chatBrowserSite.displayName) 工作区")
       : "内置浏览器已关闭"
     return BridgeDesktopBrowserSlot(
+      site: model.chatBrowserSite,
       visible: visible,
       enabled: model.isChatBrowserEnabled,
       url: model.chatWebView?.url?.absoluteString ?? model.chatBrowserResumeURL.absoluteString,

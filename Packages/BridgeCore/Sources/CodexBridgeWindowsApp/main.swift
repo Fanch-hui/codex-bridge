@@ -1,8 +1,10 @@
 #if os(Windows)
   import BridgeWindowsShell
+  import BridgeLocalMCP
   import Dispatch
   import ucrt
 
+  MCPStdioEntryPoint.runIfRequested()
   let arguments = Array(CommandLine.arguments.dropFirst())
   if arguments == ["--ensure-service"] {
     _exit(WindowsApplicationControl.ensureServiceRunning() ? EXIT_SUCCESS : EXIT_FAILURE)

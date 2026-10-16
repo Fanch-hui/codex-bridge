@@ -1,10 +1,12 @@
 #if os(Linux)
   import BridgeDesktopUI
+  import BridgeServiceAppCore
   import CLinuxDesktop
   import Foundation
 
   enum LinuxDesktopHost {
     struct BrowserSnapshot: Equatable, Sendable {
+      var site: ChatBrowserSite = .chatGPT
       var state = "loading"
       var url = "https://chatgpt.com/"
       var error: String?
@@ -34,9 +36,13 @@
           at: data, withIntermediateDirectories: true,
           attributes: [.posixPermissions: 0o700])
       } catch { return false }
-      return page.absoluteString.withCString { pagePointer in
+      let started = page.absoluteString.withCString { pagePointer in
         data.path.withCString { bridge_linux_start(pagePointer, $0) != 0 }
       }
+      if started {
+        selectBrowserSite(ChatBrowserPreferences(defaults: .standard).selectedSite)
+      }
+      return started
     }
 
     static var isRunning: Bool { bridge_linux_running() != 0 }
@@ -85,12 +91,15 @@
 
     @MainActor
     private static func receiveBrowser(_ event: String) {
-      let parts = event.split(separator: "\n", maxSplits: 4, omittingEmptySubsequences: false)
-      guard parts.count == 5 else { return }
+      let parts = event.split(separator: "\n", maxSplits: 5, omittingEmptySubsequences: false)
+      guard parts.count == 6, let site = ChatBrowserSite(rawValue: String(parts[0])) else { return }
+      let preferences = ChatBrowserPreferences(defaults: .standard)
+      if let url = URL(string: String(parts[4])) { preferences.remember(url, for: site) }
+      guard site == preferences.selectedSite else { return }
       browser = BrowserSnapshot(
-        state: String(parts[0]), url: String(parts[3]),
-        error: parts[4].isEmpty ? nil : String(parts[4]),
-        canGoBack: parts[1] == "1", canGoForward: parts[2] == "1")
+        site: site, state: String(parts[1]), url: String(parts[4]),
+        error: parts[5].isEmpty ? nil : String(parts[5]),
+        canGoBack: parts[2] == "1", canGoForward: parts[3] == "1")
     }
 
     private static func receiveFile(_ event: String) {
@@ -124,6 +133,16 @@
     }
 
     static func browserAction(_ action: Int32) { bridge_linux_browser_action(action) }
+
+    static func selectBrowserSite(_ site: ChatBrowserSite) {
+      let preferences = ChatBrowserPreferences(defaults: .standard)
+      preferences.selectedSite = site
+      site.rawValue.withCString { identifier in
+        preferences.resumeURL(for: site).absoluteString.withCString {
+          bridge_linux_browser_select(identifier, $0)
+        }
+      }
+    }
 
     static func copy(_ text: String) -> Bool {
       text.withCString { bridge_linux_copy($0) }

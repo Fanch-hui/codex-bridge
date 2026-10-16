@@ -78,7 +78,7 @@
   }
 
   function collectionCard(projectID, key, title, count) {
-    var root = disclosure(projectID, key, "page-card project-collection-card");
+    var root = disclosure(projectID, key, "project-collection");
     var summary = S.node("summary", "project-collection-summary");
     summary.appendChild(S.node("span", "project-collection-title", title));
     summary.appendChild(S.node("span", "muted collection-count", String(count)));

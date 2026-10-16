@@ -14,12 +14,20 @@
     }
   }
   function schedule() {
-    if (timer || !active || !currentPage || !S.safeArray(currentPage.setupOperations).some(
-      global.CodexBridgeDesktopAgentSetup.running)) return;
+    var setupsRunning = currentPage && S.safeArray(currentPage.setupOperations).some(
+      global.CodexBridgeDesktopAgentSetup.running);
+    var cloud = currentPage && currentPage.geminiCloud;
+    var cloudPending = cloud && cloud.enabled && cloud.hosting === "sites" &&
+      (cloud.lifecycle === "connecting" || cloud.lifecycle === "failed");
+    if (timer || !active || !currentPage || (!setupsRunning && !cloudPending)) return;
     timer = global.setTimeout(function () {
       timer = null;
-      if (active) { currentEmit("refreshAgentSetups", {}); schedule(); }
-    }, 1500);
+      if (active) {
+        if (setupsRunning) currentEmit("refreshAgentSetups", {});
+        if (cloudPending) currentEmit("refreshGeminiCloud", {});
+        schedule();
+      }
+    }, setupsRunning ? 1500 : 3000);
   }
 
   function render(page, emit) {
@@ -44,21 +52,24 @@
     var N = global.CodexBridgeDesktopConnectionsNavigation;
     var T = global.CodexBridgeDesktopConnectionsTunnel;
     var clientsSection = S.section(navigation.overview, "聊天客户端");
-    var clientsList = S.node("div", "page-card connection-list"); clientsSection.appendChild(clientsList);
-    var chat = createChatGPT(context), qwen = createQwen();
+    var clientsList = S.node("div", "page-card connection-list detail-list"); clientsSection.appendChild(clientsList);
+    var chat = createChatGPT(context), qwen = createQwen(), gemini = createGemini();
     var chatEntry = navigation.register("chatgpt", "ChatGPT", chat.root);
     var qwenEntry = navigation.register("qwen", "Qwen Studio", qwen.root);
+    var geminiEntry = navigation.register("gemini", "Gemini", gemini.root);
     clientsList.appendChild(chatEntry.root); clientsList.appendChild(qwenEntry.root);
+    clientsList.appendChild(geminiEntry.root);
 
     var agentsSection = S.section(navigation.overview, "Agent 引擎");
     var agentsHeading = S.node("div", "section-heading-row");
+    agentsHeading.appendChild(agentsSection.querySelector("h3"));
     var scanAgents = S.button("扫描 Agent", null, {}, null, "small", false);
     scanAgents.addEventListener("click", function () {
       if (scanAgents.disabled) return;
       scanAgents.disabled = true; context.emit("scanAgents");
     });
     agentsHeading.appendChild(scanAgents); agentsSection.appendChild(agentsHeading);
-    var agentsList = S.node("div", "page-card connection-list"); agentsSection.appendChild(agentsList);
+    var agentsList = S.node("div", "page-card connection-list detail-list"); agentsSection.appendChild(agentsList);
     var codex = global.CodexBridgeDesktopCodexConnection.create(emit);
     var codexEntry = navigation.register("codex", "Codex", codex.root);
     agentsList.appendChild(codexEntry.root);
@@ -86,7 +97,8 @@
         }
         context.statusMessage = page.statusMessage;
         S.pageHeader(header, Object.assign({}, page.header, { subtitle: "" }));
-        chat.update(page, nextEmit); qwen.update(page, nextEmit); codex.update(page.codex, nextEmit);
+        chat.update(page, nextEmit); qwen.update(page, nextEmit); gemini.update(page, nextEmit);
+        codex.update(page.codex, nextEmit);
         var tunnel = page.tunnel || {};
         var tunnelState = T.state(tunnel);
         N.update(chatEntry, "ChatGPT", "Secure MCP Tunnel", tunnelState.label, tunnelState.tone);
@@ -95,6 +107,15 @@
         N.update(qwenEntry, "Qwen Studio", "本机 MCP", !localReady ? "Endpoint 不可用"
           : qwenClient && qwenClient.enabled ? "已启用" : "未启用",
           !localReady ? "warning" : qwenClient && qwenClient.enabled ? "success" : "neutral");
+        var geminiClient = S.safeArray(page.clients).find(function (item) { return item.clientID === "google.gemini"; });
+        var geminiConnected = geminiClient && geminiClient.activeSessionCount > 0;
+        var geminiCloud = page.geminiCloud;
+        var cloudStatus = global.CodexBridgeDesktopGeminiCloud.status(geminiCloud || {});
+        var cloudEnabled = geminiCloud && geminiCloud.enabled;
+        N.update(geminiEntry, "Gemini", "本地 / 云 MCP", !localReady ? "服务不可用"
+          : cloudEnabled ? cloudStatus.label
+          : geminiConnected ? "本地已连接" : geminiClient && geminiClient.enabled ? "等待连接" : "未启用",
+          !localReady ? "warning" : cloudEnabled ? cloudStatus.tone : geminiConnected ? "success" : "neutral");
         var engine = page.codex || {};
         var connected = typeof engine.isConnected === "boolean" ? engine.isConnected
           : engine.modelCount > 0 && !engine.modelError;
@@ -121,15 +142,18 @@
 
   function createChatGPT(context) {
     var T = global.CodexBridgeDesktopConnectionsTunnel;
-    var root = S.node("div");
+    var root = S.node("div", "connection-detail");
     var section = S.section(root, "Secure MCP Tunnel");
     var card = S.node("div", "page-card connection-card"); section.appendChild(card);
     var badge = S.node("span"); card.appendChild(badge);
-    var diagnostics = S.node("div"); card.appendChild(diagnostics);
+    var diagnostics = S.node("div", "connection-diagnostics"); card.appendChild(diagnostics);
     var editor = E.createTunnelForm(context.emit); card.appendChild(editor.root);
     var actions = S.node("div", "form-actions"); card.appendChild(actions);
-    var proxy = E.createTunnelHTTPProxyForm(context.emit); card.appendChild(proxy.root);
-    var clients = E.createClients(context.emit); S.section(root, "客户端工具权限").appendChild(clients.root);
+    var proxy = E.createTunnelHTTPProxyForm(context.emit);
+    var proxyOptions = S.node("details", "connection-advanced");
+    proxyOptions.appendChild(S.node("summary", null, "HTTP(S) 代理"));
+    proxyOptions.appendChild(proxy.root); card.appendChild(proxyOptions);
+    var clients = E.createClients(context.emit); S.section(root, "连接与权限").appendChild(clients.root);
     var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入说明"));
     help.appendChild(S.node("p", null,
       "ChatGPT 需要 Plus 及以上或团队订阅。在“插件 → 添加 → 创建自定义 MCP 服务器”添加 Codex Bridge，再填写 Tunnel ID 和 Runtime Key。"));
@@ -137,15 +161,15 @@
     return { root: root, update: function (page, emit) {
       T.render(badge, diagnostics, editor, actions, page.tunnel || {}, context);
       proxy.update(page.tunnel || {}, emit);
-      clients.update(S.safeArray(page.clients).filter(function (item) { return item.clientID !== "qwen.studio"; }), emit);
+      clients.update(S.safeArray(page.clients).filter(function (item) { return item.clientID === "openai.chatgpt"; }), emit);
     } };
   }
 
   function createQwen() {
     var context = { emit: currentEmit };
-    var root = S.node("div"), local = S.node("div", "page-card connection-card");
+    var root = S.node("div", "connection-detail"), local = S.node("div", "page-card connection-card connection-endpoint");
     S.section(root, "本机 MCP Endpoint").appendChild(local);
-    var clients = E.createClients(currentEmit); S.section(root, "客户端工具权限").appendChild(clients.root);
+    var clients = E.createClients(currentEmit); S.section(root, "连接与权限").appendChild(clients.root);
     var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入说明"));
     help.appendChild(S.node("p", null, "启用 Qwen Studio 并复制 JSON 配置，将配置粘贴到 Qwen Studio 的 MCP 设置中。"));
     root.appendChild(help);
@@ -163,6 +187,33 @@
       var stable = global.CodexBridgeDesktopStableRender;
       if (stable) stable(local, signature, renderLocal); else renderLocal();
       clients.update(S.safeArray(page.clients).filter(function (item) { return item.clientID === "qwen.studio"; }), emit);
+    } };
+  }
+
+  function createGemini() {
+    var root = S.node("div", "connection-detail");
+    var clients = E.createClients(currentEmit);
+    S.section(root, "连接与权限").appendChild(clients.root);
+    var help = S.node("details", "connection-help");
+    help.appendChild(S.node("summary", null, "本地 MCP 接入说明"));
+    var steps = S.node("ol");
+    [
+      "先在上方启用 Gemini 连接，再点击“复制本地启动命令”。",
+      "打开 Gemini 桌面版，依次进入“更多 → 自定义 → 关联应用”，点击右上角“＋自定义”，选择“本地 MCP”。",
+      "服务器名称填写 Codex Bridge，说明可选；将复制的本地启动命令粘贴到“命令”。",
+      "点击“下一步”，核对工具列表后完成关联。"
+    ].forEach(function (text) { steps.appendChild(S.node("li", null, text)); });
+    help.appendChild(steps);
+    help.appendChild(S.node("p", "hint",
+      "使用期间请保持本机 Codex Bridge 后台服务运行。更新 App 的安装位置后，请重新复制启动命令。"));
+    root.appendChild(help);
+    var cloud = global.CodexBridgeDesktopGeminiCloud.create(currentEmit);
+    S.section(root, "云 MCP").appendChild(cloud.root);
+    return { root: root, update: function (page, emit) {
+      clients.update(S.safeArray(page.clients).filter(function (item) {
+        return item.clientID === "google.gemini";
+      }), emit);
+      cloud.update(page.geminiCloud, emit);
     } };
   }
 

@@ -1,5 +1,6 @@
 (function (global) {
   "use strict";
+  var fieldSequence = 0;
 
   function node(tag, className, value) {
     var element = document.createElement(tag);
@@ -67,9 +68,18 @@
     return element;
   }
 
-  function selectField(label, value, choices, onChange, className) {
+  function field(label, control, className) {
     var wrapper = node("div", "field " + (className || ""));
-    wrapper.appendChild(node("label", null, label));
+    var caption = node("label", null, label);
+    control.id = "desktop-field-" + (++fieldSequence);
+    control.setAttribute("aria-label", label);
+    caption.htmlFor = control.id;
+    wrapper.appendChild(caption);
+    wrapper.appendChild(control);
+    return { wrapper: wrapper, control: control };
+  }
+
+  function selectField(label, value, choices, onChange, className) {
     var select = node("select");
     (choices || []).forEach(function (choice) {
       var option = node("option", null, choice.title);
@@ -86,31 +96,24 @@
       select.insertBefore(current, select.firstChild);
     }
     select.addEventListener("change", function () { onChange(select.value); });
-    wrapper.appendChild(select);
-    return { wrapper: wrapper, control: select };
+    return field(label, select, className);
   }
 
   function textField(label, value, placeholder, className) {
-    var wrapper = node("div", "field " + (className || ""));
-    wrapper.appendChild(node("label", null, label));
     var input = node("input");
     input.type = "text";
     input.value = value || "";
     input.placeholder = placeholder || "";
-    wrapper.appendChild(input);
-    return { wrapper: wrapper, control: input };
+    return field(label, input, className);
   }
 
   function textAreaField(label, value, placeholder, className) {
-    var wrapper = node("div", "field " + (className || ""));
-    wrapper.appendChild(node("label", null, label));
     var input = node("textarea");
     input.value = value || "";
     input.placeholder = placeholder || "";
     input.rows = 1;
     input.wrap = "soft";
-    wrapper.appendChild(input);
-    return { wrapper: wrapper, control: input };
+    return field(label, input, className);
   }
 
   function autoGrowTextArea(control) {

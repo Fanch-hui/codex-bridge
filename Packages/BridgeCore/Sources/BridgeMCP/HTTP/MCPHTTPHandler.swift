@@ -11,6 +11,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
     let head: HTTPRequestHead
     let authentication: MCPClientAuthentication
     let sessionID: String?
+    let isGeminiCloud: Bool
     var body: ByteBuffer
     var byteCount: Int
   }
@@ -113,6 +114,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
   }
 
   private func receiveHead(_ head: HTTPRequestHead, context: ChannelHandlerContext) {
+    var head = head
     hasSeenRequestHead = true
     guard case .waiting = inputState else {
       context.close(promise: nil)
@@ -126,17 +128,28 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
       return
     }
     let isOAuth = head.method == .GET && isOAuthProtectedResourceRoute(head.uri)
+    let isGeminiCloud = head.uri.hasPrefix(GeminiCloudHTTPRequest.pathPrefix)
     let authentication: MCPClientAuthentication
     if !isOAuth {
-      guard isExactRoute(head.uri) else {
-        reject(status: .notFound, context: context)
-        return
+      if isGeminiCloud {
+        guard configuration.geminiCloudAccessGate?.isEnabled == true,
+          let key = GeminiCloudHTTPRequest.accessKey(from: head),
+          let authenticated = configuration.clientAuthenticator?.authenticateGeminiCloud(
+            key, admission: clientAdmission)
+        else {
+          reject(status: .notFound, context: context)
+          return
+        }
+        authentication = authenticated
+        head = GeminiCloudHTTPRequest.localHead(
+          from: head, port: context.channel.localAddress?.port ?? configuration.port)
+      } else {
+        guard isExactRoute(head.uri), let authenticatedClient = authenticate(head.headers) else {
+          reject(status: .notFound, context: context)
+          return
+        }
+        authentication = authenticatedClient
       }
-      guard let authenticatedClient = authenticate(head.headers) else {
-        reject(status: .notFound, context: context)
-        return
-      }
-      authentication = authenticatedClient
       guard isAllowedMethod(head.method) else {
         reject(status: .methodNotAllowed, allow: "POST, GET, DELETE", context: context)
         return
@@ -173,6 +186,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
         head: head,
         authentication: authentication,
         sessionID: head.headers.first(name: HTTPHeaderName.sessionID),
+        isGeminiCloud: isGeminiCloud,
         body: context.channel.allocator.buffer(capacity: capacity),
         byteCount: 0
       )
@@ -239,7 +253,12 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
   ) async {
     defer { lease.release() }
     let request = makeRequest(state)
-    let response = await handler(request)
+    let response: MCP.HTTPResponse
+    if state.isGeminiCloud && configuration.geminiCloudAccessGate?.isEnabled != true {
+      response = .error(statusCode: 503, .internalError("MCP client unavailable"))
+    } else {
+      response = await handler(request)
+    }
     let sessionID = state.sessionID ?? responseSessionID(response)
     try? await eventLoop.submit {
       self.activeResponseSessionID = sessionID

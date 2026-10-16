@@ -7,9 +7,12 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
     <title>Codex Bridge</title>
     <script src="host-context.js"></script>
+    <link rel="stylesheet" href="component-theme.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="pages.css">
     <link rel="stylesheet" href="markdown.css">
+    <link rel="stylesheet" href="component-controls.css">
+    <link rel="stylesheet" href="component-surfaces.css">
     <link rel="stylesheet" href="workbench.css">
     <link rel="stylesheet" href="responsive.css">
     <link rel="stylesheet" href="windows-theme.css">
@@ -17,6 +20,9 @@
     <link rel="stylesheet" href="detail-pages.css">
     <link rel="stylesheet" href="dsh-workbench.css">
     <link rel="stylesheet" href="dsh-workspace.css">
+    <link rel="stylesheet" href="connections.css">
+    <link rel="stylesheet" href="settings.css">
+    <link rel="stylesheet" href="component-dialogs.css">
   </head>
   <body>
     <div class="app-shell" id="app-shell" data-state="loading">
@@ -71,7 +77,7 @@
               <section class="browser-pane" id="workbench-browser-pane" aria-label="内置 ChatGPT 浏览器">
                 <div class="browser-toolbar" id="workbench-browser-toolbar"></div>
                 <div id="chat-browser-slot">
-                  <div class="browser-slot-note" id="browser-slot-note">由宿主加载真实 ChatGPT 工作区</div>
+                  <div class="browser-slot-note" id="browser-slot-note">正在加载聊天网页…</div>
                 </div>
               </section>
               <div class="workbench-divider" id="workbench-divider" role="separator"
@@ -80,7 +86,11 @@
               <aside class="inspector-pane" id="workbench-inspector-pane" aria-label="任务检查器">
                 <div class="inspector-header" id="workbench-inspector-header"></div>
                 <div class="inspector-approvals" id="workbench-inspector-approvals"></div>
-                <div class="inspector-content" id="workbench-inspector-content"></div>
+                <div class="workbench-conversation-viewport">
+                  <div class="inspector-content" id="workbench-inspector-content"></div>
+                  <div class="workbench-edge-blur" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                  <div class="workbench-edge-blur is-bottom" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                </div>
                 <div class="inspector-native-sessions" id="workbench-native-sessions" hidden></div>
                 <div class="inspector-footer" id="workbench-inspector-footer"></div>
               </aside>
@@ -125,6 +135,7 @@
     <script src="pages-workbench-conversation-incremental.js"></script>
     <script src="pages-workbench-split.js"></script>
     <script src="pages-workbench-history-search.js"></script>
+    <script src="pages-workbench-browser.js"></script>
     <script src="pages-workbench-header.js"></script>
     <script src="pages-native-session-directory.js"></script>
     <script src="pages-workbench-actions.js"></script>
@@ -150,6 +161,7 @@
     <script src="pages-project-collections.js"></script>
     <script src="pages-projects.js"></script>
     <script src="pages-logs.js"></script>
+    <script src="pages-connections-gemini-cloud.js"></script>
     <script src="pages-connections.js"></script>
     <script src="pages-settings-models.js"></script>
     <script src="pages-settings-agents.js"></script>

@@ -92,6 +92,9 @@ extension MCPServiceTaskSnapshot {
   }
 
   public var sourceDisplayName: String {
+    if sourceClientID == MCPClientID.gemini.rawValue {
+      return "Gemini"
+    }
     if source == "chatgpt.mcp" || sourceClientID == MCPClientID.chatGPT.rawValue {
       return "ChatGPT"
     }

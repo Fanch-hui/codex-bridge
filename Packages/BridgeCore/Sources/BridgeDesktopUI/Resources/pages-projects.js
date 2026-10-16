@@ -84,7 +84,7 @@
       current.emit("removeProject", { projectID: projectID });
     });
     header.appendChild(remove); root.appendChild(header);
-    var body = S.node("div", "detail-body"), description = S.node("p", "muted");
+    var body = S.node("div", "detail-body project-detail-body"), description = S.node("p", "muted project-description");
     var collections = S.node("div", "project-collections-stack");
     body.appendChild(description);
     body.appendChild(collections); root.appendChild(body);

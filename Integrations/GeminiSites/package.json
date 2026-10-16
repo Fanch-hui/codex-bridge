@@ -1,0 +1,9 @@
+{
+  "name": "codex-bridge-gemini-sites",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test Tests/relay.test.mjs",
+    "build": "node scripts/build.mjs"
+  }
+}

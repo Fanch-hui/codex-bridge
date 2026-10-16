@@ -61,7 +61,7 @@ static gboolean desktop_policy(WebKitWebView *view, WebKitPolicyDecision *decisi
   return TRUE;
 }
 
-static WebKitWebView *make_view(const gchar *data_root, const gchar *scope) {
+WebKitWebView *bridge_make_view(const gchar *data_root, const gchar *scope) {
   gchar *data = g_build_filename(data_root, scope, "data", NULL);
   gchar *cache = g_build_filename(data_root, scope, "cache", NULL);
   WebKitWebsiteDataManager *manager = webkit_website_data_manager_new(
@@ -93,12 +93,11 @@ static gpointer desktop_thread(gpointer raw) {
     bridge_desktop.layout = gtk_fixed_new();
     gtk_overlay_add_overlay(GTK_OVERLAY(overlay), bridge_desktop.layout);
     gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(overlay), bridge_desktop.layout, TRUE);
-    bridge_desktop.desktop = make_view(options->data, "Desktop");
-    bridge_desktop.browser = make_view(options->data, "ChatGPT");
+    bridge_desktop.desktop = bridge_make_view(options->data, "Desktop");
+    bridge_desktop.data_root = g_strdup(options->data);
     gtk_container_add(GTK_CONTAINER(overlay), GTK_WIDGET(bridge_desktop.desktop));
     gtk_widget_set_hexpand(GTK_WIDGET(bridge_desktop.desktop), TRUE);
     gtk_widget_set_vexpand(GTK_WIDGET(bridge_desktop.desktop), TRUE);
-    gtk_fixed_put(GTK_FIXED(bridge_desktop.layout), GTK_WIDGET(bridge_desktop.browser), 0, 0);
     bridge_desktop.browser_enabled = TRUE;
     gchar *slash = strrchr(options->page, '/');
     bridge_desktop.page_root = g_strndup(options->page, slash ? slash - options->page + 1 : 0);
@@ -107,11 +106,8 @@ static gpointer desktop_thread(gpointer raw) {
     webkit_user_content_manager_register_script_message_handler(content, "bridgeDesktopUI");
     g_signal_connect(bridge_desktop.desktop, "decide-policy", G_CALLBACK(desktop_policy), NULL);
     g_signal_connect(bridge_desktop.window, "delete-event", G_CALLBACK(close_window), NULL);
-    bridge_connect_browser();
     webkit_web_view_load_uri(bridge_desktop.desktop, options->page);
-    webkit_web_view_load_uri(bridge_desktop.browser, "https://chatgpt.com/");
     gtk_widget_show_all(bridge_desktop.window);
-    gtk_widget_hide(GTK_WIDGET(bridge_desktop.browser));
   }
   g_free(options->page); g_free(options->data); g_free(options);
   g_mutex_lock(&state_lock);
@@ -123,6 +119,9 @@ static gpointer desktop_thread(gpointer raw) {
     gtk_main();
     gtk_widget_destroy(bridge_desktop.window);
     g_free(bridge_desktop.page_root);
+    g_free(bridge_desktop.data_root);
+    for (guint i = 0; i < G_N_ELEMENTS(bridge_desktop.browsers); i++)
+      g_free(bridge_desktop.browsers[i].error);
   }
   g_mutex_lock(&state_lock);
   running = FALSE;

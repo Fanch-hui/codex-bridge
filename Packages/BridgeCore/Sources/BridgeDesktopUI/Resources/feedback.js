@@ -21,6 +21,8 @@
       timer = null;
     }
     var layer = document.getElementById("feedback-layer");
+    var dialog = layer.querySelector("dialog");
+    if (dialog && dialog.open) dialog.close();
     layer.innerHTML = "";
     layer.hidden = true;
   }
@@ -32,30 +34,36 @@
 
   function renderDialog(layer, feedback, emit) {
     layer.className = "feedback-layer is-alert";
-    var dialog = node("section", "feedback-dialog tone-" + toneClass(feedback.tone));
+    var dialog = node("dialog", "component-dialog feedback-dialog tone-" + toneClass(feedback.tone));
     dialog.setAttribute("role", "alertdialog");
     dialog.setAttribute("aria-modal", "true");
     dialog.setAttribute("aria-labelledby", "feedback-title");
     dialog.setAttribute("aria-describedby", "feedback-message");
 
-    var copy = document.createElement("div");
+    var header = node("header", "dialog-header");
     var title = node("h2", "feedback-title", feedback.title);
     title.id = "feedback-title";
-    copy.appendChild(title);
+    header.appendChild(title);
+    dialog.appendChild(header);
+    var body = node("div", "dialog-body");
     var message = node("p", "feedback-message", feedback.message);
     message.id = "feedback-message";
-    copy.appendChild(message);
-    dialog.appendChild(copy);
+    body.appendChild(message);
+    dialog.appendChild(body);
 
+    var footer = node("footer", "dialog-footer");
     var close = node("button", "button primary", "好");
     close.type = "button";
+    close.autofocus = true;
     close.addEventListener("click", function () { dismiss(feedback, emit); });
-    dialog.appendChild(close);
-    dialog.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") dismiss(feedback, emit);
+    footer.appendChild(close);
+    dialog.appendChild(footer);
+    dialog.addEventListener("cancel", function (event) {
+      event.preventDefault();
+      dismiss(feedback, emit);
     });
     layer.appendChild(dialog);
-    global.requestAnimationFrame(function () { close.focus(); });
+    dialog.showModal();
   }
 
   function renderToast(layer, feedback, emit) {

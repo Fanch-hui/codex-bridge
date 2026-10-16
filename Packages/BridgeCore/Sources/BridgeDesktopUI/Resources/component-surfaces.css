@@ -1,0 +1,57 @@
+.surface-card, .page-card, .metric-card, .summary-card,
+.list-panel, .detail-panel {
+  min-width: 0;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.page-card { padding: 16px; }
+.metric-card:hover { border-color: var(--separator-strong); background: var(--surface-muted); }
+
+.page-section > h3, .content-section > h3, .section-heading-row > h3 {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.settings-card h3, .connection-card h3, .detail-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.settings-card > .field + .field, .settings-card > .check-field + .field { margin-top: 16px; }
+.settings-card .hint, .card-subtitle { line-height: 1.6; text-wrap: pretty; }
+.detail-row-title { font-weight: 500; }
+.detail-row:hover { background: var(--surface-hover); }
+.detail-row:active { background: var(--surface-pressed); }
+.detail-heading { font-size: 18px; font-weight: 500; line-height: 26px; }
+.button.detail-back { min-height: var(--control-height-small); padding: 4px 10px; border-color: transparent; background: transparent; font-size: 13px; }
+
+.list-row:hover, .task-row:hover, .project-row:hover, .agent-row:hover, .log-row:hover {
+  background: var(--surface-hover);
+}
+
+.list-row.selected, .task-row.selected, .project-row.selected, .log-row.selected {
+  color: var(--accent);
+  background: var(--selection);
+}
+
+.conversation-entry.entry-user { padding: 12px 16px; border-radius: var(--radius); background: var(--surface-muted); }
+.entry-disclosure, .entry-child-run { border-radius: var(--control-radius); }
+.markdown-code, .entry-arguments, .entry-output, .log-diagnostic { border-radius: var(--control-radius); background: var(--surface-muted); }
+.approval-card, .task-failure-summary { border: 1px solid var(--separator); border-radius: var(--control-radius); }
+
+.dsh-native-composer { border-radius: var(--dialog-radius); box-shadow: var(--shadow-soft); }
+.button.dsh-composer-send:not(:disabled) { color: var(--on-accent); background: var(--accent); border-color: transparent; }
+.button.dsh-composer-send:hover:not(:disabled) { color: var(--on-accent); background: var(--accent-hover); }
+.dsh-chat-menu-actions { z-index: var(--z-menu); border-radius: var(--radius); padding: 4px; box-shadow: var(--shadow-overlay); }
+.dsh-chat-menu-actions .button { min-height: 34px; padding: 6px 8px; border: 0; background: transparent; font-size: 13px; line-height: 20px; }
+.dsh-chat-menu-actions .button:hover:not(:disabled) { background: var(--surface-hover); }
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .page-card, .surface-card, .metric-card, .summary-card, .list-panel, .detail-panel { border-color: var(--text-secondary); }
+}

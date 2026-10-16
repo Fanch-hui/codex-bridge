@@ -32,11 +32,13 @@ public struct MCPClientID: RawRepresentable, Hashable, Codable, Sendable {
 public enum BuiltInMCPClient {
   public static let chatGPT = MCPClientID(rawValue: "openai.chatgpt")
   public static let qwenStudio = MCPClientID(rawValue: "qwen.studio")
+  public static let gemini = MCPClientID(rawValue: "google.gemini")
 }
 
 extension MCPClientID {
   public static let chatGPT = BuiltInMCPClient.chatGPT
   public static let qwenStudio = BuiltInMCPClient.qwenStudio
+  public static let gemini = BuiltInMCPClient.gemini
 }
 
 public struct MCPInvocationContext: Equatable, Sendable {
@@ -148,6 +150,22 @@ public final class MCPClientCredentialAuthenticator: @unchecked Sendable {
     return MCPClientAuthentication(clientID: matchedClientID, admissionToken: token)
   }
 
+  package func authenticateGeminiCloud(
+    _ accessKey: String,
+    admission: MCPClientAdmissionGate?
+  ) -> MCPClientAuthentication? {
+    lock.lock()
+    defer { lock.unlock() }
+    guard let credential = credentials.first(where: { $0.clientID == .gemini }),
+      Self.constantTimeEqual(
+        Array(accessKey.utf8), Array(GeminiCloudCredentials.accessKey(for: credential.secret).utf8))
+    else { return nil }
+    let token = admission?.token(for: .gemini)
+    guard admission == nil || token != nil else { return nil }
+    lastAuthenticatedAt[.gemini] = Date()
+    return MCPClientAuthentication(clientID: .gemini, admissionToken: token)
+  }
+
   private static func isValid(_ credentials: [MCPClientCredential]) -> Bool {
     guard (1...8).contains(credentials.count) else { return false }
     return Set(credentials.map(\.clientID)).count == credentials.count
@@ -220,6 +238,7 @@ public struct MCPHTTPConfiguration: Sendable {
   public let maximumConnections: Int
   public let maximumActiveRequests: Int
   package let clientAuthenticator: MCPClientCredentialAuthenticator?
+  public let geminiCloudAccessGate: GeminiCloudAccessGate?
 
   public init(
     pathSecret: String,
@@ -291,6 +310,7 @@ public struct MCPHTTPConfiguration: Sendable {
 
   public init(
     clientAuthenticator: MCPClientCredentialAuthenticator,
+    geminiCloudAccessGate: GeminiCloudAccessGate? = nil,
     port: Int = 0,
     maximumRequestTargetBytes: Int = 2 * 1_024,
     maximumHeaderBytes: Int = 32 * 1_024,
@@ -306,6 +326,7 @@ public struct MCPHTTPConfiguration: Sendable {
       pathSecret: nil,
       headerSecret: nil,
       clientAuthenticator: clientAuthenticator,
+      geminiCloudAccessGate: geminiCloudAccessGate,
       port: port,
       maximumRequestTargetBytes: maximumRequestTargetBytes,
       maximumHeaderBytes: maximumHeaderBytes,
@@ -323,6 +344,7 @@ public struct MCPHTTPConfiguration: Sendable {
     pathSecret: String?,
     headerSecret: String?,
     clientAuthenticator: MCPClientCredentialAuthenticator?,
+    geminiCloudAccessGate: GeminiCloudAccessGate? = nil,
     port: Int,
     maximumRequestTargetBytes: Int,
     maximumHeaderBytes: Int,
@@ -352,6 +374,7 @@ public struct MCPHTTPConfiguration: Sendable {
     self.pathSecret = pathSecret ?? ""
     self.headerSecret = headerSecret
     self.clientAuthenticator = clientAuthenticator
+    self.geminiCloudAccessGate = geminiCloudAccessGate
     self.port = port
     self.maximumRequestTargetBytes = maximumRequestTargetBytes
     self.maximumHeaderBytes = maximumHeaderBytes
@@ -392,6 +415,7 @@ extension MCPHTTPConfiguration: Equatable {
     lhs.pathSecret == rhs.pathSecret
       && lhs.headerSecret == rhs.headerSecret
       && authenticationMatches(lhs, rhs)
+      && lhs.geminiCloudAccessGate === rhs.geminiCloudAccessGate
       && lhs.port == rhs.port
       && lhs.maximumRequestTargetBytes == rhs.maximumRequestTargetBytes
       && lhs.maximumHeaderBytes == rhs.maximumHeaderBytes

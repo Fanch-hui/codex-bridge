@@ -4,16 +4,19 @@ import SwiftUI
 import WebKit
 
 public struct ChatGPTWebView: NSViewRepresentable {
+  public let site: ChatBrowserSite
   public let initialURL: URL
   public let reloadRequest: UInt64
   @Binding public var webViewReference: WKWebView?
 
   public init(
-    initialURL: URL = URL(string: "https://chatgpt.com")!,
+    site: ChatBrowserSite = .chatGPT,
+    initialURL: URL? = nil,
     reloadRequest: UInt64 = 0,
     webViewReference: Binding<WKWebView?> = .constant(nil)
   ) {
-    self.initialURL = initialURL
+    self.site = site
+    self.initialURL = site.validatedURL(initialURL) ?? site.homeURL
     self.reloadRequest = reloadRequest
     self._webViewReference = webViewReference
   }
@@ -30,15 +33,7 @@ public struct ChatGPTWebView: NSViewRepresentable {
       return existing
     }
 
-    let configuration = WKWebViewConfiguration()
-    configuration.websiteDataStore = WKWebsiteDataStore.default()
-    configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
-    configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-    configuration.defaultWebpagePreferences.allowsContentJavaScript = true
-
-    let webView = WKWebView(frame: .zero, configuration: configuration)
-    webView.customUserAgent =
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+    let webView = Self.makeWebView(for: site)
     Self.attachDelegates(to: webView, coordinator: context.coordinator)
     webView.allowsBackForwardNavigationGestures = true
 

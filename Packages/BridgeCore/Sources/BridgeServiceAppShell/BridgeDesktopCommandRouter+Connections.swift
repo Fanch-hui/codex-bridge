@@ -11,25 +11,30 @@ extension BridgeDesktopCommandRouter {
   ) {
     let payload = envelope.payload
     switch envelope.command {
+    case .configureGeminiCloud, .copyGeminiCloudConfiguration, .refreshGeminiCloud:
+      handleGeminiCloud(envelope, model: model)
     case .setMCPClientEnabled:
-      guard connected(model), clientID(payload.clientID) == MCPClientID.qwenStudio.rawValue,
+      guard connected(model), let id = localClientID(payload.clientID),
         let enabled = payload.enabled
       else { return }
-      model.setQwenStudioEnabled(enabled)
+      model.setLocalMCPClientEnabled(id, enabled: enabled)
     case .setMCPClientExposure:
       guard connected(model), let clientID = clientID(payload.clientID),
         let rawMode = validatedID(payload.exposureMode, maximumBytes: 32),
         let mode = MCPServiceExposureMode(rawValue: rawMode)
       else { return }
-      if clientID == MCPClientID.qwenStudio.rawValue {
-        model.setQwenStudioExposureMode(mode)
+      if let id = localClientID(clientID) {
+        model.setLocalMCPClientExposureMode(id, mode: mode)
       } else if clientID == MCPClientID.chatGPT.rawValue {
         model.setExposureMode(mode)
       }
     case .copyMCPClientConfiguration:
-      guard connected(model), clientID(payload.clientID) == MCPClientID.qwenStudio.rawValue
-      else { return }
-      model.copyQwenStudioConfiguration()
+      guard connected(model), let id = localClientID(payload.clientID) else { return }
+      if id == .gemini {
+        model.copyGeminiLocalMCPCommand()
+      } else {
+        model.copyQwenStudioConfiguration()
+      }
     case .copyLocalMCPEndpoint:
       guard connected(model), let endpoint = model.safeLocalMCPDescription else { return }
       let pasteboard = NSPasteboard.general
@@ -37,9 +42,8 @@ extension BridgeDesktopCommandRouter {
       pasteboard.setString(endpoint, forType: .string)
       model.postToast("已复制本地 MCP Endpoint", symbol: "doc.on.doc")
     case .rotateMCPClientCredential:
-      guard connected(model), clientID(payload.clientID) == MCPClientID.qwenStudio.rawValue
-      else { return }
-      model.rotateQwenStudioCredential()
+      guard connected(model), let id = localClientID(payload.clientID) else { return }
+      model.rotateLocalMCPClientCredential(id)
     case .saveDeepSeekHarnessMCPServer:
       saveDeepSeekHarnessMCPServer(payload, model: model)
     case .deleteDeepSeekHarnessMCPServer:
@@ -111,9 +115,15 @@ extension BridgeDesktopCommandRouter {
 
   private static func clientID(_ value: String?) -> String? {
     guard let value = validatedID(value, maximumBytes: 128),
-      value == MCPClientID.chatGPT.rawValue || value == MCPClientID.qwenStudio.rawValue
+      value == MCPClientID.chatGPT.rawValue || localClientID(value) != nil
     else { return nil }
     return value
+  }
+
+  private static func localClientID(_ value: String?) -> MCPClientID? {
+    if value == MCPClientID.qwenStudio.rawValue { return .qwenStudio }
+    if value == MCPClientID.gemini.rawValue { return .gemini }
+    return nil
   }
 
   private static func tunnel(_ model: BridgeServiceAppModel) -> IPCTunnelStatus? {

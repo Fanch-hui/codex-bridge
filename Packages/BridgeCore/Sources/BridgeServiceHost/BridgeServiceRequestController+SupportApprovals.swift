@@ -47,6 +47,8 @@ extension BridgeServiceRequestController {
       clientLabel = "ChatGPT"
     case MCPClientID.qwenStudio.rawValue:
       clientLabel = "Qwen"
+    case MCPClientID.gemini.rawValue:
+      clientLabel = "Gemini"
     default:
       clientLabel = "远程客户端"
     }

@@ -20,6 +20,9 @@ extension BridgeDesktopCommandRouter {
     case .browserReload:
       guard model.isChatBrowserEnabled else { return }
       model.reloadChatBrowser()
+    case .selectBrowserSite:
+      guard let value = payload.value, let site = ChatBrowserSite(rawValue: value) else { return }
+      model.selectChatBrowserSite(site)
     case .setBrowserEnabled:
       guard let enabled = payload.enabled else { return }
       model.isChatBrowserEnabled = enabled
@@ -157,12 +160,9 @@ extension BridgeDesktopCommandRouter {
   }
 
   private static func openBrowserExternally(_ model: BridgeServiceAppModel) {
-    let candidate = model.chatWebView?.url ?? model.chatBrowserResumeURL
-    guard let host = candidate.host?.lowercased(),
-      candidate.scheme?.lowercased() == "https",
-      host == "chatgpt.com" || host.hasSuffix(".chatgpt.com")
-    else { return }
-    NSWorkspace.shared.open(candidate)
+    let site = model.chatBrowserSite
+    let url = site.validatedURL(model.chatWebView?.url) ?? site.homeURL
+    NSWorkspace.shared.open(url)
   }
 
   private static func loadEarlier(_ taskID: String?, model: BridgeServiceAppModel) {

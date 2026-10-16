@@ -50,7 +50,7 @@
   }
 
   function ruleFields(policy, value) {
-    var grid = S.node("div", "form-grid three");
+    var grid = S.node("div", "form-grid native-rule-fields");
     var effect = S.selectField("效果", value.effect, effects, function () {}, "");
     var actionChoices = S.safeArray(policy.availableActions).map(function (item) {
       return { id: item, title: actionTitle(item) };

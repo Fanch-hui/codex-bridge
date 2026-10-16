@@ -1,4 +1,5 @@
 #if os(Windows)
+  import BridgeServiceAppCore
   import Foundation
 
   struct WindowsWebViewConfiguration: Sendable, Equatable {
@@ -30,12 +31,13 @@
     }
 
     static func chatBrowser(
-      initialURL: String = WindowsChatWebView.chatURL
+      site: ChatBrowserSite = .chatGPT,
+      initialURL: String? = nil
     ) -> WindowsWebViewConfiguration {
       WindowsWebViewConfiguration(
         purpose: .chatBrowser,
-        profileName: "WebView2",
-        initialURL: initialURL,
+        profileName: site == .chatGPT ? "WebView2" : "GeminiWebView2",
+        initialURL: initialURL ?? site.homeURL.absoluteString,
         disableDefaultContextMenu: false,
         disableStatusBar: false,
         disableDevTools: false,

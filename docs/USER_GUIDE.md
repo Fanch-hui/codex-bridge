@@ -157,6 +157,79 @@ OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行�
 
 “重新生成凭证”会使旧凭据失效，之后重新复制配置到 Qwen。“重新生成 Endpoint”会改变本机服务地址，需要更新使用旧地址的客户端。
 
+### 8.1 连接 Gemini 本地 MCP
+
+本地 MCP 用于与 Bridge 位于同一台电脑、能够启动本机程序的 Gemini 桌面客户端。Gemini 网页版使用下一节的云 MCP。
+
+1. 在 Bridge 的「连接 → Gemini」中启用 Gemini，并选择客户端工具权限。
+2. 在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **本地 MCP**。
+3. 服务器名称填写 `Codex Bridge`，说明可选。
+4. 返回 Bridge，点击「复制本地启动命令」，将完整命令粘贴到 Gemini 的「命令」栏。
+5. 点击「下一步」，核对工具列表后完成关联。在对话中启用该应用，让 Gemini 调用 `bridge_status` 和 `list_projects` 检查连接。
+
+启动命令使用已安装 App 的 `--mcp-stdio` 入口，由本机连接器取得当前服务地址与凭据。无需安装 Node，也无需在 Gemini 填写 Token。使用期间保持 Bridge 后台服务运行；更换 App 安装路径后，重新复制命令并更新 Gemini 配置。
+
+Gemini 与 Qwen、ChatGPT 的启停、凭据和客户端工具权限独立。项目目录、Direct 执行规则、本机审批和 Agent 任务权限继续由 Bridge 管理。
+
+### 8.2 连接 Gemini 云 MCP
+
+云 MCP 可供 Gemini 网页版使用，提供 **ChatGPT Sites（公开）** 和 **ngrok** 两种方式。先在 Bridge 的「连接 → Gemini」启用 Gemini，选择客户端工具权限，再打开「云 MCP」选择接入方式。
+
+配置中会用到两种地址：
+
+| 地址 | 填写位置 |
+| --- | --- |
+| 托管服务的 HTTPS 根地址，例如 `https://your-site.your-workspace.chatgpt.site` | Bridge 的云 MCP 地址栏 |
+| Bridge「复制 Gemini 专用链接」生成的完整专用链接 | Gemini 的 Cloud MCP 地址栏 |
+
+专用链接包含访问凭据，请保留完整内容，不要自行拼接路径，也不要把根地址直接填入 Gemini。
+
+#### ChatGPT Sites（公开）：让 Codex 帮你配置
+
+1. 准备可使用 ChatGPT Sites 的账号，在 Bridge 的云 MCP 中选择「ChatGPT Sites（公开）」。
+2. 将下面的完整提示词复制给有 Sites 部署能力的 Codex。提示词本身不含密钥；Bridge 中「复制 Sites 托管配置」取得的配置，应另行通过受保护的 Secret 配置入口提供，不要贴入公开页面或仓库。
+
+```text
+请帮我部署 Codex Bridge 的 Gemini Cloud MCP 转发站点。
+
+请从公开仓库 https://github.com/Fanch-hui/codex-bridge 的 win 分支取得 Integrations/GeminiSites 完整模板，并先阅读该目录的 README。按模板创建一个新的 ChatGPT Sites 站点并公开部署，保留真实的 MCP 请求转发、D1 队列，以及本机 Bridge 主动领取请求和回传结果的接口。使用模板自己的构建脚本，不要用只有演示工具或静态页面的站点代替。
+
+我会另行通过受保护的 Secret 配置方式提供 Bridge「复制 Sites 托管配置」中的两项值。请将 BRIDGE_MCP_KEY 和 BRIDGE_RELAY_KEY 分别设置为站点运行时 Secret；缺少配置时提示我完成 Secret 设置。不要将它们写入源码、hosting.json、公开网页、日志或回复，也不要在回复中输出含密钥的 Gemini 连接链接。
+
+部署完成后，请返回站点的 HTTPS 根地址和部署结果，方便我填回 Bridge。随后告诉我：在 Bridge 保存该根地址并启用云 MCP，等待连接成功，再从 Bridge 复制完整连接链接，到 Gemini 的「更多 → 自定义 → 关联应用 → 右上角『＋自定义』」选择 Cloud MCP，粘贴完整连接链接并将 OAuth 高级选项留空；点击下一步，核对工具列表、将应用名称填写为 Codex Bridge，然后完成关联。
+```
+
+3. 按 Codex 提示完成两项运行时 Secret 配置，等待公开部署完成。需要自行部署时，参见[模板与开发者说明](../Integrations/GeminiSites/README.md)。
+4. 将 Codex 返回的 **HTTPS 根地址**填回 Bridge，保存并启用云 MCP。保持 Bridge 后台服务运行，等待 Sites 连接成功。
+5. 在 Bridge 点击「复制 Gemini 专用链接」。在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**。
+6. 地址粘贴刚复制的**完整专用链接**，高级 OAuth 配置无需填写，点击「下一步」。
+7. 核对工具列表，将应用名称填写为 `Codex Bridge`，完成关联，并在对话中启用该应用。
+
+Bridge 主动向 Sites 领取请求并回传结果，本机无需开放入站端口。站点首页公开不代表工具无权限开放：调用工具仍需完整专用链接，并受 Gemini 客户端权限、项目目录和本机审批限制。使用期间保持 Bridge 后台服务运行。
+
+#### ngrok
+
+1. 准备自己的 ngrok 账号，按 [ngrok 官方指南](https://ngrok.com/docs/gateway/agent/cli)在运行 Bridge 的电脑安装 ngrok，完成本机账号认证。
+2. 在 Bridge 的云 MCP 中选择「ngrok」，点击「复制 ngrok 启动命令」，在本机终端粘贴并运行。
+3. 从 ngrok 输出中取得公网 **HTTPS 根地址**，填入 Bridge，保存并启用云 MCP。不要填写指向 `127.0.0.1` 的本机目标地址。
+4. 在 Bridge 点击「复制 Gemini 专用链接」。在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**。
+5. 地址粘贴 Bridge 生成的**完整专用链接**，高级 OAuth 配置无需填写，点击「下一步」。
+6. 核对工具列表，将应用名称填写为 `Codex Bridge`，完成关联，并在对话中启用该应用。
+
+使用期间保持 ngrok 终端进程与 Bridge 后台服务运行。Bridge 生成的命令使用当前本机端口，并关闭本机 HTTP 请求检查。ngrok 公网地址变化后，将新 HTTPS 根地址保存到 Bridge，再重新复制完整连接链接并更新 Gemini；Bridge 本机端口变化后，先重新复制并运行 ngrok 启动命令，再更新地址与 Gemini 配置。
+
+#### 检查连接与更新凭据
+
+完成任一方式后，让 Gemini 调用 `bridge_status` 和 `list_projects` 检查连接。专用链接具有 Gemini 客户端的工具权限，只应填入自己的 Gemini 配置；不要发布到网页、Issue、日志或对话回复中。
+
+重置 Gemini 凭据后，旧的本地和云端凭据同时失效。云 MCP 需要重新复制完整连接链接并更新 Gemini；使用 Sites 时，还需重新复制「Sites 托管配置」，同步更新站点的两项运行时 Secret。停用云 MCP 不会关闭 Gemini 本地 MCP。
+
+### 8.3 在内置浏览器使用 ChatGPT 或 Gemini
+
+在工作台左侧浏览器工具栏选择 ChatGPT 或 Gemini。App 会记住上次选择及各站点的页面；切换时保留已打开的页面和历史，两站点的登录数据分别保存。后退、前进、刷新和“在外部浏览器打开”作用于当前站点。
+
+如果站点限制内置浏览器登录，可点击“在外部浏览器打开”继续使用。Gemini 网页中的 Bridge 工具需要配置远程 MCP 服务；本地 MCP 启动命令配置在 Gemini 桌面客户端中。
+
 ## 9. 提交第一项任务
 
 本节适用于已连接 Agent 的任务执行。直接文件与命令操作见第 11 节。
