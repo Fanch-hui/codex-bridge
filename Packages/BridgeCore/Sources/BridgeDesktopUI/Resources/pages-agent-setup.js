@@ -4,7 +4,7 @@
   var runningStates = ["checking", "installing", "configuring", "verifying"];
   function running(operation) { return !!operation && runningStates.indexOf(operation.state) >= 0; }
   function create(context, providerValue, onRetry) {
-    var operation = null, provider = providerValue, dismissed = null, lastAction = null, returnFocus = null;
+    var operation = null, provider = providerValue, lastAction = null, returnFocus = null;
     var root = S.node("dialog", "agent-setup-dialog");
     root.setAttribute("aria-label", "Agent 一键配置");
     var heading = S.node("h3", null, "一键配置"); root.appendChild(heading);
@@ -34,7 +34,6 @@
     var close = S.button("关闭", null, {}, null, "small", false);
     [login, proceed, docs, retry, cancel, close].forEach(function (button) { actions.appendChild(button); });
     function closeDialog() {
-      dismissed = operation && operation.operationID;
       key.control.value = "";
       if (root.open) root.close();
       if (returnFocus && returnFocus.isConnected) returnFocus.focus();
@@ -76,7 +75,7 @@
     });
     function open() {
       if (!operation || root.open) return;
-      dismissed = null; returnFocus = document.activeElement;
+      returnFocus = document.activeElement;
       root.showModal(); close.focus();
     }
     function update(value, nextProvider) {
@@ -118,7 +117,6 @@
       retry.disabled = !context.canConnect;
       cancel.hidden = ["ready", "failed", "cancelled", "interrupted"].indexOf(value.state) >= 0;
       cancel.disabled = !context.canConnect;
-      if (needs && dismissed !== value.operationID && (changed || lastAction !== value.userAction)) open();
       lastAction = value.userAction;
     }
     return { root: root, update: update, open: open, operation: function () { return operation; } };
