@@ -17,12 +17,12 @@ Gemini 网页版（包括 Bridge 内置浏览器）必须使用 Cloud MCP，可�
 
 我会另行通过受保护的 Secret 配置方式提供 Bridge「复制 Sites 托管配置」中的两项值。请将 BRIDGE_MCP_KEY 和 BRIDGE_RELAY_KEY 分别设置为站点运行时 Secret；缺少配置时提示我完成 Secret 设置。不要将它们写入源码、hosting.json、公开网页、日志或回复，也不要在回复中输出含密钥的 Gemini 连接链接。
 
-部署完成后，请返回站点的 HTTPS 根地址和部署结果，方便我填回 Bridge。随后告诉我：在 Bridge 保存该根地址并启用云 MCP，等待连接成功，再从 Bridge 复制完整连接链接，到 Gemini 的「更多 → 自定义 → 关联应用 → 右上角『＋自定义』」选择 Cloud MCP，粘贴完整连接链接并将 OAuth 高级选项留空；点击下一步，核对工具列表、将应用名称填写为 Codex Bridge，然后完成关联。完成关联后，在 Gemini 中切换到任务模式，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。
+部署完成后，请返回站点的 HTTPS 根地址和部署结果，方便我填回 Bridge。随后告诉我：在 Bridge 保存该根地址并启用云 MCP，等待连接成功，再从 Bridge 复制完整连接链接，到 Gemini 的「更多 → 自定义 → 关联应用 → 右上角『＋自定义』」选择 Cloud MCP，粘贴完整连接链接并将 OAuth 高级选项留空；点击下一步，核对工具列表、将应用名称填写为 Codex Bridge，然后完成关联。Gemini 只有在任务模式下才能使用已添加的自定义 MCP。完成关联后，在 Gemini 中切换到任务模式，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。
 ```
 
 按提示将 Bridge「复制 Sites 托管配置」中的两项值另行填入受保护的 Secret 配置入口。部署后，将 Codex 返回的 **HTTPS 根地址**保存到 Bridge 并启用云 MCP；连接成功后，点击「复制 Gemini 专用链接」。
 
-在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**，地址填写 Bridge 生成的**完整专用链接**，高级 OAuth 配置无需填写。点击「下一步」，核对工具列表，将应用名称填写为 `Codex Bridge`，然后完成关联。在 **Gemini 中切换到「任务模式」**，启用 Codex Bridge 应用，再让 Gemini 调用 `bridge_status` 和 `list_projects` 检查连接。
+在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**，地址填写 Bridge 生成的**完整专用链接**，高级 OAuth 配置无需填写。点击「下一步」，核对工具列表，将应用名称填写为 `Codex Bridge`，然后完成关联。**Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** 切换到任务模式并启用 Codex Bridge 应用，再让 Gemini 调用 `bridge_status` 和 `list_projects` 检查连接。
 
 HTTPS 根地址用于 Bridge 配置，完整专用链接用于 Gemini；不要用根地址代替 Gemini 的连接链接。完整的本地 MCP、Sites 与 ngrok 操作见[使用指南](../../docs/USER_GUIDE.md#82-连接-gemini-云-mcp)。
 

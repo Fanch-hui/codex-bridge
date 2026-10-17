@@ -165,6 +165,8 @@ OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行�
 
 ### 8.1 连接 Gemini 本地 MCP
 
+**Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** 本地 MCP 和云 MCP 均适用；完成关联后，在任务模式中启用 Codex Bridge 应用，再发送请求。
+
 **本地 MCP 仅用于与 Bridge 位于同一台电脑、能够启动本机程序的 Gemini 桌面 App。** Gemini 网页版（包括 Bridge 内置浏览器）不能使用本地 MCP 启动命令，必须按下一节配置 Cloud MCP。
 
 **本方式无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** 在 Bridge 登记项目并启用 Gemini 即可开始接入。
@@ -185,7 +187,7 @@ Gemini 与 Qwen、ChatGPT 的启停、凭据和客户端工具权限独立。项
 
 **两种云 MCP 都无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** Sites 需要可使用 ChatGPT Sites 的账号；ngrok 使用自己的 ngrok 账号。Sites 的 `BRIDGE_MCP_KEY` 和 `BRIDGE_RELAY_KEY` 均由 Bridge 生成，用于站点访问与请求回传，与 OpenAI Runtime API Key 无关。
 
-**完成关联后，须在 Gemini 中切换到「任务模式」并启用 Codex Bridge 应用，再发送请求。** Sites 和 ngrok 均按此方式使用。
+**Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** Sites 和 ngrok 均适用；完成关联后，在 Gemini 的任务模式中启用 Codex Bridge 应用，再发送请求。
 
 配置中会用到两种地址：
 
@@ -208,7 +210,7 @@ Gemini 与 Qwen、ChatGPT 的启停、凭据和客户端工具权限独立。项
 
 我会另行通过受保护的 Secret 配置方式提供 Bridge「复制 Sites 托管配置」中的两项值。请将 BRIDGE_MCP_KEY 和 BRIDGE_RELAY_KEY 分别设置为站点运行时 Secret；缺少配置时提示我完成 Secret 设置。不要将它们写入源码、hosting.json、公开网页、日志或回复，也不要在回复中输出含密钥的 Gemini 连接链接。
 
-部署完成后，请返回站点的 HTTPS 根地址和部署结果，方便我填回 Bridge。随后告诉我：在 Bridge 保存该根地址并启用云 MCP，等待连接成功，再从 Bridge 复制完整连接链接，到 Gemini 的「更多 → 自定义 → 关联应用 → 右上角『＋自定义』」选择 Cloud MCP，粘贴完整连接链接并将 OAuth 高级选项留空；点击下一步，核对工具列表、将应用名称填写为 Codex Bridge，然后完成关联。完成关联后，在 Gemini 中切换到任务模式，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。
+部署完成后，请返回站点的 HTTPS 根地址和部署结果，方便我填回 Bridge。随后告诉我：在 Bridge 保存该根地址并启用云 MCP，等待连接成功，再从 Bridge 复制完整连接链接，到 Gemini 的「更多 → 自定义 → 关联应用 → 右上角『＋自定义』」选择 Cloud MCP，粘贴完整连接链接并将 OAuth 高级选项留空；点击下一步，核对工具列表、将应用名称填写为 Codex Bridge，然后完成关联。Gemini 只有在任务模式下才能使用已添加的自定义 MCP。完成关联后，在 Gemini 中切换到任务模式，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。
 ```
 
 3. 按 Codex 提示完成两项运行时 Secret 配置，等待公开部署完成。需要自行部署时，参见[模板与开发者说明](../Integrations/GeminiSites/README.md)。

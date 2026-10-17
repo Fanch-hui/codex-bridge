@@ -97,7 +97,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 Gemini 的配置入口是 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，然后选择本地 MCP 或 Cloud MCP。**Gemini 的三种接入方式都无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。** 选择 Sites 时需要可使用 ChatGPT Sites 的账号；站点的两项 Secret 由 Bridge 生成。选择本地 MCP 或 ngrok 时，无需使用 ChatGPT Sites。
 
-完成关联后，须在 **Gemini 中切换到「任务模式」**，启用 Codex Bridge 应用，再发送请求。本地 MCP、Sites 和 ngrok 均按此方式使用。
+**Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** 本地 MCP、Sites 和 ngrok 均适用。完成关联后，在 Gemini 的任务模式中启用 Codex Bridge 应用，再发送请求。
 
 ### 委派 Agent 任务（可选）
 

@@ -195,7 +195,7 @@
     root.appendChild(S.node("p", "card-subtitle",
       "Gemini 网页版（包括 Bridge 内置浏览器）必须使用云 MCP，选择 Sites 或 ngrok。本地 MCP 仅用于与 Bridge 位于同一台电脑、能启动本机程序的 Gemini 桌面 App。"));
     root.appendChild(S.node("p", "card-subtitle",
-      "完成关联后，须在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用，再发送请求。本地 MCP、Sites 和 ngrok 均按此方式使用。"));
+      "Gemini 只有在“任务模式”下才能使用已添加的自定义 MCP。本地 MCP、Sites 和 ngrok 均适用。完成关联后，在任务模式中启用 Codex Bridge 应用，再发送请求。"));
     root.appendChild(S.node("p", "hint",
       "Gemini 的本地与云 MCP 均无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。委派 Agent 任务时，另行完成所选 Agent 的登录或 API 配置。"));
     var clients = E.createClients(currentEmit);
