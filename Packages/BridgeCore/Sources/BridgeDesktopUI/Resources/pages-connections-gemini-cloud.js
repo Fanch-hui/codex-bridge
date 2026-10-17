@@ -19,8 +19,8 @@
       command: "Forwarding  https://your-domain.ngrok.app -> http://127.0.0.1:62771" },
     "保存到 Bridge：把 HTTPS 根地址填入上方“HTTPS 网站根地址”，点击“保存并启用”。不加 /mcp，不填写 127.0.0.1 或 Web Interface 地址。“已配置，等待 Gemini 调用”表示配置已保存，实际连通性在 Gemini 中检查。",
     "关联 Gemini：点击“复制 Gemini 专用链接”。在 Gemini 中进入“更多 → 自定义 → 关联应用 → 右上角『＋自定义』”，选择“Cloud MCP”，粘贴完整专用链接，不使用网站根地址。OAuth 客户端 ID 和密钥均留空，不填 ngrok Authtoken。",
-    "完成关联：点击“下一步”，核对工具，将应用名称设为 Codex Bridge，再点击“关联”。在对话中启用该应用。",
-    { text: "检查调用：在 Gemini 对话中发送：", command: "请通过 Codex Bridge 调用 bridge_status 和 list_projects，确认连接并列出已登记的项目。" },
+    "完成关联：点击“下一步”，核对工具，将应用名称设为 Codex Bridge，再点击“关联”。在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用。",
+    { text: "检查调用：在 Gemini 的任务模式中发送：", command: "请通过 Codex Bridge 调用 bridge_status 和 list_projects，确认连接并列出已登记的项目。" },
     "持续运行：使用期间保持 Bridge 后台服务和 ngrok 运行。公网地址变化后重新保存根地址并更新 Gemini 专用链接；本机端口变化后，先按 Ctrl+C 停止旧 ngrok，再运行最新复制的命令。",
     "停止使用：在 Bridge 点击“停用云 MCP”，再到 ngrok 终端按 Ctrl+C。Bridge 的停用按钮不会自动关闭你手动启动的 ngrok。"
   ];
@@ -83,6 +83,7 @@
       "将网站根地址填入上方“HTTPS 网站根地址”，点击“保存并启用”。这里填写网站根地址，不是 Gemini 专用链接。",
       "等待状态显示“Sites 已连通”，点击“复制 Gemini 专用链接”。在 Gemini 中依次进入“更多 → 自定义 → 关联应用”，点击右上角“＋自定义”，选择“Cloud MCP”。",
       "在“添加自定义应用链接”中粘贴完整的 Gemini 专用链接，高级 OAuth 的客户端 ID 和密钥均留空。点击“下一步”，核对工具并将应用名称设为 Codex Bridge，再点击“关联”。",
+      "在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。",
       "使用期间保持本机 Bridge 后台服务运行。Gemini 专用链接含访问凭据，仅交给自己的 Gemini 使用。"
     ]);
     var ngrokHelp = guide(root, "ngrok 安装、认证与连接指南", ngrokSteps);

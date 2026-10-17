@@ -194,6 +194,8 @@
     var root = S.node("div", "connection-detail");
     root.appendChild(S.node("p", "card-subtitle",
       "Gemini 网页版（包括 Bridge 内置浏览器）必须使用云 MCP，选择 Sites 或 ngrok。本地 MCP 仅用于与 Bridge 位于同一台电脑、能启动本机程序的 Gemini 桌面 App。"));
+    root.appendChild(S.node("p", "card-subtitle",
+      "完成关联后，须在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用，再发送请求。本地 MCP、Sites 和 ngrok 均按此方式使用。"));
     root.appendChild(S.node("p", "hint",
       "Gemini 的本地与云 MCP 均无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。委派 Agent 任务时，另行完成所选 Agent 的登录或 API 配置。"));
     var clients = E.createClients(currentEmit);
@@ -205,7 +207,7 @@
       "先在上方启用 Gemini 连接，再点击“复制本地启动命令”。",
       "打开与 Bridge 同机的 Gemini 桌面 App，依次进入“更多 → 自定义 → 关联应用”，点击右上角“＋自定义”，选择“本地 MCP”。",
       "服务器名称填写 Codex Bridge，说明可选；将复制的本地启动命令粘贴到“命令”。",
-      "点击“下一步”，核对工具列表后完成关联。"
+      "点击“下一步”，核对工具列表后完成关联。在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。"
     ].forEach(function (text) { steps.appendChild(S.node("li", null, text)); });
     help.appendChild(steps);
     help.appendChild(S.node("p", "hint",
