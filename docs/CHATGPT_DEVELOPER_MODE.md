@@ -1,5 +1,7 @@
 # ChatGPT 与 Secure MCP Tunnel 配置指南
 
+**本指南仅适用于 ChatGPT / Dot 的 Secure MCP Tunnel。** Gemini 本地 MCP、Sites 云 MCP 和 ngrok 云 MCP 均无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，请按 [Gemini 接入指南](./USER_GUIDE.md#81-连接-gemini-本地-mcp)操作。Sites 方式需要可使用 ChatGPT Sites 的账号，站点 Secret 由 Bridge 生成。
+
 适用于 Codex Bridge 的 macOS、Windows 与 Linux 版本。完成顺序：准备 Bridge 并登记项目 → 创建 Tunnel 并选择 WORKSPACES → 创建 Runtime API Key → 在 Bridge 启动连接 → 在 ChatGPT 添加并启用插件 → 直接操作项目。
 
 **如果只需要本地文件读写、运行命令，配置好 Tunnel 并添加、启用 Codex Bridge 插件即可，无需安装或连接 Agent，也无需配置 Agent 模型。** 操作由 Bridge 的 Direct Workspace 执行，按已登记的项目目录、Direct 执行规则与审批设置。需要委派 Agent 执行任务时，再连接相应 Agent。

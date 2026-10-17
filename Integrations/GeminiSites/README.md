@@ -2,6 +2,10 @@
 
 公开 Site 接收 Gemini 的 MCP 请求，本机 Codex Bridge 主动领取并执行，再回传结果。无需开放本机入站端口；Bridge 必须保持运行。每个 Site 连接一个 Bridge。
 
+Gemini 网页版（包括 Bridge 内置浏览器）必须使用 Cloud MCP，可通过本模板部署的 Sites 或 ngrok 接入。本地 MCP 启动命令仅用于与 Bridge 同机、能启动本机程序的 Gemini 桌面 App。
+
+**本方式需要可使用 ChatGPT Sites 的账号，无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** `BRIDGE_MCP_KEY` 和 `BRIDGE_RELAY_KEY` 均由 Bridge 生成，用于站点访问与请求回传，与 OpenAI Runtime API Key 无关。本地 MCP 或 ngrok 方式无需使用 ChatGPT Sites。
+
 ## 让 Codex 帮你配置
 
 准备可使用 ChatGPT Sites 的账号，并在 Bridge 的「连接 → Gemini」启用 Gemini，在「云 MCP」选择「ChatGPT Sites（公开）」。将下面的完整提示词复制给有 Sites 部署能力的 Codex：

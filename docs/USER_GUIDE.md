@@ -2,14 +2,17 @@
 
 适用于 macOS 14+ Apple Silicon / Intel、Windows x64 / ARM64，以及 Ubuntu 24.04 LTS x64 / ARM64。首次使用按需要选择配置流程：
 
-- **本地读写文件、运行命令**：安装并启动 Bridge → 登记项目目录 → 配置 Tunnel → 添加并启用插件 → 直接操作项目。无需安装或连接 Agent，也无需配置 Agent 模型。
+- **本地读写文件、运行命令**：安装并启动 Bridge → 登记项目目录 → 完成所选聊天客户端的 MCP 接入 → 在对话中启用 Codex Bridge → 直接操作项目。无需安装或连接 Agent，也无需配置 Agent 模型。
 - **委派 Agent 任务**：安装并启动 Bridge → 登记项目目录 → 连接 Agent → 配置模型 → 从工作台或已连接的聊天客户端提交任务。
 
-Qwen Studio 使用本机 HTTP MCP 配置代替 Tunnel 和 ChatGPT 插件，直接文件与命令操作同样无需连接 Agent。
+ChatGPT / Dot 使用 Secure MCP Tunnel；Qwen Studio 使用本机 HTTP MCP；Gemini 本地 MCP 用于与 Bridge 位于同一台电脑、能启动本机程序的 Gemini 桌面 App。**Gemini 网页版（包括 Bridge 内置浏览器）必须使用 Cloud MCP，选择 Sites 或 ngrok。** 按所用客户端选择对应流程即可。
+
+**只使用 Gemini 时，无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。** 选择 Sites 仅需具备 ChatGPT Sites 的托管使用权限；本地 MCP 和 ngrok 无需使用 Sites。若要委派 Agent 任务，所选 Agent 自身的登录或 API 配置另行完成。
 
 ## 文档导航
 
 - [ChatGPT、Tunnel 与 OpenAI Runtime API Key](./CHATGPT_DEVELOPER_MODE.md)
+- [Gemini 本地 MCP](#81-连接-gemini-本地-mcp) · [Gemini 云 MCP：Sites / ngrok](#82-连接-gemini-云-mcp)
 - [DeepSeek Harness ACP 安装、API Key、连接与模型](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) · [原生桌面连接](./DSH_NATIVE_DESKTOP_GUIDE.md)
 - [Pi 与 Qoder 安装、地区选择与连接](./PI_QODER_CONNECTION_GUIDE.md)
 - [OpenCode 安装与连接](./OPENCODE_CONNECTION_GUIDE.md)
@@ -17,15 +20,16 @@ Qwen Studio 使用本机 HTTP MCP 配置代替 Tunnel 和 ChatGPT 插件，直�
 
 ## 1. 客户端与 Agent
 
-ChatGPT 和 Qwen Studio 可以通过 Bridge 直接读写文件、运行命令，也可以委派 Agent 任务；Bridge 工作台用于提交和管理 Agent 任务。直接操作由本机 Bridge 服务的 Direct Workspace 执行。Codex、OpenCode、DeepSeek Harness（DSH）、Antigravity（AGY）、Pi 和 Qoder 是实际执行委派任务的本机 Agent。
+ChatGPT、Qwen Studio 和 Gemini 可以通过 Bridge 直接读写文件、运行命令，也可以委派 Agent 任务；Bridge 工作台用于提交和管理 Agent 任务。直接操作由本机 Bridge 服务的 Direct Workspace 执行。Codex、OpenCode、DeepSeek Harness（DSH）、Antigravity（AGY）、Pi 和 Qoder 是实际执行委派任务的本机 Agent。
 
 ```text
-ChatGPT ── Secure MCP Tunnel ─┐
-Qwen ──── 本机 HTTP MCP ──────┼─ Bridge Service ─ 项目 / Agent / 审批 / 会话
-Bridge 工作台 ── 本机 IPC ────┘
+ChatGPT ── Secure MCP Tunnel ──────────┐
+Qwen ──── 本机 HTTP MCP ───────────────┤
+Gemini ── 本地 stdio / Sites / ngrok ──┼─ Bridge Service ─ 项目 / Agent / 审批 / 会话
+Bridge 工作台 ── 本机 IPC ─────────────┘
 ```
 
-委派 Agent 任务时，你可以先只用本机工作台，再配置 ChatGPT 或 Qwen。远程任务请求省略 `provider_id` 时使用 Codex；使用其他 Agent 时要明确选择。
+委派 Agent 任务时，你可以先只用本机工作台，再配置 ChatGPT、Qwen 或 Gemini。远程任务请求省略 `provider_id` 时使用 Codex；使用其他 Agent 时要明确选择。
 
 ## 2. 安装与启动
 
@@ -59,7 +63,7 @@ Windows 关闭主窗口会隐藏到托盘；需要退出时使用托盘菜单。
 | 概览 | 检查 Service、本地 MCP 和 Tunnel 状态 |
 | 工作台 | 选择项目/Agent/会话、提交任务、查看输出与审批 |
 | 项目 | 登记并授权本地目录，配置工作区命令 |
-| 连接 | 连接 Agent、配置 Tunnel、复制 Qwen 配置、管理 DSH MCP |
+| 连接 | 连接 Agent、配置 ChatGPT Tunnel、Qwen 或 Gemini MCP、管理 DSH MCP |
 | 设置 | 模型与推理选项、后台偏好、Direct 设置、MCP 自定义指令 |
 | 日志 | 排查连接与任务故障 |
 
@@ -90,7 +94,7 @@ OpenCode 只读任务使用原生权限配置，仅开放读取、文件匹配�
 
 ## 5. 连接 Agent
 
-本节用于委派 Agent 任务。只需要本地文件读写和命令执行时，可直接前往第 7 节连接 ChatGPT 或第 8 节连接 Qwen，再按第 11 节使用 Direct。
+本节用于委派 Agent 任务，所选 Agent 自身的登录或 API 配置与聊天客户端的 MCP 接入分别管理。只需要本地文件读写和命令执行时，可直接前往第 7 节连接 ChatGPT、第 8 节连接 Qwen，或第 8.1 / 8.2 节连接 Gemini，再按第 11 节使用 Direct。
 
 ### Codex
 
@@ -137,13 +141,15 @@ Bridge 自动发现安装，点击连接后才会登记并启用。安装卡片�
 
 ## 7. 连接 ChatGPT
 
+本节的 OpenAI Platform、Tunnel ID 和 OpenAI Runtime API Key 配置仅用于 ChatGPT / Dot 的 Secure MCP Tunnel。只使用 Gemini 或 Qwen 时，跳过本节。
+
 完整分步说明见 [Tunnel 配置指南](./CHATGPT_DEVELOPER_MODE.md)，包含平台入口、权限和 Key 获取步骤。
 
 流程是：在 OpenAI Platform 创建 Tunnel，明确选择并保存 **WORKSPACES**（个人空间选 **Personal**，团队选对应工作区），再创建受限 Runtime Key，在 Bridge 连接页保存并等待 `ready`。随后在 ChatGPT 侧栏打开 **插件 → 添加 → 创建自定义 MCP 服务器**，选择 **Tunnel** 连接类型并添加 Codex Bridge。Bridge 和 ChatGPT 使用同一个 Tunnel ID。
 
 完成 Tunnel 配置并在 ChatGPT 添加、启用 Codex Bridge 插件后，即可按第 11 节直接读写已授权项目的文件、运行命令，无需连接 Agent。
 
-OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行配置 API Key，原生桌面模式复用 Desktop 账号。Runtime Key 不填入 ChatGPT 对话或 Qwen 配置。
+OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行配置 API Key，原生桌面模式复用 Desktop 账号。Runtime Key 不填入 ChatGPT 对话、Qwen 或 Gemini 配置。
 
 ## 8. 连接 Qwen Studio
 
@@ -159,7 +165,9 @@ OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行�
 
 ### 8.1 连接 Gemini 本地 MCP
 
-本地 MCP 用于与 Bridge 位于同一台电脑、能够启动本机程序的 Gemini 桌面客户端。Gemini 网页版使用下一节的云 MCP。
+**本地 MCP 仅用于与 Bridge 位于同一台电脑、能够启动本机程序的 Gemini 桌面 App。** Gemini 网页版（包括 Bridge 内置浏览器）不能使用本地 MCP 启动命令，必须按下一节配置 Cloud MCP。
+
+**本方式无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** 在 Bridge 登记项目并启用 Gemini 即可开始接入。
 
 1. 在 Bridge 的「连接 → Gemini」中启用 Gemini，并选择客户端工具权限。
 2. 在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **本地 MCP**。
@@ -173,7 +181,9 @@ Gemini 与 Qwen、ChatGPT 的启停、凭据和客户端工具权限独立。项
 
 ### 8.2 连接 Gemini 云 MCP
 
-云 MCP 可供 Gemini 网页版使用，提供 **ChatGPT Sites（公开）** 和 **ngrok** 两种方式。先在 Bridge 的「连接 → Gemini」启用 Gemini，选择客户端工具权限，再打开「云 MCP」选择接入方式。
+**Gemini 网页版（包括 Bridge 内置浏览器）必须使用 Cloud MCP。** Bridge 提供 **ChatGPT Sites（公开）** 和 **ngrok** 两种方式。先在 Bridge 的「连接 → Gemini」启用 Gemini，选择客户端工具权限，再打开「云 MCP」选择接入方式。
+
+**两种云 MCP 都无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** Sites 需要可使用 ChatGPT Sites 的账号；ngrok 使用自己的 ngrok 账号。Sites 的 `BRIDGE_MCP_KEY` 和 `BRIDGE_RELAY_KEY` 均由 Bridge 生成，用于站点访问与请求回传，与 OpenAI Runtime API Key 无关。
 
 配置中会用到两种地址：
 
@@ -228,7 +238,7 @@ Bridge 主动向 Sites 领取请求并回传结果，本机无需开放入站端
 
 在工作台左侧浏览器工具栏选择 ChatGPT 或 Gemini。App 会记住上次选择及各站点的页面；切换时保留已打开的页面和历史，两站点的登录数据分别保存。后退、前进、刷新和“在外部浏览器打开”作用于当前站点。
 
-如果站点限制内置浏览器登录，可点击“在外部浏览器打开”继续使用。Gemini 网页中的 Bridge 工具需要配置远程 MCP 服务；本地 MCP 启动命令配置在 Gemini 桌面客户端中。
+如果站点限制内置浏览器登录，可点击“在外部浏览器打开”继续使用。**内置浏览器中的 Gemini 同样属于网页版，必须按第 8.2 节配置 Sites 或 ngrok 云 MCP。** 第 8.1 节的本地 MCP 启动命令只配置在与 Bridge 同机的 Gemini 桌面 App 中。
 
 ## 9. 提交第一项任务
 
@@ -295,7 +305,7 @@ Bridge 主动向 Sites 领取请求并回传结果，本机无需开放入站端
 
 ## 11. Direct 与 Skills
 
-**Direct 让聊天客户端直接执行授权的文件、命令或 Git 操作，无需安装或连接 Agent。** 在 Bridge 登记项目目录、完成 Tunnel 和插件接入（Qwen 使用本机 HTTP MCP）后即可使用。
+**Direct 让聊天客户端直接执行授权的文件、命令或 Git 操作，无需安装或连接 Agent。** 在 Bridge 登记项目目录，完成所选聊天客户端的 MCP 接入并在对话中启用 Codex Bridge 后即可使用：ChatGPT / Dot 使用 Tunnel 插件，Qwen 使用本机 HTTP MCP，Gemini 使用本地或云 MCP。
 
 例如，在已启用插件的对话中输入：
 
@@ -338,6 +348,7 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 | 已创建隧道，但 ChatGPT 插件中找不到 | 在 Platform 的 Tunnel 编辑页选择并保存 **WORKSPACES**，再回到同一 ChatGPT 工作区刷新隧道列表；详见 [Tunnel 配置指南](./CHATGPT_DEVELOPER_MODE.md#3-创建-tunnel) |
 | ChatGPT 连不上 | 按 Tunnel 指南检查两端状态、Workspace、Key 权限 |
 | Qwen 连不上 | 本机运行位置、客户端启用状态和最新复制的 JSON |
+| 只用 Gemini，是否需要填写 OpenAI 配置 | 不需要。跳过 ChatGPT Tunnel 配置，按第 8.1 / 8.2 节选择本地 MCP、Sites 或 ngrok；Sites 的两项 Secret 由 Bridge 生成。 |
 | 任务等待且不输出 | 查看启动审批、工具审批或问题表单 |
 
 日志用于定位具体错误。分享问题时提供系统、App 版本、操作步骤和脱敏错误摘要。密钥保存在系统凭据存储中，配置 JSON 也可能含凭据，请勿公开。

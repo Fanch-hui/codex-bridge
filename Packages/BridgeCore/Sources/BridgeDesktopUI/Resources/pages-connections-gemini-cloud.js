@@ -49,7 +49,7 @@
     root.appendChild(message);
     var sitesHelp = guide(root, "Sites 部署与连接指南", [
       "先在上方启用 Gemini 连接，连接方式选择“ChatGPT Sites（公开）”。",
-      "点击“复制 Sites 部署提示词”，将提示词交给 Codex；另行复制“Sites 托管配置”，在托管环境中配置两个运行时 Secret。托管配置含密钥，不要粘贴到普通对话或写入源码、网站首页、回复。",
+      "准备可使用 ChatGPT Sites 的账号。点击“复制 Sites 部署提示词”交给 Codex；另行复制“Sites 托管配置”，配置其中两个由 Bridge 生成的运行时 Secret，与 OpenAI Runtime API Key 无关。托管配置含密钥，不要粘贴到普通对话或写入源码、网站首页、回复。",
       "让 Codex 使用本项目公开仓库 Integrations/GeminiSites 的官方模板创建公开 Site，部署后返回 HTTPS 网站根地址。",
       "将网站根地址填入上方“HTTPS 网站根地址”，点击“保存并启用”。这里填写网站根地址，不是 Gemini 专用链接。",
       "等待状态显示“Sites 已连通”，点击“复制 Gemini 专用链接”。在 Gemini 中依次进入“更多 → 自定义 → 关联应用”，点击右上角“＋自定义”，选择“Cloud MCP”。",
@@ -78,8 +78,8 @@
       address.control.disabled = !state.canConfigure;
       address.control.placeholder = sites ? "https://your-site.chatgpt.site" : "https://your-domain.ngrok.app";
       note.textContent = sites
-        ? "先按下方指南部署公开 Site，再保存网站根地址。连通后复制 Gemini 专用链接完成关联。"
-        : "先运行 ngrok，再保存其网站根地址。复制 Gemini 专用链接完成关联。";
+        ? "需要可使用 ChatGPT Sites 的账号。按下方指南部署公开 Site，再保存网站根地址。连通后复制 Gemini 专用链接完成关联。"
+        : "使用自己的 ngrok 账号，无需 ChatGPT Sites。先运行 ngrok，再保存其网站根地址，复制 Gemini 专用链接完成关联。";
       save.disabled = !state.canConfigure || !validAddress();
       stop.disabled = !state.canConfigure || !state.enabled;
       copySetup.textContent = sites ? "复制 Sites 托管配置" : "复制 ngrok 启动命令";

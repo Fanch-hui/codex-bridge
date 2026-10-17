@@ -79,18 +79,27 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 
 ## 首次配置
 
-**如果只需要读写本地文件、运行命令，登记项目目录后，配置好 Tunnel、添加并启用 Codex Bridge 插件即可，无需安装或连接 Agent。** 这些操作由 Direct Workspace 执行，按已登记的项目目录、Direct 执行规则与审批设置处理。
+**如果只需要读写本地文件、运行命令，登记项目目录并完成所选聊天客户端的 MCP 接入即可，无需安装或连接 Agent。** 这些操作由 Direct Workspace 执行，按已登记的项目目录、Direct 执行规则与审批设置处理。
 
 ### 本地文件与命令
 
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
 2. **添加项目**：登记本地目录即授权完整访问。
-3. **连接聊天客户端**：ChatGPT / Dot 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)完成 Tunnel 配置，在 ChatGPT **插件 → 添加 → 创建自定义 MCP 服务器** 中添加 Codex Bridge，并在对话中启用插件（ChatGPT 使用 Secure MCP Tunnel 需要 Plus 及以上订阅或团队订阅）；Qwen Studio 使用本机回环 HTTP MCP，连接页提供配置复制入口。Gemini 在 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**选择本地 MCP 或 Cloud MCP；能启动本机程序的桌面客户端可使用[本地命令接入](./docs/USER_GUIDE.md#81-连接-gemini-本地-mcp)，网页版使用 [ChatGPT Sites（公开）或 ngrok](./docs/USER_GUIDE.md#82-连接-gemini-云-mcp)。
-4. **直接操作项目**：在已启用插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
+3. **连接聊天客户端**：按下表选择一种接入方式。
+4. **直接操作项目**：在已启用 Codex Bridge 应用或插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
+
+| 聊天客户端 | 接入方式 |
+| --- | --- |
+| ChatGPT / Dot | 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)配置 OpenAI Secure MCP Tunnel，在 ChatGPT「插件 → 添加 → 创建自定义 MCP 服务器」添加 Codex Bridge。需要 Plus 及以上订阅或团队订阅。 |
+| Qwen Studio | 使用本机回环 HTTP MCP，从 Bridge 连接页复制 Qwen JSON 配置。 |
+| Gemini 桌面 App | 本地 MCP 用于与 Bridge 位于同一台电脑、能启动本机程序的 Gemini 桌面 App，复制[本地 MCP 启动命令](./docs/USER_GUIDE.md#81-连接-gemini-本地-mcp)进行配置。 |
+| Gemini 网页版（含 Bridge 内置浏览器） | **必须使用 Cloud MCP**，选择 [ChatGPT Sites（公开）或 ngrok](./docs/USER_GUIDE.md#82-连接-gemini-云-mcp)，填写 Bridge 生成的完整专用链接。 |
+
+Gemini 的配置入口是 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，然后选择本地 MCP 或 Cloud MCP。**Gemini 的三种接入方式都无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。** 选择 Sites 时需要可使用 ChatGPT Sites 的账号；站点的两项 Secret 由 Bridge 生成。选择本地 MCP 或 ngrok 时，无需使用 ChatGPT Sites。
 
 ### 委派 Agent 任务（可选）
 
-需要让 Codex、OpenCode、DeepSeek Harness 等 Agent 执行任务时，再完成以下配置：
+需要让 Codex、OpenCode、DeepSeek Harness 等 Agent 执行任务时，再完成以下配置。Agent 自身的登录或 API 配置取决于所选引擎，与 Gemini 的 MCP 接入分别配置。
 
 1. **连接 Agent**：首次初始化自动发现已有安装，在连接页点击“连接”完成验证和启用。需要安装或补齐环境时，可以额外点击“一键配置”，按指引完成登录或填写 API Key，详见[一键配置指南](./docs/AGENT_SETUP_GUIDE.md)。Codex 使用本机 Codex 执行通道。
 2. **选择项目和权限**：在工作台选择项目、Agent 及“只读”或“完整”，并设置模型偏好。“完整”包含写入和联网，“只读”不允许写入和工具联网；GPT/Qwen 新任务使用用户在工作台选择的默认任务权限。
