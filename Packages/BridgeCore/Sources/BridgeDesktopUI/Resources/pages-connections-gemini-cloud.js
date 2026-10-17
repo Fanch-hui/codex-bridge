@@ -2,6 +2,28 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var D = global.CodexBridgeDesktopFormDraft;
+  var ngrokSteps = [
+    "准备 Bridge：确认后台 Service 和本地 MCP 可用，登记项目，在上方启用 Gemini 连接，连接方式选择“ngrok”。Gemini 网页版使用 Cloud MCP。",
+    "注册账号：打开 https://dashboard.ngrok.com/signup，注册并登录自己的 ngrok 账号，按页面提示完成账号验证。下面按自己的操作系统选择一种安装方式，其他方式跳过。",
+    { text: "macOS：打开“终端”，已有 Homebrew 时运行：", command: "brew install ngrok" },
+    { text: "macOS 没有 Homebrew：打开 https://ngrok.com/download/mac-os，选择 Download，Apple Silicon 选 ARM64、Intel 选 AMD64/x86_64。解压 ZIP，将 ngrok 文件放到“下载”目录顶层，再运行：",
+      command: 'sudo mkdir -p /usr/local/bin\nsudo install -m 755 "$HOME/Downloads/ngrok" /usr/local/bin/ngrok' },
+    { text: "Windows：打开 PowerShell，通过 Microsoft Store 安装；没有 winget 时，直接在 Microsoft Store 搜索 ngrok 安装。安装后重新打开 PowerShell。",
+      command: "winget install ngrok -s msstore" },
+    { text: "Ubuntu 24.04：打开终端，使用 Snap 安装：", command: "sudo snap install ngrok" },
+    { text: "确认安装：在运行 Bridge 的电脑执行下面的命令，能显示版本号后继续：", command: "ngrok version" },
+    { text: "认证账号：在 ngrok 控制台打开 Your Authtoken（https://dashboard.ngrok.com/get-started/your-authtoken），复制自己的值，替换下面的 YOUR_NGROK_AUTHTOKEN，保留引号，在同一系统用户的终端运行。Authtoken 只用于本机 ngrok，不填入 Bridge、Gemini 或普通对话。",
+      command: 'ngrok config add-authtoken "YOUR_NGROK_AUTHTOKEN"' },
+    "启动转发：点击上方“复制 ngrok 启动命令”，在刚才的终端粘贴并运行。使用复制的实际端口，不照抄官方示例的 80/8080。保持该窗口运行。",
+    { text: "取得公网地址：找到终端的 Forwarding 行，只复制箭头左边的 HTTPS 地址。下面仅为示例，实际地址和端口以终端输出为准：",
+      command: "Forwarding  https://your-domain.ngrok.app -> http://127.0.0.1:62771" },
+    "保存到 Bridge：把 HTTPS 根地址填入上方“HTTPS 网站根地址”，点击“保存并启用”。不加 /mcp，不填写 127.0.0.1 或 Web Interface 地址。“已配置，等待 Gemini 调用”表示配置已保存，实际连通性在 Gemini 中检查。",
+    "关联 Gemini：点击“复制 Gemini 专用链接”。在 Gemini 中进入“更多 → 自定义 → 关联应用 → 右上角『＋自定义』”，选择“Cloud MCP”，粘贴完整专用链接，不使用网站根地址。OAuth 客户端 ID 和密钥均留空，不填 ngrok Authtoken。",
+    "完成关联：点击“下一步”，核对工具，将应用名称设为 Codex Bridge，再点击“关联”。在对话中启用该应用。",
+    { text: "检查调用：在 Gemini 对话中发送：", command: "请通过 Codex Bridge 调用 bridge_status 和 list_projects，确认连接并列出已登记的项目。" },
+    "持续运行：使用期间保持 Bridge 后台服务和 ngrok 运行。公网地址变化后重新保存根地址并更新 Gemini 专用链接；本机端口变化后，先按 Ctrl+C 停止旧 ngrok，再运行最新复制的命令。",
+    "停止使用：在 Bridge 点击“停用云 MCP”，再到 ngrok 终端按 Ctrl+C。Bridge 的停用按钮不会自动关闭你手动启动的 ngrok。"
+  ];
 
   function status(state) {
     if (!state.enabled) return { label: "未启用", tone: "neutral" };
@@ -17,7 +39,14 @@
     var details = S.node("details", "connection-help");
     details.appendChild(S.node("summary", null, title));
     var list = S.node("ol");
-    steps.forEach(function (text) { list.appendChild(S.node("li", null, text)); });
+    steps.forEach(function (step) {
+      var item = S.node("li", null, typeof step === "string" ? step : step.text);
+      if (step.command) {
+        var command = S.node("pre", "connection-endpoint-value mono");
+        command.appendChild(S.node("code", null, step.command)); item.appendChild(command);
+      }
+      list.appendChild(item);
+    });
     details.appendChild(list); root.appendChild(details);
     return details;
   }
@@ -56,14 +85,11 @@
       "在“添加自定义应用链接”中粘贴完整的 Gemini 专用链接，高级 OAuth 的客户端 ID 和密钥均留空。点击“下一步”，核对工具并将应用名称设为 Codex Bridge，再点击“关联”。",
       "使用期间保持本机 Bridge 后台服务运行。Gemini 专用链接含访问凭据，仅交给自己的 Gemini 使用。"
     ]);
-    var ngrokHelp = guide(root, "ngrok 连接指南", [
-      "在自己的 ngrok 账号中完成安装和认证，启用上方 Gemini 连接，连接方式选择“ngrok”。",
-      "点击“复制 ngrok 启动命令”，在本机终端运行。",
-      "将 ngrok 提供的 HTTPS 网站根地址填入上方“HTTPS 网站根地址”，点击“保存并启用”。这里填写网站根地址，不是 Gemini 专用链接。",
-      "点击“复制 Gemini 专用链接”。在 Gemini 中依次进入“更多 → 自定义 → 关联应用”，点击右上角“＋自定义”，选择“Cloud MCP”。",
-      "在“添加自定义应用链接”中粘贴完整的 Gemini 专用链接，高级 OAuth 的客户端 ID 和密钥均留空。点击“下一步”，核对工具并将应用名称设为 Codex Bridge，再点击“关联”。",
-      "使用期间保持 Bridge 后台服务和 ngrok 运行。公网地址变化后重新保存地址，并更新 Gemini 中的专用链接。专用链接含访问凭据，仅交给自己的 Gemini 使用。"
-    ]);
+    var ngrokHelp = guide(root, "ngrok 安装、认证与连接指南", ngrokSteps);
+    ngrokHelp.appendChild(S.node("p", "hint",
+      "找不到 ngrok 命令时，完成安装后重新打开终端并检查 PATH。提示认证失败时，在当前系统用户下重新配置 ngrok Authtoken。ERR_NGROK_8012 表示 ngrok 无法连接本机目标，请检查 Bridge 服务与实际端口。"));
+    ngrokHelp.appendChild(S.node("p", "hint",
+      "Gemini 导入失败时，检查使用的是 Bridge 生成的完整专用链接、Gemini 与云 MCP 均已启用、ngrok 正在运行。专用链接含访问凭据，仅填入自己的 Gemini 配置。"));
     function validAddress() {
       try {
         var url = new URL(address.control.value.trim());

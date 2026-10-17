@@ -96,6 +96,7 @@
 .gemini-cloud-card .page-message { margin: 0; }
 .gemini-cloud-card .connection-help ol { margin: 12px 0 0; padding-left: 24px; max-width: 90ch; }
 .gemini-cloud-card .connection-help li + li { margin-top: 8px; }
+.gemini-cloud-card .connection-help pre { margin: 8px 0 0; white-space: pre-wrap; }
 @media (max-width: 700px) {
   .gemini-cloud-form { grid-template-columns: minmax(0, 1fr); }
 }

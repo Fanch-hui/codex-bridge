@@ -219,14 +219,117 @@ Bridge 主动向 Sites 领取请求并回传结果，本机无需开放入站端
 
 #### ngrok
 
-1. 准备自己的 ngrok 账号，按 [ngrok 官方指南](https://ngrok.com/docs/gateway/agent/cli)在运行 Bridge 的电脑安装 ngrok，完成本机账号认证。
-2. 在 Bridge 的云 MCP 中选择「ngrok」，点击「复制 ngrok 启动命令」，在本机终端粘贴并运行。
-3. 从 ngrok 输出中取得公网 **HTTPS 根地址**，填入 Bridge，保存并启用云 MCP。不要填写指向 `127.0.0.1` 的本机目标地址。
-4. 在 Bridge 点击「复制 Gemini 专用链接」。在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**。
-5. 地址粘贴 Bridge 生成的**完整专用链接**，高级 OAuth 配置无需填写，点击「下一步」。
-6. 核对工具列表，将应用名称填写为 `Codex Bridge`，完成关联，并在对话中启用该应用。
+ngrok 在运行 Bridge 的电脑上建立公网入口，供 Gemini 网页版通过 Cloud MCP 访问。不需要配置 ChatGPT Sites、OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。
 
-使用期间保持 ngrok 终端进程与 Bridge 后台服务运行。Bridge 生成的命令使用当前本机端口，并关闭本机 HTTP 请求检查。ngrok 公网地址变化后，将新 HTTPS 根地址保存到 Bridge，再重新复制完整连接链接并更新 Gemini；Bridge 本机端口变化后，先重新复制并运行 ngrok 启动命令，再更新地址与 Gemini 配置。
+##### 1. 准备 Bridge 和 ngrok 账号
+
+1. 打开 Bridge，确认概览中的后台 Service 和本地 MCP 可用，并在「项目」登记准备使用的目录。
+2. 打开「连接 → Gemini」，启用 Gemini，选择客户端工具权限；在「云 MCP」中选择「ngrok」。
+3. 打开 [ngrok 注册页](https://dashboard.ngrok.com/signup)，注册并登录自己的账号；按页面提示完成账号验证。
+
+##### 2. 在运行 Bridge 的电脑安装 ngrok
+
+按自己的操作系统选择一种安装方式，其他系统的步骤跳过。
+
+**macOS：**打开「终端」。如果已安装 Homebrew，运行：
+
+```sh
+brew install ngrok
+```
+
+没有 Homebrew 时，打开 [ngrok 的 macOS 下载页](https://ngrok.com/download/mac-os)，选择 Download，Apple Silicon 选择 ARM64，Intel 选择 AMD64/x86_64。下载 ZIP 并解压，把解压出的 `ngrok` 文件放到「下载」目录顶层，再运行：
+
+```sh
+sudo mkdir -p /usr/local/bin
+sudo install -m 755 "$HOME/Downloads/ngrok" /usr/local/bin/ngrok
+```
+
+**Windows：**打开 PowerShell，运行下面的命令，通过 Microsoft Store 安装；按提示确认商店协议或安装：
+
+```powershell
+winget install ngrok -s msstore
+```
+
+如果电脑没有 `winget`，打开 Microsoft Store，搜索 `ngrok` 并安装。安装后关闭并重新打开 PowerShell。
+
+**Ubuntu 24.04：**打开终端，使用系统的 Snap 安装：
+
+```sh
+sudo snap install ngrok
+```
+
+安装完成后，在终端或 PowerShell 执行：
+
+```sh
+ngrok version
+```
+
+能显示版本号后再继续。若提示找不到命令，先重新打开终端；Ubuntu 检查 `/snap/bin`，macOS 独立安装检查 `/usr/local/bin` 是否在 PATH 中。安装命令依据 ngrok 官方的 [macOS](https://ngrok.com/download/mac-os)、[Windows](https://ngrok.com/download/windows)、[Linux](https://ngrok.com/download/linux) 下载说明。
+
+##### 3. 配置 ngrok Authtoken
+
+1. 登录 ngrok 控制台，打开 [Your Authtoken](https://dashboard.ngrok.com/get-started/your-authtoken) 页面。
+2. 复制自己的 Authtoken，在运行 Bridge 的同一台电脑、同一系统用户的终端执行下面的命令。将 `YOUR_NGROK_AUTHTOKEN` 替换为自己的实际值，保留两侧引号：
+
+```sh
+ngrok config add-authtoken "YOUR_NGROK_AUTHTOKEN"
+```
+
+命令成功后会提示已保存配置。这个 Authtoken 用于本机 ngrok 登录，与 ngrok API Key、Bridge 的 Gemini 凭据和 OpenAI Runtime API Key 不同；不要填入 Bridge 或 Gemini，也不要贴到对话中。换系统用户或换电脑时，需要在对应用户下重新认证。[命令说明](https://ngrok.com/docs/gateway/agent/cli#ngrok-config-add-authtoken)。
+
+##### 4. 启动指向 Bridge 的隧道
+
+1. 返回 Bridge「连接 → Gemini → 云 MCP」，确认已选择「ngrok」。
+2. 点击「复制 ngrok 启动命令」，在刚才的终端或 PowerShell 粘贴并运行。**使用 App 复制的实际命令，不要自行填写端口或照抄官方示例的 80/8080 端口。**
+3. 命令形式如下；`62771` 只是示例，实际端口以 App 复制的命令为准：
+
+```sh
+ngrok http http://127.0.0.1:62771 --inspect=false
+```
+
+保持这个终端窗口运行。看到 ngrok 的 `Forwarding` 行后，确认箭头右边是命令中的本机地址，例如：
+
+```text
+Forwarding  https://your-domain.ngrok.app -> http://127.0.0.1:62771
+```
+
+**只复制箭头左边的 HTTPS 地址**，例如 `https://your-domain.ngrok.app`。不要复制整行、右边的 `127.0.0.1` 地址或 `Web Interface` 地址。示例域名需要替换为终端实际显示的地址。
+
+##### 5. 把公网根地址保存到 Bridge
+
+1. 将刚复制的 HTTPS 地址填入 Bridge 的「HTTPS 网站根地址」，点击「保存并启用」。这里不添加 `/mcp`，也不填写 Gemini 专用链接。
+2. ngrok 方式显示「已配置，等待 Gemini 调用」表示 Bridge 已保存配置；实际连通性在下一步通过 Gemini 的工具调用确认，不需要等待「Sites 已连通」。
+3. 点击 Bridge 的「复制 Gemini 专用链接」。完整链接由 Bridge 生成，包含访问凭据，不要手工拼接或截短。
+
+##### 6. 在 Gemini 网页版完成关联
+
+1. 在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**。
+2. 在「添加自定义应用链接」粘贴 Bridge 刚生成的**完整 Gemini 专用链接**。这里使用专用链接，不是上一步的 HTTPS 网站根地址。
+3. 展开「高级设置」时，OAuth 客户端 ID、客户端密钥均留空，不填写 ngrok Authtoken。
+4. 点击「下一步」，核对工具列表，将应用名称填写为 `Codex Bridge`，然后点击「关联」。
+5. 新建或打开 Gemini 对话，启用 Codex Bridge 应用，发送：
+
+```text
+请通过 Codex Bridge 调用 bridge_status 和 list_projects，确认连接并列出已登记的项目。
+```
+
+能返回 Bridge 状态和项目列表后，表示此次 Gemini → ngrok → 本机 Bridge 调用已连通。
+
+##### 7. 日常使用与停止
+
+使用期间保持 **Bridge 后台服务和 ngrok 终端进程**运行；电脑关机、休眠、断网或关闭 ngrok 后，Gemini 将无法访问本机工具。重新使用时启动 Bridge，再运行 App 复制的 ngrok 命令。
+
+重新启动后核对终端中的 HTTPS 地址。地址变化时，将新根地址保存到 Bridge，再复制新的完整专用链接并更新 Gemini；Bridge 本机端口变化时，先在 ngrok 终端按 `Ctrl+C` 停止旧转发，重新复制并运行启动命令，再核对公网地址。重置 Gemini 凭据后，也需重新复制专用链接并更新 Gemini。
+
+停止使用时，在 Bridge 点击「停用云 MCP」，再在 ngrok 终端按 `Ctrl+C`。Bridge 的停用按钮不会自动结束你手动启动的 ngrok 进程。
+
+| 遇到的情况 | 处理方法 |
+| --- | --- |
+| 找不到 `ngrok` 命令 | 完成安装并重新打开终端；确认 ngrok 所在目录在 PATH 中，再运行 `ngrok version`。 |
+| 提示账号未认证或 Authtoken 无效 | 在运行 ngrok 的同一系统用户下重新执行第 3 步，使用 ngrok Authtoken，不使用 API Key。 |
+| `ERR_NGROK_8012` | ngrok 无法连接本机目标；检查 Bridge 的 Service、本地 MCP 和启动命令中的实际端口，重新复制命令启动。[错误说明](https://ngrok.com/docs/errors/err_ngrok_8012)。 |
+| Gemini 导入失败、提示 OAuth 或找不到工具 | 核对使用的是 Bridge 生成的完整专用链接、Gemini 和云 MCP 均已启用、ngrok 正在运行；不要以直接打开网站根地址代替工具调用验证。 |
+| ngrok 提示当前账号的连接、流量或其他限额 | 以 ngrok 返回的具体错误为准，在自己的控制台处理限额或结束不用的端点后重试。 |
 
 #### 检查连接与更新凭据
 
