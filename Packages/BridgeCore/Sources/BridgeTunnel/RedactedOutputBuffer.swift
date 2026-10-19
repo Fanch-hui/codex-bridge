@@ -22,9 +22,17 @@ final class RedactedOutputBuffer: @unchecked Sendable {
   private var truncated = false
   private var authenticationTail: [UInt8] = []
   private var authenticationFailure = false
+  private var helperDiagnosticFilter: TunnelHelperDiagnosticFilter?
 
-  init(limit: Int, sensitiveValues: [String]) {
+  init(
+    limit: Int,
+    sensitiveValues: [String],
+    startupDiagnostics: TunnelStartupDiagnostics? = nil
+  ) {
     self.limit = limit
+    helperDiagnosticFilter = startupDiagnostics.map {
+      TunnelHelperDiagnosticFilter(diagnostics: $0)
+    }
     let uniqueValues = Set(sensitiveValues.filter { !$0.isEmpty })
     patterns = uniqueValues.sorted { $0.utf8.count > $1.utf8.count }.map {
       (Data($0.utf8), Data("<redacted>".utf8))
@@ -35,6 +43,10 @@ final class RedactedOutputBuffer: @unchecked Sendable {
   func append(_ data: Data) {
     lock.withLock {
       detectAuthenticationFailure(data)
+      if helperDiagnosticFilter != nil {
+        helperDiagnosticFilter?.append(data)
+        return
+      }
       pending.append(data)
       flushCompletePrefix()
     }
@@ -42,6 +54,7 @@ final class RedactedOutputBuffer: @unchecked Sendable {
 
   func finish() {
     lock.withLock {
+      helperDiagnosticFilter?.finish()
       appendRedacted(pending)
       pending.removeAll(keepingCapacity: false)
     }

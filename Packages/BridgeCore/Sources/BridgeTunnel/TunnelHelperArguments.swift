@@ -26,7 +26,7 @@ enum TunnelHelperArguments {
       "--pid.file", runtimeDirectory.appendingPathComponent("tunnel.pid").path,
       "--allow-remote-ui=false",
       "--open-web-ui=false",
-      "--log.level", "warn",
+      "--log.level", configuration.startupDiagnosticsEnabled && command == "run" ? "debug" : "warn",
       "--log.format", "json",
     ]
     if let httpProxy = configuration.httpProxy {

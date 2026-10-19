@@ -77,9 +77,37 @@ Tunnel failure closes only remote admission. It never cancels an already-running
 
 ## Output and shutdown
 
-Daemon stdout and stderr remain in bounded memory. Before diagnostic projection, Bridge redacts the exact Runtime Key, local MCP header secret, and compatibility secret-path URL. Raw HTTP logging is never enabled.
+Daemon stdout and stderr remain in bounded memory. Before diagnostic projection, Bridge redacts the exact Runtime Key, local MCP header secret, compatibility secret-path URL, and Tunnel ID. Raw HTTP logging is never enabled.
 
 Requested shutdown sends `SIGTERM`, waits for the bounded process timeout, then sends `SIGKILL` and reaps the exact child PID. Bridge removes only validated per-run entries, including the URL file and pid file; cleanup never relies on the helper to remove its own runtime files.
+
+## Startup diagnostics
+
+Set `CODEX_BRIDGE_TUNNEL_DIAGNOSTICS=1` in the **background service's environment before starting it**. The service reads this opt-in when it creates a Tunnel manager, including the first startup attempt. It applies on Windows, macOS and Linux. The default remains WARN logging.
+
+On Windows, finish active work and exit the desktop app, then use PowerShell with the service from the installation being diagnosed:
+
+```powershell
+$bridgeService = 'C:\path\to\CodexBridge\codex-bridge-service.exe'
+& $bridgeService --shutdown
+$env:CODEX_BRIDGE_TUNNEL_DIAGNOSTICS = '1'
+try {
+  & $bridgeService --foreground 2>&1 |
+    Select-String -SimpleMatch '[TunnelStartup]' |
+    ForEach-Object { $_.ToString() } |
+    Tee-Object -FilePath '.\tunnel-startup.log'
+} finally {
+  Remove-Item Env:CODEX_BRIDGE_TUNNEL_DIAGNOSTICS -ErrorAction SilentlyContinue
+}
+```
+
+Collect one startup attempt and stop the foreground service with Ctrl+C. The environment setting lasts only for this PowerShell process. The file contains only the projected `[TunnelStartup]` records; share those records when requesting support.
+
+Each record includes an unrelated random `attempt` identifier and monotonic `elapsed_ms` from the start of that attempt. Events bracket doctor/run launch, record readiness start and its `deadline_elapsed_ms`, local readiness and successful-poll freshness, timeout, termination request/return, escalation and observed process exit. `process_exited` reports the observation time and exit code. The last 128 records also remain available through the manager's diagnostics.
+
+For `run`, Bridge enables the helper's JSON DEBUG level and consumes its output through a strict projection. Only fixed poll lifecycle events and integer values such as `poll_attempt`, `poll_timeout_ms`, `poll_deadline_ms`, `retry_in_ms`, command counts and HTTP status are retained. Raw message text, errors, URLs, IDs, headers and bodies are discarded. Authentication failures still require local action. `doctor` keeps its existing structured report at WARN level. Health checks and readiness deadlines keep their configured values.
+
+The pinned helper exposes poll-cycle boundaries, rather than DNS, TCP, proxy CONNECT, TLS or request-write phase timings. A `poll_started` event establishes that a cycle began; it does not identify a blocked network phase. The official [v0.0.16 source](https://github.com/openai/tunnel-client/blob/v0.0.16/pkg/controlplane/internal/tunnel_service_client.go) adds recovery for some proxy disconnects before response headers; the client-deadline timeout uses the existing retry path. Helper upgrades are evaluated separately against the reported failure and the platform packaging pins.
 
 ## Automated and real acceptance
 

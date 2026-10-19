@@ -30,6 +30,7 @@ public actor TunnelManager {
   private var monitor: Task<Void, Never>?
   private var doctorInProgress = false
   private var doctorProcess: TunnelSpawnedProcess?
+  private var startupDiagnostics: TunnelStartupDiagnostics?
   private var lastDiagnostics = TunnelDiagnostics(
     standardOutput: "",
     standardError: "",
@@ -57,7 +58,7 @@ public actor TunnelManager {
 
   public func diagnostics() -> TunnelDiagnostics {
     captureDiagnostics()
-    return lastDiagnostics
+    return lastDiagnostics.appendingStartupTrace(startupDiagnostics)
   }
 
   public func doctor() async throws -> TunnelDoctorReport {
@@ -65,6 +66,8 @@ public actor TunnelManager {
       throw TunnelManagerError.lifecycleBusy
     }
     guard !doctorInProgress else { throw TunnelManagerError.lifecycleBusy }
+    startupDiagnostics = configuration.startupDiagnosticsEnabled ? TunnelStartupDiagnostics() : nil
+    startupDiagnostics?.record(.start)
     doctorInProgress = true
     defer { doctorInProgress = false }
     let verifiedHelper = try helperVerifier.verify(
@@ -95,7 +98,8 @@ public actor TunnelManager {
       captureDiagnostics(from: child)
       throw error
     }
-    let diagnostics = diagnostics(for: child)
+    startupDiagnostics?.record(.doctorExited, fields: ["exit_code": Int64(exit.code)])
+    let diagnostics = TunnelDiagnostics.capture(child)
     guard
       exit.code == 0
         || TunnelDoctorCompatibility.acceptsNoAuthDoctorCompatibility(
@@ -105,7 +109,7 @@ public actor TunnelManager {
     else {
       throw TunnelManagerError.doctorFailed(
         exitCode: exit.code,
-        diagnostics: Self.combinedDiagnostics(diagnostics)
+        diagnostics: diagnostics.combinedOutput
       )
     }
     let cleaned = cleanup(context)
@@ -122,6 +126,8 @@ public actor TunnelManager {
     guard lifecycle == .stopped || lifecycle == .failed else {
       throw TunnelManagerError.alreadyRunning
     }
+    startupDiagnostics = configuration.startupDiagnosticsEnabled ? TunnelStartupDiagnostics() : nil
+    startupDiagnostics?.record(.start)
     lifecycle = .starting
     do {
       let verifiedHelper = try helperVerifier.verify(
@@ -146,8 +152,10 @@ public actor TunnelManager {
       runContext = context
       try await waitUntilReady(runID: context.id)
       lifecycle = .ready
+      startupDiagnostics?.record(.ready)
       beginMonitor(runID: context.id)
     } catch {
+      startupDiagnostics?.record(error is CancellationError ? .startCancelled : .startFailed)
       NSLog("[TunnelManager] start failed")
       if let child = process {
         await terminate(child)
@@ -162,6 +170,7 @@ public actor TunnelManager {
   }
 
   public func stop() async {
+    startupDiagnostics?.record(.stopRequested)
     monitor?.cancel()
     monitor = nil
     let child = process
@@ -198,11 +207,12 @@ public actor TunnelManager {
     )
     process = child
     let exit = try await waitForExit(child, timeout: configuration.processTimeout)
+    startupDiagnostics?.record(.doctorExited, fields: ["exit_code": Int64(exit.code)])
     guard process === child, runContext?.id == context.id, lifecycle != .stopped else {
       throw TunnelManagerError.stopped
     }
     if process === child { process = nil }
-    let output = diagnostics(for: child)
+    let output = TunnelDiagnostics.capture(child)
     lastDiagnostics = output
     guard
       exit.code == 0
@@ -214,7 +224,7 @@ public actor TunnelManager {
       NSLog("[TunnelManager] doctor failed")
       throw TunnelManagerError.doctorFailed(
         exitCode: exit.code,
-        diagnostics: Self.combinedDiagnostics(output)
+        diagnostics: output.combinedOutput
       )
     }
   }
@@ -229,26 +239,34 @@ public actor TunnelManager {
     let urlText = configuration.localMCPURL.absoluteString
     let headerSecret = configuration.localMCPHeaderSecret
     guard context.hasExpectedIdentity else { throw TunnelManagerError.launchFailed }
-    return try launcher.spawn(
+    let isRun = arguments.first == "run"
+    startupDiagnostics?.record(isRun ? .runLaunchRequested : .doctorLaunchRequested)
+    let child = try launcher.spawn(
       verifiedHelper: verifiedHelper,
       helperVerifier: helperVerifier,
       arguments: arguments,
       runtimeKey: key,
       localMCPHeaderSecret: Data(headerSecret.utf8),
       runtimeDirectory: context.directory,
-      sensitiveValues: [keyText, urlText, headerSecret],
-      outputLimit: outputLimit
+      sensitiveValues: [keyText, urlText, headerSecret, configuration.tunnelID.rawValue],
+      outputLimit: outputLimit,
+      startupDiagnostics: isRun ? startupDiagnostics : nil
     )
+    startupDiagnostics?.record(
+      isRun ? .runSpawned : .doctorSpawned, fields: ["pid": Int64(child.pid)])
+    return child
   }
 
   private func waitUntilReady(runID: UUID) async throws {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: configuration.readinessTimeout)
+    startupDiagnostics?.recordReadiness(timeout: configuration.readinessTimeout, deadline: deadline)
     while clock.now < deadline {
       guard runContext?.id == runID, let child = process else {
         throw TunnelManagerError.stopped
       }
       if let exit = child.pollExit() {
+        startupDiagnostics?.record(.processExited, fields: ["exit_code": Int64(exit.code)])
         captureDiagnostics(from: child)
         throw TunnelManagerError.helperExited(exitCode: exit.code)
       }
@@ -259,6 +277,7 @@ public actor TunnelManager {
       try await Task.sleep(for: .milliseconds(200))
     }
     NSLog("[TunnelManager] readiness timed out")
+    startupDiagnostics?.record(.readinessTimedOut)
     throw TunnelManagerError.readinessTimedOut
   }
 
@@ -274,7 +293,8 @@ public actor TunnelManager {
 
   private func inspectRun(runID: UUID) {
     guard runContext?.id == runID, let child = process else { return }
-    if child.pollExit() != nil {
+    if let exit = child.pollExit() {
+      startupDiagnostics?.record(.processExited, fields: ["exit_code": Int64(exit.code)])
       captureDiagnostics(from: child)
       NSLog("[TunnelManager] tunnel client exited")
       lifecycle = .failed
@@ -298,12 +318,17 @@ public actor TunnelManager {
         expectedPeerPID: child.pid
       )
       guard let timestamp = snapshot.pollTimestamp, timestamp > 0 else {
+        startupDiagnostics?.recordHealth(
+          localReady: snapshot.isReady, pollObserved: false, pollFresh: false)
         return (false, false)
       }
       let age = now().timeIntervalSince1970 - timestamp
       let fresh = age >= -5 && age <= configuration.metricsFreshness.timeInterval
+      startupDiagnostics?.recordHealth(
+        localReady: snapshot.isReady, pollObserved: true, pollFresh: fresh)
       return (fresh, fresh && snapshot.isReady)
     } catch {
+      startupDiagnostics?.recordHealth(localReady: false, pollObserved: false, pollFresh: false)
       NSLog("[TunnelManager] health check failed")
       return (false, false)
     }
@@ -373,12 +398,16 @@ public actor TunnelManager {
   }
 
   private func terminate(_ child: TunnelSpawnedProcess) async {
+    startupDiagnostics?.record(.terminationRequested, fields: ["pid": Int64(child.pid)])
     guard child.beginTermination() else {
+      startupDiagnostics?.record(.terminationNotSent)
       _ = await exits(child, within: configuration.processTimeout + .seconds(2))
       return
     }
+    startupDiagnostics?.record(.terminationSent)
     if await exits(child, within: configuration.processTimeout) { return }
     child.escalateTermination()
+    startupDiagnostics?.record(.terminationEscalated)
     _ = await exits(child, within: .seconds(2))
   }
 
@@ -407,7 +436,7 @@ public actor TunnelManager {
     _ child: TunnelSpawnedProcess,
     within duration: Duration
   ) async -> TunnelChildExit? {
-    await Task.detached {
+    let exit = await Task.detached { () -> TunnelChildExit? in
       let clock = ContinuousClock()
       let deadline = clock.now.advanced(by: duration)
       while clock.now < deadline {
@@ -416,6 +445,12 @@ public actor TunnelManager {
       }
       return child.pollExit()
     }.value
+    if let exit {
+      startupDiagnostics?.record(.processExited, fields: ["exit_code": Int64(exit.code)])
+    } else {
+      startupDiagnostics?.record(.terminationWaitTimedOut)
+    }
+    return exit
   }
 
   private func captureDiagnostics() {
@@ -424,46 +459,11 @@ public actor TunnelManager {
   }
 
   private func captureDiagnostics(from child: TunnelSpawnedProcess) {
-    lastDiagnostics = diagnostics(for: child)
-  }
-
-  private func diagnostics(for child: TunnelSpawnedProcess) -> TunnelDiagnostics {
-    let stdout = child.stdout.snapshot()
-    let stderr = child.stderr.snapshot()
-    return TunnelDiagnostics(
-      standardOutput: stdout.text,
-      standardError: stderr.text,
-      wasTruncated: stdout.truncated || stderr.truncated,
-      actionRequired: child.stdout.authenticationFailureObserved()
-        || child.stderr.authenticationFailureObserved()
-        || Self.requiresAuthenticationAction(stdout.text + "\n" + stderr.text)
-    )
-  }
-
-  private static func requiresAuthenticationAction(_ text: String) -> Bool {
-    let lower = text.lowercased()
-    let compact = lower.filter { !$0.isWhitespace }
-    return lower.contains("unauthorized") || lower.contains("forbidden")
-      || compact.contains("\"status\":401") || compact.contains("\"status\":403")
-      || compact.contains("\"status_code\":401") || compact.contains("\"status_code\":403")
+    lastDiagnostics = TunnelDiagnostics.capture(child)
   }
 
   private func recordCleanupFailure() {
-    let stderr = [lastDiagnostics.standardError, "Tunnel runtime cleanup failed."]
-      .filter { !$0.isEmpty }
-      .joined(separator: "\n")
-    lastDiagnostics = TunnelDiagnostics(
-      standardOutput: lastDiagnostics.standardOutput,
-      standardError: stderr,
-      wasTruncated: lastDiagnostics.wasTruncated,
-      actionRequired: lastDiagnostics.actionRequired
-    )
-  }
-
-  private static func combinedDiagnostics(_ diagnostics: TunnelDiagnostics) -> String {
-    [diagnostics.standardOutput, diagnostics.standardError]
-      .filter { !$0.isEmpty }
-      .joined(separator: "\n")
+    lastDiagnostics = lastDiagnostics.recordingCleanupFailure()
   }
 }
 

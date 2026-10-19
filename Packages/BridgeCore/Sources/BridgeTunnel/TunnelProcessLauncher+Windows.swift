@@ -112,7 +112,8 @@
       localMCPHeaderSecret: Data,
       runtimeDirectory: URL,
       sensitiveValues: [String],
-      outputLimit: Int
+      outputLimit: Int,
+      startupDiagnostics: TunnelStartupDiagnostics? = nil
     ) throws -> TunnelSpawnedProcess {
       let stdoutPipe = try Self.makeInheritablePipe()
       let stderrPipe = try Self.makeInheritablePipe()
@@ -185,8 +186,12 @@
           throw TunnelManagerError.launchFailed
         }
         _ = CloseHandle(processInformation.hThread)
-        let stdout = RedactedOutputBuffer(limit: outputLimit, sensitiveValues: sensitiveValues)
-        let stderr = RedactedOutputBuffer(limit: outputLimit, sensitiveValues: sensitiveValues)
+        let stdout = RedactedOutputBuffer(
+          limit: outputLimit, sensitiveValues: sensitiveValues,
+          startupDiagnostics: startupDiagnostics)
+        let stderr = RedactedOutputBuffer(
+          limit: outputLimit, sensitiveValues: sensitiveValues,
+          startupDiagnostics: startupDiagnostics)
         succeeded = true
         return TunnelSpawnedProcess(
           pid: Int32(bitPattern: processInformation.dwProcessId),

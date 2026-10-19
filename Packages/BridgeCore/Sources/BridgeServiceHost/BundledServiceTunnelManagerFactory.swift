@@ -67,7 +67,9 @@ public struct BundledServiceTunnelManagerFactory: ServiceTunnelManagerBuilding {
       localMCPHeaderSecret: localMCPHeaderSecret,
       runtimeDirectory: runtimeDirectory,
       expectedHelperSHA256: digest,
-      httpProxy: httpProxy
+      httpProxy: httpProxy,
+      startupDiagnosticsEnabled:
+        ProcessInfo.processInfo.environment["CODEX_BRIDGE_TUNNEL_DIAGNOSTICS"] == "1"
     )
     return TunnelManager(configuration: configuration, secretStore: secretStore)
   }
