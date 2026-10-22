@@ -4,6 +4,27 @@
   import Foundation
 
   extension WindowsSettingsModel {
+    func refreshConnectionPreferences(forceModelRefresh: Bool = false) async {
+      guard !busy else { return }
+      busy = true
+      isRefreshingModels = true
+      publishDisplay()
+      defer {
+        busy = false
+        isRefreshingModels = false
+        publishDisplay()
+      }
+      do {
+        _ = try await client.status()
+        connectionState = .connected
+      } catch {
+        connectionState = .unavailable
+        modelError = BridgeServiceErrorMessage.message(error)
+        return
+      }
+      _ = await loadModelCatalog(forceRefresh: forceModelRefresh)
+    }
+
     func loadModelCatalog(forceRefresh: Bool) async -> IPCModelCatalogResponse? {
       modelCatalogGeneration &+= 1
       let generation = modelCatalogGeneration

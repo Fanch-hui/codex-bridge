@@ -17,7 +17,7 @@ extension BridgeServiceAppModel {
     let directConfigurationResult = await optional(when: managementVisible) {
       try await client.directConfiguration()
     }
-    async let projectResult = optional { try await client.projects() }
+    async let projectResult = optional { try await client.projectList() }
     let agentCatalogResult = await optional(when: managementVisible) {
       try await client.agentCatalog()
     }
@@ -102,7 +102,10 @@ extension BridgeServiceAppModel {
     scheduleServiceUpgradeIfNeeded()
   }
 
-  func applyProjectSnapshot(_ value: [MCPProjectSummary]) {
+  func applyProjectSnapshot(_ snapshot: IPCProjectListResponse) {
+    let value = snapshot.projects
+    let paths = snapshot.projectPaths ?? [:]
+    if projectPaths != paths { projectPaths = paths }
     guard projects != value else { return }
     projects = value
     reconcileProjectSelection()

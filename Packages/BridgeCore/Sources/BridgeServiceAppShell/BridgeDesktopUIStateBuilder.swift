@@ -15,17 +15,18 @@ enum BridgeDesktopUIStateBuilder {
       )
     }
     let selected = model.navigation
+    let connectionsState = connections(from: model)
     let state = BridgeDesktopUIState(
       navigation: navigation,
       selectedNavigation: selected.desktopNavigation,
       connectionLabel: model.connectionState.label,
       connectionTone: connectionTone(for: model.connectionState),
       isRefreshing: model.isRefreshing,
-      overview: overview(from: model),
+      overview: overview(from: model, connections: connectionsState),
       workbench: workbench(from: model),
       projects: projects(from: model),
       logs: logs(from: model),
-      connections: connections(from: model),
+      connections: connectionsState,
       settings: settings(from: model),
       appUpdate: model.appUpdateState
     )
@@ -39,7 +40,9 @@ enum BridgeDesktopUIStateBuilder {
     return state
   }
 
-  private static func overview(from model: BridgeServiceAppModel) -> BridgeDesktopOverviewState {
+  private static func overview(
+    from model: BridgeServiceAppModel, connections: BridgeDesktopConnectionsState
+  ) -> BridgeDesktopOverviewState {
     let agentStates = model.agentInstallations.map { installation in
       (
         installation.displayName,
@@ -52,70 +55,22 @@ enum BridgeDesktopUIStateBuilder {
     let enabledAgents = agentStates.filter { $0.1 == .available }.count
     let reconnectSummary = ProjectAgentPresentation.reconnectSummary(
       names: agentStates.compactMap { $0.1 == .requiresReconnect ? $0.0 : nil })
-    let approvalCount = model.approvals.count + model.directApprovals.count
-    let metrics = [
-      BridgeDesktopMetric(
-        id: "running-tasks",
-        title: "运行中任务",
-        value: String(model.runningTaskCount),
-        symbol: "bolt.fill",
-        subtitle: model.runningTaskCount > 0 ? "点击进入工作台" : "当前空闲",
-        tone: model.runningTaskCount > 0 ? .running : .neutral,
-        destination: .workbench
-      ),
-      BridgeDesktopMetric(
-        id: "pending-approvals",
-        title: "待审批项",
-        value: String(approvalCount),
-        symbol: "shield.lefthalf.filled",
-        subtitle: approvalCount == 0 ? "无阻断事项" : "点击立即处理审批",
-        tone: approvalCount == 0 ? .neutral : .warning,
-        destination: .workbench
-      ),
-      BridgeDesktopMetric(
-        id: "registered-projects",
-        title: "注册项目",
-        value: String(model.projects.count),
-        symbol: "folder.fill",
-        subtitle: "管理本地目录",
-        tone: .running,
-        destination: .projects
-      ),
-      BridgeDesktopMetric(
-        id: "total-tasks",
-        title: "任务总数",
-        value: String(model.tasks.count),
-        symbol: "list.bullet.rectangle",
-        subtitle: lastRefreshSubtitle(for: model),
-        tone: .neutral,
-        destination: .logs
-      ),
-    ]
+    let clientConnections = BridgeDesktopOverviewPresentation.clientConnections(
+      clients: connections.clients, serviceAvailable: model.connectionState == .connected,
+      localMCPReady: model.serviceStatus?.status.mcpState == "ready",
+      tunnel: connections.tunnel, geminiCloud: connections.geminiCloud)
 
     return BridgeDesktopOverviewState(
       title: "概览",
       subtitle: "",
-      notices: notices(from: model),
-      metrics: metrics,
+      notices: notices(from: model, clientConnections: clientConnections),
+      metrics: [],
       services: services(
         from: model,
         enabledAgents: enabledAgents,
         reconnectSummary: reconnectSummary
       ),
-      serviceActions: [
-        BridgeDesktopActionLink(
-          id: "manage-connections",
-          title: "管理连接与 Agent →",
-          command: .openConnections,
-          destination: .connections
-        ),
-        BridgeDesktopActionLink(
-          id: "configure-preferences",
-          title: "配置模型与执行偏好 →",
-          command: .openSettings,
-          destination: .settings
-        ),
-      ],
+      serviceActions: [],
       recentTasks: model.tasks.prefix(4).map { task in
         BridgeDesktopRecentTask(
           id: task.taskID,
@@ -126,7 +81,15 @@ enum BridgeDesktopUIStateBuilder {
           updatedAt: task.updatedAt
         )
       },
-      lastUpdatedAt: model.lastRefreshAt.map { $0.formatted(.iso8601) }
+      lastUpdatedAt: model.lastRefreshAt.map { $0.formatted(.iso8601) },
+      clientConnections: clientConnections,
+      onboardingSteps: BridgeDesktopOverviewPresentation.onboardingSteps(
+        hasProjects: !model.projects.isEmpty,
+        hasConfiguredClient: clientConnections.contains { $0.tone == .success }
+          || (connections.geminiCloud?.enabled == true
+            && connections.geminiCloud?.lifecycle == "configured"
+            && connections.clients.contains { $0.clientID == "google.gemini" && $0.enabled })
+      )
     )
   }
 
@@ -215,7 +178,9 @@ enum BridgeDesktopUIStateBuilder {
     )
   }
 
-  private static func notices(from model: BridgeServiceAppModel) -> [BridgeDesktopNotice] {
+  private static func notices(
+    from model: BridgeServiceAppModel, clientConnections: [BridgeDesktopServiceRow]
+  ) -> [BridgeDesktopNotice] {
     var result: [BridgeDesktopNotice] = []
     if model.registrationStatus == .requiresApproval {
       result.append(
@@ -228,6 +193,13 @@ enum BridgeDesktopUIStateBuilder {
           command: .openSystemSettings
         )
       )
+    }
+    if model.connectionState == .unavailable {
+      result.append(
+        BridgeDesktopNotice(
+          id: "service-unavailable", title: "后台服务不可用",
+          message: "打开诊断检查后台服务状态。", symbol: "exclamationmark.triangle.fill",
+          tone: .error, destination: .settings))
     }
     let approvalCount = model.approvals.count + model.directApprovals.count
     if approvalCount > 0 {
@@ -242,6 +214,20 @@ enum BridgeDesktopUIStateBuilder {
         )
       )
     }
+    result += BridgeDesktopOverviewPresentation.clientNotices(
+      connections: clientConnections, serviceAvailable: model.connectionState == .connected)
+    result += model.agentInstallations.compactMap { installation in
+      let availability = BridgeDesktopAgentAvailability.resolve(
+        providerID: installation.providerID, enabled: installation.isEnabled,
+        availability: installation.availability,
+        desktop: model.deepSeekDesktopStates[installation.installationID])
+      return BridgeDesktopOverviewPresentation.agentNotice(
+        installationID: installation.installationID, providerID: installation.providerID,
+        displayName: installation.displayName, availability: installation.availability,
+        requiresReconnect: availability == .requiresReconnect)
+    }
+    result += BridgeDesktopOverviewPresentation.setupNotices(
+      operations: model.agentSetupOperations.map(agentSetupState))
     return result
   }
 
@@ -277,10 +263,6 @@ enum BridgeDesktopUIStateBuilder {
     WorkbenchTaskTextPresentation.statusLabel(status)
   }
 
-  private static func lastRefreshSubtitle(for model: BridgeServiceAppModel) -> String {
-    guard let lastRefreshAt = model.lastRefreshAt else { return "任务历史" }
-    return "更新于 " + lastRefreshAt.formatted(date: .omitted, time: .standard)
-  }
 }
 
 extension BridgeServiceNavigation {

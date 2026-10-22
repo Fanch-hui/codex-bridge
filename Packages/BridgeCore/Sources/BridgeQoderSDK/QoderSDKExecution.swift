@@ -277,13 +277,13 @@ actor QoderSDKExecution {
     permissions.removeAll()
     userInputs.removeAll()
     inputs.removeAll()
+    await client.shutdown()
     do {
       if let event { try await emit(event) }
       continuation.finish()
     } catch {
       continuation.finish(throwing: error)
     }
-    await client.shutdown()
   }
 
   func shutdown() async {

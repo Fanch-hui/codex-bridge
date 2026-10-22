@@ -39,6 +39,12 @@
     if (!state || state.selectedNavigation !== "workbench") {
       emitBrowserViewport(emit, { x: 0, y: 0, width: 0, height: 0, visible: false });
     }
+    if (state && pages.connections.updateSettings) {
+      pages.connections.updateSettings(state.settings, emit, state.appUpdate);
+    }
+    if (state && pages.settings && pages.settings.updateClients) {
+      pages.settings.updateClients(state.connections && state.connections.clients, emit);
+    }
     if (!state || state.selectedNavigation === "overview") return;
     var page = pages[state.selectedNavigation];
     if (page) page.render(state[state.selectedNavigation], emit, state.appUpdate, state);

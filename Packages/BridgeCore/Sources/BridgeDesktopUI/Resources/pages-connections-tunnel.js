@@ -26,25 +26,25 @@
 
   function renderLocalMCP(card, page, context) {
     S.clear(card);
-    card.appendChild(S.node("code", "connection-endpoint-value mono", page.localMCPURL || "Endpoint 尚未就绪"));
+    card.appendChild(S.node("code", "connection-endpoint-value mono", page.localMCPURL || "本机地址尚未就绪"));
     if (page.localMCPState === "local_port_unavailable") {
-      card.appendChild(S.node("div", "page-message warning", "本地 MCP 端口被占用；不会静默更换地址，请主动生成新的 Endpoint。"));
+      card.appendChild(S.node("div", "page-message warning", "本地 MCP 端口被占用；不会静默更换地址，请主动生成新的本机地址。"));
     }
     var state = S.node("div", "connection-endpoint-actions");
     state.appendChild(S.status(page.localMCPState === "ready" ? "已就绪" : page.localMCPState,
       page.localMCPState === "ready" ? "success" : "neutral"));
     if (page.canCopyLocalMCPURL) {
-      var copy = S.button("复制 Endpoint", null, {}, null, "small", false);
+      var copy = S.button("复制本机地址", null, {}, null, "small", false);
       copy.addEventListener("click", function () {
         context.emit("copyLocalMCPEndpoint", {});
       });
       state.appendChild(copy);
     }
     if (page.canRotateLocalMCPEndpoint) {
-      var rotate = S.button("重新生成 Endpoint", null, {}, null, "small danger", false);
+      var rotate = S.button("重新生成本机地址", null, {}, null, "small danger", false);
       rotate.addEventListener("click", function () {
-        if (global.confirm("重新生成本地 MCP Endpoint？现有客户端地址将立即失效。")) {
-          sendPending(rotate, "重新生成 Endpoint", "rotateLocalMCPEndpoint", context);
+        if (global.confirm("重新生成本机地址？现有客户端地址将立即失效。")) {
+          sendPending(rotate, "重新生成本机地址", "rotateLocalMCPEndpoint", context);
         }
       });
       state.appendChild(rotate);

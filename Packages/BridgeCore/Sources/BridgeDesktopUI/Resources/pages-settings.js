@@ -2,6 +2,8 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var D = global.CodexBridgeDesktopFormDraft;
+  var pendingDetail = null, latestEmit = null, agentMounts = new Map();
+  var latestClients = [];
 
   function create(container, page, emit, updateState) {
     S.clear(container);
@@ -12,8 +14,12 @@
     var navigation = global.CodexBridgeDesktopSettingsNavigation.create(content, page, emit);
     var approvalEditor = approvalCard(page, emit);
     navigation.execution.appendChild(approvalEditor.root);
+    var clients = global.CodexBridgeDesktopConnectionsClients
+      ? global.CodexBridgeDesktopConnectionsClients.create(emit, { mode: "permissions" }) : null;
+    if (clients) navigation.execution.insertBefore(clients.root, navigation.execution.firstChild);
     var serviceEditor = serviceCard(page, emit);
     navigation.application.appendChild(serviceEditor.root);
+    navigation.diagnostics.insertBefore(serviceEditor.diagnosticsRoot, navigation.diagnostics.firstChild);
     var appUpdate = global.CodexBridgeDesktopAppUpdate
       ? global.CodexBridgeDesktopAppUpdate.createSettings(updateState, emit) : null;
     if (appUpdate) navigation.application.appendChild(appUpdate.root);
@@ -21,17 +27,20 @@
     status.setAttribute("role", "status");
     container.appendChild(status);
     var unavailable = S.node("div");
-    S.empty(unavailable, "设置页暂不可用", "连接本机 Service 后，可以配置模型、安全审批与后台服务。");
+    S.empty(unavailable, "设置页暂不可用", "连接后台服务后，可以配置权限、审批与应用。");
     container.appendChild(unavailable);
     return {
-      details: navigation.details,
+      details: navigation.details, mountAgent: navigation.mountAgent,
+      updateClients: function (items, nextEmit) { if (clients) clients.update(items, nextEmit); },
       update: function (next, nextEmit, nextUpdateState) {
         content.hidden = !next;
         unavailable.hidden = !!next;
-        S.pageHeader(header, next ? next.header : { title: "设置", symbol: "gearshape" });
+        S.pageHeader(header, next ? Object.assign({}, next.header, { subtitle: "" }) : { title: "设置", symbol: "gearshape" });
         if (appUpdate) appUpdate.update(nextUpdateState, nextEmit);
         if (!next) { status.hidden = true; return; }
         navigation.update(next, nextEmit);
+        agentMounts.forEach(function (target, id) { navigation.mountAgent(id, target); });
+        if (clients) clients.update(latestClients, nextEmit);
         approvalEditor.update(next, nextEmit);
         serviceEditor.update(next, nextEmit);
         status.textContent = next.statusMessage || "";
@@ -41,13 +50,16 @@
   }
 
   function render(page, emit, updateState) {
+    latestEmit = emit;
     var container = document.getElementById("settings-content");
+    if (!container) return;
     if (!container.__settingsEditor && !page) {
-      S.empty(container, "设置页暂不可用", "连接本机 Service 后，可以配置模型、安全审批与后台服务。");
+      S.empty(container, "设置页暂不可用", "连接后台服务后，可以配置权限、审批与应用。");
       return;
     }
     if (!container.__settingsEditor) container.__settingsEditor = create(container, page, emit, updateState);
     container.__settingsEditor.update(page, emit, updateState);
+    if (pendingDetail) { container.__settingsEditor.details.open(pendingDetail); pendingDetail = null; }
   }
 
   function approvalCard(page, emit) {
@@ -106,12 +118,12 @@
     });
     card.appendChild(keepRow);
     card.appendChild(description);
+    var diagnostics = S.node("section", "settings-subsection settings-service-diagnostics");
+    diagnostics.appendChild(S.node("h3", null, "后台服务"));
     var badge = S.badge("未注册", "warning");
-    card.appendChild(badge);
-    var serviceStatus = S.node("p", "hint");
-    card.appendChild(serviceStatus);
-    var actions = S.node("div", "form-actions");
-    card.appendChild(actions);
+    diagnostics.appendChild(badge);
+    var serviceStatus = S.node("p", "hint"); diagnostics.appendChild(serviceStatus);
+    var actions = S.node("div", "form-actions"); diagnostics.appendChild(actions);
     function update(next, nextEmit) {
       context.page = next;
       context.emit = nextEmit;
@@ -124,7 +136,7 @@
       badge.className = "status-badge " + serviceTone(next);
       badge.hidden = !needsAttention;
       serviceStatus.textContent = next.serviceStatusMessage || "";
-      serviceStatus.hidden = !needsAttention || !next.serviceStatusMessage;
+      serviceStatus.hidden = !next.serviceStatusMessage;
       S.clear(actions);
       var availableActions = next.serviceStatus === "requires_approval"
         && Array.isArray(next.serviceActions) ? next.serviceActions : [];
@@ -139,7 +151,7 @@
       actions.hidden = actions.children.length === 0;
     }
     update(page, emit);
-    return { root: card, update: update };
+    return { root: card, diagnosticsRoot: diagnostics, update: update };
   }
 
   function serviceTone(page) {
@@ -149,5 +161,25 @@
     return page.serviceRegistered ? "success" : "warning";
   }
 
-  global.CodexBridgeDesktopSettingsPage = { render: render };
+  function openDetail(id, emit) {
+    pendingDetail = id;
+    (emit || latestEmit)("selectPage", { navigation: "settings" });
+    var container = document.getElementById("settings-content");
+    if (container && container.__settingsEditor) {
+      container.__settingsEditor.details.open(id); pendingDetail = null;
+    }
+  }
+  function mountAgent(id, target) {
+    agentMounts.set(id, target);
+    var container = document.getElementById("settings-content");
+    if (container && container.__settingsEditor) container.__settingsEditor.mountAgent(id, target);
+  }
+  function updateClients(items, emit) {
+    latestClients = S.safeArray(items);
+    var container = document.getElementById("settings-content");
+    if (container && container.__settingsEditor) container.__settingsEditor.updateClients(latestClients, emit);
+  }
+  global.CodexBridgeDesktopSettingsPage = {
+    render: render, openDetail: openDetail, mountAgent: mountAgent, updateClients: updateClients
+  };
 }(window));

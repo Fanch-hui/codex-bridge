@@ -76,35 +76,6 @@
     permission.wrapper.querySelector("label").hidden = true;
     model.permission = permission.control;
     actions.appendChild(permission.wrapper);
-    model.nativeHistory = S.button("原生历史", null, {}, null, "small", false);
-    model.nativeHistory.addEventListener("click", function () {
-      var page = model.page || {}, directory = page.nativeSessions || {};
-      var installations = S.safeArray(directory.installations);
-      var installationID = directory.installationID || (installations[0] && installations[0].installationID);
-      var projectID = page.selectedProjectID || (page.projects[0] && page.projects[0].id);
-      if (!model.emit || !installationID || !projectID) return;
-      model.emit("manageNativeAgentSession", {
-        action: "list", projectID: projectID, installationID: installationID, offset: 0, limit: 50
-      });
-    });
-    actions.appendChild(model.nativeHistory);
-    model.openNativeSession = S.button("打开对应会话", null, {}, null, "small", false);
-    model.openNativeSession.addEventListener("click", function () {
-      var task = model.page && model.page.selectedTask;
-      if (task && task.canOpenNativeSession && model.emit) model.emit("openDeepSeekHarnessSession", { taskID: task.taskID });
-    });
-    actions.appendChild(model.openNativeSession);
-    model.interrupt = S.button("中断", null, {}, null, "small danger", false);
-    model.interrupt.addEventListener("click", function () {
-      var task = model.page && model.page.selectedTask;
-      if (!task || !task.canInterrupt || model.interrupt.disabled || !model.emit) return;
-      model.interrupt.__pendingTaskID = task.taskID;
-      model.interrupt.disabled = true;
-      model.interrupt.textContent = "中断请求中…";
-      model.interrupt.setAttribute("aria-busy", "true");
-      model.emit("interruptTask", { taskID: task.taskID });
-    });
-    actions.appendChild(model.interrupt);
     model.historySearch = global.CodexBridgeDesktopTaskHistorySearch.createDialog(actions);
     model.toggle = S.button("浏览器", null, {}, null, "small workbench-browser-toggle");
     model.toggle.setAttribute("role", "switch");
@@ -114,6 +85,8 @@
       if (!model.toggle.disabled && model.emit) model.emit("setBrowserEnabled", { enabled: !browser.enabled });
     });
     actions.appendChild(model.toggle);
+    model.taskActions = S.node("div", "workbench-task-actions");
+    actions.appendChild(model.taskActions);
     return actions;
   }
 
@@ -151,8 +124,6 @@
 
   function updateInspectorHeader(model, page, emit) {
     model.page = page; model.emit = emit;
-    model.openNativeSession.hidden = !(page.selectedTask && page.selectedTask.canOpenNativeSession);
-    model.nativeHistory.disabled = !S.safeArray((page.nativeSessions || {}).installations).length;
     var browser = page.browser || {};
     model.toggle.classList.toggle("is-active", !!browser.enabled);
     model.toggle.setAttribute("aria-checked", String(!!browser.enabled));
@@ -186,6 +157,15 @@
     model.permission.value = readOnly ? "read-only" : "full";
     model.permission.title = readOnly ? "Agent 允许读取，禁止写入和联网" : "Agent 允许读取、写入和联网";
     updateTaskPicker(model, page);
+    model.taskActions.hidden = !page.selectedTask;
+    if (page.selectedTask) {
+      var row = S.safeArray(page.tasks).find(function (task) {
+        var selected = page.selectedTask;
+        return task.taskID === selected.taskID || selected.sessionID && task.sessionID === selected.sessionID
+          && task.providerID === selected.providerID && task.projectID === page.selectedProjectID;
+      }) || {};
+      global.CodexBridgeDesktopWorkbenchActions.render(model.taskActions, page.selectedTask, row, emit, { showDetails: true, queueControl: true });
+    }
   }
 
   function updateTaskPicker(model, page) {
@@ -221,15 +201,6 @@
       ? "[" + currentTask.provider + "] " + currentTask.title
       : "选择 Agent 会话 (" + tasks.length + ")";
     model.taskTitle.title = model.taskTitle.textContent;
-    var canInterrupt = !!(page.selectedTask && page.selectedTask.canInterrupt === true);
-    var pendingInterrupt = canInterrupt && model.interrupt.__pendingTaskID === page.selectedTask.taskID;
-    if (!canInterrupt || !page.selectedTask || page.selectedTask.taskID !== model.interrupt.__pendingTaskID) {
-      model.interrupt.__pendingTaskID = null;
-    }
-    model.interrupt.hidden = !canInterrupt;
-    model.interrupt.disabled = !canInterrupt || pendingInterrupt;
-    model.interrupt.textContent = pendingInterrupt ? "中断请求中…" : "中断";
-    model.interrupt.setAttribute("aria-busy", String(pendingInterrupt));
   }
 
   function renderInspectorHeader(page, emit) {
@@ -264,9 +235,9 @@
       page.browser && page.browser.enabled, page.browser && page.browser.canToggle,
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode,
       (page.nativeSessions || {}).installations,
-      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canOpenNativeSession, detail.canInterrupt, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
+      page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canOpenNativeSession, detail.canInterrupt, detail.canStop, detail.resultSummary, detail.taskID, detail.sessionID, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
       S.safeArray(page.tasks).map(function (t) {
-        return [t.taskID, t.providerID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.isRunning];
+        return [t.taskID, t.providerID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.canDelete, t.isRunning];
       })
     ]);
     if (header !== headerSignature) {
@@ -275,7 +246,8 @@
         renderHeaderStable(
           document.getElementById("workbench-inspector-header"),
           header,
-          function () { renderInspectorHeader(page, emit); }
+          function () { renderInspectorHeader(page, emit); },
+          true
         );
       } else {
         renderInspectorHeader(page, emit);

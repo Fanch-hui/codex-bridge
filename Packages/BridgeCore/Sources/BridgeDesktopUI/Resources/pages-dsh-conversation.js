@@ -11,10 +11,10 @@
         empty: S.node("div", "dsh-chat-empty"),
         title: S.node("h3", "dsh-chat-empty-title"),
         conversation: S.node("div", "dsh-chat-conversation"),
-        failure: S.node("details", "dsh-chat-failure")
+        failure: S.node("section", "dsh-chat-failure")
       };
       view.empty.appendChild(view.title);
-      view.failure.appendChild(S.node("summary", "disclosure-summary"));
+      view.failure.appendChild(S.node("p", "error-text"));
       view.failure.__body = S.node("div", "dsh-chat-failure-body");
       view.failure.appendChild(view.failure.__body);
       [view.empty, view.conversation, view.failure].forEach(function (node) { view.root.appendChild(node); });
@@ -32,9 +32,7 @@
   }
 
   function updateFailure(view, detail, emit) {
-    var key = detail && detail.taskID;
-    if (view.failure.__taskID !== key) view.failure.open = false;
-    view.failure.__taskID = key;
+    view.failure.__taskID = detail && detail.taskID;
     var visible = detail && (detail.failureReason || detail.failureNextAction || detail.failureCode || detail.failureDiagnostic);
     view.failure.hidden = !visible;
     if (!visible) return;
@@ -47,8 +45,13 @@
     var body = view.failure.__body;
     S.clear(body);
     if (detail.failureNextAction) body.appendChild(S.node("p", null, detail.failureNextAction));
-    if (detail.failureCode) body.appendChild(S.node("p", "mono", detail.failureCode));
-    if (detail.failureDiagnostic) body.appendChild(S.node("pre", "mono", detail.failureDiagnostic));
+    if (detail.failureCode || detail.failureDiagnostic) {
+      var diagnostics = S.node("details", "dsh-failure-diagnostics");
+      diagnostics.appendChild(S.node("summary", "disclosure-summary", "诊断详情"));
+      if (detail.failureCode) diagnostics.appendChild(S.node("p", "mono", detail.failureCode));
+      if (detail.failureDiagnostic) diagnostics.appendChild(S.node("pre", "mono", detail.failureDiagnostic));
+      body.appendChild(diagnostics);
+    }
     if (detail.canRestart) {
       var retry = S.button("重试", null, {}, null, "small");
       retry.addEventListener("click", function () {

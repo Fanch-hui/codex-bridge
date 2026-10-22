@@ -130,7 +130,7 @@ extension ServiceAgentRegistry {
       probedAt: record.lastProbedAt,
       updatedAt: now()
     )
-    try await store.updateAgentInstallation(updated, expectedRecord: record)
+    try await updateInstallation(updated, expectedRecord: record)
     guard let current = try await store.agentInstallation(id: record.id) else {
       throw ServiceStoreError.unknownAgentInstallation(record.id)
     }

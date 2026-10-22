@@ -39,7 +39,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .nav-badge { min-width: 24px; padding: 2px 7px; border-radius: 999px; color: var(--text-secondary); background: var(--surface-pressed); font-size: 12px; line-height: 18px; text-align: center; }
 
-.sidebar-footer { display: flex; align-items: center; gap: 8px; min-height: 40px; margin-top: auto; padding: 8px 12px; border-top: 0; color: var(--text-secondary); font-size: 12px; }
+.navigation-secondary { margin-top: auto; }
+
+.sidebar-footer { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 12px; border-top: 0; color: var(--text-secondary); font-size: 12px; }
 
 .connection-indicator { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; background: var(--text-tertiary); box-shadow: 0 0 0 3px rgba(154, 155, 160, 0.18); }
 
@@ -185,3 +187,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+.onboarding-steps { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; }
+
+.project-path { overflow-wrap: anywhere; user-select: text; margin: 0; }
+.project-maintenance { position: relative; }
+.project-maintenance > summary { cursor: pointer; padding: 6px 8px; }
+.project-maintenance[open] > .button { position: absolute; right: 0; top: 100%; z-index: 2; white-space: nowrap; background: var(--surface); }

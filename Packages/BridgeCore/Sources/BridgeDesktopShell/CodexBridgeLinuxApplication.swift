@@ -19,6 +19,8 @@
         await management.refreshProjects()
         guard !model.isShuttingDown else { return }
         Task(priority: .utility) {
+          await auxiliary.connections.refresh()
+          guard !model.isShuttingDown else { return }
           await management.refreshAgents()
           guard !model.isShuttingDown else { return }
           await auxiliary.agentDefaults.refresh()

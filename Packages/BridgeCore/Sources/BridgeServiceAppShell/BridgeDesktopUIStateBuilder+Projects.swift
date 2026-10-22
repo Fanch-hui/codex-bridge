@@ -18,7 +18,7 @@ extension BridgeDesktopUIStateBuilder {
         BridgeDesktopProjectRow(
           projectID: project.projectID,
           name: project.name,
-          detail: project.projectID,
+          path: model.projectPaths[project.projectID],
           gitState: project.gitState,
           selected: project.projectID == model.selectedProjectID
         )

@@ -5,31 +5,58 @@
     var page = {}, emit = null, projectID = null, selectedPath = null, active = false, initialized = false;
     var directories = new Map(), expanded = new Set([""]), pending = null, queue = [], ack = null, diffPath = null, timer = null;
     var root = S.node("aside", "dsh-workspace-pane"); root.setAttribute("aria-label", "项目文件与变更");
-    var disclosure = S.node("details", "dsh-workspace-disclosure");
-    disclosure.open = !(global.matchMedia && global.matchMedia("(max-width: 1100px)").matches);
-    disclosure.appendChild(S.node("summary", "dsh-workspace-summary", "文件 / 变更")); root.appendChild(disclosure);
-    var header = S.node("header", "dsh-workspace-heading"); disclosure.appendChild(header);
-    header.appendChild(S.node("h3", null, "项目文件"));
+    var selectedTab = "files", tabStorageKey = "codexbridge.dsh.workspace.tab.v1";
+    try { if (global.localStorage.getItem(tabStorageKey) === "changes") selectedTab = "changes"; } catch (_) {}
+    var tabs = S.node("div", "dsh-workspace-tabs"); tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", "项目工作区"); root.appendChild(tabs);
+    var filesPanel = S.node("section", "dsh-workspace-panel"), changesPanel = S.node("section", "dsh-workspace-panel");
+    filesPanel.id = "dsh-workspace-files"; changesPanel.id = "dsh-workspace-changes";
+    [filesPanel, changesPanel].forEach(function (panel) { panel.setAttribute("role", "tabpanel"); });
+    function selectTab(kind) {
+      selectedTab = kind; filesPanel.hidden = kind !== "files"; changesPanel.hidden = kind !== "changes";
+      [filesTab, changesTab].forEach(function (tab, index) {
+        var selected = (index === 0 ? "files" : "changes") === kind;
+        tab.setAttribute("aria-selected", String(selected)); tab.tabIndex = selected ? 0 : -1;
+      });
+      try { global.localStorage.setItem(tabStorageKey, kind); } catch (_) {}
+    }
+    function tab(title, kind, panel) {
+      var control = button(title, function () { selectTab(kind); }, tabs, "small dsh-workspace-tab");
+      control.id = panel.id + "-tab"; control.setAttribute("role", "tab");
+      control.setAttribute("aria-controls", panel.id); panel.setAttribute("aria-labelledby", control.id);
+      control.addEventListener("keydown", function (event) {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        var next = selectedTab === "files" ? changesTab : filesTab;
+        if (event.key === "Home") next = filesTab;
+        else if (event.key === "End") next = changesTab;
+        selectTab(next === filesTab ? "files" : "changes"); next.focus();
+      });
+      return control;
+    }
+    var filesTab = tab("文件", "files", filesPanel), changesTab = tab("变更", "changes", changesPanel);
+    var header = S.node("header", "dsh-workspace-heading"); filesPanel.appendChild(header);
     function button(title, action, parent, style) {
       var value = S.button(title, null, {}, null, style || "small"); value.addEventListener("click", action);
       parent.appendChild(value); return value;
     }
     button("刷新", refresh, header);
-    var message = S.node("p", "hint dsh-workspace-message"); message.setAttribute("role", "status"); disclosure.appendChild(message);
+    var message = S.node("p", "hint dsh-workspace-message"); message.setAttribute("role", "status"); root.appendChild(message);
     var diagnostics = S.node("details", "dsh-workspace-error-details"); diagnostics.hidden = true;
     diagnostics.appendChild(S.node("summary", null, "诊断详情"));
-    var diagnosticText = S.node("pre"); diagnostics.appendChild(diagnosticText); disclosure.appendChild(diagnostics);
+    var diagnosticText = S.node("pre"); diagnostics.appendChild(diagnosticText); root.appendChild(diagnostics);
     var recovery = button("恢复请求", function () {
       if (!pending || !emit) return;
       ack = null;
       emit("workbenchWorkspace", pending.payload, pending.requestID);
-    }, disclosure); recovery.hidden = true;
-    var tree = S.node("nav", "dsh-file-tree"); tree.setAttribute("aria-label", "项目目录"); disclosure.appendChild(tree);
-    var editor = E.create(request, closeFile); disclosure.appendChild(editor.root);
+    }, root); recovery.hidden = true;
+    var tree = S.node("nav", "dsh-file-tree"); tree.setAttribute("aria-label", "项目目录"); filesPanel.appendChild(tree);
+    var editor = E.create(request, closeFile); filesPanel.appendChild(editor.root);
     var gitHeader = S.node("header", "dsh-workspace-heading"); gitHeader.appendChild(S.node("h3", null, "项目当前变更"));
-    button("刷新变更", function () { request("gitStatus", {}); }, gitHeader); disclosure.appendChild(gitHeader);
-    var changes = S.node("nav", "dsh-git-changes"); changes.setAttribute("aria-label", "Git 文件变更"); disclosure.appendChild(changes);
-    var diff = S.node("pre", "dsh-git-diff"); diff.setAttribute("aria-label", "Git Diff"); disclosure.appendChild(diff);
+    button("刷新变更", function () { request("gitStatus", {}); }, gitHeader); changesPanel.appendChild(gitHeader);
+    var changes = S.node("nav", "dsh-git-changes"); changes.setAttribute("aria-label", "Git 文件变更"); changesPanel.appendChild(changes);
+    var diff = S.node("pre", "dsh-git-diff"); diff.setAttribute("aria-label", "Git Diff"); changesPanel.appendChild(diff);
+    root.appendChild(filesPanel); root.appendChild(changesPanel); selectTab(selectedTab);
     function drain() {
       if (pending || !active || !emit || !queue.length) return;
       pending = queue.shift();

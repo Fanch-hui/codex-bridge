@@ -12,7 +12,7 @@
       return BridgeDesktopSettingsState(
         header: header(
           "设置",
-          "配置模型、执行偏好、安全策略与全局指令。",
+          "管理权限与审批、客户端指令和应用。",
           "gearshape"
         ),
         models: settings.modelOptions,

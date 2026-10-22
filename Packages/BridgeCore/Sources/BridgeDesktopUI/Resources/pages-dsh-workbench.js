@@ -3,10 +3,10 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var Selection = global.CodexBridgeDesktopDSHWorkbenchSelection;
   var storageKey = "codexbridge.dsh.workbench.v1";
-  var preferences = { mode: "collaboration", tasks: {}, panels: {} }, view, context, newSession = false, settingsOpen = false, restoreRequested = null, awaitingTaskID = null, restoreProjectID = null, navigationTaskID = null;
+  var preferences = { mode: "collaboration", tasks: {}, panels: { workspaceCollapsed: true } }, view, context, newSession = false, settingsOpen = false, restoreRequested = null, awaitingTaskID = null, restoreProjectID = null, navigationTaskID = null;
   try {
     var stored = JSON.parse(global.localStorage.getItem(storageKey) || "null");
-    if (stored) preferences = { mode: stored.mode === "dsh" ? "dsh" : "collaboration", tasks: stored.tasks || {}, panels: stored.panels || {}, draftProjectID: stored.draftProjectID };
+    if (stored) preferences = { mode: stored.mode === "dsh" ? "dsh" : "collaboration", tasks: stored.tasks || {}, panels: Object.assign({ workspaceCollapsed: true }, stored.panels || {}), draftProjectID: stored.draftProjectID };
   } catch (_) {}
 
   function persist() {
@@ -110,10 +110,7 @@
     view.header = S.node("header", "dsh-conversation-header");
     view.title = S.node("h3"); view.status = S.node("span");
     view.header.appendChild(view.title); view.header.appendChild(view.status);
-    view.menu = S.node("details", "dsh-chat-menu");
-    var menuToggle = S.node("summary", "dsh-chat-menu-toggle"); menuToggle.setAttribute("aria-label", "会话操作");
-    menuToggle.appendChild(S.icon("ellipsis")); view.menu.appendChild(menuToggle);
-    view.actions = S.node("div", "dsh-chat-menu-actions"); view.menu.appendChild(view.actions); view.header.appendChild(view.menu);
+    view.actions = S.node("div", "workbench-task-actions"); view.header.appendChild(view.actions);
     view.center.appendChild(view.header);
     view.shared = S.node("div", "dsh-shared-conversation"); view.center.appendChild(view.shared);
     view.composer = global.CodexBridgeDesktopDSHComposer.create(function (taskID) {
@@ -244,8 +241,6 @@
       var detail = filtered.selectedTask;
       S.updateStatus(view.status, detail.status, /失败|failed/.test(detail.status || "") ? "error"
         : detail.canStop || detail.canSteer ? "running" : "success");
-      if (view.menu.__taskID !== detail.taskID) view.menu.open = false;
-      view.menu.__taskID = detail.taskID;
       var row = filtered.tasks.find(function (task) { return task.taskID === detail.taskID; }) || {};
       if (global.CodexBridgeDesktopWorkbenchActions) global.CodexBridgeDesktopWorkbenchActions.render(view.actions, detail, row, emit);
     }

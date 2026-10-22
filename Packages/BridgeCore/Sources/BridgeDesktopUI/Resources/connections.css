@@ -100,3 +100,29 @@
 @media (max-width: 700px) {
   .gemini-cloud-form { grid-template-columns: minmax(0, 1fr); }
 }
+
+.connection-add-menu { position: relative; }
+.connection-add-menu > summary, .agent-maintenance > summary {
+  cursor: pointer; color: var(--text-secondary); font-size: 13px; line-height: 24px;
+}
+.connection-menu-actions {
+  position: absolute; z-index: 5; right: 0; top: 100%; min-width: 220px;
+  display: grid; gap: 4px; padding: 8px; background: var(--surface);
+  border: 1px solid var(--separator); border-radius: var(--radius);
+  box-shadow: 0 8px 24px #0002;
+}
+.connection-menu-actions > .button { justify-self: stretch; text-align: left; }
+.connection-menu-actions > .detail-row { padding: 8px; border: 0; }
+.connection-route { display: grid; gap: 16px; min-width: 0; }
+.connection-route > .button { justify-self: start; }
+.gemini-cloud-configuration { display: grid; gap: 16px; }
+.gemini-cloud-configuration > summary { color: var(--text-secondary); cursor: pointer; }
+.gemini-cloud-configuration[open] > summary { margin-bottom: 16px; }
+.gemini-cloud-configuration > .button { margin-top: 16px; }
+.gemini-cloud-configuration .card-subtitle { margin-top: 12px; }
+.agent-defaults-slot { min-width: 0; }
+.agent-defaults-slot .settings-provider-detail { gap: 16px; }
+.agent-installations { display: grid; gap: 16px; }
+.agent-maintenance[open] > summary { margin-bottom: 8px; }
+.agent-installation-detail > .button { justify-self: start; }
+.connection-detail > .field { max-width: 360px; }

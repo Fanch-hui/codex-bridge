@@ -37,7 +37,7 @@ struct CodexModelCatalogRequestState {
 }
 
 extension BridgeServiceAppModel {
-  func refreshCodexModels() async {
+  func refreshCodexModels(forceRefresh: Bool = true) async {
     guard !stopped, !isRefreshingModels else { return }
     isRefreshingModels = true
     modelCatalogError = nil
@@ -51,7 +51,8 @@ extension BridgeServiceAppModel {
     guard !stopped else { return }
     do {
       let client = try currentClient()
-      await refreshModelCatalog(client: client, forceRefresh: true, includeInstructions: false)
+      await refreshModelCatalog(
+        client: client, forceRefresh: forceRefresh, includeInstructions: false)
     } catch {
       modelCatalogError = errorMessage ?? Self.message(error)
     }

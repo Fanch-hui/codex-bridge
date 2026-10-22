@@ -19,21 +19,6 @@
       BridgeDesktopChoice(id: id, title: title, detail: detail, enabled: enabled)
     }
 
-    static func permissionChoice(_ value: String) -> BridgeDesktopChoice {
-      choice(value, permissionLabel(value))
-    }
-
-    static func permissionLabel(_ value: String) -> String {
-      switch value {
-      case "read-only": "只读"
-      case "full": "完整"
-      case "allowed": "允许"
-      case "requiresLocalApproval": "需要本机批准"
-      case "denied": "拒绝"
-      default: value
-      }
-    }
-
     static func statusLabel(_ state: WindowsWorkbenchDisplay.ConnectionState)
       -> (label: String, tone: BridgeDesktopStatusTone)
     {

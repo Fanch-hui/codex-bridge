@@ -61,6 +61,9 @@ public struct BridgeDesktopNotice: Codable, Equatable, Sendable {
   public let tone: BridgeDesktopStatusTone
   public let destination: BridgeDesktopNavigation?
   public let command: BridgeDesktopCommand?
+  public let detailID: String?
+  public let distribution: String?
+  public let installationID: String?
 
   public init(
     id: String,
@@ -69,7 +72,10 @@ public struct BridgeDesktopNotice: Codable, Equatable, Sendable {
     symbol: String,
     tone: BridgeDesktopStatusTone,
     destination: BridgeDesktopNavigation? = nil,
-    command: BridgeDesktopCommand? = nil
+    command: BridgeDesktopCommand? = nil,
+    detailID: String? = nil,
+    distribution: String? = nil,
+    installationID: String? = nil
   ) {
     self.id = id
     self.title = title
@@ -78,6 +84,9 @@ public struct BridgeDesktopNotice: Codable, Equatable, Sendable {
     self.tone = tone
     self.destination = destination
     self.command = command
+    self.detailID = detailID
+    self.distribution = distribution
+    self.installationID = installationID
   }
 }
 
@@ -137,6 +146,8 @@ public struct BridgeDesktopOverviewState: Codable, Equatable, Sendable {
   public let serviceActions: [BridgeDesktopActionLink]
   public let recentTasks: [BridgeDesktopRecentTask]
   public let lastUpdatedAt: String?
+  public let clientConnections: [BridgeDesktopServiceRow]?
+  public let onboardingSteps: [BridgeDesktopActionLink]?
 
   public init(
     title: String,
@@ -146,7 +157,9 @@ public struct BridgeDesktopOverviewState: Codable, Equatable, Sendable {
     services: [BridgeDesktopServiceRow],
     serviceActions: [BridgeDesktopActionLink] = [],
     recentTasks: [BridgeDesktopRecentTask],
-    lastUpdatedAt: String? = nil
+    lastUpdatedAt: String? = nil,
+    clientConnections: [BridgeDesktopServiceRow]? = nil,
+    onboardingSteps: [BridgeDesktopActionLink]? = nil
   ) {
     self.title = title
     self.subtitle = subtitle
@@ -156,5 +169,7 @@ public struct BridgeDesktopOverviewState: Codable, Equatable, Sendable {
     self.serviceActions = serviceActions
     self.recentTasks = recentTasks
     self.lastUpdatedAt = lastUpdatedAt
+    self.clientConnections = clientConnections
+    self.onboardingSteps = onboardingSteps
   }
 }

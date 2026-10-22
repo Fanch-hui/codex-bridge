@@ -10,15 +10,18 @@ extension ServiceAgentAutoDiscovery {
     existingInstallations: [ServiceAgentInstallationRecord],
     preferGeneratedConfiguration: Bool,
     environment: [String: String],
-    allowGeneratedConfiguration: Bool = true
+    allowGeneratedConfiguration: Bool = true,
+    discoveredExecutablePath: String? = nil
   ) throws -> [ServiceAgentRegistrationRequest] {
-    var executables =
-      ([managedDeepSeekExecutable(dataPaths: dataPaths)]
-      + deepSeekExecutableCandidates(
-        existingInstallations: existingInstallations,
-        environment: environment,
-        includeSourceSearch: false
-      )).compactMap(deepSeekResolvedExecutable)
+    let candidates =
+      discoveredExecutablePath.map { [$0] }
+      ?? ([managedDeepSeekExecutable(dataPaths: dataPaths)]
+        + deepSeekExecutableCandidates(
+          existingInstallations: existingInstallations,
+          environment: environment,
+          includeSourceSearch: false
+        ))
+    var executables = candidates.compactMap(deepSeekResolvedExecutable)
     #if os(Windows)
       executables = executables.filter {
         !isWindowsGUIExecutable($0) || DeepSeekHarnessACPRuntimeLayout.desktop(at: $0) != nil

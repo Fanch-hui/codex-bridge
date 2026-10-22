@@ -21,6 +21,11 @@
     let agentReconnectSummary: String?
     let recentTasks: [WindowsRecentTaskPresentation]
     let tunnel: BridgeDesktopTunnelState?
+    let clients: [BridgeDesktopMCPClientRow]
+    let geminiCloud: BridgeDesktopGeminiCloudState?
+    let installations: [BridgeDesktopAgentInstallationRow]
+    let providers: [BridgeDesktopAgentProviderRow]
+    let setupOperations: [BridgeDesktopAgentSetupState]
   }
 
   struct WindowsDesktopWorkbenchCacheKey: Equatable {

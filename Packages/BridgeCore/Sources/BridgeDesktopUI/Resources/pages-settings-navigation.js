@@ -3,14 +3,6 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var M = global.CodexBridgeDesktopSettingsModels;
 
-  function group(container, title, listOnly) {
-    var section = S.section(container, title);
-    section.className += " settings-group";
-    var stack = S.node("div", "page-card settings-group-body" + (listOnly ? " detail-list" : ""));
-    section.appendChild(stack);
-    return stack;
-  }
-
   function choiceTitle(value, choices) {
     var choice = S.safeArray(choices).find(function (item) { return item.id === value; });
     return choice ? choice.title : value || "默认";
@@ -18,7 +10,7 @@
 
   function modelTitle(value, options) {
     var option = S.safeArray(options).find(function (item) { return item.modelID === value; });
-    return option ? option.displayName : value || "Provider 默认";
+    return option ? option.displayName : value || "Agent 默认";
   }
 
   function effortTitle(value, choices) {
@@ -50,15 +42,24 @@
   function create(container, page, emit) {
     var details = global.CodexBridgeDesktopDetailPages.create(container);
     var openDetail = details.open;
+    var context = { emit: emit };
+    var mounts = new Map();
     details.open = function (id) {
+      if (id === "direct") id = "permissions";
       if (id === "agent:deepseek-harness" && global.CodexBridgeDesktopDSHWorkbench) {
         global.CodexBridgeDesktopDSHWorkbench.openSettings();
+      } else if ((id === "codex" || id.indexOf("agent:") === 0) && global.CodexBridgeDesktopConnectionsPage) {
+        global.CodexBridgeDesktopConnectionsPage.openDetail(id, context.emit);
       } else openDetail(id);
     };
-    var agentsGroup = group(details.overview, "Agent", true);
-    var execution = group(details.overview, "执行策略");
-    var clients = group(details.overview, "客户端指令", true);
-    var application = group(details.overview, "应用运行");
+    var summaries = S.node("div", "page-card detail-list settings-summary-list");
+    details.overview.appendChild(summaries);
+    var agentsGroup = S.node("div", "settings-agent-storage");
+    agentsGroup.hidden = true; container.appendChild(agentsGroup);
+    var execution = S.node("div", "settings-stack");
+    var permissionEntry = details.register("permissions", "权限与审批", execution);
+    summaries.appendChild(permissionEntry.root);
+    var application = S.node("div", "settings-stack");
     var codex = M.preferences(page, emit, true);
     var codexEntry = details.register("codex", "Codex", codex.root);
     agentsGroup.appendChild(codexEntry.root);
@@ -66,10 +67,20 @@
     codexEntry.accessory.appendChild(codexStatus);
     var direct = global.CodexBridgeDesktopDirect.create();
     var directEntry = details.register("direct", "Direct 命令规则", direct.root);
-    execution.appendChild(directEntry.root);
+    execution.appendChild(direct.root);
+    agentsGroup.appendChild(directEntry.root);
     var instructions = global.CodexBridgeDesktopSettingsInstructions.create(page, emit);
-    var instructionsEntry = details.register("instructions", "全局自定义指令", instructions.root);
-    clients.appendChild(instructionsEntry.root);
+    var instructionsEntry = details.register("instructions", "客户端指令", instructions.root);
+    summaries.appendChild(instructionsEntry.root);
+    var applicationEntry = details.register("application", "应用", application);
+    summaries.appendChild(applicationEntry.root);
+    var diagnostics = S.node("div", "settings-stack");
+
+    var logs = S.button("打开日志", null, {}, null, "small", false);
+    logs.addEventListener("click", function () { context.emit("selectPage", { navigation: "logs" }); });
+    diagnostics.appendChild(logs);
+    var diagnosticsEntry = details.register("diagnostics", "诊断与日志", diagnostics);
+    summaries.appendChild(diagnosticsEntry.root);
     var qoder = global.CodexBridgeDesktopSettingsQoderPermissions.create();
     var providers = new Map();
 
@@ -87,11 +98,16 @@
     }
 
     function update(next, nextEmit) {
+      context.emit = nextEmit;
       codex.update(next, nextEmit);
       codexStatus.hidden = !next.modelError && !next.isRefreshingModels;
       S.updateStatus(codexStatus, next.modelError ? "模型获取失败" : "正在获取模型", next.modelError ? "error" : "running");
       codexEntry.update({ value: [modelTitle(next.executionModel, next.models),
         effortTitle(next.executionEffort, next.effortOptions), choiceTitle(next.accessMode, next.accessOptions)].join(" · ") });
+      permissionEntry.update({ value: "客户端权限、命令规则与审批" });
+      applicationEntry.update({ value: next.keepServiceRunningAfterExit ? "退出后继续运行后台服务" : "后台运行与更新" });
+      diagnosticsEntry.update({ value: next.serviceStatusTitle || "后台服务与运行记录" });
+
       direct.update(next.direct, nextEmit);
       directEntry.update({ available: !!next.direct, value: next.direct
         ? choiceTitle(next.direct.commandMode, [{ id: "denied", title: "关闭" }, { id: "safe", title: "安全模式" }, { id: "full", title: "完整模式" }]) : "" });
@@ -130,8 +146,15 @@
         current.keys = nextKeys;
         current.entry.update({ available: visible.has(id) });
       });
+      mounts.forEach(function (target, id) { mountAgent(id, target); });
     }
-    return { details: details, execution: execution, application: application, update: update };
+    function mountAgent(id, target) {
+      mounts.set(id, target);
+      var body = id === "codex" ? codex.root : providers.has(id) ? providers.get(id).body : null;
+      if (body && body.parentNode !== target) target.appendChild(body);
+    }
+    return { details: details, execution: execution, application: application,
+      diagnostics: diagnostics, mountAgent: mountAgent, update: update };
   }
 
   global.CodexBridgeDesktopSettingsNavigation = { create: create };

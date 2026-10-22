@@ -83,6 +83,10 @@ public actor ServiceExecutionCoordinator {
     self.providerDisplayNameResolver = providerDisplayNameResolver
   }
 
+  package func codexInstallationArtifacts() async throws -> [ServiceAgentExecutableIdentity] {
+    try await execution.codexInstallationArtifacts()
+  }
+
   @discardableResult
   public func start(taskID: TaskID) async throws -> ExecutionBinding? {
     guard !isShuttingDown else {

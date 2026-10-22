@@ -22,17 +22,9 @@ export async function queryAccountScope(sdk, config) {
     }), 35000);
     query = warm.query(new MessageInput());
     validateSDKQuery(query);
-    if (typeof query.accountInfo !== 'function') throw new HostError('account_scope_unavailable');
     drain = (async () => { for await (const _message of query) {} })();
     await deadline(query.initializationResult());
-    const account = await deadline(query.accountInfo());
-    if (typeof account?.userId !== 'string' || !account.userId.trim()
-      || Buffer.byteLength(account.userId) > 512 || /[\x00-\x1f\x7f]/u.test(account.userId)) {
-      throw new HostError('account_scope_unavailable');
-    }
-    return createHash('sha256')
-      .update(`codexbridge:qoder-account-scope:v1\0${config.distribution}\0${account.userId}`)
-      .digest('hex');
+    return await accountScopeFromQuery(query, config);
   } catch (error) {
     if (expired || error?.exitCode === 41 || error?.code === 'authentication_required') {
       throw new HostError('authentication_required');
@@ -45,4 +37,23 @@ export async function queryAccountScope(sdk, config) {
     try { await deadline(drain, 2000); } catch {}
     await processes.close();
   }
+}
+
+export async function accountScopeFromQuery(query, config) {
+  if (typeof query.accountInfo !== 'function') throw new HostError('account_scope_unavailable');
+  let account;
+  try { account = await deadline(query.accountInfo()); }
+  catch (error) {
+    if (error?.exitCode === 41 || error?.code === 'authentication_required') {
+      throw new HostError('authentication_required');
+    }
+    throw new HostError('account_scope_unavailable');
+  }
+  if (typeof account?.userId !== 'string' || !account.userId.trim()
+    || Buffer.byteLength(account.userId) > 512 || /[\x00-\x1f\x7f]/u.test(account.userId)) {
+    throw new HostError('account_scope_unavailable');
+  }
+  return createHash('sha256')
+    .update(`codexbridge:qoder-account-scope:v1\0${config.distribution}\0${account.userId}`)
+    .digest('hex');
 }

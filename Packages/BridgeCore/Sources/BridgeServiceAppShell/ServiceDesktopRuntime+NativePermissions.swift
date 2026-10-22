@@ -9,7 +9,7 @@ extension BridgeServiceAppModel {
   }
 
   func loadNativePermissionPolicy(installationID: String) async {
-    guard !installationID.isEmpty else { return }
+    guard !installationID.isEmpty, !isSavingNativePermissionPolicy(installationID) else { return }
     let generation = incrementNativePermissionGeneration(for: installationID)
     agentNativePermissionLoadingInstallations.insert(installationID)
     agentNativePermissionErrors.removeValue(forKey: installationID)
@@ -202,7 +202,7 @@ extension BridgeServiceAppModel {
     agentNativePermissionErrors[policy.installationID] =
       "已有 Ask 或 Deny 规则覆盖该目标，请先在此处处理冲突。"
     focusedAgentNativePermissionInstallationID = policy.installationID
-    selection = .settings
+    selection = .connections
     postToast("请先处理 AGY Global 规则冲突", symbol: "exclamationmark.shield", tone: .warning)
     return true
   }

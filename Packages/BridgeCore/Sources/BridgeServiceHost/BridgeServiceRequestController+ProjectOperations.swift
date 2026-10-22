@@ -6,12 +6,12 @@ import Foundation
 
 extension BridgeServiceRequestController {
   func handleListProjects(_ request: BridgeServiceIPCRequest) async throws -> Data {
-    let projects = try await composition.application.serviceManagedProjects(
+    let result = try await composition.application.serviceManagedProjectList(
       deadline: Self.deadline()
     )
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
-      payload: IPCProjectListResponse(projects: projects)
+      payload: IPCProjectListResponse(projects: result.projects, projectPaths: result.projectPaths)
     )
   }
 

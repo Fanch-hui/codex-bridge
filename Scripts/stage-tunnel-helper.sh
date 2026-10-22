@@ -16,7 +16,7 @@ readonly helper_directory
 if [[ -n "${TUNNEL_HELPER_UNSIGNED_SHA256:-}" ]]; then
   trusted_unsigned_sha256="${TUNNEL_HELPER_UNSIGNED_SHA256}"
 elif [[ "${helper_directory}" == "${default_helper_directory}" ]]; then
-  trusted_unsigned_sha256="1f1d76a01673bd2037178c8e9c8829a6bf18ed7b3260c6fa373bf1aa66e9e371"
+  trusted_unsigned_sha256="530ed44091d204dae5363298d62e769cdf0226dc11dab617835304f315fcbaee"
 else
   trusted_unsigned_sha256=""
 fi
@@ -38,7 +38,8 @@ clear_staged_helper() {
   remove_if_present "${staged_helper}"
   remove_if_present "${staged_digest}"
   remove_if_present "${legacy_staged_digest}"
-  for name in LICENSE NOTICE tunnel-client.manifest; do
+  for name in LICENSE NOTICE tunnel-client.manifest \
+    licenses-darwin-amd64.txt sbom-darwin-amd64.spdx.json licenses-darwin-arm64.txt sbom-darwin-arm64.spdx.json; do
     remove_if_present "${resources_destination}/${name}"
   done
 }
@@ -113,7 +114,8 @@ print -r -- "${staged_sha256%% *}" > "${temporary_digest}"
 /bin/mv -f "${temporary_helper}" "${staged_helper}"
 /bin/mv -f "${temporary_digest}" "${staged_digest}"
 
-for name in LICENSE NOTICE tunnel-client.manifest; do
+for name in LICENSE NOTICE tunnel-client.manifest \
+    licenses-darwin-amd64.txt sbom-darwin-amd64.spdx.json licenses-darwin-arm64.txt sbom-darwin-arm64.spdx.json; do
   /usr/bin/install -m 0644 \
     "${resolved_helper_directory}/${name}" \
     "${resources_destination}/${name}"

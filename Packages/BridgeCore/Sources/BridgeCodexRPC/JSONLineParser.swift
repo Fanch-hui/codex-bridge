@@ -1,4 +1,4 @@
-import BridgeProcess
+import BridgeAgentCore
 import Foundation
 
 struct JSONLineParser: Sendable {

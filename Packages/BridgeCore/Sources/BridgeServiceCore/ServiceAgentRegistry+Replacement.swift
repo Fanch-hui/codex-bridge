@@ -58,7 +58,7 @@ extension ServiceAgentRegistry {
         existing.id, reason: candidate.lastProbeError ?? "The Agent replacement did not pass Probe."
       )
     }
-    try await store.updateAgentInstallation(
+    try await updateInstallation(
       candidate,
       allowExecutableReplacement: true
     )

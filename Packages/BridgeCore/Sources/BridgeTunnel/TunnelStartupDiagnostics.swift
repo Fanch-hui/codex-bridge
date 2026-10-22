@@ -28,6 +28,7 @@ final class TunnelStartupDiagnostics: @unchecked Sendable {
     case pollerStarted = "poller_started"
     case pollerStopped = "poller_stopped"
     case pollerRecovered = "poller_recovered"
+    case proxyPollAdjusted = "proxy_poll_adjusted"
   }
 
   private let lock = NSLock()
@@ -89,6 +90,8 @@ final class TunnelStartupDiagnostics: @unchecked Sendable {
     case "poller started": event = .pollerStarted
     case "poller stopped": event = .pollerStopped
     case "poller recovered; polling operational": event = .pollerRecovered
+    case "control-plane proxy closed long poll; lowering future poll timeout":
+      event = .proxyPollAdjusted
     default: return
     }
     let currentPoll = lock.withLock {
@@ -98,7 +101,8 @@ final class TunnelStartupDiagnostics: @unchecked Sendable {
     var fields = ["poll_attempt": currentPoll]
     for name in [
       "limit", "commands_polled", "commands_enqueued", "retry_in_ms", "poll_timeout_ms",
-      "poll_deadline_ms", "status_code",
+      "poll_deadline_ms", "status_code", "observed_disconnect_ms", "attempted_poll_timeout_ms",
+      "learned_poll_timeout_ms",
     ] {
       guard let number = object[name] as? NSNumber,
         String(cString: number.objCType) != "c",

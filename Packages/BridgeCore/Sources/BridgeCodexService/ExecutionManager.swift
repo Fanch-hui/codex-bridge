@@ -1,4 +1,5 @@
 import BridgeDomain
+import BridgeServiceCore
 import Foundation
 
 public actor ExecutionManager {
@@ -7,6 +8,24 @@ public actor ExecutionManager {
 
   public init(configuration: ExecutionManagerConfiguration) {
     self.configuration = configuration
+  }
+
+  package func codexInstallationArtifacts() throws -> [ServiceAgentExecutableIdentity] {
+    let launch = configuration.appServer.current()
+    var identities = [try ServiceAgentExecutableIdentity(capturing: launch.executableURL.path)]
+    #if os(Windows)
+      if launch.arguments.count >= 4,
+        Array(launch.arguments.prefix(3)) == ["/d", "/s", "/c"]
+      {
+        let commandPath = launch.arguments[3]
+        if commandPath.lowercased().hasSuffix(".cmd")
+          || commandPath.lowercased().hasSuffix(".bat")
+        {
+          identities.append(try ServiceAgentExecutableIdentity(capturing: commandPath))
+        }
+      }
+    #endif
+    return identities
   }
 
   public func start(_ request: ExecutionRequest) async throws -> ExecutionHandle {

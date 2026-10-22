@@ -59,13 +59,18 @@
             availableAgentCount: management.availableAgentCount,
             agentReconnectSummary: agentReconnectSummary,
             recentTasks: workbench.recentTasks,
-            tunnel: connections?.tunnel
+            tunnel: connections?.tunnel,
+            clients: connections?.clientItems ?? [],
+            geminiCloud: connections?.geminiCloud,
+            installations: management.agent.installationItems,
+            providers: management.agent.providerItems,
+            setupOperations: management.agent.setupOperations
           )
         ) {
           overview(
             workbench: workbench,
             management: management,
-            tunnel: connections?.tunnel,
+            connections: connections,
             agentReconnectSummary: agentReconnectSummary
           )
         },
@@ -145,74 +150,44 @@
     private static func overview(
       workbench: WindowsWorkbenchDisplay,
       management: WindowsManagementDisplay,
-      tunnel: BridgeDesktopTunnelState?,
+      connections: WindowsConnectionDisplay?,
       agentReconnectSummary: String?
     ) -> BridgeDesktopOverviewState {
-      let projectCount = management.project.rows.count
-      let metrics = [
-        metric(
-          id: "running-tasks",
-          title: "运行中任务",
-          value: workbench.runningTaskCount,
-          symbol: "bolt.fill",
-          subtitle: workbench.runningTaskCount > 0 ? "点击进入工作台" : "当前空闲",
-          tone: workbench.runningTaskCount > 0 ? .running : .neutral,
-          destination: .workbench
-        ),
-        metric(
-          id: "pending-approvals",
-          title: "待审批项",
-          value: workbench.pendingApprovalCount,
-          symbol: "shield.lefthalf.filled",
-          subtitle: workbench.pendingApprovalCount > 0 ? "点击立即处理审批" : "无阻断事项",
-          tone: workbench.pendingApprovalCount > 0 ? .warning : .neutral,
-          destination: .workbench
-        ),
-        metric(
-          id: "registered-projects",
-          title: "注册项目",
-          value: projectCount,
-          symbol: "folder.fill",
-          subtitle: "管理本地目录",
-          tone: projectCount > 0 ? .running : .neutral,
-          destination: .projects
-        ),
-        metric(
-          id: "total-tasks",
-          title: "任务总数",
-          value: workbench.taskCount,
-          symbol: "list.bullet.rectangle",
-          subtitle: "任务历史",
-          tone: workbench.taskCount > 0 ? .running : .neutral,
-          destination: .workbench
-        ),
-      ]
+      let tunnel = connections?.tunnel
+      let clientConnections = BridgeDesktopOverviewPresentation.clientConnections(
+        clients: connections?.clientItems ?? [],
+        serviceAvailable: workbench.connectionState == .connected,
+        localMCPReady: workbench.mcpState == "ready", tunnel: tunnel,
+        geminiCloud: connections?.geminiCloud)
+      let clientNotices = BridgeDesktopOverviewPresentation.clientNotices(
+        connections: clientConnections, serviceAvailable: workbench.connectionState == .connected)
+      let agentNotices = management.agent.installationItems.compactMap { installation in
+        let desktop = management.agent.providerItems.compactMap(\.desktop).first {
+          $0.installationID == installation.installationID
+        }
+        let availability = BridgeDesktopAgentAvailability.resolve(
+          providerID: installation.providerID, enabled: installation.enabled,
+          availability: installation.availability, desktop: desktop)
+        return BridgeDesktopOverviewPresentation.agentNotice(
+          installationID: installation.installationID, providerID: installation.providerID,
+          displayName: installation.displayName, availability: installation.availability,
+          requiresReconnect: availability == .requiresReconnect)
+      }
+      let setupNotices = BridgeDesktopOverviewPresentation.setupNotices(
+        operations: management.agent.setupOperations)
 
       return BridgeDesktopOverviewState(
         title: "概览",
         subtitle: "",
-        notices: notices(workbench: workbench),
-        metrics: metrics,
+        notices: notices(workbench: workbench) + clientNotices + agentNotices + setupNotices,
+        metrics: [],
         services: services(
           workbench: workbench,
           management: management,
           tunnel: tunnel,
           agentReconnectSummary: agentReconnectSummary
         ),
-        serviceActions: [
-          BridgeDesktopActionLink(
-            id: "manage-connections",
-            title: "管理连接与 Agent →",
-            command: .openConnections,
-            destination: .connections
-          ),
-          BridgeDesktopActionLink(
-            id: "configure-preferences",
-            title: "配置模型与执行偏好 →",
-            command: .openSettings,
-            destination: .settings
-          ),
-        ],
+        serviceActions: [],
         recentTasks: workbench.recentTasks.prefix(4).map {
           BridgeDesktopRecentTask(
             id: $0.taskID,
@@ -223,27 +198,17 @@
             updatedAt: $0.updatedAt
           )
         },
-        lastUpdatedAt: workbench.recentTasks.map(\.updatedAt).max()
-      )
-    }
-
-    private static func metric(
-      id: String,
-      title: String,
-      value: Int,
-      symbol: String,
-      subtitle: String,
-      tone: BridgeDesktopStatusTone,
-      destination: BridgeDesktopNavigation
-    ) -> BridgeDesktopMetric {
-      BridgeDesktopMetric(
-        id: id,
-        title: title,
-        value: String(value),
-        symbol: symbol,
-        subtitle: subtitle,
-        tone: tone,
-        destination: destination
+        lastUpdatedAt: workbench.recentTasks.map(\.updatedAt).max(),
+        clientConnections: clientConnections,
+        onboardingSteps: BridgeDesktopOverviewPresentation.onboardingSteps(
+          hasProjects: !management.project.rows.isEmpty,
+          hasConfiguredClient: clientConnections.contains { $0.tone == .success }
+            || (connections?.geminiCloud?.enabled == true
+              && connections?.geminiCloud?.lifecycle == "configured"
+              && connections?.clientItems.contains {
+                $0.clientID == "google.gemini" && $0.enabled
+              } == true)
+        )
       )
     }
 

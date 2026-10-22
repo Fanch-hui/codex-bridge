@@ -182,8 +182,15 @@ public struct IPCWorkbenchPermissionModeRequest: Codable, Equatable, Sendable {
 
 public struct IPCProjectListResponse: Codable, Equatable, Sendable {
   public let projects: [MCPProjectSummary]
+  public let projectPaths: [String: String]?
 
-  public init(projects: [MCPProjectSummary]) {
+  public init(projects: [MCPProjectSummary], projectPaths: [String: String]? = nil) {
     self.projects = projects
+    self.projectPaths = projectPaths
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case projects
+    case projectPaths = "project_paths"
   }
 }

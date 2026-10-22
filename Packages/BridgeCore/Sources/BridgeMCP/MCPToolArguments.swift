@@ -99,13 +99,6 @@ struct StrictToolArguments {
     return result
   }
 
-  func requiredObject(_ key: String) throws -> [String: Value] {
-    guard case .object(let value)? = values[key] else {
-      throw MCPError.invalidParams("Argument '\(key)' must be an object.")
-    }
-    return value
-  }
-
   func optionalStringArrayMap(
     _ key: String,
     maximumKeys: Int,

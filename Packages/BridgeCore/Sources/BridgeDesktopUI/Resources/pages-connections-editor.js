@@ -85,7 +85,7 @@
   function createAgentRegistration(emit) {
     var context = { emit: emit, providers: [], enabled: false };
     var wrapper = S.node("div", "page-card connection-card agent-registration");
-    var provider = S.selectField("Provider", "", [], function () {}, "");
+    var provider = S.selectField("Agent", "", [], function () {}, "");
     var qoderDistribution = S.selectField("Qoder 地区", "cn", [], function () {}, "");
     var name = S.textField("显示名称", "", "Agent 名称");
     var executable = S.textField("可执行路径", "", "由系统弹窗选取，或手动输入绝对路径");
@@ -102,7 +102,7 @@
         || context.providers[0];
     }
     function guideText(item) {
-      if (!item) return "请选择要登记的 Agent Provider。";
+      if (!item) return "请选择要登记的 Agent。";
       var id = (item.providerID || "").toLowerCase();
       if (id === "qoder") {
         return "Qoder SDK 引擎。选择 CLI 所属地区；认证、模型偏好和原生会话严格按地区隔离。CN 使用 qodercn / qoderclicn，国际版使用 qoder / qodercli。";
@@ -143,7 +143,7 @@
       var requiresConfiguration = !!(selected && selected.requiresConfiguration);
       configuration.control.disabled = !requiresConfiguration;
       configuration.control.placeholder = requiresConfiguration
-        ? "需要配置时填写（如 cordis.yml）" : "当前 Provider 无需配置文件";
+        ? "需要配置时填写（如 cordis.yml）" : "当前 Agent 无需配置文件";
     }
     provider.control.addEventListener("change", function () {
       var selected = getProvider(provider.control.value);

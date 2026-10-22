@@ -6,27 +6,33 @@ extension ServiceAgentSetupInstaller {
     -> ServiceAgentSetupRuntime
   {
     if providerID == .antigravity { return try await installAntigravity(in: directory) }
-    let release = try await object(
-      URL(string: "https://api.github.com/repos/anomalyco/opencode/releases/latest")!)
-    // Baseline builds also work on older x64 CPUs, including Intel Macs without AVX2.
-    let baseline = platform.architecture == "x64" ? "-baseline" : ""
-    let extensionName = platform.os == "linux" ? ".tar.gz" : ".zip"
-    let filename = "opencode-\(platform.os)-\(platform.architecture)\(baseline)\(extensionName)"
-    guard let assets = release["assets"] as? [[String: Any]],
-      let asset = assets.first(where: { $0["name"] as? String == filename }),
-      let download = asset["browser_download_url"] as? String,
-      let digest = asset["digest"] as? String, digest.hasPrefix("sha256:"),
-      let version = release["tag_name"] as? String
-    else { throw ServiceAgentSetupInstallError.invalidMetadata("OpenCode release") }
-    let archive = directory.appendingPathComponent(filename)
+    let name = "@opencode/cli"
+    let metadata = try await object(
+      URL(string: "https://registry.npmjs.org/@opencode%2fcli/latest")!)
+    let package = platform.openCodePackageName
+    guard metadata["name"] as? String == name,
+      let version = metadata["version"] as? String, !version.isEmpty,
+      let dependencies = metadata["optionalDependencies"] as? [String: String],
+      dependencies[package] == version
+    else { throw ServiceAgentSetupInstallError.invalidMetadata("OpenCode distribution") }
+    let encodedPackage = package.replacingOccurrences(of: "/", with: "%2f")
+    let artifact = try await object(
+      URL(string: "https://registry.npmjs.org/\(encodedPackage)/\(version)")!)
+    guard artifact["name"] as? String == package, artifact["version"] as? String == version,
+      let dist = artifact["dist"] as? [String: Any],
+      let download = dist["tarball"] as? String,
+      let integrity = dist["integrity"] as? String, integrity.hasPrefix("sha512-"),
+      let digest = Data(base64Encoded: String(integrity.dropFirst(7))), digest.count == 64
+    else { throw ServiceAgentSetupInstallError.invalidMetadata("OpenCode package") }
+    let archive = directory.appendingPathComponent("opencode.tgz")
     defer { try? FileManager.default.removeItem(at: archive) }
     try await io.download(
-      officialURL(download, allowedHosts: ["github.com"]), to: archive)
+      officialURL(download, allowedHosts: ["registry.npmjs.org"]), to: archive)
     try ServiceAgentSetupInstallIntegrity.verify(
-      archive, digest: String(digest.dropFirst(7)), algorithm: "sha256")
+      archive, digest: digest.map { String(format: "%02x", $0) }.joined(), algorithm: "sha512")
     try await extract(archive, into: directory)
     let entry = try executable(
-      directory.appendingPathComponent("opencode" + platform.executableSuffix))
+      directory.appendingPathComponent("package/bin/opencode" + platform.executableSuffix))
     _ = try await io.run(
       [entry, "--version"], cwd: directory, environment: installEnvironment(in: directory))
     return ServiceAgentSetupRuntime(
@@ -62,5 +68,13 @@ extension ServiceAgentSetupInstaller {
       [entry, "--version"], cwd: directory, environment: installEnvironment(in: directory))
     return ServiceAgentSetupRuntime(
       executablePath: entry, version: version, installationDirectory: directory.path)
+  }
+}
+
+extension ServiceAgentSetupInstallPlatform {
+  var openCodePackageName: String {
+    // Baseline builds also support older x64 CPUs, including Intel Macs without AVX2.
+    let baseline = architecture == "x64" ? "-baseline" : ""
+    return "@opencode/cli-\(os)-\(architecture)\(baseline)"
   }
 }

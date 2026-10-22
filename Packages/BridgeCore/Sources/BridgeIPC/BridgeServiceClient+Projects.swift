@@ -2,11 +2,14 @@ import BridgeMCP
 
 extension BridgeServiceClient {
   public func projects() async throws -> [MCPProjectSummary] {
-    let response: IPCProjectListResponse = try await call(
+    try await projectList().projects
+  }
+
+  public func projectList() async throws -> IPCProjectListResponse {
+    try await call(
       operation: .listProjects,
       payload: Optional<IPCMutationResponse>.none
     )
-    return response.projects
   }
 
   public func registerProject(

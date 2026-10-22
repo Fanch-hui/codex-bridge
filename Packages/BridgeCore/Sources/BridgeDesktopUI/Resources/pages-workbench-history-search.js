@@ -26,11 +26,64 @@
     dialog.id = "workbench-history-dialog";
     dialog.setAttribute("aria-labelledby", "workbench-history-dialog-title");
     var heading = S.node("div", "dialog-header");
-    var title = S.node("h2", null, "搜索历史会话");
+    var title = S.node("h2", null, "历史会话");
     title.id = "workbench-history-dialog-title";
     heading.appendChild(title); dialog.appendChild(heading);
     var body = S.node("div", "dialog-body");
-    var model = create(body);
+    var tabs = S.node("div", "workbench-history-tabs");
+    tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", "历史来源"); body.appendChild(tabs);
+    var model = create(body), selected = "bridge";
+    var nativePanel = S.node("section", "workbench-native-history");
+    nativePanel.id = "workbench-history-native"; nativePanel.setAttribute("role", "tabpanel");
+    var nativeNote = S.node("p", "hint"); nativePanel.appendChild(nativeNote);
+    var nativeRoot = document.getElementById("workbench-native-sessions");
+    if (nativeRoot) nativePanel.appendChild(nativeRoot);
+    body.appendChild(nativePanel);
+    model.panel.id = "workbench-history-bridge"; model.panel.setAttribute("role", "tabpanel");
+    function selectHistory(kind, load) {
+      selected = kind;
+      model.panel.hidden = kind !== "bridge"; nativePanel.hidden = kind !== "native";
+      [bridgeTab, nativeTab].forEach(function (tab, index) {
+        var active = (index === 0 ? "bridge" : "native") === kind;
+        tab.setAttribute("aria-selected", String(active)); tab.tabIndex = active ? 0 : -1;
+      });
+      if (kind !== "native" || !load || !model.emit) return;
+      var page = model.page || {}, directory = page.nativeSessions || {};
+      var installations = S.safeArray(directory.installations);
+      var installationID = directory.installationID || (installations[0] && installations[0].installationID);
+      var projectID = page.selectedProjectID || (S.safeArray(page.projects)[0] || {}).id;
+      if (installationID && projectID) model.emit("manageNativeAgentSession", {
+        action: "list", projectID: projectID, installationID: installationID, offset: 0, limit: 50
+      });
+    }
+    function tab(title, kind, id) {
+      var button = S.button(title, null, {}, null, "small history-source-tab");
+      button.id = id; button.setAttribute("role", "tab");
+      button.setAttribute("aria-controls", kind === "bridge" ? model.panel.id : nativePanel.id);
+      button.addEventListener("click", function () { selectHistory(kind, true); });
+      button.addEventListener("keydown", function (event) {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        var next = selected === "bridge" ? nativeTab : bridgeTab;
+        if (event.key === "Home") next = bridgeTab;
+        else if (event.key === "End") next = nativeTab;
+        selectHistory(next === bridgeTab ? "bridge" : "native", true); next.focus();
+      });
+      tabs.appendChild(button); return button;
+    }
+    var bridgeTab = tab("Bridge 记录", "bridge", "workbench-history-bridge-tab");
+    var nativeTab = tab("原生历史", "native", "workbench-history-native-tab");
+    model.panel.setAttribute("aria-labelledby", bridgeTab.id);
+    nativePanel.setAttribute("aria-labelledby", nativeTab.id);
+    selectHistory("bridge", false);
+    model.updateNative = function (page) {
+      if (dialog.open && selected === "native" && model.__selectedTaskID !== undefined
+        && model.__selectedTaskID !== page.selectedTaskID) dialog.close();
+      model.__selectedTaskID = page.selectedTaskID;
+      var available = S.safeArray((page.nativeSessions || {}).installations).length > 0;
+      nativeNote.hidden = available;
+      nativeNote.textContent = available ? "" : "当前项目没有支持原生历史的 Agent。";
+    };
     model.panel.open = true;
     model.panel.querySelector("summary").hidden = true;
     model.input.autofocus = true;
@@ -39,9 +92,9 @@
     var close = S.button("关闭", null, {}, null, "small");
     close.addEventListener("click", function () { dialog.close(); });
     footer.appendChild(close); dialog.appendChild(footer);
-    model.trigger = S.button("搜索", null, {}, null, "small");
-    model.trigger.title = "搜索历史会话";
-    model.trigger.setAttribute("aria-label", "搜索历史会话");
+    model.trigger = S.button("历史", null, {}, null, "small");
+    model.trigger.title = "查看历史会话";
+    model.trigger.setAttribute("aria-label", "查看历史会话");
     model.trigger.setAttribute("aria-haspopup", "dialog");
     model.trigger.setAttribute("aria-controls", dialog.id);
     model.trigger.addEventListener("click", function () { dialog.showModal(); });
@@ -105,6 +158,7 @@
 
   function update(model, page, emit) {
     model.page = page; model.emit = emit;
+    if (model.updateNative) model.updateNative(page);
     var state = page.taskHistorySearch || {};
     if (model.fixedProviderID && state.providerID !== model.fixedProviderID) state = {};
     setOptions(model.provider, [["", "全部 Agent"]].concat(S.safeArray(state.providers).map(function (item) {

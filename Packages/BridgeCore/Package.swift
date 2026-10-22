@@ -228,6 +228,7 @@ let package = Package(
         "BridgeDomain",
         "BridgeProjects",
         "BridgeServiceCore",
+        "BridgeTunnel",
         .product(name: "GRDB", package: "GRDB.swift"),
         .product(name: "Crypto", package: "swift-crypto"),
       ]
@@ -313,7 +314,7 @@ let package = Package(
         .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
-    .target(name: "BridgeProcess"),
+    .target(name: "BridgeProcess", dependencies: ["BridgeAgentCore"]),
     .target(
       name: "BridgePiRPC",
       dependencies: ["BridgeAgentCore", "BridgeDomain", "BridgeProcess", "BridgeSecurity"],

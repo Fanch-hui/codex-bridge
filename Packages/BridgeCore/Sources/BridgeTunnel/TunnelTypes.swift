@@ -18,8 +18,15 @@ public struct TunnelID: Hashable, RawRepresentable, Sendable {
 
   private static func isValid(_ value: String) -> Bool {
     let bytes = Array(value.utf8)
-    guard bytes.count == 39, bytes.starts(with: Array("tunnel_".utf8)) else { return false }
-    return bytes.dropFirst(7).allSatisfy {
+    guard bytes.starts(with: Array("tunnel_".utf8)) else { return false }
+    var identifier = Array(bytes.dropFirst(7))
+    if identifier.count == 37 {
+      guard identifier[4] == UInt8(ascii: "_") else { return false }
+      identifier.remove(at: 4)
+    } else if identifier.count != 32 {
+      return false
+    }
+    return identifier.allSatisfy {
       (UInt8(ascii: "a")...UInt8(ascii: "z")).contains($0)
         || (UInt8(ascii: "0")...UInt8(ascii: "9")).contains($0)
     }

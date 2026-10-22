@@ -1,8 +1,7 @@
+import BridgeAgentCore
 import Foundation
 
-public enum BoundedLineDecoderError: Error, Equatable, Sendable {
-  case oversizedFrame
-}
+public typealias BoundedLineDecoderError = BridgeAgentCore.BoundedLineDecoderError
 
 /// Incrementally splits LF-delimited process output while enforcing a hard
 /// per-frame limit. CRLF is accepted, empty lines are ignored, and a final

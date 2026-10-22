@@ -1,7 +1,7 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
-  var expanded = new Map();
+  var expanded = new Map(), currentView = null;
 
   function sections(card) {
     var header = card.__detailHeader;
@@ -14,33 +14,23 @@
     if (card.lastChild !== conversation) card.appendChild(conversation);
     if (!header.__presentation) {
       var summary = S.node("div", "task-detail-summary");
-      var title = S.node("h3", "detail-title");
       var step = S.node("div", "current-step-card");
-      step.appendChild(S.node("span", "step-caption", "当前操作"));
       var stepText = S.node("span", "step-text"); step.appendChild(stepText);
-      summary.appendChild(title); summary.appendChild(step);
-      var actions = S.node("div", "form-actions");
+      summary.appendChild(step);
       var failure = S.node("div", "task-failure-summary");
       var metadata = S.node("details", "task-metadata");
       metadata.appendChild(S.node("summary", "disclosure-summary", "会话详情"));
       var grid = S.node("dl", "detail-grid"); metadata.appendChild(grid);
       var files = S.node("div", "task-detail-files"); metadata.appendChild(files);
-      var copy = S.button("复制结果", null, {}, null, "small");
-      var copyStatus = S.node("span", "hint"); copyStatus.setAttribute("role", "status");
-      copy.addEventListener("click", function () {
-        var text = copy.__text;
-        copyResult(text).then(function () {
-          if (copy.__text === text) copyStatus.textContent = "已复制";
-        }, function () {
-          if (copy.__text === text) copyStatus.textContent = "复制失败，请选择结果文字复制。";
-        });
+      metadata.addEventListener("toggle", function () {
+        expanded.set(metadata.__taskKey, !!metadata.open); metadata.hidden = !metadata.open;
+        header.hidden = step.hidden && failure.hidden && metadata.hidden;
+        if (!metadata.open && metadata.__returnFocus && metadata.contains(document.activeElement)) metadata.__returnFocus.focus();
       });
-      metadata.appendChild(copy); metadata.appendChild(copyStatus);
-      metadata.addEventListener("toggle", function () { expanded.set(metadata.__taskKey, !!metadata.open); });
-      [summary, actions, failure, metadata].forEach(function (node) { header.appendChild(node); });
+      [summary, failure, metadata].forEach(function (node) { header.appendChild(node); });
       header.__presentation = {
-        title: title, step: step, stepText: stepText, actions: actions, failure: failure,
-        metadata: metadata, grid: grid, files: files, conversation: conversation, copy: copy, copyStatus: copyStatus
+        header: header, step: step, stepText: stepText, failure: failure,
+        metadata: metadata, grid: grid, files: files, conversation: conversation
       };
     }
     return header.__presentation;
@@ -52,13 +42,15 @@
       view.metadata.__taskKey = key;
       view.metadata.open = expanded.get(key) === true;
     }
-    view.title.textContent = detail.title;
+    currentView = view;
+    view.metadata.hidden = !view.metadata.open;
     view.step.hidden = !detail.currentStep || detail.isTerminal === true;
     view.stepText.textContent = detail.currentStep || "";
     S.clear(view.failure);
     view.failure.hidden = !detail.failureReason && !detail.failureNextAction;
     if (detail.failureReason) view.failure.appendChild(S.node("p", "error-text", detail.failureReason));
     if (detail.failureNextAction) view.failure.appendChild(S.node("p", null, detail.failureNextAction));
+    view.header.hidden = view.step.hidden && view.failure.hidden && view.metadata.hidden;
     S.clear(view.grid);
     addDetail(view.grid, "项目", detail.projectName);
     addDetail(view.grid, "Agent", detail.provider);
@@ -70,9 +62,6 @@
     addUsage(view.grid, detail.usage);
     if (detail.failureCode) addDetail(view.grid, "失败代码", detail.failureCode);
     if (detail.failureDiagnostic) addDetail(view.grid, "诊断详情", detail.failureDiagnostic);
-    var copyText = detail.providerID === "deepseek-harness" ? detail.resultSummary || "" : "";
-    if (view.copy.__text !== copyText) view.copyStatus.textContent = "";
-    view.copy.__text = copyText; view.copy.hidden = !copyText; view.copyStatus.hidden = !copyText;
     S.clear(view.files);
     var files = S.safeArray(detail.changedFiles);
     view.files.hidden = !files.length;
@@ -125,5 +114,15 @@
     container.appendChild(item);
   }
 
-  global.CodexBridgeDesktopWorkbenchDetails = { sections: sections, update: update };
+  global.CodexBridgeDesktopWorkbenchDetails = {
+    sections: sections, update: update, copyResult: copyResult,
+    open: function (detail, returnFocus) {
+      var view = currentView;
+      if (!view || view.metadata.__taskKey !== JSON.stringify([detail.providerID, detail.sessionID || detail.taskID])) return;
+      view.header.hidden = false; view.metadata.hidden = false; view.metadata.open = true;
+      view.metadata.__returnFocus = returnFocus; expanded.set(view.metadata.__taskKey, true);
+      view.metadata.querySelector("summary").focus({ preventScroll: true });
+      if (view.metadata.scrollIntoView) view.metadata.scrollIntoView({ block: "nearest" });
+    }
+  };
 }(window));

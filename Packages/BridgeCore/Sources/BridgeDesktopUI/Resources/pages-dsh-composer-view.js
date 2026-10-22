@@ -23,7 +23,6 @@
     var model = select("DSH 会话模型"), effort = select("DSH 会话推理强度"), mode = select("发送方式");
     model.wrapper.classList.add("dsh-composer-model");
     toolbar.appendChild(model.wrapper); toolbar.appendChild(effort.wrapper); toolbar.appendChild(mode.wrapper);
-    var stop = S.button("停止", null, {}, null, "small dsh-composer-stop"); toolbar.appendChild(stop);
     root.appendChild(toolbar);
     var recovery = S.node("div", "dsh-composer-recovery");
     var recover = S.button("恢复提交", null, {}, null, "small");
@@ -33,7 +32,7 @@
     return { root: root, input: input.control, send: send,
       model: model.control, effort: effort.control, effortWrapper: effort.wrapper,
       mode: mode.control, modeWrapper: mode.wrapper,
-      stop: stop, attachmentSlot: attachments, recover: recover, edit: edit, recovery: recovery, hint: hint };
+      attachmentSlot: attachments, recover: recover, edit: edit, recovery: recovery, hint: hint };
   }
   function attachments(slot, draft, allowed, onChange) {
     S.clear(slot);

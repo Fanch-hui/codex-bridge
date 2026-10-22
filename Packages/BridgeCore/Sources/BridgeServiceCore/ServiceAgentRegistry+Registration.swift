@@ -70,7 +70,7 @@ extension ServiceAgentRegistry {
         probedAt: existing.lastProbedAt,
         updatedAt: now()
       )
-      try await store.updateAgentInstallation(unavailable)
+      try await updateInstallation(unavailable)
       return unavailable
     }
 
@@ -83,7 +83,7 @@ extension ServiceAgentRegistry {
         probedAt: existing.lastProbedAt,
         updatedAt: now()
       )
-      try await store.updateAgentInstallation(review)
+      try await updateInstallation(review)
       return review
     }
 
@@ -108,7 +108,7 @@ extension ServiceAgentRegistry {
         probedAt: existing.lastProbedAt,
         updatedAt: now()
       )
-      try await store.updateAgentInstallation(review)
+      try await updateInstallation(review)
       return review
     }
     let artifactsChanged =
@@ -124,7 +124,7 @@ extension ServiceAgentRegistry {
         probedAt: existing.lastProbedAt,
         updatedAt: now()
       )
-      try await store.updateAgentInstallation(review)
+      try await updateInstallation(review)
       return review
     }
 
@@ -141,7 +141,7 @@ extension ServiceAgentRegistry {
       artifacts: currentArtifacts,
       createdAt: existing.createdAt
     )
-    try await store.updateAgentInstallation(record)
+    try await updateInstallation(record)
     return record
   }
 
@@ -162,7 +162,7 @@ extension ServiceAgentRegistry {
       }
     }
     let updated = try validated.replacingEnabled(enabled, updatedAt: now())
-    try await store.updateAgentInstallation(updated)
+    try await updateInstallation(updated)
     return updated
   }
 }

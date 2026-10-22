@@ -23,11 +23,17 @@ extension ServiceAgentRegistry {
     requireSelectedModel: Bool = true,
     runtimeBinding: AgentRuntimeBinding? = nil
   ) async throws -> [AgentModelDescriptor] {
+    try Task.checkCancellation()
+    let generation = modelCatalogGenerations[installationID, default: 0]
     guard let stored = try await store.agentInstallation(id: installationID) else {
       throw ServiceStoreError.unknownAgentInstallation(installationID)
     }
     var runtimeBinding = runtimeBinding
     if runtimeBinding == nil { runtimeBinding = try await selectedRuntimeBinding(for: stored) }
+    try Task.checkCancellation()
+    guard generation == modelCatalogGenerations[installationID, default: 0] else {
+      throw CancellationError()
+    }
     guard stored.isSelectable || (stored.isEnabled && runtimeBinding != nil) else {
       if stored.availability == .needsReview {
         throw ServiceAgentRegistryError.installationNeedsReview(installationID)
@@ -54,6 +60,13 @@ extension ServiceAgentRegistry {
     let record = try await validateForRuntimeBinding(
       installationID: installationID,
       projectRoot: projectRoot, runtimeBinding: runtimeBinding)
+    try await validateModelCatalogSnapshot(record)
+    if generation != modelCatalogGenerations[installationID, default: 0] {
+      // Execution validation may refresh an installation's runtime before its first catalog read.
+      guard runtimeBinding == nil,
+        modelCatalogFingerprint(for: record, runtimeBinding: nil) != storedKey.fingerprint
+      else { throw CancellationError() }
+    }
     let key = ServiceAgentModelCatalogCacheKey(
       installationID: installationID,
       projectRoot: projectRoot,
@@ -89,18 +102,13 @@ extension ServiceAgentRegistry {
     key: ServiceAgentModelCatalogCacheKey,
     runtimeBinding: AgentRuntimeBinding?
   ) async throws -> [AgentModelDescriptor] {
-    if let task = modelCatalogInFlight[key] { return try await task.value }
-    let task = Task { [self] in
-      let fetched = try await providerModels(
+    try await sharedModelCatalogQuery(key: key, selectedModelID: nil) {
+      let fetched = try await self.providerModels(
         record: record, projectRoot: projectRoot, selectedModelID: nil,
         runtimeBinding: runtimeBinding)
-      let models = mergeModelDescriptors([], fetched)
-      modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(models: models, createdAt: now())
-      return models
+      try await self.validateModelCatalogSnapshot(record)
+      return await self.mergeModelDescriptors([], fetched)
     }
-    modelCatalogInFlight[key] = task
-    defer { modelCatalogInFlight.removeValue(forKey: key) }
-    return try await task.value
   }
 
   private func resolveSelectedModel(
@@ -113,6 +121,7 @@ extension ServiceAgentRegistry {
     runtimeBinding: AgentRuntimeBinding?,
     resolveInputModalities: Bool
   ) async throws -> [AgentModelDescriptor] {
+    try Task.checkCancellation()
     guard let selectedModelID else { return models }
     let selected = AgentModelMatcher.match(selectedModelID, in: models)
     guard
@@ -120,22 +129,30 @@ extension ServiceAgentRegistry {
         || (selected == nil && requireSelectedModel)
         || (resolveInputModalities && selected?.inputModalities == nil)
     else { return models }
+    let generation = modelCatalogGenerations[installationID, default: 0]
     let record = try await validateForRuntimeBinding(
       installationID: installationID,
       projectRoot: projectRoot, runtimeBinding: runtimeBinding)
-    let resolved = try await fetchAndMergeSelectedModel(
-      record: record, projectRoot: projectRoot, selectedModelID: selected?.id ?? selectedModelID,
-      into: models, runtimeBinding: runtimeBinding,
-      preserveDefault: resolveInputModalities,
-      propagateErrors: resolveInputModalities && selected?.inputModalities == nil)
-    // Another caller may have resolved a different selection during this await.
-    let merged = mergeModelDescriptors(modelCatalogCache[key]?.models ?? [], resolved)
-    modelCatalogCache[key] = ServiceAgentModelCatalogCacheEntry(
-      models: merged, createdAt: modelCatalogCache[key]?.createdAt ?? now())
+    guard generation == modelCatalogGenerations[installationID, default: 0],
+      modelCatalogFingerprint(for: record, runtimeBinding: runtimeBinding) == key.fingerprint
+    else {
+      throw CancellationError()
+    }
+    let merged = try await sharedModelCatalogQuery(
+      key: key, selectedModelID: selected?.id ?? selectedModelID
+    ) {
+      let resolved = try await self.fetchSelectedModelDescriptors(
+        record: record, projectRoot: projectRoot, selectedModelID: selected?.id ?? selectedModelID,
+        into: models, runtimeBinding: runtimeBinding,
+        preserveDefault: resolveInputModalities,
+        propagateErrors: resolveInputModalities && selected?.inputModalities == nil)
+      try await self.validateModelCatalogSnapshot(record)
+      return resolved
+    }
     return requireSelectedModel ? try requireModel(selectedModelID, in: merged) : merged
   }
 
-  private func fetchAndMergeSelectedModel(
+  private func fetchSelectedModelDescriptors(
     record: ServiceAgentInstallationRecord,
     projectRoot: String?,
     selectedModelID: String,
@@ -151,10 +168,10 @@ extension ServiceAgentRegistry {
         selectedModelID: selectedModelID,
         runtimeBinding: runtimeBinding
       )
+      guard let selected = AgentModelMatcher.match(selectedModelID, in: fetched) else {
+        return []
+      }
       if preserveDefault {
-        guard let selected = AgentModelMatcher.match(selectedModelID, in: fetched) else {
-          return cached
-        }
         let previous = AgentModelMatcher.match(selectedModelID, in: cached)
         let resolved = try AgentModelDescriptor(
           id: selected.id, displayName: selected.displayName,
@@ -165,12 +182,14 @@ extension ServiceAgentRegistry {
           isDefaultModel: previous?.isDefaultModel,
           contextWindowTokens: selected.contextWindowTokens,
           inputModalities: selected.inputModalities)
-        return mergeModelDescriptors(cached, [resolved])
+        return [resolved]
       }
-      return mergeModelDescriptors(cached, fetched)
+      return [selected]
+    } catch is CancellationError {
+      throw CancellationError()
     } catch {
       if propagateErrors { throw error }
-      return cached
+      return []
     }
   }
 
@@ -189,6 +208,18 @@ extension ServiceAgentRegistry {
     )
   }
 
+  private func validateModelCatalogSnapshot(
+    _ record: ServiceAgentInstallationRecord
+  ) async throws {
+    guard let current = try await store.agentInstallation(id: record.id),
+      current.isEnabled, current.executableIdentity == record.executableIdentity,
+      current.trustProfile == record.trustProfile,
+      current.securityProfileID == record.securityProfileID,
+      current.artifacts == record.artifacts, current.runtimeArtifacts == record.runtimeArtifacts,
+      current.adapterRevision == record.adapterRevision, current.lastProbedAt == record.lastProbedAt
+    else { throw CancellationError() }
+  }
+
   private func requireModel(
     _ modelID: String,
     in models: [AgentModelDescriptor]
@@ -199,7 +230,7 @@ extension ServiceAgentRegistry {
     return models
   }
 
-  private func mergeModelDescriptors(
+  func mergeModelDescriptors(
     _ existing: [AgentModelDescriptor],
     _ incoming: [AgentModelDescriptor]
   ) -> [AgentModelDescriptor] {

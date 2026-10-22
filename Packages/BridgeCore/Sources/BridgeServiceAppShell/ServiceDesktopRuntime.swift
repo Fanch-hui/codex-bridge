@@ -93,6 +93,7 @@ extension BridgeServiceAppModel {
       connectionState = .idle
       serviceStatus = nil
       projects = []
+      projectPaths = [:]
       agentProviders = []
       agentInstallations = []
       agentModelOptions = []
@@ -104,7 +105,6 @@ extension BridgeServiceAppModel {
       agentModelCatalogScopes = [:]
       agentModelHydrationGenerations = [:]
       agentModelRefreshGenerations = [:]
-      agentModelHydrationSuppressions = [:]
       agentModelDefaultLoadGenerations = [:]
       agentModelDefaultRevisions = [:]
       for task in agentModelDefaultMutationTasks.values {

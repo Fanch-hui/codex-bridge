@@ -18,7 +18,7 @@ extension BridgeServiceApplication {
     models: [MCPModelSummary]?
   ) async throws -> ModelSelections {
     guard let models, !models.isEmpty else {
-      return try uncataloguedModelSelections(submission: submission)
+      return try await uncataloguedModelSelections(submission: submission)
     }
     let configuredExecutionModel = try await settings.string(for: .defaultExecutionModel)
     let configuredExecutionEffort = try await settings.string(for: .defaultExecutionEffort)
@@ -68,23 +68,17 @@ extension BridgeServiceApplication {
 
   private func uncataloguedModelSelections(
     submission: MCPServiceTaskSubmission
-  ) throws -> ModelSelections {
-    guard submission.modelOverride == true else {
-      return ModelSelections(
-        execution: SelectedModel(
-          model: serviceDefaultProviderExecutionModel,
-          effort: serviceDefaultProviderExecutionEffort
-        ),
-        supervisor: nil
-      )
-    }
+  ) async throws -> ModelSelections {
+    let configuredModel = try await settings.string(for: .defaultExecutionModel)
+    let configuredEffort = try await settings.string(for: .defaultExecutionEffort)
+    let usesExplicitOverride = submission.modelOverride == true
     let model = try Self.validatedCodexSelection(
-      submission.executionModel,
+      (usesExplicitOverride ? submission.executionModel : nil) ?? configuredModel,
       fallback: serviceDefaultProviderExecutionModel,
       maximumBytes: 256
     )
     let effort = try Self.validatedCodexSelection(
-      submission.executionEffort,
+      (usesExplicitOverride ? submission.executionEffort : nil) ?? configuredEffort,
       fallback: serviceDefaultProviderExecutionEffort,
       maximumBytes: 64
     )

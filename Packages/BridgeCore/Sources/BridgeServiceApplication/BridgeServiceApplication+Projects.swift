@@ -3,6 +3,11 @@ import BridgeMCP
 import BridgeProjects
 import Foundation
 
+public struct ServiceManagedProjectList: Sendable {
+  public let projects: [MCPProjectSummary]
+  public let projectPaths: [String: String]
+}
+
 extension BridgeServiceApplication {
   public func serviceProjects(
     cursor: String?,
@@ -31,6 +36,18 @@ extension BridgeServiceApplication {
     try Self.checkDeadline(deadline)
     return await checkedProjectSummaries(
       Self.sortedProjects(try await projects.projects()), deadline: deadline
+    )
+  }
+
+  public func serviceManagedProjectList(
+    deadline: ContinuousClock.Instant
+  ) async throws -> ServiceManagedProjectList {
+    try Self.checkDeadline(deadline)
+    let registered = Self.sortedProjects(try await projects.projects())
+    return ServiceManagedProjectList(
+      projects: await checkedProjectSummaries(registered, deadline: deadline),
+      projectPaths: Dictionary(
+        uniqueKeysWithValues: registered.map { ($0.id.rawValue, $0.root.canonicalPath) })
     )
   }
 

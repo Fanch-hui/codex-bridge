@@ -2,26 +2,6 @@ import BridgeIPC
 import BridgeServiceAppCore
 
 extension BridgeServiceAppModel {
-  func consumeAgentModelHydrationSuppression(
-    providerID: String = "opencode",
-    installationID: String?,
-    projectID: String?,
-    modelID: String?
-  ) -> Bool {
-    let hydrationID = AgentModelHydrationID(
-      providerID: providerID,
-      installationID: installationID,
-      projectID: projectID,
-      modelID: modelID
-    )
-    guard agentModelHydrationSuppressions[providerID] == hydrationID else {
-      agentModelHydrationSuppressions.removeValue(forKey: providerID)
-      return false
-    }
-    agentModelHydrationSuppressions.removeValue(forKey: providerID)
-    return true
-  }
-
   func hydrateAgentModelState(
     installationID: String?,
     providerID: String = "opencode"

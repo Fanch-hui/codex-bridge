@@ -72,10 +72,15 @@ export class NativeServices {
     if (page.hasMore && firstSeq !== undefined) window.offsets.add(firstSeq + 1);
     return { sessionID, cwd: window.header.cwd, messages, ...(page.hasMore && firstSeq !== undefined ? { nextOffset: firstSeq + 1 } : {}) };
   }
-  async create(root, sessionID) {
+  async create(root) {
     const workspace = await this.ctx.workspaceController.create({ path: root });
     const workspaceID = workspace.workspace?.id ?? workspace.id;
-    return this.ctx.sessionController.create({ ...(workspaceID ? { workspaceId: workspaceID } : { cwd: root }), ...(sessionID ? { sessionId: sessionID } : {}) });
+    return this.ctx.sessionController.create(workspaceID ? { workspaceId: workspaceID } : { cwd: root });
+  }
+  async resume(sessionID) {
+    const result = await this.ctx.sessionController.resolveAgent(sessionID);
+    if ('error' in result) throw result.error;
+    if (result.agent.id !== sessionID) throw fault('native_session_mismatch', 'Native session resume returned another identity');
   }
   async selectModel(sessionID, params) {
     const selected = decodeModel(params.modelID);

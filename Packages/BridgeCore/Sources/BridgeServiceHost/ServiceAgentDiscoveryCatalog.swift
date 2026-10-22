@@ -20,11 +20,24 @@ struct ServiceAgentDiscoverySummary: Codable, Equatable, Sendable {
 /// Shares filesystem discovery until a desktop client explicitly requests a scan.
 /// Registration and Probe remain explicit user actions.
 actor ServiceAgentDiscoveryCatalog {
+  typealias Discovery =
+    @Sendable (
+      [AgentProviderID], [ServiceAgentInstallationRecord], [String: String]
+    ) -> [AgentProviderID: ServiceAgentDiscoverySummary]
+
+  private let discover: Discovery
   private let environment: [String: String]?
   private let cacheURL: URL?
   private var cached: [AgentProviderID: ServiceAgentDiscoverySummary]?
 
-  init(environment: [String: String]? = nil, cacheURL: URL? = nil) {
+  init(
+    environment: [String: String]? = nil, cacheURL: URL? = nil,
+    discover: @escaping Discovery = { providerIDs, installations, environment in
+      ServiceAgentAutoDiscovery.discoverySummaries(
+        providerIDs: providerIDs, existingInstallations: installations, environment: environment)
+    }
+  ) {
+    self.discover = discover
     self.environment = environment
     self.cacheURL = cacheURL
     self.cached = cacheURL.flatMap(ServiceAgentDiscoveryCache.load)
@@ -38,11 +51,8 @@ actor ServiceAgentDiscoveryCatalog {
     let missingProviders = providerIDs.filter { cached?[$0] == nil }
     if cached == nil || forceRefresh || !missingProviders.isEmpty {
       let currentEnvironment = environment ?? ToolDiscoveryEnvironment.current()
-      let discovered = ServiceAgentAutoDiscovery.discoverySummaries(
-        providerIDs: forceRefresh ? providerIDs : missingProviders,
-        existingInstallations: existingInstallations,
-        environment: currentEnvironment
-      )
+      let discovered = discover(
+        forceRefresh ? providerIDs : missingProviders, existingInstallations, currentEnvironment)
       cached = (cached ?? [:]).merging(discovered) { _, new in new }
       if let cached, let cacheURL {
         try? ServiceAgentDiscoveryCache.save(cached, to: cacheURL)
@@ -115,7 +125,7 @@ extension ServiceAgentAutoDiscovery {
     case .openCode:
       let requests = try commandLineRequests(
         providerID: providerID,
-        names: ["opencode", "opencode-cli"],
+        names: ["opencode", "opencode2", "opencode-cli"],
         displayName: "OpenCode",
         trustProfile: .managed,
         securityProfileID: ServiceAgentProviderPolicyRegistry.controlledReadOnlyProfileID,

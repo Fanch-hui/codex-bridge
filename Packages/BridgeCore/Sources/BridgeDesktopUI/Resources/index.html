@@ -33,6 +33,7 @@
           </button>
         </div>
         <nav class="navigation" id="navigation" aria-label="页面导航"></nav>
+        <nav class="navigation navigation-secondary" id="secondary-navigation" aria-label="应用设置"></nav>
         <div class="sidebar-footer">
           <span class="connection-indicator" id="connection-indicator" role="img" aria-label="等待连接状态"></span>
           <span id="connection-label">等待连接状态</span>
@@ -50,21 +51,24 @@
 
         <div class="content-scroll">
           <section class="overview-page" id="overview-page" aria-labelledby="page-title">
-            <div class="notice-stack" id="notices" aria-live="polite"></div>
-            <div class="app-update" id="app-update" aria-live="polite" hidden></div>
-
-            <section class="content-section" aria-label="任务与项目统计">
-              <div class="metrics-grid" id="metrics"></div>
-            </section>
-
             <section class="content-section" aria-labelledby="services-title">
-              <h3 id="services-title">连接与服务</h3>
+              <h3 id="services-title">连接摘要</h3>
               <div class="surface-card service-card" id="services"></div>
+            </section>
+            <section class="content-section" id="onboarding-section" aria-labelledby="onboarding-title" hidden>
+              <h3 id="onboarding-title">开始使用</h3>
+              <div class="surface-card onboarding-steps" id="onboarding-steps"></div>
+              <p class="muted">委派任务时可按需连接 Agent。</p>
+            </section>
+            <section class="content-section" id="pending-section" aria-labelledby="pending-title" hidden>
+              <h3 id="pending-title">待处理事项</h3>
+              <div class="notice-stack" id="notices" aria-live="polite"></div>
+              <div class="app-update" id="app-update" aria-live="polite" hidden></div>
             </section>
 
             <section class="content-section recent-section" id="recent-section" aria-labelledby="recent-title">
               <div class="section-heading-row">
-                <h3 id="recent-title">最近任务</h3>
+                <h3 id="recent-title">最近会话</h3>
                 <button class="link-button" type="button" data-action="select-page" data-page="workbench">进入工作台 <span aria-hidden="true">→</span></button>
               </div>
               <div class="surface-card recent-card" id="recent-tasks"></div>
@@ -115,7 +119,7 @@
 
           <div class="loading-state" id="loading-state" role="status">
             <span class="loading-spinner" aria-hidden="true"></span>
-            <span>正在读取本机 Service 状态…</span>
+            <span>正在读取后台服务状态…</span>
           </div>
         </div>
       </main>

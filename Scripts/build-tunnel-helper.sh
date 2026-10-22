@@ -2,15 +2,15 @@
 set -euo pipefail
 umask 077
 
-readonly TUNNEL_CLIENT_VERSION="0.0.10"
-readonly TUNNEL_CLIENT_COMMIT="105e17a79a36e4e5c897fd698ed2b8dbf935b144"
+readonly TUNNEL_CLIENT_VERSION="0.0.17"
+readonly TUNNEL_CLIENT_COMMIT="a248b7f725fc989c1eb26680cf4351ee33421f61"
 readonly AMD64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-amd64.zip"
 readonly ARM64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-arm64.zip"
 readonly RELEASE_BASE_URL="https://github.com/openai/tunnel-client/releases/download/v${TUNNEL_CLIENT_VERSION}"
 readonly AMD64_ARCHIVE_URL="${RELEASE_BASE_URL}/${AMD64_ARCHIVE_NAME}"
 readonly ARM64_ARCHIVE_URL="${RELEASE_BASE_URL}/${ARM64_ARCHIVE_NAME}"
-readonly AMD64_ARCHIVE_SHA256="1a48616e584484f8bef4c1128d515ac96cf44d0d9609c1462abccc1793f4b847"
-readonly ARM64_ARCHIVE_SHA256="288accc7fd20cfee1d495adb933773af9e19ebc0cdef3173f7fb544afa5065b2"
+readonly AMD64_ARCHIVE_SHA256="1d54cc57e0a624dc733d402f7d36585f2135a23ddc32c4cb52a7253c7d8d94a0"
+readonly ARM64_ARCHIVE_SHA256="df03ad0ba9c95c22951bab6833df289469f15b9a3fa0397d95e3d568d1ff6c1f"
 readonly LICENSE_URL="https://raw.githubusercontent.com/openai/tunnel-client/${TUNNEL_CLIENT_COMMIT}/LICENSE"
 readonly LICENSE_SHA256="f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4"
 readonly NOTICE_SHA256="1364c020d86ecf948b78b7c655175032068203d13aece70fb0bfe112d7802dc2"
@@ -83,6 +83,9 @@ cleanup() {
   remove_file_if_present "${license_file}"
   remove_file_if_present "${notice_file}"
   remove_file_if_present "${manifest_file}"
+  for name in licenses-darwin-amd64.txt sbom-darwin-amd64.spdx.json licenses-darwin-arm64.txt sbom-darwin-arm64.spdx.json; do
+    remove_file_if_present "${temporary_directory}/${name}"
+  done
   /bin/rmdir "${temporary_directory}" 2>/dev/null || true
 
   (( output_created == 0 || build_succeeded == 1 )) && return
@@ -90,6 +93,9 @@ cleanup() {
   remove_file_if_present "${output_directory}/LICENSE"
   remove_file_if_present "${output_directory}/NOTICE"
   remove_file_if_present "${output_directory}/tunnel-client.manifest"
+  for name in licenses-darwin-amd64.txt sbom-darwin-amd64.spdx.json licenses-darwin-arm64.txt sbom-darwin-arm64.spdx.json; do
+    remove_file_if_present "${output_directory}/${name}"
+  done
   /bin/rmdir "${output_directory}" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -135,31 +141,31 @@ verify_archive_hash() {
 validate_archive_members() {
   local archive="$1"
   local entry listing
-  local -a entries
+  local -a entries expected_entries
   local -A counts
+  expected_entries=(
+    tunnel-client cloudflared cloudflared-manifest.json LICENSE NOTICE
+    "${archive:t:r}-licenses.txt" "${archive:t:r}.spdx.json"
+  )
   entries=("${(@f)$(/usr/bin/unzip -Z1 "${archive}")}")
-  (( ${#entries} == 1 )) || {
+  (( ${#entries} == ${#expected_entries} )) || {
     print -u2 "Unexpected member count in ${archive:t}."
     return 1
   }
-
   for entry in "${entries[@]}"; do
-    [[ "${entry}" == "tunnel-client" ]] || {
-      print -u2 "Unsafe or unexpected archive member in ${archive:t}: ${entry}"
-      return 1
-    }
     counts["${entry}"]=$(( ${counts["${entry}"]:-0} + 1 ))
   done
-
-  (( ${counts["tunnel-client"]:-0} == 1 )) || {
-    print -u2 "Missing or duplicate tunnel-client member in ${archive:t}."
-    return 1
-  }
-  listing="$(/usr/bin/zipinfo -l "${archive}" tunnel-client)"
-  [[ "${listing}" == -* && "${listing}" != *$'\n'* ]] || {
-    print -u2 "Archive member is not one regular file in ${archive:t}: tunnel-client"
-    return 1
-  }
+  for entry in "${expected_entries[@]}"; do
+    (( ${counts["${entry}"]:-0} == 1 )) || {
+      print -u2 "Missing or duplicate expected member in ${archive:t}: ${entry}"
+      return 1
+    }
+    listing="$(/usr/bin/zipinfo -l "${archive}" "${entry}")"
+    [[ "${listing}" == -* && "${listing}" != *$'\n'* ]] || {
+      print -u2 "Archive member is not one regular file in ${archive:t}: ${entry}"
+      return 1
+    }
+  done
 }
 
 extract_regular_member() {
@@ -203,6 +209,13 @@ validate_archive_members "${arm64_archive}"
 
 extract_regular_member "${amd64_archive}" tunnel-client "${amd64_binary}"
 extract_regular_member "${arm64_archive}" tunnel-client "${arm64_binary}"
+for architecture in amd64 arm64; do
+  archive="${temporary_directory}/tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-${architecture}.zip"
+  extract_regular_member "${archive}" "${archive:t:r}-licenses.txt" \
+    "${temporary_directory}/licenses-darwin-${architecture}.txt"
+  extract_regular_member "${archive}" "${archive:t:r}.spdx.json" \
+    "${temporary_directory}/sbom-darwin-${architecture}.spdx.json"
+done
 download_archive "${LICENSE_URL}" "${license_file}"
 [[ "$(sha256 "${license_file}")" == "${LICENSE_SHA256}" ]] || {
   print -u2 "Pinned upstream LICENSE SHA-256 mismatch."
@@ -257,6 +270,9 @@ output_created=1
 /usr/bin/install -m 0644 "${license_file}" "${output_directory}/LICENSE"
 /usr/bin/install -m 0644 "${notice_file}" "${output_directory}/NOTICE"
 /usr/bin/install -m 0644 "${manifest_file}" "${output_directory}/tunnel-client.manifest"
+for name in licenses-darwin-amd64.txt sbom-darwin-amd64.spdx.json licenses-darwin-arm64.txt sbom-darwin-arm64.spdx.json; do
+  /usr/bin/install -m 0644 "${temporary_directory}/${name}" "${output_directory}/${name}"
+done
 /bin/zsh "${SCRIPT_DIRECTORY}/verify-tunnel-helper.sh" "${output_directory}" "${derived_sha256}"
 build_succeeded=1
 

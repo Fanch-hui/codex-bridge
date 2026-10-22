@@ -12,7 +12,6 @@
     var rejected = !!(pending && pending.canEditInput), message = pending ? "提交未确认，请恢复提交。" : "";
     var view = V.create(), attachmentDraft = { attachmentPaths: [], attachmentError: "" };
     var attachments = null, attachmentSignature = null, composing = false, deferredUpdate = null;
-    function forward(command, payload) { if (context.emit) context.emit(command, payload); }
     function persist() {
       try { global.localStorage.setItem(key, JSON.stringify({ drafts: drafts, pending: pending })); } catch (_) {}
     }
@@ -93,7 +92,6 @@
       view.recover.hidden = !pending || !recovered;
       view.edit.hidden = !pending || !rejected || pending.draftKey !== draftKey;
       view.recover.disabled = !pending || !context.emit; view.recovery.hidden = view.recover.hidden && view.edit.hidden;
-      view.stop.hidden = task.canStop !== true; view.stop.disabled = !context.emit;
       view.modeWrapper.hidden = !task.canSteer || S.safeArray(page.steerModes).length < 2;
       view.mode.disabled = blocked; view.input.setAttribute("aria-invalid", String(invalid));
       view.hint.textContent = message || (invalidAttachments ? attachmentDraft.attachmentError
@@ -180,7 +178,6 @@
     });
     view.effort.addEventListener("change", saveInput); view.mode.addEventListener("change", saveInput);
     view.send.addEventListener("click", submit);
-    view.stop.addEventListener("click", function () { if (detail().canStop) forward("stopTask", { taskID: detail().taskID }); });
     view.recover.addEventListener("click", function () { if (pending && recovered) emitPending(); });
     view.edit.addEventListener("click", function () {
       if (!rejected) return;

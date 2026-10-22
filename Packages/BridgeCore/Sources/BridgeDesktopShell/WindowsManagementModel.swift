@@ -12,6 +12,7 @@
 
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var projects: [MCPProjectSummary] = []
+    private(set) var projectPaths: [String: String] = [:]
     private(set) var agentProviders: [IPCAgentProviderSummary] = []
     private(set) var agentInstallations: [IPCAgentInstallationSummary] = []
     var selectedProjectID: String?
@@ -98,7 +99,9 @@
       projectLoading = true
       publishDisplay()
       do {
-        projects = try await client.projects()
+        let snapshot = try await client.projectList()
+        projects = snapshot.projects
+        projectPaths = snapshot.projectPaths ?? [:]
         connectionState = .connected
         reconcileProjectSelection()
         projectStatusText = "已加载 \(projects.count) 个项目。"
@@ -169,7 +172,7 @@
         BridgeDesktopProjectRow(
           projectID: project.projectID,
           name: project.name,
-          detail: ProjectAgentPresentation.project(project).detailText,
+          path: projectPaths[project.projectID],
           gitState: project.gitState,
           selected: project.projectID == selectedProjectID
         )

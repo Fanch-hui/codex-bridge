@@ -196,7 +196,8 @@
     var selectedThreadID: String?
     var selectedThreadPage: MCPThreadReadPage?
     var workbenchPermissionMode = "full"
-    var isChatBrowserEnabled = true
+    let browserPreferences: ChatBrowserPreferences
+    var isChatBrowserEnabled: Bool
     var selectedTaskID: String?
     var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
     var nativeSessionDirectory: BridgeDesktopNativeSessionDirectoryState?
@@ -252,9 +253,14 @@
       )
     }
 
-    init(client: any BridgeServiceClientProtocol, feedback: WindowsDesktopFeedbackStore) {
+    init(
+      client: any BridgeServiceClientProtocol, feedback: WindowsDesktopFeedbackStore,
+      userDefaults: UserDefaults = .standard
+    ) {
       self.client = client
       self.feedback = feedback
+      browserPreferences = ChatBrowserPreferences(defaults: userDefaults)
+      isChatBrowserEnabled = browserPreferences.isEnabled
       publishDisplay()
     }
 

@@ -1,13 +1,13 @@
 #!/bin/zsh
 set -euo pipefail
 
-readonly TUNNEL_CLIENT_VERSION="0.0.10"
-readonly TUNNEL_CLIENT_COMMIT="105e17a79a36e4e5c897fd698ed2b8dbf935b144"
+readonly TUNNEL_CLIENT_VERSION="0.0.17"
+readonly TUNNEL_CLIENT_COMMIT="a248b7f725fc989c1eb26680cf4351ee33421f61"
 readonly AMD64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-amd64.zip"
 readonly ARM64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-arm64.zip"
 readonly RELEASE_BASE_URL="https://github.com/openai/tunnel-client/releases/download/v${TUNNEL_CLIENT_VERSION}"
-readonly AMD64_ARCHIVE_SHA256="1a48616e584484f8bef4c1128d515ac96cf44d0d9609c1462abccc1793f4b847"
-readonly ARM64_ARCHIVE_SHA256="288accc7fd20cfee1d495adb933773af9e19ebc0cdef3173f7fb544afa5065b2"
+readonly AMD64_ARCHIVE_SHA256="1d54cc57e0a624dc733d402f7d36585f2135a23ddc32c4cb52a7253c7d8d94a0"
+readonly ARM64_ARCHIVE_SHA256="df03ad0ba9c95c22951bab6833df289469f15b9a3fa0397d95e3d568d1ff6c1f"
 readonly LICENSE_URL="https://raw.githubusercontent.com/openai/tunnel-client/${TUNNEL_CLIENT_COMMIT}/LICENSE"
 readonly LICENSE_SHA256="f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4"
 readonly NOTICE_SHA256="1364c020d86ecf948b78b7c655175032068203d13aece70fb0bfe112d7802dc2"
@@ -117,6 +117,19 @@ expect_manifest_value notice.sha256 "${NOTICE_SHA256}"
   print -u2 "Tunnel helper NOTICE SHA-256 mismatch."
   exit 65
 }
+
+verify_attribution() {
+  local name="$1" expected="$2"
+  [[ -f "${helper_directory}/${name}" && ! -L "${helper_directory}/${name}" && \
+    "$(sha256 "${helper_directory}/${name}")" == "${expected}" ]] || {
+    print -u2 "Tunnel helper attribution SHA-256 mismatch: ${name}"
+    exit 65
+  }
+}
+verify_attribution licenses-darwin-amd64.txt ecc5a0ec1cc5c7b16f3d1c2ddb8fb111b738b75a31e03f91c4540345106057a2
+verify_attribution sbom-darwin-amd64.spdx.json 9d3da401f87911e403d2ecc99b350fc536100daf4863b53c953c382dd7998dc7
+verify_attribution licenses-darwin-arm64.txt f18edf70eaa393e9441fda1ec7ad2471323efc75e1cfd3346679e1ba3854ee02
+verify_attribution sbom-darwin-arm64.spdx.json 24d3559dfca40214787ac3448fdf35d6ac6cdc63d652d083025645625504349f
 
 /usr/bin/lipo "${helper}" -verify_arch x86_64
 /usr/bin/lipo "${helper}" -verify_arch arm64

@@ -158,6 +158,9 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
     var directory = entry.deletingLastPathComponent()
     var packages = ServiceAgentSetupInstallPackage.packages(
       providerID: providerID, distribution: distribution)
+    if providerID == .openCode {
+      packages.append(ServiceAgentSetupInstallPackage(name: "@opencode/cli", command: "opencode"))
+    }
     if providerID == .pi {
       packages.append(
         ServiceAgentSetupInstallPackage(name: "@mariozechner/pi-coding-agent", command: "pi"))

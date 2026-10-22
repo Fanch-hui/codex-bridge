@@ -98,10 +98,14 @@ extension BridgeServiceApplication {
       if pairedState.connected && pairedState.paired, record.providerID == .deepSeekHarnessDesktop {
         try await settings.set(record.id.rawValue, for: .deepSeekHarnessDesktopActiveInstallationID)
       }
+      if pairedState.connected && pairedState.paired {
+        try await invalidateDeepSeekDesktopCatalogs(record.id, registry: registry)
+      }
       state = pairedState
     case "revoke":
       try await requireIdleDeepSeekDesktopInstallation(record.id)
       try await controller.revoke(installation: installation)
+      try await invalidateDeepSeekDesktopCatalogs(record.id, registry: registry)
       state = try await controller.status(installation: installation)
     case "openSession":
       let address = try await deepSeekDesktopSessionAddress(
@@ -114,6 +118,19 @@ extension BridgeServiceApplication {
     default: throw BridgeMCPQueryError.contractRejected
     }
     return try await deepSeekDesktopResult(installation: installation, state: state, action: action)
+  }
+
+  private func invalidateDeepSeekDesktopCatalogs(
+    _ installationID: AgentInstallationID, registry: ServiceAgentRegistry
+  ) async throws {
+    let namespace = try await settings.deepSeekHarnessDesktopNamespace(for: installationID)
+    for providerID in [AgentProviderID.deepSeekHarness, .deepSeekHarnessDesktop] {
+      for record in try await registry.installations(providerID: providerID) {
+        if try await settings.deepSeekHarnessDesktopNamespace(for: record.id) == namespace {
+          await registry.invalidateModelCatalog(installationID: record.id)
+        }
+      }
+    }
   }
 
   private func deepSeekDesktopInstallation(

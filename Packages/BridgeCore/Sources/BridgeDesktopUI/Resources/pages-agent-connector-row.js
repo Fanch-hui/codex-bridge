@@ -47,7 +47,7 @@
     var desktop = global.CodexBridgeDesktopDSHDesktop.create(S, function (command, payload) { context.emit(command, payload); });
     row.appendChild(desktop.root);
     var qoderSettings = global.CodexBridgeDesktopQoderRuntimeSettings.create(refreshAction);
-    row.appendChild(qoderSettings.root);
+
 
     var actionBar = S.node("div", "agent-connect-actionbar");
     var action = S.button("连接", null, {}, null, "small primary", true);
@@ -65,7 +65,7 @@
     installOptions.appendChild(S.node("summary", null, "高级安装选项"));
     var installDirectory = S.textField("安装目录（可选）", "", "留空时使用应用管理的安装目录");
     installOptions.appendChild(installDirectory.wrapper);
-    row.appendChild(installOptions);
+
     function beginSetup() {
       context.emit("beginAgentSetup", { providerID: currentProvider.providerID,
         qoderDistribution: currentProvider.providerID === "qoder" ? qoderSettings.distribution() : null,
@@ -86,13 +86,30 @@
     row.appendChild(headlessConfirmation.root);
 
     var details = S.node("details", "agent-details");
-    var summary = S.node("summary", null, "查看详情");
+    var summary = S.node("summary", null, "高级配置");
     var detailsBody = S.node("div", "agent-details-body");
     var providerDetail = S.node("p", "agent-provider-detail");
     detailsBody.appendChild(providerDetail);
+    detailsBody.appendChild(qoderSettings.root);
+    detailsBody.appendChild(installOptions);
+    if (dependencies.openMCP && (provider.providerID === "pi" || provider.providerID === "qoder")) {
+      var mcp = S.button("MCP 服务", null, {}, null, "small", false);
+      mcp.addEventListener("click", function () {
+        dependencies.openMCP(currentProvider.providerID === "qoder"
+          ? "qoder." + qoderSettings.distribution() : currentProvider.providerID, mcp);
+      });
+      detailsBody.appendChild(mcp);
+    }
     detailsBody.appendChild(desktop.maintenanceRoot);
+    var installationDetails = S.node("div", "agent-installations");
+    detailsBody.appendChild(installationDetails);
     details.appendChild(summary);
     details.appendChild(detailsBody);
+    var defaults = S.section(row, "任务默认设置");
+    var defaultsBody = S.node("div", "agent-defaults-slot"); defaults.appendChild(defaultsBody);
+    if (global.CodexBridgeDesktopSettingsPage) {
+      global.CodexBridgeDesktopSettingsPage.mountAgent(provider.providerID, defaultsBody);
+    }
     row.appendChild(details);
 
     var draft = D.bind({ baseURL: baseURL.control, apiKey: apiKey.control,
@@ -303,7 +320,7 @@
 
     function updateDetails(nextProvider, installations, primary) {
       summary.textContent = installations.length > 1
-        ? "查看详情 · " + installations.length + " 个本机安装" : "查看详情";
+        ? "高级配置 · " + installations.length + " 个本机安装" : "高级配置";
       var visible = new Set();
       installations.forEach(function (installation, index) {
         var item = rowsForInstallation.get(installation.installationID);
@@ -323,7 +340,7 @@
           !!pending && (!pending.installationID || pending.installationID === installation.installationID),
           desktop.isDesktop() ? desktop.presentation() : null
         );
-        place(detailsBody, item.root, detailsBody.contains(configPanel) ? index + 2 : index + 1);
+        place(installationDetails, item.root, index);
         visible.add(installation.installationID);
       });
       rowsForInstallation.forEach(function (item, installationID) {
@@ -362,7 +379,8 @@
       }
     });
     configSave.addEventListener("click", function () { sendConnect(configSave); });
-    return { root: row, update: update };
+    return { root: row, update: update, advanced: detailsBody, defaults: defaultsBody,
+      selectDistribution: qoderSettings.selectDistribution };
   }
 
   function place(parent, child, index) {

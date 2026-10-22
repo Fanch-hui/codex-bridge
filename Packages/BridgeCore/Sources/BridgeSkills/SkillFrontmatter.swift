@@ -360,12 +360,4 @@ extension SkillFrontmatter.Node {
     }
     return []
   }
-
-  func childMapping(_ key: String) -> SkillFrontmatter.Node? {
-    guard case .mapping(let pairs) = self else { return nil }
-    for (k, v) in pairs where k == key {
-      if case .mapping = v { return v }
-    }
-    return nil
-  }
 }

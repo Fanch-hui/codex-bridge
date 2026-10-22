@@ -80,3 +80,9 @@
 @media (prefers-reduced-motion: reduce) {
   .app-update-spinner { animation: none; }
 }
+
+.settings-summary-list { padding: 0; }
+.settings-summary-list > .detail-row + .detail-row { border-top: 1px solid var(--separator); }
+.settings-content-stack .client-settings-card { padding: 0; border: 0; background: transparent; }
+.settings-content-stack .client-settings-card > .client-row { padding: 16px 0; }
+.settings-content-stack .client-settings-card .client-settings-controls { align-items: start; }

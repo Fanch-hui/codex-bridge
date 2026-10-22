@@ -4,7 +4,6 @@ import BridgeServiceAppCore
 extension BridgeServiceAppModel {
   func saveAgentModelDefault(_ model: String?, providerID: String = "opencode") {
     incrementAgentModelCatalogGeneration(for: providerID)
-    agentModelHydrationSuppressions.removeValue(forKey: providerID)
     let current = agentModelDefault(for: providerID)
     saveAgentDefaults(
       providerID: providerID,

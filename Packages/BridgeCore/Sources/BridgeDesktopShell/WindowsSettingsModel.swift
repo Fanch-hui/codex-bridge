@@ -92,7 +92,7 @@
     nonisolated static let accessValues = ["request-approval", "auto-review", "full-access"]
     nonisolated static let approvalValues = ["require", "auto"]
 
-    func refresh(forceModelRefresh: Bool = false) async {
+    func refresh(forceModelRefresh: Bool = false, includeModelCatalog: Bool = true) async {
       guard !busy else { return }
       busy = true
       statusText = "正在读取设置…"
@@ -111,12 +111,14 @@
         return
       }
       var failures: [String] = []
-      isRefreshingModels = true
-      publishDisplay()
-      if await loadModelCatalog(forceRefresh: forceModelRefresh) == nil {
-        failures.append("模型：\(modelError ?? "无法读取模型目录")")
+      if includeModelCatalog {
+        isRefreshingModels = true
+        publishDisplay()
+        if await loadModelCatalog(forceRefresh: forceModelRefresh) == nil {
+          failures.append("模型：\(modelError ?? "无法读取模型目录")")
+        }
+        isRefreshingModels = false
       }
-      isRefreshingModels = false
       do {
         directConfiguration = try await client.directConfiguration()
         directCommandProjects = try await client.projects()

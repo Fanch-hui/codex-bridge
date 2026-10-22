@@ -23,7 +23,7 @@
     context.page = page; context.emit = emit;
     if (!shell) shell = createShell(document.getElementById("projects-content"));
     S.pageHeader(shell.header, page ? page.header : {
-      title: "项目", subtitle: "正在从本机 Service 读取项目状态。", symbol: "folder.fill"
+      title: "项目", subtitle: "正在从后台服务 读取项目状态。", symbol: "folder.fill"
     });
     shell.add.disabled = !page || !page.canRegister;
     if (!page) {
@@ -59,7 +59,9 @@
         row.type = "button"; row.appendChild(S.icon("folder.fill", "service-icon"));
         var text = S.node("div", "row-main");
         text.appendChild(S.node("div", "row-title", project.name));
-        text.appendChild(S.node("div", "row-detail", project.detail || project.projectID));
+        var path = S.node("div", "row-detail", project.path ? compactPath(project.path) : project.detail || project.projectID);
+        path.title = project.path || "";
+        text.appendChild(path);
         row.appendChild(text);
         var gitState = S.gitStateBadge(project.gitState);
         if (gitState) row.appendChild(S.status(gitState.label, gitState.tone));
@@ -73,6 +75,11 @@
     if (stable) stable(shell.list, signature, render); else render();
   }
 
+  function compactPath(value) {
+    var parts = value.split(/[\\/]/).filter(Boolean);
+    return parts.length > 2 ? "…/" + parts.slice(-2).join("/") : value;
+  }
+
   function createDetail(projectID) {
     var current = { project: null, emit: null }, collectionsSignature = null;
     var root = S.node("section", "detail-panel"), header = S.node("div", "detail-panel-header");
@@ -83,9 +90,18 @@
       if (remove.disabled || !global.confirm("从 Codex Bridge 移除项目“" + current.project.name + "”？\n本地磁盘文件不会受到影响。")) return;
       current.emit("removeProject", { projectID: projectID });
     });
-    header.appendChild(remove); root.appendChild(header);
+    var maintenance = S.node("details", "project-maintenance");
+    maintenance.appendChild(S.node("summary", null, "更多"));
+    maintenance.appendChild(remove);
+    maintenance.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape" || !maintenance.open) return;
+      event.preventDefault(); maintenance.open = false; maintenance.firstChild.focus();
+    });
+    header.appendChild(maintenance); root.appendChild(header);
     var body = S.node("div", "detail-body project-detail-body"), description = S.node("p", "muted project-description");
+    var path = S.node("p", "project-path");
     var collections = S.node("div", "project-collections-stack");
+    body.appendChild(path);
     body.appendChild(description);
     body.appendChild(collections); root.appendChild(body);
     return {
@@ -95,7 +111,9 @@
       },
       update: function (page, project, emit) {
         current.project = project; current.emit = emit;
-        name.textContent = project.name; description.textContent = page.selectedProjectDetail || "";
+        name.textContent = project.name;
+        path.textContent = project.path || ""; path.hidden = !project.path;
+        description.textContent = page.selectedProjectDetail || "";
         description.hidden = !page.selectedProjectDetail; remove.disabled = !page.canRemove;
         var nextCollectionsSignature = JSON.stringify({
           verificationCommands: page.verificationCommands,

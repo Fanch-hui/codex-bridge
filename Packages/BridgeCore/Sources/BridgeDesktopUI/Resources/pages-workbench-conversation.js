@@ -71,7 +71,6 @@
     if (process) values = process.entries(values, page);
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
     if (incremental) return incremental.render(container, values, page, emit, options);
-    container.appendChild(S.node("h4", "subsection-title", "对话"));
     var state = page.selectedTask && page.selectedTask.conversationState;
     if (state && state.errorMessage) container.appendChild(conversationError(state.errorMessage));
     var list = S.node("div", "conversation-list");

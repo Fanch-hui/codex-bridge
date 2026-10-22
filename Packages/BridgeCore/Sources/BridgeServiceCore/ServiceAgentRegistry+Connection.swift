@@ -107,11 +107,11 @@ extension ServiceAgentRegistry {
         )
       }
       let unavailable = try candidate.replacingEnabled(existing.isEnabled, updatedAt: now())
-      try await store.updateAgentInstallation(unavailable)
+      try await updateInstallation(unavailable)
       return unavailable
     }
     let enabled = try candidate.replacingEnabled(true, updatedAt: now())
-    try await store.updateAgentInstallation(enabled)
+    try await updateInstallation(enabled)
     return enabled
   }
 }

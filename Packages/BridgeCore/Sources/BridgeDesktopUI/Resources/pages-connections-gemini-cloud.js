@@ -3,7 +3,7 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var D = global.CodexBridgeDesktopFormDraft;
   var ngrokSteps = [
-    "准备 Bridge：确认后台 Service 和本地 MCP 可用，登记项目，在上方启用 Gemini 连接，连接方式选择“ngrok”。Gemini 网页版使用 Cloud MCP。",
+    "准备 Bridge：确认后台服务 和本机 MCP 可用，登记项目，在上方启用 Gemini 连接，连接方式选择“ngrok”。Gemini 网页版使用 云 MCP。",
     "注册账号：打开 https://dashboard.ngrok.com/signup，注册并登录自己的 ngrok 账号，按页面提示完成账号验证。下面按自己的操作系统选择一种安装方式，其他方式跳过。",
     { text: "macOS：打开“终端”，已有 Homebrew 时运行：", command: "brew install ngrok" },
     { text: "macOS 没有 Homebrew：打开 https://ngrok.com/download/mac-os，选择 Download，Apple Silicon 选 ARM64、Intel 选 AMD64/x86_64。解压 ZIP，将 ngrok 文件放到“下载”目录顶层，再运行：",
@@ -18,9 +18,9 @@
     { text: "取得公网地址：找到终端的 Forwarding 行，只复制箭头左边的 HTTPS 地址。下面仅为示例，实际地址和端口以终端输出为准：",
       command: "Forwarding  https://your-domain.ngrok.app -> http://127.0.0.1:62771" },
     "保存到 Bridge：把 HTTPS 根地址填入上方“HTTPS 网站根地址”，点击“保存并启用”。不加 /mcp，不填写 127.0.0.1 或 Web Interface 地址。“已配置，等待 Gemini 调用”表示配置已保存，实际连通性在 Gemini 中检查。",
-    "关联 Gemini：点击“复制 Gemini 专用链接”。在 Gemini 中进入“更多 → 自定义 → 关联应用 → 右上角『＋自定义』”，选择“Cloud MCP”，粘贴完整专用链接，不使用网站根地址。OAuth 客户端 ID 和密钥均留空，不填 ngrok Authtoken。",
-    "完成关联：点击“下一步”，核对工具，将应用名称设为 Codex Bridge，再点击“关联”。在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用。",
-    { text: "检查调用：在 Gemini 的任务模式中发送：", command: "请通过 Codex Bridge 调用 bridge_status 和 list_projects，确认连接并列出已登记的项目。" },
+    "关联 Gemini：点击“复制 Gemini 专用链接”。在 Gemini 网页版进入“设置 → Connected Apps → Add a custom app”（若找不到 Connected Apps，先进入 Personal Intelligence），粘贴完整专用链接，不使用网站根地址。OAuth 客户端 ID 和密钥均留空，不填 ngrok Authtoken。",
+    "完成关联：点击“下一步”，核对工具，将应用名称设为 Codex Bridge，再点击“关联”。在 Gemini 聊天或任务中输入 @ 并选择 Codex Bridge。",
+    { text: "检查调用：在 Gemini 中输入 @ 并选择 Codex Bridge，然后发送：", command: "请通过 Codex Bridge 调用 bridge_status 和 list_projects，确认连接并列出已登记的项目。" },
     "持续运行：使用期间保持 Bridge 后台服务和 ngrok 运行。公网地址变化后重新保存根地址并更新 Gemini 专用链接；本机端口变化后，先按 Ctrl+C 停止旧 ngrok，再运行最新复制的命令。",
     "停止使用：在 Bridge 点击“停用云 MCP”，再到 ngrok 终端按 Ctrl+C。Bridge 的停用按钮不会自动关闭你手动启动的 ngrok。"
   ];
@@ -52,12 +52,15 @@
   }
 
   function create(emit) {
-    var context = { emit: emit, state: {} };
+    var context = { emit: emit, state: {}, initialized: false };
     var root = S.node("div", "page-card connection-card gemini-cloud-card");
     var badge = S.badge("未启用", "neutral"); root.appendChild(badge);
     var prerequisite = S.node("p", "card-subtitle", "请先在上方启用 Gemini 连接，再配置云 MCP。");
     root.appendChild(prerequisite);
-    var form = S.node("div", "form-grid gemini-cloud-form"); root.appendChild(form);
+    var configuration = S.node("details", "gemini-cloud-configuration");
+    configuration.appendChild(S.node("summary", null, "修改配置"));
+    var form = S.node("div", "form-grid gemini-cloud-form"); configuration.appendChild(form);
+    root.appendChild(configuration);
     var hosting = S.selectField("连接方式", "sites", [
       { id: "sites", title: "ChatGPT Sites（公开）" },
       { id: "ngrok", title: "ngrok" }
@@ -66,14 +69,18 @@
     address.control.type = "url"; address.control.autocomplete = "off";
     form.appendChild(hosting.wrapper); form.appendChild(address.wrapper);
     var draft = D.bind({ hosting: hosting.control, baseURL: address.control });
-    var note = S.node("p", "card-subtitle"); root.appendChild(note);
+    var note = S.node("p", "card-subtitle"); configuration.appendChild(note);
     var actions = S.node("div", "form-actions"); root.appendChild(actions);
     var save = S.button("保存并启用", null, {}, null, "small primary", true);
     var stop = S.button("停用云 MCP", null, {}, null, "small", true);
     var copyEndpoint = S.button("复制 Gemini 专用链接", null, {}, null, "small", true);
     var copySetup = S.button("复制 Sites 托管配置", null, {}, null, "small", true);
     var copyPrompt = S.button("复制 Sites 部署提示词", null, {}, null, "small", true);
-    [save, stop, copyEndpoint, copySetup, copyPrompt].forEach(function (button) { actions.appendChild(button); });
+    configuration.appendChild(save);
+    [copyEndpoint, stop].forEach(function (button) { actions.appendChild(button); });
+    var setupActions = S.node("div", "form-actions");
+    setupActions.appendChild(copySetup); setupActions.appendChild(copyPrompt);
+    configuration.appendChild(setupActions);
     var message = S.node("p", "page-message"); message.setAttribute("role", "status");
     root.appendChild(message);
     var sitesHelp = guide(root, "Sites 部署与连接指南", [
@@ -81,9 +88,9 @@
       "准备可使用 ChatGPT Sites 的账号。点击“复制 Sites 部署提示词”交给 Codex；另行复制“Sites 托管配置”，配置其中两个由 Bridge 生成的运行时 Secret，与 OpenAI Runtime API Key 无关。托管配置含密钥，不要粘贴到普通对话或写入源码、网站首页、回复。",
       "让 Codex 使用本项目公开仓库 Integrations/GeminiSites 的官方模板创建公开 Site，部署后返回 HTTPS 网站根地址。",
       "将网站根地址填入上方“HTTPS 网站根地址”，点击“保存并启用”。这里填写网站根地址，不是 Gemini 专用链接。",
-      "等待状态显示“Sites 已连通”，点击“复制 Gemini 专用链接”。在 Gemini 中依次进入“更多 → 自定义 → 关联应用”，点击右上角“＋自定义”，选择“Cloud MCP”。",
+      "等待状态显示“Sites 已连通”，点击“复制 Gemini 专用链接”。在 Gemini 网页版进入“设置 → Connected Apps”，点击“Add a custom app”；若找不到 Connected Apps，先打开 Personal Intelligence。",
       "在“添加自定义应用链接”中粘贴完整的 Gemini 专用链接，高级 OAuth 的客户端 ID 和密钥均留空。点击“下一步”，核对工具并将应用名称设为 Codex Bridge，再点击“关联”。",
-      "在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。",
+      "在 Gemini 聊天或任务中输入 @ 并选择 Codex Bridge，再调用 bridge_status 和 list_projects 检查连接。",
       "使用期间保持本机 Bridge 后台服务运行。Gemini 专用链接含访问凭据，仅交给自己的 Gemini 使用。"
     ]);
     var ngrokHelp = guide(root, "ngrok 安装、认证与连接指南", ngrokSteps);
@@ -143,6 +150,7 @@
     });
     return { root: root, update: function (state, nextEmit) {
       context.state = state || {}; context.emit = nextEmit;
+      if (!context.initialized) { configuration.open = !context.state.enabled; context.initialized = true; }
       draft.update({ hosting: context.state.hosting || "sites", baseURL: context.state.baseURL || "" });
       var value = status(context.state); S.updateStatus(badge, value.label, value.tone);
       message.textContent = context.state.message || "";

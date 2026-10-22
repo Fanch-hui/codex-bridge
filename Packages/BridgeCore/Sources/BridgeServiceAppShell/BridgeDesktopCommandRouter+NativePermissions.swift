@@ -32,13 +32,20 @@ extension BridgeDesktopCommandRouter {
     }
   }
 
-  static func loadNativePermissionPolicyIfNeeded(_ model: BridgeServiceAppModel) {
+  @discardableResult
+  static func loadNativePermissionPolicyIfNeeded(
+    _ model: BridgeServiceAppModel, forceRefresh: Bool = false
+  ) -> Task<Void, Never>? {
+    let focusedInstallationID = model.focusedAgentNativePermissionInstallationID.flatMap {
+      nativePermissionInstallationID($0, model: model)
+    }
     guard connected(model),
-      let installationID = nativePermissionInstallationID(nil, model: model),
-      model.nativePermissionPolicy(installationID: installationID) == nil,
+      let installationID = focusedInstallationID
+        ?? nativePermissionInstallationID(nil, model: model),
+      forceRefresh || model.nativePermissionPolicy(installationID: installationID) == nil,
       !model.isLoadingNativePermissionPolicy(installationID)
-    else { return }
-    Task { await model.loadNativePermissionPolicy(installationID: installationID) }
+    else { return nil }
+    return Task { await model.loadNativePermissionPolicy(installationID: installationID) }
   }
 
   private static func setNativePermissionMode(

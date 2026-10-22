@@ -1,4 +1,5 @@
 import BridgeServiceCore
+import BridgeTunnel
 import Foundation
 
 struct LegacyOnboardingReader {
@@ -21,7 +22,7 @@ struct LegacyOnboardingReader {
     else {
       return []
     }
-    guard Self.isValidTunnelID(tunnelID) else {
+    guard (try? TunnelID(validating: tunnelID)) != nil else {
       throw LegacyImportError.corruptOnboardingState
     }
     return [
@@ -36,16 +37,6 @@ struct LegacyOnboardingReader {
         updatedAt: date
       ),
     ]
-  }
-
-  private static func isValidTunnelID(_ value: String) -> Bool {
-    let bytes = Array(value.utf8)
-    guard bytes.count == 39, bytes.starts(with: Array("tunnel_".utf8)) else {
-      return false
-    }
-    return bytes.dropFirst(7).allSatisfy {
-      (97...122).contains($0) || (48...57).contains($0)
-    }
   }
 }
 

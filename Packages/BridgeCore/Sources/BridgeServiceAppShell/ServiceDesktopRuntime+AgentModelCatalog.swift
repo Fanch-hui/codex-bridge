@@ -127,9 +127,7 @@ extension BridgeServiceAppModel {
         resolution: resolution,
         correctedDefault: correctedDefault,
         persistedDefault: persistedDefault,
-        providerID: providerID,
-        installationID: installationID,
-        projectID: projectID
+        providerID: providerID
       )
     } catch {
       guard catalogGeneration == agentModelCatalogGeneration(for: providerID),
@@ -204,21 +202,11 @@ extension BridgeServiceAppModel {
     resolution: AgentModelCatalogResolution,
     correctedDefault: IPCAgentModelDefaultResponse?,
     persistedDefault: IPCAgentModelDefaultResponse,
-    providerID: String,
-    installationID: String,
-    projectID: String?
+    providerID: String
   ) {
     setAgentModelOptions(resolution.response.models, providerID: providerID)
     setAgentModelRefreshError(nil, providerID: providerID)
     let finalDefault = correctedDefault ?? persistedDefault
-    if agentModelDefault(for: providerID).model != finalDefault.model {
-      agentModelHydrationSuppressions[providerID] = AgentModelHydrationID(
-        providerID: providerID,
-        installationID: installationID,
-        projectID: projectID,
-        modelID: finalDefault.model
-      )
-    }
     if correctedDefault != nil {
       incrementAgentModelDefaultRevision(for: providerID)
     }

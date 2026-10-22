@@ -24,13 +24,13 @@ extension BridgeServiceApplication {
       permissionMode: source.permissionMode.rawValue, clientRequestID: "handoff:" + handoffID)
     let prepared = try await prepareTaskSubmission(
       submission, sourceClientID: "macos.app", source: .macOSApp, deadline: deadline)
-    var capabilityFingerprint = "codex"
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    let capabilityFingerprint: String
     var contextWindowTokens: Int?
     if providerID == serviceCodexProviderID {
-      let models = try await catalog.listModels(deadline: deadline).models
-      guard models.contains(where: { $0.modelID == prepared.request.executionModel }) else {
-        throw TaskHandoffError.rejected("Codex 当前未提供所选模型，请先连接并刷新模型列表。")
-      }
+      let artifacts = try await coordinator.codexInstallationArtifacts()
+      capabilityFingerprint = try encoder.encode(artifacts).base64EncodedString()
     } else {
       guard let installationID = prepared.request.installationID else {
         throw TaskHandoffError.rejected("目标 Agent 没有可用安装。")
@@ -67,8 +67,6 @@ extension BridgeServiceApplication {
         }
         contextWindowTokens = model.contextWindowTokens
       }
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys]
       let region =
         installation.providerID == .qoder
         ? try await qoderDistribution(for: installation)?.rawValue : nil

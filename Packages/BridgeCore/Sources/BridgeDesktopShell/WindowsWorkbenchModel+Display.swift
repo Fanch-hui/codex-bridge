@@ -207,6 +207,7 @@
 
     func setChatBrowserEnabled(_ enabled: Bool) {
       isChatBrowserEnabled = enabled
+      browserPreferences.isEnabled = enabled
       publishDisplay()
     }
 

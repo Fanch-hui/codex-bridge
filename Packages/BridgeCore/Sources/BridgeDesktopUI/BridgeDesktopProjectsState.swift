@@ -4,6 +4,7 @@ import Foundation
 public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
   public let projectID: String
   public let name: String
+  public let path: String?
   public let detail: String?
   public let gitState: String?
   public let selected: Bool
@@ -11,12 +12,14 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
   public init(
     projectID: String,
     name: String,
+    path: String? = nil,
     detail: String? = nil,
     gitState: String? = nil,
     selected: Bool = false
   ) {
     self.projectID = projectID
     self.name = name
+    self.path = path
     self.detail = detail
     self.gitState = gitState
     self.selected = selected

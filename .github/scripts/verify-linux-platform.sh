@@ -20,5 +20,5 @@ python3 -c 'import secrets, sys; sys.stdout.write(secrets.token_hex(16))' |
   gnome-keyring-daemon --unlock --components=secrets >/dev/null
 swift test --package-path "$CODEX_BRIDGE_TEST_PACKAGE" --build-system swiftbuild \
   -Xswiftc -DSQLITE_DISABLE_SNAPSHOT \
-  --filter 'LinuxServiceIPCTests|LinuxShutdownOptionsTests|LinuxSecretServiceStoreTests|LinuxNetworkSandboxTests|CodexLinuxExecutableResolverTests|LinuxTunnelRuntimeTests|ManagedStdioProcessPOSIXTests|BridgeAgentSetupTests|AgentSetupLoginLauncherTests|AgentSetupIPCTests'
+  --filter 'LinuxServiceIPCTests|LinuxShutdownOptionsTests|LinuxSecretServiceStoreTests|LinuxNetworkSandboxTests|BridgeCodexRPCLinuxTests|BridgeTunnelLinuxTests|ManagedStdioProcessPOSIXTests|BridgeAgentSetupTests|AgentSetupLoginLauncherTests|AgentSetupIPCTests|BridgeAgentProgressTests|BridgeConversationLinuxTests|BridgeServiceCoreLinuxProgressTests'
 SH

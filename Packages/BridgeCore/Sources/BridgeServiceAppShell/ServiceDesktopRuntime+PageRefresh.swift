@@ -42,7 +42,7 @@ extension BridgeServiceAppModel {
     case .workbench:
       await refreshWorkbenchCollections(client: client)
     case .projects:
-      if let value = try? await client.projects() { applyProjectSnapshot(value) }
+      if let value = try? await client.projectList() { applyProjectSnapshot(value) }
       if let projectID = selectedProjectID,
         let value = try? await client.projectCommands(projectID: projectID)
       {
@@ -60,20 +60,25 @@ extension BridgeServiceAppModel {
   }
 
   private func refreshOverviewCollections(client: any BridgeServiceClientProtocol) async {
-    async let projectResult = try? await client.projects()
+    async let projectResult = try? await client.projectList()
     async let agentResult = try? await client.agentCatalog()
     async let taskResult = try? await client.tasks(IPCTaskListRequest(limit: 200))
     async let approvalResult = try? await client.approvals(taskID: nil)
     async let directApprovalResult = try? await client.pendingDirectApprovals()
+    async let mcpResult = try? await client.mcpClients()
+    async let cloudResult = try? await client.geminiCloudStatus()
+    await refreshAgentSetups(client: client)
     if let value = await projectResult { applyProjectSnapshot(value) }
     if let value = await agentResult { applyAgentCatalogSnapshot(value) }
     if let value = await taskResult { applyTaskSnapshot(value) }
     if let value = await approvalResult { applyApprovalSnapshot(value) }
     if let value = await directApprovalResult { applyDirectApprovalSnapshot(value) }
+    if let value = await mcpResult { mcpClients = value }
+    if let value = await cloudResult { geminiCloudStatus = value }
   }
 
   private func refreshWorkbenchCollections(client: any BridgeServiceClientProtocol) async {
-    async let projectResult = try? await client.projects()
+    async let projectResult = try? await client.projectList()
     async let taskResult = try? await client.tasks(IPCTaskListRequest(limit: 200))
     async let approvalResult = try? await client.approvals(taskID: nil)
     async let directApprovalResult = try? await client.pendingDirectApprovals()
@@ -103,6 +108,7 @@ extension BridgeServiceAppModel {
     if let value = await serverResult, selectedAgentMCPScope == scope {
       deepSeekHarnessMCPServers = value.servers
     }
+    await refreshConnectionModelSettings(client: client, forceRefresh: true)
   }
 
   private func refreshSettingsCollections(client: any BridgeServiceClientProtocol) async {
@@ -110,18 +116,20 @@ extension BridgeServiceAppModel {
     async let approvalModeResult = try? await client.directApprovalMode()
     async let taskStartModeResult = try? await client.taskStartApprovalMode()
     async let instructionsResult = try? await client.customInstructions()
-    async let modelsResult: Void = refreshSettingsModels(client: client)
     if let value = await configurationResult { directConfiguration = value }
     if let value = await approvalModeResult { directApprovalMode = value }
     if let value = await taskStartModeResult { taskStartApprovalMode = value }
     if let value = await instructionsResult { customInstructions = value }
-    await modelsResult
-    if let installationID = focusedAgentNativePermissionInstallationID {
-      await loadNativePermissionPolicy(installationID: installationID)
-    }
   }
 
-  private func refreshSettingsModels(client: any BridgeServiceClientProtocol) async {
+  func loadConnectionSettings() async {
+    guard !stopped, connectionState == .connected, let client else { return }
+    await refreshConnectionModelSettings(client: client, forceRefresh: false)
+  }
+
+  private func refreshConnectionModelSettings(
+    client: any BridgeServiceClientProtocol, forceRefresh: Bool
+  ) async {
     if let catalog = try? await client.agentCatalog() { applyAgentCatalogSnapshot(catalog) }
     let refreshes: [Task<Void, Never>?] = agentProviders.map { provider in
       let candidates = agentInstallations.filter {
@@ -129,14 +137,17 @@ extension BridgeServiceAppModel {
       }
       if let installation = candidates.first(where: { $0.isActive == true }) ?? candidates.first {
         return refreshAgentModelCatalog(
-          installationID: installation.installationID, providerID: provider.providerID)
+          installationID: installation.installationID, providerID: provider.providerID,
+          forceRefresh: forceRefresh)
       }
       return Task {
         await hydrateAgentModelState(installationID: nil, providerID: provider.providerID)
       }
     }
-    await refreshCodexModels()
+    await refreshCodexModels(forceRefresh: forceRefresh)
     for refresh in refreshes { await refresh?.value }
+    await BridgeDesktopCommandRouter.loadNativePermissionPolicyIfNeeded(
+      self, forceRefresh: forceRefresh)?.value
   }
 
 }

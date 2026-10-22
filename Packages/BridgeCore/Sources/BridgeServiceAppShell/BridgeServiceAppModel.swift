@@ -100,6 +100,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var connectionState: BridgeServiceConnectionState = .idle
   @Published public internal(set) var serviceStatus: IPCServiceStatusResponse?
   @Published public internal(set) var projects: [MCPProjectSummary] = []
+  @Published public internal(set) var projectPaths: [String: String] = [:]
   @Published public internal(set) var projectDetails: [String: MCPProjectDetail] = [:]
   @Published var deepSeekDesktopStates: [String: BridgeDesktopDeepSeekHarnessDesktopState] = [:]
   @Published var deepSeekDesktopBusy = false
@@ -215,12 +216,12 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var toast: ToastNotice?
   @Published public var isChatBrowserEnabled: Bool {
     didSet {
-      userDefaults.set(isChatBrowserEnabled, forKey: Self.chatBrowserEnabledKey)
+      ChatBrowserPreferences(defaults: userDefaults).isEnabled = isChatBrowserEnabled
       if isChatBrowserEnabled {
         updateChatBrowserVisibility()
       } else {
         cancelChatBrowserSleep()
-        releaseChatWebView()
+        chatBrowserViewport = nil
       }
     }
   }
@@ -263,7 +264,6 @@ public final class BridgeServiceAppModel: ObservableObject {
   var agentModelCatalogScopes: [String: AgentModelCatalogScope] = [:]
   var agentModelHydrationGenerations: [String: UInt64] = [:]
   var agentModelRefreshGenerations: [String: UInt64] = [:]
-  var agentModelHydrationSuppressions: [String: AgentModelHydrationID] = [:]
   var agentModelDefaultLoadGenerations: [String: UInt64] = [:]
   var agentModelDefaultRevisions: [String: UInt64] = [:]
   var agentModelDefaultMutationTasks: [String: Task<Void, Never>] = [:]
@@ -274,7 +274,6 @@ public final class BridgeServiceAppModel: ObservableObject {
   var started = false
   var stopped = false
 
-  private static let chatBrowserEnabledKey = "chatBrowserEnabled"
   private static let keepServiceRunningAfterAppExitKey =
     "keepServiceRunningAfterAppExit"
 
@@ -304,9 +303,7 @@ public final class BridgeServiceAppModel: ObservableObject {
     self.userDefaults = userDefaults
     self.chatBrowserSessions = ChatBrowserSessions(defaults: userDefaults)
     registrationStatus = registration.status
-    isChatBrowserEnabled =
-      userDefaults.object(forKey: Self.chatBrowserEnabledKey)
-      as? Bool ?? true
+    isChatBrowserEnabled = ChatBrowserPreferences(defaults: userDefaults).isEnabled
     keepServiceRunningAfterAppExit =
       userDefaults.object(forKey: Self.keepServiceRunningAfterAppExitKey)
       as? Bool ?? true
@@ -446,25 +443,6 @@ public final class BridgeServiceAppModel: ObservableObject {
     withAnimation(.easeInOut(duration: 0.2)) {
       toast = nil
     }
-  }
-}
-
-struct AgentModelHydrationID: Equatable {
-  let providerID: String
-  let installationID: String?
-  let projectID: String?
-  let modelID: String?
-
-  init(
-    providerID: String = "opencode",
-    installationID: String?,
-    projectID: String?,
-    modelID: String?
-  ) {
-    self.providerID = providerID
-    self.installationID = installationID
-    self.projectID = projectID
-    self.modelID = modelID
   }
 }
 

@@ -15,7 +15,7 @@ extension BridgeDesktopUIStateBuilder {
     return BridgeDesktopSettingsState(
       header: BridgeDesktopPageHeader(
         title: "设置",
-        subtitle: "配置 Agent模型与权限、安全审批与 macOS 后台服务。",
+        subtitle: "管理权限与审批、客户端指令和应用。",
         symbol: BridgeServiceNavigation.settings.symbol
       ),
       models: models,

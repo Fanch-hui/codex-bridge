@@ -121,12 +121,7 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
     if let policy {
       environment["OPENCODE_CONFIG_CONTENT"] = try policy.configuration()
     }
-    let argv = [
-      executable,
-      "acp",
-      "--cwd",
-      project,
-    ]
+    let argv = [executable, "acp"]
     return OpenCodeACPLaunchConfiguration(
       process: OpenCodeACPProcessTransportConfiguration(
         argv: argv,

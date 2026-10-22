@@ -24,6 +24,8 @@
           await management.refreshProjects()
           guard !model.isShuttingDown else { return }
           Task(priority: .utility) {
+            await auxiliary.connections.refresh()
+            guard !model.isShuttingDown else { return }
             await management.refreshAgents()
             guard !model.isShuttingDown else { return }
             await auxiliary.agentDefaults.refresh()
@@ -131,6 +133,7 @@
           await model.refreshServiceStatus()
           await model.refreshTasks()
           await management.refresh()
+          await auxiliary.connections.refresh()
         }
       case .workbench:
         Task { await model.refreshSelectedTask() }
@@ -143,12 +146,13 @@
         Task {
           await auxiliary.connections.refresh()
           await management.refreshAgents()
-          await auxiliary.agentDefaults.refresh()
+          await auxiliary.settings.refreshConnectionPreferences(
+            forceModelRefresh: forceModelRefresh)
+          await auxiliary.agentDefaults.refresh(forceModelRefresh: forceModelRefresh)
         }
       case .settings:
         Task {
-          await auxiliary.settings.refresh(forceModelRefresh: forceModelRefresh)
-          await auxiliary.agentDefaults.refresh(forceModelRefresh: forceModelRefresh)
+          await auxiliary.settings.refresh(includeModelCatalog: false)
         }
       }
     }

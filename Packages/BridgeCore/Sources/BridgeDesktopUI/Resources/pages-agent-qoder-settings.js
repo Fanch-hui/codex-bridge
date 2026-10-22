@@ -32,7 +32,8 @@
     var provider = null;
     var installations = [];
     var lastServerRegion = null;
-    var initialized = false;
+    var initialized = false, draftRegion = null;
+    var regionDrafts = new Map();
 
     function regionSettings(value) {
       return S.safeArray(provider && provider.qoderRegionSettings).find(function (item) {
@@ -58,21 +59,34 @@
       return choices;
     }
 
+    function settingsValues(value) {
+      var settings = regionSettings(value);
+      return { activeInstallationID: settings.activeInstallationID || "",
+        nodeExecutablePath: settings.nodeExecutablePath || "", sdkRoot: settings.sdkRoot || "" };
+    }
+
     function updateDraft(reset) {
-      var settings = regionSettings(region.control.value);
       D.selectOptions(active.control, activeChoices(region.control.value), false);
-      var values = {
-        activeInstallationID: settings.activeInstallationID || "",
-        nodeExecutablePath: settings.nodeExecutablePath || "",
-        sdkRoot: settings.sdkRoot || ""
-      };
+      var values = settingsValues(region.control.value);
       if (reset) draft.reset(values);
       else draft.update(values);
     }
 
     function regionChanged(value) {
-      region.control.value = value;
+      if (value !== "cn" && value !== "international") return;
+      if (draftRegion === value) { updateDraft(false); updateSaveState(); return; }
+      if (draftRegion) regionDrafts.set(draftRegion, {
+        values: draft.values(), baseline: settingsValues(draftRegion)
+      });
+      region.control.value = value; draftRegion = value;
       updateDraft(true);
+      var previous = regionDrafts.get(value);
+      if (previous) {
+        [["activeInstallationID", active.control], ["nodeExecutablePath", nodePath.control],
+          ["sdkRoot", sdkRoot.control]].forEach(function (field) {
+          if (previous.values[field[0]] !== previous.baseline[field[0]]) field[1].value = previous.values[field[0]];
+        });
+      }
       updateSaveState();
       if (onRegionChanged) onRegionChanged();
     }
@@ -116,15 +130,15 @@
         ], false);
         var serverRegion = provider.qoderDistribution || null;
         if (!initialized || serverRegion !== lastServerRegion) {
-          region.control.value = serverRegion || "cn";
           initialized = true;
           lastServerRegion = serverRegion;
-          updateDraft(true);
+          regionChanged(serverRegion || "cn");
         } else {
           updateDraft(false);
         }
         updateSaveState();
       },
+      selectDistribution: regionChanged,
       distribution: function () { return region.control.value; },
       installationID: function () { return draft.values().activeInstallationID || null; }
     };

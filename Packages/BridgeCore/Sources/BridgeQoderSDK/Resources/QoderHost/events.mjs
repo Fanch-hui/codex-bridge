@@ -46,7 +46,7 @@ export class MessageProjection {
     value.message.content.forEach((block, index) => {
       if (block.type === 'tool_use') {
         identifier(block.id, 200); identifier(block.name);
-        this.tools.set(block.id, { name: block.name, input: block.input });
+        this.tools.set(block.id, { name: block.name, input: block.input, parent });
         this.emit({ kind: 'tool', key: block.id, name: block.name, status: 'in_progress',
           arguments: argumentDisplay(block.input) });
       }
@@ -141,6 +141,9 @@ export class MessageProjection {
     this.children.set(child.id, child);
     this.emit({ kind: 'child', ...child });
     this.signalChildrenSettled();
+  }
+  get mainTools() {
+    return [...this.tools.values()].filter(tool => tool.parent === 'main');
   }
   get unsettledChildren() {
     return [...this.children.values()].filter(item => !['completed', 'failed', 'stopped'].includes(item.status));

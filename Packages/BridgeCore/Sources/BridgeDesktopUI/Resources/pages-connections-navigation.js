@@ -3,7 +3,7 @@
   var S = global.CodexBridgeDesktopPageSupport;
 
   function update(entry, title, value, label, tone, available) {
-    entry.update({ title: title, value: value, available: available !== false });
+    entry.update({ title: title, value: "", available: available !== false });
     if (!entry.connectionStatus) {
       entry.connectionStatus = S.status(label, tone);
       entry.accessory.appendChild(entry.connectionStatus);

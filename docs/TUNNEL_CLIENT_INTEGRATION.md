@@ -1,13 +1,13 @@
 # Secure MCP Tunnel Helper Integration
 
-This document defines the process boundary used by `BridgeTunnel`. The current supply pin is the official public OpenAI `tunnel-client` v0.0.10 release at commit `105e17a79a36e4e5c897fd698ed2b8dbf935b144`, rechecked on 2026-08-17. OpenAI's Platform Tunnels page remains the source of truth for the version currently supported by the control plane; release packaging must recheck that page before distribution rather than assuming this repository pin remains current forever.
+This document defines the process boundary used by `BridgeTunnel`. The current supply pin is the official public OpenAI `tunnel-client` v0.0.17 release at commit `a248b7f725fc989c1eb26680cf4351ee33421f61`, rechecked on 2026-10-22. OpenAI's Platform Tunnels page remains the source of truth for the version currently supported by the control plane; release packaging must recheck that page before distribution rather than assuming this repository pin remains current forever.
 
 ## Trust and packaging
 
-- Pin v0.0.10 and validate both official macOS archives against the SHA-256 values in `docs/DEPENDENCIES.md` before extracting either executable.
-- The v0.0.10 platform archives each contain exactly one thin `tunnel-client` executable. The supply build combines the verified arm64 and amd64 files into a derived Universal 2 helper and records its unsigned SHA-256.
+- Pin v0.0.17 and validate both official macOS archives against the SHA-256 values in `docs/DEPENDENCIES.md` before extracting either executable.
+- The v0.0.17 full-client archives contain seven regular members. Packaging validates that exact layout and selects `tunnel-client`, LICENSE, NOTICE, third-party licenses and SPDX metadata. The supply build combines the verified macOS arm64 and amd64 executables into a derived Universal 2 helper and records its unsigned SHA-256. The full client provides the required `doctor` preflight; the separate customer runtime distribution provides only `run`.
 - The upstream arm64 executable is ad-hoc linker-signed and has no Team Identifier; the amd64 executable is not suitable as the final application trust identity. Release packaging signs the derived Universal 2 helper with the same Developer ID Team as the containing App, recomputes the post-sign hash into an App-signature-covered resource, then signs and notarizes the containing App.
-- Download the Apache-2.0 LICENSE from the pinned source commit and validate its digest. Preserve the project NOTICE material.
+- Download the Apache-2.0 LICENSE from the pinned source commit and validate its digest. Preserve the project NOTICE material and the release-provided third-party licenses and SPDX metadata.
 - Runtime verification opens the helper through `O_NOFOLLOW`, hashes that exact file descriptor against the externally trusted post-sign digest, starts it suspended, and resumes it only after the running `SecCode` matches the host Team requirement and the static CDHash read from the same descriptor.
 - The App never downloads an unverified “latest” helper at runtime.
 
@@ -19,6 +19,7 @@ Bridge passes bounded non-secret configuration through argv. macOS and Linux sen
 run
 --control-plane.tunnel-id tunnel_0123456789abcdef0123456789abcdef
 --control-plane.api-key=file:/dev/fd/3
+--control-plane.initial-poll-timeout 5s
 --mcp.server-url http://127.0.0.1:43210/mcp
 --mcp.extra-headers "X-Codex-Bridge-Token: file:/dev/fd/4"
 --health.listen-addr 127.0.0.1:0
@@ -38,7 +39,7 @@ The helper is spawned without a shell, with stdin replaced by `/dev/null` on mac
 
 The caller creates an app-owned runtime root with exact mode 0700. Bridge holds root and per-run directory file descriptors, binds both paths to device/inode identity, creates fixed entries with `openat`/`mkdirat`, and removes only those fixed entries. It does not recursively delete an arbitrary pathname after identity drift.
 
-Tunnel IDs follow the upstream contract: `tunnel_` plus 32 lowercase ASCII letters or digits. Runtime Keys are preserved byte-for-byte, must be non-empty printable ASCII without leading/trailing whitespace, and are limited to 16 KiB before being stored in Keychain or sent to the helper.
+Tunnel IDs follow the upstream contract: `tunnel_<32 lowercase ASCII letters or digits>` or `tunnel_<namespace>_<32 lowercase ASCII letters or digits>`, where the namespace is exactly four lowercase ASCII letters or digits. Runtime Keys are preserved byte-for-byte, must be non-empty printable ASCII without leading/trailing whitespace, and are limited to 16 KiB before being stored in Keychain or sent to the helper.
 
 ## Health and readiness
 
@@ -46,9 +47,11 @@ Current public tunnel-client configuration exposes the health/admin server throu
 
 Before any health request, Bridge verifies that the exact supervised helper PID owns the listening TCP port using macOS `proc_pidinfo` / `proc_pidfdinfo`. The URL file must be owned by the current user, have one hard link, reject symlinks, have no group/other permissions, contain only an `http://127.0.0.1:<port>` origin, and fit the configured size bound.
 
-Bridge connects directly to the numeric loopback address. The HTTP parser requires exactly one decimal `Content-Length`, rejects transfer encoding, caps the complete response, and accepts readiness only when `GET /readyz` returns exactly `200 ready`.
+Bridge connects directly to the numeric loopback address. The HTTP parser requires exactly one decimal `Content-Length`, rejects transfer encoding, caps the complete response, and accepts `GET /readyz` with status 200 and the supported `ready`, `ok` or empty body.
 
-`/readyz` alone does not prove control-plane authentication. A remotely ready state additionally requires `commands_poll_last_successful_timestamp_seconds` from `/metrics` to be non-zero and fresh. The Prometheus sample value is the second whitespace-delimited field; an optional third field is a scrape timestamp and is never substituted for the poll value. With the current defaults, a successful poll older than 70 seconds is stale.
+A remotely ready state requires both local `/readyz` success and `commands_poll_last_successful_timestamp_seconds` from `/metrics` to be non-zero and fresh. The Prometheus sample value is the second whitespace-delimited field; an optional third field is a scrape timestamp and is never substituted for the poll value. With the current defaults, a successful poll older than 70 seconds is stale.
+
+Bridge requests a five-second first poll with `--control-plane.initial-poll-timeout 5s`. The helper applies this cap only to the first request, preserves the normal 30-second poll wait and 35-second client deadline, and can lower later proxy-routed waits after an observed idle disconnect. Bridge keeps its 45-second initial readiness window.
 
 State mapping:
 
@@ -107,7 +110,7 @@ Each record includes an unrelated random `attempt` identifier and monotonic `ela
 
 For `run`, Bridge enables the helper's JSON DEBUG level and consumes its output through a strict projection. Only fixed poll lifecycle events and integer values such as `poll_attempt`, `poll_timeout_ms`, `poll_deadline_ms`, `retry_in_ms`, command counts and HTTP status are retained. Raw message text, errors, URLs, IDs, headers and bodies are discarded. Authentication failures still require local action. `doctor` keeps its existing structured report at WARN level. Health checks and readiness deadlines keep their configured values.
 
-The pinned helper exposes poll-cycle boundaries, rather than DNS, TCP, proxy CONNECT, TLS or request-write phase timings. A `poll_started` event establishes that a cycle began; it does not identify a blocked network phase. The official [v0.0.16 source](https://github.com/openai/tunnel-client/blob/v0.0.16/pkg/controlplane/internal/tunnel_service_client.go) adds recovery for some proxy disconnects before response headers; the client-deadline timeout uses the existing retry path. Helper upgrades are evaluated separately against the reported failure and the platform packaging pins.
+The pinned helper exposes poll-cycle boundaries and proxy disconnect recovery. A `proxy_poll_adjusted` event records only `observed_disconnect_ms`, `attempted_poll_timeout_ms` and `learned_poll_timeout_ms` when the helper lowers a future poll wait. The official [v0.0.17 source](https://github.com/openai/tunnel-client/blob/v0.0.17/pkg/controlplane/internal/tunnel_service_client.go) defines this recovery and the first-poll cap. Transport phase timings are not included in these events.
 
 ## Automated and real acceptance
 
@@ -124,14 +127,14 @@ Automated tests use real fake executable processes and synthetic secrets to veri
 - App UI shutdown without Service or Tunnel shutdown;
 - Tunnel failure without local task cancellation.
 
-`build-tunnel-helper.sh` reproduces the pinned v0.0.10 Universal 2 unsigned helper. `verify-tunnel-helper.sh` requires an external trusted digest and never executes its input. On Apple Silicon, `test-tunnel-helper-config.sh` separately pins the official arm64 archive and embedded helper hashes, then runs the exact official `doctor` image through the production suspended-process/CDHash boundary against the real header-authenticated Swift MCP fixture.
+`build-tunnel-helper.sh` reproduces the pinned v0.0.17 Universal 2 unsigned helper. `verify-tunnel-helper.sh` requires an external trusted digest and never executes its input. On Apple Silicon, `test-tunnel-helper-config.sh` separately pins the official arm64 archive and embedded helper hashes, then runs the exact official `doctor` image through the production suspended-process/CDHash boundary against the real header-authenticated Swift MCP fixture.
 
 Final acceptance still requires the user's real Developer ID identity, a Platform-supported helper build, a restricted Runtime API Key with Tunnels Read + Use, a real Tunnel ID, and a ChatGPT custom MCP plugin scan/call/reconnect exercise. Create the ChatGPT connection from Plugins → Add → Create custom MCP server and select Tunnel. Those credentials are entered locally and must never be pasted into source, chat, issue reports, or logs.
 
 Official references:
 
-- https://github.com/openai/tunnel-client/releases/tag/v0.0.10
-- https://github.com/openai/tunnel-client/blob/v0.0.10/docs/configuration.md
+- https://github.com/openai/tunnel-client/releases/tag/v0.0.17
+- https://github.com/openai/tunnel-client/blob/v0.0.17/docs/configuration.md
 - https://github.com/openai/tunnel-client
 - https://platform.openai.com/settings/organization/tunnels
 - https://platform.openai.com/settings/organization/api-keys

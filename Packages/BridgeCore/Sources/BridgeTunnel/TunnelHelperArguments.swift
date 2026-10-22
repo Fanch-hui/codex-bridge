@@ -29,6 +29,9 @@ enum TunnelHelperArguments {
       "--log.level", configuration.startupDiagnosticsEnabled && command == "run" ? "debug" : "warn",
       "--log.format", "json",
     ]
+    if command == "run" {
+      arguments += ["--control-plane.initial-poll-timeout", "5s"]
+    }
     if let httpProxy = configuration.httpProxy {
       arguments += ["--control-plane.http-proxy", httpProxy.url.absoluteString]
     }

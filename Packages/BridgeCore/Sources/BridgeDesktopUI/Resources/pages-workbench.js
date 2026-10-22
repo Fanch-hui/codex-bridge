@@ -92,26 +92,18 @@
       content.appendChild(empty);
       return;
     }
-    var detail = page.selectedTask, row = S.safeArray(page.tasks).find(function (t) {
-      return t.taskID === detail.taskID || (
-        detail.sessionID &&
-        t.sessionID === detail.sessionID &&
-        t.providerID === detail.providerID &&
-        t.projectID === page.selectedProjectID
-      );
-    }) || {};
+    var detail = page.selectedTask;
     var remediationCard = N && N.remediationCard(detail, emit);
     if (remediationCard) content.appendChild(remediationCard);
     var card = retained.card || S.node("div", "task-detail-card");
     var sections = global.CodexBridgeDesktopWorkbenchDetails.sections(card);
     if (retained.keep) content.__windowsDetailCard = card;
     global.CodexBridgeDesktopWorkbenchDetails.update(sections, detail);
-    global.CodexBridgeDesktopWorkbenchActions.render(sections.actions, detail, row, emit);
 
     if ((detail.conversation && detail.conversation.length) || detail.conversationState || P.hasEntries(page)) {
       global.CodexBridgeDesktopWorkbenchConversation.render(
         sections.conversation, detail.conversation || [], page, emit, { owner: content });
-      if (content.__windowsConversationBlock) content.__windowsConversationBlock.heading.hidden = false;
+      if (content.__windowsConversationBlock) content.__windowsConversationBlock.heading.hidden = true;
     }
     if (card.parentNode !== content) content.appendChild(card);
     else if (content.lastChild !== card) content.appendChild(card);
@@ -137,7 +129,7 @@
       global.CodexBridgeDesktopWorkbenchHeader.reset();
       global.CodexBridgeDesktopWorkbenchControls.render(null, emit);
       document.getElementById("chat-browser-slot").classList.add("browser-hidden");
-      document.getElementById("browser-slot-note").textContent = "等待本机 Service 提供浏览器状态";
+      document.getElementById("browser-slot-note").textContent = "等待后台服务 提供浏览器状态";
       return;
     }
     if (!development) global.CodexBridgeDesktopWorkbenchHeader.render(page, emit);

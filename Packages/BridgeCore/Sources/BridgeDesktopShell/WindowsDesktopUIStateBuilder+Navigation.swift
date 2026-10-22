@@ -22,11 +22,11 @@
         result.append(
           BridgeDesktopNotice(
             id: "service-unavailable",
-            title: "后台 Service 不可用",
-            message: workbench.detailText ?? "无法读取本机 Service 状态。",
+            title: "后台服务不可用",
+            message: "打开诊断检查后台服务状态。",
             symbol: "circle.dashed",
             tone: .error,
-            destination: .connections
+            destination: .settings
           )
         )
       }

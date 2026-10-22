@@ -46,7 +46,6 @@ extension BridgeServiceAppModel {
     incrementAgentModelCatalogGeneration(for: providerID)
     incrementAgentModelRefreshGeneration(for: providerID)
     incrementAgentModelDefaultLoadGeneration(for: providerID)
-    agentModelHydrationSuppressions.removeValue(forKey: providerID)
     setAgentModelsRefreshing(false, providerID: providerID)
     setAgentModelsHydrating(false, providerID: providerID)
     setAgentModelOptions([], providerID: providerID)

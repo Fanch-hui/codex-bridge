@@ -25,6 +25,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func prepareAppUpdateStatus() async throws -> IPCAppUpdatePreparationResponse
   func cancelAppUpdate() async throws
   func projects() async throws -> [MCPProjectSummary]
+  func projectList() async throws -> IPCProjectListResponse
   func registerProject(_ request: IPCProjectRegistrationRequest) async throws -> MCPProjectDetail
   func projectCommands(projectID: String) async throws -> MCPProjectDetail
   func updateProjectCommands(
@@ -217,6 +218,10 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func projectList() async throws -> IPCProjectListResponse {
+    IPCProjectListResponse(projects: try await projects())
+  }
+
   public func connectAgentInstallation(_ request: IPCAgentConnectRequest) async throws
     -> IPCAgentInstallationSummary
   {

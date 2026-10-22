@@ -3,6 +3,7 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var E = global.CodexBridgeDesktopConnectionsEditors;
   var active = false, timer = null, currentPage = null, currentEmit = null;
+  var pendingDetail = null, permissionErrorSignature = "";
   function setActive(value, emit) {
     currentEmit = emit;
     if (active === value) return;
@@ -35,6 +36,7 @@
     var container = document.getElementById("connections-content");
     if (!container.__connectionsPage) container.__connectionsPage = create(container, emit);
     container.__connectionsPage.update(page, emit);
+    if (pendingDetail) deliverDetail(container);
   }
 
   function create(container, emit) {
@@ -44,10 +46,13 @@
     container.appendChild(header); container.appendChild(content); container.appendChild(unavailable);
     var navigation = global.CodexBridgeDesktopDetailPages.create(content);
     var openDetail = navigation.open;
-    navigation.open = function (id) {
+    navigation.open = function (id, options) {
       if (id === "agent:deepseek-harness" && global.CodexBridgeDesktopDSHWorkbench) {
         global.CodexBridgeDesktopDSHWorkbench.openSettings();
-      } else openDetail(id);
+      } else {
+        if (connectors && id.indexOf("agent:") === 0) connectors.locate(id.slice(6), options);
+        openDetail(id, options);
+      }
     };
     var N = global.CodexBridgeDesktopConnectionsNavigation;
     var T = global.CodexBridgeDesktopConnectionsTunnel;
@@ -60,7 +65,7 @@
     clientsList.appendChild(chatEntry.root); clientsList.appendChild(qwenEntry.root);
     clientsList.appendChild(geminiEntry.root);
 
-    var agentsSection = S.section(navigation.overview, "Agent 引擎");
+    var agentsSection = S.section(navigation.overview, "Agent");
     var agentsHeading = S.node("div", "section-heading-row");
     agentsHeading.appendChild(agentsSection.querySelector("h3"));
     var scanAgents = S.button("扫描 Agent", null, {}, null, "small", false);
@@ -68,7 +73,11 @@
       if (scanAgents.disabled) return;
       scanAgents.disabled = true; context.emit("scanAgents");
     });
-    agentsHeading.appendChild(scanAgents); agentsSection.appendChild(agentsHeading);
+    var addMenu = S.node("details", "connection-add-menu");
+    addMenu.appendChild(S.node("summary", null, "添加"));
+    var addActions = S.node("div", "connection-menu-actions");
+    addActions.appendChild(scanAgents); addMenu.appendChild(addActions);
+    agentsHeading.appendChild(addMenu); agentsSection.appendChild(agentsHeading);
     var agentsList = S.node("div", "page-card connection-list detail-list"); agentsSection.appendChild(agentsList);
     var codex = global.CodexBridgeDesktopCodexConnection.create(emit);
     var codexEntry = navigation.register("codex", "Codex", codex.root);
@@ -79,10 +88,18 @@
       excludedScopes: ["deepseek-harness"]
     });
     var mcpEntry = navigation.register("agent-mcp", "Agent MCP 服务", agentMCP.root);
-    agentsList.appendChild(mcpEntry.root);
+    var advancedEntries = S.node("div"); advancedEntries.hidden = true;
+    advancedEntries.appendChild(mcpEntry.root); content.appendChild(advancedEntries);
+    mcpEntry.returnFocus = navigation.overview;
     var agentEditor = E.createAgentRegistration(emit);
     var manualEntry = navigation.register("agent-registration", "登记已有安装", agentEditor.root);
-    agentsList.appendChild(manualEntry.root);
+    addActions.appendChild(manualEntry.root);
+    manualEntry.returnFocus = addMenu.querySelector("summary");
+    manualEntry.root.addEventListener("click", function () { addMenu.open = false; });
+    scanAgents.addEventListener("click", function () { addMenu.open = false; });
+    var dshSettings = S.button("DSH ACP 开发台", null, {}, null, "small", false);
+    dshSettings.addEventListener("click", function () { navigation.open("agent:deepseek-harness"); });
+    agentsSection.appendChild(dshSettings);
     var status = S.node("div", "page-message"); content.appendChild(status);
 
     return {
@@ -92,10 +109,11 @@
         content.hidden = !page; unavailable.hidden = !!page;
         if (!page) {
           S.pageHeader(header, { title: "连接", symbol: "point.3.connected.trianglepath.dotted" });
-          S.empty(unavailable, "连接页暂不可用", "连接本机 Service 后管理客户端与 Agent。");
+          S.empty(unavailable, "连接页暂不可用", "连接后台服务后管理客户端与 Agent。");
           return;
         }
         context.statusMessage = page.statusMessage;
+        if (global.CodexBridgeDesktopSettingsPage) global.CodexBridgeDesktopSettingsPage.updateClients(page.clients, nextEmit);
         S.pageHeader(header, Object.assign({}, page.header, { subtitle: "" }));
         chat.update(page, nextEmit); qwen.update(page, nextEmit); gemini.update(page, nextEmit);
         codex.update(page.codex, nextEmit);
@@ -104,7 +122,7 @@
         N.update(chatEntry, "ChatGPT", "Secure MCP Tunnel", tunnelState.label, tunnelState.tone);
         var qwenClient = S.safeArray(page.clients).find(function (item) { return item.clientID === "qwen.studio"; });
         var localReady = page.localMCPState === "ready";
-        N.update(qwenEntry, "Qwen Studio", "本机 MCP", !localReady ? "Endpoint 不可用"
+        N.update(qwenEntry, "Qwen Studio", "本机 MCP", !localReady ? "本机地址不可用"
           : qwenClient && qwenClient.enabled ? "已启用" : "未启用",
           !localReady ? "warning" : qwenClient && qwenClient.enabled ? "success" : "neutral");
         var geminiClient = S.safeArray(page.clients).find(function (item) { return item.clientID === "google.gemini"; });
@@ -112,7 +130,7 @@
         var geminiCloud = page.geminiCloud;
         var cloudStatus = global.CodexBridgeDesktopGeminiCloud.status(geminiCloud || {});
         var cloudEnabled = geminiCloud && geminiCloud.enabled;
-        N.update(geminiEntry, "Gemini", "本地 / 云 MCP", !localReady ? "服务不可用"
+        N.update(geminiEntry, "Gemini", "网页版 / 同机客户端", !localReady ? "服务不可用"
           : cloudEnabled ? cloudStatus.label
           : geminiConnected ? "本地已连接" : geminiClient && geminiClient.enabled ? "等待连接" : "未启用",
           !localReady ? "warning" : cloudEnabled ? cloudStatus.tone : geminiConnected ? "success" : "neutral");
@@ -153,8 +171,8 @@
     var proxyOptions = S.node("details", "connection-advanced");
     proxyOptions.appendChild(S.node("summary", null, "HTTP(S) 代理"));
     proxyOptions.appendChild(proxy.root); card.appendChild(proxyOptions);
-    var clients = E.createClients(context.emit); S.section(root, "连接与权限").appendChild(clients.root);
-    var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入说明"));
+    var clients = E.createClients(context.emit, { mode: "connection" }); S.section(root, "连接").appendChild(clients.root);
+    var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入帮助"));
     help.appendChild(S.node("p", null,
       "ChatGPT 需要 Plus 及以上或团队订阅。在“插件 → 添加 → 创建自定义 MCP 服务器”添加 Codex Bridge，再填写 Tunnel ID 和 Runtime Key。"));
     root.appendChild(help);
@@ -168,9 +186,9 @@
   function createQwen() {
     var context = { emit: currentEmit };
     var root = S.node("div", "connection-detail"), local = S.node("div", "page-card connection-card connection-endpoint");
-    S.section(root, "本机 MCP Endpoint").appendChild(local);
-    var clients = E.createClients(currentEmit); S.section(root, "连接与权限").appendChild(clients.root);
-    var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入说明"));
+    S.section(root, "本机地址").appendChild(local);
+    var clients = E.createClients(currentEmit, { mode: "connection" }); S.section(root, "连接").appendChild(clients.root);
+    var help = S.node("details", "connection-help"); help.appendChild(S.node("summary", null, "接入帮助"));
     help.appendChild(S.node("p", null, "启用 Qwen Studio 并复制 JSON 配置，将配置粘贴到 Qwen Studio 的 MCP 设置中。"));
     root.appendChild(help);
     return { root: root, update: function (page, emit) {
@@ -191,37 +209,68 @@
   }
 
   function createGemini() {
+    var context = { emit: currentEmit, routeChosen: false, client: null };
     var root = S.node("div", "connection-detail");
-    root.appendChild(S.node("p", "card-subtitle",
-      "Gemini 网页版（包括 Bridge 内置浏览器）必须使用云 MCP，选择 Sites 或 ngrok。本地 MCP 仅用于与 Bridge 位于同一台电脑、能启动本机程序的 Gemini 桌面 App。"));
-    root.appendChild(S.node("p", "card-subtitle",
-      "Gemini 只有在“任务模式”下才能使用已添加的自定义 MCP。本地 MCP、Sites 和 ngrok 均适用。完成关联后，在任务模式中启用 Codex Bridge 应用，再发送请求。"));
-    root.appendChild(S.node("p", "hint",
-      "Gemini 的本地与云 MCP 均无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。委派 Agent 任务时，另行完成所选 Agent 的登录或 API 配置。"));
-    var clients = E.createClients(currentEmit);
-    S.section(root, "连接与权限").appendChild(clients.root);
+    var route = S.selectField("使用方式", "web", [
+      { id: "web", title: "网页版" }, { id: "local", title: "同机客户端" }
+    ], function () { context.routeChosen = true; showRoute(); });
+    root.appendChild(route.wrapper);
+    var clients = E.createClients(currentEmit, { mode: "connection", hideCopy: true });
+    S.section(root, "连接").appendChild(clients.root);
+    var local = S.node("div", "connection-route"); root.appendChild(local);
+    var copy = S.button("复制本地启动命令", null, {}, null, "small primary", true);
+    copy.addEventListener("click", function () {
+      if (!copy.disabled) context.emit("copyMCPClientConfiguration", { clientID: "google.gemini" });
+    });
+    local.appendChild(copy);
     var help = S.node("details", "connection-help");
-    help.appendChild(S.node("summary", null, "本地 MCP 接入说明（Gemini 桌面 App）"));
+    help.appendChild(S.node("summary", null, "接入帮助"));
     var steps = S.node("ol");
     [
-      "先在上方启用 Gemini 连接，再点击“复制本地启动命令”。",
-      "打开与 Bridge 同机的 Gemini 桌面 App，依次进入“更多 → 自定义 → 关联应用”，点击右上角“＋自定义”，选择“本地 MCP”。",
-      "服务器名称填写 Codex Bridge，说明可选；将复制的本地启动命令粘贴到“命令”。",
-      "点击“下一步”，核对工具列表后完成关联。在 Gemini 中切换到“任务模式”，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。"
+      "确认同机客户端提供本地程序启动入口，再启用 Gemini 连接并复制本地启动命令。",
+      "在客户端的 MCP 配置中选择本地 stdio，将服务器名称设为 Codex Bridge，粘贴启动命令。",
+      "保存后启用 Codex Bridge，调用 bridge_status 和 list_projects 检查连接。",
+      "使用期间保持后台服务运行；App 安装位置改变后重新复制启动命令。"
     ].forEach(function (text) { steps.appendChild(S.node("li", null, text)); });
-    help.appendChild(steps);
-    help.appendChild(S.node("p", "hint",
-      "使用期间请保持本机 Codex Bridge 后台服务运行。更新 App 的安装位置后，请重新复制启动命令。"));
-    root.appendChild(help);
-    var cloud = global.CodexBridgeDesktopGeminiCloud.create(currentEmit);
-    S.section(root, "云 MCP").appendChild(cloud.root);
+    help.appendChild(steps); local.appendChild(help);
+    var web = S.node("div", "connection-route"); root.appendChild(web);
+    var cloud = global.CodexBridgeDesktopGeminiCloud.create(currentEmit); web.appendChild(cloud.root);
+    function showRoute() { local.hidden = route.control.value !== "local"; web.hidden = !local.hidden; }
+    showRoute();
     return { root: root, update: function (page, emit) {
-      clients.update(S.safeArray(page.clients).filter(function (item) {
-        return item.clientID === "google.gemini";
-      }), emit);
-      cloud.update(page.geminiCloud, emit);
+      context.emit = emit;
+      context.client = S.safeArray(page.clients).find(function (item) { return item.clientID === "google.gemini"; });
+      if (!context.routeChosen && context.client && context.client.activeSessionCount > 0
+        && !(page.geminiCloud && page.geminiCloud.enabled)) route.control.value = "local";
+      clients.update(context.client ? [context.client] : [], emit);
+      copy.disabled = !context.client || !context.client.enabled || !context.client.canCopyConfiguration;
+      cloud.update(page.geminiCloud, emit); showRoute();
     } };
   }
 
-  global.CodexBridgeDesktopConnectionsPage = { render: render, setActive: setActive };
+  function openDetail(id, emit, options) {
+    pendingDetail = { id: id, options: options };
+    (emit || currentEmit)("selectPage", { navigation: "connections" });
+    var container = document.getElementById("connections-content");
+    if (active && container && container.__connectionsPage) {
+      deliverDetail(container);
+    }
+  }
+  function deliverDetail(container) {
+    var details = container.__connectionsPage.details;
+    details.open(pendingDetail.id, pendingDetail.options);
+    if (details.selectedID() === pendingDetail.id || pendingDetail.id === "agent:deepseek-harness") pendingDetail = null;
+  }
+  function updateSettings(page, emit, updateState) {
+    if (global.CodexBridgeDesktopSettingsPage && page) {
+      global.CodexBridgeDesktopSettingsPage.render(page, emit, updateState);
+      var policy = page.nativePermissionPolicy;
+      var signature = policy && policy.errorMessage
+        ? [policy.providerID, policy.installationID, policy.errorMessage].join(":") : "";
+      if (signature && signature !== permissionErrorSignature) pendingDetail = { id: "agent:" + policy.providerID };
+      permissionErrorSignature = signature;
+    }
+  }
+
+  global.CodexBridgeDesktopConnectionsPage = { render: render, setActive: setActive, openDetail: openDetail, updateSettings: updateSettings };
 }(window));

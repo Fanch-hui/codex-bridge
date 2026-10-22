@@ -13,8 +13,8 @@
     root.appendChild(installation);
     var grid = S.node("div", "form-grid");
     var model = S.selectField("默认模型", item.model || "", S.choices(item.model || "", modelOptions(item)), function () {}, "");
-    var effort = S.selectField("推理强度", item.effort || "", S.choices(item.effort || "", [{ id: "", title: "Provider 默认" }].concat(S.safeArray(item.effortOptions))), function () {}, "");
-    var permission = S.selectField("访问权限", item.permissionMode, permissionChoices(item), function () {}, "");
+    var effort = S.selectField("推理强度", item.effort || "", S.choices(item.effort || "", [{ id: "", title: "Agent 默认" }].concat(S.safeArray(item.effortOptions))), function () {}, "");
+    var permission = S.selectField("任务权限", item.permissionMode, permissionChoices(item), function () {}, "");
     var permissionHint = S.node("p", "hint");
     var desktopDefaultHint = S.node("p", "hint", "此选择会同步到 DSH 桌面默认，影响后续新建会话。");
     [model, effort, permission].forEach(function (field) { grid.appendChild(field.wrapper); });
@@ -47,7 +47,7 @@
         ? selected.reasoningEfforts
         : known && sameModel ? S.safeArray(state.effortOptions) : [];
       efforts = efforts.filter(function (option) { return option.id !== ""; });
-      var options = [{ id: "", title: "Provider 默认" }].concat(efforts);
+      var options = [{ id: "", title: "Agent 默认" }].concat(efforts);
       if (!changedModel && sameModel) options = S.choices(effort.control.value, options);
       M.chooseEffort(effort.control, options,
         changedModel, selected && selected.defaultReasoningEffort);
@@ -55,7 +55,7 @@
         || state.canSelectEffort === false || !known || efforts.length === 0;
       var message = "";
       if (state.isRefreshingModels || !known) message = "正在获取模型推理强度…";
-      else if (efforts.length === 0) message = "当前模型不提供可选推理强度，使用 Provider 默认。";
+      else if (efforts.length === 0) message = "当前模型不提供可选推理强度，使用 Agent 默认。";
       else if (state.providerID === "deepseek-harness") {
         message = "推理选项由 DSH 适配器提供，可能对不同模型返回相同选项；模型实际支持以 API 为准。";
       }
@@ -88,7 +88,7 @@
       D.selectOptions(model.control, S.choices(next.model || "", modelOptions(next)));
       D.selectOptions(permission.control, permissionChoices(next));
       var sameModel = model.control.value === (next.model || "");
-      if (sameModel) D.selectOptions(effort.control, S.choices(next.effort || "", [{ id: "", title: "Provider 默认" }].concat(S.safeArray(next.effortOptions))));
+      if (sameModel) D.selectOptions(effort.control, S.choices(next.effort || "", [{ id: "", title: "Agent 默认" }].concat(S.safeArray(next.effortOptions))));
       draft.update({ model: next.model || "", effort: sameModel ? next.effort || "" : effort.control.value, permission: next.providerID === "deepseek-harness-desktop" ? "full" : next.permissionMode });
       sameModel = model.control.value === (next.model || "");
       updateEfforts(next, false);
@@ -114,7 +114,7 @@
   }
 
   function modelOptions(item) {
-    return [{ id: "", title: "Provider 默认" }].concat(M.modelChoices(item.modelOptions));
+    return [{ id: "", title: "Agent 默认" }].concat(M.modelChoices(item.modelOptions));
   }
 
   function desktopNotRunning(item) {

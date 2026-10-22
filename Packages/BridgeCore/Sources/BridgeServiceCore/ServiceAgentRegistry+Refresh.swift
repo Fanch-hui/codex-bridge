@@ -38,7 +38,7 @@ extension ServiceAgentRegistry {
           updatedAt: probed.updatedAt
         )
       // A local edit or disconnect made during Probe takes precedence.
-      try await self.store.updateAgentInstallation(
+      try await self.updateInstallation(
         updated, allowExecutableReplacement: true, expectedRecord: record)
       guard let current = try await self.store.agentInstallation(id: record.id) else {
         throw ServiceStoreError.unknownAgentInstallation(record.id)

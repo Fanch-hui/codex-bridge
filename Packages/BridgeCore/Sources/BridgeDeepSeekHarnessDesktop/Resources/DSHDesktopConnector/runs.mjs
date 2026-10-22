@@ -50,13 +50,15 @@ export class Runs {
     if (params.attachments?.length || params.skills?.length || params.mcpServers?.length) throw fault('input_unsupported', 'Native Desktop execution accepts text only');
     text(params.text, 'prompt');
     const root = await this.grants.require(key, params.projectPath);
+    let sessionID = params.sessionID;
     if (params.sessionID) {
       const { summary } = await this.grants.requireSession(key, root, params.sessionID, this.native);
       if (summary.running) throw fault('native_session_busy', 'Native session is already running');
       if ([...this.store.runs.values()].some(run => run.sessionID === params.sessionID && !TERMINAL.has(run.status))) throw fault('native_session_busy', 'Bridge already owns a request in this session');
+      await this.native.resume(sessionID);
+    } else {
+      sessionID = (await this.native.create(root)).sessionId;
     }
-    const created = await this.native.create(root, params.sessionID);
-    const sessionID = created.sessionId;
     if (params.modelID) await this.native.selectModel(sessionID, params);
     const run = { requestID: params.requestID, fingerprint: requestFingerprint(params), sessionID, owner: key, projectPath: root, status: 'running', cursor: 0, nativeCursor: 0, events: [], createdAt: Date.now(), pendingInput: { text: params.text } };
     this.store.runs.set(run.requestID, run);
@@ -120,10 +122,9 @@ export class Runs {
     }
     if (!accepted && run.pendingInput) {
       try {
-        await this.grants.require(run.owner, run.projectPath);
-        const summary = await this.native.summary(run.sessionID);
-        if (summary?.running) throw fault('native_session_busy', 'Native session became busy before recovered admission');
-        await this.native.create(run.projectPath, run.sessionID);
+        const { summary } = await this.grants.requireSession(run.owner, run.projectPath, run.sessionID, this.native);
+        if (summary.running) throw fault('native_session_busy', 'Native session became busy before recovered admission');
+        await this.native.resume(run.sessionID);
         await this.native.prompt(run.sessionID, run.requestID, run.pendingInput.text);
       } catch (error) { this.append(run, 'failed', { message: error.message }); }
     }

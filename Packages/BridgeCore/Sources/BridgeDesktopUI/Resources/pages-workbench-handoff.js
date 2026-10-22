@@ -178,7 +178,10 @@
     open.addEventListener("click", function () {
       if (!open.disabled && draft.preview) emit("selectTask", { taskID: draft.preview.targetTaskID });
     });
-    [prepare, submit, query, open].forEach(function (button) { actions.appendChild(button); });
+    var other = S.node("details", "workbench-handoff-other");
+    other.appendChild(S.node("summary", "button small", "更多"));
+    var otherActions = S.node("div", "form-actions"); other.appendChild(otherActions);
+    actions.appendChild(other);
     var hint = S.node("p", "hint workbench-handoff-hint");
     hint.setAttribute("aria-live", "polite");
     form.appendChild(provider.wrapper); form.appendChild(input.wrapper);
@@ -187,6 +190,7 @@
     root.__input = input.control; root.__provider = provider.control; root.__preview = preview;
     root.__meter = meter; root.__warnings = warnings; root.__hint = hint;
     root.__prepare = prepare; root.__submit = submit; root.__query = query; root.__open = open;
+    root.__actionBar = actions; root.__other = other; root.__otherActions = otherActions;
     update(detail);
   }
   function update(detail) {
@@ -202,6 +206,25 @@
     root.__submit.disabled = !canSubmit(detail, draft);
     root.__query.disabled = busy || !draft.operation;
     root.__open.disabled = !preview || !preview.targetTaskID || preview.phase === "target_deleted";
+    var next = root.__prepare;
+    if (preview && preview.targetTaskID && preview.phase !== "target_deleted") next = root.__open;
+    else if (canSubmit(detail, draft)) next = root.__submit;
+    else if (draft.operation && (draft.uncertain || draft.recovered || !preview || locked)) next = root.__query;
+    var secondary = 0;
+    [root.__prepare, root.__submit, root.__query, root.__open].forEach(function (button) {
+      var available = !button.disabled;
+      if (button === root.__prepare) available = canPrepare(draft);
+      else if (button === root.__submit) available = canSubmit(detail, draft);
+      else if (button === root.__query) available = !!draft.operation;
+      button.hidden = button !== next && !available;
+      if (button === next) {
+        if (button.parentNode !== root.__actionBar) root.__actionBar.insertBefore(button, root.__other);
+      } else {
+        if (button.parentNode !== root.__otherActions) root.__otherActions.appendChild(button);
+        if (available) secondary++;
+      }
+    });
+    root.__other.hidden = secondary === 0;
     root.__submit.setAttribute("aria-busy", String(busy));
     root.__preview.textContent = preview && preview.prompt ? preview.prompt : "正文由服务端生成；尚未确认时不会启动目标 Agent。";
     root.__meter.textContent = preview ? "目标模型：" + preview.model + "；权限：" + preview.permissionMode

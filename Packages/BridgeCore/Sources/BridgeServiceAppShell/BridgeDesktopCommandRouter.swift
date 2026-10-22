@@ -64,7 +64,7 @@ enum BridgeDesktopCommandRouter {
     case .openProjects:
       model.selection = .projects
     case .openConnections:
-      model.selection = .connections
+      select(.connections, model: model)
     case .openSettings:
       model.selection = .settings
       loadNativePermissionPolicyIfNeeded(model)
@@ -127,7 +127,11 @@ enum BridgeDesktopCommandRouter {
     model: BridgeServiceAppModel
   ) {
     guard let selection = BridgeServiceNavigation(rawValue: navigation.rawValue) else { return }
+    let changed = model.selection != selection
     model.selection = selection
+    if changed, selection == .connections {
+      Task { await model.loadConnectionSettings() }
+    }
     if selection == .settings { loadNativePermissionPolicyIfNeeded(model) }
   }
 

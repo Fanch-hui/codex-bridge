@@ -171,6 +171,22 @@ try {
     Assert-RegularFile $tunnelManifestPath | Out-Null
     Stage-File $tunnelManifestPath "tunnel-client.manifest.json"
   }
+  $tunnelAttributionDirectory = Join-Path $tunnelClientFull "TunnelClient"
+  if (Test-Path -LiteralPath $tunnelAttributionDirectory) {
+    Assert-RegularFile $tunnelManifestPath | Out-Null
+    $tunnelManifest = Get-Content -LiteralPath $tunnelManifestPath -Raw | ConvertFrom-Json
+    New-Item -ItemType Directory -Path (Join-Path $outFull "TunnelClient") -Force | Out-Null
+    foreach ($name in @("LICENSE", "NOTICE", "THIRD-PARTY-LICENSES.txt", "SBOM.spdx.json")) {
+      $source = Join-Path $tunnelAttributionDirectory $name
+      Assert-RegularFile $source | Out-Null
+      $expectedAttributionHash = $tunnelManifest.attributionSHA256.$name
+      if ($expectedAttributionHash -notmatch "^[0-9a-f]{64}$" -or
+          (Get-Sha256 $source) -cne $expectedAttributionHash) {
+        throw "Tunnel client attribution SHA-256 mismatch: $name"
+      }
+      Stage-File $source "TunnelClient/$name"
+    }
+  }
   $tunnelClientSHA256 = $tunnelDigest
 
   $swiftRuntimeModule = Resolve-SwiftRuntimeMergeModule $Architecture

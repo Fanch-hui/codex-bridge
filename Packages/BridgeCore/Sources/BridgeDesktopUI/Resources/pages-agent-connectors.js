@@ -14,13 +14,22 @@
     var root = S.node("div", "agent-connectors");
     var rows = new Map();
     var entries = new Map();
-    var empty = S.node("div", "list-empty", "暂无可连接的 Agent Provider。");
+    var empty = S.node("div", "list-empty", "暂无可连接的 Agent。");
     root.appendChild(empty);
 
     return {
       root: root,
+      locate: function (id, options) {
+        var row = rows.get(id);
+        if (!row || id !== "qoder" || !options) return;
+        var installation = S.safeArray(context.installations).find(function (item) {
+          return item.installationID === options.installationID;
+        });
+        row.selectDistribution(options.distribution || installation && installation.distribution);
+      },
       update: function (providers, installations, options, nextEmit) {
         context.emit = nextEmit;
+        context.installations = installations;
         var settings = typeof options === "object" ? options : { canConnect: options };
         context.canConnect = !!settings.canConnect;
         context.busy = !!settings.busy;
@@ -33,7 +42,11 @@
           visible.add(provider.providerID);
           var row = rows.get(provider.providerID);
           if (!row) {
-            row = R.create(provider, { S: S, D: D, context: context, detail: !!navigation });
+            row = R.create(provider, { S: S, D: D, context: context, detail: !!navigation,
+              openMCP: navigation ? function (scope, trigger) {
+                context.emit("setAgentMCPScope", { mcpServerScope: scope });
+                navigation.open("agent-mcp", { returnTo: navigation.selectedID(), trigger: trigger });
+              } : null });
             rows.set(provider.providerID, row);
             if (navigation) entries.set(provider.providerID, navigation.register(
               "agent:" + provider.providerID, provider.displayName, row.root));

@@ -47,7 +47,7 @@ enum ServiceAgentAutoDiscovery {
     case .openCode:
       return try commandLineRequests(
         providerID: providerID,
-        names: ["opencode", "opencode-cli"],
+        names: ["opencode", "opencode2", "opencode-cli"],
         displayName: "OpenCode",
         trustProfile: .managed,
         securityProfileID: ServiceAgentProviderPolicyRegistry.controlledReadOnlyProfileID,
@@ -67,16 +67,13 @@ enum ServiceAgentAutoDiscovery {
         allowInstallationSearch: discoveredExecutablePath == nil
       )
     case .deepSeekHarness:
-      var environment = environment
-      if let discoveredExecutablePath {
-        environment["CODEX_BRIDGE_DEEPSEEK_HARNESS_EXECUTABLE"] = discoveredExecutablePath
-      }
       return try deepSeekRequests(
         dataPaths: dataPaths,
         existingInstallations: existingInstallations,
         preferGeneratedConfiguration: credentialsProvided,
         environment: environment,
-        allowGeneratedConfiguration: allowGeneratedConfiguration
+        allowGeneratedConfiguration: allowGeneratedConfiguration,
+        discoveredExecutablePath: discoveredExecutablePath
       )
     case .deepSeekHarnessDesktop:
       return try deepSeekDesktopRequests(existingPaths: existingPaths, environment: environment)

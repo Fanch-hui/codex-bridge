@@ -10,7 +10,7 @@
     var title = S.node("h2", "detail-heading");
     var content = S.node("div", "detail-content");
     var storage = S.node("div", "detail-storage");
-    var entries = new Map(), selected = null, parentScroll = 0;
+    var entries = new Map(), selected = null, parentScroll = 0, returnTarget = null;
     detail.hidden = true; storage.hidden = true; overview.tabIndex = -1;
     backButton.insertBefore(S.icon("chevron.left"), backButton.firstChild);
     header.appendChild(backButton); header.appendChild(title);
@@ -20,12 +20,14 @@
 
     function scrollHost() { return document.querySelector(".content-scroll") || container; }
 
-    function open(id) {
+    function open(id, options) {
       var entry = entries.get(id);
       if (!entry || entry.root.hidden || selected === id) return;
-      var scroll = scrollHost();
-      if (selected === null) parentScroll = scroll.scrollTop || 0;
+      var scroll = scrollHost(), sourceScroll = scroll.scrollTop || 0;
+      if (selected === null) parentScroll = sourceScroll;
       else storage.appendChild(entries.get(selected).body);
+      returnTarget = options && options.returnTo
+        ? { id: options.returnTo, trigger: options.trigger, scroll: sourceScroll } : null;
       selected = id;
       container.dataset.detailOpen = "true";
       overview.hidden = true; detail.hidden = false;
@@ -39,11 +41,20 @@
     function back(restoreFocus) {
       if (selected === null) return;
       var entry = entries.get(selected);
+      var target = returnTarget;
+      if (target && entries.has(target.id) && !entries.get(target.id).root.hidden) {
+        returnTarget = null;
+        open(target.id);
+        scrollHost().scrollTop = target.scroll;
+        if (target.trigger && target.trigger.parentNode) target.trigger.focus({ preventScroll: true });
+        return;
+      }
+      returnTarget = null;
       storage.appendChild(entry.body);
       selected = null; detail.hidden = true; overview.hidden = false;
       delete container.dataset.detailOpen;
       scrollHost().scrollTop = parentScroll;
-      (restoreFocus === false ? overview : entry.root).focus({ preventScroll: true });
+      (restoreFocus === false ? overview : entry.returnFocus || entry.root).focus({ preventScroll: true });
     }
 
     function register(id, label, body) {

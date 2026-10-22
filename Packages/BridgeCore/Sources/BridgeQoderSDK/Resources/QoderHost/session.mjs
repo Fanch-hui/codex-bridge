@@ -6,7 +6,7 @@ import { MessageProjection, stopChildren } from './events.mjs';
 import { catalog, modelPolicy, validateSelection } from './models.mjs';
 import { loadSDK, authentication, validateSDKQuery, sdkPermissionMode } from './sdk.mjs';
 import { SDKProcessOwner } from './process.mjs';
-import { queryAccountScope } from './account-scope.mjs';
+import { queryAccountScope, accountScopeFromQuery } from './account-scope.mjs';
 import { stageSelectedSkills } from './skill-resources.mjs';
 import { usageStatistics, contextView, usageInfoView } from './usage.mjs';
 import { requireValue, absolute, identifier, deadline, HostError, samePath } from './validation.mjs';
@@ -35,10 +35,10 @@ export class QoderSession {
       const loaded = await this.loader(this.config);
       requireValue(this.phase === 'opening', 'session_closed'); this.sdk = loaded.sdk;
       this.skillStage = await stageSelectedSkills(this.config.selectedSkills);
-      this.accountScopeDigest = await queryAccountScope(this.sdk, this.config);
-      requireValue(!this.config.expectedAccountScope || this.config.expectedAccountScope === this.accountScopeDigest,
-        'session_account_mismatch');
       if (this.config.resume) {
+        this.accountScopeDigest = await queryAccountScope(this.sdk, this.config);
+        requireValue(!this.config.expectedAccountScope || this.config.expectedAccountScope === this.accountScopeDigest,
+          'session_account_mismatch');
         const previous = await deadline(this.sdk.getSessionInfo(this.config.sessionID, { dir: this.config.cwd }));
         requireValue(previous?.sessionId === this.config.sessionID && previous.cwd
           && samePath(absolute(previous.cwd), this.config.cwd), 'session_binding_mismatch');
@@ -61,7 +61,13 @@ export class QoderSession {
         'selected_skill_unavailable');
       requireValue(this.config.selectedSkills.length === 0 || this.nativeCapabilities.has('selected_skills_v1'),
         'selected_skills_unavailable');
-      const models = catalog(await deadline(this.query.getAvailableModels()));
+      const [accountScope, nativeModels] = await Promise.all([
+        accountScopeFromQuery(this.query, this.config), deadline(this.query.getAvailableModels()),
+      ]);
+      requireValue(!this.config.expectedAccountScope || this.config.expectedAccountScope === accountScope,
+        'session_account_mismatch');
+      this.accountScopeDigest = accountScope;
+      const models = catalog(nativeModels);
       validateSelection(models, this.config.model, this.config.effort);
       requireValue(this.phase === 'opening', 'session_open_failed'); this.phase = 'ready';
       return { revision: 1, distribution: this.config.distribution, sessionID: this.config.sessionID,
@@ -141,6 +147,7 @@ export class QoderSession {
             server && typeof server.name === 'string' && typeof server.status === 'string') : [];
           this.resolveNativeInitialization?.(); this.resolveNativeInitialization = null;
         }
+        if (this.phase === 'closed') break;
         await this.projection.message(message);
         if (message.type === 'result') await this.result(message);
       }
@@ -155,26 +162,35 @@ export class QoderSession {
     }
   }
   async result(value) {
-    const context = value.origin?.kind === 'task-notification' ? null : await this.contextUsage();
-    const statistics = usageStatistics(value, context);
-    if (statistics) this.publish({ kind: 'usage_statistics', statistics });
+    if (value.origin?.kind === 'task-notification') return;
+    const context = await this.contextUsage();
     if (this.phase === 'stopping') {
       this.queue.finish();
       if (this.resultWaiter) { this.resultWaiter(); this.resultWaiter = null; }
       return;
     }
     if (this.phase !== 'running') return;
-    if (value.origin?.kind !== 'task-notification') this.queue.finish();
+    const statistics = usageStatistics(value, context);
+    if (statistics) this.publish({ kind: 'usage_statistics', statistics });
+    this.queue.finish();
     if (value.subtype !== 'success' || value.is_error) { await this.fail('qoder_incomplete_result'); return; }
-    if (this.projection.unsettledChildren.length > 0) return;
-    requireValue(this.projection.tools.size === 0, 'unfinished_tools');
-    if (this.queue.pending.length > 0) { this.beginNext(); return; }
-    requireValue(this.queue.empty, 'unfinished_input');
+    requireValue(this.projection.mainTools.length === 0, 'unfinished_tools');
     const summary = typeof value.result === 'string' ? value.result : '';
     requireValue(summary.trim().length > 0, 'empty_result');
+    this.mainResult = { summary: summary.slice(0, 16000), stopReason: 'success' };
+    if (this.queue.pending.length > 0) { this.beginNext(); return; }
+    requireValue(this.queue.empty, 'unfinished_input');
     this.phase = 'closing';
-    await this.closeResources();
-    this.publish({ kind: 'completed', summary: summary.slice(0, 16000), stopReason: 'success' });
+    // Keep consuming native stop notifications while cleanup confirms process exit.
+    this.completion = this.complete();
+  }
+  async complete() {
+    try {
+      await this.closeResources();
+      this.publish({ kind: 'completed', ...this.mainResult });
+    } catch (error) {
+      this.publish({ kind: 'failed', code: error instanceof HostError ? error.code : 'cleanup_failed' });
+    }
     this.phase = 'closed';
   }
   async interrupt(continuation) {
@@ -224,22 +240,26 @@ export class QoderSession {
     this.phase = 'closing'; await this.closeResources();
     this.publish({ kind: 'failed', code }); this.phase = 'closed';
   }
+  cleanupDiagnostic(stage, error) {
+    const code = error instanceof HostError ? error.code : 'cleanup_failed';
+    this.publish({ kind: 'tool', key: 'qoder-cleanup-' + stage, name: 'Qoder 清理',
+      status: 'failed', output: stage + ': ' + code });
+  }
   async closeResources() {
     if (!this.closing) this.closing = (async () => {
       this.interactions.abort(); this.queue.cancelPending(); this.input.close();
-      try {
-        await stopChildren(this.query, this.projection, this.nativeCapabilities);
-      } finally {
-        try {
-          if (this.query) await this.query.close();
-          if (this.warm) await this.warm.close();
-        } finally {
-          await this.processes.close();
-          this.policy?.close();
-          await this.skillStage?.close();
-          this.skillStage = null;
-        }
+      for (const [stage, close] of [
+        ['background', () => stopChildren(this.query, this.projection, this.nativeCapabilities)],
+        ['query', () => this.query?.close()], ['startup', () => this.warm?.close()],
+      ]) {
+        try { await close(); } catch (error) { this.cleanupDiagnostic(stage, error); }
       }
+      // A terminal event is safe only after every owned process has exited.
+      await this.processes.close();
+      this.projection.cancelTools(); this.policy?.close();
+      try { await this.skillStage?.close(); }
+      catch (error) { this.cleanupDiagnostic('skills', error); }
+      this.skillStage = null;
     })();
     return this.closing;
   }

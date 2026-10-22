@@ -38,7 +38,7 @@ Qwen 配置中的本地 MCP 凭据由 Bridge 生成，和这三项不同。ChatG
 
 创建和编辑 Tunnel 需要 Tunnels **Read + Manage**；运行 Helper 和在 ChatGPT 选择 Tunnel 需要 **Read + Use**。若入口不可用，由组织管理员检查角色权限。只关联 Platform 组织，可能无法在目标 ChatGPT Workspace 找到它。依据：[OpenAI Secure MCP Tunnel 官方指南](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)。
 
-Bridge 接受 `tunnel_` 后跟 32 个小写字母或数字的 ID。请复制平台实际值。
+Bridge 接受 `tunnel_` 后跟 32 个小写字母或数字的 ID，以及 `tunnel_<4位命名空间>_<32位ID>` 格式；命名空间也由小写字母或数字组成。请复制平台实际值。
 
 ## 4. 创建 Runtime API Key
 
@@ -76,7 +76,7 @@ Runtime Key 由后台 Service 存入 macOS Keychain 或 Windows Credential Manag
 
 代理配置可在填写 Tunnel ID 与 Runtime Key 前保存，也可单独修改已有连接，无需重新输入 Key。保存会重新连接已启用的 Tunnel；未启用的 Tunnel 保持断开。清除 Tunnel 配置会同时清除代理地址。
 
-Bridge 显式传递 helper 的 `control-plane.http-proxy`，只影响 OpenAI 控制面请求。本机 MCP 仍使用回环直连。三平台均不自动采用系统代理、PAC 或父进程的代理环境变量。参数契约见 [官方 helper 代理配置源码](https://github.com/openai/tunnel-client/blob/v0.0.10/pkg/config/proxy.go) 与 [代理传输源码](https://github.com/openai/tunnel-client/blob/v0.0.10/pkg/transport/proxy.go)。
+Bridge 显式传递 helper 的 `control-plane.http-proxy`，只影响 OpenAI 控制面请求。本机 MCP 仍使用回环直连。三平台均不自动采用系统代理、PAC 或父进程的代理环境变量。参数契约见 [官方 helper 代理配置源码](https://github.com/openai/tunnel-client/blob/v0.0.17/pkg/config/proxy.go) 与 [代理传输源码](https://github.com/openai/tunnel-client/blob/v0.0.17/pkg/transport/proxy.go)。
 
 ### 连接失败时的最小诊断
 

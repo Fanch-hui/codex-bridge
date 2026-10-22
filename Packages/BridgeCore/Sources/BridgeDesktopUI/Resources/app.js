@@ -48,8 +48,15 @@
   }
 
   function renderNavigation(items, selected) {
-    var container = document.getElementById("navigation"), active = new Set();
-    (items || []).forEach(function (item, index) {
+    var primary = document.getElementById("navigation");
+    var secondary = document.getElementById("secondary-navigation") || primary;
+    var active = new Set();
+    var order = ["overview", "connections", "projects", "workbench", "settings"];
+    order.map(function (id) {
+      return (items || []).find(function (item) { return item.navigation === id; });
+    }).filter(Boolean).forEach(function (item, index) {
+      var container = item.navigation === "settings" ? secondary : primary;
+      if (item.navigation === "settings" && secondary !== primary) index = 0;
       active.add(item.navigation);
       var button = navigationNodes.get(item.navigation);
       if (!button) {
@@ -62,12 +69,16 @@
         setIcons(button);
       }
       button.title = item.title; button.setAttribute("aria-label", item.title);
-      button.className = "nav-item" + (item.navigation === selected ? " is-selected" : "");
-      button.setAttribute("aria-current", item.navigation === selected ? "page" : "false");
+      var isSelected = item.navigation === selected || (item.navigation === "settings" && selected === "logs");
+      button.className = "nav-item" + (isSelected ? " is-selected" : "");
+      button.setAttribute("aria-current", isSelected ? "page" : "false");
       button.querySelector(".nav-title").textContent = item.title;
       var badge = button.querySelector(".nav-badge");
       badge.hidden = item.badge == null; badge.textContent = item.badge == null ? "" : item.badge;
-      if (container.children[index] !== button) container.insertBefore(button, container.children[index] || null);
+      if (container.children[index] !== button) {
+        if (container.children[index]) container.insertBefore(button, container.children[index]);
+        else container.appendChild(button);
+      }
     });
     navigationNodes.forEach(function (button, key) {
       if (!active.has(key)) { button.remove(); navigationNodes.delete(key); }
@@ -88,32 +99,10 @@
     return element;
   }
 
-  function renderMetric(metric) {
-    var button = document.createElement("button");
-    button.type = "button";
-    button.className = "metric-card tone-" + toneClass(metric.tone);
-    var top = document.createElement("span");
-    top.className = "metric-topline";
-    top.appendChild(elementWithText("span", "metric-title", metric.title));
-    top.appendChild(iconElement(metric.symbol, "metric-icon"));
-    button.appendChild(top);
-    var value = document.createElement("span");
-    value.className = "metric-value";
-    value.appendChild(elementWithText("span", "metric-number", metric.value));
-    if (metric.destination) value.appendChild(elementWithText("span", "metric-chevron", "›"));
-    button.appendChild(value);
-    button.title = metric.subtitle || metric.title;
-    if (metric.destination) button.addEventListener("click", function () { emit("selectPage", { navigation: metric.destination }); });
-    return button;
-  }
-
   function renderOverview(overview) {
     if (!overview) return;
-    var metrics = document.getElementById("metrics");
-    metrics.innerHTML = "";
-    (overview.metrics || []).forEach(function (metric) { metrics.appendChild(renderMetric(metric)); });
-    setIcons(metrics);
-    renderServices(overview.services, overview.serviceActions);
+    renderServices(overview.clientConnections || overview.services, overview.serviceActions);
+    renderOnboarding(overview.onboardingSteps);
     renderRecentTasks(overview.recentTasks);
     renderNotices(overview.notices);
     if (window.CodexBridgeDesktopAppUpdate) {
@@ -123,15 +112,41 @@
         emit
       );
     }
+    var pending = document.getElementById("pending-section");
+    var update = document.getElementById("app-update");
+    if (pending) pending.hidden = !(overview.notices || []).length && (!update || update.hidden);
+  }
+
+  function openDestination(destination, detailID, options) {
+    var connections = window.CodexBridgeDesktopConnectionsPage;
+    if (destination === "connections" && detailID && connections && connections.openDetail) {
+      connections.openDetail(detailID, emit, options);
+    } else emit("selectPage", { navigation: destination });
+  }
+
+  function renderOnboarding(steps) {
+    var section = document.getElementById("onboarding-section");
+    var container = document.getElementById("onboarding-steps");
+    if (!section || !container) return;
+    section.hidden = !(steps || []).length;
+    window.CodexBridgeDesktopPageSupport.clear(container);
+    (steps || []).forEach(function (step, index) {
+      var button = elementWithText("button", "button", (index + 1) + ". " + step.title);
+      button.type = "button";
+      button.addEventListener("click", function () {
+        emit(step.command, { navigation: step.destination || null, taskID: step.taskID || null });
+      });
+      container.appendChild(button);
+    });
   }
 
   function renderServices(rows, actions) {
     var container = document.getElementById("services");
-    container.innerHTML = "";
+    window.CodexBridgeDesktopPageSupport.clear(container);
     (rows || []).forEach(function (row) {
       var element = document.createElement(row.destination ? "button" : "div");
       element.className = "service-row tone-" + toneClass(row.tone);
-      if (row.destination) { element.type = "button"; element.addEventListener("click", function () { emit("selectPage", { navigation: row.destination }); }); }
+      if (row.destination) { element.type = "button"; element.addEventListener("click", function () { openDestination(row.destination, { "openai.chatgpt": "chatgpt", "qwen.studio": "qwen", "google.gemini": "gemini" }[row.id] || row.id); }); }
       element.appendChild(iconElement(row.symbol, "service-icon"));
       element.appendChild(elementWithText("span", "service-title", row.title));
       element.appendChild(window.CodexBridgeDesktopPageSupport.status(row.value, toneClass(row.tone)));
@@ -165,8 +180,8 @@
     var section = document.getElementById("recent-section");
     var container = document.getElementById("recent-tasks");
     section.hidden = !tasks || tasks.length === 0;
-    container.innerHTML = "";
-    (tasks || []).forEach(function (task) {
+    window.CodexBridgeDesktopPageSupport.clear(container);
+    (tasks || []).slice(0, 4).forEach(function (task) {
       var row = document.createElement("button");
       row.type = "button";
       row.className = "recent-task";
@@ -187,7 +202,7 @@
 
   function renderNotices(notices) {
     var container = document.getElementById("notices");
-    container.innerHTML = "";
+    window.CodexBridgeDesktopPageSupport.clear(container);
     (notices || []).forEach(function (notice) {
       var element = document.createElement("div");
       element.className = "notice " + toneClass(notice.tone);
@@ -207,7 +222,7 @@
           if (notice.command) {
             emit(notice.command, { navigation: notice.destination || null });
           } else {
-            emit("selectPage", { navigation: notice.destination });
+            openDestination(notice.destination, notice.detailID, { distribution: notice.distribution, installationID: notice.installationID });
           }
         });
         element.appendChild(action);

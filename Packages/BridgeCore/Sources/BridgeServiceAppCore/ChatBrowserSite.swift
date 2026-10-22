@@ -37,9 +37,15 @@ public enum ChatBrowserSite: String, Codable, CaseIterable, Sendable {
 public struct ChatBrowserPreferences {
   private let defaults: UserDefaults
   private static let selectedSiteKey = "chatBrowserSite"
+  private static let enabledKey = "chatBrowserEnabled"
 
   public init(defaults: UserDefaults) {
     self.defaults = defaults
+  }
+
+  public var isEnabled: Bool {
+    get { defaults.object(forKey: Self.enabledKey) as? Bool ?? false }
+    nonmutating set { defaults.set(newValue, forKey: Self.enabledKey) }
   }
 
   public var selectedSite: ChatBrowserSite {

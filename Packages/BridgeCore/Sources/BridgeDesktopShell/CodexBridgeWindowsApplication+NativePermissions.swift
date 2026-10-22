@@ -90,9 +90,9 @@
             await agentDefaults.refreshNativePermissionPolicy(installationID: installationID)
           case .conflict(let installationID):
             await agentDefaults.refreshNativePermissionPolicy(installationID: installationID)
-            selectedPage = .settings
+            selectedPage = .connections
             DesktopPlatformHost.enqueue {
-              DesktopPlatformHost.selectPage(.settings)
+              DesktopPlatformHost.selectPage(.connections)
             }
           case .failed:
             break

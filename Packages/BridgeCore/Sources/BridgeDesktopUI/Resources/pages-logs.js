@@ -12,6 +12,8 @@
   function create(container, emit) {
     S.clear(container);
     var header = S.node("div");
+    var back = S.button("返回设置", "selectPage", { navigation: "settings" }, emit, "small");
+    container.appendChild(back);
     var filters = createFilterBar(emit);
     var list = S.node("div", "log-list");
     var entries = new Map();
@@ -27,13 +29,13 @@
         if (!page) {
           S.pageHeader(header, {
             title: "日志",
-            subtitle: "正在从本机 Service 读取执行事件。",
+            subtitle: "正在从后台服务 读取执行事件。",
             symbol: "list.dash.header.rectangle"
           });
           filters.root.hidden = true;
           list.hidden = true;
           unavailable.hidden = false;
-          S.empty(unavailable, "日志页暂不可用", "连接本机 Service 后，任务事件会显示在这里。");
+          S.empty(unavailable, "日志页暂不可用", "连接后台服务 后，任务事件会显示在这里。");
           return;
         }
         S.pageHeader(header, page.header);
@@ -104,9 +106,6 @@
       }, 1500);
     });
     actions.appendChild(copy);
-    var refresh = S.button("刷新", null, {}, null, "small primary", true);
-    refresh.addEventListener("click", function () { context.emit("refreshLogs", {}); });
-    actions.appendChild(refresh);
     bar.appendChild(actions);
 
     function update(page, nextEmit) {
@@ -120,7 +119,6 @@
         { id: "all", title: "全部" }
       ]);
       copy.disabled = !page.canCopy;
-      refresh.disabled = !page.canRefresh;
     }
 
     return { root: bar, update: update };

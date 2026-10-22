@@ -5,7 +5,7 @@
 - **本地读写文件、运行命令**：安装并启动 Bridge → 登记项目目录 → 完成所选聊天客户端的 MCP 接入 → 在对话中启用 Codex Bridge → 直接操作项目。无需安装或连接 Agent，也无需配置 Agent 模型。
 - **委派 Agent 任务**：安装并启动 Bridge → 登记项目目录 → 连接 Agent → 配置模型 → 从工作台或已连接的聊天客户端提交任务。
 
-ChatGPT / Dot 使用 Secure MCP Tunnel；Qwen Studio 使用本机 HTTP MCP；Gemini 本地 MCP 用于与 Bridge 位于同一台电脑、能启动本机程序的 Gemini 桌面 App。**Gemini 网页版（包括 Bridge 内置浏览器）必须使用 Cloud MCP，选择 Sites 或 ngrok。** 按所用客户端选择对应流程即可。
+ChatGPT / Dot 使用 Secure MCP Tunnel；Qwen Studio 使用本机 HTTP MCP；Gemini 本地 MCP 用于与 Bridge 同机且明确支持 stdio 程序启动的客户端。**Gemini 网页版（包括 Bridge 内置浏览器）必须使用 Cloud MCP，选择 Sites 或 ngrok。** 按所用客户端选择对应流程即可。
 
 **只使用 Gemini 时，无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。** 选择 Sites 仅需具备 ChatGPT Sites 的托管使用权限；本地 MCP 和 ngrok 无需使用 Sites。若要委派 Agent 任务，所选 Agent 自身的登录或 API 配置另行完成。
 
@@ -165,17 +165,17 @@ OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行�
 
 ### 8.1 连接 Gemini 本地 MCP
 
-**Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** 本地 MCP 和云 MCP 均适用；完成关联后，在任务模式中启用 Codex Bridge 应用，再发送请求。
+本地 MCP 适用于明确提供本地 stdio 启动命令入口的同机客户端。客户端仅提供服务器 URL 输入框时，请使用下一节的云 MCP。
 
-**本地 MCP 仅用于与 Bridge 位于同一台电脑、能够启动本机程序的 Gemini 桌面 App。** Gemini 网页版（包括 Bridge 内置浏览器）不能使用本地 MCP 启动命令，必须按下一节配置 Cloud MCP。
+Gemini 网页版（包括 Bridge 内置浏览器）使用下一节的 Cloud MCP。
 
 **本方式无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** 在 Bridge 登记项目并启用 Gemini 即可开始接入。
 
 1. 在 Bridge 的「连接 → Gemini」中启用 Gemini，并选择客户端工具权限。
-2. 在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **本地 MCP**。
+2. 在同机客户端的 MCP 配置中选择本地 stdio；使用程序启动命令入口。
 3. 服务器名称填写 `Codex Bridge`，说明可选。
-4. 返回 Bridge，点击「复制本地启动命令」，将完整命令粘贴到 Gemini 的「命令」栏。
-5. 点击「下一步」，核对工具列表后完成关联。在 **Gemini 中切换到「任务模式」**，启用 Codex Bridge 应用，再让 Gemini 调用 `bridge_status` 和 `list_projects` 检查连接。
+4. 返回 Bridge，点击「复制本地启动命令」，将完整命令粘贴到客户端的「命令」栏。
+5. 保存配置并核对工具列表，在客户端启用 Codex Bridge，再调用 `bridge_status` 和 `list_projects` 检查连接。
 
 启动命令使用已安装 App 的 `--mcp-stdio` 入口，由本机连接器取得当前服务地址与凭据。无需安装 Node，也无需在 Gemini 填写 Token。使用期间保持 Bridge 后台服务运行；更换 App 安装路径后，重新复制命令并更新 Gemini 配置。
 
@@ -187,7 +187,7 @@ Gemini 与 Qwen、ChatGPT 的启停、凭据和客户端工具权限独立。项
 
 **两种云 MCP 都无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** Sites 需要可使用 ChatGPT Sites 的账号；ngrok 使用自己的 ngrok 账号。Sites 的 `BRIDGE_MCP_KEY` 和 `BRIDGE_RELAY_KEY` 均由 Bridge 生成，用于站点访问与请求回传，与 OpenAI Runtime API Key 无关。
 
-**Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** Sites 和 ngrok 均适用；完成关联后，在 Gemini 的任务模式中启用 Codex Bridge 应用，再发送请求。
+Gemini 自定义应用可用于聊天和任务；完成关联后，输入 `@` 并选择 Codex Bridge，再发送请求。配置入口为 **设置 → Connected Apps → Add a custom app**；部分账号需先进入 **Personal Intelligence**。当前可用地区、账号与语言条件见 [Google 官方说明](https://support.google.com/gemini/answer/17209137?hl=en)。
 
 配置中会用到两种地址：
 
@@ -210,14 +210,14 @@ Gemini 与 Qwen、ChatGPT 的启停、凭据和客户端工具权限独立。项
 
 我会另行通过受保护的 Secret 配置方式提供 Bridge「复制 Sites 托管配置」中的两项值。请将 BRIDGE_MCP_KEY 和 BRIDGE_RELAY_KEY 分别设置为站点运行时 Secret；缺少配置时提示我完成 Secret 设置。不要将它们写入源码、hosting.json、公开网页、日志或回复，也不要在回复中输出含密钥的 Gemini 连接链接。
 
-部署完成后，请返回站点的 HTTPS 根地址和部署结果，方便我填回 Bridge。随后告诉我：在 Bridge 保存该根地址并启用云 MCP，等待连接成功，再从 Bridge 复制完整连接链接，到 Gemini 的「更多 → 自定义 → 关联应用 → 右上角『＋自定义』」选择 Cloud MCP，粘贴完整连接链接并将 OAuth 高级选项留空；点击下一步，核对工具列表、将应用名称填写为 Codex Bridge，然后完成关联。Gemini 只有在任务模式下才能使用已添加的自定义 MCP。完成关联后，在 Gemini 中切换到任务模式，启用 Codex Bridge 应用，再调用 bridge_status 和 list_projects 检查连接。
+部署完成后，请返回站点的 HTTPS 根地址和部署结果，方便我填回 Bridge。随后告诉我：在 Bridge 保存该根地址并启用云 MCP，等待连接成功，再从 Bridge 复制完整连接链接，到 Gemini 网页版的「设置 → Connected Apps → Add a custom app」添加自定义应用（若找不到 Connected Apps，先进入 Personal Intelligence），粘贴完整连接链接并将 OAuth 高级选项留空；点击下一步，核对工具列表、将应用名称填写为 Codex Bridge，然后完成关联。完成关联后，在 Gemini 聊天或任务中输入 @ 并选择 Codex Bridge，再调用 bridge_status 和 list_projects 检查连接。
 ```
 
 3. 按 Codex 提示完成两项运行时 Secret 配置，等待公开部署完成。需要自行部署时，参见[模板与开发者说明](../Integrations/GeminiSites/README.md)。
 4. 将 Codex 返回的 **HTTPS 根地址**填回 Bridge，保存并启用云 MCP。保持 Bridge 后台服务运行，等待 Sites 连接成功。
-5. 在 Bridge 点击「复制 Gemini 专用链接」。在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**。
+5. 在 Bridge 点击「复制 Gemini 专用链接」。在 Gemini 打开 **设置 → Connected Apps → Add a custom app**，添加自定义应用。
 6. 地址粘贴刚复制的**完整专用链接**，高级 OAuth 配置无需填写，点击「下一步」。
-7. 核对工具列表，将应用名称填写为 `Codex Bridge`，完成关联。在 **Gemini 中切换到「任务模式」**，启用 Codex Bridge 应用后再发送请求。
+7. 核对工具列表，将应用名称填写为 `Codex Bridge`，完成关联。在 Gemini 聊天或任务中输入 `@` 并选择 Codex Bridge 后再发送请求。
 
 Bridge 主动向 Sites 领取请求并回传结果，本机无需开放入站端口。站点首页公开不代表工具无权限开放：调用工具仍需完整专用链接，并受 Gemini 客户端权限、项目目录和本机审批限制。使用期间保持 Bridge 后台服务运行。
 
@@ -307,11 +307,11 @@ Forwarding  https://your-domain.ngrok.app -> http://127.0.0.1:62771
 
 ##### 6. 在 Gemini 网页版完成关联
 
-1. 在 Gemini 打开 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，选择 **Cloud MCP**。
+1. 在 Gemini 打开 **设置 → Connected Apps → Add a custom app**，添加自定义应用。
 2. 在「添加自定义应用链接」粘贴 Bridge 刚生成的**完整 Gemini 专用链接**。这里使用专用链接，不是上一步的 HTTPS 网站根地址。
 3. 展开「高级设置」时，OAuth 客户端 ID、客户端密钥均留空，不填写 ngrok Authtoken。
 4. 点击「下一步」，核对工具列表，将应用名称填写为 `Codex Bridge`，然后点击「关联」。
-5. 新建或打开 Gemini 对话，切换到 **任务模式**，启用 Codex Bridge 应用，发送：
+5. 新建或打开 Gemini 对话，输入 `@` 并选择 Codex Bridge，发送：
 
 ```text
 请通过 Codex Bridge 调用 bridge_status 和 list_projects，确认连接并列出已登记的项目。
@@ -337,7 +337,7 @@ Forwarding  https://your-domain.ngrok.app -> http://127.0.0.1:62771
 
 #### 检查连接与更新凭据
 
-完成任一方式后，先在 **Gemini 中切换到「任务模式」**并启用 Codex Bridge 应用，再让 Gemini 调用 `bridge_status` 和 `list_projects` 检查连接。专用链接具有 Gemini 客户端的工具权限，只应填入自己的 Gemini 配置；不要发布到网页、Issue、日志或对话回复中。
+完成任一方式后，先在 Gemini 中输入 `@` 并选择 Codex Bridge，再让 Gemini 调用 `bridge_status` 和 `list_projects` 检查连接。专用链接具有 Gemini 客户端的工具权限，只应填入自己的 Gemini 配置；不要发布到网页、Issue、日志或对话回复中。
 
 重置 Gemini 凭据后，旧的本地和云端凭据同时失效。云 MCP 需要重新复制完整连接链接并更新 Gemini；使用 Sites 时，还需重新复制「Sites 托管配置」，同步更新站点的两项运行时 Secret。停用云 MCP 不会关闭 Gemini 本地 MCP。
 
@@ -345,7 +345,7 @@ Forwarding  https://your-domain.ngrok.app -> http://127.0.0.1:62771
 
 在工作台左侧浏览器工具栏选择 ChatGPT 或 Gemini。App 会记住上次选择及各站点的页面；切换时保留已打开的页面和历史，两站点的登录数据分别保存。后退、前进、刷新和“在外部浏览器打开”作用于当前站点。
 
-如果站点限制内置浏览器登录，可点击“在外部浏览器打开”继续使用。**内置浏览器中的 Gemini 同样属于网页版，必须按第 8.2 节配置 Sites 或 ngrok 云 MCP，关联后切换到 Gemini 的「任务模式」并启用 Codex Bridge 应用。** 第 8.1 节的本地 MCP 启动命令只配置在与 Bridge 同机的 Gemini 桌面 App 中。
+如果站点限制内置浏览器登录，可点击“在外部浏览器打开”继续使用。**内置浏览器中的 Gemini 同样属于网页版，必须按第 8.2 节配置 Sites 或 ngrok 云 MCP，关联后输入 `@` 并选择 Codex Bridge。** 第 8.1 节的本地 MCP 启动命令只配置在与 Bridge 同机且支持 stdio 的客户端中。
 
 ## 9. 提交第一项任务
 
@@ -456,7 +456,7 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 | ChatGPT 连不上 | 按 Tunnel 指南检查两端状态、Workspace、Key 权限 |
 | Qwen 连不上 | 本机运行位置、客户端启用状态和最新复制的 JSON |
 | 只用 Gemini，是否需要填写 OpenAI 配置 | 不需要。跳过 ChatGPT Tunnel 配置，按第 8.1 / 8.2 节选择本地 MCP、Sites 或 ngrok；Sites 的两项 Secret 由 Bridge 生成。 |
-| Gemini 已关联，但没有调用工具 | 先确认 Gemini 已切换到「任务模式」并启用 Codex Bridge 应用，再要求调用 `bridge_status` 和 `list_projects`；如返回错误，按具体错误检查连接。 |
+| Gemini 已关联，但没有调用工具 | 先在 Gemini 中输入 `@` 并选择 Codex Bridge，再要求调用 `bridge_status` 和 `list_projects`；如返回错误，按具体错误检查连接。 |
 | 任务等待且不输出 | 查看启动审批、工具审批或问题表单 |
 
 日志用于定位具体错误。分享问题时提供系统、App 版本、操作步骤和脱敏错误摘要。密钥保存在系统凭据存储中，配置 JSON 也可能含凭据，请勿公开。

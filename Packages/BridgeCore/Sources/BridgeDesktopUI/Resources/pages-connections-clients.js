@@ -2,7 +2,10 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var D = global.CodexBridgeDesktopFormDraft;
-  function createClients(emit) {
+  function createClients(emit, options) {
+    options = options || {};
+    var permissionsOnly = options.mode === "permissions";
+    var connectionOnly = options.mode === "connection";
     var context = { emit: emit };
     var card = S.node("div", "page-card connection-card client-settings-card");
     var rows = new Map();
@@ -26,7 +29,15 @@
         });
         exposure.control.setAttribute("aria-busy", "true");
       }, "client-exposure");
-      controls.appendChild(exposure.wrapper);
+      if (!connectionOnly) controls.appendChild(exposure.wrapper);
+      var permissionLink = S.button("客户端权限", null, {}, null, "small", false);
+      permissionLink.hidden = !connectionOnly;
+      permissionLink.addEventListener("click", function () {
+        if (global.CodexBridgeDesktopSettingsPage) {
+          global.CodexBridgeDesktopSettingsPage.openDetail("permissions", context.emit);
+        }
+      });
+      controls.appendChild(permissionLink);
       var toggle = S.node("label", "check-field");
       var checkbox = S.node("input");
       var toggleText = S.node("span");
@@ -61,7 +72,7 @@
       row.appendChild(controls);
       var hint = S.node("p", "client-exposure-hint");
       row.appendChild(hint);
-      var draft = D.bind({ exposure: exposure.control, enabled: checkbox });
+      var draft = D.bind(connectionOnly ? { enabled: checkbox } : { exposure: exposure.control, enabled: checkbox });
       return {
         root: row,
         name: name,
@@ -79,7 +90,7 @@
     function updateRow(row, client, nextEmit, singleClient) {
       row.root.dataset.clientID = client.clientID;
       row.name.textContent = client.displayName;
-      row.name.hidden = singleClient;
+      row.name.hidden = singleClient && !permissionsOnly;
       S.updateStatus(row.state,
         client.enabled ? "已启用" : "已停用", client.enabled ? "success" : "neutral");
       var details = [];
@@ -93,17 +104,20 @@
       row.checkbox.disabled = !client.canToggle;
       row.exposure.setAttribute("aria-busy", "false");
       row.checkbox.setAttribute("aria-busy", "false");
-      row.toggle.hidden = !client.canToggle;
+      row.toggle.hidden = permissionsOnly || !client.canToggle;
+      row.state.hidden = permissionsOnly;
       var gemini = client.clientID === "google.gemini";
       row.toggleText.textContent = singleClient ? "启用连接" : "启用 " + client.displayName;
       row.copy.textContent = gemini ? "复制本地启动命令" : "复制 Qwen JSON 配置";
       row.rotate.textContent = gemini ? "重置连接" : "重新生成凭证";
-      row.copy.hidden = !client.canCopyConfiguration;
-      row.rotate.hidden = !client.canRotateCredential;
+      row.copy.hidden = permissionsOnly || !client.canCopyConfiguration || options.hideCopy === true;
+      row.rotate.hidden = permissionsOnly || !client.canRotateCredential;
       row.actions.hidden = row.copy.hidden && row.rotate.hidden;
       row.copy.disabled = !client.enabled || !client.canCopyConfiguration;
       row.rotate.disabled = !client.enabled || !client.canRotateCredential;
-      row.hint.textContent = "客户端工具权限决定可用的 MCP 工具；Agent 任务权限在工作台选择。";
+      row.hint.textContent = permissionsOnly ? "控制此客户端可以调用的 MCP 工具。" : "";
+      row.hint.hidden = !row.hint.textContent;
+      row.detail.hidden = permissionsOnly || !row.detail.textContent;
       context.emit = nextEmit;
     }
     function placeRow(card, row, index) {

@@ -13,18 +13,18 @@ macOS 与 Windows 安装前等待任务与 Direct 操作结束，并由 Service 
 ```bash
 python3 Scripts/generate-update-manifest.py \
   --output /absolute/release/latest.json \
-  --version 2.1.1 --tag v2.1.1 \
-  --notes-file docs/RELEASE_NOTES_v2.1.1.md \
-  --asset macos arm64 app /absolute/release/CodexBridge-2.1.1-macos-arm64.zip \
-  --asset macos x64 app /absolute/release/CodexBridge-2.1.1-macos-x86_64.zip \
-  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-2.1.1-Setup.exe \
-  --asset windows arm64 installer /absolute/release/CodexBridge-Windows-arm64-2.1.1-Setup.exe \
+  --version 2.1.2 --tag v2.1.2 \
+  --notes-file docs/RELEASE_NOTES_v2.1.2.md \
+  --asset macos arm64 app /absolute/release/CodexBridge-2.1.2-macos-arm64.zip \
+  --asset macos x64 app /absolute/release/CodexBridge-2.1.2-macos-x86_64.zip \
+  --asset windows x64 installer /absolute/release/CodexBridge-Windows-x64-2.1.2-Setup.exe \
+  --asset windows arm64 installer /absolute/release/CodexBridge-Windows-arm64-2.1.2-Setup.exe \
   --asset windows x64 portable /absolute/release/codex-bridge-windows-x64.zip \
   --asset windows arm64 portable /absolute/release/codex-bridge-windows-arm64.zip \
-  --asset linux x64 installer /absolute/release/CodexBridge-Linux-x64-2.1.1.deb \
-  --asset linux arm64 installer /absolute/release/CodexBridge-Linux-arm64-2.1.1.deb \
-  --asset linux x64 portable /absolute/release/codex-bridge-linux-x64-2.1.1.tar.gz \
-  --asset linux arm64 portable /absolute/release/codex-bridge-linux-arm64-2.1.1.tar.gz
+  --asset linux x64 installer /absolute/release/CodexBridge-Linux-x64-2.1.2.deb \
+  --asset linux arm64 installer /absolute/release/CodexBridge-Linux-arm64-2.1.2.deb \
+  --asset linux x64 portable /absolute/release/codex-bridge-linux-x64-2.1.2.tar.gz \
+  --asset linux arm64 portable /absolute/release/codex-bridge-linux-arm64-2.1.2.tar.gz
 ```
 
 当前发布架构为 macOS `arm64` / `x86_64`、Windows `x64` / `arm64`
@@ -77,7 +77,7 @@ macOS 公开包使用 ad-hoc 签名。下载者首次打开 App 时需要手动�
 
 ## 1. Prepare and verify the pinned helper
 
-Use a new output directory. The script downloads only the pinned OpenAI v0.0.10 archives, verifies their external SHA-256 values, produces a Universal 2 helper and records its unsigned digest. Before every public release, recheck the OpenAI Platform Tunnels page because control-plane support may move beyond this repository pin.
+Use a new output directory. The script downloads only the pinned OpenAI v0.0.17 archives, verifies their external SHA-256 values, produces a Universal 2 helper and records its unsigned digest. Before every public release, recheck the OpenAI Platform Tunnels page because control-plane support may move beyond this repository pin.
 
 ```bash
 helper_root="$(mktemp -d)"

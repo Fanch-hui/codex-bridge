@@ -13,6 +13,6 @@
       "external": ["@deepseek-ai/dsh-client-ui-workspace/client", "@deepseek-ai/dsh-client-ui-renderer/client", "@deepseek-ai/dsh-client-connection/client", "react"]
     }
   },
-  "peerDependencies": { "@deepseek-ai/schemastery": "3.18.4", "@deepseek-ai/cordis": "4.0.4", "@deepseek-ai/dsh-api-session-controller": "0.2.0-rc.2", "@deepseek-ai/dsh-agent-default-model": "0.2.0-rc.2" },
+  "peerDependencies": { "@deepseek-ai/schemastery": "3.18.4", "@deepseek-ai/cordis": "4.0.4" },
   "files": ["*.mjs", "client.js", "cordis.patch.yml"]
 }

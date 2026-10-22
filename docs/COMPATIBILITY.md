@@ -17,7 +17,7 @@ Compatibility is determined by the installed runtime, protocol handshake and obs
 | Qoder | native Node SDK host and installed regional CLI | SDK methods, native tools/capabilities, models and session binding | CN and international preferences/login/session bindings remain separate. SDK and CLI patch versions may differ. [Qoder guide](PI_QODER_CONNECTION_GUIDE.md). |
 | Swift MCP SDK | 0.12.1 | exact pin and local protocol checks | BridgeMCP implements the production HTTP listener. |
 | MCP Inspector | 2.1.0 on Node 22.19+ | development-only acceptance script | Available in the full development tree; never bundled. |
-| OpenAI tunnel-client | 0.0.10, commit `105e17a79a36e4e5c897fd698ed2b8dbf935b144` | pinned archives, architecture/digest checks, loopback ownership and helper lifecycle | Platform Tunnels is the support source of truth. Unsigned preview packages ad-hoc sign the selected helper slice. |
+| OpenAI tunnel-client | 0.0.17, commit `a248b7f725fc989c1eb26680cf4351ee33421f61` | pinned archives, architecture/digest checks, loopback ownership and helper lifecycle | Platform Tunnels is the support source of truth. Unsigned preview packages ad-hoc sign the selected helper slice. |
 | ChatGPT custom MCP plugin | current Secure MCP Tunnel client behavior | local helper, admission and MCP contract checks; account connection requires user acceptance | Create from Plugins → Add → Create custom MCP server and select Tunnel. The Runtime Key stays in Bridge. |
 
 ## Execution and capability boundaries
@@ -32,6 +32,6 @@ Compatibility is determined by the installed runtime, protocol handshake and obs
 - If the Service loses the original active Codex event stream, it does not start a replacement turn and pretend to have resumed the original. Recovery reconciles persisted turn facts and preserves the task's locks until ownership/termination is resolved.
 - Supervisor is unavailable on all platforms; enabling it is rejected. Codex approvals use the supported local desktop channel, and unknown native approval requests are refused.
 - Tunnel readiness requires exact helper-process ownership of the loopback health port, strict `/readyz`, and a fresh successful control-plane poll metric.
-- tunnel-client v0.0.10 `doctor` has a documented false failure for an intentionally no-OAuth MCP endpoint returning PRMD 404. Bridge accepts only that exact structured single-failure result; any additional failed check remains fatal.
+- tunnel-client v0.0.17 `doctor` accepts an intentionally no-OAuth MCP endpoint when metadata candidates return HTTP 404. Bridge retains the exact structured single-failure compatibility check for older helpers.
 
 Public source excludes development tests, fixtures, prototypes and generated schemas. Commands that use those paths require the full development tree. Runtime resources can be checked from the public checkout with `node Scripts/verify-agent-runtime-resources.mjs`; authenticated tasks and desktop navigation require direct user acceptance.

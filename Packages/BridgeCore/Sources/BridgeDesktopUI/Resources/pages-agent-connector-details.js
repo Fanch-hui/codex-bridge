@@ -40,15 +40,18 @@
     root.appendChild(error);
 
     var actions = S.node("div", "agent-installation-actions");
+    var maintenance = S.node("details", "agent-maintenance");
+    maintenance.appendChild(S.node("summary", null, "更多"));
+    maintenance.appendChild(actions);
     var probe = S.button("重新检查", null, {}, null, "small", true);
     var accept = S.button("确认更新并检查", null, {}, null, "small primary", true);
     var disconnect = S.button("断开连接", null, {}, null, "small", true);
     var removeButton = S.button("移除登记", null, {}, null, "small danger", true);
     actions.appendChild(probe);
-    actions.appendChild(accept);
+    root.appendChild(accept);
     actions.appendChild(disconnect);
     actions.appendChild(removeButton);
-    root.appendChild(actions);
+    root.appendChild(maintenance);
 
     var removal = confirmation(
       S,
