@@ -5,6 +5,42 @@ public enum MCPServiceExposureMode: String, Codable, Equatable, Sendable {
   case full
 }
 public protocol BridgeMCPServiceAPI: Sendable {
+  func serviceImportChatFile(
+    _ request: MCPChatFileImportRequest,
+    invocationContext: MCPInvocationContext,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectWriteReceipt
+
+  func serviceBeginFileUpload(
+    _ request: MCPFileUploadRequest,
+    invocationContext: MCPInvocationContext,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPFileTransfer
+
+  func serviceAppendFileUpload(
+    transferID: String, offset: Int, dataBase64: String,
+    invocationContext: MCPInvocationContext,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPFileTransfer
+
+  func serviceCommitFileUpload(
+    transferID: String, clientRequestID: String?,
+    invocationContext: MCPInvocationContext,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPDirectWriteReceipt
+
+  func serviceCancelFileUpload(
+    transferID: String,
+    invocationContext: MCPInvocationContext,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPFileTransfer
+
+  func serviceReadFileChunk(
+    _ request: MCPFileChunkRequest,
+    invocationContext: MCPInvocationContext,
+    deadline: ContinuousClock.Instant
+  ) async throws -> MCPFileChunk
+
   func serviceCustomInstructions(
     deadline: ContinuousClock.Instant
   ) async throws -> String

@@ -121,6 +121,8 @@ public struct MCPServiceToolDispatcher: Sendable {
     sessionID: String
   ) async throws -> CallTool.Result {
     switch contract.route {
+    case .fileTransfer:
+      return try await callFileTransfer(contract.name, arguments: arguments, sessionID: sessionID)
     case .readOnly:
       return try await callReadOnly(contract.name, arguments: arguments)
     case .task:

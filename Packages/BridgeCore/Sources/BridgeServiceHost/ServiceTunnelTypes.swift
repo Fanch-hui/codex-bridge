@@ -11,6 +11,9 @@ public struct ServiceTunnelSnapshot: Equatable, Sendable {
   public let acceptsRemoteSubmissions: Bool
   public let actionRequired: Bool
   public let httpProxy: String?
+  public let lastSuccessfulPollAt: Date?
+  public let localHealthReady: Bool?
+  public let isReconnecting: Bool
 
   public init(
     configured: Bool,
@@ -20,7 +23,10 @@ public struct ServiceTunnelSnapshot: Equatable, Sendable {
     lifecycle: TunnelLifecycle,
     acceptsRemoteSubmissions: Bool,
     actionRequired: Bool,
-    httpProxy: String? = nil
+    httpProxy: String? = nil,
+    lastSuccessfulPollAt: Date? = nil,
+    localHealthReady: Bool? = nil,
+    isReconnecting: Bool = false
   ) {
     self.configured = configured
     self.enabled = enabled
@@ -30,6 +36,9 @@ public struct ServiceTunnelSnapshot: Equatable, Sendable {
     self.acceptsRemoteSubmissions = acceptsRemoteSubmissions
     self.actionRequired = actionRequired
     self.httpProxy = httpProxy
+    self.lastSuccessfulPollAt = lastSuccessfulPollAt
+    self.localHealthReady = localHealthReady
+    self.isReconnecting = isReconnecting
   }
 
   public static func unconfigured(

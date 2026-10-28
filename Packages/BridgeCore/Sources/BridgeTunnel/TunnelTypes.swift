@@ -252,17 +252,23 @@ public struct TunnelDiagnostics: Equatable, Sendable {
   public let standardError: String
   public let wasTruncated: Bool
   public let actionRequired: Bool
+  public let lastSuccessfulPollAt: Date?
+  public let localHealthReady: Bool?
 
   public init(
     standardOutput: String,
     standardError: String,
     wasTruncated: Bool,
-    actionRequired: Bool
+    actionRequired: Bool,
+    lastSuccessfulPollAt: Date? = nil,
+    localHealthReady: Bool? = nil
   ) {
     self.standardOutput = standardOutput
     self.standardError = standardError
     self.wasTruncated = wasTruncated
     self.actionRequired = actionRequired
+    self.lastSuccessfulPollAt = lastSuccessfulPollAt
+    self.localHealthReady = localHealthReady
   }
 }
 

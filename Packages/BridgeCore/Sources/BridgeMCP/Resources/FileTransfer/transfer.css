@@ -1,0 +1,24 @@
+:root { color-scheme: light dark; font: 14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background: transparent; color: light-dark(#202124,#ececed); }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 720px; padding: 20px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+h1 { margin: 0; font-size: 18px; font-weight: 600; }
+#project { color: light-dark(#62656b,#a9adb5); overflow-wrap: anywhere; }
+label { display: block; margin-bottom: 6px; font-weight: 500; }
+input,select,button,a { font: inherit; }
+input,select { width: 100%; min-height: 38px; border: 1px solid light-dark(#d3d6dc,#555961); background: light-dark(#fff,#27292d); color: inherit; border-radius: 7px; padding: 8px 10px; }
+input[type=file] { padding: 8px 0; border: 0; background: transparent; }
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible { outline: 2px solid #397ff0; outline-offset: 3px; }
+.fields { display: grid; grid-template-columns: minmax(140px,1fr) minmax(200px,2fr); gap: 12px; margin: 12px 0 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+button,#download { border: 1px solid light-dark(#d3d6dc,#555961); background: light-dark(#f5f6f8,#303339); color: inherit; border-radius: 7px; padding: 8px 14px; cursor: pointer; text-decoration: none; }
+#submit,#save { background: light-dark(#202124,#ececed); color: light-dark(#fff,#202124); border-color: transparent; }
+button:disabled { opacity: .5; cursor: default; }
+progress { width: 100%; height: 8px; margin-top: 20px; accent-color: #397ff0; }
+#status { margin: 12px 0 0; color: light-dark(#62656b,#b8bbc2); overflow-wrap: anywhere; }
+#status[data-error=true] { color: light-dark(#a33329,#f1a19a); }
+#text-preview { max-height: 260px; overflow: auto; padding: 12px; border-radius: 7px; background: light-dark(#f5f6f8,#27292d); white-space: pre-wrap; overflow-wrap: anywhere; }
+#image-preview { display: block; max-width: 100%; max-height: 320px; object-fit: contain; margin-top: 16px; }
+[hidden] { display: none !important; }
+@media(max-width: 440px) { main { padding: 16px; } .fields { grid-template-columns: 1fr; } header { align-items: start; flex-direction: column; gap: 4px; } }

@@ -3,8 +3,12 @@ import Foundation
 package enum MCPHTTPResponseDeadline {
   package static func duration(body: Data, defaultDuration: Duration) -> Duration {
     guard let call = try? JSONDecoder().decode(ToolCall.self, from: body),
-      call.method == "tools/call", call.params?.name == MCPServiceToolName.waitTask.rawValue
+      call.method == "tools/call"
     else { return defaultDuration }
+    if call.params?.name == MCPServiceToolName.importChatFile.rawValue {
+      return max(defaultDuration, .seconds(70))
+    }
+    guard call.params?.name == MCPServiceToolName.waitTask.rawValue else { return defaultDuration }
     let timeout = call.params?.arguments?.timeoutSeconds ?? 300
     guard (1...300).contains(timeout) else { return defaultDuration }
     return max(defaultDuration, .seconds(timeout + 10))

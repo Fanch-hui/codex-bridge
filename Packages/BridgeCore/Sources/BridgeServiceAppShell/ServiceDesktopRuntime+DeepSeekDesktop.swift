@@ -166,7 +166,8 @@ extension BridgeServiceAppModel {
       message: value.desktop.unavailableReason,
       errorCode: value.desktop.errorCode,
       executablePath: value.executablePath, connectorInstalled: value.connectorInstalled,
-      canInstallConnector: value.canInstallConnector)
+      canInstallConnector: value.canInstallConnector,
+      connectorUpdateAvailable: value.connectorUpdateAvailable)
     synchronizeAgentModelScopes()
   }
 }

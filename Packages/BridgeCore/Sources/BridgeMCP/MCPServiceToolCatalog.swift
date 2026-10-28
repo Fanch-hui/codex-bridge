@@ -1,6 +1,13 @@
 import MCP
 
 public enum MCPServiceToolName: String, CaseIterable, Sendable {
+  case openFileTransfer = "open_file_transfer"
+  case importChatFile = "import_chat_file"
+  case beginFileUpload = "begin_file_upload"
+  case appendFileUpload = "append_file_upload"
+  case commitFileUpload = "commit_file_upload"
+  case cancelFileUpload = "cancel_file_upload"
+  case readFileChunk = "read_file_chunk"
   case bridgeStatus = "bridge_status"
   case listProjects = "list_projects"
   case listAgents = "list_agents"
@@ -44,11 +51,12 @@ public enum MCPServiceToolName: String, CaseIterable, Sendable {
   case directGitCommit = "direct_git_commit"
 }
 
-enum MCPServiceToolRoute: Sendable {
+enum MCPServiceToolRoute: Equatable, Sendable {
   case readOnly
   case task
   case direct
   case nativeSessionDirectory
+  case fileTransfer
 }
 
 struct MCPServiceToolContract: Sendable {
@@ -63,14 +71,25 @@ struct MCPServiceToolContract: Sendable {
 }
 
 public struct MCPServiceToolCatalog: Sendable {
-  public static let contractVersion = "1.4.0"
+  public static let contractVersion = "1.6.0"
 
   public let definitions: [Tool]
 
   public init(exposureMode: MCPServiceExposureMode) {
     definitions = Self.contracts
       .filter { $0.isExposed(in: exposureMode) }
-      .map(\.definition)
+      .map { contract in
+        var definition = contract.definition
+        if contract.route == .fileTransfer {
+          var metadata = definition._meta?.fields ?? [:]
+          metadata["openai/widgetAccessible"] = true
+          var ui = metadata["ui"]?.objectValue ?? [:]
+          ui["visibility"] = ["model", "app"]
+          metadata["ui"] = .object(ui)
+          definition._meta = Metadata(additionalFields: metadata)
+        }
+        return definition
+      }
   }
 
   static func contract(named rawName: String) -> MCPServiceToolContract? {
@@ -85,6 +104,13 @@ public struct MCPServiceToolCatalog: Sendable {
   }()
 
   private static let contracts: [MCPServiceToolContract] = [
+    contract(.openFileTransfer, openFileTransfer, exposure: .full, route: .fileTransfer),
+    contract(.importChatFile, importChatFile, exposure: .full, route: .fileTransfer),
+    contract(.beginFileUpload, beginFileUpload, exposure: .full, route: .fileTransfer),
+    contract(.appendFileUpload, appendFileUpload, exposure: .full, route: .fileTransfer),
+    contract(.commitFileUpload, commitFileUpload, exposure: .full, route: .fileTransfer),
+    contract(.cancelFileUpload, cancelFileUpload, exposure: .full, route: .fileTransfer),
+    contract(.readFileChunk, readFileChunk, exposure: .full, route: .fileTransfer),
     contract(.bridgeStatus, bridgeStatus, exposure: .readOnly, route: .readOnly),
     contract(.listProjects, listProjects, exposure: .readOnly, route: .readOnly),
     contract(.listAgents, listAgents, exposure: .readOnly, route: .readOnly),

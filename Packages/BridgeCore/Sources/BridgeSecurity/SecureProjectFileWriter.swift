@@ -61,12 +61,15 @@ public struct SecureProjectFileWriter: Sendable {
     mode: SecureWriteMode,
     content: Data,
     expectedSHA256: String?,
-    createParents: Bool
+    createParents: Bool,
+    allowsBinaryContent: Bool = false
   ) throws -> SecureWriteResult {
     guard content.count <= maximumBytes else {
       throw PathSecurityError.fileTooLarge(maximumBytes: maximumBytes)
     }
-    guard String(data: content, encoding: .utf8) != nil, !content.contains(0) else {
+    guard
+      allowsBinaryContent || (String(data: content, encoding: .utf8) != nil && !content.contains(0))
+    else {
       throw PathSecurityError.binaryFileBlocked
     }
     try resolver.root.validateCurrentIdentity()

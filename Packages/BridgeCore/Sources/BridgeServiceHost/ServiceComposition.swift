@@ -284,6 +284,7 @@ public actor ServiceComposition {
       deepSeekDesktop: desktopController,
       installDeepSeekDesktopConnector: installDesktopConnector,
       isDeepSeekDesktopConnectorInstalled: { deepSeekDesktopInstaller.isInstalled($0) },
+      isDeepSeekDesktopConnectorUpdateAvailable: { deepSeekDesktopInstaller.updateAvailable($0) },
       directCommands: DirectCommandSessionManager(
         orphanPIDFileURL: paths.supervisorScratchURL.appending(path: "direct-command-pids.txt"),
         historyFileURL: paths.rootURL.appending(path: "direct-command-history.json")

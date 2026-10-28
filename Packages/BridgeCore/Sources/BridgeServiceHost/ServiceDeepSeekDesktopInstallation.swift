@@ -60,15 +60,23 @@ struct ServiceDeepSeekDesktopInstallation: Sendable {
   }
 
   func isInstalled(_ installation: AgentInstallation) -> Bool {
+    receipt(for: installation)?.fingerprint == DSHDesktopRuntimeResources.fingerprint
+  }
+
+  func updateAvailable(_ installation: AgentInstallation) -> Bool {
+    guard let receipt = receipt(for: installation) else { return false }
+    return receipt.fingerprint != DSHDesktopRuntimeResources.fingerprint
+  }
+
+  private func receipt(for installation: AgentInstallation) -> Receipt? {
     guard
       let marker = try? SecureFileArtifactReader.read(
         at: installationRoot(installation.id).appendingPathComponent("installed.json").path,
         maximumBytes: 4 * 1_024),
       let value = try? JSONDecoder().decode(Receipt.self, from: marker),
-      value.fingerprint == DSHDesktopRuntimeResources.fingerprint,
       value.executablePath == installation.executablePath
-    else { return false }
-    return true
+    else { return nil }
+    return value
   }
 
   func desktopRunning(_ installation: AgentInstallation) async throws -> Bool? {

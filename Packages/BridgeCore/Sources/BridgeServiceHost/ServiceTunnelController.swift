@@ -15,6 +15,10 @@ public actor ServiceTunnelController {
   let factory: any ServiceTunnelManagerBuilding
   private let monitorInterval: Duration
   private let restartDelays: [Duration]
+  private let degradedRecoveryDelay: Duration
+  private let recoveryNow: @Sendable () -> ContinuousClock.Instant
+  private var degradedSince: ContinuousClock.Instant?
+  var lastSuccessfulPollAt: Date?
 
   var tunnelID: TunnelID?
   var httpProxy: TunnelHTTPProxy?
@@ -34,15 +38,20 @@ public actor ServiceTunnelController {
     secretStore: any SecretStore,
     factory: any ServiceTunnelManagerBuilding,
     monitorInterval: Duration = .seconds(2),
-    restartDelays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)]
+    restartDelays: [Duration] = [.seconds(1), .seconds(2), .seconds(4)],
+    degradedRecoveryDelay: Duration = .seconds(90),
+    recoveryNow: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock().now }
   ) {
     precondition(monitorInterval > .zero)
+    precondition(degradedRecoveryDelay > .zero)
     self.settings = settings
     self.runtimeStatus = runtimeStatus
     self.secretStore = secretStore
     self.factory = factory
     self.monitorInterval = monitorInterval
     self.restartDelays = Array(restartDelays.prefix(5))
+    self.degradedRecoveryDelay = degradedRecoveryDelay
+    self.recoveryNow = recoveryNow
     snapshot = .unconfigured(helperAvailable: factory.helperAvailable())
   }
 
@@ -107,7 +116,8 @@ public actor ServiceTunnelController {
       lifecycle: .stopped,
       acceptsRemoteSubmissions: false,
       actionRequired: snapshot.actionRequired,
-      httpProxy: httpProxy?.url.absoluteString
+      httpProxy: httpProxy?.url.absoluteString,
+      lastSuccessfulPollAt: lastSuccessfulPollAt
     )
     snapshot = final
     await runtimeStatus.updateTunnel(state: TunnelLifecycle.stopped.rawValue)
@@ -190,7 +200,8 @@ public actor ServiceTunnelController {
         lifecycle: .failed,
         acceptsRemoteSubmissions: false,
         actionRequired: true,
-        httpProxy: httpProxy?.url.absoluteString
+        httpProxy: httpProxy?.url.absoluteString,
+        lastSuccessfulPollAt: lastSuccessfulPollAt
       )
       snapshot = failure
       await publish(failure, degradation: "The signed tunnel-client helper is unavailable.")
@@ -214,7 +225,8 @@ public actor ServiceTunnelController {
       lifecycle: .starting,
       acceptsRemoteSubmissions: false,
       actionRequired: false,
-      httpProxy: httpProxy?.url.absoluteString
+      httpProxy: httpProxy?.url.absoluteString,
+      lastSuccessfulPollAt: lastSuccessfulPollAt
     )
     snapshot = starting
     await publish(starting)
@@ -281,7 +293,8 @@ public actor ServiceTunnelController {
       lifecycle: .failed,
       acceptsRemoteSubmissions: false,
       actionRequired: actionRequired,
-      httpProxy: httpProxy?.url.absoluteString
+      httpProxy: httpProxy?.url.absoluteString,
+      lastSuccessfulPollAt: lastSuccessfulPollAt
     )
     snapshot = failed
     await publish(
@@ -324,6 +337,13 @@ public actor ServiceTunnelController {
     let diagnostics = await manager.diagnostics()
     let acceptsRemote = await manager.acceptsRemoteSubmissions()
     guard observedGeneration == generation else { return }
+    if let poll = diagnostics.lastSuccessfulPollAt,
+      lastSuccessfulPollAt.map({ poll > $0 }) ?? true
+    {
+      lastSuccessfulPollAt = poll
+    }
+    let degradedRecoveryDue = updateDegradation(
+      lifecycle: lifecycle, actionRequired: diagnostics.actionRequired)
     let current = ServiceTunnelSnapshot(
       configured: tunnelID != nil && hasRuntimeKey(),
       enabled: enabled,
@@ -332,18 +352,41 @@ public actor ServiceTunnelController {
       lifecycle: lifecycle,
       acceptsRemoteSubmissions: acceptsRemote && !diagnostics.actionRequired,
       actionRequired: diagnostics.actionRequired,
-      httpProxy: httpProxy?.url.absoluteString
+      httpProxy: httpProxy?.url.absoluteString,
+      lastSuccessfulPollAt: lastSuccessfulPollAt,
+      localHealthReady: diagnostics.localHealthReady,
+      isReconnecting: restartTask != nil
     )
     snapshot = current
     await publish(current, degradation: Self.degradation(for: current))
 
-    guard scheduleRestart, lifecycle == .failed, enabled else { return }
+    guard scheduleRestart, observedGeneration == generation, enabled, !isShutdown,
+      lifecycle == .failed || degradedRecoveryDue
+    else { return }
     monitorTask?.cancel()
     monitorTask = nil
     if diagnostics.actionRequired || restartDelays.isEmpty {
       return
     }
+    if degradedRecoveryDue {
+      NSLog("[ServiceTunnelController] Restarting tunnel after sustained degraded readiness.")
+    }
     beginRestart(generation: generation)
+  }
+
+  private func updateDegradation(
+    lifecycle: TunnelLifecycle, actionRequired: Bool
+  ) -> Bool {
+    guard lifecycle == .degraded, !actionRequired else {
+      degradedSince = nil
+      return false
+    }
+    let now = recoveryNow()
+    guard let degradedSince else {
+      self.degradedSince = now
+      return false
+    }
+    return degradedSince.duration(to: now) >= degradedRecoveryDelay
   }
 
   private func beginRestart(generation: UInt64) {
@@ -354,6 +397,16 @@ public actor ServiceTunnelController {
   }
 
   private func restart(generation: UInt64) async {
+    guard generation == self.generation, enabled, !isShutdown else { return }
+    let recovering = ServiceTunnelSnapshot(
+      configured: snapshot.configured, enabled: snapshot.enabled,
+      helperAvailable: snapshot.helperAvailable, tunnelID: snapshot.tunnelID,
+      lifecycle: snapshot.lifecycle, acceptsRemoteSubmissions: false,
+      actionRequired: false, httpProxy: snapshot.httpProxy,
+      lastSuccessfulPollAt: lastSuccessfulPollAt,
+      localHealthReady: snapshot.localHealthReady, isReconnecting: true)
+    snapshot = recovering
+    await publish(recovering, degradation: "Secure MCP Tunnel is reconnecting.")
     var backoff = TunnelReconnectBackoff(restartDelays)
     while let delay = backoff.next() {
       do {
@@ -430,7 +483,8 @@ public actor ServiceTunnelController {
       lifecycle: .failed,
       acceptsRemoteSubmissions: false,
       actionRequired: actionRequired,
-      httpProxy: httpProxy?.url.absoluteString
+      httpProxy: httpProxy?.url.absoluteString,
+      lastSuccessfulPollAt: lastSuccessfulPollAt
     )
     snapshot = failed
     await publish(
@@ -455,13 +509,15 @@ public actor ServiceTunnelController {
       lifecycle: .stopped,
       acceptsRemoteSubmissions: false,
       actionRequired: false,
-      httpProxy: httpProxy?.url.absoluteString
+      httpProxy: httpProxy?.url.absoluteString,
+      lastSuccessfulPollAt: lastSuccessfulPollAt
     )
     snapshot = stopped
     await publish(stopped)
   }
 
   private func cancelBackgroundTasks() {
+    degradedSince = nil
     monitorTask?.cancel()
     restartTask?.cancel()
     monitorTask = nil

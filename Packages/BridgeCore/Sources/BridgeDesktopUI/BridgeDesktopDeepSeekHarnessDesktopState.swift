@@ -10,6 +10,7 @@ public struct BridgeDesktopDeepSeekHarnessDesktopState: Codable, Equatable, Send
   public let message: String?
   public let errorCode: String?
   public let executablePath: String?
+  public let connectorUpdateAvailable: Bool?
   public let connectorInstalled: Bool
   public let canInstallConnector: Bool
 
@@ -18,7 +19,8 @@ public struct BridgeDesktopDeepSeekHarnessDesktopState: Codable, Equatable, Send
     pairingCode: String? = nil, profileID: String? = nil, message: String? = nil,
     errorCode: String? = nil,
     executablePath: String? = nil,
-    connectorInstalled: Bool = false, canInstallConnector: Bool = false
+    connectorInstalled: Bool = false, canInstallConnector: Bool = false,
+    connectorUpdateAvailable: Bool? = nil
   ) {
     self.installationID = installationID
     self.mode = mode
@@ -29,6 +31,7 @@ public struct BridgeDesktopDeepSeekHarnessDesktopState: Codable, Equatable, Send
     self.message = message
     self.errorCode = errorCode
     self.executablePath = executablePath
+    self.connectorUpdateAvailable = connectorUpdateAvailable
     self.connectorInstalled = connectorInstalled
     self.canInstallConnector = canInstallConnector
   }

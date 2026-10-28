@@ -25,6 +25,8 @@ public actor TunnelManager {
   private let now: Now
   private let outputLimit = 128 * 1024
   private var lifecycle: TunnelLifecycle = .stopped
+  private var lastSuccessfulPollAt: Date?
+  private var localHealthReady: Bool?
   private var process: TunnelSpawnedProcess?
   private var runContext: RunContext?
   private var monitor: Task<Void, Never>?
@@ -58,7 +60,11 @@ public actor TunnelManager {
 
   public func diagnostics() -> TunnelDiagnostics {
     captureDiagnostics()
-    return lastDiagnostics.appendingStartupTrace(startupDiagnostics)
+    let captured = lastDiagnostics.appendingStartupTrace(startupDiagnostics)
+    return TunnelDiagnostics(
+      standardOutput: captured.standardOutput, standardError: captured.standardError,
+      wasTruncated: captured.wasTruncated, actionRequired: captured.actionRequired,
+      lastSuccessfulPollAt: lastSuccessfulPollAt, localHealthReady: localHealthReady)
   }
 
   public func doctor() async throws -> TunnelDoctorReport {
@@ -129,6 +135,7 @@ public actor TunnelManager {
     startupDiagnostics = configuration.startupDiagnosticsEnabled ? TunnelStartupDiagnostics() : nil
     startupDiagnostics?.record(.start)
     lifecycle = .starting
+    localHealthReady = nil
     do {
       let verifiedHelper = try helperVerifier.verify(
         executable: configuration.helperExecutable,
@@ -180,6 +187,7 @@ public actor TunnelManager {
     doctorProcess = nil
     runContext = nil
     lifecycle = .stopped
+    localHealthReady = nil
     if let child {
       await terminate(child)
       captureDiagnostics(from: child)
@@ -317,18 +325,25 @@ public actor TunnelManager {
         urlFileDirectory: context.run,
         expectedPeerPID: child.pid
       )
+      localHealthReady = snapshot.isReady
       guard let timestamp = snapshot.pollTimestamp, timestamp > 0 else {
         startupDiagnostics?.recordHealth(
           localReady: snapshot.isReady, pollObserved: false, pollFresh: false)
         return (false, false)
       }
       let age = now().timeIntervalSince1970 - timestamp
+      if timestamp.isFinite, age >= -5,
+        lastSuccessfulPollAt.map({ timestamp > $0.timeIntervalSince1970 }) ?? true
+      {
+        lastSuccessfulPollAt = Date(timeIntervalSince1970: timestamp)
+      }
       let fresh = age >= -5 && age <= configuration.metricsFreshness.timeInterval
       startupDiagnostics?.recordHealth(
         localReady: snapshot.isReady, pollObserved: true, pollFresh: fresh)
       return (fresh, fresh && snapshot.isReady)
     } catch {
       startupDiagnostics?.recordHealth(localReady: false, pollObserved: false, pollFresh: false)
+      localHealthReady = false
       NSLog("[TunnelManager] health check failed")
       return (false, false)
     }

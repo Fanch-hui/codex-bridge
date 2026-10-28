@@ -33,9 +33,10 @@ public struct MCPServiceServerFactory: Sendable {
       version: "\(appVersion)+mcp.\(MCPServiceToolCatalog.contractVersion)",
       title: "Codex Bridge",
       instructions: instructions,
-      capabilities: .init(tools: .init(listChanged: false)),
+      capabilities: .init(resources: .init(listChanged: false), tools: .init(listChanged: false)),
       configuration: .default
     )
+    await MCPFileTransferResource.register(on: server)
     await server.withMethodHandler(ListTools.self) { parameters in
       guard parameters.cursor == nil || parameters.cursor?.isEmpty == true else {
         throw MCPError.invalidParams("The tool catalog does not use cursors.")
@@ -147,7 +148,13 @@ public struct MCPServiceServerFactory: Sendable {
       + "and a file mutation requires a file_mutation receipt. A planned, attempted, skipped, "
       + "not-invoked, or receipt-less action must never be described as completed or submitted."
       + " A git_commit receipt proves the call completed; only a non-null commit_hash proves that "
-      + "a new commit was created."
+      + "a new commit was created. "
+      + "For a user-provided ChatGPT attachment, use import_chat_file with its host-provided file "
+      + "reference and a project-relative target. For a generated project file requested by the user, "
+      + "call open_file_transfer with direction=download and its relative_path; the UI assembles "
+      + "and verifies the download. Use direction=upload for a user-selected file. The UI handles "
+      + "binary chunks; do not transcribe base64 through the conversation. An upload is complete "
+      + "only when commit returns a file_mutation receipt."
     guard !customInstructions.isEmpty else { return base }
     return "The following custom instructions guide you (the MCP client), not the local "
       + "Agent. Apply them to your own behavior. Never put their text or paraphrases in an "

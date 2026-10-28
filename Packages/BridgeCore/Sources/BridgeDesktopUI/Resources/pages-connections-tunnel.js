@@ -63,11 +63,23 @@
     var currentState = state(tunnel);
     S.updateStatus(badge, currentState.label, currentState.tone);
     S.clear(diagnostics);
+    actions.__tunnelDiagnostic = diagnosticText(tunnel);
+    if (tunnel.lastSuccessfulPollAt) {
+      var poll = new Date(tunnel.lastSuccessfulPollAt);
+      if (!isNaN(poll.getTime())) diagnostics.appendChild(S.node("p", "hint",
+        "最近成功轮询：" + poll.toLocaleString()));
+    }
+    if (tunnel.localHealthReady != null) diagnostics.appendChild(S.node("p", "hint",
+      "本机健康检查：" + (tunnel.localHealthReady ? "已就绪" : "未就绪")));
+    if (tunnel.isReconnecting) diagnostics.appendChild(S.node("div", "page-message",
+      "正在自动重连，连接恢复后继续接收远程请求。"));
+    else if (tunnel.lifecycle === "degraded" && !tunnel.actionRequired) diagnostics.appendChild(
+      S.node("div", "page-message warning", "远程通信暂时异常，持续降级 90 秒后自动重连。"));
     if (!tunnel.helperAvailable) {
       diagnostics.appendChild(S.node("div", "page-message warning", "Helper 辅助工具缺失，本地 MCP 仍可用，但远程隧道不能启动。"));
     }
     if (tunnel.actionRequired) {
-      diagnostics.appendChild(S.node("div", "page-message warning", "Tunnel 需要检查凭据，请核对 Tunnel ID、Runtime Key 以及当前工作区权限。"));
+      diagnostics.appendChild(S.node("div", "page-message warning", "Tunnel 需要本机处理，请检查连接配置、凭据与工作区权限。"));
     }
     editor.update(tunnel, context.emit);
     recoverPending(actions, context, {
@@ -75,6 +87,18 @@
     });
     var renderActions = function () {
       S.clear(actions);
+      var copy = S.button("复制连接诊断", null, {}, null, "small", false);
+      copy.addEventListener("click", function () {
+        var details = global.CodexBridgeDesktopWorkbenchDetails;
+        if (!details || !details.copyResult) { copy.textContent = "复制暂不可用"; return; }
+        details.copyResult(actions.__tunnelDiagnostic).then(function () {
+          copy.textContent = "已复制";
+        }, function () { copy.textContent = "复制失败，请重试"; });
+      });
+      actions.appendChild(copy);
+      var logs = S.button("打开日志", null, {}, null, "small", false);
+      logs.addEventListener("click", function () { context.emit("selectPage", { navigation: "logs" }); });
+      actions.appendChild(logs);
       if (tunnel.canConnect) {
         var connect = S.button("连接", null, {}, null, "small primary", false);
         connect.addEventListener("click", function () {
@@ -111,6 +135,7 @@
   function state(tunnel) {
     if (!tunnel.helperAvailable) return { label: "Helper 不可用", tone: "warning" };
     if (tunnel.actionRequired) return { label: "需要处理", tone: "warning" };
+    if (tunnel.isReconnecting) return { label: "自动重连中", tone: "running" };
     var states = {
       ready: { label: "已连接", tone: "success" },
       stopped: { label: "未连接", tone: "neutral" },
@@ -123,7 +148,17 @@
     return states[tunnel.lifecycle] || { label: "未知", tone: "neutral" };
   }
 
+  function diagnosticText(tunnel) {
+    return ["Codex Bridge 连接诊断", "记录时间：" + new Date().toISOString(),
+      "连接状态：" + state(tunnel).label,
+      "本机 Helper：" + (tunnel.helperAvailable ? "可用" : "不可用"),
+      "接收远程请求：" + (tunnel.acceptsRemoteSubmissions ? "是" : "否"),
+      "本机健康检查：" + (tunnel.localHealthReady == null ? "尚无记录" : tunnel.localHealthReady ? "已就绪" : "未就绪"),
+      "最近成功轮询：" + (tunnel.lastSuccessfulPollAt || "尚无记录"),
+      "需要本机处理：" + (tunnel.actionRequired ? "是" : "否")].join("\n");
+  }
+
   global.CodexBridgeDesktopConnectionsTunnel = {
-    renderLocal: renderLocalMCP, render: renderTunnel, state: state, recoverPending: recoverPending
+    renderLocal: renderLocalMCP, render: renderTunnel, state: state, recoverPending: recoverPending, diagnosticText: diagnosticText
   };
 }(window));

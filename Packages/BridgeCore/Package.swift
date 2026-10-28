@@ -198,7 +198,8 @@ let package = Package(
         .product(name: "NIOCore", package: "swift-nio"),
         .product(name: "NIOHTTP1", package: "swift-nio"),
         .product(name: "NIOPosix", package: "swift-nio"),
-      ]
+      ],
+      resources: [.copy("Resources/FileTransfer")]
     ),
     .target(
       name: "BridgeTunnel",

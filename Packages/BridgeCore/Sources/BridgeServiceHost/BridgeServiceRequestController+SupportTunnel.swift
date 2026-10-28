@@ -16,7 +16,12 @@ extension BridgeServiceRequestController {
       lifecycle: snapshot.lifecycle.rawValue,
       acceptsRemoteSubmissions: snapshot.acceptsRemoteSubmissions,
       actionRequired: snapshot.actionRequired,
-      httpProxy: snapshot.httpProxy
+      httpProxy: snapshot.httpProxy,
+      lastSuccessfulPollAt: snapshot.lastSuccessfulPollAt.map {
+        ISO8601DateFormatter().string(from: $0)
+      },
+      localHealthReady: snapshot.localHealthReady,
+      isReconnecting: snapshot.isReconnecting
     )
   }
 

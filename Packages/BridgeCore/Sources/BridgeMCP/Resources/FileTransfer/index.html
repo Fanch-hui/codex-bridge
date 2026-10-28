@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codex Bridge 文件传输</title>
+<style>{{STYLE}}</style>
+</head>
+<body>
+<main>
+  <header><h1 id="title">文件传输</h1><span id="project"></span></header>
+  <form id="transfer-form">
+    <div id="upload-fields">
+      <label for="file">选择文件</label><input id="file" type="file">
+      <div class="fields"><div><label for="mode">写入方式</label><select id="mode"><option value="create">新建文件</option><option value="replace">替换文件</option></select></div></div>
+    </div>
+    <label for="path">项目内文件路径</label><input id="path" required autocomplete="off" spellcheck="false" placeholder="例如：资料/report.pdf">
+    <div class="actions"><button id="submit" type="submit">上传到项目</button><button id="retry" type="button" hidden>继续</button><button id="cancel" type="button" hidden>取消传输</button></div>
+  </form>
+  <progress id="progress" max="1" value="0" hidden aria-label="文件传输进度"></progress>
+  <p id="status" role="status" aria-live="polite">正在连接聊天客户端…</p>
+  <section id="result" hidden>
+    <div class="actions"><button id="save" type="button">保存到设备</button><a id="download" hidden>下载文件</a></div>
+    <pre id="text-preview" hidden aria-label="文本预览"></pre><img id="image-preview" hidden alt="文件图片预览">
+  </section>
+</main>
+<script>{{CORE}}</script>
+<script>{{VIEW}}</script>
+</body>
+</html>

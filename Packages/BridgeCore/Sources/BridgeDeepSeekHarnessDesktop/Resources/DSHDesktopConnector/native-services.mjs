@@ -25,7 +25,7 @@ export class NativeServices {
       try { return canonical(await realpath(item.cwd)) === canonical(projectPath) ? item : undefined; } catch { return undefined; }
     }));
     return mapped.filter(Boolean).map(item => ({
-      sessionID: item.sessionId, cwd: item.cwd, title: item.projections?.title?.title ?? item.projections?.title ?? 'DSH 会话',
+      sessionID: item.sessionId, cwd: item.cwd, title: item.projections?.values?.title ?? item.projections?.title?.title ?? item.projections?.title ?? 'DSH 会话',
       updatedAt: new Date(item.updatedAt).toISOString(), status: item.running ? 'running' : 'idle',
     }));
   }

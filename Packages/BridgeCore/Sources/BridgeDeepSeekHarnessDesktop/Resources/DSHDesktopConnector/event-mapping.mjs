@@ -12,7 +12,7 @@ export function mapNativeEvent(event) {
     return mapped;
   }
   if (event.type === 'tool/call') return [{ eventType: 'tool', data: { toolCallID: data.callId, name: data.name, arguments: data.arguments, status: 'running' } }];
-  if (event.type === 'tool/result') return [{ eventType: 'tool', data: { toolCallID: data.callId ?? data.message?.callId, name: data.name ?? data.message?.name ?? 'tool', result: messageText(data.message?.content ?? data.content), status: 'completed' } }];
+  if (event.type === 'tool/result') return [{ eventType: 'tool', data: { toolCallID: data.message?.source?.callId ?? data.callId ?? data.message?.callId, name: data.name ?? data.message?.name ?? 'tool', result: messageText(data.message?.content ?? data.content), status: 'completed' } }];
   if (event.type === 'turn/end') {
     const reason = data.reason.kind;
     const eventType = ['cancelled', 'aborted', 'interrupted'].includes(reason) ? 'cancelled' : ['error', 'blocked'].includes(reason) ? 'failed' : 'completed';

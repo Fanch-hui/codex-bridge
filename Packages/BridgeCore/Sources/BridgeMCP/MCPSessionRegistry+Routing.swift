@@ -231,7 +231,7 @@ extension MCPSessionRegistry {
     let result: [String: Any] = [
       "resultType": "complete",
       "supportedVersions": [Self.modernProtocolVersion, Version.latest],
-      "capabilities": ["tools": [:]],
+      "capabilities": ["tools": [:], "resources": [:]],
       "_meta": [
         "io.modelcontextprotocol/serverInfo": [
           "name": "Codex Bridge",

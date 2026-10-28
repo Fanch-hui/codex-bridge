@@ -30,6 +30,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let agentCredentials: ServiceAgentCredentialEnvironment?
   let deepSeekDesktop: (any DeepSeekHarnessDesktopControlling)?
   let installDeepSeekDesktopConnector: (@Sendable (AgentInstallation) async throws -> Void)?
+  let isDeepSeekDesktopConnectorUpdateAvailable: @Sendable (AgentInstallation) -> Bool
   let isDeepSeekDesktopConnectorInstalled: @Sendable (AgentInstallation) -> Bool
   let coordinator: ServiceExecutionCoordinator
   let catalog: ServiceCodexCatalog
@@ -38,6 +39,10 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let runtimeStatus: ServiceRuntimeStatus
   let workspaceGate: ServiceWorkspaceMutationGate
   let directMutationOperations: DirectMutationOperationStore
+  let fileUploads = ServiceFileUploadStore()
+  var chatFileImports: [String: ChatFileImportCacheEntry] = [:]
+  var chatFileImportDownloads = Set<String>()
+  var fileExportGrants: [String: Date] = [:]
   var appUpdatePreparationTask: Task<Bool, Error>?
   public let commandPolicy: DirectCommandPolicy
   public let directCommands: DirectCommandSessionManager
@@ -62,6 +67,9 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     isDeepSeekDesktopConnectorInstalled: @escaping @Sendable (AgentInstallation) -> Bool = { _ in
       false
     },
+    isDeepSeekDesktopConnectorUpdateAvailable: @escaping @Sendable (AgentInstallation) -> Bool = {
+      _ in false
+    },
     files: RestrictedProjectFileService? = nil,
     mutations: RestrictedProjectMutationService? = nil,
     workspaceGate: ServiceWorkspaceMutationGate? = nil,
@@ -80,6 +88,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     self.deepSeekDesktop = deepSeekDesktop
     self.installDeepSeekDesktopConnector = installDeepSeekDesktopConnector
     self.isDeepSeekDesktopConnectorInstalled = isDeepSeekDesktopConnectorInstalled
+    self.isDeepSeekDesktopConnectorUpdateAvailable = isDeepSeekDesktopConnectorUpdateAvailable
     self.coordinator = coordinator
     self.catalog = catalog
     self.runtimeStatus = runtimeStatus

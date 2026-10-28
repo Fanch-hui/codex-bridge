@@ -158,6 +158,9 @@ public struct IPCTunnelStatus: Codable, Equatable, Sendable {
   public let acceptsRemoteSubmissions: Bool
   public let actionRequired: Bool
   public let httpProxy: String?
+  public let lastSuccessfulPollAt: String?
+  public let localHealthReady: Bool?
+  public let isReconnecting: Bool?
 
   public init(
     configured: Bool,
@@ -167,7 +170,10 @@ public struct IPCTunnelStatus: Codable, Equatable, Sendable {
     lifecycle: String,
     acceptsRemoteSubmissions: Bool,
     actionRequired: Bool,
-    httpProxy: String? = nil
+    httpProxy: String? = nil,
+    lastSuccessfulPollAt: String? = nil,
+    localHealthReady: Bool? = nil,
+    isReconnecting: Bool? = nil
   ) {
     self.configured = configured
     self.enabled = enabled
@@ -177,6 +183,9 @@ public struct IPCTunnelStatus: Codable, Equatable, Sendable {
     self.acceptsRemoteSubmissions = acceptsRemoteSubmissions
     self.actionRequired = actionRequired
     self.httpProxy = httpProxy
+    self.lastSuccessfulPollAt = lastSuccessfulPollAt
+    self.localHealthReady = localHealthReady
+    self.isReconnecting = isReconnecting
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -188,6 +197,9 @@ public struct IPCTunnelStatus: Codable, Equatable, Sendable {
     case acceptsRemoteSubmissions = "accepts_remote_submissions"
     case actionRequired = "action_required"
     case httpProxy = "http_proxy"
+    case lastSuccessfulPollAt = "last_successful_poll_at"
+    case localHealthReady = "local_health_ready"
+    case isReconnecting = "is_reconnecting"
   }
 }
 

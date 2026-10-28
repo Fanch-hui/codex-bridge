@@ -8,6 +8,7 @@ public struct ServiceDeepSeekDesktopState: Sendable {
   public let mode: DeepSeekHarnessConnectionMode
   public let desktop: DeepSeekHarnessDesktopStatus
   public let executablePath: String
+  public let connectorUpdateAvailable: Bool
   public let connectorInstalled: Bool
   public let canInstallConnector: Bool
 }
@@ -167,6 +168,7 @@ extension BridgeServiceApplication {
     return ServiceDeepSeekDesktopState(
       mode: currentMode, desktop: state,
       executablePath: installation.executablePath,
+      connectorUpdateAvailable: isDeepSeekDesktopConnectorUpdateAvailable(installation),
       connectorInstalled: isDeepSeekDesktopConnectorInstalled(installation),
       canInstallConnector: installDeepSeekDesktopConnector != nil)
   }

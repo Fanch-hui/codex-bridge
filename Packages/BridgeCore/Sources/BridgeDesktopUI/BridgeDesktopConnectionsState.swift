@@ -9,6 +9,9 @@ public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
   public let lifecycle: String
   public let acceptsRemoteSubmissions: Bool
   public let actionRequired: Bool
+  public let lastSuccessfulPollAt: String?
+  public let localHealthReady: Bool?
+  public let isReconnecting: Bool?
   public let canConfigure: Bool
   public let canSetHTTPProxy: Bool
   public let canConnect: Bool
@@ -24,6 +27,9 @@ public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
     lifecycle: String,
     acceptsRemoteSubmissions: Bool,
     actionRequired: Bool,
+    lastSuccessfulPollAt: String? = nil,
+    localHealthReady: Bool? = nil,
+    isReconnecting: Bool? = nil,
     canConfigure: Bool = true,
     canSetHTTPProxy: Bool = false,
     canConnect: Bool = false,
@@ -38,6 +44,9 @@ public struct BridgeDesktopTunnelState: Codable, Equatable, Sendable {
     self.lifecycle = lifecycle
     self.acceptsRemoteSubmissions = acceptsRemoteSubmissions
     self.actionRequired = actionRequired
+    self.lastSuccessfulPollAt = lastSuccessfulPollAt
+    self.localHealthReady = localHealthReady
+    self.isReconnecting = isReconnecting
     self.canConfigure = canConfigure
     self.canSetHTTPProxy = canSetHTTPProxy
     self.canConnect = canConnect

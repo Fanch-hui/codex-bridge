@@ -258,6 +258,7 @@ try {
   Copy-Item -LiteralPath $resourceCandidates[0].FullName -Destination (Join-Path $outFull $resourceCandidates[0].Name) -Recurse -Force
 
   $agentResourceSpecs = @(
+    @{ Name = "BridgeCore_BridgeMCP"; Entry = "FileTransfer/index.html" },
     @{ Name = "BridgeCore_BridgePiRPC"; Entry = "PiBridgeExtension/index.mjs" },
     @{ Name = "BridgeCore_BridgeQoderSDK"; Entry = "QoderHost/index.mjs" },
     @{ Name = "BridgeCore_BridgeDeepSeekHarnessDesktop"; Entry = "DSHDesktopConnector/index.mjs" }

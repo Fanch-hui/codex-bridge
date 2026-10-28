@@ -6,6 +6,7 @@ import Foundation
 
 public enum DirectApprovalKind: String, Codable, Sendable {
   case fileWrite = "file_write"
+  case fileExport = "file_export"
   case pathAction = "path_action"
   case command = "command"
   case network = "network"

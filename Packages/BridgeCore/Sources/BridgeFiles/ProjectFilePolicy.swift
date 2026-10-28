@@ -79,8 +79,19 @@ struct RedactedTextLine: Equatable, Sendable {
   let redacted: Bool
 }
 
-enum ProjectSecretRedactor {
+package enum ProjectSecretRedactor {
   static let replacement = "[REDACTED: suspected secret]"
+
+  package static func containsSensitiveContent(_ text: String) -> Bool {
+    var found = false
+    text.enumerateLines { line, stop in
+      if isSuspectedSecret(line) {
+        found = true
+        stop = true
+      }
+    }
+    return found
+  }
 
   static func redact(_ line: String) -> RedactedTextLine {
     guard isSuspectedSecret(line) else {

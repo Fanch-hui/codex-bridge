@@ -13,6 +13,7 @@ extension ServiceTunnelController {
     let tunnelID = try TunnelID(validating: rawTunnelID)
     let runtimeKey = try Self.validatedRuntimeKey(rawRuntimeKey)
     try await persist(tunnelID: tunnelID, runtimeKey: runtimeKey, enabled: true)
+    if self.tunnelID != tunnelID { lastSuccessfulPollAt = nil }
     self.tunnelID = tunnelID
     self.enabled = true
     snapshot = ServiceTunnelSnapshot(
@@ -63,6 +64,7 @@ extension ServiceTunnelController {
       throw ServiceTunnelError.secretStoreUnavailable
     }
     tunnelID = nil
+    lastSuccessfulPollAt = nil
     snapshot = .unconfigured(helperAvailable: factory.helperAvailable())
     await publish(snapshot)
   }

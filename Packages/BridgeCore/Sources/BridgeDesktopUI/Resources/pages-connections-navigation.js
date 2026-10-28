@@ -38,12 +38,14 @@
       if (primary && primary.availability === "needs_review") {
         return { value: "原生桌面", label: "需确认更新", tone: "warning" };
       }
-      var connected = desktop && desktop.connected && desktop.paired;
+      var updateAvailable = desktop && desktop.connectorUpdateAvailable;
+      var connected = desktop && desktop.connected && desktop.paired && !updateAvailable;
       var failed = desktop && desktop.errorCode && desktop.errorCode !== "desktop_connector_not_ready"
         && desktop.errorCode !== "desktop_pairing_required" && desktop.errorCode !== "desktop_not_running";
       var found = desktop && desktop.executablePath || primary || provider.discoveredExecutablePath
         || provider.discoveryState === "discovered";
       return { value: "原生桌面", label: connected ? "已连接" : failed ? "连接失败"
+        : updateAvailable ? "待更新连接器"
         : desktop && desktop.pairingCode && !desktop.paired ? "等待配对"
         : found && desktop && desktop.connectorInstalled && desktop.errorCode === "desktop_not_running"
           ? "DSH 桌面版未打开"

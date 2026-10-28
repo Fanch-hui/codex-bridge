@@ -14,6 +14,7 @@ extension BridgeServiceRequestController {
       payload: DeepSeekHarnessDesktopState(
         mode: result.mode, desktop: result.desktop,
         executablePath: result.executablePath, connectorInstalled: result.connectorInstalled,
-        canInstallConnector: result.canInstallConnector))
+        canInstallConnector: result.canInstallConnector,
+        connectorUpdateAvailable: result.connectorUpdateAvailable))
   }
 }

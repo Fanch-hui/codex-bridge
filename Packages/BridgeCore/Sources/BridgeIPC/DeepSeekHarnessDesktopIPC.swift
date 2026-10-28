@@ -31,6 +31,7 @@ public struct DeepSeekHarnessDesktopState: Codable, Equatable, Sendable {
   public let mode: DeepSeekHarnessConnectionMode
   public let desktop: DeepSeekHarnessDesktopStatus
   public let executablePath: String
+  public let connectorUpdateAvailable: Bool?
   public let connectorInstalled: Bool
   public let canInstallConnector: Bool
   public let canOpenSession: Bool
@@ -40,11 +41,13 @@ public struct DeepSeekHarnessDesktopState: Codable, Equatable, Sendable {
 
   public init(
     mode: DeepSeekHarnessConnectionMode, desktop: DeepSeekHarnessDesktopStatus,
-    executablePath: String, connectorInstalled: Bool = false, canInstallConnector: Bool = false
+    executablePath: String, connectorInstalled: Bool = false, canInstallConnector: Bool = false,
+    connectorUpdateAvailable: Bool? = nil
   ) {
     self.mode = mode
     self.desktop = desktop
     self.executablePath = executablePath
+    self.connectorUpdateAvailable = connectorUpdateAvailable
     self.connectorInstalled = connectorInstalled
     self.canInstallConnector = canInstallConnector
     self.canOpenSession = desktop.paired
