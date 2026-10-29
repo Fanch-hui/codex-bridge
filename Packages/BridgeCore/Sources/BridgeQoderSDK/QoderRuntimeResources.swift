@@ -27,7 +27,7 @@ enum QoderRuntimeResources {
   }
 
   static let hashes: [String: String] = [
-    "account-scope.mjs": "aaed445d487d39a9ba66a19b25e272c6849e777755c3c529cc0a0294efa6327b",
+    "account-scope.mjs": "1dc5734ba341fb95b6eace2c55522fa22dfdbf0501121a0614904bdecca746e3",
     "configuration.mjs": "2162d4bcf032e442f36d9544d5154bd1a6592e22ec1c0e24f39082e63caa0685",
     "process.mjs": "96d78d8db77b527689da9fefd2917ebfbdf99b3a4acd87c4108e8fc5ea5b145c",
     "native-history.mjs": "390e08ce53c6c5a299729d4aca4afc99e1cb45cad79f51059a86c29ce6e34f7b",
@@ -37,8 +37,8 @@ enum QoderRuntimeResources {
     "models.mjs": "44442327ff6a9d555993b0d6645abfb4aae97876b380884f7c9a7af7395cf877",
     "policy.mjs": "71086a874e8639a51b21f95b0b7f5d494ef4cd54545119d5b8df7d56548a843a",
     "rpc.mjs": "3de8b0274634185bf88789fe5670afca5a1d9d01c7c8e7617697a48fe4a9292b",
-    "sdk.mjs": "0bb18e5aca146bf1b93a9d3aee2bd7e5fdf60946fec9a0a8daf9b5214d715b87",
-    "session.mjs": "9fb58fa774daebdc90a8e83bae9245f2bfa5a548ef4ebdfc6e943dacbb08595d",
+    "sdk.mjs": "f08f5c96b53d0bab6b8ff0a363c5b17565baff3dd7269625efaf7bf82a203fd0",
+    "session.mjs": "1b471104181da4fc1577a931ad3b063e8fd48246f86f32c2a9724c7bb555eb4d",
     "skill-resources.mjs": "bc72e4bb849050ff2093d054c910b75c4097c06631aad44ddd70824b4e14524c",
     "usage.mjs": "ccb9b84eea18c2721793e8770627b3a501ab834ddf89a565184a6f6a66ff65e3",
     "validation.mjs": "5a058e471b5038683c7ac3b94dac5a09e2072f3271b9a74e5ecc841e650cedc3",

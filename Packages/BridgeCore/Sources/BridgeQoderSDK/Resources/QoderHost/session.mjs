@@ -4,7 +4,7 @@ export { validateConfiguration } from './configuration.mjs';
 import { createPolicy } from './policy.mjs';
 import { MessageProjection, stopChildren } from './events.mjs';
 import { catalog, modelPolicy, validateSelection } from './models.mjs';
-import { loadSDK, authentication, validateSDKQuery, sdkPermissionMode } from './sdk.mjs';
+import { loadSDK, authentication, isSDKAuthenticationError, validateSDKQuery, sdkPermissionMode } from './sdk.mjs';
 import { SDKProcessOwner } from './process.mjs';
 import { queryAccountScope, accountScopeFromQuery } from './account-scope.mjs';
 import { stageSelectedSkills } from './skill-resources.mjs';
@@ -83,7 +83,7 @@ export class QoderSession {
           .filter(name => typeof this.query[name] === 'function') };
     } catch (error) {
       await this.close();
-      if (this.authenticationExpired) throw new HostError('authentication_required');
+      if (this.authenticationExpired || isSDKAuthenticationError(error)) throw new HostError('authentication_required');
       throw error;
     }
   }

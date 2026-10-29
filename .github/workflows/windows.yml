@@ -211,6 +211,7 @@ jobs:
           import { pathToFileURL } from 'node:url';
           import path from 'node:path';
           import { SDKProcessOwner } from '../../Packages/BridgeCore/Sources/BridgeQoderSDK/Resources/QoderHost/process.mjs';
+          import { isSDKAuthenticationError } from '../../Packages/BridgeCore/Sources/BridgeQoderSDK/Resources/QoderHost/sdk.mjs';
           const root = path.resolve('.build/agent-contract');
           const modules = path.join(root, 'node_modules');
           const cli = path.join(modules, '@qodercn-ai/qoderclicn/bundle/qoderclicn.js');
@@ -229,7 +230,7 @@ jobs:
             } });
             console.log('Qoder CN native SDK initialization: passed');
           } catch (error) {
-            if (!authRequired) throw new Error('Qoder SDK startup failed before authentication was verified');
+            if (!authRequired && !isSDKAuthenticationError(error)) throw error;
             console.log('Qoder CN native SDK reached authentication; inference requires a signed-in account');
           } finally { if (warm) await warm.close(); await owner.close(); }
           '@ | Set-Content -LiteralPath .build/agent-contract/verify.mjs -Encoding utf8

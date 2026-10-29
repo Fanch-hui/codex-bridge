@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { MessageInput } from './input.mjs';
 import { SDKProcessOwner } from './process.mjs';
-import { authentication, validateSDKQuery } from './sdk.mjs';
+import { authentication, isSDKAuthenticationError, validateSDKQuery } from './sdk.mjs';
 import { HostError, deadline } from './validation.mjs';
 
 export async function queryAccountScope(sdk, config) {
@@ -26,7 +26,7 @@ export async function queryAccountScope(sdk, config) {
     await deadline(query.initializationResult());
     return await accountScopeFromQuery(query, config);
   } catch (error) {
-    if (expired || error?.exitCode === 41 || error?.code === 'authentication_required') {
+    if (expired || isSDKAuthenticationError(error)) {
       throw new HostError('authentication_required');
     }
     if (error instanceof HostError) throw error;
@@ -44,7 +44,7 @@ export async function accountScopeFromQuery(query, config) {
   let account;
   try { account = await deadline(query.accountInfo()); }
   catch (error) {
-    if (error?.exitCode === 41 || error?.code === 'authentication_required') {
+    if (isSDKAuthenticationError(error)) {
       throw new HostError('authentication_required');
     }
     throw new HostError('account_scope_unavailable');

@@ -52,6 +52,10 @@ export async function loadSDK(config) {
 export function authentication(sdk) {
   return sdk.qodercliAuth();
 }
+export function isSDKAuthenticationError(error) {
+  return error?.exitCode === 41 || error?.code === 'authentication_required'
+    || (error?.result?.is_error === true && error.result.terminal_reason === 'auth_required');
+}
 export function validateSDKQuery(query) {
   for (const method of ['initializationResult', 'getAvailableModels', 'interrupt', 'close']) {
     if (typeof query[method] !== 'function') throw new HostError('sdk_query_contract_unavailable');
