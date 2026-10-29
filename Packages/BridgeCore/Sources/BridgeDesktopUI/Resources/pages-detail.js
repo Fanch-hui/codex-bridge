@@ -1,6 +1,7 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
+  var detailSequence = 0;
 
   function create(container) {
     var overview = S.node("div", "detail-overview");
@@ -64,11 +65,15 @@
       var name = S.node("span", "detail-row-title", label);
       var value = S.node("span", "detail-row-value");
       var accessory = S.node("span", "detail-row-accessory");
+      var idSuffix = String(++detailSequence);
+      name.id = "desktop-detail-title-" + idSuffix;
+      value.id = "desktop-detail-value-" + idSuffix;
+      accessory.id = "desktop-detail-accessory-" + idSuffix;
       copy.appendChild(name); copy.appendChild(value);
       root.appendChild(copy); root.appendChild(accessory);
       root.appendChild(S.icon("chevron.right", "detail-row-chevron"));
       root.dataset.detailID = id;
-      root.setAttribute("aria-label", label);
+      root.setAttribute("aria-labelledby", [name.id, value.id, accessory.id].join(" "));
       storage.appendChild(body);
       var entry = {
         root: root, body: body, value: value, accessory: accessory, title: label,
@@ -76,7 +81,6 @@
         update: function (next) {
           if (next.title !== undefined) {
             entry.title = next.title; name.textContent = next.title;
-            root.setAttribute("aria-label", next.title);
             if (selected === id) title.textContent = next.title;
           }
           if (next.value !== undefined) { value.textContent = next.value || ""; value.hidden = !next.value; }

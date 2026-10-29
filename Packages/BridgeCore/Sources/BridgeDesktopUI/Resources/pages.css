@@ -1,6 +1,6 @@
-.page, .overview-page { width: calc(100% - var(--page-gutter) * 2); margin: 0 var(--page-gutter); padding: 8px 0 32px; }
+.page, .overview-page { width: calc(100% - var(--page-gutter) * 2); margin: 0 var(--page-gutter); padding: 16px 0 32px; }
 .page-header { display: flex; align-items: flex-start; gap: 12px; }
-.page-header h2 { margin: 0; font-size: 20px; line-height: 28px; }
+.page-header h2 { margin: 0; font-size: var(--font-size-title); font-weight: 600; line-height: 24px; }
 .page-header p { margin: 1px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 20px; }
 .page-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
 .page-toolbar > .toolbar-spacer { flex: 1 1 auto; }
@@ -20,7 +20,7 @@
 .check-field input { width: 16px; height: 16px; flex: 0 0 16px; margin: 0; accent-color: var(--accent); }
 .check-field label { color: inherit; font-size: 13px; }
 .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
-.form-actions > .button, .page-toolbar > .button, .filter-actions > .button { min-height: var(--control-height); padding-block: 6px; }
+.form-actions > .button, .page-toolbar > .button, .filter-actions > .button { min-height: var(--control-height); padding-block: 4px; }
 .split-layout { display: grid; grid-template-columns: minmax(240px, .32fr) minmax(0, .68fr); align-items: start; gap: 16px; margin-top: 16px; }
 .list-panel { overflow: hidden; }
 .list-panel-header, .detail-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--separator); }
@@ -32,7 +32,7 @@
 .list-row:hover, .task-row:hover, .project-row:hover, .agent-row:hover, .log-row:hover { background: var(--surface-muted); }
 .list-row.selected, .task-row.selected, .project-row.selected { color: var(--accent); background: var(--accent-soft); }
 .row-main { min-width: 0; flex: 1 1 auto; }
-.row-title { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.row-title { overflow: hidden; font-size: var(--font-size-body); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .row-detail { margin-top: 3px; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-body { padding: 18px; }
 .detail-title { margin: 0; }

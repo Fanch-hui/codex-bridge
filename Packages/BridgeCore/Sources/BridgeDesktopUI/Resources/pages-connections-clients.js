@@ -7,7 +7,8 @@
     var permissionsOnly = options.mode === "permissions";
     var connectionOnly = options.mode === "connection";
     var context = { emit: emit };
-    var card = S.node("div", "page-card connection-card client-settings-card");
+    var card = S.node("div", "page-card connection-card client-settings-card"
+      + (permissionsOnly ? " client-permissions-card" : ""));
     var rows = new Map();
     function createRow(client) {
       var row = S.node("div", "client-row");
@@ -70,8 +71,6 @@
       actions.appendChild(rotate);
       controls.appendChild(actions);
       row.appendChild(controls);
-      var hint = S.node("p", "client-exposure-hint");
-      row.appendChild(hint);
       var draft = D.bind(connectionOnly ? { enabled: checkbox } : { exposure: exposure.control, enabled: checkbox });
       return {
         root: row,
@@ -83,8 +82,7 @@
         draft: draft,
         copy: copy,
         rotate: rotate,
-        actions: actions,
-        hint: hint
+        actions: actions
       };
     }
     function updateRow(row, client, nextEmit, singleClient) {
@@ -115,8 +113,6 @@
       row.actions.hidden = row.copy.hidden && row.rotate.hidden;
       row.copy.disabled = !client.enabled || !client.canCopyConfiguration;
       row.rotate.disabled = !client.enabled || !client.canRotateCredential;
-      row.hint.textContent = permissionsOnly ? "控制此客户端可以调用的 MCP 工具。" : "";
-      row.hint.hidden = !row.hint.textContent;
       row.detail.hidden = permissionsOnly || !row.detail.textContent;
       context.emit = nextEmit;
     }

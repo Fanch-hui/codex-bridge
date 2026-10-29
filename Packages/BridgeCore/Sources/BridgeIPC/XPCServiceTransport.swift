@@ -1,4 +1,5 @@
 #if os(macOS)
+  import BridgeAgentCore
   import Foundation
 
   final class XPCStreamBridge: NSObject, CodexBridgeTaskStreamListener, @unchecked Sendable {
@@ -69,8 +70,7 @@
     func perform(_ data: Data) async throws -> Data {
       try await withCheckedThrowingContinuation { continuation in
         let completion = XPCClientCompletion(continuation)
-        let operation = try? BridgeServiceIPCCodec.decodeRequest(data).operation
-        let timeout: TimeInterval = operation == .status ? 3 : 120
+        let timeout = Self.responseTimeout(for: data)
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
           if completion.resume(throwing: BridgeServiceClientError.unavailable) {
             self?.invalidate()
@@ -88,6 +88,18 @@
           completion.resume(returning: response)
         }
       }
+    }
+
+    static func responseTimeout(for data: Data) -> TimeInterval {
+      guard let request = try? BridgeServiceIPCCodec.decodeRequest(data) else { return 120 }
+      if request.operation == .status { return 3 }
+      guard request.operation == .manageDeepSeekHarnessDesktop,
+        let payload = try? BridgeServiceIPCCodec.payload(
+          DeepSeekHarnessDesktopRequest.self, from: request),
+        payload.action == .installConnector
+      else { return 120 }
+      // Include installation preflight and receipt delivery after the subprocess deadline.
+      return TimeInterval(AgentSetupProcessLimits.maximumConnectorRunSeconds + 60)
     }
 
     func invalidate() {

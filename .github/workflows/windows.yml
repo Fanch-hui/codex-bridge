@@ -197,14 +197,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node Scripts/verify-agent-runtime-resources.mjs "$env:SWIFT_BIN_PATH"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          foreach ($piVersion in @("0.87.1", "1.0.3")) {
+          foreach ($piVersion in @("0.87.1", "1.0.3", "1.4.0")) {
             $piRoot = ".build/pi-contract/$piVersion"
             npm install --prefix $piRoot --ignore-scripts --no-audit --no-fund "@earendil-works/pi-coding-agent@$piVersion"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             node Scripts/verify-pi-cli-contract.mjs $piRoot $piVersion
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          npm install --prefix .build/agent-contract --ignore-scripts --no-audit --no-fund @qodercn-ai/qoderclicn@1.1.64 @qodercn-ai/qodercn-agent-sdk@1.0.50
+          npm install --prefix .build/agent-contract --ignore-scripts --no-audit --no-fund @qodercn-ai/qoderclicn@1.1.80 @qodercn-ai/qodercn-agent-sdk@1.0.56
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           @'
           import { execFileSync } from 'node:child_process';

@@ -17,7 +17,13 @@ public struct OpenCodeACPSemanticVersion: Comparable, Equatable, Sendable {
   }
 
   public init?(_ value: String) {
-    let core = value.split(separator: "+", maxSplits: 1).first?
+    let version: String
+    if value.hasPrefix("opencode v") {
+      version = String(value.dropFirst("opencode v".count))
+    } else {
+      version = value
+    }
+    let core = version.split(separator: "+", maxSplits: 1).first?
       .split(separator: "-", maxSplits: 1).first
     guard let core else { return nil }
     let components = core.split(separator: ".", omittingEmptySubsequences: false)
@@ -203,7 +209,41 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
         environment[key] = value
       }
     }
+    for key in providerEnvironmentKeys {
+      #if os(Windows)
+        let value =
+          source[key]
+          ?? source.first {
+            $0.key.caseInsensitiveCompare(key) == .orderedSame
+          }?.value
+      #else
+        let value = source[key]
+      #endif
+      if let value, !value.isEmpty, !value.contains("\0"), value.utf8.count <= 16 * 1_024 {
+        environment[key] = value
+      }
+    }
     return environment
   }
+
+  private static let providerEnvironmentKeys = [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GOOGLE_API_KEY",
+    "GOOGLE_GENERATIVE_AI_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "OPENCODE_API_KEY",
+    "GROQ_API_KEY",
+    "XAI_API_KEY",
+    "MISTRAL_API_KEY",
+    "MOONSHOT_API_KEY",
+    "DASHSCOPE_API_KEY",
+    "ZHIPU_API_KEY",
+    "MINIMAX_API_KEY",
+    "CEREBRAS_API_KEY",
+    "OLLAMA_API_KEY",
+  ]
 
 }

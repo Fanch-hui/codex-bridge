@@ -1,26 +1,26 @@
 :root {
   color-scheme: light dark;
-  --canvas: #f8f9fa;
-  --sidebar: #f1f2f4;
+  --canvas: #f5f5f7;
+  --sidebar: #ececee;
   --surface: #fff;
   --surface-muted: #f4f5f7;
   --surface-hover: rgba(38, 49, 72, .06);
   --surface-pressed: rgba(38, 49, 72, .10);
   --text: #0f1115;
-  --text-secondary: #61666b;
-  --text-tertiary: #81858c;
+  --text-secondary: #555b63;
+  --text-tertiary: #6b6f76;
   --separator: rgba(0, 0, 0, .10);
   --separator-strong: rgba(0, 0, 0, .16);
   --control-border: rgba(0, 0, 0, .12);
-  --primary: #0f1115;
-  --primary-hover: #30343b;
-  --on-primary: #fff;
-  --accent: #4176e6;
-  --accent-hover: #3265d2;
+  --primary: var(--accent);
+  --primary-hover: var(--accent-hover);
+  --on-primary: var(--on-accent);
+  --accent: #3265d2;
+  --accent-hover: #2856bb;
   --accent-soft: #edf2fd;
   --on-accent: #fff;
   --focus-ring: var(--accent);
-  --focus-ring-soft: rgba(65, 118, 230, .16);
+  --focus-ring-soft: rgba(50, 101, 210, .16);
   --success: #27804b;
   --success-strong: #216c40;
   --success-soft: #eaf5ee;
@@ -35,15 +35,15 @@
   --running-soft: var(--accent-soft);
   --neutral-soft: #eceef1;
   --selection: var(--accent-soft);
-  --radius: 16px;
-  --dialog-radius: 28px;
-  --control-radius: 12px;
-  --control-radius-small: 8px;
-  --button-height: 36px;
+  --radius: 10px;
+  --dialog-radius: 16px;
+  --control-radius: 6px;
+  --control-radius-small: 5px;
+  --button-height: 32px;
   --control-height: 32px;
   --control-height-small: 28px;
-  --shadow-soft: 0 4px 16px rgba(0, 0, 0, .03), 0 0 24px rgba(0, 0, 0, .03);
-  --shadow-overlay: 0 3px 8px rgba(0, 0, 0, .04), 0 0 20px rgba(0, 0, 0, .05);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow-overlay: 0 12px 32px rgba(0, 0, 0, .16), 0 2px 6px rgba(0, 0, 0, .08);
   --overlay-backdrop: rgba(0, 0, 0, .24);
   --scrollbar-thumb: rgba(97, 102, 107, .32);
   --scrollbar-thumb-hover: rgba(97, 102, 107, .5);
@@ -52,6 +52,10 @@
   --z-feedback: 1000;
   --sidebar-width: 144px;
   --page-gutter: 24px;
+  --font-size-body: 13px;
+  --font-size-caption: 12px;
+  --font-size-title: 17px;
+  --line-height-body: 20px;
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: var(--font-ui);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -61,21 +65,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #151517;
-    --sidebar: #1b1b1d;
-    --surface: #232324;
-    --surface-muted: #2c2c2e;
+    --canvas: #1e1e20;
+    --sidebar: #252527;
+    --surface: #28282b;
+    --surface-muted: #303033;
     --surface-hover: rgba(255, 255, 255, .08);
     --surface-pressed: rgba(255, 255, 255, .14);
     --text: #f9fafb;
-    --text-secondary: #cfd3d6;
-    --text-tertiary: #adb2b8;
+    --text-secondary: #bdc1c9;
+    --text-tertiary: #a0a5ae;
     --separator: rgba(255, 255, 255, .12);
     --separator-strong: rgba(255, 255, 255, .20);
     --control-border: rgba(255, 255, 255, .16);
-    --primary: #f9fafb;
-    --primary-hover: #dedfe2;
-    --on-primary: #151517;
     --accent: #7aaaff;
     --accent-hover: #a0c3ff;
     --accent-soft: rgba(122, 170, 255, .14);
@@ -91,9 +92,52 @@
     --error-strong: #ffacb4;
     --error-soft: rgba(241, 144, 153, .12);
     --neutral-soft: #353638;
-    --shadow-overlay: 0 3px 8px rgba(0, 0, 0, .16), 0 0 20px rgba(0, 0, 0, .20);
+    --shadow-overlay: 0 12px 32px rgba(0, 0, 0, .4), 0 2px 6px rgba(0, 0, 0, .2);
     --overlay-backdrop: rgba(0, 0, 0, .5);
     --scrollbar-thumb: rgba(173, 178, 184, .30);
     --scrollbar-thumb-hover: rgba(173, 178, 184, .48);
+  }
+}
+
+@supports (color: AccentColor) and (color: color-mix(in srgb, black, white)) {
+  /* Keep small accent text readable on window and sidebar surfaces. */
+  :root:not([data-platform]) {
+    --accent: color-mix(in srgb, AccentColor 42%, #000);
+    --accent-hover: color-mix(in srgb, var(--accent) 88%, #000);
+    --on-accent: #fff;
+    --accent-soft: color-mix(in srgb, AccentColor 12%, var(--surface));
+    --focus-ring-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-platform]) {
+      --accent: color-mix(in srgb, AccentColor 40%, #fff);
+      --accent-hover: color-mix(in srgb, var(--accent) 88%, #fff);
+      --on-accent: #10203a;
+    }
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root { --separator: var(--text-secondary); --control-border: var(--text-secondary); --text-tertiary: var(--text-secondary); }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --canvas: Canvas;
+    --sidebar: Canvas;
+    --surface: Canvas;
+    --surface-muted: Canvas;
+    --text: CanvasText;
+    --text-secondary: CanvasText;
+    --text-tertiary: GrayText;
+    --separator: ButtonBorder;
+    --separator-strong: ButtonText;
+    --control-border: ButtonBorder;
+    --accent: LinkText;
+    --focus-ring: Highlight;
+    --selection: Highlight;
+    --shadow-soft: none;
+    --shadow-overlay: none;
   }
 }

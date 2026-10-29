@@ -31,7 +31,7 @@ enum ServiceAgentSetupInstallError: Error, LocalizedError, Sendable {
   case unsupported(String)
   case invalidMetadata(String)
   case checksumMismatch
-  case commandFailed(String)
+  case commandFailed(String, diagnosticCode: String? = nil)
   case unavailableExecutable
 
   var errorDescription: String? {
@@ -39,7 +39,7 @@ enum ServiceAgentSetupInstallError: Error, LocalizedError, Sendable {
     case .unsupported(let message): message
     case .invalidMetadata(let source): "官方安装信息无效：\(source)"
     case .checksumMismatch: "下载文件完整性校验失败，请重试。"
-    case .commandFailed(let command): "安装步骤失败：\(command)"
+    case .commandFailed(let command, _): "安装步骤失败：\(command)"
     case .unavailableExecutable: "安装程序未生成可用的运行入口。"
     }
   }

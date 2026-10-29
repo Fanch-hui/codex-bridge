@@ -85,6 +85,14 @@ public struct DeepSeekHarnessACPProfile: Sendable {
     DeepSeekHarnessACPArtifactRuntime.isCompatibleNodeVersion(version)
   }
 
+  public static func nodeRequirement(forExecutable executable: String) throws
+    -> DeepSeekHarnessNodeRequirement
+  {
+    let root = try DeepSeekHarnessACPArtifactRuntime.findSourceRoot(startingAt: executable)
+    let manifest = try DeepSeekHarnessACPPathSupport.append("package.json", to: root)
+    return try DeepSeekHarnessACPArtifactRuntime.parseManifest(at: manifest).nodeRequirement
+  }
+
   private func validatedConfigurationData(for installation: AgentInstallation) throws -> Data {
     try DeepSeekHarnessACPArtifactValidator.validatedConfigurationData(
       for: installation,

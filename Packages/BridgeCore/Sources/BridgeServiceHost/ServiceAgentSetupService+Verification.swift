@@ -22,7 +22,7 @@ extension ServiceAgentSetupService {
       }
       let record = try await connect(request, runtime: runtime, previous: previous, input: input)
       try Task.checkCancellation()
-      if [.openCode, .pi, .antigravity].contains(providerID), previous?.isSelectable != true,
+      if [.pi, .antigravity].contains(providerID), previous?.isSelectable != true,
         input?.loginCompleted != true
       {
         throw ServiceAgentSetupError.userAction("安装与接口已准备，请完成原生登录或确认已有登录，再验证连接。")

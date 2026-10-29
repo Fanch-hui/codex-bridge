@@ -247,6 +247,13 @@ extension BridgeServiceRequestController {
   ) -> BridgeServiceIPCError {
     switch error {
     case .artifactInvalid(let field):
+      if field == "runtime_manifest.node_engine" {
+        return .init(
+          code: "agent_runtime_incompatible",
+          message:
+            "DeepSeek Harness declares an unsupported Node version requirement. Update Codex Bridge."
+        )
+      }
       return .init(
         code: "agent_artifact_invalid",
         message:
@@ -262,6 +269,11 @@ extension BridgeServiceRequestController {
       return .init(
         code: "agent_runtime_incompatible",
         message: "DeepSeek Harness requires Node ^22.19.0 or >=24.0.0."
+      )
+    case .nodeRequirementIncompatible(let version, let required):
+      return .init(
+        code: "agent_runtime_incompatible",
+        message: "DeepSeek Harness requires Node \(required); found \(version)."
       )
     case .processUnavailable:
       return .init(

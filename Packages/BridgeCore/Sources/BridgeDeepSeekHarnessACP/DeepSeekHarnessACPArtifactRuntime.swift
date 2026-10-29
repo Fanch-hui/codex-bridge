@@ -5,6 +5,7 @@ import Foundation
 enum DeepSeekHarnessACPArtifactRuntime {
   struct PackageManifest: Sendable {
     let version: String?
+    let nodeRequirement: DeepSeekHarnessNodeRequirement
   }
 
   struct SemanticVersion: Comparable, Equatable, Sendable {
@@ -39,11 +40,7 @@ enum DeepSeekHarnessACPArtifactRuntime {
   }
 
   static func isCompatibleNodeVersion(_ version: String) -> Bool {
-    guard let parsed = SemanticVersion(version) else { return false }
-    if parsed.major == 22 {
-      return parsed >= SemanticVersion(major: 22, minor: 19, patch: 0)
-    }
-    return parsed.major >= 24
+    DeepSeekHarnessNodeRequirement(nil)!.accepts(version)
   }
 
   static var launchEntryRequiresNativeExecutable: Bool {
@@ -95,7 +92,8 @@ enum DeepSeekHarnessACPArtifactRuntime {
 
   static func findNodeInterpreter(
     executablePath: String,
-    sourceEnvironment: [String: String]
+    sourceEnvironment: [String: String],
+    nodeRequirement: DeepSeekHarnessNodeRequirement
   ) throws -> String {
     let shebangCandidates = try shebangInterpreters(at: executablePath)
     let pathCandidates =
@@ -105,6 +103,7 @@ enum DeepSeekHarnessACPArtifactRuntime {
         sourceEnvironment: sourceEnvironment
       )
     var seen = Set<String>()
+    var firstExecutable: String?
     for candidate in pathCandidates {
       guard let canonical = try? canonicalPath(candidate, field: "node_interpreter") else {
         continue
@@ -114,9 +113,14 @@ enum DeepSeekHarnessACPArtifactRuntime {
       if (try? DeepSeekHarnessACPFileSnapshot(capturing: canonical, requiresExecutable: true))
         != nil
       {
-        return canonical
+        if shebangCandidates.contains(candidate) { return canonical }
+        if firstExecutable == nil { firstExecutable = canonical }
+        if let version = try? nodeVersion(at: canonical), nodeRequirement.accepts(version) {
+          return canonical
+        }
       }
     }
+    if let firstExecutable { return firstExecutable }
     throw DeepSeekHarnessACPError.artifactInvalid("node_interpreter")
   }
 
@@ -242,12 +246,21 @@ enum DeepSeekHarnessACPArtifactRuntime {
       maximumBytes: 2 * 1_024 * 1_024,
       field: "runtime_manifest.size"
     )
+    return try parseManifest(data)
+  }
+
+  static func parseManifest(_ data: Data) throws -> PackageManifest {
     guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
       json["version"] == nil || json["version"] is String
     else {
       throw DeepSeekHarnessACPError.artifactInvalid("runtime_manifest.json")
     }
-    return PackageManifest(version: json["version"] as? String)
+    let engines = json["engines"] as? [String: Any]
+    guard json["engines"] == nil || engines != nil,
+      engines?["node"] == nil || engines?["node"] is String,
+      let requirement = DeepSeekHarnessNodeRequirement(engines?["node"] as? String)
+    else { throw DeepSeekHarnessACPError.artifactInvalid("runtime_manifest.node_engine") }
+    return PackageManifest(version: json["version"] as? String, nodeRequirement: requirement)
   }
 
   static func boundedData(at path: String, maximumBytes: Int, field: String) throws -> Data {

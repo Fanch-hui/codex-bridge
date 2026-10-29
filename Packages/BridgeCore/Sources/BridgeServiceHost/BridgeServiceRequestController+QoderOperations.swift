@@ -165,7 +165,7 @@ extension BridgeServiceRequestController {
     if let requestedID = payload.installationID {
       guard
         let installation = existing.first(where: {
-          $0.id.rawValue == requestedID && $0.availability == .available
+          $0.id.rawValue == requestedID && $0.availability != .needsReview
         })
       else { throw BridgeMCPQueryError.unavailable }
       let byID = try await composition.settings.qoderInstallationDistribution(
@@ -191,8 +191,7 @@ extension BridgeServiceRequestController {
       return try await qoderInstallation(
         id: activeID,
         distribution: distribution,
-        existing: existing,
-        mustBeSelectable: true
+        existing: existing
       )
     }
 
@@ -213,13 +212,11 @@ extension BridgeServiceRequestController {
   private func qoderInstallation(
     id: String,
     distribution: QoderDistribution,
-    existing: [ServiceAgentInstallationRecord],
-    mustBeSelectable: Bool
+    existing: [ServiceAgentInstallationRecord]
   ) async throws -> ServiceAgentInstallationRecord {
     guard
       let installation = existing.first(where: {
-        $0.id.rawValue == id && $0.availability == .available
-          && (!mustBeSelectable || $0.isSelectable)
+        $0.id.rawValue == id && $0.availability != .needsReview && $0.isEnabled
       })
     else { throw BridgeMCPQueryError.unavailable }
     let mapped = try await composition.settings.qoderInstallationDistribution(

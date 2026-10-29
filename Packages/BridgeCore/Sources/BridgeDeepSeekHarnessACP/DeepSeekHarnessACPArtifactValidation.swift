@@ -31,6 +31,9 @@ enum DeepSeekHarnessACPArtifactValidator {
     let sourceRoot = try DeepSeekHarnessACPArtifactRuntime.findSourceRoot(
       startingAt: executable
     )
+    let manifestPath = try DeepSeekHarnessACPPathSupport.append("package.json", to: sourceRoot)
+    let requirement = try DeepSeekHarnessACPArtifactRuntime.parseManifest(at: manifestPath)
+      .nodeRequirement
     guard let configurationRoot = AgentPathSemantics.directoryPath(of: configuration),
       !AgentPathSemantics.isContained(configurationRoot, in: sourceRoot)
     else {
@@ -38,11 +41,12 @@ enum DeepSeekHarnessACPArtifactValidator {
     }
     let node = try DeepSeekHarnessACPArtifactRuntime.findNodeInterpreter(
       executablePath: executable,
-      sourceEnvironment: sourceEnvironment
+      sourceEnvironment: sourceEnvironment,
+      nodeRequirement: requirement
     )
     var paths: [AgentInstallationArtifactRole: String] = [
       .launchConfiguration: configuration,
-      .runtimeManifest: try DeepSeekHarnessACPPathSupport.append("package.json", to: sourceRoot),
+      .runtimeManifest: manifestPath,
       .nodeInterpreter: node,
     ]
     if let lock = try? DeepSeekHarnessACPArtifactRuntime.dependencyLockPath(in: sourceRoot) {
@@ -123,10 +127,11 @@ enum DeepSeekHarnessACPArtifactValidator {
       installation.executablePath,
       sourceRoot: sourceRoot
     )
-    _ = try DeepSeekHarnessACPArtifactRuntime.parseManifest(at: manifest.path)
+    let requirement = try DeepSeekHarnessACPArtifactRuntime.parseManifest(at: manifest.path)
+      .nodeRequirement
     let nodeVersion = try DeepSeekHarnessACPArtifactRuntime.nodeVersion(at: node.path)
-    guard DeepSeekHarnessACPArtifactRuntime.isCompatibleNodeVersion(nodeVersion) else {
-      throw DeepSeekHarnessACPError.nodeVersionIncompatible(nodeVersion)
+    guard requirement.accepts(nodeVersion) else {
+      throw requirement.incompatibility(nodeVersion)
     }
 
     return DeepSeekHarnessACPValidatedInstallation(

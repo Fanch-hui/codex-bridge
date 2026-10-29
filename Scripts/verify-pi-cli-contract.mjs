@@ -6,9 +6,9 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 
 const [installation, expectedVersion] = process.argv.slice(2);
-const providers = { '0.87.1': 'azure-openai-responses', '1.0.3': 'azure' };
+const providers = { '0.87.1': 'azure-openai-responses', '1.0.3': 'azure', '1.4.0': 'azure' };
 if (!installation || !Object.hasOwn(providers, expectedVersion)) {
-  throw new Error('Usage: node Scripts/verify-pi-cli-contract.mjs <npm-prefix> <0.87.1|1.0.3>');
+  throw new Error(`Usage: node Scripts/verify-pi-cli-contract.mjs <npm-prefix> <${Object.keys(providers).join('|')}>`);
 }
 const root = path.resolve(installation);
 const packageRoot = path.join(root, 'node_modules/@earendil-works/pi-coding-agent');

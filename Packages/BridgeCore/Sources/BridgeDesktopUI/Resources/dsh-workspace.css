@@ -9,8 +9,8 @@
 .dsh-file-entry { display: flex; flex: 0 0 auto; align-items: center; min-width: 0; }
 .dsh-file-entry .dsh-file-row { flex: 1; min-width: 0; }
 .dsh-file-add-image { flex: 0 0 auto; }
-.button.dsh-file-row { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-width: 0; min-height: 32px; padding: 4px 8px; border: 0; background: transparent; text-align: left; font-weight: 400; }
-.button.dsh-file-row.is-active { background: var(--surface-muted); }
+.button.dsh-file-row { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-width: 0; min-height: 32px; padding: 4px 8px; border: 0; border-inline-start: 2px solid transparent; background: transparent; text-align: left; font-weight: 400; }
+.button.dsh-file-row.is-active { border-inline-start-color: var(--accent); background: var(--selection); font-weight: 600; }
 .dsh-file-icon { flex: 0 0 auto; order: -1; }
 .dsh-file-name { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-git-status { flex: 0 0 auto; margin-left: auto; font-family: var(--font-mono, monospace); white-space: pre; font-variant-numeric: tabular-nums; }
@@ -21,6 +21,7 @@
 .button.dsh-source-close { flex: 0 0 auto; }
 .dsh-source-body { display: flex; height: clamp(160px, 35dvh, 400px); min-height: 160px; background: var(--surface); border: 1px solid var(--separator); border-radius: var(--control-radius-small); overflow: hidden; }
 .dsh-source-body[hidden] { display: none; }
+.dsh-source-body:focus-within { border-color: var(--accent); outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .dsh-line-numbers, .dsh-source-input { font-family: var(--font-mono, monospace); font-size: 12px; line-height: 20px; padding: 10px 8px; margin: 0; border: 0; font-variant-numeric: tabular-nums; }
 .dsh-line-numbers { flex: 0 0 auto; text-align: right; color: var(--text-secondary); background: var(--surface-muted); overflow: hidden; user-select: none; }
 .dsh-source-input { flex: 1; min-width: 0; height: 100%; resize: none; border-radius: 0; background: var(--surface); color: var(--text); tab-size: 2; }
@@ -40,3 +41,8 @@
 .dsh-workspace-tab[aria-selected="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .dsh-workspace-panel { min-width: 0; }
 .dsh-workspace-panel[hidden] { display: none; }
+
+@media (forced-colors: active) {
+  .button.dsh-file-row.is-active { border-inline-start-color: Highlight; }
+  .dsh-source-body:focus-within { outline-color: Highlight; }
+}

@@ -1,3 +1,4 @@
+#connections-content { container-type: inline-size; }
 .connection-detail { display: grid; gap: 24px; min-width: 0; }
 .connection-detail > .page-section { margin-top: 0; }
 .connection-card { display: grid; gap: 16px; align-content: start; }
@@ -7,6 +8,8 @@
 .connection-card > .form-actions:empty { display: none; }
 .connection-card > .button { justify-self: start; }
 .connection-card .form-grid { gap: 16px; }
+.connection-card > .form-grid { width: 100%; max-width: 760px; }
+.connection-card .form-grid > .full { grid-column: 1 / -1; }
 .connection-diagnostics { display: grid; gap: 8px; }
 .connection-diagnostics:empty { display: none; }
 .connection-diagnostics .page-message { margin: 0; }
@@ -40,7 +43,6 @@
 .client-settings-controls > .client-exposure { flex: 0 1 240px; min-width: 160px; }
 .client-settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .client-settings-actions > .button { min-height: 32px; }
-.client-exposure-hint { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 .agent-connectors { display: grid; gap: 16px; }
 .connection-list > .agent-connectors { gap: 0; }
 .agent-connect-row { display: grid; gap: 16px; }
@@ -90,7 +92,6 @@
   .client-settings-controls { align-items: stretch; }
   .client-settings-controls > .client-exposure { flex: 1 1 100%; }
 }
-
 .gemini-cloud-form { grid-template-columns: minmax(180px, .7fr) minmax(0, 2fr); }
 .gemini-cloud-card > .status-badge { justify-self: start; }
 .gemini-cloud-card .page-message { margin: 0; }
@@ -126,3 +127,10 @@
 .agent-maintenance[open] > summary { margin-bottom: 8px; }
 .agent-installation-detail > .button { justify-self: start; }
 .connection-detail > .field { max-width: 360px; }
+
+@container (max-width: 560px) {
+  .connection-detail .form-grid, .connection-card .form-grid,
+  .agent-connect-fields, .dsh-mcp-secret-row, .gemini-cloud-form { grid-template-columns: minmax(0, 1fr); }
+  .client-settings-controls { align-items: stretch; }
+  .client-settings-controls > .client-exposure { flex: 1 1 100%; }
+}

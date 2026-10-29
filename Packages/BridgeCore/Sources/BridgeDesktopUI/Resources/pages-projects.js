@@ -56,7 +56,9 @@
       var body = S.node("div", "list-body");
       S.safeArray(page.rows).forEach(function (project) {
         var row = S.node("button", "project-row" + (project.selected ? " selected" : ""));
-        row.type = "button"; row.appendChild(S.icon("folder.fill", "service-icon"));
+        row.type = "button";
+        row.setAttribute("aria-current", project.selected ? "true" : "false");
+        row.appendChild(S.icon("folder.fill", "service-icon"));
         var text = S.node("div", "row-main");
         text.appendChild(S.node("div", "row-title", project.name));
         var path = S.node("div", "row-detail", project.path ? compactPath(project.path) : project.detail || project.projectID);

@@ -4,37 +4,39 @@
 
 ## 自动发现与连接
 
-在 OpenCode 卡片点击“一键配置”。Bridge 会复用现有兼容安装，或下载当前官方版本，然后引导完成原生 `auth login`。登录或 API 配置完成后返回 Bridge 重新检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。
+在 OpenCode 卡片点击“一键配置”。Bridge 会复用现有兼容安装，或下载当前官方版本，然后直接检测可用模型。免费模型、本地服务和已配置的模型接口可以直接连接；具体模型服务需要授权时，再按其要求完成原生登录或 API 配置。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。
 
 Bridge 首次初始化时扫描本机 Agent 并保存结果。打开连接页后，选择已发现的 Agent 并点击“连接”；需要授权或配置的项目会在连接时提示。后续安装或移动 Agent，可点击“扫描 Agent”更新目录。App 与后台服务重启、切页及日常状态刷新都复用保存的结果。
 
 ## 先说明连接方向
 
-OpenCode 不是 MCP 客户端，也不是要求把 Bridge 加到 OpenCode 的 MCP 列表中。正确的数据流是：
+聊天客户端通过 Bridge 将项目任务委派给 OpenCode，数据流是：
 
 ```text
 ChatGPT / Qwen Studio → Codex Bridge MCP → OpenCode ACP → 已登记的本地项目
 ```
 
-Bridge 会在任务批准后启动：
+Bridge 会在任务批准后，以已登记的项目根目录作为进程工作目录启动：
 
 ```text
-opencode acp --cwd <已登记的项目根目录>
+opencode acp
 ```
 
-OpenCode 不随 Bridge 打包，Bridge 也不会读取、复制或导出 OpenCode 的登录凭据。
+OpenCode 不随 Bridge 打包，模型服务凭据由 OpenCode 自身管理。
 
 ## OpenCode Desktop 与 CLI 的关系
 
-OpenCode Desktop 和 OpenCode CLI 是两个界面，但 Desktop 的本地后端运行 `opencode-cli` sidecar。OpenCode 官方文档把它们的标准配置和运行数据放在同一组用户目录中：全局配置在 `~/.config/opencode/`，认证和其他运行数据在 `~/.local/share/opencode/`（Windows 对应 `%USERPROFILE%\.config\opencode` 和 `%USERPROFILE%\.local\share\opencode`）。因此通过 Desktop 完成的标准 Provider 配置和登录通常可以被 CLI 复用，反过来也一样；Desktop 自己的窗口、服务器选择和最近项目等 UI 状态仍保存在单独的应用数据目录。
+OpenCode Desktop 和 OpenCode CLI 是两个界面，但 Desktop 的本地后端运行 `opencode-cli` sidecar。OpenCode 官方文档把它们的标准配置和运行数据放在同一组用户目录中：全局配置在 `~/.config/opencode/`，认证和其他运行数据在 `~/.local/share/opencode/`（Windows 对应 `%USERPROFILE%\.config\opencode` 和 `%USERPROFILE%\.local\share\opencode`）。Desktop 与 CLI 可以读取同一份标准 Provider 配置。OpenCode 2.x 将保存的服务商账号放在其 SQLite 数据库中，旧版使用 `auth.json`；Desktop 的窗口、服务器选择和最近项目等 UI 状态保存在单独的应用数据目录。
 
 Bridge 不启动或嵌入 OpenCode Desktop，而是启动已登记的 OpenCode CLI：
 
 ```text
-Bridge Desktop → Bridge Service → opencode acp --cwd <项目根目录> → OpenCode ACP
+Bridge Desktop → Bridge Service → opencode acp → 已登记项目
 ```
 
-Bridge 会把当前系统用户的 `HOME`、`PATH`、`XDG_CONFIG_HOME` 和 `XDG_DATA_HOME` 传给 OpenCode ACP，因此会读取上述标准配置和 `auth.json`。同时，Bridge 将缓存、临时目录、运行状态以及 ACP 使用的数据库放到自己的运行目录；这部分会话数据不会与 OpenCode Desktop 的本地 UI 状态混用。若你依赖 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR` 或其他自定义环境变量，应把配置写入标准全局/项目文件并在 CLI 中确认，因为 Bridge 的 ACP 启动环境不承诺转发这些自定义覆盖项。配置或登录后，应在 `opencode` CLI 中先确认能正常连接 Provider 和读取模型。
+Bridge 会把当前系统用户的 `HOME`、`PATH`、`XDG_CONFIG_HOME` 和 `XDG_DATA_HOME` 传给 OpenCode ACP，因此会读取上述标准全局与项目配置；旧版认证材料由 OpenCode 自身处理。同时，Bridge 将缓存、临时目录、运行状态以及 ACP 使用的数据库放到自己的运行目录；这部分会话数据不会与 OpenCode Desktop 的本地 UI 状态混用。
+
+Bridge 会传递其后台服务进程中已有的常见模型服务变量，包括 OpenAI、Anthropic、Google、OpenRouter 和 DeepSeek 等服务的标准 API Key 变量。只在某个终端设置的变量，需要让后台服务取得后再重新连接。自定义 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR` 等运行覆盖项继续由 Bridge 管理；配置应放在标准全局或项目文件中。配置后，可在 `opencode` CLI 中确认所需模型可用。
 
 Bridge 桌面 App 中的设置边界如下：
 
@@ -46,9 +48,9 @@ Bridge 桌面 App 中的设置边界如下：
 | 项目登记、任务只读/完整、远程启动批准 | 项目登记授权目录完整访问；用户选择任务权限并审批远程启动 |
 | OpenCode/Antigravity 原生权限 | 由各自 CLI 或 ACP 处理，不因其他 Agent 的访问设置改变 |
 
-因此，OpenCode Desktop 与 CLI 会共享 OpenCode 自己的标准配置和认证数据；OpenCode 与 AGY 不会共享彼此的 Provider 配置。Bridge 的桌面 App 只提供统一的项目、任务、模型和审批控制面。
+OpenCode 的授权方式取决于所选模型服务。免费模型、本地服务与已配置接口可直接使用；2.x 保存在原生数据库中的账号与 Bridge 隔离数据库分别生效。Bridge 的桌面 App 提供统一的项目、任务、模型和审批控制面。
 
-## 1. 安装并登录 OpenCode
+## 1. 安装与模型服务配置
 
 请先阅读 [OpenCode 官方文档](https://opencode.ai/docs/)。常用安装方式如下：
 
@@ -57,7 +59,7 @@ Bridge 桌面 App 中的设置边界如下：
 curl -fsSL https://opencode.ai/install | bash
 
 # npm
-npm install -g opencode-ai
+npm install -g @opencode/cli
 ```
 
 也可以按官方文档使用 Homebrew、Bun、pnpm、Yarn、Scoop 或 Chocolatey。使用 Windows 版 Bridge 时安装 Windows 原生 CLI，例如在 PowerShell 运行上面的 npm 命令；登记可执行的 CLI 入口。仅在 WSL 内安装的 Linux CLI 不能直接作为 Windows Bridge 的本机入口。
@@ -69,7 +71,7 @@ cd /path/to/your/project
 opencode
 ```
 
-在 OpenCode 中输入 `/connect`，按页面提示选择 Provider，并在 Provider 页面完成登录、订阅或 API key 配置。API key 只应交给 OpenCode 的官方登录流程，不要粘贴到 Bridge、聊天、日志或 Issue。可以使用 `/init` 让 OpenCode 为项目生成初始说明，但这不是 Bridge 连接的必要步骤。
+选择已有可用模型即可开始使用。需要添加模型服务时，在 OpenCode 中输入 `/connect`，按该服务的要求完成登录、订阅或 API key 配置。模型服务凭据保存在 OpenCode 自身的配置或原生认证流程中。可以使用 `/init` 让 OpenCode 为项目生成初始说明，但这不是 Bridge 连接的必要步骤。
 
 先在 OpenCode 自己的界面确认所需模型可用，再退出交互界面。Bridge 的模型目录来自 ACP，会以当前项目根启动一次 ACP `session/new` 读取 Provider 实际返回的模型和模式能力。
 
@@ -77,7 +79,7 @@ opencode
 
 Bridge 通过 ACP 握手判断 OpenCode 是否可用，而不是仅根据命令行版本号判断。Probe 会检查：
 
-- 能否启动 `opencode acp --cwd <项目根目录>`；
+- 能否在目标项目目录启动 `opencode acp`；
 - ACP 协议版本是否为当前适配器支持的版本；
 - Agent 名称和版本字段是否正常返回；
 - `session/new`、模型配置选项和当前任务所需能力是否可用。

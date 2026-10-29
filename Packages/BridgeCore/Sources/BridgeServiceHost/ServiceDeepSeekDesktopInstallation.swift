@@ -13,14 +13,14 @@ enum ServiceDeepSeekDesktopInstallError: Error, LocalizedError {
   case unsupportedPlatform
   case desktopInstallationRequired
   case desktopMustExit
-  case installationFailed
+  case installationFailed(diagnosticCode: String? = nil)
 
   var errorDescription: String? {
     switch self {
     case .unsupportedPlatform: "此平台暂不支持 DSH 原生桌面安装。"
     case .desktopInstallationRequired: "请先安装官方 DSH Desktop，再安装连接器。"
     case .desktopMustExit: "请完全退出 DSH Desktop 后重试安装连接器。"
-    case .installationFailed: "连接器安装失败。请先启动一次 DSH Desktop 完成初始化，再完全退出后重试。"
+    case .installationFailed: "连接器安装失败，请检查 DSH 插件安装环境和诊断代码。"
     }
   }
 }
@@ -94,25 +94,22 @@ struct ServiceDeepSeekDesktopInstallation: Sendable {
         throw ServiceDeepSeekDesktopInstallError.desktopMustExit
       }
       let package = try preparePackage(installation)
-      var launchEnvironment: [String: String] = [:]
-      for name in [
-        "HOME", "PATH", "DSH_HOME", "TMPDIR", "TMP", "TEMP", "HTTP_PROXY", "HTTPS_PROXY",
-        "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy",
-      ] {
-        if let value = environment[name], !value.contains("\0"), value.utf8.count <= 32 * 1_024 {
-          launchEnvironment[name] = value
-        }
-      }
-      AgentProviderEnvironment.applyWindowsSystemEnvironment(
-        to: &launchEnvironment, from: environment)
-      launchEnvironment.merge(layout.environment) { _, value in value }
-      do {
-        _ = try await io.run(
+      let launchEnvironment = installerEnvironment(layout)
+      if try await !selectInstalledConnector(
+        layout: layout, package: package, environment: launchEnvironment)
+      {
+        _ = try await runNativeCommand(
           [layout.runtimePath] + layout.runtimeArguments
-            + [layout.entryPath, "plugin", "--profile", "desktop", "add", package.path],
+            + [layout.entryPath, "plugin", "--profile", "desktop", "add", package.path]
+            + packageManagerArguments(cwd: package),
           cwd: package, environment: launchEnvironment)
-      } catch is CancellationError { throw CancellationError() } catch {
-        throw ServiceDeepSeekDesktopInstallError.installationFailed
+        guard
+          try await selectInstalledConnector(
+            layout: layout, package: package, environment: launchEnvironment)
+        else {
+          throw ServiceDeepSeekDesktopInstallError.installationFailed(
+            diagnosticCode: "DSH_CONNECTOR_INSTALL_INCOMPLETE")
+        }
       }
       let receipt = Receipt(
         fingerprint: DSHDesktopRuntimeResources.fingerprint,
@@ -123,6 +120,41 @@ struct ServiceDeepSeekDesktopInstallation: Sendable {
     #else
       throw ServiceDeepSeekDesktopInstallError.unsupportedPlatform
     #endif
+  }
+
+  private func installerEnvironment(_ layout: DeepSeekHarnessACPRuntimeLayout) -> [String: String] {
+    var launchEnvironment: [String: String] = [:]
+    for name in [
+      "HOME", "PATH", "DSH_HOME", "TMPDIR", "TMP", "TEMP", "HTTP_PROXY", "HTTPS_PROXY",
+      "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy",
+    ] {
+      if let value = environment[name], !value.contains("\0"), value.utf8.count <= 32 * 1_024 {
+        launchEnvironment[name] = value
+      }
+    }
+    AgentProviderEnvironment.applyWindowsSystemEnvironment(
+      to: &launchEnvironment, from: environment)
+    launchEnvironment.merge(layout.environment) { _, value in value }
+    return launchEnvironment
+  }
+
+  func runNativeCommand(
+    _ argv: [String], cwd: URL, environment: [String: String],
+    timeoutSeconds: Int64 = AgentSetupProcessLimits.maximumRunSeconds
+  ) async throws -> String {
+    do {
+      return try await io.run(
+        argv, cwd: cwd, environment: environment, timeoutSeconds: timeoutSeconds)
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch let error as ServiceAgentSetupInstallError {
+      if case .commandFailed(_, let diagnosticCode) = error {
+        throw ServiceDeepSeekDesktopInstallError.installationFailed(diagnosticCode: diagnosticCode)
+      }
+      throw ServiceDeepSeekDesktopInstallError.installationFailed()
+    } catch {
+      throw ServiceDeepSeekDesktopInstallError.installationFailed()
+    }
   }
 
   private func preparePackage(_ installation: AgentInstallation) throws -> URL {

@@ -1,13 +1,13 @@
 #!/bin/zsh
 set -euo pipefail
 
-readonly TUNNEL_CLIENT_VERSION="0.0.17"
-readonly TUNNEL_CLIENT_COMMIT="a248b7f725fc989c1eb26680cf4351ee33421f61"
+readonly TUNNEL_CLIENT_VERSION="0.0.18"
+readonly TUNNEL_CLIENT_COMMIT="274a5588414819f063d27100a4fb1096aae3830f"
 readonly AMD64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-amd64.zip"
 readonly ARM64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-arm64.zip"
 readonly RELEASE_BASE_URL="https://github.com/openai/tunnel-client/releases/download/v${TUNNEL_CLIENT_VERSION}"
-readonly AMD64_ARCHIVE_SHA256="1d54cc57e0a624dc733d402f7d36585f2135a23ddc32c4cb52a7253c7d8d94a0"
-readonly ARM64_ARCHIVE_SHA256="df03ad0ba9c95c22951bab6833df289469f15b9a3fa0397d95e3d568d1ff6c1f"
+readonly AMD64_ARCHIVE_SHA256="95595c6538b3f9872c1367592aede22e0d18ea7f6bdd51cd17fe0bf7e5ca8b26"
+readonly ARM64_ARCHIVE_SHA256="ba7a0994f7dd15bc8708aa1602ecf54371a492319a641ab9c33dc00f1fd56bfe"
 readonly LICENSE_URL="https://raw.githubusercontent.com/openai/tunnel-client/${TUNNEL_CLIENT_COMMIT}/LICENSE"
 readonly LICENSE_SHA256="f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4"
 readonly NOTICE_SHA256="1364c020d86ecf948b78b7c655175032068203d13aece70fb0bfe112d7802dc2"
@@ -126,10 +126,10 @@ verify_attribution() {
     exit 65
   }
 }
-verify_attribution licenses-darwin-amd64.txt ecc5a0ec1cc5c7b16f3d1c2ddb8fb111b738b75a31e03f91c4540345106057a2
-verify_attribution sbom-darwin-amd64.spdx.json 9d3da401f87911e403d2ecc99b350fc536100daf4863b53c953c382dd7998dc7
-verify_attribution licenses-darwin-arm64.txt f18edf70eaa393e9441fda1ec7ad2471323efc75e1cfd3346679e1ba3854ee02
-verify_attribution sbom-darwin-arm64.spdx.json 24d3559dfca40214787ac3448fdf35d6ac6cdc63d652d083025645625504349f
+verify_attribution licenses-darwin-amd64.txt 97237c1bc9b3b0c3de842f3d1e60e921791166fe1414d17a11a651d58f1835ce
+verify_attribution sbom-darwin-amd64.spdx.json bc1abb618993a0a65f348511b5d0b3f0d20d10e3145ba34ee9bd44975881f6af
+verify_attribution licenses-darwin-arm64.txt 4f497f45e64a0ce7c06e3f7c90260fe4ad941bbb1a56c6bbad6f8797f62b2dfb
+verify_attribution sbom-darwin-arm64.spdx.json da6db4a05b6bc145f248ec672d0ebb162199e5ca705e074d9a8efdb821761e92
 
 /usr/bin/lipo "${helper}" -verify_arch x86_64
 /usr/bin/lipo "${helper}" -verify_arch arm64

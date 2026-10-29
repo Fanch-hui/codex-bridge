@@ -1,13 +1,16 @@
 import BridgeAgentCore
+import BridgeDeepSeekHarnessACP
 import Foundation
 
 extension ServiceAgentSetupInstaller {
-  func installNode(in directory: URL) async throws -> String {
+  func installNode(
+    in directory: URL, requirement: DeepSeekHarnessNodeRequirement? = nil
+  ) async throws -> String {
     let bytes = try await io.fetch(URL(string: "https://nodejs.org/dist/index.json")!)
     guard let releases = try JSONSerialization.jsonObject(with: bytes) as? [[String: Any]],
       let release = releases.first(where: {
         ($0["lts"] as? String) != nil
-          && Self.nodeVersionSupported($0["version"] as? String ?? "")
+          && Self.nodeVersionSupported($0["version"] as? String ?? "", requirement: requirement)
       }), let version = release["version"] as? String
     else { throw ServiceAgentSetupInstallError.invalidMetadata("Node LTS") }
     let stem = "node-\(version)-\(platform.nodeArchivePlatform)-\(platform.architecture)"
@@ -56,29 +59,53 @@ extension ServiceAgentSetupInstaller {
     let output = try await io.run(
       [node, "--version"], cwd: directory,
       environment: installEnvironment(in: directory, node: node))
-    guard Self.nodeVersionSupported(output.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-      throw ServiceAgentSetupInstallError.commandFailed("Node 版本要求至少 22.19.0")
+    guard
+      Self.nodeVersionSupported(
+        output.trimmingCharacters(in: .whitespacesAndNewlines), requirement: requirement)
+    else {
+      throw ServiceAgentSetupInstallError.commandFailed(
+        "Node 版本要求 \(requirement?.value ?? "^22.19.0 || >=24.0.0")")
     }
     return node
   }
 
-  static func nodeVersionSupported(_ version: String) -> Bool {
+  static func nodeVersionSupported(
+    _ version: String, requirement: DeepSeekHarnessNodeRequirement? = nil
+  ) -> Bool {
     let components = version.trimmingCharacters(in: CharacterSet(charactersIn: "v \r\n"))
       .split(separator: ".").compactMap { Int($0) }
     guard components.count == 3 else { return false }
-    return components[0] >= 24
+    let supported =
+      components[0] >= 24
       || (components[0] == 22 && !components.lexicographicallyPrecedes([22, 19, 0]))
+    return supported && (requirement?.accepts(version) ?? true)
   }
 
-  func reusableNode(near executable: String, cwd: URL) async -> String? {
-    guard
-      let candidate = AgentNodeExecutableResolver.resolve(
-        near: executable, environment: sourceEnvironment),
-      let output = try? await io.run(
-        [candidate, "--version"], cwd: cwd,
-        environment: installEnvironment(in: cwd, node: candidate)),
-      Self.nodeVersionSupported(output.trimmingCharacters(in: .whitespacesAndNewlines))
-    else { return nil }
-    return candidate
+  func reusableNode(
+    near executable: String, cwd: URL, requirement: DeepSeekHarnessNodeRequirement? = nil
+  ) async -> String? {
+    let resolver = AgentExecutableResolver(environment: sourceEnvironment)
+    var candidates = [
+      AgentNodeExecutableResolver.resolve(
+        near: executable, environment: sourceEnvironment)
+    ].compactMap { $0 }
+    if requirement != nil {
+      let name = platform.os == "windows" ? "node.exe" : "node"
+      candidates += resolver.searchDirectories().compactMap { directory in
+        resolver.resolve(URL(fileURLWithPath: directory).appendingPathComponent(name).path)
+      }
+    }
+    var seen = Set<String>()
+    for candidate in candidates where seen.insert(candidate).inserted {
+      guard
+        let output = try? await io.run(
+          [candidate, "--version"], cwd: cwd,
+          environment: installEnvironment(in: cwd, node: candidate)),
+        Self.nodeVersionSupported(
+          output.trimmingCharacters(in: .whitespacesAndNewlines), requirement: requirement)
+      else { continue }
+      return candidate
+    }
+    return nil
   }
 }

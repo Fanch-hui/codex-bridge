@@ -1,3 +1,4 @@
+#settings-content { container-type: inline-size; }
 .settings-content-stack, .settings-stack { display: grid; gap: 24px; }
 .settings-group { min-width: 0; }
 .settings-group-body { display: grid; gap: 0; padding: 16px; }
@@ -11,7 +12,7 @@
 .settings-section-heading h3 { margin: 0; color: var(--text); font-size: 14px; font-weight: 500; line-height: 22px; }
 .settings-subsection > .hint, .settings-subsection .field > .hint,
 .agent-preferences > .hint { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
-.settings-subsection > .form-grid, .agent-preferences > .form-grid { width: 100%; gap: 16px; }
+.settings-subsection > .form-grid, .agent-preferences > .form-grid { width: 100%; max-width: 760px; gap: 16px; }
 .settings-subsection > .form-actions, .agent-preferences > .form-actions { justify-content: flex-start; margin-top: 0; }
 .settings-policy-grid { align-items: end; }
 .settings-service { gap: 12px; }
@@ -83,6 +84,18 @@
 
 .settings-summary-list { padding: 0; }
 .settings-summary-list > .detail-row + .detail-row { border-top: 1px solid var(--separator); }
-.settings-content-stack .client-settings-card { padding: 0; border: 0; background: transparent; }
+.settings-content-stack .client-settings-card { gap: 0; padding: 0; border: 0; background: transparent; }
 .settings-content-stack .client-settings-card > .client-row { padding: 16px 0; }
 .settings-content-stack .client-settings-card .client-settings-controls { align-items: start; }
+.settings-client-permissions { gap: 8px; }
+.settings-client-permissions .client-settings-card > .client-row:first-child { padding-top: 8px; }
+.settings-client-permissions .client-settings-card > .client-row:last-child { padding-bottom: 0; }
+.client-permissions-card > .client-row { grid-template-columns: minmax(140px, 220px) minmax(0, 320px); align-items: center; }
+.client-permissions-card .client-heading h3 { font-size: var(--font-size-body, 13px); line-height: 20px; }
+
+@container (max-width: 560px) {
+  .settings-grid, .settings-subsection > .form-grid, .agent-preferences > .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .app-update-card, .app-update-state { grid-template-columns: 20px minmax(0, 1fr); }
+  .app-update-actions { grid-column: 2; justify-content: flex-start; }
+  .client-permissions-card > .client-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}

@@ -10,11 +10,13 @@ extension BridgeServiceRequestController {
     requestID: String,
     code: String,
     message: String,
-    retryable: Bool = false
+    retryable: Bool = false,
+    diagnosticCode: String? = nil
   ) -> Data {
     if let response = try? BridgeServiceIPCCodec.failure(
       requestID: requestID,
-      error: .init(code: code, message: message, retryable: retryable)
+      error: .init(
+        code: code, message: message, retryable: retryable, diagnosticCode: diagnosticCode)
     ) {
       return response
     }

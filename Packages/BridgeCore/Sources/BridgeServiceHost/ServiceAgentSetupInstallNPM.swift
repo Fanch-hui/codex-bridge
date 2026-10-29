@@ -1,5 +1,13 @@
 import BridgeAgentCore
+import BridgeDeepSeekHarnessACP
 import Foundation
+
+struct ServiceAgentSetupResolvedPackage: Sendable {
+  let name: String
+  let version: String
+  let integrity: String
+  let nodeRequirement: DeepSeekHarnessNodeRequirement?
+}
 
 struct ServiceAgentSetupInstallPackage: Equatable, Sendable {
   let name: String
@@ -27,7 +35,8 @@ struct ServiceAgentSetupInstallPackage: Equatable, Sendable {
 extension ServiceAgentSetupInstaller {
   func installNPM(
     providerID: AgentProviderID, distribution: QoderDistribution?, in directory: URL,
-    node: String, existingExecutable: String? = nil
+    node: String, existingExecutable: String? = nil,
+    resolvedDeepSeekPackage: ServiceAgentSetupResolvedPackage? = nil
   ) async throws -> ServiceAgentSetupRuntime {
     let packages = ServiceAgentSetupInstallPackage.packages(
       providerID: providerID, distribution: distribution)
@@ -36,16 +45,15 @@ extension ServiceAgentSetupInstaller {
     var integrities: [String: String] = [:]
     var specifications: [String] = []
     for package in required {
-      let encoded = package.name.replacingOccurrences(of: "/", with: "%2f")
-      let metadata = try await object(URL(string: "https://registry.npmjs.org/\(encoded)/latest")!)
-      guard metadata["name"] as? String == package.name,
-        let version = metadata["version"] as? String, !version.isEmpty,
-        let dist = metadata["dist"] as? [String: Any],
-        let integrity = dist["integrity"] as? String, integrity.hasPrefix("sha512-")
-      else { throw ServiceAgentSetupInstallError.invalidMetadata(package.name) }
-      versions[package.name] = version
-      integrities[package.name] = integrity
-      specifications.append(package.name + "@" + version)
+      let metadata: ServiceAgentSetupResolvedPackage
+      if let resolvedDeepSeekPackage, resolvedDeepSeekPackage.name == package.name {
+        metadata = resolvedDeepSeekPackage
+      } else {
+        metadata = try await resolveNPMPackage(package)
+      }
+      versions[package.name] = metadata.version
+      integrities[package.name] = metadata.integrity
+      specifications.append(package.name + "@" + metadata.version)
     }
     if !specifications.isEmpty {
       let npm = try npmEntry(near: node)
@@ -71,6 +79,29 @@ extension ServiceAgentSetupInstaller {
       executablePath: entry, nodeExecutablePath: node, sdkRoot: sdk,
       version: versions[cli.name] ?? output.trimmingCharacters(in: .whitespacesAndNewlines),
       installationDirectory: directory.path)
+  }
+
+  func resolveNPMPackage(_ package: ServiceAgentSetupInstallPackage) async throws
+    -> ServiceAgentSetupResolvedPackage
+  {
+    let encoded = package.name.replacingOccurrences(of: "/", with: "%2f")
+    let metadata = try await object(URL(string: "https://registry.npmjs.org/\(encoded)/latest")!)
+    guard metadata["name"] as? String == package.name,
+      let version = metadata["version"] as? String, !version.isEmpty,
+      let dist = metadata["dist"] as? [String: Any],
+      let integrity = dist["integrity"] as? String, integrity.hasPrefix("sha512-")
+    else { throw ServiceAgentSetupInstallError.invalidMetadata(package.name) }
+    var requirement: DeepSeekHarnessNodeRequirement?
+    if package.name == "@deepseek-ai/dsh" {
+      let engines = metadata["engines"] as? [String: Any]
+      guard metadata["engines"] == nil || engines != nil,
+        engines?["node"] == nil || engines?["node"] is String,
+        let parsed = DeepSeekHarnessNodeRequirement(engines?["node"] as? String)
+      else { throw ServiceAgentSetupInstallError.invalidMetadata("DSH Node 版本要求") }
+      requirement = parsed
+    }
+    return ServiceAgentSetupResolvedPackage(
+      name: package.name, version: version, integrity: integrity, nodeRequirement: requirement)
   }
 
   func packageEntry(_ package: ServiceAgentSetupInstallPackage, prefix: URL) throws -> String {

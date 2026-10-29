@@ -9,24 +9,24 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$release = 'v0.0.17'
+$release = 'v0.0.18'
 if ($Architecture -eq 'ARM64') {
   $platform = @{
     Name = 'arm64'
     Machine = [UInt16]0xAA64
-    ArchiveSHA256 = '925c8298e46e088413bb02c81d36775f2e818970231bc2ecc215fcb0f0382bf7'
-    TunnelClientSHA256 = '2986f8ea93ead7462d0babfecd858bf50dd04dff750fbab938e182ec6544f590'
-    LicensesSHA256 = '56c9285870b684aedb9b837cd9278682595192f89ea4a0b39e3147679a755eb4'
-    SBOMSHA256 = '65ea6b5f855a27fba9c835c149c4e99f76316e49a27600bf1ce321e73e1ad47a'
+    ArchiveSHA256 = 'b73237513d50bf7acbeb960d80d9cbb6513879292f80ec1bd04b886fac1fe1c8'
+    TunnelClientSHA256 = '71e8350e6dc14334b0d0ac2a637f98cdc0f0f1aac4dcd2f883354b2f9cbec70f'
+    LicensesSHA256 = '4f0ad0501bf260d39369e6879661b5adf58b1d5ff01e4668605e0a32738d4445'
+    SBOMSHA256 = '7aebe4c63a96bbdae601b65935fd60c760482ac9902b888c948d75b3c2cb3dd7'
   }
 } else {
   $platform = @{
     Name = 'amd64'
     Machine = [UInt16]0x8664
-    ArchiveSHA256 = 'b89074637596262067061308cf174959561a1a8bcffe2db956650dad7303052b'
-    TunnelClientSHA256 = '61a770c759c386845f830a106f7e6d0d3f854b932259744a88b4013c282e64ec'
-    LicensesSHA256 = '7fa05f02e1187d6bb5df44133cc02669f42c8d11a0c3ea818780d86c5ed66235'
-    SBOMSHA256 = '1449368915f606868a2ec6970d7ba5bf86d2afd11b03a3d9e89f64109279a62e'
+    ArchiveSHA256 = '8d0da1ce79532d44ccc5ed5d8bd36cdfffba37dfd287c602d69635c8bb5db2b2'
+    TunnelClientSHA256 = '9d0a22b7eb64fe7c5e34dfc97273ffcab6a07557855cf9e7f8869068402caf6b'
+    LicensesSHA256 = '2b1def83c55dea817579ea1a7206119356c6a97a190c31181fe7817ae60c29ec'
+    SBOMSHA256 = '6fdf06f5663980bb01e63417a6fa9dc0f42a20aa7f5498b7e444e6977bcc43d7'
   }
 }
 
@@ -152,7 +152,7 @@ try {
     archiveSHA256 = $platform.ArchiveSHA256
     tunnelClientSHA256 = $platform.TunnelClientSHA256
     sourceURL = $url
-    upstreamCommit = 'a248b7f725fc989c1eb26680cf4351ee33421f61'
+    upstreamCommit = '274a5588414819f063d27100a4fb1096aae3830f'
     attributionSHA256 = $attributionHashes
   }
   $utf8NoBom = [Text.UTF8Encoding]::new($false)

@@ -1,4 +1,5 @@
 import BridgeAgentCore
+import BridgeDeepSeekHarnessACP
 import BridgeOpenCodeACP
 import Foundation
 
@@ -55,19 +56,32 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
       if [.openCode, .antigravity].contains(providerID) {
         return try await installBinary(providerID: providerID, in: stage)
       }
+      let resolvedDeepSeekPackage: ServiceAgentSetupResolvedPackage?
+      if providerID == .deepSeekHarness {
+        guard
+          let package = ServiceAgentSetupInstallPackage.packages(
+            providerID: providerID, distribution: distribution
+          ).first
+        else { throw ServiceAgentSetupInstallError.unavailableExecutable }
+        resolvedDeepSeekPackage = try await resolveNPMPackage(package)
+      } else {
+        resolvedDeepSeekPackage = nil
+      }
+      let requirement = resolvedDeepSeekPackage?.nodeRequirement
       await report("准备 Node 运行时")
       let node: String
       if let existingNode = await reusableNode(
-        near: stage.appendingPathComponent("node").path, cwd: stage),
+        near: stage.appendingPathComponent("node").path, cwd: stage, requirement: requirement),
         (try? npmEntry(near: existingNode)) != nil
       {
         node = existingNode
       } else {
-        node = try await installNode(in: stage)
+        node = try await installNode(in: stage, requirement: requirement)
       }
       await report("安装官方 Agent 包")
       let runtime = try await installNPM(
-        providerID: providerID, distribution: distribution, in: stage, node: node)
+        providerID: providerID, distribution: distribution, in: stage, node: node,
+        resolvedDeepSeekPackage: resolvedDeepSeekPackage)
       await report("正在保存安装结果")
       return runtime
     }
@@ -110,7 +124,10 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
         executablePath: entry, version: version,
         installationDirectory: URL(fileURLWithPath: entry).deletingLastPathComponent().path)
     }
-    let node = await reusableNode(near: entry, cwd: group)
+    let requirement: DeepSeekHarnessNodeRequirement? =
+      providerID == .deepSeekHarness
+      ? try DeepSeekHarnessACPProfile.nodeRequirement(forExecutable: entry) : nil
+    let node = await reusableNode(near: entry, cwd: group, requirement: requirement)
     let sdk = providerID == .qoder ? existingSDK(near: entry, distribution: distribution) : nil
     if let node, providerID != .qoder || sdk != nil,
       let output = try? await io.run(
@@ -129,7 +146,7 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
       if let node, providerID != .qoder || (try? npmEntry(near: node)) != nil {
         preparedNode = node
       } else {
-        preparedNode = try await installNode(in: stage)
+        preparedNode = try await installNode(in: stage, requirement: requirement)
       }
       if providerID == .qoder, sdk == nil {
         return try await installNPM(
@@ -219,6 +236,16 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
         FileManager.default.fileExists(atPath: receipt.runtime.executablePath)
       else { continue }
       let runtime = receipt.runtime
+      if providerID == .deepSeekHarness, let node = runtime.nodeExecutablePath {
+        guard
+          let requirement = try? DeepSeekHarnessACPProfile.nodeRequirement(
+            forExecutable: runtime.executablePath),
+          let output = try? await io.run(
+            [node, "--version"], cwd: group, environment: installEnvironment(in: group, node: node)),
+          Self.nodeVersionSupported(
+            output.trimmingCharacters(in: .whitespacesAndNewlines), requirement: requirement)
+        else { continue }
+      }
       let argv = versionArguments(
         executable: runtime.executablePath, node: runtime.nodeExecutablePath)
       if let version = try? await io.run(

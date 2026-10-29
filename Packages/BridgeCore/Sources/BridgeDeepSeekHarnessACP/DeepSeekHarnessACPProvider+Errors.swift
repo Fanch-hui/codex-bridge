@@ -13,6 +13,8 @@ extension DeepSeekHarnessACPProvider {
     case DeepSeekHarnessACPError.nodeVersionIncompatible(let version):
       return
         "DeepSeek Harness requires Node \(DeepSeekHarnessACPConstants.nodeRequirement); found \(version)."
+    case DeepSeekHarnessACPError.nodeRequirementIncompatible(let version, let required):
+      return "DeepSeek Harness requires Node \(required); found \(version)."
     case AgentRuntimeError.unsupportedProtocol(let value):
       return "DeepSeek Harness ACP identity or protocol is incompatible: \(value)."
     case DeepSeekHarnessACPError.unsupportedProtocol(let value):
@@ -52,6 +54,7 @@ extension DeepSeekHarnessACPProvider {
     case DeepSeekHarnessACPError.artifactInvalid,
       DeepSeekHarnessACPError.templateMismatch,
       DeepSeekHarnessACPError.nodeVersionIncompatible,
+      DeepSeekHarnessACPError.nodeRequirementIncompatible,
       AgentRuntimeError.unsupportedProtocol:
       return true
     default:

@@ -82,7 +82,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
         requestID: request.requestID,
         code: mapped.code,
         message: mapped.message,
-        retryable: mapped.retryable
+        retryable: mapped.retryable,
+        diagnosticCode: mapped.diagnosticCode
       )
     }
   }

@@ -12,23 +12,23 @@
 .page-section > h3, .content-section > h3, .section-heading-row > h3 {
   color: var(--text-secondary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 20px;
 }
 
 .settings-card h3, .connection-card h3, .detail-title {
   color: var(--text);
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 24px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .settings-card > .field + .field, .settings-card > .check-field + .field { margin-top: 16px; }
-.settings-card .hint, .card-subtitle { line-height: 1.6; text-wrap: pretty; }
+.settings-card .hint, .card-subtitle { line-height: 1.5; text-wrap: pretty; }
 .detail-row-title { font-weight: 500; }
 .detail-row:hover { background: var(--surface-hover); }
 .detail-row:active { background: var(--surface-pressed); }
-.detail-heading { font-size: 18px; font-weight: 500; line-height: 26px; }
+.detail-heading { font-size: var(--font-size-title); font-weight: 600; line-height: 24px; }
 .button.detail-back { min-height: var(--control-height-small); padding: 4px 10px; border-color: transparent; background: transparent; font-size: 13px; }
 
 .list-row:hover, .task-row:hover, .project-row:hover, .agent-row:hover, .log-row:hover {

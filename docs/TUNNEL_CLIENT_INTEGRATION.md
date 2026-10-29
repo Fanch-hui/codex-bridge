@@ -1,11 +1,11 @@
 # Secure MCP Tunnel Helper Integration
 
-This document defines the process boundary used by `BridgeTunnel`. The current supply pin is the official public OpenAI `tunnel-client` v0.0.17 release at commit `a248b7f725fc989c1eb26680cf4351ee33421f61`, rechecked on 2026-10-22. OpenAI's Platform Tunnels page remains the source of truth for the version currently supported by the control plane; release packaging must recheck that page before distribution rather than assuming this repository pin remains current forever.
+This document defines the process boundary used by `BridgeTunnel`. The current supply pin is the official public OpenAI `tunnel-client` v0.0.18 release at commit `274a5588414819f063d27100a4fb1096aae3830f`, rechecked on 2026-10-28. OpenAI's Platform Tunnels page remains the source of truth for the version currently supported by the control plane; release packaging must recheck that page before distribution rather than assuming this repository pin remains current forever.
 
 ## Trust and packaging
 
-- Pin v0.0.17 and validate both official macOS archives against the SHA-256 values in `docs/DEPENDENCIES.md` before extracting either executable.
-- The v0.0.17 full-client archives contain seven regular members. Packaging validates that exact layout and selects `tunnel-client`, LICENSE, NOTICE, third-party licenses and SPDX metadata. The supply build combines the verified macOS arm64 and amd64 executables into a derived Universal 2 helper and records its unsigned SHA-256. The full client provides the required `doctor` preflight; the separate customer runtime distribution provides only `run`.
+- Pin v0.0.18 and validate both official macOS archives against the SHA-256 values in `docs/DEPENDENCIES.md` before extracting either executable.
+- The v0.0.18 full-client archives contain seven regular members. Packaging validates that exact layout and selects `tunnel-client`, LICENSE, NOTICE, third-party licenses and SPDX metadata. The supply build combines the verified macOS arm64 and amd64 executables into a derived Universal 2 helper and records its unsigned SHA-256. The full client provides the required `doctor` preflight; the separate customer runtime distribution provides only `run`.
 - The upstream arm64 executable is ad-hoc linker-signed and has no Team Identifier; the amd64 executable is not suitable as the final application trust identity. Release packaging signs the derived Universal 2 helper with the same Developer ID Team as the containing App, recomputes the post-sign hash into an App-signature-covered resource, then signs and notarizes the containing App.
 - Download the Apache-2.0 LICENSE from the pinned source commit and validate its digest. Preserve the project NOTICE material and the release-provided third-party licenses and SPDX metadata.
 - Runtime verification opens the helper through `O_NOFOLLOW`, hashes that exact file descriptor against the externally trusted post-sign digest, starts it suspended, and resumes it only after the running `SecCode` matches the host Team requirement and the static CDHash read from the same descriptor.
@@ -110,7 +110,7 @@ Each record includes an unrelated random `attempt` identifier and monotonic `ela
 
 For `run`, Bridge enables the helper's JSON DEBUG level and consumes its output through a strict projection. Only fixed poll lifecycle events and integer values such as `poll_attempt`, `poll_timeout_ms`, `poll_deadline_ms`, `retry_in_ms`, command counts and HTTP status are retained. Raw message text, errors, URLs, IDs, headers and bodies are discarded. Authentication failures still require local action. `doctor` keeps its existing structured report at WARN level. Health checks and readiness deadlines keep their configured values.
 
-The pinned helper exposes poll-cycle boundaries and proxy disconnect recovery. A `proxy_poll_adjusted` event records only `observed_disconnect_ms`, `attempted_poll_timeout_ms` and `learned_poll_timeout_ms` when the helper lowers a future poll wait. The official [v0.0.17 source](https://github.com/openai/tunnel-client/blob/v0.0.17/pkg/controlplane/internal/tunnel_service_client.go) defines this recovery and the first-poll cap. Transport phase timings are not included in these events.
+The pinned helper exposes poll-cycle boundaries and proxy disconnect recovery. A `proxy_poll_adjusted` event records only `observed_disconnect_ms`, `attempted_poll_timeout_ms` and `learned_poll_timeout_ms` when the helper lowers a future poll wait. The official [v0.0.18 source](https://github.com/openai/tunnel-client/blob/v0.0.18/pkg/controlplane/internal/tunnel_service_client.go) defines this recovery and the first-poll cap. Transport phase timings are not included in these events.
 
 ## Automated and real acceptance
 
@@ -127,14 +127,14 @@ Automated tests use real fake executable processes and synthetic secrets to veri
 - App UI shutdown without Service or Tunnel shutdown;
 - Tunnel failure without local task cancellation.
 
-`build-tunnel-helper.sh` reproduces the pinned v0.0.17 Universal 2 unsigned helper. `verify-tunnel-helper.sh` requires an external trusted digest and never executes its input. On Apple Silicon, `test-tunnel-helper-config.sh` separately pins the official arm64 archive and embedded helper hashes, then runs the exact official `doctor` image through the production suspended-process/CDHash boundary against the real header-authenticated Swift MCP fixture.
+`build-tunnel-helper.sh` reproduces the pinned v0.0.18 Universal 2 unsigned helper. `verify-tunnel-helper.sh` requires an external trusted digest and never executes its input. On Apple Silicon, `test-tunnel-helper-config.sh` separately pins the official arm64 archive and embedded helper hashes, then runs the exact official `doctor` image through the production suspended-process/CDHash boundary against the real header-authenticated Swift MCP fixture.
 
 Final acceptance still requires the user's real Developer ID identity, a Platform-supported helper build, a restricted Runtime API Key with Tunnels Read + Use, a real Tunnel ID, and a ChatGPT custom MCP plugin scan/call/reconnect exercise. Create the ChatGPT connection from Plugins → Add → Create custom MCP server and select Tunnel. Those credentials are entered locally and must never be pasted into source, chat, issue reports, or logs.
 
 Official references:
 
-- https://github.com/openai/tunnel-client/releases/tag/v0.0.17
-- https://github.com/openai/tunnel-client/blob/v0.0.17/docs/configuration.md
+- https://github.com/openai/tunnel-client/releases/tag/v0.0.18
+- https://github.com/openai/tunnel-client/blob/v0.0.18/docs/configuration.md
 - https://github.com/openai/tunnel-client
 - https://platform.openai.com/settings/organization/tunnels
 - https://platform.openai.com/settings/organization/api-keys

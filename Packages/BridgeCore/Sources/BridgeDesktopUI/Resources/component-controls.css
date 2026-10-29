@@ -4,15 +4,15 @@
   justify-content: center;
   gap: 6px;
   min-height: var(--button-height);
-  padding: 6px 14px;
+  padding: 4px 12px;
   border: 1px solid var(--control-border);
   border-radius: var(--control-radius);
   background-color: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 500;
-  line-height: 22px;
+  line-height: var(--line-height-body);
   text-align: center;
   cursor: pointer;
 }
@@ -39,10 +39,10 @@
 .button[data-pending="true"] { cursor: progress; }
 .button.small {
   min-height: var(--control-height-small);
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: var(--control-radius-small);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: 20px;
 }
 .button.link-button {
   min-height: var(--control-height-small);
@@ -56,8 +56,8 @@
 .button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .button.icon-btn-small { min-height: var(--control-height-small); }
 
-.field { display: grid; align-content: start; gap: 6px; min-width: 0; }
-.field label { color: var(--text-secondary); font-size: 13px; font-weight: 500; line-height: 20px; }
+.field { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.field label { color: var(--text); font-size: var(--font-size-body); font-weight: 400; line-height: var(--line-height-body); }
 .field :is(input, select, textarea), .filter-bar :is(input, select), .browser-site-select, .dsh-project-select {
   min-width: 0;
   min-height: var(--control-height);
@@ -67,8 +67,8 @@
   background-color: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 .field :is(input, select, textarea) { width: 100%; }
 .field select, .browser-site-select, .dsh-project-select {
@@ -85,16 +85,18 @@
 .field :is(input, select, textarea):hover:not(:disabled),
 .filter-bar :is(input, select):hover:not(:disabled),
 .browser-site-select:hover:not(:disabled) { background-color: var(--surface-hover); }
-.field :is(input, select, textarea):focus,
-.filter-bar :is(input, select):focus,
-.browser-site-select:focus {
+.field :is(input, select, textarea):focus-visible,
+.filter-bar :is(input, select):focus-visible,
+.browser-site-select:focus-visible,
+.dsh-project-select:focus-visible {
   border-color: var(--accent);
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 .field :is(input, select, textarea):disabled,
 .filter-bar :is(input, select):disabled,
-.browser-site-select:disabled {
+.browser-site-select:disabled,
+.dsh-project-select:disabled {
   background-color: var(--surface-muted);
   color: var(--text-tertiary);
   cursor: not-allowed;
@@ -110,7 +112,7 @@
 .compact-field select { min-height: var(--control-height-small); padding-block: 3px; font-size: 13px; line-height: 18px; }
 .dsh-native-composer .dsh-composer-choice select { border-color: transparent; background-color: transparent; font-size: 13px; }
 
-.segmented-control { display: inline-flex; gap: 2px; padding: 4px; border-radius: var(--control-radius); background: var(--surface-hover); }
+.segmented-control { display: inline-flex; max-width: 100%; gap: 2px; padding: 2px; border-radius: var(--control-radius); background: var(--surface-hover); }
 .segmented-btn { min-height: var(--control-height-small); padding: 0 12px; border: 1px solid transparent; border-radius: var(--control-radius-small); color: var(--text-secondary); background: transparent; font: inherit; font-size: 13px; line-height: 20px; font-weight: 500; cursor: pointer; }
 .segmented-btn:hover:not(.is-active) { color: var(--text); background: var(--surface-hover); }
 .segmented-btn.is-active { color: var(--text); border-color: var(--separator); background: var(--surface); box-shadow: var(--shadow-soft); }
@@ -120,6 +122,9 @@
 .switch-toggle.is-active { background: var(--accent); border-color: var(--accent); }
 .switch-thumb { display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
 .switch-toggle.is-active .switch-thumb { transform: translateX(14px); }
+.switch-toggle:disabled { opacity: .55; cursor: not-allowed; }
+
+:is(.button, .segmented-btn, .switch-toggle) { transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease; }
 
 @media (forced-colors: active) {
   .button, .field :is(input, select, textarea), .filter-bar :is(input, select), .browser-site-select {

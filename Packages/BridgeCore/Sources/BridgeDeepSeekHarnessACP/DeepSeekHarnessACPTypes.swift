@@ -48,6 +48,7 @@ public enum DeepSeekHarnessACPError: Error, Equatable, Sendable {
   case artifactInvalid(String)
   case templateMismatch
   case nodeVersionIncompatible(String)
+  case nodeRequirementIncompatible(version: String, required: String)
   case processUnavailable
   case inactivityTimeout
 }

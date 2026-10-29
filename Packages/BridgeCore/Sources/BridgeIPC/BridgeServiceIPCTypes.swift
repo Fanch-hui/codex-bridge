@@ -125,6 +125,7 @@ public struct BridgeServiceIPCError: Codable, Equatable, Sendable {
   public let taskID: String?
   public let operationID: String?
   public let sessionID: String?
+  public let diagnosticCode: String?
 
   public init(
     code: String,
@@ -133,7 +134,8 @@ public struct BridgeServiceIPCError: Codable, Equatable, Sendable {
     owner: String? = nil,
     taskID: String? = nil,
     operationID: String? = nil,
-    sessionID: String? = nil
+    sessionID: String? = nil,
+    diagnosticCode: String? = nil
   ) {
     self.code = code
     self.message = message
@@ -142,6 +144,7 @@ public struct BridgeServiceIPCError: Codable, Equatable, Sendable {
     self.taskID = taskID
     self.operationID = operationID
     self.sessionID = sessionID
+    self.diagnosticCode = diagnosticCode
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -152,6 +155,7 @@ public struct BridgeServiceIPCError: Codable, Equatable, Sendable {
     case taskID = "task_id"
     case operationID = "operation_id"
     case sessionID = "session_id"
+    case diagnosticCode = "diagnostic_code"
   }
 }
 

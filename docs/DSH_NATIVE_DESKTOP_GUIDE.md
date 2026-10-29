@@ -15,6 +15,14 @@ Bridge 的 DSH ACP 与 DSH 桌面是两个独立连接，可以同时使用。AC
 
 插件升级同样需要先完全退出 Desktop，更新后重启并检测连接。使用 ACP、断开桌面连接或撤销配对保留桌面会话；撤销配对可以在任一端执行。更换原生 profile 或身份后需要重新配对；安装、配对与撤销要求对应 Connector 没有未结束的原生桌面任务。ACP 任务独立运行。
 
+macOS 也可在 Bridge 已启动时，通过已安装 App 的本机维护入口更新连接器：
+
+```sh
+/Applications/CodexBridge.app/Contents/MacOS/CodexBridge --update-dsh-connector <安装ID>
+```
+
+DSH 安装文件变化且已确认使用该版本时，附加 `--accept-replacement`，先重新检测运行工件再更新连接器。命令沿用相同的桌面退出和原生任务检查。
+
 ## 模型与任务
 
 **此选择会同步到 DSH 桌面默认，影响后续新建会话。** 模型和推理强度保存等待原生默认持久化并回读确认，界面按保存结果更新。自动推理强度由原生模型配置解析。

@@ -1,7 +1,7 @@
 .component-dialog {
   width: min(540px, calc(100vw - 40px));
   max-width: none;
-  max-height: calc(100dvh - 48px);
+  max-height: calc(100dvh - 40px);
   margin: auto;
   padding: 0;
   overflow: hidden;
@@ -22,20 +22,20 @@
 
 .component-dialog .dialog-header {
   flex: 0 0 auto;
-  padding: 22px 24px 14px;
+  padding: 20px 24px 12px;
 }
 
 .component-dialog .dialog-header h2 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--font-size-title);
+  font-weight: 600;
   line-height: 24px;
   text-wrap: balance;
 }
 
 .component-dialog .dialog-body {
   min-height: 0;
-  padding: 0 24px 24px;
+  padding: 0 24px 20px;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -50,14 +50,16 @@
   justify-content: flex-end;
   gap: 8px;
   margin: 0;
-  padding: 0 24px 24px;
+  padding: 12px 24px 20px;
+  border-top: 1px solid var(--separator);
+  background: var(--surface-muted);
 }
 
 .feedback-message {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   text-wrap: pretty;

@@ -38,6 +38,7 @@
       || /queued|pending|approval|failed|unavailable|unknown/.test(label);
     var quiet = !actionable && (kind === "success" || kind === "running");
     element.className = "status-indicator " + kind + (quiet ? " is-quiet" : "");
+    element.setAttribute("role", "img");
     element.title = label; element.setAttribute("aria-label", label);
     clear(element);
     var symbol = kind === "success" ? "checkmark.circle.fill"

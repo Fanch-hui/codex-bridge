@@ -29,12 +29,8 @@
     return typeof value === "number" && isFinite(value) && value > 0;
   }
 
-  function isStacked() {
-    return global.matchMedia && global.matchMedia("(max-width: 700px)").matches;
-  }
-
   function axisValues(layout) {
-    var stacked = isStacked();
+    var stacked = layout.classList.contains("is-stacked");
     var rect = layout.getBoundingClientRect();
     return {
       stacked: stacked,
@@ -77,6 +73,7 @@
     var axis = axisValues(layout);
     var maximum = Math.max(axis.minimum, axis.available - axis.otherMinimum - DIVIDER_SIZE);
     divider.setAttribute("aria-orientation", axis.stacked ? "horizontal" : "vertical");
+    divider.setAttribute("aria-label", axis.stacked ? "调整网页与 Agent 展示区域高度" : "调整网页与 Agent 展示区域宽度");
     divider.setAttribute("aria-valuemin", String(axis.minimum));
     divider.setAttribute("aria-valuemax", String(Math.round(maximum)));
     divider.setAttribute("aria-valuenow", String(Math.round(value || currentSize(layout, document.getElementById("workbench-inspector-pane"), axis))));
@@ -90,7 +87,7 @@
     global.removeEventListener("pointerup", drag.end);
     global.removeEventListener("pointercancel", drag.end);
     drag.divider.classList.remove("is-dragging");
-    document.body.classList.remove("workbench-is-resizing");
+    document.body.classList.remove("workbench-is-resizing", "workbench-resizing-stacked");
     try { drag.divider.releasePointerCapture(drag.pointerID); } catch (_) {}
     setSize(drag.layout, drag.size, true);
   }
@@ -115,6 +112,7 @@
     activeDrag = drag;
     divider.classList.add("is-dragging");
     document.body.classList.add("workbench-is-resizing");
+    document.body.classList.toggle("workbench-resizing-stacked", axis.stacked);
     try { divider.setPointerCapture(event.pointerId); } catch (_) {}
     global.addEventListener("pointermove", drag.move, { passive: false });
     global.addEventListener("pointerup", drag.end);
@@ -145,9 +143,16 @@
     var axis = axisValues(layout);
     if (axis.available <= 0) return;
     var size = currentSize(layout, inspector, axis);
-    var maximum = Math.max(axis.minimum, axis.available - axis.otherMinimum - DIVIDER_SIZE);
-    if (size > maximum) size = setSize(layout, maximum, false);
     updateAccessibility(layout, size);
+  }
+
+  function updateLayout(layout) {
+    var width = layout.getBoundingClientRect().width;
+    if (width <= 0) return;
+    var stacked = width < MIN_BROWSER_WIDTH + MIN_INSPECTOR_WIDTH + DIVIDER_SIZE;
+    if (activeDrag && activeDrag.layout === layout && activeDrag.axis.stacked !== stacked) finishDrag();
+    layout.classList.toggle("is-stacked", stacked);
+    updateLayoutAccessibility(layout);
   }
 
   function mount() {
@@ -161,13 +166,14 @@
     if (saved.height) layout.style.setProperty("--workbench-inspector-height", saved.height + "px");
     divider.addEventListener("pointerdown", function (event) { beginDrag(event, layout, divider, inspector); });
     divider.addEventListener("keydown", function (event) { keyboardResize(event, layout, divider); });
-    global.addEventListener("resize", function () { global.requestAnimationFrame(function () { updateLayoutAccessibility(layout); }); });
-    updateLayoutAccessibility(layout);
+    if (global.ResizeObserver) new global.ResizeObserver(function () { updateLayout(layout); }).observe(layout);
+    global.addEventListener("resize", function () { global.requestAnimationFrame(function () { updateLayout(layout); }); });
+    updateLayout(layout);
   }
 
   mount();
   global.CodexBridgeDesktopWorkbenchSplit = { sync: function () {
     var layout = document.querySelector(".workbench-layout");
-    if (layout) updateLayoutAccessibility(layout);
+    if (layout) updateLayout(layout);
   } };
 }(window));

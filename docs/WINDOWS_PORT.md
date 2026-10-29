@@ -177,7 +177,7 @@ macOS 侧命令保持不变：`Scripts/with-xcode.sh xcodebuild …` /
      派生 `tunnel-client.exe` + `tunnel-client.sha256`（portable/安装目录）；
      macOS bundle 路径不变。
    - 载荷：`Scripts/stage-windows-tunnel-client.ps1` 固定下载并校验
-     openai/tunnel-client **v0.0.17** windows-amd64/arm64 归档，校验七个常规成员，
+     openai/tunnel-client **v0.0.18** windows-amd64/arm64 归档，校验七个常规成员，
      提取 `tunnel-client.exe` 及许可、SPDX 信息，生成 `tunnel-client.sha256` 与
      `tunnel-client.manifest.json`；`stage-windows-portable.ps1` 新增
      `-TunnelClientDir` 钩子校验 PE 架构与摘要后并入 payload 与 SHA256SUMS；

@@ -68,7 +68,8 @@
         navigationNodes.set(item.navigation, button);
         setIcons(button);
       }
-      button.title = item.title; button.setAttribute("aria-label", item.title);
+      button.title = item.title;
+      button.setAttribute("aria-label", item.title + (item.badge == null ? "" : "，" + item.badge));
       var isSelected = item.navigation === selected || (item.navigation === "settings" && selected === "logs");
       button.className = "nav-item" + (isSelected ? " is-selected" : "");
       button.setAttribute("aria-current", isSelected ? "page" : "false");
@@ -185,14 +186,16 @@
       var row = document.createElement("button");
       row.type = "button";
       row.className = "recent-task";
+      var copy = document.createElement("span");
+      copy.className = "recent-main";
+      copy.appendChild(elementWithText("span", "recent-title", task.title));
+      copy.appendChild(elementWithText("span", "recent-project", task.projectName));
+      copy.title = [task.title, task.projectName].filter(Boolean).join(" · ");
+      row.appendChild(copy);
       var status = window.CodexBridgeDesktopPageSupport.status(task.status, recentTaskTone(task.status));
       status.className += " recent-status";
       row.appendChild(status);
       row.appendChild(elementWithText("span", "recent-source", task.source));
-      var copy = document.createElement("span");
-      copy.appendChild(elementWithText("span", "recent-title", task.title));
-      copy.appendChild(elementWithText("span", "recent-project", task.projectName));
-      row.appendChild(copy);
       row.appendChild(elementWithText("span", "recent-time", task.updatedAt));
       row.appendChild(elementWithText("span", "recent-chevron", "›"));
       row.addEventListener("click", function () { emit("openTask", { taskID: task.id }); });
@@ -249,8 +252,10 @@
     renderNavigation(state.navigation, state.selectedNavigation);
     var selectedItem = (state.navigation || []).find(function (item) { return item.navigation === state.selectedNavigation; }) || {};
     var pageState = state[state.selectedNavigation];
-    document.getElementById("page-title").textContent = state.selectedNavigation === "overview" && state.overview
+    var pageTitle = document.getElementById("page-title");
+    pageTitle.textContent = state.selectedNavigation === "overview" && state.overview
       ? state.overview.title : pageState && pageState.header ? pageState.header.title : selectedItem.title || "Codex Bridge";
+    pageTitle.title = pageTitle.textContent;
     var indicator = document.getElementById("connection-indicator");
     indicator.className = "connection-indicator " + toneClass(state.connectionTone);
     indicator.title = state.connectionLabel;

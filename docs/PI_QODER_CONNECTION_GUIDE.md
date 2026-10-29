@@ -7,7 +7,7 @@ Pi 和 Qoder 使用本机安装与各自的原生登录态。在连接页点击�
 ## Pi
 
 ```sh
-npm install -g @earendil-works/pi-coding-agent@0.87.1
+npm install -g @earendil-works/pi-coding-agent@1.4.0
 pi
 ```
 
@@ -15,10 +15,10 @@ pi
 
 ## Qoder CN
 
-CLI 与 SDK 必须来自同一地区，并使用配套版本。以下是一组已核对官方契约的版本：
+CLI 与 SDK 必须来自同一地区。以下是一组已核对的官方版本：
 
 ```sh
-npm install -g @qodercn-ai/qoderclicn@1.1.64 @qodercn-ai/qodercn-agent-sdk@1.0.50
+npm install -g @qodercn-ai/qoderclicn@1.1.80 @qodercn-ai/qodercn-agent-sdk@1.0.56
 qoderclicn login
 ```
 

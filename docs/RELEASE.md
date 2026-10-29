@@ -77,7 +77,7 @@ macOS 公开包使用 ad-hoc 签名。下载者首次打开 App 时需要手动�
 
 ## 1. Prepare and verify the pinned helper
 
-Use a new output directory. The script downloads only the pinned OpenAI v0.0.17 archives, verifies their external SHA-256 values, produces a Universal 2 helper and records its unsigned digest. Before every public release, recheck the OpenAI Platform Tunnels page because control-plane support may move beyond this repository pin.
+Use a new output directory. The script downloads only the pinned OpenAI v0.0.18 archives, verifies their external SHA-256 values, produces a Universal 2 helper and records its unsigned digest. Before every public release, recheck the OpenAI Platform Tunnels page because control-plane support may move beyond this repository pin.
 
 ```bash
 helper_root="$(mktemp -d)"

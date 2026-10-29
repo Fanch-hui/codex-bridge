@@ -16,7 +16,13 @@
     navigation.execution.appendChild(approvalEditor.root);
     var clients = global.CodexBridgeDesktopConnectionsClients
       ? global.CodexBridgeDesktopConnectionsClients.create(emit, { mode: "permissions" }) : null;
-    if (clients) navigation.execution.insertBefore(clients.root, navigation.execution.firstChild);
+    if (clients) {
+      var clientSection = S.node("section", "settings-subsection settings-client-permissions");
+      clientSection.appendChild(S.node("h3", null, "客户端权限"));
+      clientSection.appendChild(S.node("p", "hint", "控制每个客户端可调用的 MCP 工具。"));
+      clientSection.appendChild(clients.root);
+      navigation.execution.insertBefore(clientSection, navigation.execution.firstChild);
+    }
     var serviceEditor = serviceCard(page, emit);
     navigation.application.appendChild(serviceEditor.root);
     navigation.diagnostics.insertBefore(serviceEditor.diagnosticsRoot, navigation.diagnostics.firstChild);

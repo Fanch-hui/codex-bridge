@@ -53,8 +53,17 @@ enum DeepSeekHarnessACPDesktopArtifacts {
     _ = try DeepSeekHarnessACPModelCatalog.profile(
       configuration: data, template: configurationTemplate)
     let version = try DeepSeekHarnessACPArtifactRuntime.nodeVersion(at: node.path, electron: true)
-    guard DeepSeekHarnessACPArtifactRuntime.isCompatibleNodeVersion(version) else {
-      throw DeepSeekHarnessACPError.nodeVersionIncompatible(version)
+    let archive = try DeepSeekHarnessACPArchive(path: archivePath)
+    let manifestPath = "dsh/node_modules/@deepseek-ai/dsh/package.json"
+    let requirement: DeepSeekHarnessNodeRequirement
+    if archive.entry(manifestPath) != nil {
+      requirement = try DeepSeekHarnessACPArtifactRuntime.parseManifest(archive.data(manifestPath))
+        .nodeRequirement
+    } else {
+      requirement = DeepSeekHarnessNodeRequirement(nil)!
+    }
+    guard requirement.accepts(version) else {
+      throw requirement.incompatibility(version)
     }
     return DeepSeekHarnessACPValidatedInstallation(
       installation: installation,

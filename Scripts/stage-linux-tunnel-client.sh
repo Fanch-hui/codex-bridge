@@ -3,21 +3,21 @@ set -euo pipefail
 
 architecture="$1"
 destination="$2"
-version=0.0.17
+version=0.0.18
 case "$architecture" in
   x64)
     upstream_architecture=amd64
-    expected=bd6a57c6c0511644267cafadd13ffdb53ece0d753e0b88857f957e78a8fbc793
-    binary_digest=e163ff89cfc3c8bd9d196fe3fd622ba39d009af9935e38432790f39eb9b6db01
-    licenses_digest=22bdf95290d3b39d0274a608b5347c9b343b3f4147be5106db76ff677e2814be
-    sbom_digest=59fad7b2ae79241dfc9d17bbc207c1c016a25c5e2fc98c3945c137ae221f7270
+    expected=3c82307316acd93c88a384b62af1d81d3f4cb0efa975f9c0bfaef922866a04c4
+    binary_digest=55c48566e682473a602eea4951978d27acc0f2c8de2340b684a8b114feba7a83
+    licenses_digest=338065faea9beccb5d218b4141a7876e3f18bee34a0844ee33001f1229bc6650
+    sbom_digest=08a10a7005c3ce9fae4af382e7d7df90c04d31e7902369c1d63caa918b2216ff
     machine=62 ;;
   arm64)
     upstream_architecture=arm64
-    expected=f5060d0b63663268aab3ca310cb6110fa14867981db2b0657f679d8836a2daa0
-    binary_digest=683afd34c71fca51670cf3d79d47abd5c717ecb3a52d721f3449c3ed41f36c60
-    licenses_digest=5889ca9bd77eb3a62b9c0caac5a4c25df1d7ae02c1f64281a36924b711debb85
-    sbom_digest=490ebb7666e6db4827f50bb058d798949a2ee04e837aa0efb1966633e0a41af1
+    expected=a5f3d70efc75f5e66ab5c67c44d272aa80b2736f93f875f165140517750ec035
+    binary_digest=5e0c8e2cc3b49ea718a81866001625ad8ea4a19771ec3c4efaaccda0c71e715a
+    licenses_digest=ae12231037484059009e2d2b590f9f684660910e07e2a7689af800983abd87da
+    sbom_digest=5e5b083963ac6b7574c6d93ba038469937a9793c7f45231afbc5d3a4940b7f10
     machine=183 ;;
   *) echo "Architecture must be x64 or arm64." >&2; exit 1 ;;
 esac

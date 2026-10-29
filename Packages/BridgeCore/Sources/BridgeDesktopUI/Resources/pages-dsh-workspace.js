@@ -50,7 +50,7 @@
       ack = null;
       emit("workbenchWorkspace", pending.payload, pending.requestID);
     }, root); recovery.hidden = true;
-    var tree = S.node("nav", "dsh-file-tree"); tree.setAttribute("aria-label", "项目目录"); filesPanel.appendChild(tree);
+    var tree = S.node("nav", "dsh-file-tree"); tree.setAttribute("aria-label", "项目目录"); tree.tabIndex = -1; filesPanel.appendChild(tree);
     var editor = E.create(request, closeFile); filesPanel.appendChild(editor.root);
     var gitHeader = S.node("header", "dsh-workspace-heading"); gitHeader.appendChild(S.node("h3", null, "项目当前变更"));
     button("刷新变更", function () { request("gitStatus", {}); }, gitHeader); changesPanel.appendChild(gitHeader);
@@ -110,6 +110,7 @@
           renderTree();
         }, container, "dsh-file-row" + (relative === selectedPath ? " is-active" : ""));
         row.style.paddingInlineStart = (depth * 12 + 8) + "px"; row.title = relative;
+        row.dataset.workspaceFocusKey = "entry:" + relative;
         row.appendChild(S.icon(folder ? "folder.fill" : "doc.text", "dsh-file-icon"));
         row.appendChild(S.node("span", "dsh-file-name", relative.split("/").pop()));
         row.setAttribute("aria-label", relative);
@@ -120,21 +121,37 @@
             if (onAddImage(projectID, relative)) { message.textContent = ""; message.hidden = true; }
             else { message.textContent = "在新会话中选择支持图片的模型后添加。"; message.hidden = false; }
           }, container, "small dsh-file-add-image");
+          add.dataset.workspaceFocusKey = "image:" + relative;
           add.appendChild(S.icon("plus")); add.title = "添加到新会话";
           add.setAttribute("aria-label", "添加图片到新会话：" + relative);
         }
         if (folder && expanded.has(relative)) directoryRows(relative, depth + 1);
       });
-      if (directory.nextCursor) button("加载更多文件", function () {
-        request("listDirectory", { path: path, value: directory.nextCursor, limit: 100 });
-      }, tree);
+      if (directory.nextCursor) {
+        var more = button("加载更多文件", function () {
+          request("listDirectory", { path: path, value: directory.nextCursor, limit: 100 });
+        }, tree);
+        more.dataset.workspaceFocusKey = "more:" + path;
+      }
     }
-    function renderTree() {
+    function renderTree(fallback) {
+      var focused = document.activeElement;
+      var focusKey = tree.contains(focused) && focused.dataset.workspaceFocusKey;
       S.clear(tree);
       if (!projectID) tree.appendChild(S.node("p", "hint", "先选择项目。"));
       else if (!directories.has("")) tree.appendChild(S.node("p", "hint", "正在读取目录…"));
       else if (!directories.get("").entries.length) tree.appendChild(S.node("p", "hint", "目录为空。"));
       else directoryRows("", 0);
+      if (focusKey) {
+        var buttons = Array.from(tree.querySelectorAll("button"));
+        var replacement = buttons.find(function (item) { return item.dataset.workspaceFocusKey === focusKey; });
+        var moved = false;
+        if (!replacement && fallback && fallback.from === focusKey) {
+          replacement = buttons.find(function (item) { return item.dataset.workspaceFocusKey === fallback.to; }) || tree;
+          moved = true;
+        }
+        if (replacement) replacement.focus({ preventScroll: !moved });
+      }
     }
     function renderGit(git) {
       S.clear(changes);
@@ -167,9 +184,14 @@
         if (command.payload.action === "listDirectory" && state.directory) {
           var directory = state.directory, path = E.field(directory, "relativeDirectory", "relative_directory") || "";
           if (path !== command.payload.path) { drain(); return; }
-          var previous = command.payload.value && directories.get(path);
-          var entries = (previous ? previous.entries : []).concat(S.safeArray(directory.entries));
-          directories.set(path, { entries: entries, nextCursor: E.field(directory, "nextCursor", "next_cursor") }); renderTree();
+          var previous = command.payload.value && directories.get(path), incoming = S.safeArray(directory.entries);
+          var entries = (previous ? previous.entries : []).concat(incoming);
+          var nextCursor = E.field(directory, "nextCursor", "next_cursor"), fallback = null;
+          if (previous && !nextCursor) {
+            var firstPath = incoming.length && E.field(incoming[0], "relativePath", "relative_path");
+            fallback = { from: "more:" + path, to: "entry:" + (firstPath || path) };
+          }
+          directories.set(path, { entries: entries, nextCursor: nextCursor }); renderTree(fallback);
         }
         if (command.payload.action === "gitStatus") renderGit(state.git);
         if (command.payload.action === "gitDiff" && state.diff && state.diff.relativePath === diffPath) {

@@ -21,7 +21,14 @@ extension BridgeServiceRequestController {
       case .desktopMustExit: code = "dsh_desktop_must_exit"
       case .installationFailed: code = "dsh_desktop_connector_install_failed"
       }
-      return .init(code: code, message: error.localizedDescription)
+      let diagnosticCode: String?
+      if case .installationFailed(let detail) = error {
+        diagnosticCode = detail
+      } else {
+        diagnosticCode = nil
+      }
+      return .init(
+        code: code, message: error.localizedDescription, diagnosticCode: diagnosticCode)
     }
     if case .unsupportedProtocol(let detail) = error as? AgentRuntimeError,
       detail == "dsh_desktop_profile_changed"
