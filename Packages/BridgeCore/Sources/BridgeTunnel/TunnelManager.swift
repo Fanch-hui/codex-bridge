@@ -323,7 +323,8 @@ public actor TunnelManager {
     do {
       let snapshot = try healthClient.snapshot(
         urlFileDirectory: context.run,
-        expectedPeerPID: child.pid
+        expectedPeerPID: child.pid,
+        diagnostics: startupDiagnostics
       )
       localHealthReady = snapshot.isReady
       guard let timestamp = snapshot.pollTimestamp, timestamp > 0 else {

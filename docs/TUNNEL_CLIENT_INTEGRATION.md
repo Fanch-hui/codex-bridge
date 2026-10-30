@@ -45,9 +45,9 @@ Tunnel IDs follow the upstream contract: `tunnel_<32 lowercase ASCII letters or 
 
 Current public tunnel-client configuration exposes the health/admin server through `--health.listen-addr` and optionally writes the resolved base URL through `--health.url-file`. Bridge requests an OS-assigned loopback port with `127.0.0.1:0` and reads the resulting URL from a private regular file inside the validated per-run directory.
 
-Before any health request, Bridge verifies that the exact supervised helper PID owns the listening TCP port using macOS `proc_pidinfo` / `proc_pidfdinfo`. The URL file must be owned by the current user, have one hard link, reject symlinks, have no group/other permissions, contain only an `http://127.0.0.1:<port>` origin, and fit the configured size bound.
+Before any health request, Bridge verifies that the exact supervised helper PID owns the listening TCP port using macOS `proc_pidinfo` / `proc_pidfdinfo`, Windows `GetExtendedTcpTable`, or Linux socket-inode matching. Windows retries a growing TCP table up to three times and retains API errors separately from ownership mismatches. The URL file must contain only an `http://127.0.0.1:<port>` origin and fit the configured size bound. Each platform pins the per-run directory identity and rejects symlinks/reparse points; POSIX also requires current-user ownership, one hard link, and no group/other permissions.
 
-Bridge connects directly to the numeric loopback address. The HTTP parser requires exactly one decimal `Content-Length`, rejects transfer encoding, caps the complete response, and accepts `GET /readyz` with status 200 and the supported `ready`, `ok` or empty body.
+Bridge connects directly to the numeric loopback address. The HTTP parser accepts an exact decimal `Content-Length` or chunked framing, caps the complete response, and accepts `GET /readyz` with status 200 and the supported `ready`, `ok` or empty body.
 
 A remotely ready state requires both local `/readyz` success and `commands_poll_last_successful_timestamp_seconds` from `/metrics` to be non-zero and fresh. The Prometheus sample value is the second whitespace-delimited field; an optional third field is a scrape timestamp and is never substituted for the poll value. With the current defaults, a successful poll older than 70 seconds is stale.
 
@@ -107,6 +107,15 @@ try {
 Collect one startup attempt and stop the foreground service with Ctrl+C. The environment setting lasts only for this PowerShell process. The file contains only the projected `[TunnelStartup]` records; share those records when requesting support.
 
 Each record includes an unrelated random `attempt` identifier and monotonic `elapsed_ms` from the start of that attempt. Events bracket doctor/run launch, record readiness start and its `deadline_elapsed_ms`, local readiness and successful-poll freshness, timeout, termination request/return, escalation and observed process exit. `process_exited` reports the observation time and exit code. The last 128 records also remain available through the manager's diagnostics.
+
+Health checks report each stage separately, retaining only changed results:
+
+- `health_url`: `ok=1` after the current run's pinned URL file passes validation; `invalid_url_file=1` or `unavailable=1` identifies a file/read failure.
+- `health_peer`: `ok=1` after the supervised PID owns the listening port; `tcp_table_error` is the Windows TCP-table API error code, and `unexpected_peer=1` reports an ownership mismatch. Windows also emits `health_peer_mismatch` with counts of rows for that port (`port_rows`), listening rows (`listen_rows`), and rows belonging to the expected PID (`pid_rows`).
+- `health_ready`: `http_status` and `body_ready` report the parsed readiness result. `invalid_response=1` and `response_too_large=1` identify HTTP parsing failures.
+- `health_metrics`: `http_status`, `poll_sample_valid`, and `poll_positive` distinguish an HTTP failure, a missing/malformed sample, and a zero poll value. The existing `health` event reports `poll_fresh` separately.
+
+Socket failures use fixed fields such as `socket_connect_error`, `socket_send_error`, or `socket_receive_error`, containing the native Winsock error code on Windows and errno on macOS/Linux. These records omit the URL, port, PID, file path, response body, and raw error text. Share one attempt's projected records to identify the first failing stage while preserving the port-owner and successful-poll checks.
 
 For `run`, Bridge enables the helper's JSON DEBUG level and consumes its output through a strict projection. Only fixed poll lifecycle events and integer values such as `poll_attempt`, `poll_timeout_ms`, `poll_deadline_ms`, `retry_in_ms`, command counts and HTTP status are retained. Raw message text, errors, URLs, IDs, headers and bodies are discarded. Authentication failures still require local action. `doctor` keeps its existing structured report at WARN level. Health checks and readiness deadlines keep their configured values.
 

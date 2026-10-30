@@ -15,10 +15,14 @@
       baseURL: URL,
       maximumResponseBytes: Int
     ) throws -> HTTPResponse {
-      guard bootstrapError == 0 else { throw TunnelHealthError.unavailable }
+      guard bootstrapError == 0 else {
+        throw TunnelHealthError.socketFailed(operation: .startup, code: bootstrapError)
+      }
       guard let port = baseURL.port else { throw TunnelHealthError.invalidURLFile }
       let descriptor = socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP.rawValue))
-      guard descriptor != INVALID_SOCKET else { throw TunnelHealthError.unavailable }
+      guard descriptor != INVALID_SOCKET else {
+        throw TunnelHealthError.socketFailed(operation: .create, code: WSAGetLastError())
+      }
       defer { _ = closesocket(descriptor) }
       try setTimeout(descriptor)
       try connect(descriptor, port: port)
@@ -37,7 +41,9 @@
         return setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, raw, Int32(size)) == 0
           && setsockopt(descriptor, SOL_SOCKET, SO_SNDTIMEO, raw, Int32(size)) == 0
       }
-      guard configured else { throw TunnelHealthError.unavailable }
+      guard configured else {
+        throw TunnelHealthError.socketFailed(operation: .configure, code: WSAGetLastError())
+      }
     }
 
     private static func connect(_ descriptor: SOCKET, port: Int) throws {
@@ -45,14 +51,16 @@
       address.sin_family = ADDRESS_FAMILY(AF_INET)
       address.sin_port = UInt16(port).bigEndian
       guard inet_pton(Int32(AF_INET), "127.0.0.1", &address.sin_addr) == 1 else {
-        throw TunnelHealthError.unavailable
+        throw TunnelHealthError.socketFailed(operation: .connect, code: WSAGetLastError())
       }
       let status = withUnsafePointer(to: &address) { pointer in
         pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
           WinSDK.connect(descriptor, $0, Int32(MemoryLayout<sockaddr_in>.size))
         }
       }
-      guard status == 0 else { throw TunnelHealthError.unavailable }
+      guard status == 0 else {
+        throw TunnelHealthError.socketFailed(operation: .connect, code: WSAGetLastError())
+      }
     }
 
     private static func write(_ data: Data, to descriptor: SOCKET) throws {
@@ -66,7 +74,9 @@
             Int32(bytes.count - offset),
             0
           )
-          guard count > 0 else { throw TunnelHealthError.unavailable }
+          guard count > 0 else {
+            throw TunnelHealthError.socketFailed(operation: .send, code: WSAGetLastError())
+          }
           offset += Int(count)
         }
       }
@@ -86,7 +96,7 @@
         guard count > 0 else {
           let error = WSAGetLastError()
           guard error == WSAETIMEDOUT || error == WSAEWOULDBLOCK else {
-            throw TunnelHealthError.unavailable
+            throw TunnelHealthError.socketFailed(operation: .receive, code: error)
           }
           break
         }
@@ -102,37 +112,4 @@
     }
   }
 
-  /// Queries the IPv4 TCP owner table for a listening port owned by the
-  /// expected process, mirroring the macOS proc_pidinfo port-owner check.
-  enum WindowsHealthPortOwner {
-    static func owns(port: Int, processID: Int32) -> Bool {
-      guard port > 0, port <= 65_535, processID > 0 else { return false }
-      var size: DWORD = 0
-      guard
-        GetExtendedTcpTable(nil, &size, false, ULONG(AF_INET), TCP_TABLE_OWNER_PID_ALL, 0)
-          == ERROR_INSUFFICIENT_BUFFER,
-        size >= MemoryLayout<MIB_TCPTABLE_OWNER_PID>.size
-      else { return false }
-      let bytes = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(size))
-      defer { bytes.deallocate() }
-      guard
-        GetExtendedTcpTable(bytes, &size, false, ULONG(AF_INET), TCP_TABLE_OWNER_PID_ALL, 0) == 0
-      else { return false }
-      let rowOffset = MemoryLayout<MIB_TCPTABLE_OWNER_PID>.offset(of: \.table) ?? 4
-      let count = Int(bytes.withMemoryRebound(to: UInt32.self, capacity: 1) { $0.pointee })
-      let rows = UnsafeMutableRawPointer(bytes.advanced(by: rowOffset)).assumingMemoryBound(
-        to: MIB_TCPROW_OWNER_PID.self
-      )
-      for index in 0..<count {
-        let row = rows[index]
-        guard
-          row.dwState == MIB_TCP_STATE_LISTEN.rawValue,
-          ntohs(UInt16(truncatingIfNeeded: row.dwLocalPort)) == UInt16(port),
-          row.dwOwningPid == DWORD(bitPattern: processID)
-        else { continue }
-        return true
-      }
-      return false
-    }
-  }
 #endif

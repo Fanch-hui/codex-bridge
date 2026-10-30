@@ -10,6 +10,11 @@ final class TunnelStartupDiagnostics: @unchecked Sendable {
     case runSpawned = "run_spawned"
     case readinessStarted = "readiness_started"
     case health
+    case healthURL = "health_url"
+    case healthPeer = "health_peer"
+    case healthPeerMismatch = "health_peer_mismatch"
+    case healthReady = "health_ready"
+    case healthMetrics = "health_metrics"
     case ready
     case readinessTimedOut = "readiness_timed_out"
     case startFailed = "start_failed"
@@ -36,7 +41,7 @@ final class TunnelStartupDiagnostics: @unchecked Sendable {
   private let attempt = UUID().uuidString
   private var events: [String] = []
   private var pollAttempt: Int64 = 0
-  private var lastHealth: [String: Int64]?
+  private var lastHealthChecks: [Event: [String: Int64]] = [:]
 
   func record(_ event: Event, fields: [String: Int64] = [:]) {
     let line = lock.withLock {
@@ -60,12 +65,16 @@ final class TunnelStartupDiagnostics: @unchecked Sendable {
       "poll_observed": pollObserved ? 1 : 0,
       "poll_fresh": pollFresh ? 1 : 0,
     ]
+    recordHealthCheck(.health, fields: fields)
+  }
+
+  func recordHealthCheck(_ event: Event, fields: [String: Int64]) {
     let changed = lock.withLock {
-      guard lastHealth != fields else { return false }
-      lastHealth = fields
+      guard lastHealthChecks[event] != fields else { return false }
+      lastHealthChecks[event] = fields
       return true
     }
-    if changed { record(.health, fields: fields) }
+    if changed { record(event, fields: fields) }
   }
 
   func recordReadiness(timeout: Duration, deadline: ContinuousClock.Instant) {

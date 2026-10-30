@@ -18,25 +18,60 @@ struct LoopbackHealthClient: Sendable {
 
   func snapshot(
     urlFileDirectory: TunnelDirectoryHandle,
-    expectedPeerPID: Int32
+    expectedPeerPID: Int32,
+    diagnostics: TunnelStartupDiagnostics? = nil
   ) throws -> TunnelHealthSnapshot {
-    let baseURL = try healthBaseURL(in: urlFileDirectory)
-    guard Self.process(expectedPeerPID, ownsListeningPort: baseURL.port!) else {
-      throw TunnelHealthError.unexpectedPeer
+    let baseURL = try checkingHealth(.healthURL, diagnostics: diagnostics) {
+      try healthBaseURL(in: urlFileDirectory)
     }
-    let ready = try request(path: "/readyz", baseURL: baseURL)
+    diagnostics?.recordHealthCheck(.healthURL, fields: ["ok": 1])
+    try checkingHealth(.healthPeer, diagnostics: diagnostics) {
+      guard
+        try Self.process(
+          expectedPeerPID, ownsListeningPort: baseURL.port!, diagnostics: diagnostics)
+      else { throw TunnelHealthError.unexpectedPeer }
+    }
+    diagnostics?.recordHealthCheck(.healthPeer, fields: ["ok": 1])
+    let ready = try checkingHealth(.healthReady, diagnostics: diagnostics) {
+      try request(path: "/readyz", baseURL: baseURL)
+    }
     let readyBodyText = String(decoding: ready.body, as: UTF8.self).trimmingCharacters(
       in: .whitespacesAndNewlines)
     let isReady =
       ready.status == 200
       && (readyBodyText == "ready" || readyBodyText == "ok" || readyBodyText.isEmpty)
-    let metrics = try? request(path: "/metrics", baseURL: baseURL)
-    let pollTime =
-      metrics != nil && metrics!.status == 200 ? Self.pollTimestamp(in: metrics!.body) : nil
+    diagnostics?.recordHealthCheck(
+      .healthReady, fields: ["http_status": Int64(ready.status), "body_ready": isReady ? 1 : 0])
+    let metrics = try? checkingHealth(.healthMetrics, diagnostics: diagnostics) {
+      try request(path: "/metrics", baseURL: baseURL)
+    }
+    let pollTime = metrics.flatMap { $0.status == 200 ? Self.pollTimestamp(in: $0.body) : nil }
+    if let metrics {
+      diagnostics?.recordHealthCheck(
+        .healthMetrics,
+        fields: [
+          "http_status": Int64(metrics.status), "poll_sample_valid": pollTime == nil ? 0 : 1,
+          "poll_positive": (pollTime ?? 0) > 0 ? 1 : 0,
+        ])
+    }
     return TunnelHealthSnapshot(
       isReady: isReady,
       pollTimestamp: pollTime
     )
+  }
+
+  private func checkingHealth<Value>(
+    _ event: TunnelStartupDiagnostics.Event,
+    diagnostics: TunnelStartupDiagnostics?,
+    operation: () throws -> Value
+  ) throws -> Value {
+    do {
+      return try operation()
+    } catch {
+      let fields = (error as? TunnelHealthError)?.diagnosticFields ?? ["unavailable": 1]
+      diagnostics?.recordHealthCheck(event, fields: fields)
+      throw error
+    }
   }
 
   private func healthBaseURL(in directory: TunnelDirectoryHandle) throws -> URL {
@@ -91,7 +126,7 @@ struct LoopbackHealthClient: Sendable {
         let descriptor = Darwin.socket(AF_INET, SOCK_STREAM, 0)
       #endif
       guard descriptor >= 0 else {
-        throw TunnelHealthError.unavailable
+        throw TunnelHealthError.socketFailed(operation: .create, code: errno)
       }
       defer { close(descriptor) }
       try setTimeout(descriptor)
@@ -109,7 +144,7 @@ struct LoopbackHealthClient: Sendable {
       guard setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, &timeout, size) == 0,
         setsockopt(descriptor, SOL_SOCKET, SO_SNDTIMEO, &timeout, size) == 0
       else {
-        throw TunnelHealthError.unavailable
+        throw TunnelHealthError.socketFailed(operation: .configure, code: errno)
       }
     }
 
@@ -131,7 +166,7 @@ struct LoopbackHealthClient: Sendable {
         }
       }
       guard status == 0 else {
-        throw TunnelHealthError.unavailable
+        throw TunnelHealthError.socketFailed(operation: .connect, code: errno)
       }
     }
 
@@ -147,7 +182,7 @@ struct LoopbackHealthClient: Sendable {
             Int32(MSG_NOSIGNAL)
           )
           guard count > 0 else {
-            throw TunnelHealthError.unavailable
+            throw TunnelHealthError.socketFailed(operation: .send, code: errno)
           }
           offset += count
         }
@@ -164,7 +199,7 @@ struct LoopbackHealthClient: Sendable {
           if errno == EAGAIN || errno == EWOULDBLOCK {
             break
           }
-          throw TunnelHealthError.unavailable
+          throw TunnelHealthError.socketFailed(operation: .receive, code: errno)
         }
         response.append(chunk, count: count)
       }
@@ -197,15 +232,21 @@ struct LoopbackHealthClient: Sendable {
   }
 
   #if os(Windows)
-    private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {
-      WindowsHealthPortOwner.owns(port: port, processID: processID)
+    private static func process(
+      _ processID: Int32, ownsListeningPort port: Int, diagnostics: TunnelStartupDiagnostics?
+    ) throws -> Bool {
+      try WindowsHealthPortOwner.owns(port: port, processID: processID, diagnostics: diagnostics)
     }
   #elseif os(Linux)
-    private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {
+    private static func process(
+      _ processID: Int32, ownsListeningPort port: Int, diagnostics: TunnelStartupDiagnostics?
+    ) throws -> Bool {
       LinuxHealthPortOwner.owns(port: port, processID: processID)
     }
   #else
-    private static func process(_ processID: Int32, ownsListeningPort port: Int) -> Bool {
+    private static func process(
+      _ processID: Int32, ownsListeningPort port: Int, diagnostics: TunnelStartupDiagnostics?
+    ) throws -> Bool {
       let requiredBytes = proc_pidinfo(processID, PROC_PIDLISTFDS, 0, nil, 0)
       guard requiredBytes > 0 else { return false }
       let stride = MemoryLayout<proc_fdinfo>.stride
@@ -341,4 +382,22 @@ enum TunnelHealthError: Error, Equatable, Sendable {
   case invalidResponse
   case responseTooLarge
   case unexpectedPeer
+  case portTableQueryFailed(UInt32)
+  case socketFailed(operation: TunnelHealthSocketOperation, code: Int32)
+
+  var diagnosticFields: [String: Int64] {
+    switch self {
+    case .unavailable: ["unavailable": 1]
+    case .invalidURLFile: ["invalid_url_file": 1]
+    case .invalidResponse: ["invalid_response": 1]
+    case .responseTooLarge: ["response_too_large": 1]
+    case .unexpectedPeer: ["unexpected_peer": 1]
+    case .portTableQueryFailed(let code): ["tcp_table_error": Int64(code)]
+    case .socketFailed(let operation, let code): ["socket_\(operation.rawValue)_error": Int64(code)]
+    }
+  }
+}
+
+enum TunnelHealthSocketOperation: String, Sendable {
+  case startup, create, configure, connect, send, receive
 }
