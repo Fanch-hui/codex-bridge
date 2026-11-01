@@ -415,5 +415,9 @@ let package = Package(
       ]
     ),
     
+    .testTarget(
+      name: "BridgeMCPResponseTests",
+      dependencies: ["BridgeMCP", .product(name: "MCP", package: "swift-sdk")]
+    ),
   ] + macOSOnlyTargets + linuxOnlyTargets
 )
