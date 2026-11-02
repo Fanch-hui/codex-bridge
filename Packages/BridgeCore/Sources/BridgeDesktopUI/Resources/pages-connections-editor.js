@@ -6,7 +6,7 @@
     var context = { canConfigure: false, emit: emit };
     var form = S.node("div", "form-grid tunnel-credentials");
     var id = S.textField("Tunnel ID", "", "输入 Tunnel ID");
-    var key = S.textField("Runtime Key", "", "不会写入 UI 状态");
+    var key = S.textField("Runtime Key", "", "输入 Runtime Key");
     key.control.type = "password";
     key.control.autocomplete = "off";
     form.appendChild(id.wrapper);

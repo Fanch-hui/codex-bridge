@@ -168,7 +168,8 @@ public actor ServiceWorkspaceMutationGate {
   public func acquireDirectLease(
     projectID: ProjectID,
     owner: ServiceWorkspaceOwner,
-    activeCodexWriteTask: @Sendable () async throws -> ServiceTaskRecord?
+    activeCodexWriteTask: @Sendable () async throws -> ServiceTaskRecord?,
+    activeEmbeddedDSHSession: @Sendable () async throws -> String? = { nil }
   ) async throws -> DirectWorkspaceLease {
     expireAppUpdateIfNeeded()
     guard appUpdateLeaseExpiresAt == nil, serviceShutdown == nil else {
@@ -187,6 +188,10 @@ public actor ServiceWorkspaceMutationGate {
       if let task = try await activeCodexWriteTask() {
         removeDirectReservation(projectID: projectID, token: token)
         throw ProjectWorkspaceBusyError.busy(.codex(taskID: task.id.rawValue))
+      }
+      if let sessionID = try await activeEmbeddedDSHSession() {
+        removeDirectReservation(projectID: projectID, token: token)
+        throw ProjectWorkspaceBusyError.busy(.direct(owner: "embedded_dsh", operationID: sessionID))
       }
     } catch {
       removeDirectReservation(projectID: projectID, token: token)

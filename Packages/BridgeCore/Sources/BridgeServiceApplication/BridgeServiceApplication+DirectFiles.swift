@@ -262,7 +262,10 @@ extension BridgeServiceApplication {
       return try await workspaceGate.acquireDirectLease(
         projectID: project.id,
         owner: owner,
-        activeCodexWriteTask: { try await self.tasks.activeWriteTask(projectID: project.id) }
+        activeCodexWriteTask: { try await self.tasks.activeWriteTask(projectID: project.id) },
+        activeEmbeddedDSHSession: {
+          try await self.tasks.activeEmbeddedDSHSession(projectID: project.id)
+        }
       )
     } catch {
       throw Self.publicWorkspaceBusyError(error)

@@ -46,6 +46,8 @@ package actor ExecutionSession {
   var deferredCompletion: TurnNotification?
   var seenSemanticSources: Set<String> = []
   var terminal = false
+  var finishingTask: Task<Void, Never>?
+  var stoppingClient: Task<Void, Never>?
 
   init(
     taskID: TaskID,
@@ -219,15 +221,25 @@ package actor ExecutionSession {
   }
 
   func shutdown() async {
-    guard !terminal else {
-      await client.stop()
-      return
-    }
-    terminal = true
+    if !terminal { terminal = true }
     eventTask?.cancel()
     lifetimeTask?.cancel()
     continuation.finish()
-    await client.stop()
+    if let finishingTask {
+      await finishingTask.value
+    } else {
+      await stopClient()
+    }
+  }
+
+  func stopClient() async {
+    if let stoppingClient {
+      await stoppingClient.value
+      return
+    }
+    let task = Task { [client] in await client.stop() }
+    stoppingClient = task
+    await task.value
   }
 
   private func beginConsumingEvents() {

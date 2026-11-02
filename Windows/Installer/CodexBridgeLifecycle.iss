@@ -140,6 +140,8 @@ var
   NewManifest: String;
   OldLines: TArrayOfString;
   NewLines: TArrayOfString;
+  NewPaths: TStringList;
+  NewIndex: Integer;
   RelativePath: String;
   InstalledPath: String;
 begin
@@ -159,25 +161,34 @@ begin
     Exit;
   end;
 
-  for I := 0 to GetArrayLength(OldLines) - 1 do
-  begin
-    RelativePath := ManifestPath(OldLines[I]);
-    if not IsSafeRelativePath(RelativePath) then
-      Continue;
-    if ManifestContains(NewLines, RelativePath) then
-      Continue;
-    InstalledPath := AddBackslash(ExpandConstant('{app}')) + RelativePath;
-    if FileExists(InstalledPath) and HasReparseDirectory(InstalledPath) then
+  NewPaths := TStringList.Create;
+  try
+    NewPaths.CaseSensitive := False;
+    for I := 0 to GetArrayLength(NewLines) - 1 do
+      NewPaths.Add(ManifestPath(NewLines[I]));
+    NewPaths.Sorted := True;
+    for I := 0 to GetArrayLength(OldLines) - 1 do
     begin
-      Result := 'Codex Bridge found an unsafe application directory.';
-      Exit;
+      RelativePath := ManifestPath(OldLines[I]);
+      if not IsSafeRelativePath(RelativePath) then
+        Continue;
+      if NewPaths.Find(RelativePath, NewIndex) then
+        Continue;
+      InstalledPath := AddBackslash(ExpandConstant('{app}')) + RelativePath;
+      if FileExists(InstalledPath) and HasReparseDirectory(InstalledPath) then
+      begin
+        Result := 'Codex Bridge found an unsafe application directory.';
+        Exit;
+      end;
+      if FileExists(InstalledPath) and not DeleteFile(InstalledPath) then
+      begin
+        Result := 'Codex Bridge could not remove an obsolete application file.';
+        Exit;
+      end;
+      RemoveEmptyParents(InstalledPath);
     end;
-    if FileExists(InstalledPath) and not DeleteFile(InstalledPath) then
-    begin
-      Result := 'Codex Bridge could not remove an obsolete application file.';
-      Exit;
-    end;
-    RemoveEmptyParents(InstalledPath);
+  finally
+    NewPaths.Free;
   end;
 end;
 

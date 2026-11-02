@@ -53,6 +53,18 @@ extension BridgeServiceApplication {
       models: models
     )
 
+    return try await modelPreferences(execution: execution)
+  }
+
+  func configuredModelPreferences() async throws -> ServiceModelPreferences? {
+    guard let model = try await settings.string(for: .defaultExecutionModel),
+      let effort = try await settings.string(for: .defaultExecutionEffort)
+    else { return nil }
+    let execution = try Self.select(modelID: model, effort: effort, models: [])
+    return try await modelPreferences(execution: execution)
+  }
+
+  private func modelPreferences(execution: SelectedModel) async throws -> ServiceModelPreferences {
     let supervisorModel = try await settings.string(for: .defaultSupervisorModel) ?? ""
     let supervisorEffort = try await settings.string(for: .defaultSupervisorEffort) ?? ""
 

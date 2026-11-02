@@ -44,6 +44,7 @@
         selectedNavigation: selectedNavigation,
         connectionLabel: connectionLabel(for: workbench.connectionState),
         connectionTone: connectionTone(for: workbench.connectionState),
+        serviceConnected: workbench.connectionState == .connected,
         isRefreshing: isRefreshing,
         feedback: feedback,
         overview: pageCache.overview(

@@ -114,9 +114,7 @@
       if includeModelCatalog {
         isRefreshingModels = true
         publishDisplay()
-        if await loadModelCatalog(forceRefresh: forceModelRefresh) == nil {
-          failures.append("模型：\(modelError ?? "无法读取模型目录")")
-        }
+        _ = await loadModelCatalog(forceRefresh: forceModelRefresh)
         isRefreshingModels = false
       }
       do {

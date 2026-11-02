@@ -48,6 +48,19 @@
       }
     }
 
+    static func shutdownServiceAndWait() -> Bool {
+      guard let executablePath = serviceExecutablePath() else { return false }
+      switch launchServiceProcess(executablePath: executablePath, shutdown: true) {
+      case .failed:
+        return false
+      case .running(let process):
+        defer { _ = CloseHandle(process) }
+        guard WaitForSingleObject(process, 40_000) == WAIT_OBJECT_0 else { return false }
+        var exitCode: DWORD = 1
+        return GetExitCodeProcess(process, &exitCode) && exitCode == 0
+      }
+    }
+
     /// Opening the pipe with the same access the real client uses both probes
     /// the server and (on ERROR_PIPE_BUSY) proves one exists.
     static func isPipeAvailable() -> Bool {
@@ -91,11 +104,14 @@
       case failed(systemError: Int)
     }
 
-    private static func launchServiceProcess(executablePath: String) -> LaunchedProcess {
+    private static func launchServiceProcess(executablePath: String, shutdown: Bool = false)
+      -> LaunchedProcess
+    {
       var startupInfo = STARTUPINFOW()
       startupInfo.cb = DWORD(MemoryLayout<STARTUPINFOW>.size)
       var processInfo = PROCESS_INFORMATION()
-      var commandLine = Array("\"\(executablePath)\"".utf16) + [WCHAR(0)]
+      let arguments = shutdown ? " --shutdown" : ""
+      var commandLine = Array("\"\(executablePath)\"\(arguments)".utf16) + [WCHAR(0)]
       // The launcher derives the service path from this executable's own
       // directory, so the separator always exists and the child never
       // inherits a stale working directory from the shell.

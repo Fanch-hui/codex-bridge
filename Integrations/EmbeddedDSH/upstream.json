@@ -1,0 +1,17 @@
+{
+  "dsh": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "version": "0.2.1-rc.5",
+    "commit": "b830ec950faba0a46dda564be3e2d854afed94f1",
+    "license": "licenses/DSH-LICENSE",
+    "patch": "Give Agent Teams distinct control tools; coordinate scheduled admissions and pauses; persist prompt admission before wake, support trusted project binding and bounded history reads"
+  },
+  "chatgptSiwc": {
+    "package": "dsh-plugin-chatgpt-siwc",
+    "version": "0.9.7",
+    "license": "licenses/SIWC-LICENSE",
+    "patch": "agent_name_hint is Codex Bridge"
+  },
+  "node": "24.11.1",
+  "pnpm": "11.28.5"
+}

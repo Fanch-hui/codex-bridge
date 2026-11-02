@@ -27,7 +27,7 @@ private struct LegacyWorkspaceCommand: Codable {
 }
 
 enum ServiceStoreSchema {
-  static let version: Int64 = 24
+  static let version: Int64 = 26
   static let migrationPrefix = "BridgeServiceCore."
   static let migrationV1 = "BridgeServiceCore.v1"
   static let migrationV2 = "BridgeServiceCore.v2"
@@ -53,6 +53,8 @@ enum ServiceStoreSchema {
   static let migrationV22 = "BridgeServiceCore.v22"
   static let migrationV23 = "BridgeServiceCore.v23"
   static let migrationV24 = "BridgeServiceCore.v24"
+  static let migrationV25 = "BridgeServiceCore.v25"
+  static let migrationV26 = "BridgeServiceCore.v26"
   static let knownMigrations = Set((1...version).map { "\(migrationPrefix)v\($0)" })
 
   static func prepare(_ database: DatabaseQueue) throws {
@@ -304,6 +306,12 @@ enum ServiceStoreSchema {
     }
     migrator.registerMigration(migrationV24) { db in
       try createVersionTwentyFour(in: db)
+    }
+    migrator.registerMigration(migrationV25) { db in
+      try createVersionTwentyFive(in: db)
+    }
+    migrator.registerMigration(migrationV26) { db in
+      try createVersionTwentySix(in: db)
     }
     return migrator
   }
@@ -1198,6 +1206,38 @@ enum ServiceStoreSchema {
         "bridge_service_dsh_native_sessions": [
           "installation_id", "profile_id", "project_id", "session_id",
         ],
+        "bridge_service_execution_groups": [
+          "project_id", "group_id", "root_session_id", "root_active", "root_closing",
+          "root_permission_mode",
+        ],
+        "bridge_service_embedded_dsh_subagents": [
+          "parent_session_id", "child_id", "project_id", "provider_id", "installation_id",
+          "current_task_id", "current_request_id", "created_at", "updated_at",
+        ],
+        "bridge_service_embedded_dsh_inputs": [
+          "parent_session_id", "child_id", "request_id", "task_id", "result_delivered",
+        ],
+        "bridge_service_workbench_operations": [
+          "operation_id", "kind", "session_id", "child_id", "project_id", "target_id",
+          "request_id", "generation", "input_json", "input_digest", "phase", "result_target_id",
+          "result_json", "cancelled", "version", "created_at", "updated_at",
+        ],
+        "bridge_service_workbench_generations": ["session_id", "generation", "closed"],
+        "bridge_service_workbench_conversations": [
+          "logical_session_id", "native_session_id", "project_id", "created_at", "updated_at",
+        ],
+        "bridge_service_workbench_segments": [
+          "logical_session_id", "native_session_id", "ordinal", "project_id", "created_at",
+        ],
+        "bridge_service_workbench_bindings": [
+          "logical_session_id", "source_native_session_id", "target_native_session_id",
+          "project_id", "request_id", "tool_call_id", "boundary_seq", "phase", "version",
+          "created_at", "updated_at",
+        ],
+        "bridge_service_workbench_pending_interactions": [
+          "logical_session_id", "interaction_id", "native_session_id", "kind", "event_seq",
+          "updated_at",
+        ],
         "bridge_service_settings": ["setting_key", "setting_value", "updated_at"],
         "bridge_service_agent_installations": [
           "installation_id", "provider_id", "display_name", "executable_path",
@@ -1221,7 +1261,7 @@ enum ServiceStoreSchema {
           "created_at", "updated_at",
           "provider_id", "installation_id", "selection_mode",
           "provider_session_id", "provider_run_id", "queue_if_busy", "queue_state",
-          "selected_skills_json",
+          "selected_skills_json", "execution_group_id",
         ],
         "bridge_service_task_events": [
           "event_id", "task_id", "kind", "summary", "details", "created_at",

@@ -5,7 +5,7 @@
   var dialogCount = 0;
   function running(operation) { return !!operation && runningStates.indexOf(operation.state) >= 0; }
   function create(context, providerValue, onRetry) {
-    var operation = null, provider = providerValue, lastAction = null;
+    var operation = null, provider = providerValue, lastAction = null, loginAttempt = null;
     var root = S.node("dialog", "component-dialog agent-setup-dialog");
     var header = S.node("header", "dialog-header"); root.appendChild(header);
     var heading = S.node("h2", null, "一键配置"); header.appendChild(heading);
@@ -42,12 +42,29 @@
       key.control.value = "";
       if (root.open) root.close();
     }
-    root.addEventListener("close", function () { key.control.value = ""; });
+    root.addEventListener("close", function () { key.control.value = ""; loginAttempt = null; });
     close.addEventListener("click", closeDialog);
     retry.addEventListener("click", function () { closeDialog(); onRetry(); });
     login.addEventListener("click", function () {
-      if (operation && !login.disabled) context.emit("openAgentSetupLogin", { operationID: operation.operationID });
+      if (operation && !login.disabled) {
+        loginAttempt = { operationID: operation.operationID, left: false };
+        context.emit("openAgentSetupLogin", { operationID: operation.operationID });
+      }
     });
+    function leftForeground() { if (loginAttempt) loginAttempt.left = true; }
+    function returnedForeground() {
+      if (!loginAttempt || !loginAttempt.left) return;
+      var attempt = loginAttempt; loginAttempt = null;
+      if (!root.open || !operation || operation.operationID !== attempt.operationID
+        || operation.state !== "needs_user_action" || operation.userAction !== "login"
+        || operation.providerID !== "qoder") return;
+      proceed.disabled = true;
+      context.emit("probeAgentSetupLogin", { operationID: attempt.operationID });
+    }
+    if (global.addEventListener) {
+      global.addEventListener("blur", leftForeground);
+      global.addEventListener("focus", returnedForeground);
+    }
     docs.addEventListener("click", function () {
       if (operation && operation.documentationURL) context.emit("openExternalURL", { value: operation.documentationURL });
     });
@@ -87,6 +104,7 @@
       operation = value;
       if (!value) { closeDialog(); return; }
       if (changed) {
+        loginAttempt = null;
         base.control.value = provider.configuredBaseURL || "";
         protocol.control.value = provider.configuredInferenceProtocol || "deepseek-messages";
         catalog.control.value = provider.configuredCatalogBaseURL || "";

@@ -194,6 +194,9 @@ extension SimpleServiceStore {
         guard activeTaskCount == 0 else {
           throw ServiceStoreError.invalidArgument("project.activeTasks")
         }
+        guard try Self.executionGroup(projectID: id, in: db) == nil else {
+          throw ServiceStoreError.invalidArgument("project.activeTasks")
+        }
         try db.execute(
           sql: "DELETE FROM bridge_service_tasks WHERE project_id = ?",
           arguments: [id.rawValue]

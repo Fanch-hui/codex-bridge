@@ -5,7 +5,7 @@ import Foundation
 public actor ServiceTaskManager {
   let store: SimpleServiceStore
   private let makeTaskID: @Sendable () -> TaskID
-  private let now: @Sendable () -> Date
+  let now: @Sendable () -> Date
   public nonisolated let changes: ServiceStateChangeHub
   // Store awaits reenter this actor; serialize read-modify-write cycles per task.
   private var activeMutationTaskIDs: Set<TaskID> = []
@@ -28,7 +28,8 @@ public actor ServiceTaskManager {
     _ request: ServiceTaskRequest,
     taskID requestedTaskID: TaskID? = nil,
     queued: Bool = false,
-    handoffID: String? = nil
+    handoffID: String? = nil,
+    embeddedDSHSubagent: EmbeddedDSHSubagentIdentity? = nil
   ) async throws -> ServiceTaskCreationResult {
     let date = now()
     let state = try ServiceTaskState(status: .awaitingLocalApproval)
@@ -67,7 +68,8 @@ public actor ServiceTaskManager {
       ),
       handoffID: handoffID,
       attachments: request.attachments,
-      runtimeBinding: request.runtimeBinding
+      runtimeBinding: request.runtimeBinding,
+      embeddedDSHSubagent: embeddedDSHSubagent
     )
     changes.publish()
     return result

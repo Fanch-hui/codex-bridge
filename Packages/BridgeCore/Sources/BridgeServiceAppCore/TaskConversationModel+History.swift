@@ -12,12 +12,13 @@ extension TaskConversationModel {
     guard canLoadEarlier, !isLoadingEarlier else { return }
     let lifecycle = lifecycleGeneration
     let load = loadGeneration
+    let reveal = searchRevealGeneration
     isLoadingEarlier = true
-    defer { isLoadingEarlier = false }
+    defer { if reveal == searchRevealGeneration { isLoadingEarlier = false } }
 
     isBrowsingHistory = true
     if canLoadEarlierCurrentTask {
-      await loadEarlierCurrentTask(lifecycle: lifecycle, load: load)
+      await loadEarlierCurrentTask(lifecycle: lifecycle, load: load, reveal: reveal)
       updateEarlierAvailability()
       return
     }
@@ -30,11 +31,11 @@ extension TaskConversationModel {
       canLoadEarlier = false
       return
     }
-    await loadEarlierPriorTask(priorID, lifecycle: lifecycle, load: load)
+    await loadEarlierPriorTask(priorID, lifecycle: lifecycle, load: load, reveal: reveal)
     updateEarlierAvailability()
   }
 
-  private func loadEarlierCurrentTask(lifecycle: UInt64, load: UInt64) async {
+  private func loadEarlierCurrentTask(lifecycle: UInt64, load: UInt64, reveal: UInt64) async {
     let currentEntries = entries.dropFirst(priorEntries.count)
     guard let anchor = currentEntries.first(where: { $0.messageID != nil })?.messageID else {
       canLoadEarlierCurrentTask = false
@@ -48,7 +49,10 @@ extension TaskConversationModel {
           limit: Self.earlierPageSize
         )
       )
-      guard isRequestValid(lifecycle: lifecycle, load: load) else { return }
+      guard isRequestValid(lifecycle: lifecycle, load: load), reveal == searchRevealGeneration
+      else {
+        return
+      }
       guard page.taskID == taskID else {
         canLoadEarlierCurrentTask = false
         return
@@ -70,7 +74,10 @@ extension TaskConversationModel {
       rebuildIndex()
       scrollAnchor = entries.last?.key
     } catch {
-      guard isRequestValid(lifecycle: lifecycle, load: load) else { return }
+      guard isRequestValid(lifecycle: lifecycle, load: load), reveal == searchRevealGeneration
+      else {
+        return
+      }
       errorMessage = BridgeServiceErrorMessage.message(error)
     }
   }
@@ -78,7 +85,8 @@ extension TaskConversationModel {
   private func loadEarlierPriorTask(
     _ priorID: String,
     lifecycle: UInt64,
-    load: UInt64
+    load: UInt64,
+    reveal: UInt64
   ) async {
     guard var history = priorTaskHistories[priorID], history.canLoadEarlier,
       let anchor = history.beforeMessageID
@@ -91,7 +99,10 @@ extension TaskConversationModel {
           limit: Self.earlierPageSize
         )
       )
-      guard isRequestValid(lifecycle: lifecycle, load: load) else { return }
+      guard isRequestValid(lifecycle: lifecycle, load: load), reveal == searchRevealGeneration
+      else {
+        return
+      }
       guard page.taskID == priorID else {
         history.canLoadEarlier = false
         priorTaskHistories[priorID] = history
@@ -118,7 +129,10 @@ extension TaskConversationModel {
       priorTaskHistories[priorID] = history
       replacePriorEntriesPreservingCurrent()
     } catch {
-      guard isRequestValid(lifecycle: lifecycle, load: load) else { return }
+      guard isRequestValid(lifecycle: lifecycle, load: load), reveal == searchRevealGeneration
+      else {
+        return
+      }
       errorMessage = BridgeServiceErrorMessage.message(error)
     }
   }

@@ -93,9 +93,13 @@ struct AgentModelCatalogScope: Equatable {
 public final class BridgeServiceAppModel: ObservableObject {
   @Published var appUpdateState: BridgeDesktopAppUpdateState?
   lazy var appUpdater = makeAppUpdater()
-  @Published public var selection: BridgeServiceNavigation? = .overview {
+  @Published public var selection: BridgeServiceNavigation? = .workbench {
     didSet { updateChatBrowserVisibility() }
   }
+  @Published var preferencesNavigation: BridgeServiceNavigation = .settings
+  @Published var preferencesWindowIsKey = false
+  var preferencesWindowIsVisible = false
+  @Published var pendingNewConversationRequestID: UUID?
   @Published public internal(set) var registrationStatus: BridgeServiceRegistrationStatus
   @Published public internal(set) var connectionState: BridgeServiceConnectionState = .idle
   @Published public internal(set) var serviceStatus: IPCServiceStatusResponse?
@@ -175,6 +179,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var directApprovalMode = "require"
   @Published public internal(set) var taskStartApprovalMode = "require"
   @Published public internal(set) var mcpClients: [IPCMCPClientStatus] = []
+  var mcpClientStatusRefreshInFlight = false
   @Published var geminiCloudStatus: IPCGeminiCloudStatus?
   @Published public internal(set) var deepSeekHarnessMCPServers:
     [IPCDeepSeekHarnessMCPServerSummary] = []
@@ -201,6 +206,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   }
   @Published public internal(set) var workbenchPermissionMode = "full"
   @Published public internal(set) var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+  @Published public internal(set) var embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt] = []
   @Published var desktopLogSearchText = ""
   @Published var desktopLogProjectID: String?
   @Published var desktopLogKind = "all"
@@ -252,6 +258,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   var pendingRefresh = false
   var pendingVisibleRefresh = false
   var pendingCatalogRefresh = false
+  var pendingSettingsRefresh = false
   var pendingForceCatalogRefresh = false
   var codexModelCatalogRequests = CodexModelCatalogRequestState()
   var chatWebViewSleepTask: Task<Void, Never>?
@@ -330,7 +337,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   }
 
   public var navigation: BridgeServiceNavigation {
-    get { selection ?? .overview }
+    get { selection ?? .workbench }
     set { selection = newValue }
   }
 

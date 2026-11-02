@@ -200,6 +200,7 @@
           availableModelCount: models.count,
           modelError: modelError,
           commandReceipt: workbenchCommandReceipt,
+          embeddedDSHReceipts: embeddedDSHReceipts,
           workspace: workspaceModel.state
         )
       )

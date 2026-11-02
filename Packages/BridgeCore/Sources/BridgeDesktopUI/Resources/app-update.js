@@ -40,6 +40,7 @@
       update.notes,
       update.progress,
       update.message,
+      JSON.stringify(update.blockers || []),
       update.isDeferred
     ].map(function (value) { return String(value === undefined ? "" : value); }).join("\u001f");
   }
@@ -125,6 +126,26 @@
     copy.appendChild(row);
   }
 
+  function appendBlockers(copy, update, emit) {
+    if (phaseOf(update) !== "waiting" || !Array.isArray(update.blockers) || !update.blockers.length) return;
+    var list = node("div", "app-update-blockers");
+    list.setAttribute("aria-label", "等待完成的任务");
+    update.blockers.forEach(function (blocker) {
+      if (!blocker || !blocker.id || !blocker.label) return;
+      if (blocker.kind !== "task" && blocker.kind !== "workbench") {
+        list.appendChild(node("span", "hint", blocker.label)); return;
+      }
+      var link = node("button", "button small", blocker.label);
+      link.type = "button";
+      link.addEventListener("click", function () {
+        if (blocker.kind === "task") emit("openTask", { taskID: blocker.id });
+        else emit("openWorkbenchSession", { sessionID: blocker.id, projectID: blocker.projectID || null });
+      });
+      list.appendChild(link);
+    });
+    copy.appendChild(list);
+  }
+
   function appendState(container, update, emit, mode) {
     var state = update || { phase: "idle", currentVersion: "" };
     var phase = phaseOf(state);
@@ -142,6 +163,7 @@
     }
     if (state.notes) copy.appendChild(node("p", "app-update-notes", String(state.notes)));
     copy.appendChild(node("p", "app-update-message", messageFor(state)));
+    appendBlockers(copy, state, emit);
     if (["available", "downloading", "verifying", "waiting", "installing"].indexOf(phase) !== -1) {
       var reminder = node("div", "app-update-plugin-reminder");
       reminder.appendChild(node("strong", null, "更新后，请刷新 ChatGPT 插件"));

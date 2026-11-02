@@ -10,6 +10,7 @@ if [[ "$(dpkg-query --show --showformat='${Status}' codex-bridge 2>/dev/null || 
 fi
 trap 'dpkg --remove codex-bridge >/dev/null || true' EXIT
 dpkg --install "$package"
+node "$root/Scripts/verify-embedded-dsh-runtime.mjs" /opt/codex-bridge/EmbeddedDSH linux "$2"
 installed_version="$(dpkg-query --show --showformat='${Version}' codex-bridge)"
 if [[ "$installed_version" != "$version" ]]; then
   echo "Installed version mismatch: $installed_version, expected $version." >&2

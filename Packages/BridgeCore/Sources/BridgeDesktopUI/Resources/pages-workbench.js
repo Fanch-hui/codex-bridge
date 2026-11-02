@@ -88,7 +88,7 @@
       var empty = S.node("div", "workbench-empty-state");
       empty.appendChild(S.icon("sparkles", "empty-sparkle-icon"));
       empty.appendChild(S.node("h3", "empty-title", "选择 Agent 会话"));
-      empty.appendChild(S.node("p", "empty-desc", "从顶部选择已有会话，或在 ChatGPT / Qwen 中委派任务。"));
+      empty.appendChild(S.node("p", "empty-desc", "从侧栏选择会话，或在聊天客户端中委派任务。"));
       content.appendChild(empty);
       return;
     }

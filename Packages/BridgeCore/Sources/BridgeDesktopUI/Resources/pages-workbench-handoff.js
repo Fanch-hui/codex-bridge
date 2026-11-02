@@ -3,6 +3,7 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var root = null, currentKey = null, drafts = new Map(), openTasks = new Set();
   var terminalPhases = ["completed", "failed", "interrupted", "target_deleted"];
+  var recoveryDelays = [1000, 2000, 4000, 8000, 15000, 30000, 60000];
 
   function identifier() {
     if (global.crypto && global.crypto.randomUUID) return "handoff-" + global.crypto.randomUUID();
@@ -13,16 +14,20 @@
   function draftFor(taskID) {
     if (drafts.has(taskID)) return drafts.get(taskID);
     var draft = { providerID: "", input: "", preview: null, preparedInput: null,
-      operation: null, pending: null, message: "", recovered: false, dirty: false, uncertain: false };
+      operation: null, pending: null, message: "", recovered: false, dirty: false, uncertain: false,
+      recoveryAttempt: 0, recoveryTimer: null };
     try {
       var saved = JSON.parse(global.localStorage.getItem(storageKey(taskID)) || "null");
       if (saved && saved.version === 1 && typeof saved.id === "string"
         && /^[a-zA-Z0-9_-]{1,128}$/.test(saved.id) && typeof saved.providerID === "string") {
         draft.operation = { id: saved.id, providerID: saved.providerID,
-          sourceUpdatedAt: saved.sourceUpdatedAt || "", submitted: saved.submitted === true };
+          sourceUpdatedAt: saved.sourceUpdatedAt || "", submitted: saved.submitted === true,
+          submitOperationID: saved.submitOperationID || "", submitRevision: saved.submitRevision,
+          submitAccepted: saved.submitAccepted === true, resubmitted: saved.resubmitted === true };
         draft.providerID = saved.providerID;
         draft.recovered = true;
-        draft.message = "发现本机保存的交接记录，请查询状态后继续；不会自动重新执行。";
+        draft.uncertain = draft.operation.submitted;
+        draft.message = "正在恢复原交接状态…";
       }
     } catch (_) { /* No prompt or credential is persisted in browser storage. */ }
     drafts.set(taskID, draft);
@@ -33,7 +38,9 @@
     try {
       var operation = draft.operation;
       var encoded = JSON.stringify({ version: 1, id: operation.id, providerID: operation.providerID,
-        sourceUpdatedAt: operation.sourceUpdatedAt, submitted: operation.submitted });
+        sourceUpdatedAt: operation.sourceUpdatedAt, submitted: operation.submitted,
+        submitOperationID: operation.submitOperationID || "", submitRevision: operation.submitRevision,
+        submitAccepted: operation.submitAccepted === true, resubmitted: operation.resubmitted === true });
       global.localStorage.setItem(storageKey(taskID), encoded);
       return global.localStorage.getItem(storageKey(taskID)) === encoded;
     } catch (_) { return false; }
@@ -47,7 +54,7 @@
   }
   function canSubmit(detail, draft) {
     return !draft.pending && !draft.uncertain && !invalidInput(draft) && draft.preview && draft.preview.ready === true
-      && draft.operation && draft.preview.handoffID === draft.operation.id
+      && draft.operation && !draft.operation.submitted && draft.preview.handoffID === draft.operation.id
       && draft.providerID === draft.operation.providerID && draft.input === draft.preparedInput
       && draft.operation.sourceUpdatedAt === (detail.updatedAt || "");
   }
@@ -67,6 +74,10 @@
     } else if (action === "submit") {
       if (!canSubmit(detail, draft)) return;
       draft.operation.submitted = true;
+      draft.operation.submitOperationID = identifier();
+      draft.operation.submitRevision = draft.preview.revision;
+      draft.operation.submitAccepted = false;
+      draft.operation.resubmitted = false;
       draft.uncertain = true;
     } else if (!draft.operation) return;
     if (action !== "status" && !persist(detail.taskID, draft)) {
@@ -75,18 +86,24 @@
       update(detail);
       return;
     }
+    if (action === "submit") {
+      submitDurable(detail, emit, draft);
+      return;
+    }
     var request = identifier(), operation = draft.operation;
     var input = action === "prepare" ? draft.input : "";
     var pending = { requestID: request, action: action, id: operation.id, input: input };
     draft.pending = pending;
     draft.message = action === "prepare" ? "正在生成并校验服务端交接预览…"
       : action === "submit" ? "正在提交已确认的交接版本…" : "正在查询原交接状态…";
-    pending.timer = setTimeout(function () {
+    pending.timer = global.setTimeout(function () {
       if (draft.pending !== pending) return;
       draft.pending = null;
-      draft.message = "未收到交接回执；请查询原交接状态，不要把超时当成未执行。";
+      draft.uncertain = draft.uncertain || action === "submit";
+      draft.message = "正在核对原交接状态…";
+      scheduleRecovery(detail, emit, draft);
       if (root && root.__detail && root.__detail.taskID === detail.taskID) update(root.__detail);
-    }, 45000);
+    }, 10000);
     if (pending.timer && pending.timer.unref) pending.timer.unref();
     update(detail);
     emit("handoffTask", { taskID: detail.taskID, providerID: operation.providerID, input: input,
@@ -103,19 +120,117 @@
     if (receipt.accepted !== true || !preview || preview.handoffID !== pending.id
       || preview.sourceTaskID !== receipt.taskID || preview.providerID !== draft.operation.providerID) {
       draft.message = receipt.message || "未获得匹配的交接回执，请查询状态；必要时同步升级 App 与后台服务。";
+      if (pending.action === "status" && draft.lastDetail && draft.lastEmit) {
+        scheduleRecovery(draft.lastDetail, draft.lastEmit, draft);
+      }
       return;
     }
     draft.preview = preview;
-    draft.uncertain = false;
+    draft.uncertain = !!(draft.operation.submitAccepted
+      && (preview.phase === "prepared" || preview.phase === "submitting"));
     draft.preparedInput = preview.additionalInstructions || "";
     if ((pending.action === "prepare" && draft.input === pending.input)
       || (draft.recovered && !draft.dirty)) draft.input = draft.preparedInput;
     draft.recovered = false;
-    if (preview.phase === "prepared") draft.operation.submitted = false;
+    draft.recoveryAttempt = 0;
+    if (draft.recoveryTimer) global.clearTimeout(draft.recoveryTimer);
+    draft.recoveryTimer = null;
+    if (preview.phase === "prepared" && !draft.operation.submitAccepted) draft.operation.submitted = false;
     if (preview.targetTaskID || preview.phase === "submitting") draft.operation.submitted = true;
     draft.message = preview.message || (preview.ready ? "预览已生成；确认后才会启动目标 Agent。" : "交接校验未通过，未启动目标任务。");
     persist(receipt.taskID, draft);
+    if (draft.uncertain && draft.lastDetail && draft.lastEmit) {
+      scheduleRecovery(draft.lastDetail, draft.lastEmit, draft);
+    }
   }
+
+  function submitDurable(detail, emit, draft) {
+    var operation = draft.operation, transport = global.CodexBridgeDesktopEmbeddedDSHTransport;
+    if (!transport) {
+      draft.message = "后台服务暂不可用，正在恢复交接状态…";
+      scheduleRecovery(detail, emit, draft); update(detail); return;
+    }
+    var pending = { action: "submit", id: operation.id };
+    draft.pending = pending;
+    draft.message = "正在提交已确认的交接版本…";
+    update(detail);
+    transport.call("operations.submit", {
+      operationID: operation.submitOperationID, requestID: operation.submitOperationID,
+      kind: "handoff.submit", sessionID: detail.taskID,
+      input: { taskID: detail.taskID, providerID: operation.providerID,
+        handoffID: operation.id, revision: operation.submitRevision }
+    }, { timeoutMs: 10000 }).then(function (response) {
+      if (draft.pending !== pending) return;
+      draft.pending = null; applySubmit(detail, emit, draft, response);
+    }, function () {
+      if (draft.pending !== pending) return;
+      draft.pending = null; draft.message = "正在核对原交接状态…";
+      scheduleRecovery(detail, emit, draft); update(detail);
+    });
+  }
+
+  function applySubmit(detail, emit, draft, response) {
+    var operation = draft.operation;
+    var rows = response && response.operations;
+    var result = Array.isArray(rows) && rows.find(function (row) {
+      return row.operationID === operation.submitOperationID;
+    });
+    if (!result && response && response.outcome === "notFound" && !operation.resubmitted) {
+      operation.resubmitted = true;
+      if (persist(detail.taskID, draft)) { submitDurable(detail, emit, draft); return; }
+      draft.message = "无法保存交接状态，请检查应用本地存储。";
+    } else if (result && ["accepted", "completed"].indexOf(result.phase) >= 0) {
+      operation.submitAccepted = true; draft.recoveryAttempt = 0;
+      persist(detail.taskID, draft);
+      send("status", detail, emit);
+      return;
+    } else if (result && ["failed", "cancelled"].indexOf(result.phase) >= 0) {
+      var failure = null;
+      try { failure = JSON.parse(result.resultJSON || "null"); } catch (_) {}
+      operation.submitted = false; operation.submitAccepted = false; draft.uncertain = false;
+      draft.message = failure && failure.message || "交接未完成，请检查后重试。";
+      persist(detail.taskID, draft); update(detail); return;
+    } else {
+      draft.message = "正在核对原交接状态…";
+    }
+    scheduleRecovery(detail, emit, draft); update(detail);
+  }
+
+  function reconcileSubmit(detail, emit, draft) {
+    var operation = draft.operation, transport = global.CodexBridgeDesktopEmbeddedDSHTransport;
+    if (!transport) { scheduleRecovery(detail, emit, draft); return; }
+    var pending = { action: "reconcile", id: operation.id };
+    draft.pending = pending;
+    transport.call("operations.reconcile", { operationID: operation.submitOperationID },
+      { timeoutMs: 10000 }).then(function (response) {
+      if (draft.pending !== pending) return;
+      draft.pending = null; applySubmit(detail, emit, draft, response);
+    }, function () {
+      if (draft.pending !== pending) return;
+      draft.pending = null; scheduleRecovery(detail, emit, draft); update(detail);
+    });
+  }
+  function scheduleRecovery(detail, emit, draft, immediate) {
+    if (!draft.operation || draft.pending || draft.recoveryTimer) return;
+    var attempt = Math.min(draft.recoveryAttempt, recoveryDelays.length - 1);
+    draft.recoveryAttempt = attempt + 1;
+    draft.recoveryTimer = global.setTimeout(function () {
+      draft.recoveryTimer = null;
+      if (global.document && global.document.visibilityState === "hidden") return;
+      if (draft.operation.submitOperationID && !draft.operation.submitAccepted) {
+        reconcileSubmit(detail, emit, draft);
+      } else send("status", detail, emit);
+    }, immediate ? 0 : recoveryDelays[attempt]);
+    if (draft.recoveryTimer && draft.recoveryTimer.unref) draft.recoveryTimer.unref();
+  }
+  if (global.document) global.document.addEventListener("visibilitychange", function () {
+    if (global.document.visibilityState === "hidden") return;
+    drafts.forEach(function (draft) {
+      if ((draft.recovered || draft.uncertain) && draft.lastDetail && draft.lastEmit) {
+        scheduleRecovery(draft.lastDetail, draft.lastEmit, draft, true);
+      }
+    });
+  });
   function ensureRoot() {
     if (root) return;
     var footer = document.getElementById("workbench-inspector-footer");
@@ -131,6 +246,10 @@
     var draft = draftFor(detail.taskID), providers = S.safeArray(detail.handoffProviders).filter(function (provider) {
       return provider.id !== "deepseek-harness";
     });
+    draft.lastDetail = detail; draft.lastEmit = emit;
+    if ((draft.recovered || draft.uncertain) && !draft.pending && !draft.recoveryTimer) {
+      scheduleRecovery(detail, emit, draft, draft.recovered);
+    }
     if (draft.operation && !providers.some(function (p) { return p.id === draft.operation.providerID; })) {
       providers.push({ id: draft.operation.providerID, title: draft.operation.providerID + "（仅恢复交接）" });
     }

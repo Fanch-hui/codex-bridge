@@ -8,6 +8,7 @@ public struct IPCMCPClientStatus: Codable, Equatable, Sendable {
   public let exposureMode: MCPServiceExposureMode
   public let activeSessionCount: Int
   public let lastConnectedAt: String?
+  public let successfulToolCalls: [String: String]?
 
   public init(
     clientID: String,
@@ -15,7 +16,8 @@ public struct IPCMCPClientStatus: Codable, Equatable, Sendable {
     enabled: Bool,
     exposureMode: MCPServiceExposureMode,
     activeSessionCount: Int,
-    lastConnectedAt: String? = nil
+    lastConnectedAt: String? = nil,
+    successfulToolCalls: [String: String]? = nil
   ) {
     self.clientID = clientID
     self.displayName = displayName
@@ -23,6 +25,7 @@ public struct IPCMCPClientStatus: Codable, Equatable, Sendable {
     self.exposureMode = exposureMode
     self.activeSessionCount = activeSessionCount
     self.lastConnectedAt = lastConnectedAt
+    self.successfulToolCalls = successfulToolCalls
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -32,6 +35,7 @@ public struct IPCMCPClientStatus: Codable, Equatable, Sendable {
     case exposureMode = "exposure_mode"
     case activeSessionCount = "active_session_count"
     case lastConnectedAt = "last_connected_at"
+    case successfulToolCalls = "successful_tool_calls"
   }
 }
 

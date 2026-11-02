@@ -8,14 +8,15 @@ extension BridgeServiceAppModel {
   public func registerProject(at url: URL) {
     runMutation { [weak self] client in
       guard let self else { return }
-      _ = try await client.registerProject(
+      let detail = try await client.registerProject(
         IPCProjectRegistrationRequest(
           name: url.lastPathComponent,
           absolutePath: url.standardizedFileURL.path
         )
       )
       await self.refresh(silent: true, includeCatalog: false)
-      self.postToast("已成功注册项目：\(url.lastPathComponent)")
+      self.selectProject(detail.projectID)
+      self.postToast("已打开工作文件夹：\(url.lastPathComponent)")
     }
   }
 

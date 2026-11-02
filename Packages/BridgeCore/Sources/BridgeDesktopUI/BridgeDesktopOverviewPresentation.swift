@@ -17,16 +17,20 @@ public enum BridgeDesktopOverviewPresentation {
   public static func onboardingSteps(
     hasProjects: Bool, hasConfiguredClient: Bool
   ) -> [BridgeDesktopActionLink] {
-    guard !hasProjects || !hasConfiguredClient else { return [] }
-    return [
-      BridgeDesktopActionLink(
-        id: "register-project", title: "登记项目", command: .openProjects, destination: .projects),
-      BridgeDesktopActionLink(
-        id: "connect-client", title: "连接聊天客户端", command: .openConnections,
-        destination: .connections),
-      BridgeDesktopActionLink(
-        id: "start-using", title: "开始使用", command: .openWorkbench, destination: .workbench),
-    ]
+    var actions: [BridgeDesktopActionLink] = []
+    if !hasProjects {
+      actions.append(
+        BridgeDesktopActionLink(
+          id: "register-project", title: "选择工作文件夹", command: .registerProject,
+          destination: .projects))
+    }
+    if !hasConfiguredClient {
+      actions.append(
+        BridgeDesktopActionLink(
+          id: "connect-client", title: "连接其他应用", command: .openConnections,
+          destination: .connections))
+    }
+    return actions
   }
 
   public static func clientNotices(

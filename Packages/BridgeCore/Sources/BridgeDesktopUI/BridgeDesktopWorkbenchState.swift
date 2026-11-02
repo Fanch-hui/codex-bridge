@@ -191,6 +191,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let isRefreshingModels: Bool?
   public let modelError: String?
   public let commandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+  public let embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]?
   public let workspace: WorkbenchWorkspaceState?
 
   public init(
@@ -216,6 +217,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     isRefreshingModels: Bool? = nil,
     modelError: String? = nil,
     commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil,
+    embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]? = nil,
     workspace: WorkbenchWorkspaceState? = nil
   ) {
     self.header = header
@@ -240,6 +242,7 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     self.isRefreshingModels = isRefreshingModels
     self.modelError = modelError
     self.commandReceipt = commandReceipt
+    self.embeddedDSHReceipts = embeddedDSHReceipts
     self.workspace = workspace
   }
 }

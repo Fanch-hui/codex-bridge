@@ -66,6 +66,13 @@ extension SimpleServiceStore {
         sql: "DELETE FROM bridge_service_task_queue WHERE task_id = ?",
         arguments: [task.id.rawValue]
       )
+      if let groupID = try String.fetchOne(
+        db,
+        sql: "SELECT execution_group_id FROM bridge_service_tasks WHERE task_id = ?",
+        arguments: [task.id.rawValue]
+      ) {
+        try Self.releaseInactiveExecutionGroup(groupID, in: db)
+      }
     }
   }
 

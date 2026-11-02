@@ -14,12 +14,13 @@
   font-weight: 500;
   line-height: var(--line-height-body);
   text-align: center;
+  box-shadow: var(--shadow-soft);
   cursor: pointer;
 }
 
-.button:hover:not(:disabled) { background: var(--surface-hover); }
+.button:hover:not(:disabled) { background: var(--surface-muted); }
 .button:active:not(:disabled) { background: var(--surface-pressed); }
-.button.primary { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.button.primary { border-color: var(--primary); background: var(--primary); color: var(--on-primary); box-shadow: none; }
 .button.primary:hover:not(:disabled), .button.primary:active:not(:disabled) {
   border-color: var(--primary-hover);
   background: var(--primary-hover);
@@ -34,7 +35,7 @@
   border-color: var(--control-border);
   background: var(--surface-muted);
   color: var(--text-tertiary);
-  cursor: not-allowed;
+  cursor: default;
 }
 .button[data-pending="true"] { cursor: progress; }
 .button.small {
@@ -52,11 +53,12 @@
   color: var(--accent);
   font-size: 13px;
   line-height: 18px;
+  box-shadow: none;
 }
 .button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .button.icon-btn-small { min-height: var(--control-height-small); }
 
-.field { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.field { display: grid; align-content: start; gap: 6px; min-width: 0; }
 .field label { color: var(--text); font-size: var(--font-size-body); font-weight: 400; line-height: var(--line-height-body); }
 .field :is(input, select, textarea), .filter-bar :is(input, select), .browser-site-select, .dsh-project-select {
   min-width: 0;
@@ -84,7 +86,8 @@
 .field :is(input, textarea)::placeholder, .filter-bar input::placeholder { color: var(--text-tertiary); }
 .field :is(input, select, textarea):hover:not(:disabled),
 .filter-bar :is(input, select):hover:not(:disabled),
-.browser-site-select:hover:not(:disabled) { background-color: var(--surface-hover); }
+.browser-site-select:hover:not(:disabled),
+.dsh-project-select:hover:not(:disabled) { background-color: var(--surface-muted); }
 .field :is(input, select, textarea):focus-visible,
 .filter-bar :is(input, select):focus-visible,
 .browser-site-select:focus-visible,
@@ -99,9 +102,9 @@
 .dsh-project-select:disabled {
   background-color: var(--surface-muted);
   color: var(--text-tertiary);
-  cursor: not-allowed;
+  cursor: default;
 }
-.browser-site-select, .dsh-native-composer .dsh-composer-choice select {
+.browser-site-select {
   min-height: var(--control-height-small);
   padding: 3px 26px 3px 7px;
   border-radius: var(--control-radius-small);
@@ -110,26 +113,58 @@
 }
 .browser-site-select { max-width: 110px; }
 .compact-field select { min-height: var(--control-height-small); padding-block: 3px; font-size: 13px; line-height: 18px; }
-.dsh-native-composer .dsh-composer-choice select { border-color: transparent; background-color: transparent; font-size: 13px; }
 
-.segmented-control { display: inline-flex; max-width: 100%; gap: 2px; padding: 2px; border-radius: var(--control-radius); background: var(--surface-hover); }
+.message-composer { min-width: 0; }
+.message-composer [hidden] { display: none; }
+.message-composer-surface { padding: 10px 12px 9px; border: 1px solid var(--separator-strong); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-soft); }
+.message-composer-surface:focus-within { border-color: var(--text-tertiary); }
+.message-composer-input-row { display: flex; align-items: stretch; }
+.message-composer-input { flex: 1 1 0; min-width: 0; }
+.message-composer .message-composer-surface .field.message-composer-input textarea { min-height: 48px; max-height: 180px; padding: 3px 4px 6px; border: 0; border-radius: 0; background: transparent; resize: none; line-height: 1.5; }
+.message-composer .message-composer-surface .field.message-composer-input textarea:focus-visible { border-color: transparent; outline: none; box-shadow: none; }
+.message-composer-toolbar { display: flex; align-items: flex-end; gap: 8px; margin-top: 6px; }
+.message-composer-tools { display: flex; flex: 1 1 0; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.dsh-native-composer .dsh-composer-leading { flex: 1 1 auto; }
+.dsh-native-composer .dsh-composer-trailing { flex: 0 1 auto; justify-content: flex-end; }
+.message-composer-tools .field select { min-height: 30px; padding: 4px 27px 4px 9px; border-color: transparent; border-radius: 8px; color: var(--text-secondary); background-color: transparent; font-size: 12px; font-weight: 500; text-overflow: ellipsis; }
+.message-composer-tools .field select:hover:not(:disabled) { color: var(--text); background-color: var(--surface-muted); }
+.message-composer-tools .field select:focus { border-color: transparent; outline: none; }
+.message-composer-tools .field select:focus-visible { outline: 1px solid var(--focus-ring); outline-offset: 1px; }
+.message-composer-tools .field select:disabled { color: var(--text-tertiary); }
+.message-composer-tools .button:not(.primary):not(.danger) { min-height: 30px; padding: 4px 8px; border-color: transparent; border-radius: 8px; color: var(--text-secondary); background: transparent; box-shadow: none; }
+.message-composer-tools .button:not(.primary):not(.danger):hover:not(:disabled) { color: var(--text); background: var(--surface-muted); }
+.message-composer-tools .button:not(.primary):not(.danger):disabled { color: var(--text-tertiary); }
+.message-composer-tools .button.message-composer-icon:not(.primary):not(.danger) { width: 30px; padding: 0; }
+.button.message-composer-send { flex: 0 0 32px; width: 32px; min-height: 32px; padding: 0; border-radius: 50%; font-size: 21px; line-height: 1; }
+.message-composer-recovery { display: flex; gap: 8px; margin: 8px 4px 0; }
+.message-composer-hint { margin: 8px 4px 0; }
+
+.segmented-control { display: inline-flex; max-width: 100%; gap: 2px; padding: 2px; border: 1px solid var(--separator); border-radius: var(--control-radius); background: var(--surface-muted); }
 .segmented-btn { min-height: var(--control-height-small); padding: 0 12px; border: 1px solid transparent; border-radius: var(--control-radius-small); color: var(--text-secondary); background: transparent; font: inherit; font-size: 13px; line-height: 20px; font-weight: 500; cursor: pointer; }
 .segmented-btn:hover:not(.is-active) { color: var(--text); background: var(--surface-hover); }
 .segmented-btn.is-active { color: var(--text); border-color: var(--separator); background: var(--surface); box-shadow: var(--shadow-soft); }
-.segmented-btn:disabled { color: var(--text-tertiary); cursor: not-allowed; }
+.segmented-btn:disabled { color: var(--text-tertiary); cursor: default; }
 .segmented-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .switch-toggle { position: relative; width: 34px; height: 20px; padding: 2px; border: 1px solid var(--separator-strong); border-radius: 999px; background: var(--surface-pressed); cursor: pointer; }
 .switch-toggle.is-active { background: var(--accent); border-color: var(--accent); }
 .switch-thumb { display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
 .switch-toggle.is-active .switch-thumb { transform: translateX(14px); }
-.switch-toggle:disabled { opacity: .55; cursor: not-allowed; }
+.switch-toggle:disabled { opacity: .55; cursor: default; }
 
 :is(.button, .segmented-btn, .switch-toggle) { transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease; }
 
 @media (forced-colors: active) {
-  .button, .field :is(input, select, textarea), .filter-bar :is(input, select), .browser-site-select {
+  .message-composer-surface:focus-within { outline: 2px solid Highlight; outline-offset: 2px; }
+  .button, .field :is(input, select, textarea), .filter-bar :is(input, select), .browser-site-select, .dsh-project-select {
     border: 1px solid ButtonText;
   }
+  .message-composer-tools .field select:focus-visible { outline: 2px solid Highlight; }
   .button:disabled { border-color: GrayText; color: GrayText; }
   .field select, .browser-site-select, .dsh-project-select { appearance: auto; background-image: none; padding-right: 9px; }
+  .button.primary:not(:disabled), .button.primary:not(:disabled):is(:hover, :active),
+  .segmented-btn.is-active { color: HighlightText; border-color: Highlight; background: Highlight; }
+  .switch-toggle { border-color: ButtonText; background: Canvas; }
+  .switch-thumb { background: ButtonText; }
+  .switch-toggle.is-active { border-color: Highlight; background: Highlight; }
+  .switch-toggle.is-active .switch-thumb { background: HighlightText; }
 }

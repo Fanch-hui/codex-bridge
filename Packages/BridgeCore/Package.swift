@@ -101,6 +101,7 @@ let package = Package(
     .library(name: "BridgeOpenCodeACP", targets: ["BridgeOpenCodeACP"]),
     .library(name: "BridgeDeepSeekHarnessACP", targets: ["BridgeDeepSeekHarnessACP"]),
     .library(name: "BridgeDeepSeekHarnessDesktop", targets: ["BridgeDeepSeekHarnessDesktop"]),
+    .library(name: "BridgeEmbeddedDSH", targets: ["BridgeEmbeddedDSH"]),
     .library(name: "BridgeAntigravityCLI", targets: ["BridgeAntigravityCLI"]),
     .library(name: "BridgePiRPC", targets: ["BridgePiRPC"]),
     .library(name: "BridgeQoderSDK", targets: ["BridgeQoderSDK"]),
@@ -240,6 +241,7 @@ let package = Package(
         "BridgeAgentCore",
         "BridgeCodexRPC",
         "BridgeDomain",
+        "BridgeProcess",
         "BridgeProjects",
         "BridgeSecurity",
         "BridgeServiceCore",
@@ -253,6 +255,13 @@ let package = Package(
     .target(
       name: "BridgeACP",
       dependencies: ["BridgeProcess", "BridgeSecurity"]
+    ),
+    .target(
+      name: "BridgeEmbeddedDSH",
+      dependencies: [
+        "BridgeACP", "BridgeAgentCore", "BridgeProcess", "BridgeSecurity",
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
     ),
     .target(
       name: "BridgeOpenCodeACP",
@@ -353,6 +362,8 @@ let package = Package(
     .target(
       name: "BridgeServiceHost",
       dependencies: [
+        "BridgeACP",
+        "BridgeEmbeddedDSH",
         "BridgeAgentCore",
         "BridgeAntigravityCLI",
         "BridgePiRPC",

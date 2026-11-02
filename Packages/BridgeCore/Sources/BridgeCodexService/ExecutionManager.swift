@@ -5,6 +5,7 @@ import Foundation
 public actor ExecutionManager {
   private let configuration: ExecutionManagerConfiguration
   private var sessions: [TaskID: ExecutionSession] = [:]
+  private var stopping: [TaskID: Task<Void, Never>] = [:]
 
   public init(configuration: ExecutionManagerConfiguration) {
     self.configuration = configuration
@@ -30,10 +31,10 @@ public actor ExecutionManager {
 
   public func start(_ request: ExecutionRequest) async throws -> ExecutionHandle {
     let taskID = request.task.id
-    guard sessions[taskID] == nil else {
+    guard sessions[taskID] == nil, stopping[taskID] == nil else {
       throw ExecutionServiceError.activeSession(taskID)
     }
-    guard sessions.count < configuration.maximumConcurrentSessions else {
+    guard sessions.count + stopping.count < configuration.maximumConcurrentSessions else {
       throw ExecutionServiceError.sessionLimitReached
     }
 
@@ -119,20 +120,25 @@ public actor ExecutionManager {
   }
 
   public func stop(taskID: TaskID) async {
+    if let pending = stopping[taskID] {
+      await pending.value
+      return
+    }
     guard let session = sessions.removeValue(forKey: taskID) else { return }
-    await session.shutdown()
+    let pending = Task { await session.shutdown() }
+    stopping[taskID] = pending
+    await pending.value
+    stopping.removeValue(forKey: taskID)
   }
 
   public func shutdown() async {
-    let active = Array(sessions.values)
-    sessions.removeAll(keepingCapacity: false)
-    for session in active {
-      await session.shutdown()
-    }
+    let active = Array(sessions.keys)
+    for taskID in active { await stop(taskID: taskID) }
+    for pending in Array(stopping.values) { await pending.value }
   }
 
   public func hasActiveSession(taskID: TaskID) -> Bool {
-    sessions[taskID] != nil
+    sessions[taskID] != nil || stopping[taskID] != nil
   }
 
   private func requiredSession(_ taskID: TaskID) throws -> ExecutionSession {

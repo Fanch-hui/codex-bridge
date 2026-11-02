@@ -31,6 +31,43 @@
       chooseFile(title: title, filter: filter, completion: completion)
     }
 
+    static func chooseImageFile(completion: @escaping @Sendable (String?) -> Void) {
+      let filter = "图片 (*.png;*.jpg;*.jpeg;*.webp)\0*.png;*.jpg;*.jpeg;*.webp\0"
+      WindowsUIThread.shared.enqueue {
+        completion(openFileDialog(title: "选择项目图片", filter: filter))
+      }
+    }
+
+    static func chooseSaveFile(completion: @escaping @Sendable (String?) -> Void) {
+      WindowsUIThread.shared.enqueue {
+        let filter = "文本文件 (*.txt)\0*.txt\0所有文件 (*.*)\0*.*\0\0"
+        var fileName = [WCHAR](repeating: 0, count: Int(MAX_PATH))
+        for (index, character) in "会话内容.txt".utf16.enumerated() { fileName[index] = character }
+        let filters = Array(filter.utf16)
+        let path = "导出会话内容".withCString(encodedAs: UTF16.self) { title in
+          filters.withUnsafeBufferPointer { filterPointer in
+            fileName.withUnsafeMutableBufferPointer { filePointer in
+              var dialog = OPENFILENAMEW()
+              dialog.lStructSize = DWORD(MemoryLayout<OPENFILENAMEW>.size)
+              dialog.hwndOwner = WindowsMainWindow.currentWindow()
+              dialog.lpstrFilter = filterPointer.baseAddress
+              dialog.lpstrFile = filePointer.baseAddress
+              dialog.nMaxFile = DWORD(MAX_PATH)
+              dialog.lpstrTitle = title
+              dialog.Flags = DWORD(OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR)
+              guard GetSaveFileNameW(&dialog) else { return nil as String? }
+              return String(decoding: filePointer.prefix { $0 != 0 }, as: UTF16.self)
+            }
+          }
+        }
+        completion(path)
+      }
+    }
+
+    static func chooseWorkspaceDirectory(completion: @escaping @Sendable (String?) -> Void) {
+      WindowsUIThread.shared.enqueue { completion(chooseDirectory()) }
+    }
+
     static func chooseFile(
       title: String,
       filter: String,

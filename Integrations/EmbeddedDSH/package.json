@@ -1,0 +1,27 @@
+{
+  "name": "codex-bridge-embedded-dsh",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-api-remotes": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-api-settings-controller": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-atomic-write": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-client-connection": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-client-modules": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-plugin-manager": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-sdk-protocol": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-session-stats": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-session-turn-outline": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-subagent": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-web-app": "0.2.1-rc.5",
+    "dsh-plugin-chatgpt-siwc": "0.9.7",
+    "pnpm": "11.28.5",
+    "yaml": "2.9.1"
+  }
+}

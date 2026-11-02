@@ -18,10 +18,11 @@ readonly service="${app}/Contents/Resources/CodexBridgeService"
 readonly helper="${app}/Contents/Helpers/tunnel-client"
 readonly deepseek_bundle="${app}/Contents/Resources/BridgeCore_BridgeDeepSeekHarnessACP.bundle"
 readonly deepseek_template="${deepseek_bundle}/Contents/Resources/cordis.yml"
+readonly embedded_dsh="${app}/Contents/Resources/EmbeddedDSH"
 
 [[ -d "${app}" && ! -L "${app}" ]] || { print -u2 "App bundle is missing or unsafe."; exit 66; }
-for path in "${app}" "${service}" "${helper}" "${deepseek_bundle}" "${deepseek_template}"; do
-  [[ -e "${path}" && ! -L "${path}" ]] || { print -u2 "Missing release component: ${path}"; exit 66; }
+for component_path in "${app}" "${service}" "${helper}" "${deepseek_bundle}" "${deepseek_template}"; do
+  [[ -e "${component_path}" && ! -L "${component_path}" ]] || { print -u2 "Missing release component: ${component_path}"; exit 66; }
 done
 
 /usr/bin/codesign --verify --deep --strict --verbose=2 "${app}"
@@ -64,6 +65,29 @@ for component in "${service}" "${helper}"; do
     exit 65
   }
 done
+
+case "${expected_architectures}" in
+  "arm64 ") runtime_architecture=arm64 ;;
+  "x86_64 ") runtime_architecture=x64 ;;
+  *) print -u2 "Embedded DSH requires one release architecture."; exit 65 ;;
+esac
+node "${0:A:h}/verify-embedded-dsh-runtime.mjs" "${embedded_dsh}" darwin "${runtime_architecture}"
+embedded_node_relative="$(/usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["node"])' "${embedded_dsh}/runtime.json")"
+embedded_node="${embedded_dsh}/${embedded_node_relative}"
+if (( allow_ad_hoc == 0 )); then
+  node_details="$(/usr/bin/codesign -dvv "${embedded_node}" 2>&1)"
+  node_team="${node_details##*TeamIdentifier=}"
+  [[ "${node_team%%$'\n'*}" == "${app_team_id}" ]] || {
+    print -u2 "Embedded Node team identifier does not match the app."
+    exit 65
+  }
+fi
+/usr/bin/codesign --verify --strict --verbose=2 "${embedded_node}"
+node_architectures="$(/usr/bin/lipo -archs "${embedded_node}" | /usr/bin/tr ' ' '\n' | /usr/bin/sort | /usr/bin/tr '\n' ' ')"
+[[ "${node_architectures}" == "${expected_architectures}" ]] || {
+  print -u2 "Embedded Node architecture does not match the app."
+  exit 65
+}
 
 if (( allow_ad_hoc == 1 )); then
   print "Ad hoc release package verified for ${app}."

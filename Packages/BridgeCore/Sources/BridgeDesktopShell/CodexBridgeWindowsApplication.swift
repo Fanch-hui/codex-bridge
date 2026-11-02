@@ -7,7 +7,7 @@
   /// Shared desktop coordinator. Platform event loops own their native surfaces.
   @MainActor
   public enum CodexBridgeDesktopApplication {
-    static var selectedPage = WindowsMainPage.overview
+    static var selectedPage = WindowsMainPage.workbench
 
     #if os(Windows)
       public static func main() async {
@@ -68,6 +68,14 @@
           try? await Task.sleep(nanoseconds: 10_000_000)
         }
         stopActivityScheduling()
+        model.stopSchedulingForApplicationExit()
+        if !auxiliary.settings.keepServiceRunningAfterExit {
+          let stopped = await Task.detached { WindowsServiceLauncher.shutdownServiceAndWait() }
+            .value
+          if !stopped {
+            FileHandle.standardError.write(Data("后台服务尚未结束，请查看服务日志。\n".utf8))
+          }
+        }
         await model.shutdown()
       }
 
@@ -92,9 +100,8 @@
         refreshAll(model: model, management: management, auxiliary: auxiliary)
       case .registerProject(let name, let path):
         Task {
-          await management.registerProject(name: name, path: path)
-          await model.connectAndRefresh()
-          await auxiliary.workspace.refreshSelected()
+          await registerWorkFolder(
+            name: name, path: path, model: model, management: management, auxiliary: auxiliary)
         }
       case .desktopCommand, .registerAgentFromDesktop:
         return

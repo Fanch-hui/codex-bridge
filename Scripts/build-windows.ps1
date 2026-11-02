@@ -130,6 +130,8 @@ try {
   }
 
 
+  $embeddedDSHTemporary = Join-Path $resolvedOutDir ("embedded-dsh-" + [Guid]::NewGuid().ToString("N"))
+  $embeddedDSHBuilder = Join-Path $repoRoot "Scripts\build-embedded-dsh-runtime.mjs"
   $portableDir = Join-Path $resolvedOutDir $architecture
   $stageScript = Join-Path $repoRoot "Scripts\stage-windows-portable.ps1"
   $stageArguments = @{
@@ -137,6 +139,7 @@ try {
     OutDir = $portableDir
     Architecture = $architecture
     VcpkgTriplet = $vcpkgTriplet
+    EmbeddedDSHRuntimeDir = $embeddedDSHTemporary
   }
   if ($targetTriple) {
     $stageArguments["TargetTriple"] = $targetTriple
@@ -161,8 +164,16 @@ try {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     $stageArguments["TunnelClientDir"] = $resolvedTunnelClientDir
   }
-  & $stageScript @stageArguments
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  try {
+    & node $embeddedDSHBuilder --platform windows --arch $architecture --output $embeddedDSHTemporary
+    if ($LASTEXITCODE -ne 0) { throw "Embedded DSH runtime build failed." }
+    & $stageScript @stageArguments
+    if ($LASTEXITCODE -ne 0) { throw "Windows portable staging failed." }
+  } finally {
+    if (Test-Path -LiteralPath $embeddedDSHTemporary) {
+      Remove-Item -LiteralPath $embeddedDSHTemporary -Recurse -Force
+    }
+  }
 
   if ($Installer) {
     $installerOutDir = Join-Path $repoRoot ".build\windows-installer\$architecture"

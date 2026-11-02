@@ -55,6 +55,7 @@
         isRefreshingModels: modelRefreshInProgress,
         modelError: display.modelError,
         commandReceipt: display.commandReceipt,
+        embeddedDSHReceipts: display.embeddedDSHReceipts,
         workspace: display.workspace
       )
     }

@@ -14,56 +14,6 @@
     global.CodexBridgeDesktopWorkbenchBrowser.render(page, emit);
   }
 
-  function setOptions(control, options, selected) {
-    var signature = JSON.stringify(options);
-    if (control.__choiceSignature !== signature) {
-      control.__choiceSignature = signature;
-      S.clear(control);
-      options.forEach(function (choice) {
-        var option = S.node("option", null, choice.title);
-        option.value = choice.id;
-        option.disabled = choice.enabled === false;
-        control.appendChild(option);
-      });
-    }
-    control.value = selected || "";
-  }
-
-  function createContextPickers(model) {
-    var context = S.node("div", "inspector-context-pickers");
-    var pGroup = S.node("div", "project-selector-group");
-    pGroup.appendChild(S.icon("folder.fill", "project-folder-icon"));
-    var selectWrap = S.node("div", "project-select-wrap");
-    model.projectSelect = S.node("select", "project-native-select");
-    model.projectSelect.setAttribute("aria-label", "工作台项目");
-    model.projectSelect.addEventListener("change", function () {
-      if (model.emit && model.projectSelect.value) model.emit("selectProject", { projectID: model.projectSelect.value });
-    });
-    selectWrap.appendChild(model.projectSelect);
-    var pFace = S.node("span", "project-dropdown-face");
-    model.projectTitle = S.node("span", "project-title-text");
-    pFace.appendChild(model.projectTitle);
-    pFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
-    selectWrap.appendChild(pFace);
-    pGroup.appendChild(selectWrap);
-    context.appendChild(pGroup);
-    var taskWrap = S.node("div", "task-picker-wrap");
-    taskWrap.appendChild(S.icon("list.bullet.rectangle", "task-picker-icon"));
-    model.taskSelect = S.node("select", "task-native-select");
-    model.taskSelect.setAttribute("aria-label", "当前 Agent 会话");
-    model.taskSelect.addEventListener("change", function () {
-      if (model.emit && model.taskSelect.value) model.emit("selectTask", { taskID: model.taskSelect.value });
-    });
-    taskWrap.appendChild(model.taskSelect);
-    var taskFace = S.node("span", "task-dropdown-face");
-    model.taskTitle = S.node("span", "task-title-text");
-    taskFace.appendChild(model.taskTitle);
-    taskFace.appendChild(S.icon("chevron.down", "dropdown-arrow"));
-    taskWrap.appendChild(taskFace);
-    context.appendChild(taskWrap);
-    return context;
-  }
-
   function createHeaderActions(model) {
     var actions = S.node("div", "inspector-toolbar-actions");
     model.status = S.node("div", "inspector-status-wrap");
@@ -113,10 +63,11 @@
   function createInspectorHeader(header) {
     S.clear(header);
     var model = { page: null, emit: null };
-    var toolbar = S.node("div", "inspector-toolbar");
-    toolbar.appendChild(createContextPickers(model));
-    toolbar.appendChild(createHeaderActions(model));
-    header.appendChild(toolbar);
+    model.context = S.node("div", "collaboration-toolbar-context");
+    model.title = S.node("span", "dsh-toolbar-title"); model.context.appendChild(model.title);
+    document.getElementById("workspace-toolbar-context").appendChild(model.context);
+    model.actions = createHeaderActions(model);
+    document.getElementById("workspace-toolbar-actions").appendChild(model.actions);
     createQueue(model, header);
     header.__inspectorHeader = model;
     return model;
@@ -130,14 +81,8 @@
     model.toggle.title = browser.enabled ? "收起内置浏览器" : "显示内置浏览器";
     model.toggle.disabled = !browser.canToggle;
 
-    var projects = S.safeArray(page.projects);
-    setOptions(model.projectSelect, projects.map(function (project) {
-      return { id: project.id, title: project.title };
-    }), page.selectedProjectID);
-    var currentProject = projects.find(function (project) { return project.id === page.selectedProjectID; });
-    model.projectTitle.textContent = currentProject
-      ? currentProject.title : projects.length ? projects[0].title : "选择项目";
-    model.projectTitle.title = model.projectTitle.textContent;
+    model.title.textContent = page.selectedTask && page.selectedTask.title || "网页工作台会话";
+    model.title.title = model.title.textContent;
     S.clear(model.status);
     if (page.selectedTask) {
       model.status.appendChild(S.status(page.selectedTask.status, toneForStatus(page.selectedTask.status)));
@@ -147,6 +92,7 @@
 
     var queueTask = page.selectedTask;
     model.queue.hidden = !(queueTask && queueTask.queuePosition);
+    document.getElementById("workbench-inspector-header").hidden = model.queue.hidden;
     if (queueTask && queueTask.queuePosition) {
       var queueText = "排队第 " + queueTask.queuePosition + " 位";
       if (queueTask.queueOccupantTaskID) queueText += " · 等待 " + queueTask.queueOccupantTaskID;
@@ -156,7 +102,6 @@
     var readOnly = page.permissionMode === "read-only";
     model.permission.value = readOnly ? "read-only" : "full";
     model.permission.title = readOnly ? "Agent 允许读取，禁止写入和联网" : "Agent 允许读取、写入和联网";
-    updateTaskPicker(model, page);
     model.taskActions.hidden = !page.selectedTask;
     if (page.selectedTask) {
       var row = S.safeArray(page.tasks).find(function (task) {
@@ -168,59 +113,10 @@
     }
   }
 
-  function updateTaskPicker(model, page) {
-    var tasks = S.safeArray(page.tasks), choices = [{ id: "", title: "选择 Agent 会话 (" + tasks.length + ")" }];
-    groupTasks(tasks).forEach(function (group) {
-      choices.push({ group: group.label + " 会话", options: group.tasks.map(function (task) {
-        return { id: task.taskID, title: task.title + " (" + task.status + ")" };
-      }) });
-    });
-    var taskSignature = JSON.stringify(choices);
-    if (model.taskSelect.__choiceSignature !== taskSignature) {
-      model.taskSelect.__choiceSignature = taskSignature;
-      S.clear(model.taskSelect);
-      choices.forEach(function (choice) {
-        if (choice.group) {
-          var group = S.node("optgroup"); group.label = choice.group;
-          choice.options.forEach(function (optionValue) {
-            var option = S.node("option", null, optionValue.title);
-            option.value = optionValue.id; group.appendChild(option);
-          });
-          model.taskSelect.appendChild(group);
-          return;
-        }
-        var option = S.node("option", null, choice.title);
-        option.value = choice.id; model.taskSelect.appendChild(option);
-      });
-    }
-    model.taskSelect.value = page.selectedTaskID || "";
-    var currentTask = tasks.find(function (task) {
-      return task.taskID === page.selectedTaskID || task.selected;
-    });
-    model.taskTitle.textContent = currentTask
-      ? "[" + currentTask.provider + "] " + currentTask.title
-      : "选择 Agent 会话 (" + tasks.length + ")";
-    model.taskTitle.title = model.taskTitle.textContent;
-  }
-
   function renderInspectorHeader(page, emit) {
     var header = document.getElementById("workbench-inspector-header");
     var model = header.__inspectorHeader || createInspectorHeader(header);
     updateInspectorHeader(model, page, emit);
-  }
-
-  function groupTasks(tasks) {
-    var groups = [], byProvider = new Map();
-    tasks.forEach(function (task) {
-      var key = task.providerID || task.provider || "unknown";
-      var group = byProvider.get(key);
-      if (!group) {
-        group = { label: task.provider || task.providerID || "未知 Agent", tasks: [] };
-        byProvider.set(key, group); groups.push(group);
-      }
-      group.tasks.push(task);
-    });
-    return groups;
   }
 
   var browserSignature, headerSignature;
@@ -244,7 +140,7 @@
       var renderHeaderStable = global.CodexBridgeDesktopStableRender;
       if (renderHeaderStable) {
         renderHeaderStable(
-          document.getElementById("workbench-inspector-header"),
+          document.getElementById("workspace-toolbar-actions"),
           header,
           function () { renderInspectorHeader(page, emit); },
           true
@@ -260,6 +156,10 @@
 
   global.CodexBridgeDesktopWorkbenchHeader = {
     render: render,
+    setVisible: function (visible) {
+      var header = document.getElementById("workbench-inspector-header"), model = header && header.__inspectorHeader;
+      if (model) { model.context.hidden = !visible; model.actions.hidden = !visible; }
+    },
     reset: function () { browserSignature = headerSignature = undefined; }
   };
 }(window));

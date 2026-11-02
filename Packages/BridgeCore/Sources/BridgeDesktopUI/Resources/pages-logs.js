@@ -3,14 +3,15 @@
 
   var S = global.CodexBridgeDesktopPageSupport;
 
-  function render(page, emit) {
+  function render(page, emit, updateState, state) {
     var container = document.getElementById("logs-content");
     var view = container.__logsPage || (container.__logsPage = create(container, emit));
-    view.update(page, emit);
+    view.update(page, emit, state);
   }
 
   function create(container, emit) {
     S.clear(container);
+    var context = { emit: emit };
     var header = S.node("div");
     var back = S.button("返回设置", "selectPage", { navigation: "settings" }, emit, "small");
     container.appendChild(back);
@@ -23,9 +24,15 @@
     container.appendChild(filters.root);
     container.appendChild(list);
     container.appendChild(unavailable);
+    var actions = S.node("div", "form-actions");
+    var refresh = S.button("刷新日志", null, {}, null, "small", true);
+    refresh.addEventListener("click", function () { context.emit("refresh", {}); });
+    actions.appendChild(refresh); container.appendChild(actions);
 
     return {
-      update: function (page, nextEmit) {
+      update: function (page, nextEmit, state) {
+        if (nextEmit) context.emit = nextEmit;
+        if (state) refresh.disabled = !!state.isRefreshing;
         if (!page) {
           S.pageHeader(header, {
             title: "日志",

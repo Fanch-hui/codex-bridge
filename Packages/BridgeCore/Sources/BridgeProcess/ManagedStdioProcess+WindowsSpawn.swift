@@ -16,6 +16,7 @@
       argv: [String],
       workingDirectory: String?,
       environment: [String: String],
+      processGroupName: String?,
       standardInput: Pipe,
       standardOutput: Pipe,
       standardError: Pipe?
@@ -38,6 +39,7 @@
       return try launchWindowsProcess(
         launch: launch,
         workingDirectory: workingDirectory,
+        processGroupName: processGroupName,
         stdinRead: stdinRead,
         stdoutWrite: stdoutWrite,
         stderrWrite: stderrWrite
@@ -99,11 +101,12 @@
     private static func launchWindowsProcess(
       launch: WindowsLaunch,
       workingDirectory: String?,
+      processGroupName: String?,
       stdinRead: HANDLE,
       stdoutWrite: HANDLE,
       stderrWrite: HANDLE
     ) throws -> (pid: Int32, handle: HANDLE, job: ManagedWindowsProcessJob) {
-      let job = try ManagedWindowsProcessJob()
+      let job = try ManagedWindowsProcessJob(name: processGroupName)
       var processInformation = PROCESS_INFORMATION()
       var commandLine =
         Array(

@@ -122,12 +122,20 @@ extension SimpleServiceStore {
         guard
           try
             (existing.permissionMode != .full
-            || Self.activeWriteTaskRow(projectID: existing.projectID, in: db) == nil)
+            || Self.executionGroup(projectID: existing.projectID, in: db) == nil)
         else { return nil }
         guard try Self.projectRow(id: existing.projectID, in: db) != nil else {
           throw ServiceStoreError.unknownProject(existing.projectID)
         }
         let promoted = try existing.replacingQueueState(false, updatedAt: date)
+        if let groupID = try Self.claimExecutionGroup(
+          task: promoted, embeddedDSHSubagent: nil, in: db)
+        {
+          try db.execute(
+            sql: "UPDATE bridge_service_tasks SET execution_group_id = ? WHERE task_id = ?",
+            arguments: [groupID, id.rawValue]
+          )
+        }
         try updateTaskRow(promoted, in: db)
         try db.execute(
           sql: "DELETE FROM bridge_service_task_queue WHERE task_id = ?",

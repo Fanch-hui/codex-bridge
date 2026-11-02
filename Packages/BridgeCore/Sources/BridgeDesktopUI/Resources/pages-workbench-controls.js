@@ -8,6 +8,7 @@
 
   function render(page, emit) {
     currentPage = page;
+    P.setSettled(function (pending) { applySubmission(pending, emit); });
     var footer = document.getElementById("workbench-inspector-footer");
     if (!controls) {
       controls = S.node("div", "workbench-controls");
@@ -56,6 +57,7 @@
         detail, emit, page && page.commandReceipt
       );
     }
+    if (controls.__activeForm && controls.__activeForm.__updateQueue) controls.__activeForm.__updateQueue();
     var statusSignature = JSON.stringify([
       page && page.engineStatus,
       page && page.selectedTaskID
@@ -71,13 +73,26 @@
   function acknowledgeSubmission(page) {
     var pending = P.acknowledge(page);
     if (!pending) return;
+    applySubmission(pending);
+  }
+
+  function applySubmission(pending, emit) {
     var draft = draftFor(pending.taskID), value = null;
+    draft.error = pending.state === "failed" ? pending.message || "发送失败，请重试。" : "";
     if (pending.state === "accepted" && !pending.visible && draft.input === pending.input) value = "";
     if (pending.state === "failed" && pending.visible && !draft.input) value = pending.input;
     var form = controls && controls.__activeForm;
     if (value !== null) updateDraft(pending.taskID, value,
       form && form.__taskID === pending.taskID ? form.__inputControl : null);
     if (form && form.__validate) form.__validate();
+    if (form && form.__updateQueue) form.__updateQueue();
+    if (emit && pending.state === "accepted") {
+      emit("refreshTasks", {});
+      if (pending.command === "resumeTask" && pending.resultingTaskID && currentPage
+        && currentPage.selectedTaskID === pending.taskID) {
+        emit("selectTask", { taskID: pending.resultingTaskID });
+      }
+    }
   }
 
   function updateDraft(taskID, value, input) {
@@ -88,8 +103,7 @@
   }
 
   function beginSubmission(request, input) {
-    var pending = P.begin(currentPage, request);
-    if (pending.visible) updateDraft(request.taskID, "", input);
+    return P.begin(currentPage, request);
   }
 
   function renderStatus(page, emit) {
@@ -146,6 +160,7 @@
     field.wrapper.querySelector("label").hidden = label === "消息";
     field.control.addEventListener("input", function () {
       draft.input = field.control.value;
+      draft.error = "";
       persistDraft(detail.taskID, draft);
       S.autoGrowTextArea(field.control);
     });
@@ -153,11 +168,23 @@
     return field;
   }
 
+  function messageComposer(input, className) {
+    var form = S.node("div", className + " message-composer");
+    var surface = S.node("div", "message-composer-surface");
+    var inputRow = S.node("div", "message-composer-input-row");
+    var toolbar = S.node("div", "message-composer-toolbar");
+    var tools = S.node("div", "message-composer-tools");
+    input.wrapper.classList.add("message-composer-input");
+    input.wrapper.querySelector("label").hidden = true;
+    inputRow.appendChild(input.wrapper); toolbar.appendChild(tools);
+    surface.appendChild(inputRow); surface.appendChild(toolbar); form.appendChild(surface);
+    return { form: form, toolbar: toolbar, tools: tools };
+  }
+
   function steerForm(detail, modes, emit) {
-    var draft = draftFor(detail.taskID), form = S.node("div", "steer-form");
-    var grid = S.node("div", "form-grid workbench-steer-grid");
+    var draft = draftFor(detail.taskID);
     var input = inputField(detail, "补充指令", "");
-    grid.appendChild(input.wrapper);
+    var composer = messageComposer(input, "steer-form"), form = composer.form;
     var options = modes.length ? modes : [{ id: "queued", title: "当前任务结束后继续" }];
     if (!options.some(function (mode) { return mode.id === draft.mode && mode.enabled !== false; })) draft.mode = options[0].id;
     var mode = S.selectField("发送方式", draft.mode, options, function (value) {
@@ -168,23 +195,35 @@
     mode.control.id = "workbench-steer-mode";
     mode.control.dataset.taskID = detail.taskID;
     mode.wrapper.querySelector("label").htmlFor = mode.control.id;
+    mode.wrapper.querySelector("label").hidden = true;
+    mode.wrapper.classList.add("message-composer-choice");
     if (options.length > 1) {
-      grid.classList.add("has-mode");
-      grid.appendChild(mode.wrapper);
+      composer.tools.appendChild(mode.wrapper);
+    }
+    var queue = S.node("details", "workbench-queued-menu");
+    var queueLabel = S.node("summary"), queueItems = S.node("ul", "workbench-queued-list");
+    queue.appendChild(queueLabel); queue.appendChild(queueItems); composer.tools.appendChild(queue);
+    function updateQueue() {
+      var items = P.queued(currentPage);
+      queue.hidden = !items.length;
+      queueLabel.textContent = "排队 " + items.length + " 条";
+      S.clear(queueItems);
+      items.forEach(function (item) { queueItems.appendChild(S.node("li", null, item.input)); });
     }
     var send = S.button("发送指令", null, {}, emit, "small primary", false);
+    send.classList.add("workbench-composer-send");
     function updateModeText() {
       var immediate = draft.mode === "interrupt-current-then-continue";
-      input.control.placeholder = immediate ? "输入指令，立即插入对话引导" : "输入指令，当前任务结束后运行";
-      send.textContent = immediate ? "立即插入对话引导" : "结束后运行";
+      input.control.placeholder = immediate ? "输入指令，中断当前任务并发送" : "输入指令，当前任务结束后运行";
+      send.textContent = immediate ? "中断并发送" : "结束后运行";
       send.title = immediate ? "中断当前任务并继续执行这条指令" : "当前任务结束后执行这条指令";
     }
     updateModeText();
-    var actions = S.node("div", "form-actions workbench-steer-actions");
-    actions.appendChild(send);
-    grid.appendChild(actions);
-    var hint = S.node("p", "hint");
+    composer.toolbar.appendChild(send);
+    var hint = S.node("span", "hint workbench-composer-hint");
     hint.id = "workbench-input-hint";
+    hint.setAttribute("role", "status");
+    composer.tools.appendChild(hint);
     input.control.setAttribute("aria-describedby", hint.id);
     function validate() {
       var value = input.control.value;
@@ -194,20 +233,24 @@
       updateModeText();
       send.setAttribute("aria-busy", String(pending));
       send.setAttribute("data-pending", String(pending));
-      hint.textContent = invalid ? "指令不能包含 NUL 字符，且不能超过 32768 字节。" : "";
-      hint.hidden = !invalid;
+      hint.textContent = invalid ? "指令不能包含 NUL 字符，且不能超过 32768 字节。" : draft.error || "";
+      hint.hidden = !hint.textContent;
       input.control.setAttribute("aria-invalid", String(invalid));
     }
     function submit() {
       if (send.disabled) return;
       var value = input.control.value;
+      draft.error = "";
       var requestID = P.newRequestID();
-      beginSubmission({
+      var pending = beginSubmission({
         command: "steerTask", requestID: requestID,
         taskID: detail.taskID, input: value, mode: draft.mode
       }, input.control);
+      var payload = { taskID: detail.taskID, input: value, mode: draft.mode };
+      var saved = P.sendOperation(pending, payload, function (result) { applySubmission(result, emit); });
+      if (pending.visible && saved && pending.state !== "failed") updateDraft(detail.taskID, "", input.control);
       validate();
-      emit("steerTask", { taskID: detail.taskID, input: value, mode: draft.mode }, requestID);
+      updateQueue();
     }
     input.control.addEventListener("input", validate);
     input.control.addEventListener("keydown", function (event) {
@@ -216,47 +259,55 @@
       }
     });
     send.addEventListener("click", submit);
-    form.appendChild(grid); form.appendChild(hint);
     form.__taskID = detail.taskID;
     form.__inputControl = input.control;
     form.__validate = validate;
+    form.__updateQueue = updateQueue;
     validate();
+    updateQueue();
     return form;
   }
 
   function continuationForm(detail, emit, canRetry) {
-    var form = S.node("div", "workbench-continuation-form");
-    var actions = S.node("div", "form-actions"), buttons = [];
-    var input = null;
+    var input = null, composer = null, buttons = [];
     if (detail.canResume) {
       input = inputField(detail, "消息", "输入消息，续写当前会话");
-      form.appendChild(input.wrapper);
-      addAction("插入对话", "resumeTask", "small primary");
+      composer = messageComposer(input, "workbench-continuation-form");
       input.control.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
           event.preventDefault(); submit("resumeTask");
         }
       });
     }
-    if (canRetry) addAction("失败重试", "restartTask", "small");
+    var form = composer ? composer.form : S.node("div", "workbench-continuation-form");
+    var actions = composer ? composer.tools : S.node("div", "form-actions");
+    if (input) {
+      var send = addAction("插入对话", "resumeTask", "small primary");
+      send.classList.add("workbench-composer-send");
+      composer.toolbar.appendChild(send);
+    }
+    if (canRetry) actions.appendChild(addAction("失败重试", "restartTask", "small"));
     function addAction(title, command, style) {
       var button = S.button(title, null, {}, emit, style, false);
       button.addEventListener("click", function () { submit(command); });
-      buttons.push(button); actions.appendChild(button);
+      buttons.push(button); return button;
     }
     function submit(command) {
       if (P.isPending(detail.taskID)) return;
       var value = command === "resumeTask" ? input.control.value : null;
       var requestID = P.newRequestID();
-      beginSubmission({
+      var pending = beginSubmission({
         command: command, requestID: requestID,
         taskID: detail.taskID, input: value
       }, input && input.control);
-      validate();
       var payload = { taskID: detail.taskID };
       if (command === "resumeTask") payload.input = value;
       else payload.attachmentPaths = S.safeArray(detail.attachmentPaths).slice();
-      emit(command, payload, requestID);
+      if (command === "resumeTask") {
+        var saved = P.sendOperation(pending, payload, function (result) { applySubmission(result, emit); });
+        if (pending.visible && saved && pending.state !== "failed") updateDraft(detail.taskID, "", input.control);
+      } else emit(command, payload, requestID);
+      validate();
     }
     function validate() {
       var pending = P.isPending(detail.taskID);
@@ -266,7 +317,7 @@
         button.setAttribute("data-pending", String(pending));
       });
     }
-    form.appendChild(actions);
+    if (!composer) form.appendChild(actions);
     form.__taskID = detail.taskID;
     form.__inputControl = input && input.control;
     form.__validate = validate;

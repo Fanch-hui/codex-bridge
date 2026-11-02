@@ -4,20 +4,16 @@
   var S = global.CodexBridgeDesktopPageSupport;
 
   function create(emit) {
-    var context = { emit: emit };
+    var context = { emit: emit, connected: false };
     var section = S.node("section", "connection-detail");
-    var card = S.node("div", "page-card connection-card");
+    var card = S.node("div", "connection-card");
     section.appendChild(card);
-    var titleRow = S.node("div", "section-heading-row");
-    var title = S.node("h3", null, "连接状态");
     var badge = S.badge("未知", "neutral");
-    titleRow.appendChild(title);
-    titleRow.appendChild(badge);
-    card.appendChild(titleRow);
+    card.appendChild(badge);
     var subtitle = S.node(
       "p",
       "card-subtitle",
-      "Codex 由 Bridge 自动发现；安装在非常规位置时，可在此指定可执行文件。"
+      "连接已安装的 Codex 后即可在工作台使用。"
     );
     card.appendChild(subtitle);
     var facts = S.node("div", "detail-grid connection-runtime");
@@ -27,7 +23,7 @@
     var path = S.textField(
       "可执行文件路径（可选）",
       "",
-      "留空自动发现；也可填写 codex.exe 或 npm 的 codex.cmd 绝对路径"
+      "留空自动发现，或填写可执行文件的绝对路径"
     );
     var draft = global.CodexBridgeDesktopFormDraft.bind({ path: path.control });
     var pathActions = S.node("div", "form-actions");
@@ -39,6 +35,8 @@
     pathActions.appendChild(clearPath);
     advanced.appendChild(path.wrapper);
     advanced.appendChild(pathActions);
+    var reconnect = S.button("重新连接", null, {}, null, "small", false);
+    advanced.appendChild(reconnect);
     var diagnostics = S.node("div", "connection-diagnostics");
     card.appendChild(diagnostics);
     var actions = S.node("div", "form-actions");
@@ -54,7 +52,9 @@
       context.emit = nextEmit;
       var codex = page || {};
       var count = typeof codex.modelCount === "number" ? Math.max(0, codex.modelCount) : 0;
+      context.connected = isConnected(codex, count);
       S.updateStatus(badge, statusLabel(codex, count), statusTone(codex, count));
+      subtitle.hidden = context.connected;
       S.clear(facts);
       addFact(facts, "当前使用", resolvedLabel(codex));
       draft.update({ path: typeof codex.executablePath === "string" ? codex.executablePath : "" });
@@ -74,18 +74,11 @@
       }
       if (codex.modelError) {
         diagnostics.appendChild(S.node("div", "page-message error", "模型目录读取失败：" + codex.modelError));
-        if (!codex.executablePath) {
-          diagnostics.appendChild(
-            S.node(
-              "div",
-              "page-message",
-              "若 Codex 装在非常规位置，请在路径输入框填写 codex.exe 或 codex.cmd 的绝对路径后重试。"
-            )
-          );
-        }
       }
-      refresh.textContent = codex.isRefreshing ? "刷新中…" : isConnected(codex, count) ? "重新连接" : "连接";
-      refresh.disabled = codex.isRefreshing === true || codex.canRefresh !== true;
+      refresh.textContent = context.connected ? "打开工作台" : codex.isRefreshing ? "连接中…" : "连接";
+      refresh.disabled = !context.connected && (codex.isRefreshing === true || codex.canRefresh !== true);
+      reconnect.hidden = !context.connected;
+      reconnect.disabled = codex.isRefreshing === true || codex.canRefresh !== true;
     }
 
     function emitPath(value) {
@@ -99,14 +92,20 @@
       if (!clearPath.disabled) emitPath("");
     });
     refresh.addEventListener("click", function () {
-      if (!refresh.disabled) context.emit("refreshModels", {});
+      if (refresh.disabled) return;
+      if (context.connected && global.CodexBridgeDesktopDSHWorkbench) {
+        global.CodexBridgeDesktopDSHWorkbench.openCollaboration();
+      } else context.emit("refreshModels", {});
+    });
+    reconnect.addEventListener("click", function () {
+      if (!reconnect.disabled) context.emit("refreshModels", {});
     });
     var defaults = S.section(section, "任务默认设置");
     var defaultsBody = S.node("div", "agent-defaults-slot"); defaults.appendChild(defaultsBody);
     if (global.CodexBridgeDesktopSettingsPage) global.CodexBridgeDesktopSettingsPage.mountAgent("codex", defaultsBody);
     section.appendChild(advanced);
     update(null, emit);
-    return { root: section, update: update };
+    return { root: section, primaryActions: actions, status: badge, update: update };
   }
 
   function isConnected(codex, count) {

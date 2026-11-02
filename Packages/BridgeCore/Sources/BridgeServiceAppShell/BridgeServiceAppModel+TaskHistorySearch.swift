@@ -1,5 +1,6 @@
 import BridgeDesktopUI
 import BridgeIPC
+import BridgeMCP
 import BridgeServiceAppCore
 
 extension BridgeServiceAppModel {
@@ -57,14 +58,61 @@ extension BridgeServiceAppModel {
     }
   }
 
-  func selectTaskHistory(_ taskID: String?) {
-    guard let taskID,
-      let snapshot = taskHistorySearch.tasks.first(where: { $0.taskID == taskID }),
-      snapshot.projectID == selectedProjectID
-    else { return }
+  func selectTaskHistory(_ taskID: String?, requestID: String? = nil, messageID: Int64? = nil) {
+    guard let taskID else { return }
+    if let snapshot = taskHistorySearch.tasks.first(where: { $0.taskID == taskID }) {
+      openHistorySnapshot(snapshot, messageID: messageID)
+      recordWorkbenchCommandReceipt(
+        requestID: requestID, command: "selectTaskHistory", taskID: taskID, input: nil,
+        accepted: true)
+      return
+    }
+    guard let client, connectionState == .connected else {
+      rejectWorkbenchCommand(
+        requestID: requestID, command: "selectTaskHistory", taskID: taskID, input: nil,
+        message: "后台服务未连接。")
+      return
+    }
+    let priorSelection = selectedTaskID
+    let priorProject = selectedProjectID
+    let priorHistory = selectedHistoryTaskID
     selectedHistoryTaskID = taskID
-    if !tasks.contains(where: { $0.taskID == taskID }) { tasks.append(snapshot) }
-    openTask(taskID)
+    Task { [weak self] in
+      guard let self else { return }
+      do {
+        let snapshot: MCPServiceTaskSnapshot
+        do {
+          snapshot = try await client.task(IPCTaskRequest(taskID: taskID))
+        } catch BridgeServiceIPCCodecError.remoteError(let error) where error.code == "unavailable"
+        {
+          snapshot = try await client.localTaskHistory(IPCTaskRequest(taskID: taskID))
+        }
+        guard selectedProjectID == priorProject,
+          selectedTaskID == priorSelection, selectedHistoryTaskID == taskID
+        else { return }
+        openHistorySnapshot(snapshot, messageID: messageID)
+        recordWorkbenchCommandReceipt(
+          requestID: requestID, command: "selectTaskHistory", taskID: taskID, input: nil,
+          accepted: true)
+      } catch {
+        guard selectedProjectID == priorProject, selectedHistoryTaskID == taskID else {
+          return
+        }
+        selectedHistoryTaskID = priorHistory
+        let message = "打开历史会话失败：\(BridgeServiceErrorMessage.message(error))"
+        errorMessage = message
+        rejectWorkbenchCommand(
+          requestID: requestID, command: "selectTaskHistory", taskID: taskID, input: nil,
+          message: message)
+      }
+    }
+  }
+
+  private func openHistorySnapshot(_ snapshot: MCPServiceTaskSnapshot, messageID: Int64?) {
+    selectedHistoryTaskID = snapshot.taskID
+    if !tasks.contains(where: { $0.taskID == snapshot.taskID }) { tasks.append(snapshot) }
+    openTask(snapshot.taskID)
+    if let messageID { conversation?.requestSearchReveal(messageID) }
     selection = .workbench
   }
 }

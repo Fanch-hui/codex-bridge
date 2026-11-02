@@ -339,9 +339,12 @@ public actor CodexAppServerClient {
   }
 
   public func stop() async {
-    guard lifecycle != .stopped else { return }
     lifecycle = .stopped
     await process.stop()
+  }
+
+  public func confirmedStopped() async -> Bool {
+    await process.confirmedStopped()
   }
 
   private func makeRequestID() throws -> RequestID {

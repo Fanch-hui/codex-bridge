@@ -3,64 +3,46 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var disclosureState = new Map(), pendingDeletes = new Set();
 
-  function renderReadonlyCollections(container, page, emit) {
-    if (page.verificationCommands && page.verificationCommands.length) addValues(container, "验证命令", page.verificationCommands, page.selectedProjectID);
-    addSessionRows(container, page.sessions, page.selectedProjectID, emit);
-    addSkillRows(container, page.skills, page.selectedProjectID);
+  function renderReadonlyCollections(container, page, emit, kind) {
+    if (!kind || kind === "verification") addValues(container, page.verificationCommands);
+    if (!kind || kind === "sessions") addSessionRows(container, page.sessions, page.selectedProjectID, emit);
+    if (!kind || kind === "skills") addSkillRows(container, page.skills, page.selectedProjectID);
   }
 
   function addSessionRows(container, sessions, projectID, emit) {
     var values = S.safeArray(sessions);
     var active = new Set(values.map(function (session) { return deleteKey(projectID, session); }));
     pendingDeletes.forEach(function (key) { if (key.indexOf(String(projectID || "") + "|") === 0 && !active.has(key)) pendingDeletes.delete(key); });
-    var card = collectionCard(
-      projectID,
-      "sessions",
-      "Agent 会话",
-      values.length
-    );
+    var root = S.node("div", "project-session-groups");
     if (!values.length) {
-      card.body.appendChild(S.node("div", "list-empty", "暂无会话。"));
+      root.appendChild(S.node("div", "project-pane-empty", "此项目还没有会话。"));
     } else {
       groupSessions(values).forEach(function (group) {
-        var groupDetails = disclosure(
-          projectID,
-          "session:" + group.key,
-          "project-agent-session-group"
-        );
-        var summary = S.node("summary", "project-agent-session-summary");
-        summary.appendChild(S.icon("cpu.fill", "project-agent-icon"));
-        summary.appendChild(S.node("span", "project-agent-name", group.label));
-        summary.appendChild(S.node("span", "muted collection-count", String(group.sessions.length)));
-        groupDetails.appendChild(summary);
+        var section = S.node("section", "project-session-group");
+        var heading = S.node("div", "project-group-heading");
+        heading.appendChild(S.node("h3", null, group.label));
+        heading.appendChild(S.node("span", "muted", String(group.sessions.length)));
+        section.appendChild(heading);
         var list = S.node("div", "project-session-list");
         group.sessions.forEach(function (session) { list.appendChild(sessionRow(session, projectID, emit)); });
-        groupDetails.appendChild(list);
-        card.body.appendChild(groupDetails);
+        section.appendChild(list); root.appendChild(section);
       });
     }
-    container.appendChild(card.root);
+    container.appendChild(root);
   }
 
   function addSkillRows(container, skills, projectID) {
     var values = S.safeArray(skills);
-    var card = collectionCard(
-      projectID,
-      "skills",
-      "Skills",
-      values.length
-    );
     var list = S.node("div", "project-skill-list");
     if (!values.length) {
-      list.appendChild(S.node("div", "list-empty", "暂无 Skill。"));
+      list.appendChild(S.node("div", "project-pane-empty", "此项目还没有技能。"));
     } else {
       values.forEach(function (skill) {
         var row = S.node("article", "skill-row");
         var heading = S.node("div", "skill-heading");
         var copy = S.node("div", "row-main");
         copy.appendChild(S.node("div", "row-title", skill.name || skill.skillID));
-        if (skill.scope) copy.appendChild(S.node("div", "row-detail", "范围：" + skill.scope));
-        heading.appendChild(S.icon("wand.and.stars", "skill-icon"));
+        if (skill.scope) copy.appendChild(S.node("div", "row-detail", skill.scope));
         heading.appendChild(copy);
         if (skill.actionCount) heading.appendChild(S.badge("动作 " + skill.actionCount, "neutral"));
         row.appendChild(heading);
@@ -73,19 +55,7 @@
         list.appendChild(row);
       });
     }
-    card.body.appendChild(list);
-    container.appendChild(card.root);
-  }
-
-  function collectionCard(projectID, key, title, count) {
-    var root = disclosure(projectID, key, "project-collection");
-    var summary = S.node("summary", "project-collection-summary");
-    summary.appendChild(S.node("span", "project-collection-title", title));
-    summary.appendChild(S.node("span", "muted collection-count", String(count)));
-    root.appendChild(summary);
-    var body = S.node("div", "project-collection-body");
-    root.appendChild(body);
-    return { root: root, body: body };
+    container.appendChild(list);
   }
 
   function disclosure(projectID, key, className) {
@@ -122,12 +92,14 @@
     var copy = S.node("div", "row-main");
     copy.appendChild(S.node("div", "row-title", session.title || "未命名会话"));
     open.appendChild(copy);
-    open.addEventListener("click", function () { emit("selectTask", { taskID: session.taskID }); });
+    open.addEventListener("click", function () { emit("openTask", { taskID: session.taskID }); });
     row.appendChild(open);
     var status = session.status || "未知";
-    var tone = session.isRunning ? "running" : /失败|failed/.test(status) ? "error"
-      : /等待|审批|排队|queued|waiting|awaiting/.test(status) ? "warning"
-      : /已完成|已创建|就绪|completed/.test(status) ? "success" : "neutral";
+    var tone = "neutral";
+    if (session.isRunning) tone = "running";
+    else if (/失败|failed/.test(status)) tone = "error";
+    else if (/等待|审批|排队|queued|waiting|awaiting/.test(status)) tone = "warning";
+    else if (/已完成|已创建|就绪|completed/.test(status)) tone = "success";
     row.appendChild(S.status(status, tone));
     if (session.canDelete) {
       var remove = S.button("删除", null, {}, emit, "small danger", false);
@@ -158,10 +130,12 @@
     return row;
   }
 
-  function addValues(container, title, values, projectID) {
-    var card = collectionCard(projectID, "verification", title, values.length);
-    values.forEach(function (value) { card.body.appendChild(S.node("div", "page-message mono", value)); });
-    container.appendChild(card.root);
+  function addValues(container, values) {
+    if (!S.safeArray(values).length) return;
+    var section = S.node("section", "project-verification-commands");
+    section.appendChild(S.node("h3", null, "验证命令"));
+    values.forEach(function (value) { section.appendChild(S.node("pre", "project-command mono", value)); });
+    container.appendChild(section);
   }
 
   global.CodexBridgeDesktopProjectCollections = { render: renderReadonlyCollections };

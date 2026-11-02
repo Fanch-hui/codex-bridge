@@ -79,6 +79,18 @@ for architecture in "${architectures[@]}"; do
   disk_image_directory="${temporary_root}/disk-image-${architecture}"
   archived_app="${archive_path}/Products/Applications/CodexBridge.app"
   artifact_base="CodexBridge-${product_version}-macos-${architecture}"
+  if [[ "${architecture}" == "arm64" ]]; then
+    runtime_architecture=arm64
+    node_entitlements="${repository_root}/Config/EmbeddedDSHNode.entitlements"
+  else
+    runtime_architecture=x64
+    node_entitlements="${repository_root}/Config/EmbeddedDSHNodeIntel.entitlements"
+  fi
+  embedded_dsh_build="${temporary_root}/EmbeddedDSH-${runtime_architecture}"
+  node "${script_directory}/build-embedded-dsh-runtime.mjs" \
+    --platform darwin --arch "${runtime_architecture}" --output "${embedded_dsh_build}"
+  node "${script_directory}/verify-embedded-dsh-runtime.mjs" \
+    "${embedded_dsh_build}" darwin "${runtime_architecture}"
 
   "${script_directory}/with-xcode.sh" xcodebuild \
     -project CodexBridge.xcodeproj \
@@ -90,6 +102,7 @@ for architecture in "${architectures[@]}"; do
     CODE_SIGNING_ALLOWED=NO \
     ARCHS="${architecture}" \
     ONLY_ACTIVE_ARCH=NO \
+    EMBEDDED_DSH_RUNTIME_DIRECTORY="${embedded_dsh_build}" \
     REQUIRE_TUNNEL_HELPER=YES \
     TUNNEL_HELPER_ARCHITECTURE="${architecture}" \
     TUNNEL_HELPER_DIRECTORY="${helper_directory}" \
@@ -105,6 +118,7 @@ for architecture in "${architectures[@]}"; do
   service_binary="${archived_app}/Contents/Resources/CodexBridgeService"
   bundled_helper="${archived_app}/Contents/Helpers/tunnel-client"
   bundled_digest="${archived_app}/Contents/Resources/TunnelClient/tunnel-client.sha256"
+  embedded_dsh="${archived_app}/Contents/Resources/EmbeddedDSH"
   deepseek_bundle="${archived_app}/Contents/Resources/BridgeCore_BridgeDeepSeekHarnessACP.bundle"
   deepseek_template="${deepseek_bundle}/Contents/Resources/cordis.yml"
   [[ -d "${deepseek_bundle}" && ! -L "${deepseek_bundle}" && \
@@ -132,6 +146,12 @@ for architecture in "${architectures[@]}"; do
   done
   actual_bundled_sha256="$(/usr/bin/shasum -a 256 "${bundled_helper}")"
   print -r -- "${actual_bundled_sha256%% *}" > "${bundled_digest}"
+  node "${script_directory}/verify-embedded-dsh-runtime.mjs" \
+    "${embedded_dsh}" darwin "${runtime_architecture}"
+  /usr/bin/python3 "${script_directory}/sign-embedded-dsh-runtime.py" \
+    "${embedded_dsh}" - "${node_entitlements}" --hardened
+  node "${script_directory}/verify-embedded-dsh-runtime.mjs" \
+    "${embedded_dsh}" darwin "${runtime_architecture}"
   /usr/bin/codesign --force --sign - \
     --entitlements "${repository_root}/App/CodexBridge.entitlements" "${archived_app}"
   /usr/bin/codesign --verify --deep --strict --verbose=2 "${archived_app}"

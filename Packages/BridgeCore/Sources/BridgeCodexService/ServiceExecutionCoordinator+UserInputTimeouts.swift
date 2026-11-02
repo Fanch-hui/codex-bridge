@@ -70,10 +70,9 @@ extension ServiceExecutionCoordinator {
     finishedRuns.insert(taskID)
     clearAgentUserInputs(taskID: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
-    if let run = activeAgentRuns.removeValue(forKey: taskID) {
-      await run.shutdown()
-    }
+    await closeAgentRun(taskID: taskID)
     _ = await conversation.close(taskID: taskID)
+    guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
     _ = try? await tasks.fail(taskID: taskID, failureCode: code, summary: summary)
   }
 }

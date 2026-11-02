@@ -16,7 +16,7 @@
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var commands: [MainWindowCommand] = []
-    nonisolated(unsafe) private static var fileRequests: [String: @Sendable (String) -> Void] = [:]
+    nonisolated(unsafe) private static var fileRequests: [String: @Sendable (String?) -> Void] = [:]
     @MainActor private(set) static var browser = BrowserSnapshot()
 
     static func start() -> Bool {
@@ -106,7 +106,7 @@
       let parts = event.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
       guard parts.count == 2 else { return }
       let callback = lock.withLock { fileRequests.removeValue(forKey: String(parts[0])) }
-      if !parts[1].isEmpty { callback?(String(parts[1])) }
+      callback?(parts[1].isEmpty ? nil : String(parts[1]))
     }
 
     static func send(_ patch: BridgeDesktopUIStatePatch) {
@@ -158,10 +158,29 @@
       title: String, directory: Bool,
       completion: @escaping @Sendable (String) -> Void
     ) {
+      chooseFileIncludingCancellation(title: title, directory: directory) { path in
+        if let path { completion(path) }
+      }
+    }
+
+    static func chooseFileIncludingCancellation(
+      title: String, directory: Bool,
+      completion: @escaping @Sendable (String?) -> Void
+    ) {
       let id = UUID().uuidString
       lock.withLock { fileRequests[id] = completion }
       id.withCString { identifier in
         title.withCString { bridge_linux_choose_file(identifier, $0, directory ? 1 : 0) }
+      }
+    }
+
+    static func chooseSaveFile(completion: @escaping @Sendable (String?) -> Void) {
+      let id = UUID().uuidString
+      lock.withLock { fileRequests[id] = completion }
+      id.withCString { identifier in
+        "导出会话内容".withCString { title in
+          "会话内容.txt".withCString { bridge_linux_save_file(identifier, title, $0) }
+        }
       }
     }
   }

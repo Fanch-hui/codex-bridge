@@ -11,7 +11,8 @@
     ) -> Bool {
       let payload = envelope.payload
       switch envelope.command {
-      case .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .cancelAgentSetup,
+      case .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .probeAgentSetupLogin,
+        .cancelAgentSetup,
         .openAgentSetupLogin:
         Task { @MainActor in
           if await management.handleAgentSetupCommand(envelope) {

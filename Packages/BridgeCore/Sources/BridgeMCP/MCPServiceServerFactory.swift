@@ -5,16 +5,19 @@ public struct MCPServiceServerFactory: Sendable {
   private let appVersion: String
   private let catalog: MCPServiceToolCatalog
   private let dispatcher: MCPServiceToolDispatcher
+  private let activity: MCPClientCallActivity?
 
   public init(
     appVersion: String,
     service: any BridgeMCPServiceAPI,
     exposureMode: MCPServiceExposureMode,
     clientID: MCPClientID = .chatGPT,
+    activity: MCPClientCallActivity? = nil,
     logger: Logger = Logger(label: "CodexBridge.BridgeMCP.LightweightServer")
   ) {
     precondition(!appVersion.isEmpty)
     self.appVersion = appVersion
+    self.activity = activity
     catalog = MCPServiceToolCatalog(exposureMode: exposureMode)
     dispatcher = MCPServiceToolDispatcher(
       service: service,
@@ -27,6 +30,7 @@ public struct MCPServiceServerFactory: Sendable {
   public func makeServer() async -> Server {
     let definitions = catalog.definitions
     let dispatcher = dispatcher
+    let activity = activity
     let instructions = await serverInstructions()
     let server = Server(
       name: "codex-bridge",
@@ -47,7 +51,20 @@ public struct MCPServiceServerFactory: Sendable {
       let sessionID =
         Server.currentHandlerContext?.httpContext?
         .header(HTTPHeaderName.sessionID) ?? "direct"
-      return try await dispatcher.call(parameters, sessionID: sessionID)
+      let result = try await dispatcher.call(parameters, sessionID: sessionID)
+      let request = Server.currentHandlerContext?.httpContext
+      if result.isError != true, let request,
+        let route = request.header(MCPTrustedContextHeaders.route),
+        let rawGeneration = request.header(MCPTrustedContextHeaders.generation),
+        let generation = UInt64(rawGeneration)
+      {
+        let cloudGeneration = request.header(MCPTrustedContextHeaders.cloudGeneration).flatMap(
+          UInt64.init)
+        await activity?.record(
+          clientID: dispatcher.clientID, route: route, generation: generation,
+          cloudGeneration: cloudGeneration)
+      }
+      return result
     }
     return server
   }

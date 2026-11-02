@@ -1,6 +1,24 @@
 # DeepSeek Harness 接入指南
 
-本指南说明 DeepSeek Harness（DSH）的 ACP 连接、现代入口、自动发现和 ChatGPT/Qwen 任务。调用官方桌面的共享会话请使用[原生桌面连接指南](./DSH_NATIVE_DESKTOP_GUIDE.md)。已有连接默认保持 ACP。
+本指南说明 Bridge 内置的 DSH 开发台及外部 ACP 连接。调用官方桌面的共享会话请使用[原生桌面连接指南](./DSH_NATIVE_DESKTOP_GUIDE.md)。
+
+## 使用内置开发台
+
+Bridge 随应用交付 DSH 引擎、Node、包管理器与运行依赖，安装后可直接打开开发台。
+
+1. 在项目页登记工作目录，进入 `工作台 → DSH 开发台`。
+2. 打开“引擎设置”，选择“使用 ChatGPT 登录”，或在“自定义 API”中填写连接。自定义接口支持 Chat Completions 和 Responses，可读取模型目录或手动填写模型 ID。
+3. 返回对话，选择模型与可用的推理强度，发送第一条消息创建会话。
+
+DSH 原生工具、技能、MCP、权限、上下文压缩及会话恢复由内置引擎处理。引擎设置提供模型连接、MCP 服务、权限与插件的安装、启停、更新和移除；模型凭据保存在系统 SecretStore。
+
+主智能体可以发现 Bridge 已连接的 Agent、查询模型并委派任务。每个子智能体保留独立会话和安装、项目及模型绑定，可在开发台查看过程、处理审批、追加指令或单独停止。同一根执行及其子任务共享项目目录并可并行，组外写任务继续等待。
+
+停止会话会停止所属活动子任务。停止后收到的结果保持待回传，用户再次发起会话或子任务后恢复处理；直接续写同一个子智能体时，先前结果会在新任务结束后回传。切换页面保留后台执行。
+
+新会话历史由 DSH 原生日志保存；已有 ACP 会话从“历史 ACP 会话”进入，沿用原执行绑定。以下章节介绍外部 ACP 的安装与配置，可从“历史 ACP 会话”中的“ACP 设置”进入。
+
+## 外部 ACP 连接
 
 最短路径是：在 Bridge 的 `工作台 → DSH 开发台 → 引擎设置` 点击“一键配置” → Bridge 准备官方 DSH 与 Node/npm → 按弹窗填写 Base URL 和 API Key 并检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。API Key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
@@ -12,13 +30,13 @@ deepseek-harness
 
 省略 `provider_id` 时 Bridge 使用 Codex，不会自动改用 DSH。
 
-## 使用开发台
+## 历史 ACP 会话
 
-在项目页登记目录后，进入 `工作台 → DSH 开发台`，选择项目并新建会话。模型和推理强度可按会话选择；当前 ACP 执行要求明确选择完整权限。会话列表显示任务来源，并可搜索 Bridge 保存的历史、继续会话、处理审批和复制执行结果。
+进入 `工作台 → DSH 开发台 → 历史 ACP 会话`，选择原会话继续。模型和推理强度可按会话选择；ACP 执行使用完整权限。会话列表显示任务来源，并可搜索 Bridge 保存的历史、处理审批和复制执行结果。
 
 右侧“文件 / 变更”提供目录浏览、带行号的文本预览和 Git Diff。完整且未脱敏的 UTF-8 文件支持编辑，保存前展示修改预览；确认后沿用 Direct 审批与工作区互斥，按原内容摘要检查冲突。每次保存最多 256 KiB，并保留常规 LF/CRLF 换行和尾换行。Git 区展示项目当前全部变更，包含已有修改。
 
-新会话可填写项目 Skill 名称；支持图片的模型可从文件树逐张添加项目内 PNG、JPEG、WebP 图片，最多 8 张、合计 8 MiB。Bridge 按所选模型查询能力，并在执行时再次核对 ACP 的图片声明与原图片内容。协议依据官方 [ACP 内容实现](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts)，发送实际图像字节。
+ACP 会话可使用项目 Skill；支持图片的模型可从文件树逐张添加项目内 PNG、JPEG、WebP 图片，最多 8 张、合计 8 MiB。Bridge 按所选模型查询能力，并在执行时再次核对 ACP 的图片声明与原图片内容。协议依据官方 [ACP 内容实现](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts)，发送实际图像字节。
 
 ChatGPT/Qwen 继续使用同一个 `deepseek-harness` Provider 和既有任务工具；开发台与协作视图共享任务记录和审批。
 

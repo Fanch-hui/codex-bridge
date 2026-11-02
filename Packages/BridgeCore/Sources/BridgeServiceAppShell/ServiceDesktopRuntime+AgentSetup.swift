@@ -11,7 +11,9 @@ extension BridgeServiceAppModel {
       do {
         let client = try currentClient()
         let payload = envelope.payload
-        if [.beginAgentSetup, .continueAgentSetup, .cancelAgentSetup].contains(envelope.command) {
+        if [.beginAgentSetup, .continueAgentSetup, .probeAgentSetupLogin, .cancelAgentSetup]
+          .contains(envelope.command)
+        {
           agentSetupRequestGeneration &+= 1
         }
         switch envelope.command {
@@ -44,6 +46,10 @@ extension BridgeServiceAppModel {
         case .cancelAgentSetup:
           guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID) else { return }
           await applyAgentSetup(try await client.cancelAgentSetup(operationID: id), client: client)
+        case .probeAgentSetupLogin:
+          guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID) else { return }
+          await applyAgentSetup(
+            try await client.probeAgentSetupLogin(operationID: id), client: client)
         case .openAgentSetupLogin:
           guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID),
             let value = try await client.agentSetups().first(where: { $0.operationID == id }),

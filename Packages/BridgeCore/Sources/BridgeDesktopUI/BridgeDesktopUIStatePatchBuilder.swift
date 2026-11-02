@@ -88,6 +88,9 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     if oldWorkbench.approvals != newWorkbench.approvals {
       changes.append(.approvals(newWorkbench.approvals))
     }
+    if oldWorkbench.embeddedDSHReceipts != newWorkbench.embeddedDSHReceipts {
+      changes.append(.embeddedDSHReceipts(newWorkbench.embeddedDSHReceipts ?? []))
+    }
 
     guard oldWorkbench.selectedTaskID == newWorkbench.selectedTaskID else {
       return nil
@@ -120,6 +123,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.selectedNavigation == new.selectedNavigation
       && old.connectionLabel == new.connectionLabel
       && old.connectionTone == new.connectionTone
+      && old.serviceConnected == new.serviceConnected
       && old.isRefreshing == new.isRefreshing
       && old.feedback == new.feedback
       && old.projects == new.projects

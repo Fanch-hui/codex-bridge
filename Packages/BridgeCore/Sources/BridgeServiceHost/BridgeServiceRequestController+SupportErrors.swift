@@ -2,6 +2,7 @@ import BridgeAgentCore
 import BridgeCodexService
 import BridgeDeepSeekHarnessACP
 import BridgeDomain
+import BridgeEmbeddedDSH
 import BridgeIPC
 import BridgeMCP
 import BridgeSecurity
@@ -12,6 +13,20 @@ import Foundation
 
 extension BridgeServiceRequestController {
   static func map(_ error: Error) -> BridgeServiceIPCError {
+    if let error = error as? WorkbenchTaskOperationNotDispatched {
+      return .init(
+        code: "workbench_preflight_failed", message: error.causeMessage, retryable: false)
+    }
+    if let error = error as? EmbeddedDSHRuntimeError {
+      return .init(
+        code: "embedded_dsh_runtime", message: error.localizedDescription,
+        retryable: error == .startupTimedOut)
+    }
+    if case EmbeddedDSHRecoveryError.pendingProcessReconciliation = error {
+      return .init(
+        code: "embedded_dsh_recovery_pending", message: "正在核对原 Agent 执行，请恢复连接后重试。",
+        retryable: true)
+    }
     if let error = error as? GeminiCloudError {
       return .init(code: "gemini_cloud_configuration", message: error.localizedDescription)
     }

@@ -1,4 +1,4 @@
-.surface-card, .page-card, .metric-card, .summary-card,
+.surface-card, .page-card, .summary-card,
 .list-panel, .detail-panel {
   min-width: 0;
   border: 1px solid var(--separator);
@@ -6,10 +6,9 @@
   background: var(--surface);
 }
 
-.page-card { padding: 16px; }
-.metric-card:hover { border-color: var(--separator-strong); background: var(--surface-muted); }
+.page-card { padding: 20px; }
 
-.page-section > h3, .content-section > h3, .section-heading-row > h3 {
+.page-section > h3, .section-heading-row > h3 {
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
@@ -36,8 +35,13 @@
 }
 
 .list-row.selected, .task-row.selected, .project-row.selected, .log-row.selected {
-  color: var(--accent);
+  color: var(--text);
   background: var(--selection);
+}
+
+:is(.list-row, .task-row, .project-row, .agent-row, .log-row):focus-visible {
+  position: relative;
+  outline-offset: -2px;
 }
 
 .conversation-entry.entry-user { padding: 12px 16px; border-radius: var(--radius); background: var(--surface-muted); }
@@ -53,5 +57,9 @@
 .dsh-chat-menu-actions .button:hover:not(:disabled) { background: var(--surface-hover); }
 
 @media (prefers-contrast: more), (forced-colors: active) {
-  .page-card, .surface-card, .metric-card, .summary-card, .list-panel, .detail-panel { border-color: var(--text-secondary); }
+  .page-card, .surface-card, .summary-card, .list-panel, .detail-panel { border-color: var(--text-secondary); }
+}
+
+@media (forced-colors: active) {
+  :is(.list-row, .task-row, .project-row, .agent-row, .log-row).selected { color: HighlightText; background: Highlight; }
 }

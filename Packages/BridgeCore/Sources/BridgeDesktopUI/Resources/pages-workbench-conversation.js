@@ -2,6 +2,42 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var disclosures = new Map(), viewports = new Map(), viewportKey = null, activeContextKey = null;
+  var searchReveal = null;
+
+  function reveal(taskID, messageKey) {
+    searchReveal = taskID && messageKey
+      ? { taskID: String(taskID), key: String(messageKey), scrolled: false }
+      : null;
+  }
+
+  function hasSearchReveal(taskID) {
+    return !!(searchReveal && searchReveal.taskID === taskID);
+  }
+
+  function showSearchMatch(container, page, options) {
+    if (!hasSearchReveal(page.selectedTaskID)) return;
+    var match = Array.from(container.querySelectorAll("[data-message-key]")).find(function (item) {
+      return item.dataset.messageKey === searchReveal.key;
+    });
+    if (!match) return;
+    match.classList.add("is-search-match");
+    if (searchReveal.scrolled) return;
+    searchReveal.scrolled = true;
+    var anchor = searchReveal;
+    var scroll = function () {
+      if (searchReveal !== anchor || !match.isConnected) return;
+      var owner = options && options.owner;
+      if (owner && owner.__conversationFollow) owner.__conversationFollow.following = false;
+      match.scrollIntoView({ block: "center" });
+    };
+    if (global.requestAnimationFrame) global.requestAnimationFrame(scroll);
+    else scroll();
+  }
+
+  function returnToLatest(taskID, emit) {
+    searchReveal = null;
+    emit("refreshConversation", { taskID: taskID });
+  }
 
   function contextKey(page) {
     var task = page.selectedTask;
@@ -70,7 +106,11 @@
     var process = global.CodexBridgeDesktopWorkbenchProcess;
     if (process) values = process.entries(values, page);
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
-    if (incremental) return incremental.render(container, values, page, emit, options);
+    if (incremental) {
+      incremental.render(container, values, page, emit, options);
+      showSearchMatch(container, page, options);
+      return;
+    }
     var state = page.selectedTask && page.selectedTask.conversationState;
     if (state && state.errorMessage) container.appendChild(conversationError(state.errorMessage));
     var list = S.node("div", "conversation-list");
@@ -108,7 +148,16 @@
       if (state && state.isLoadingEarlier) earlier.setAttribute("aria-busy", "true");
       actions.appendChild(earlier);
     }
+    if (hasSearchReveal(page.selectedTaskID)) {
+      var latest = S.button("返回最新消息", null, {}, null, "small", false);
+      latest.addEventListener("click", function () {
+        latest.disabled = true;
+        returnToLatest(page.selectedTaskID, emit);
+      });
+      actions.appendChild(latest);
+    }
     if (actions.childNodes.length) container.appendChild(actions);
+    showSearchMatch(container, page, options);
   }
 
   function conversationMessage(entry) {
@@ -120,6 +169,7 @@
   function updateMessage(item, entry) {
     var isUser = entry.role === "用户";
     item.className = "conversation-entry entry-message " + (isUser ? "entry-user" : "entry-agent") + (entry.isFinal ? "" : " entry-streaming");
+    item.dataset.messageKey = String(entry.id);
     if (!item.__text) {
       item.__text = S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML);
       item.appendChild(item.__text);
@@ -392,6 +442,9 @@
 
   global.CodexBridgeDesktopWorkbenchConversation = {
     render: addConversationBlock,
+    reveal: reveal,
+    hasSearchReveal: hasSearchReveal,
+    returnToLatest: returnToLatest,
     captureViewport: captureViewport,
     contextKey: contextKey,
     createMessage: conversationMessage,

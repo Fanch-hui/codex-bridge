@@ -85,6 +85,7 @@
     public var availableModelCount: Int = 0
     public var modelError: String? = nil
     public var commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil
+    public var embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt] = []
     public var workspace: WorkbenchWorkspaceState? = nil
   }
 
@@ -200,6 +201,7 @@
     var isChatBrowserEnabled: Bool
     var selectedTaskID: String?
     var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+    var embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt] = []
     var nativeSessionDirectory: BridgeDesktopNativeSessionDirectoryState?
     var nativeSessionDirectoryGeneration: UInt64 = 0
     var conversation: TaskConversationModel?

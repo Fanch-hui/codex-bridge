@@ -8,14 +8,18 @@ extension BridgeServiceAppModel {
     client: any BridgeServiceClientProtocol,
     includeCatalog: Bool,
     includeProjectResources: Bool,
-    forceCatalogRefresh: Bool = false
+    forceCatalogRefresh: Bool = false,
+    includeSettings: Bool = false
   ) async {
     let catalogConnectionGeneration = codexModelCatalogRequests.connectionGeneration
     let managementVisible =
-      includeCatalog || includeProjectResources
-      || navigation == .settings || navigation == .connections
+      includeCatalog || includeProjectResources || includeSettings
+      || navigation == .settings || navigation == .connections || preferencesWindowIsVisible
     let directConfigurationResult = await optional(when: managementVisible) {
       try await client.directConfiguration()
+    }
+    async let instructionsResult = optional(when: includeSettings && !includeCatalog) {
+      try await client.customInstructions()
     }
     async let projectResult = optional { try await client.projectList() }
     let agentCatalogResult = await optional(when: managementVisible) {
@@ -40,6 +44,7 @@ extension BridgeServiceAppModel {
     }
 
     if let value = directConfigurationResult { directConfiguration = value }
+    if let value = await instructionsResult { customInstructions = value }
     if let value = await projectResult {
       applyProjectSnapshot(value)
     }

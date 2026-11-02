@@ -9,13 +9,13 @@ extension BridgeServiceApplication {
     _ submission: MCPServiceTaskSubmission,
     sourceClientID: String,
     source: ServiceTaskSource,
-    deadline: ContinuousClock.Instant
+    deadline: ContinuousClock.Instant,
+    embeddedDSH: Bool = false
   ) async throws -> PreparedTaskSubmission {
     let projectID = try await submissionProjectID(explicit: submission.projectID)
     let project = try await readableProject(projectID)
-    let workbenchPermissionMode = try await workbenchDefaultPermissionMode(
-      source: source
-    )
+    let workbenchPermissionMode: ServicePermissionMode? =
+      if embeddedDSH { nil } else { try await workbenchDefaultPermissionMode(source: source) }
     if let providerRaw = submission.providerID, providerRaw != serviceCodexProviderID {
       return try await prepareAgentSubmission(
         submission,

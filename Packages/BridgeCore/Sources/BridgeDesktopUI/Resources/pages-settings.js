@@ -7,21 +7,18 @@
 
   function create(container, page, emit, updateState) {
     S.clear(container);
-    var header = S.node("div");
-    container.appendChild(header);
-    var content = S.node("div", "settings-content-stack");
+    var content = S.node("div", "settings-window settings-content-stack");
     container.appendChild(content);
     var navigation = global.CodexBridgeDesktopSettingsNavigation.create(content, page, emit);
     var approvalEditor = approvalCard(page, emit);
-    navigation.execution.appendChild(approvalEditor.root);
+    navigation.execution.insertBefore(approvalEditor.root, navigation.execution.firstChild);
     var clients = global.CodexBridgeDesktopConnectionsClients
       ? global.CodexBridgeDesktopConnectionsClients.create(emit, { mode: "permissions" }) : null;
     if (clients) {
       var clientSection = S.node("section", "settings-subsection settings-client-permissions");
       clientSection.appendChild(S.node("h3", null, "客户端权限"));
-      clientSection.appendChild(S.node("p", "hint", "控制每个客户端可调用的 MCP 工具。"));
       clientSection.appendChild(clients.root);
-      navigation.execution.insertBefore(clientSection, navigation.execution.firstChild);
+      navigation.clients.insertBefore(clientSection, navigation.clients.firstChild);
     }
     var serviceEditor = serviceCard(page, emit);
     navigation.application.appendChild(serviceEditor.root);
@@ -29,22 +26,19 @@
     var appUpdate = global.CodexBridgeDesktopAppUpdate
       ? global.CodexBridgeDesktopAppUpdate.createSettings(updateState, emit) : null;
     if (appUpdate) navigation.application.appendChild(appUpdate.root);
-    var status = S.node("div", "page-message");
-    status.setAttribute("role", "status");
-    container.appendChild(status);
+    var status = navigation.status;
     var unavailable = S.node("div");
     S.empty(unavailable, "设置页暂不可用", "连接后台服务后，可以配置权限、审批与应用。");
     container.appendChild(unavailable);
     return {
       details: navigation.details, mountAgent: navigation.mountAgent,
       updateClients: function (items, nextEmit) { if (clients) clients.update(items, nextEmit); },
-      update: function (next, nextEmit, nextUpdateState) {
+      update: function (next, nextEmit, nextUpdateState, desktopState) {
         content.hidden = !next;
         unavailable.hidden = !!next;
-        S.pageHeader(header, next ? Object.assign({}, next.header, { subtitle: "" }) : { title: "设置", symbol: "gearshape" });
         if (appUpdate) appUpdate.update(nextUpdateState, nextEmit);
         if (!next) { status.hidden = true; return; }
-        navigation.update(next, nextEmit);
+        navigation.update(next, nextEmit, desktopState);
         agentMounts.forEach(function (target, id) { navigation.mountAgent(id, target); });
         if (clients) clients.update(latestClients, nextEmit);
         approvalEditor.update(next, nextEmit);
@@ -55,7 +49,7 @@
     };
   }
 
-  function render(page, emit, updateState) {
+  function render(page, emit, updateState, desktopState) {
     latestEmit = emit;
     var container = document.getElementById("settings-content");
     if (!container) return;
@@ -64,14 +58,14 @@
       return;
     }
     if (!container.__settingsEditor) container.__settingsEditor = create(container, page, emit, updateState);
-    container.__settingsEditor.update(page, emit, updateState);
-    if (pendingDetail) { container.__settingsEditor.details.open(pendingDetail); pendingDetail = null; }
+    container.__settingsEditor.update(page, emit, updateState, desktopState);
+    if (pendingDetail && container.__settingsEditor.details.open(pendingDetail)) pendingDetail = null;
   }
 
   function approvalCard(page, emit) {
     var context = { page: page, emit: emit };
     var card = S.node("section", "settings-subsection settings-approval");
-    card.appendChild(S.node("h3", null, "安全审批策略"));
+    card.appendChild(S.node("h3", null, "审批"));
     var direct = S.selectField("Direct 操作", page.directApprovalMode, S.choices(page.directApprovalMode, page.directApprovalOptions), function (value) {
       context.emit("setDirectApprovalMode", { mode: value });
     }, "");
@@ -99,7 +93,7 @@
   function serviceCard(page, emit) {
     var context = { page: page, emit: emit };
     var card = S.node("section", "settings-subsection settings-service");
-    card.appendChild(S.node("h3", null, "退出 App 后继续运行服务"));
+    card.appendChild(S.node("h3", null, "后台运行"));
     var description = S.node("p", "hint");
     var keepRow = S.node("div", "check-field");
     var keep = S.node("button", "switch-toggle");
@@ -110,8 +104,8 @@
     var thumb = S.node("span", "switch-thumb");
     thumb.setAttribute("aria-hidden", "true");
     keep.appendChild(thumb);
+    keepRow.appendChild(S.node("span", null, "退出 App 后继续运行"));
     keepRow.appendChild(keep);
-    keepRow.appendChild(S.node("span", null, "继续运行后台服务"));
     var keepDraft = D.bind({ keep: keep });
     function updateSwitch() {
       keep.className = "switch-toggle" + (keep.value === "true" ? " is-active" : "");
@@ -169,11 +163,17 @@
 
   function openDetail(id, emit) {
     pendingDetail = id;
-    (emit || latestEmit)("selectPage", { navigation: "settings" });
+    var dispatch = emit || latestEmit;
+    if (dispatch && document.documentElement.dataset.surface !== "preferences") {
+      dispatch("selectPage", { navigation: "settings", kind: "settings-detail", value: id });
+    }
     var container = document.getElementById("settings-content");
     if (container && container.__settingsEditor) {
-      container.__settingsEditor.details.open(id); pendingDetail = null;
+      var opened = container.__settingsEditor.details.open(id);
+      if (opened) pendingDetail = null;
+      return opened;
     }
+    return false;
   }
   function mountAgent(id, target) {
     agentMounts.set(id, target);

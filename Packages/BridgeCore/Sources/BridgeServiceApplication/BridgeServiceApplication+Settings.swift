@@ -30,7 +30,12 @@ extension BridgeServiceApplication {
   public func serviceModelPreferences(
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceModelPreferences {
-    try await serviceModelCatalog(deadline: deadline).preferences
+    try Self.checkDeadline(deadline)
+    if let preferences = try await configuredModelPreferences() {
+      try Self.checkDeadline(deadline)
+      return preferences
+    }
+    return try await serviceModelCatalog(deadline: deadline).preferences
   }
 
   public func serviceModelCatalog(
@@ -56,11 +61,10 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws {
     try Self.checkDeadline(deadline)
-    let models = try await catalog.listModels(deadline: deadline).models
     _ = try Self.select(
       modelID: preferences.executionModel,
       effort: preferences.executionEffort,
-      models: models
+      models: []
     )
     try Self.checkDeadline(deadline)
     try await settings.setModelPreferences(preferences)

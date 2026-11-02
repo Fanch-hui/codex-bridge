@@ -12,8 +12,9 @@
   var currentNavigation;
   var viewportEmitter;
   var viewportFrame = 0;
+  var preferencesSurface = new URLSearchParams(global.location.search).get("surface") === "preferences";
   var slot = document.getElementById("chat-browser-slot");
-  if (global.ResizeObserver && slot) {
+  if (!preferencesSurface && global.ResizeObserver && slot) {
     new ResizeObserver(function () {
       if (!viewportEmitter || viewportFrame) return;
       viewportFrame = global.requestAnimationFrame(function () {
@@ -26,7 +27,7 @@
   function render(state, emit) {
     viewportEmitter = emit;
     currentNavigation = state && state.selectedNavigation;
-    if (global.CodexBridgeDesktopDSHWorkbench) {
+    if (!preferencesSurface && global.CodexBridgeDesktopDSHWorkbench) {
       global.CodexBridgeDesktopDSHWorkbench.configure(state, emit);
       global.CodexBridgeDesktopDSHWorkbench.setActive(currentNavigation === "workbench", emit);
     }
@@ -36,7 +37,7 @@
       var section = document.getElementById(name + "-page");
       if (section) section.hidden = !state || state.selectedNavigation !== name;
     });
-    if (!state || state.selectedNavigation !== "workbench") {
+    if (!preferencesSurface && (!state || state.selectedNavigation !== "workbench")) {
       emitBrowserViewport(emit, { x: 0, y: 0, width: 0, height: 0, visible: false });
     }
     if (state && pages.connections.updateSettings) {
@@ -60,6 +61,7 @@
   }
 
   function measureBrowserViewport(emit) {
+    if (preferencesSurface) return;
     var development = global.CodexBridgeDesktopDSHWorkbench
       && global.CodexBridgeDesktopDSHWorkbench.mode() === "dsh";
     if ((currentNavigation && currentNavigation !== "workbench") || development) {
@@ -88,6 +90,7 @@
   }
 
   function emitBrowserViewport(emit, viewport) {
+    if (preferencesSurface) return;
     var signature = [viewport.x, viewport.y, viewport.width, viewport.height, viewport.visible,
       viewport.deviceScaleFactor || ""].join(":");
     if (signature === lastViewport) return;

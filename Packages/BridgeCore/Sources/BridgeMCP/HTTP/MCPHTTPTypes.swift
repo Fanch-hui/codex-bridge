@@ -1,6 +1,13 @@
 import Foundation
 import MCP
 
+package enum MCPTrustedContextHeaders {
+  static let route = "x-codex-bridge-internal-route"
+  static let generation = "x-codex-bridge-internal-generation"
+  static let cloudGeneration = "x-codex-bridge-internal-cloud-generation"
+  static let names: Set<String> = [route, generation, cloudGeneration]
+}
+
 public typealias MCPHTTPRequestHandler =
   @Sendable (MCP.HTTPRequest) async -> MCP.HTTPResponse
 

@@ -4,18 +4,19 @@
   import Foundation
 
   extension WindowsManagementModel {
-    func registerProject(name: String, path: String) async {
+    @discardableResult
+    func registerProject(name: String, path: String) async -> String? {
       let projectName = name.trimmingCharacters(in: .whitespacesAndNewlines)
       let absolutePath = path.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !projectName.isEmpty, !absolutePath.isEmpty else {
         reportProjectFailure("项目名称和绝对路径不能为空。")
-        return
+        return nil
       }
       guard connectionState == .connected else {
         reportProjectFailure("后台 Service 未连接，无法注册项目。")
-        return
+        return nil
       }
-      guard !projectBusy else { return }
+      guard !projectBusy else { return nil }
       setProjectBusy(true)
       setProjectStatus("正在注册项目…")
       defer { setProjectBusy(false) }
@@ -25,9 +26,11 @@
         )
         selectedProjectID = detail.projectID
         await refreshProjects()
-        reportProjectSuccess("项目已注册：\(detail.name)")
+        reportProjectSuccess("已打开工作文件夹：\(detail.name)")
+        return detail.projectID
       } catch {
         reportProjectFailure("项目注册失败：\(BridgeServiceErrorMessage.message(error))")
+        return nil
       }
     }
 

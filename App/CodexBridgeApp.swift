@@ -22,17 +22,35 @@ struct CodexBridgeApp: App {
     WindowGroup("Codex Bridge", id: Self.mainWindowID) {
       BridgeServiceRootView(model: model)
         .frame(minWidth: 720, minHeight: 520)
+        .modifier(PreferencesWindowOpenHandler())
     }
     .defaultSize(width: 1180, height: 760)
+    .windowStyle(.hiddenTitleBar)
     .commands {
       BridgeServiceCommands(model: model, mainWindowID: Self.mainWindowID)
     }
 
+    Settings {
+      BridgeServicePreferencesView(model: model, mainWindowID: Self.mainWindowID)
+    }
+
     MenuBarExtra {
-      BridgeServiceMenuBarView(model: model)
+      BridgeServiceMenuBarView(model: model, mainWindowID: Self.mainWindowID)
     } label: {
       Label("Codex Bridge", systemImage: "link")
         .accessibilityLabel("Codex Bridge")
+    }
+  }
+}
+
+private struct PreferencesWindowOpenHandler: ViewModifier {
+  @Environment(\.openSettings) private var openSettings
+
+  func body(content: Content) -> some View {
+    content.onReceive(
+      NotificationCenter.default.publisher(for: BridgeDesktopWindowNotifications.openPreferences)
+    ) { _ in
+      openSettings()
     }
   }
 }
@@ -49,12 +67,14 @@ private final class CodexBridgeAppDelegate: NSObject, NSApplicationDelegate {
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     if canTerminate || model?.isPreparedForUpdateTermination == true { return .terminateNow }
-    guard !isClosingClient, let model else { return .terminateNow }
+    if isClosingClient { return .terminateLater }
+    guard let model else { return .terminateNow }
     isClosingClient = true
     Task {
-      await model.shutdownForApplicationTermination()
-      canTerminate = true
-      sender.reply(toApplicationShouldTerminate: true)
+      let stopped = await model.shutdownForApplicationTermination()
+      canTerminate = stopped
+      isClosingClient = false
+      sender.reply(toApplicationShouldTerminate: stopped)
     }
     return .terminateLater
   }

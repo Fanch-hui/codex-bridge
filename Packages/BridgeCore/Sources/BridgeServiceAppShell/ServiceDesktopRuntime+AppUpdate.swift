@@ -51,7 +51,10 @@ extension BridgeServiceAppModel {
         guard let self else { throw CancellationError() }
         let status = try await self.currentClient().prepareAppUpdateStatus()
         return AppUpdateInstallationReadiness(
-          canInstall: status.canInstall, waitingReason: status.waitingReason)
+          canInstall: status.canInstall, waitingReason: status.waitingReason,
+          blockers: (status.blockers ?? []).map {
+            AppUpdateBlocker(kind: $0.kind, id: $0.id, projectID: $0.projectID, label: $0.label)
+          })
       }
     )
     updater.onChange = { [weak self] status in

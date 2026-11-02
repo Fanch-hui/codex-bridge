@@ -44,10 +44,11 @@
         try? await Task.sleep(for: .milliseconds(30))
       }
       appUpdater?.cancel()
-      if !auxiliary.settings.keepServiceRunningAfterExit,
-        let client = model.client as? BridgeServiceClient
-      {
-        _ = try? await client.shutdownService()
+      model.stopSchedulingForApplicationExit()
+      if !auxiliary.settings.keepServiceRunningAfterExit {
+        do { try await LinuxServiceControl.shutdownAndWait() } catch {
+          FileHandle.standardError.write(Data("后台服务尚未结束：\(error)\n".utf8))
+        }
       }
       await model.shutdown()
     }

@@ -42,7 +42,9 @@ extension BridgeDesktopCommandRouter {
     case .searchTaskHistory:
       model.searchTaskHistory(payload)
     case .selectTaskHistory:
-      model.selectTaskHistory(payload.taskID)
+      model.selectTaskHistory(
+        payload.taskID, requestID: envelope.requestID,
+        messageID: payload.value.flatMap(Int64.init))
     case .selectTask:
       guard let taskID = validatedID(payload.taskID),
         model.tasks.contains(where: { $0.taskID == taskID })
@@ -55,6 +57,8 @@ extension BridgeDesktopCommandRouter {
       model.performWorkbenchWorkspace(envelope)
     case .submitDSHTask:
       model.submitDSHTask(envelope)
+    case .embeddedDSH:
+      model.performEmbeddedDSH(envelope)
     case .interruptTask:
       guard let task = task(payload.taskID, in: model),
         connected(model),

@@ -3,7 +3,7 @@ public enum SecretStoreFactory {
   /// on Windows, and Secret Service on Linux.
   public static func defaultStore() -> any SecretStore {
     #if canImport(Security)
-      return KeychainSecretStore(allowsUserInteraction: false)
+      return KeychainVaultSecretStore()
     #elseif os(Windows)
       return WindowsCredentialStore()
     #elseif os(Linux)

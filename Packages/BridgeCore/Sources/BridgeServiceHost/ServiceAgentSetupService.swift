@@ -1,5 +1,6 @@
 import BridgeAgentCore
 import BridgeIPC
+import BridgeQoderSDK
 import BridgeServiceApplication
 import BridgeServiceCore
 import Foundation
@@ -18,7 +19,33 @@ struct ServiceAgentSetupService: Sendable {
       candidates: { try await candidates($0) },
       configure: { try await configure($0, runtime: $1) },
       verify: { try await verify($0, runtime: $1, input: $2) },
-      login: { try ServiceAgentSetupLogin.command(request: $0, runtime: $1, paths: paths) })
+      login: { try ServiceAgentSetupLogin.command(request: $0, runtime: $1, paths: paths) },
+      probeLogin: { try await probeLogin($0, runtime: $1) })
+  }
+
+  func probeLogin(_ request: IPCAgentSetupRequest, runtime: ServiceAgentSetupRuntime) async throws
+    -> Bool?
+  {
+    guard request.providerID == "qoder",
+      let distribution = request.qoderDistribution.flatMap(QoderDistribution.init(rawValue:))
+    else { return nil }
+    let existing = try await registry.installations(providerID: .qoder).first {
+      Self.matchesExecutable($0.executablePath, runtime.executablePath)
+    }
+    let installation =
+      try existing?.agentInstallation()
+      ?? AgentInstallation(
+        id: AgentInstallationID(rawValue: "qoder-setup-probe"), providerID: .qoder,
+        executablePath: runtime.executablePath)
+    let configuration = QoderSDKProviderConfiguration(
+      runtimeBaseDirectory: paths.agentStateURL.appendingPathComponent("QoderSDK").path,
+      runtimeConfiguration: { _ in
+        QoderSDKRuntimeConfiguration(
+          distribution: distribution, nodeExecutablePath: runtime.nodeExecutablePath,
+          sdkRoot: runtime.sdkRoot)
+      })
+    return try await QoderSDKProvider(configuration: configuration)
+      .isAuthenticated(installation: installation)
   }
 
   func candidates(_ request: IPCAgentSetupRequest) async throws -> [IPCAgentSetupCandidate] {

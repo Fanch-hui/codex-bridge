@@ -4,6 +4,12 @@ import Foundation
 
 extension ServiceExecutionCoordinator {
   func consume(_ event: ExecutionEvent, taskID: TaskID) async {
+    switch event {
+    case .completed, .interrupted, .failed:
+      guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
+    default:
+      break
+    }
     do {
       switch event {
       case .planUpdated(let currentStep, _):
@@ -91,6 +97,7 @@ extension ServiceExecutionCoordinator {
     } catch {
       await execution.stop(taskID: taskID)
       _ = await conversation.close(taskID: taskID)
+      guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
       _ = try? await tasks.fail(
         taskID: taskID,
         failureCode: "execution_state_update_failed",

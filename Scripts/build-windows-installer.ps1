@@ -102,6 +102,9 @@ if ((Test-SameOrChildPath $payloadFull $outputFull) -or
 }
 $files = @(Assert-SafePayload $payloadFull)
 Assert-PayloadChecksums $payloadFull $files
+& node (Join-Path $repoRoot "Scripts\verify-embedded-dsh-runtime.mjs") `
+  (Join-Path $payloadFull "EmbeddedDSH") "windows" $Architecture
+if ($LASTEXITCODE -ne 0) { throw "Embedded DSH runtime verification failed." }
 
 $buildInfoPath = Join-Path $payloadFull "BUILD-INFO.json"
 $buildInfo = Get-Content -LiteralPath $buildInfoPath -Raw | ConvertFrom-Json

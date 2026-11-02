@@ -27,6 +27,8 @@
     ) -> Bool {
       let payload = envelope.payload
       switch envelope.command {
+      case .refreshMCPClients:
+        Task { @MainActor in await auxiliary.connections.refreshMCPClientStatus() }
       case .setMCPClientEnabled:
         guard let clientID = BridgeDesktopCommandValue.nonEmpty(payload.clientID),
           let enabled = payload.enabled,

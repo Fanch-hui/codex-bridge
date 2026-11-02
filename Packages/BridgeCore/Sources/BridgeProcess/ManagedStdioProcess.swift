@@ -18,6 +18,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   private let standardInputHandle: FileHandle
   private let standardOutputSink: OutputHandler
   private let standardErrorSink: OutputHandler
+  private let ownershipRecord: ManagedProcessOwnershipRecord?
   private let lock = NSLock()
   private let inputLock = NSLock()
   private let outputLock = NSLock()
@@ -49,21 +50,30 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     workingDirectory: String?,
     environment: [String: String],
     mergeStandardError: Bool,
+    processGroupName: String? = nil,
     onStandardOutput: @escaping OutputHandler,
     onStandardError: @escaping OutputHandler = { _ in },
     readOutput: Bool = true
   ) throws {
-    #if os(Windows)
-      guard let executable = argv.first,
-        !executable.isEmpty,
-        argv.count <= 128,
-        argv.allSatisfy({ !$0.contains("\0") }),
-        environment.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }),
-        workingDirectory.map({ !$0.isEmpty && !$0.contains("\0") }) ?? true
-      else {
-        throw ManagedProcessError.invalidArgument
-      }
+    guard let executable = argv.first, !executable.isEmpty, argv.count <= 128,
+      argv.allSatisfy({ !$0.contains("\0") }),
+      environment.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }),
+      workingDirectory.map({ !$0.isEmpty && !$0.contains("\0") }) ?? true
+    else { throw ManagedProcessError.invalidArgument }
+    #if !os(Windows)
+      guard executable.hasPrefix("/") else { throw ManagedProcessError.invalidArgument }
+    #endif
+    guard ManagedProcessOwnership.current == nil || processGroupName == nil else {
+      throw ManagedProcessError.invalidArgument
+    }
+    let ownership = try ManagedProcessOwnership.current?.prepareLaunch()
+    ownershipRecord = ownership
+    var processCreated = false
+    defer {
+      if !processCreated { ownership?.remove() }
+    }
 
+    #if os(Windows)
       standardOutputSink = onStandardOutput
       standardErrorSink = onStandardError
 
@@ -76,6 +86,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
           argv: argv,
           workingDirectory: workingDirectory,
           environment: environment,
+          processGroupName: ownership?.groupName ?? processGroupName,
           standardInput: inputPipe,
           standardOutput: outputPipe,
           standardError: errorPipe
@@ -88,6 +99,26 @@ public final class ManagedStdioProcess: @unchecked Sendable {
         errorPipe?.fileHandleForReading.closeFile()
         errorPipe?.fileHandleForWriting.closeFile()
         throw error
+      }
+      processCreated = true
+
+      if let ownership {
+        do {
+          guard let identity = Self.identity(of: launched.pid) else {
+            throw ManagedProcessError.processLaunchFailed(-1)
+          }
+          try ownership.save(identity: identity)
+        } catch {
+          _ = launched.job.terminate()
+          _ = CloseHandle(launched.handle)
+          inputPipe.fileHandleForReading.closeFile()
+          inputPipe.fileHandleForWriting.closeFile()
+          outputPipe.fileHandleForReading.closeFile()
+          outputPipe.fileHandleForWriting.closeFile()
+          errorPipe?.fileHandleForReading.closeFile()
+          errorPipe?.fileHandleForWriting.closeFile()
+          throw error
+        }
       }
 
       inputPipe.fileHandleForReading.closeFile()
@@ -102,22 +133,13 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       windowsProcessJob = launched.job
       identityStorage = Self.identity(of: pid)
     #else
-      guard let executable = argv.first,
-        executable.hasPrefix("/"),
-        argv.count <= 128,
-        argv.allSatisfy({ !$0.contains("\0") }),
-        environment.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }),
-        workingDirectory.map({ !$0.isEmpty && !$0.contains("\0") }) ?? true
-      else {
-        throw ManagedProcessError.invalidArgument
-      }
-
       standardOutputSink = onStandardOutput
       standardErrorSink = onStandardError
 
       let inputPipe = Pipe()
       let outputPipe = Pipe()
       let errorPipe = mergeStandardError ? nil : Pipe()
+      let launchGate = ownership == nil ? nil : Pipe()
       let processID: pid_t
       do {
         #if os(Linux)
@@ -127,6 +149,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
               outputPipe.fileHandleForReading, outputPipe.fileHandleForWriting,
             ]
             + (errorPipe.map { [$0.fileHandleForReading, $0.fileHandleForWriting] } ?? [])
+            + (launchGate.map { [$0.fileHandleForReading, $0.fileHandleForWriting] } ?? [])
           for handle in handles {
             guard fcntl(handle.fileDescriptor, F_SETFD, FD_CLOEXEC) == 0 else {
               throw ManagedProcessError.processLaunchFailed(errno)
@@ -134,14 +157,15 @@ public final class ManagedStdioProcess: @unchecked Sendable {
           }
         #endif
         processID = try Self.spawn(
-          argv: argv,
+          argv: ownership == nil ? argv : Self.gatedArguments(argv),
           workingDirectory: workingDirectory,
           environment: environment,
           standardInput: inputPipe.fileHandleForReading.fileDescriptor,
           standardOutput: outputPipe.fileHandleForWriting.fileDescriptor,
           standardError: mergeStandardError
             ? outputPipe.fileHandleForWriting.fileDescriptor
-            : errorPipe!.fileHandleForWriting.fileDescriptor
+            : errorPipe!.fileHandleForWriting.fileDescriptor,
+          launchGate: launchGate?.fileHandleForReading.fileDescriptor
         )
       } catch {
         inputPipe.fileHandleForReading.closeFile()
@@ -150,7 +174,32 @@ public final class ManagedStdioProcess: @unchecked Sendable {
         outputPipe.fileHandleForWriting.closeFile()
         errorPipe?.fileHandleForReading.closeFile()
         errorPipe?.fileHandleForWriting.closeFile()
+        launchGate?.fileHandleForReading.closeFile()
+        launchGate?.fileHandleForWriting.closeFile()
         throw error
+      }
+      processCreated = true
+
+      if let ownership, let launchGate {
+        launchGate.fileHandleForReading.closeFile()
+        do {
+          guard let identity = Self.identity(of: processID) else {
+            throw ManagedProcessError.processLaunchFailed(-1)
+          }
+          try ownership.save(identity: identity)
+          try launchGate.fileHandleForWriting.write(contentsOf: Data("run\n".utf8))
+          launchGate.fileHandleForWriting.closeFile()
+        } catch {
+          launchGate.fileHandleForWriting.closeFile()
+          _ = kill(-processID, SIGKILL)
+          inputPipe.fileHandleForReading.closeFile()
+          inputPipe.fileHandleForWriting.closeFile()
+          outputPipe.fileHandleForReading.closeFile()
+          outputPipe.fileHandleForWriting.closeFile()
+          errorPipe?.fileHandleForReading.closeFile()
+          errorPipe?.fileHandleForWriting.closeFile()
+          throw error
+        }
       }
 
       inputPipe.fileHandleForReading.closeFile()
@@ -352,6 +401,48 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     #endif
   }
 
+  /// Confirms that both the launched process and its managed descendants have exited.
+  public func isProcessTreeStopped() -> Bool {
+    #if os(Windows)
+      lock.lock()
+      let job = windowsProcessJob
+      lock.unlock()
+      return job?.isEmpty() ?? false
+    #else
+      guard reapIfExited(gracePeriod: .zero) != nil else { return false }
+      return !posixProcessGroup.exists
+    #endif
+  }
+
+  /// Requests termination and returns true only after the managed process tree is gone.
+  public func terminateProcessTreeAndWait(
+    gracePeriod: Duration = .seconds(1),
+    killWait: Duration = .seconds(5)
+  ) -> Bool {
+    if isProcessTreeStopped() { return true }
+    #if os(Windows)
+      lock.lock()
+      let job = windowsProcessJob
+      lock.unlock()
+      guard let job else { return false }
+      _ = job.terminate()
+      let deadline = ContinuousClock.now.advanced(by: gracePeriod + killWait)
+      repeat {
+        if job.isEmpty() {
+          _ = reapIfExited(gracePeriod: .zero)
+          return true
+        }
+        Thread.sleep(forTimeInterval: 0.01)
+      } while ContinuousClock.now < deadline
+      return false
+    #else
+      guard terminateAndWait(gracePeriod: gracePeriod, killWait: killWait) != nil else {
+        return false
+      }
+      return isProcessTreeStopped()
+    #endif
+  }
+
   #if !os(Windows)
     private func waitForGroupExit(timeout: Duration) -> ManagedProcessTermination? {
       let deadline = ContinuousClock.now.advanced(by: timeout)
@@ -391,6 +482,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     guard !handlesClosed else {
       outputLock.unlock()
       closeStdin()
+      if isProcessTreeStopped() { ownershipRecord?.remove() }
       return
     }
     handlesClosed = true
@@ -406,11 +498,24 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       if terminationStorage != nil, let handle = windowsProcessHandle {
         _ = CloseHandle(handle)
         windowsProcessHandle = nil
-        windowsProcessJob = nil
+        // Keep the job handle until deinitialization so callers can confirm all
+        // descendants have exited after requesting termination.
+        _ = windowsProcessJob?.terminate()
       }
       lock.unlock()
     #endif
+    if isProcessTreeStopped() { ownershipRecord?.remove() }
   }
+
+  #if !os(Windows)
+    private static func gatedArguments(_ argv: [String]) -> [String] {
+      [
+        "/bin/sh", "-c",
+        "IFS= read -r bridge_launch <&3 && [ \"$bridge_launch\" = run ] || exit 1; exec 3<&-; exec \"$@\"",
+        "bridge-launch",
+      ] + argv
+    }
+  #endif
 
   private func consumeAvailableData(_ handle: FileHandle, sink: OutputHandler) {
     outputLock.lock()

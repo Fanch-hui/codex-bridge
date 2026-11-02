@@ -30,13 +30,16 @@
       actions.appendChild(value); return value;
     }
     var reload = button("重新读取", function () {
-      if (!selectedPath || !draft) return;
+      if (reload.disabled || !selectedPath || !draft) return;
       if (draft.content !== draft.original && !global.confirm("重新读取将替换未保存的草稿，是否继续？")) return;
       draft.preview = null; draft.pending = null;
       draft.reloadRequestID = request("readFile", { path: selectedPath, offset: 1, limit: 10000 }).requestID;
+      draft.readRequestID = draft.reloadRequestID; draft.message = "正在重新读取…"; render();
     });
     var next = button("下一页", function () {
-      if (draft && draft.nextLine) request("readFile", { path: selectedPath, offset: draft.nextLine, limit: 10000 });
+      if (next.disabled || !draft || !draft.nextLine) return;
+      draft.readRequestID = request("readFile", { path: selectedPath, offset: draft.nextLine, limit: 10000 }).requestID;
+      draft.message = "正在读取下一页…"; render();
     });
     var prepare = button("预览保存", function () {
       if (prepare.disabled) return;
@@ -52,7 +55,8 @@
       draft.message = "正在确认保存…"; render();
     });
     var retry = button("恢复保存", function () {
-      if (!draft || !draft.pending) return;
+      if (!draft || !draft.pending || !draft.recover) return;
+      draft.recover = false;
       request(draft.pending.payload.action, draft.pending.payload, draft.pending.requestID);
       draft.message = "正在确认原保存请求…"; render();
     });
@@ -67,7 +71,8 @@
       input.readOnly = !valid || pending; source.hidden = !draft || draft.binary;
       message.textContent = draft ? draft.message || (!valid ? "当前内容为分页或脱敏预览，不能保存。" : "") : "正在读取文件…";
       message.hidden = !message.textContent;
-      next.hidden = !draft || !draft.nextLine; reload.disabled = !draft || pending;
+      next.hidden = !draft || !draft.nextLine; next.disabled = !draft || pending || !!draft.readRequestID;
+      reload.disabled = !draft || pending || !!draft.readRequestID;
       var tooLarge = new TextEncoder().encode(input.value).length > 262144;
       prepare.disabled = !valid || pending || composing || tooLarge || input.value === draft.original;
       if (tooLarge && valid) { message.textContent = "编辑内容超过 256 KiB，不能保存。"; message.hidden = false; }
@@ -85,7 +90,9 @@
     }
     input.addEventListener("input", function () {
       if (!draft) return;
-      draft.content = input.value; draft.preview = null; draft.reloadRequestID = null; draft.message = ""; render();
+      draft.content = input.value; draft.preview = null; draft.reloadRequestID = null;
+      if (!draft.readRequestID) draft.message = "";
+      render();
     });
     input.addEventListener("compositionstart", function () { composing = true; render(); });
     input.addEventListener("compositionend", function () { composing = false; render(); });
@@ -99,6 +106,13 @@
     }
     function receive(state, pending) {
       if (!state || state.projectID !== projectID || !pending) return;
+      if (pending.payload.action === "readFile") {
+        var reading = drafts.get(JSON.stringify([projectID, pending.payload.path]));
+        if (reading && reading.readRequestID === pending.requestID) {
+          reading.readRequestID = null;
+          if (/^正在(重新读取|读取下一页)/.test(reading.message || "")) reading.message = "";
+        }
+      }
       var saving = pending.payload.action === "previewWrite" || pending.payload.action === "applyWrite";
       if (saving) {
         var target = drafts.get(JSON.stringify([projectID, pending.payload.path]));

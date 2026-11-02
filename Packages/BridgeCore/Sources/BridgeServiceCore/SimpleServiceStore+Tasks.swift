@@ -9,7 +9,8 @@ extension SimpleServiceStore {
     event: ServiceTaskEventDraft,
     handoffID: String? = nil,
     attachments: [AgentImageAttachment] = [],
-    runtimeBinding: AgentRuntimeBinding? = nil
+    runtimeBinding: AgentRuntimeBinding? = nil,
+    embeddedDSHSubagent: EmbeddedDSHSubagentIdentity? = nil
   ) throws -> ServiceTaskCreationResult {
     guard event.kind == .taskCreated,
       event.createdAt == task.updatedAt,
@@ -24,7 +25,18 @@ extension SimpleServiceStore {
           throw ServiceStoreError.unknownProject(task.projectID)
         }
         if let handoffID { try Self.validateHandoffSubmission(handoffID, task: task, in: db) }
+        if let embeddedDSHSubagent,
+          let existing = try Self.existingEmbeddedDSHSubmission(
+            task: task, identity: embeddedDSHSubagent, attachments: attachments, in: db)
+        {
+          return existing
+        }
         if let existing = try Self.idempotentTask(for: task, in: db) {
+          let isEmbeddedTask = try Self.isEmbeddedDSHTask(existing.id, in: db)
+          if embeddedDSHSubagent != nil || isEmbeddedTask {
+            throw ServiceStoreError.idempotencyConflict(
+              source: task.source, clientRequestID: task.clientRequestID ?? "")
+          }
           guard try Self.taskAttachments(taskID: existing.id.rawValue, in: db) == attachments else {
             throw ServiceStoreError.invalidArgument("task.attachments")
           }
@@ -32,19 +44,28 @@ extension SimpleServiceStore {
           return try Self.reusedResult(existing: existing, requested: task)
         }
         if let row = try Self.taskRow(id: task.id, in: db) {
+          let isEmbeddedTask = try Self.isEmbeddedDSHTask(task.id, in: db)
+          if embeddedDSHSubagent != nil || isEmbeddedTask {
+            throw ServiceStoreError.duplicateTask(task.id)
+          }
           guard try Self.taskAttachments(taskID: task.id.rawValue, in: db) == attachments else {
             throw ServiceStoreError.invalidArgument("task.attachments")
           }
           if let handoffID { try Self.linkHandoff(handoffID, taskID: task.id.rawValue, in: db) }
           return try Self.reusedResult(existing: Self.decodeTask(row), requested: task)
         }
-        if task.permissionMode == .full, task.state.status.holdsWriteSlot,
-          !task.isQueued,
-          try Self.activeWriteTaskRow(projectID: task.projectID, in: db) != nil
-        {
-          throw ServiceStoreError.activeWriteTaskExists(task.projectID)
-        }
+        let groupID = try Self.claimExecutionGroup(
+          task: task, embeddedDSHSubagent: embeddedDSHSubagent, in: db)
         try insertTask(task, in: db)
+        if let groupID {
+          try db.execute(
+            sql: "UPDATE bridge_service_tasks SET execution_group_id = ? WHERE task_id = ?",
+            arguments: [groupID, task.id.rawValue]
+          )
+        }
+        if let embeddedDSHSubagent {
+          try Self.linkEmbeddedDSHSubagent(task: task, identity: embeddedDSHSubagent, in: db)
+        }
         try Self.insertRuntimeBinding(runtimeBinding, taskID: task.id, in: db)
         try Self.insertTaskAttachments(attachments, taskID: task.id, in: db)
         if task.isQueued {
@@ -62,6 +83,7 @@ extension SimpleServiceStore {
     } catch let error as ServiceStoreError {
       throw error
     } catch {
+      if embeddedDSHSubagent != nil { throw ServiceStoreError.storageFailure }
       if let existing = try? existingIdempotentTask(for: task) {
         return try Self.reusedResult(existing: existing, requested: task)
       }
@@ -69,7 +91,7 @@ extension SimpleServiceStore {
         return try Self.reusedResult(existing: existing, requested: task)
       }
       if task.permissionMode == .full,
-        (try? activeWriteTask(projectID: task.projectID)) != nil
+        (try? hasActiveExecutionGroup(projectID: task.projectID)) == true
       {
         throw ServiceStoreError.activeWriteTaskExists(task.projectID)
       }
@@ -103,10 +125,17 @@ extension SimpleServiceStore {
             to: task.state.status
           )
         }
+        if existing.state.status == .unknown, task.state.status.isTerminal,
+          try Self.isEmbeddedDSHTask(task.id, in: db)
+        {
+          throw EmbeddedDSHRecoveryError.pendingProcessReconciliation(taskID: task.id)
+        }
         try Self.validateTransition(from: existing.state.status, to: task.state.status)
         try updateTaskRow(task, in: db)
         try Self.insert(event, taskID: task.id, in: db)
       }
+    } catch let error as EmbeddedDSHRecoveryError {
+      throw error
     } catch let error as ServiceStoreError {
       throw error
     } catch {
@@ -275,15 +304,28 @@ extension SimpleServiceStore {
   public func removeTask(id: TaskID) throws {
     do {
       try database.write { db in
-        guard try Self.taskRow(id: id, in: db) != nil else {
+        guard let row = try Self.taskRow(id: id, in: db) else {
           throw ServiceStoreError.unknownTask(id)
         }
+        if row["status"] as String == ServiceTaskStatus.unknown.rawValue,
+          try Self.isEmbeddedDSHTask(id, in: db)
+        {
+          throw EmbeddedDSHRecoveryError.pendingProcessReconciliation(taskID: id)
+        }
+        let groupID = try String.fetchOne(
+          db,
+          sql: "SELECT execution_group_id FROM bridge_service_tasks WHERE task_id = ?",
+          arguments: [id.rawValue]
+        )
         try db.execute(
           sql: "DELETE FROM bridge_service_tasks WHERE task_id = ?",
           arguments: [id.rawValue]
         )
         guard db.changesCount == 1 else { throw ServiceStoreError.storageFailure }
+        if let groupID { try Self.releaseInactiveExecutionGroup(groupID, in: db) }
       }
+    } catch let error as EmbeddedDSHRecoveryError {
+      throw error
     } catch let error as ServiceStoreError {
       throw error
     } catch {

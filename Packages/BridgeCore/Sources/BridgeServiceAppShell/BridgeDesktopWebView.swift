@@ -6,6 +6,7 @@ import WebKit
 
 struct BridgeDesktopWebView: NSViewRepresentable {
   @ObservedObject var model: BridgeServiceAppModel
+  var surface: BridgeDesktopSurface = .main
 
   static let websiteDataStoreIdentifier = UUID(
     uuid: (
@@ -18,7 +19,7 @@ struct BridgeDesktopWebView: NSViewRepresentable {
   }
 
   func makeCoordinator() -> Coordinator {
-    Coordinator(model: model)
+    Coordinator(model: model, surface: surface)
   }
 
   func makeNSView(context: Context) -> WKWebView {
@@ -30,6 +31,7 @@ struct BridgeDesktopWebView: NSViewRepresentable {
     configuration.userContentController = userContentController
     configuration.defaultWebpagePreferences.allowsContentJavaScript = true
     let webView = WKWebView(frame: .zero, configuration: configuration)
+    context.coordinator.attach(webView)
     webView.navigationDelegate = context.coordinator
     webView.uiDelegate = context.coordinator
     webView.setValue(false, forKey: "drawsBackground")
@@ -38,16 +40,21 @@ struct BridgeDesktopWebView: NSViewRepresentable {
       context.coordinator.failLoading()
       return webView
     }
-    webView.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
+    var components = URLComponents(url: indexURL, resolvingAgainstBaseURL: false)
+    if surface == .preferences {
+      components?.queryItems = [URLQueryItem(name: "surface", value: "preferences")]
+    }
+    webView.loadFileURL(
+      components?.url ?? indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
     context.coordinator.update(
-      state: BridgeDesktopUIStateBuilder.build(from: model),
+      state: context.coordinator.buildState(from: model),
       webView: webView
     )
     return webView
   }
 
   func updateNSView(_ nsView: WKWebView, context: Context) {
-    let state = BridgeDesktopUIStateBuilder.build(from: model)
+    let state = context.coordinator.buildState(from: model)
     context.coordinator.update(
       state: state,
       webView: nsView
@@ -56,21 +63,67 @@ struct BridgeDesktopWebView: NSViewRepresentable {
 
   final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     weak var model: BridgeServiceAppModel?
+    private(set) weak var webView: WKWebView?
+    let surface: BridgeDesktopSurface
     private var latestState: BridgeDesktopUIState?
     private var latestPatch: BridgeDesktopUIStatePatch?
     private var latestRevision: UInt64 = 0
     private var patchBuilder = BridgeDesktopUIStatePatchBuilder()
     private var didFinishLoading = false
+    private var newConversationRequestInFlight: UUID?
+    private var destinationRequestInFlight: UUID?
     private let conversationObservation = DesktopConversationObservation()
 
-    init(model: BridgeServiceAppModel) {
+    init(model: BridgeServiceAppModel, surface: BridgeDesktopSurface = .main) {
       self.model = model
+      self.surface = surface
+      super.init()
+      if surface == .preferences {
+        NotificationCenter.default.addObserver(
+          self, selector: #selector(windowDidBecomeKey(_:)),
+          name: NSWindow.didBecomeKeyNotification, object: nil)
+        NotificationCenter.default.addObserver(
+          self, selector: #selector(windowWillClose(_:)),
+          name: NSWindow.willCloseNotification, object: nil)
+      }
+    }
+
+    func attach(_ webView: WKWebView) {
+      self.webView = webView
+      BridgeDesktopWindowCoordinator.shared.attach(self, surface: surface)
+      if surface == .preferences {
+        DispatchQueue.main.async { [weak self] in
+          self?.model?.preferencesWindowIsKey = self?.webView?.window?.isKeyWindow == true
+        }
+      }
+    }
+
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+      guard let window = notification.object as? NSWindow else { return }
+      let isPreferences = window === webView?.window
+      model?.preferencesWindowIsKey = isPreferences
+      if isPreferences { model?.preferencesWindowDidAppear() }
+    }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+      guard let window = notification.object as? NSWindow, window === webView?.window else {
+        return
+      }
+      model?.preferencesWindowDidDisappear()
+    }
+
+    func buildState(from model: BridgeServiceAppModel) -> BridgeDesktopUIState {
+      BridgeDesktopUIStateBuilder.build(
+        from: model, selectionOverride: surface == .preferences ? model.preferencesNavigation : nil)
     }
 
     func update(state: BridgeDesktopUIState, webView: WKWebView) {
+      defer {
+        if surface == .main { sendRequestedConversation(to: webView) }
+      }
       conversationObservation.observe(model?.conversation) { [weak self, weak webView] in
         guard let self, let model = self.model, let webView else { return }
-        self.update(state: BridgeDesktopUIStateBuilder.build(from: model), webView: webView)
+        self.update(state: self.buildState(from: model), webView: webView)
       }
       guard latestState != state else { return }
       latestRevision &+= 1
@@ -98,7 +151,33 @@ struct BridgeDesktopWebView: NSViewRepresentable {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
       didFinishLoading = true
+      if surface == .main { webView.window?.isMovableByWindowBackground = true }
       sendFullSnapshot(to: webView)
+      if surface == .main { sendRequestedConversation(to: webView) }
+    }
+
+    private func sendRequestedConversation(to webView: WKWebView) {
+      guard didFinishLoading, newConversationRequestInFlight == nil,
+        let requestID = model?.pendingNewConversationRequestID
+      else { return }
+      newConversationRequestInFlight = requestID
+      let script =
+        "Boolean(window.CodexBridgeDesktopDSHWorkbench?.openConversation())"
+      webView.evaluateJavaScript(script) { [weak self, weak webView] value, error in
+        guard let self else { return }
+        self.newConversationRequestInFlight = nil
+        if (value as? Bool) == true {
+          self.model?.acknowledgeNewConversation(requestID)
+        } else if error != nil {
+          self.model?.acknowledgeNewConversation(requestID)
+          self.model?.errorMessage = "无法打开新对话，请重新打开工作台。"
+        }
+        if let pending = self.model?.pendingNewConversationRequestID,
+          pending != requestID, let webView
+        {
+          self.sendRequestedConversation(to: webView)
+        }
+      }
     }
 
     func webView(
@@ -109,7 +188,7 @@ struct BridgeDesktopWebView: NSViewRepresentable {
     }
 
     deinit {
-      model = nil
+      NotificationCenter.default.removeObserver(self)
     }
 
     private func sendLatestPatch(to webView: WKWebView) {
@@ -120,7 +199,10 @@ struct BridgeDesktopWebView: NSViewRepresentable {
       else { return }
       let script =
         "window.CodexBridgeDesktopUI && window.CodexBridgeDesktopUI.applyStatePatch(\(json))"
-      webView.evaluateJavaScript(script, completionHandler: nil)
+      webView.evaluateJavaScript(script) { [weak self] _, error in
+        guard error == nil else { return }
+        self?.sendPendingDestination()
+      }
       ConversationPerformanceRecorder.shared.record(
         ConversationPerformanceSample(
           stage: .desktopStateEncode,
@@ -140,7 +222,32 @@ struct BridgeDesktopWebView: NSViewRepresentable {
       else { return }
       let script =
         "window.CodexBridgeDesktopUI && window.CodexBridgeDesktopUI.applyStatePatch(\(json))"
-      webView.evaluateJavaScript(script, completionHandler: nil)
+      webView.evaluateJavaScript(script) { [weak self] _, error in
+        guard error == nil else { return }
+        self?.sendPendingDestination()
+      }
+    }
+
+    func sendPendingDestination() {
+      guard didFinishLoading, destinationRequestInFlight == nil, let webView,
+        let destination = BridgeDesktopWindowCoordinator.shared.pendingDestination(for: surface),
+        let script = destination.script
+      else { return }
+      destinationRequestInFlight = destination.id
+      webView.evaluateJavaScript(script) { [weak self] value, error in
+        guard let self else { return }
+        self.destinationRequestInFlight = nil
+        if error == nil, (value as? Bool) == true {
+          BridgeDesktopWindowCoordinator.shared.completeDestination(
+            destination.id, surface: self.surface)
+        }
+        if let pending = BridgeDesktopWindowCoordinator.shared.pendingDestination(
+          for: self.surface),
+          pending.id != destination.id
+        {
+          self.sendPendingDestination()
+        }
+      }
     }
 
     private func decode(_ body: Any) -> BridgeDesktopCommandEnvelope? {
@@ -163,9 +270,9 @@ struct BridgeDesktopWebView: NSViewRepresentable {
 
     private func handle(_ envelope: BridgeDesktopCommandEnvelope) {
       guard let model else { return }
-      Task { @MainActor [weak model] in
-        guard let model else { return }
-        BridgeDesktopCommandRouter.handle(envelope, model: model)
+      Task { @MainActor [weak self, weak model] in
+        guard let self, let model else { return }
+        self.route(envelope, model: model)
       }
     }
 

@@ -20,7 +20,7 @@ extension BridgeDesktopCommandRouter {
       model.refresh()
     case .registerProject:
       guard connected(model) else { return }
-      chooseProject(model: model)
+      model.chooseWorkFolder()
     case .removeProject:
       guard connected(model), let projectID = validatedID(payload.projectID),
         project(projectID, in: model) != nil
@@ -46,17 +46,6 @@ extension BridgeDesktopCommandRouter {
     default:
       return
     }
-  }
-
-  private static func chooseProject(model: BridgeServiceAppModel) {
-    let panel = NSOpenPanel()
-    panel.title = "选择要注册的项目目录"
-    panel.prompt = "注册"
-    panel.canChooseFiles = false
-    panel.canChooseDirectories = true
-    panel.allowsMultipleSelection = false
-    guard panel.runModal() == .OK, let url = panel.url else { return }
-    model.registerProject(at: url)
   }
 
   private static func saveCommand(

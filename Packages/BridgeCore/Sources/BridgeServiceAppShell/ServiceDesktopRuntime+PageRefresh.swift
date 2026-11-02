@@ -3,9 +3,39 @@ import BridgeServiceAppCore
 import Foundation
 
 extension BridgeServiceAppModel {
-  func refreshCurrentPage() async {
+  func refreshMCPClientStatus() async {
+    guard !mcpClientStatusRefreshInFlight, !stopped, connectionState == .connected,
+      let client
+    else { return }
+    mcpClientStatusRefreshInFlight = true
+    defer { mcpClientStatusRefreshInFlight = false }
+    let previous = mcpClients
+    if let value = try? await client.mcpClients(), previous == mcpClients {
+      mcpClients = value
+    }
+  }
+
+  func preferencesWindowDidAppear() {
+    guard !preferencesWindowIsVisible else { return }
+    preferencesWindowIsVisible = true
+    Task { [weak self] in await self?.refreshVisiblePreferences() }
+  }
+
+  func preferencesWindowDidDisappear() {
+    preferencesWindowIsVisible = false
+    preferencesWindowIsKey = false
+  }
+
+  func refreshVisiblePreferences() async {
+    guard preferencesWindowIsVisible, !stopped, connectionState == .connected, client != nil else {
+      return
+    }
+    await refresh(silent: true, includeCatalog: false, includeSettings: true)
+  }
+
+  func refreshCurrentPage(_ requestedPage: BridgeServiceNavigation? = nil) async {
     guard !stopped, !isRefreshing else { return }
-    let page = navigation
+    let page = requestedPage ?? navigation
     isRefreshing = true
     defer { isRefreshing = false }
     errorMessage = nil
@@ -116,10 +146,12 @@ extension BridgeServiceAppModel {
     async let approvalModeResult = try? await client.directApprovalMode()
     async let taskStartModeResult = try? await client.taskStartApprovalMode()
     async let instructionsResult = try? await client.customInstructions()
+    async let mcpClientsResult = try? await client.mcpClients()
     if let value = await configurationResult { directConfiguration = value }
     if let value = await approvalModeResult { directApprovalMode = value }
     if let value = await taskStartModeResult { taskStartApprovalMode = value }
     if let value = await instructionsResult { customInstructions = value }
+    if let value = await mcpClientsResult { mcpClients = value }
   }
 
   func loadConnectionSettings() async {

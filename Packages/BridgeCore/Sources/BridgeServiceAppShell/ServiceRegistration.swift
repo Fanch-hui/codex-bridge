@@ -21,6 +21,8 @@ public protocol BridgeServiceRegistrationManaging: AnyObject {
 
   func register() throws
   func unregister() async throws
+  func processIDsForShutdown() async throws -> [Int32]
+  func waitForShutdown(processIDs: [Int32]) async throws
   func openSystemSettings()
   func recoverUnavailableService() async throws -> Bool
 }
@@ -28,6 +30,8 @@ public protocol BridgeServiceRegistrationManaging: AnyObject {
 extension BridgeServiceRegistrationManaging {
   public var supportsAutomaticRecovery: Bool { false }
   public func recoverUnavailableService() async throws -> Bool { false }
+  public func processIDsForShutdown() async throws -> [Int32] { [] }
+  public func waitForShutdown(processIDs: [Int32]) async throws {}
 }
 
 @MainActor
@@ -92,6 +96,19 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
   public func unregister() async throws {
     try? await service.unregister()
     unregisterUserLaunchAgent()
+  }
+
+  public func processIDsForShutdown() async throws -> [Int32] {
+    guard
+      let executable = locateServiceExecutable()
+        ?? Bundle.main.resourceURL?
+        .appendingPathComponent("CodexBridgeService")
+    else { throw BridgeServiceRegistrationError.executableNotFound }
+    return try await MacAppUpdateServiceExit.processIDs(serviceExecutableURL: executable)
+  }
+
+  public func waitForShutdown(processIDs: [Int32]) async throws {
+    try await MacAppUpdateServiceExit.wait(for: processIDs)
   }
 
   public func openSystemSettings() {

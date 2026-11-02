@@ -19,6 +19,7 @@
     var deepSeekHarnessMCPServers: [IPCDeepSeekHarnessMCPServerSummary] = []
     var selectedAgentMCPScope = BridgeDesktopAgentMCPScope.deepSeekHarness.rawValue
     private var pendingAgentMCPScopeRefresh = false
+    private var clientStatusRefreshInFlight = false
     var selectedClientID: String?
     var busy = false
     var statusText = "尚未读取 MCP 客户端状态。"
@@ -81,6 +82,17 @@
       } catch {
         connectionState = .unavailable
         statusText = "MCP 状态读取失败：\(BridgeServiceErrorMessage.message(error))"
+      }
+    }
+
+    func refreshMCPClientStatus() async {
+      guard !clientStatusRefreshInFlight else { return }
+      clientStatusRefreshInFlight = true
+      defer { clientStatusRefreshInFlight = false }
+      let previous = clients
+      if let value = try? await client.mcpClients(), previous == clients {
+        clients = value
+        publishDisplay()
       }
     }
 
@@ -242,6 +254,7 @@
           },
           activeSessionCount: client.activeSessionCount,
           lastConnectedAt: client.lastConnectedAt,
+          successfulToolCalls: client.successfulToolCalls,
           canToggle: Self.isLocalClient(client.clientID) && !busy,
           canCopyConfiguration: Self.isLocalClient(client.clientID)
             && client.enabled && !busy,

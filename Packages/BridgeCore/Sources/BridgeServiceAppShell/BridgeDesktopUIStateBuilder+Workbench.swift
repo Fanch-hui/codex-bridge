@@ -43,6 +43,7 @@ extension BridgeDesktopUIStateBuilder {
       isRefreshingModels: model.isRefreshingModels,
       modelError: model.modelCatalogError,
       commandReceipt: model.workbenchCommandReceipt,
+      embeddedDSHReceipts: model.embeddedDSHReceipts,
       workspace: model.workspaceModel.state
     )
   }

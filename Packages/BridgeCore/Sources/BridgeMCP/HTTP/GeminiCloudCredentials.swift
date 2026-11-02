@@ -19,16 +19,28 @@ public enum GeminiCloudCredentials {
 public final class GeminiCloudAccessGate: @unchecked Sendable {
   private let lock = NSLock()
   private var enabled: Bool
+  private var generation: UInt64 = 0
 
   public init(enabled: Bool = false) {
     self.enabled = enabled
   }
 
   public func setEnabled(_ enabled: Bool) {
-    lock.withLock { self.enabled = enabled }
+    lock.withLock {
+      self.enabled = enabled
+      generation &+= 1
+    }
   }
 
   public var isEnabled: Bool {
     lock.withLock { enabled }
+  }
+
+  package var currentGeneration: UInt64? {
+    lock.withLock { enabled ? generation : nil }
+  }
+
+  package func isCurrent(_ generation: UInt64) -> Bool {
+    lock.withLock { enabled && self.generation == generation }
   }
 }

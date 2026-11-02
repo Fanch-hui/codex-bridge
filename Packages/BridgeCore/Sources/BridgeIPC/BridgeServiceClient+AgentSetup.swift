@@ -13,6 +13,11 @@ extension BridgeServiceClient {
     try await call(operation: .continueAgentSetup, payload: request)
   }
 
+  public func probeAgentSetupLogin(operationID: String) async throws -> IPCAgentSetupState {
+    try await call(
+      operation: .probeAgentSetupLogin, payload: IPCAgentSetupIDRequest(operationID: operationID))
+  }
+
   public func cancelAgentSetup(operationID: String) async throws -> IPCAgentSetupState {
     try await call(
       operation: .cancelAgentSetup, payload: IPCAgentSetupIDRequest(operationID: operationID))

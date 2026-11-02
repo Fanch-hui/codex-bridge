@@ -128,7 +128,7 @@ extension MCPServiceToolDispatcher {
     let taskID = try values.requiredIdentifier("task_id", maximumUTF8Bytes: 128)
     let turnID = try values.requiredIdentifier("expected_turn_id", maximumUTF8Bytes: 1_024)
     let input = try values.requiredText("input", maximumUTF8Bytes: 32 * 1_024)
-    guard OutboundContentSecurity.isSafe(input) else {
+    guard OutboundContentSecurity.isSafeSecrets(input) else {
       throw BridgeMCPQueryError.unsafeContentDetected
     }
     let rawMode = try values.optionalIdentifier("mode", maximumUTF8Bytes: 64)

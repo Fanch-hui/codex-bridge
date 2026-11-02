@@ -6,7 +6,10 @@ import Foundation
 
 @MainActor
 enum BridgeDesktopUIStateBuilder {
-  static func build(from model: BridgeServiceAppModel) -> BridgeDesktopUIState {
+  static func build(
+    from model: BridgeServiceAppModel,
+    selectionOverride: BridgeServiceNavigation? = nil
+  ) -> BridgeDesktopUIState {
     let startedAt = ContinuousClock.now
     let navigation = BridgeDesktopNavigation.allCases.map { item in
       BridgeDesktopNavigationItem(
@@ -14,13 +17,14 @@ enum BridgeDesktopUIStateBuilder {
         badge: navigationBadge(for: item, model: model)
       )
     }
-    let selected = model.navigation
+    let selected = selectionOverride ?? model.navigation
     let connectionsState = connections(from: model)
     let state = BridgeDesktopUIState(
       navigation: navigation,
       selectedNavigation: selected.desktopNavigation,
       connectionLabel: model.connectionState.label,
       connectionTone: connectionTone(for: model.connectionState),
+      serviceConnected: model.connectionState == .connected,
       isRefreshing: model.isRefreshing,
       overview: overview(from: model, connections: connectionsState),
       workbench: workbench(from: model),

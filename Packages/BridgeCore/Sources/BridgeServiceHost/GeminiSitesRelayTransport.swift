@@ -90,7 +90,10 @@ final class GeminiSitesRelayTransport: @unchecked Sendable {
         !job.id.isEmpty, job.id.utf8.count <= 128,
         let body = Data(base64Encoded: job.body), body.count <= 1_024 * 1_024
       else { throw GeminiCloudError.invalidResponse }
-      var request = URLRequest(url: endpoint)
+      let cloudEndpoint = endpoint.deletingLastPathComponent()
+        .appendingPathComponent("gemini-mcp")
+        .appendingPathComponent(GeminiCloudCredentials.accessKey(for: credential))
+      var request = URLRequest(url: cloudEndpoint)
       request.httpMethod = job.method
       request.httpBody = body.isEmpty ? nil : body
       for (name, value) in job.headers where Self.requestHeaders.contains(name.lowercased()) {
@@ -99,8 +102,6 @@ final class GeminiSitesRelayTransport: @unchecked Sendable {
         }
         request.setValue(value, forHTTPHeaderField: name)
       }
-      request.setValue(
-        credential, forHTTPHeaderField: MCPHTTPConfiguration.tunnelAuthenticationHeader)
       let (data, response) = try await local.data(for: request)
       guard let http = response as? HTTPURLResponse, data.count <= 8 * 1_024 * 1_024 else {
         throw GeminiCloudError.invalidResponse

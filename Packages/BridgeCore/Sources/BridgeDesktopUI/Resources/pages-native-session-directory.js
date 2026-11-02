@@ -1,6 +1,11 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
+  var searchMatch = null;
+
+  function reveal(sessionID, messageID) {
+    searchMatch = sessionID && messageID ? { sessionID: sessionID, messageID: messageID } : null;
+  }
 
   function emit(emitCommand, action, state, sessionID, extra) {
     var payload = Object.assign({
@@ -17,6 +22,9 @@
     var state = page && page.nativeSessions;
     container.hidden = !state || !state.isOpen;
     if (container.hidden) return;
+    if (searchMatch && state.selectedSessionID && state.selectedSessionID !== searchMatch.sessionID) {
+      searchMatch = null;
+    }
     S.clear(container);
     var header = S.node("div", "native-session-header");
     header.appendChild(S.node("h3", null, "Agent 原生会话"));
@@ -144,6 +152,14 @@
       row.appendChild(S.node("strong", null, message.role));
       row.appendChild(S.node("p", null, message.content));
       card.appendChild(row);
+      if (searchMatch && state.selectedSessionID === searchMatch.sessionID
+        && message.message_id === searchMatch.messageID) {
+        row.classList.add("is-search-match");
+        if (!state.isLoading && !searchMatch.revealed) {
+          searchMatch.revealed = true;
+          global.requestAnimationFrame(function () { row.scrollIntoView({ block: "center" }); });
+        }
+      }
     });
     if (state.transcriptNextOffset != null) {
       var more = S.button("读取更早内容", null, {}, null, "small", state.isLoading);
@@ -164,5 +180,5 @@
     return isNaN(date.getTime()) ? "" : date.toLocaleString();
   }
 
-  global.CodexBridgeDesktopNativeSessionDirectory = { render: render };
+  global.CodexBridgeDesktopNativeSessionDirectory = { render: render, reveal: reveal };
 }(window));

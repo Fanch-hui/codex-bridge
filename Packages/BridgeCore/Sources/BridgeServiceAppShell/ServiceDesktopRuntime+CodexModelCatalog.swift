@@ -77,6 +77,13 @@ extension BridgeServiceAppModel {
     } catch {
       guard generation == codexModelCatalogRequests.catalogGeneration else { return }
       modelCatalogError = Self.message(error)
+      if modelPreferences == nil, !codexModelCatalogRequests.isSavingPreferences,
+        let preferences = try? await client.modelPreferences(),
+        generation == codexModelCatalogRequests.catalogGeneration,
+        !codexModelCatalogRequests.isSavingPreferences
+      {
+        modelPreferences = preferences
+      }
     }
     if includeInstructions, let instructions = try? await client.customInstructions(),
       generation == codexModelCatalogRequests.catalogGeneration

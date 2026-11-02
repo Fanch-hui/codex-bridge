@@ -17,7 +17,8 @@ import Foundation
       environment: [String: String],
       standardInput: Int32,
       standardOutput: Int32,
-      standardError: Int32
+      standardError: Int32,
+      launchGate: Int32? = nil
     ) throws -> pid_t {
       #if canImport(Darwin)
         return try spawnDarwin(
@@ -26,7 +27,8 @@ import Foundation
           environment: environment,
           standardInput: standardInput,
           standardOutput: standardOutput,
-          standardError: standardError
+          standardError: standardError,
+          launchGate: launchGate
         )
       #else
         return try spawnGlibc(
@@ -35,7 +37,8 @@ import Foundation
           environment: environment,
           standardInput: standardInput,
           standardOutput: standardOutput,
-          standardError: standardError
+          standardError: standardError,
+          launchGate: launchGate
         )
       #endif
     }
@@ -47,7 +50,8 @@ import Foundation
         environment: [String: String],
         standardInput: Int32,
         standardOutput: Int32,
-        standardError: Int32
+        standardError: Int32,
+        launchGate: Int32?
       ) throws -> pid_t {
         var actions: posix_spawn_file_actions_t?
         var attributes: posix_spawnattr_t?
@@ -65,10 +69,15 @@ import Foundation
           workingDirectory: workingDirectory,
           standardInput: standardInput,
           standardOutput: standardOutput,
-          standardError: standardError
+          standardError: standardError,
+          launchGate: launchGate
         )
-        let flags = Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT)
+        var childSignalMask = sigset_t()
+        let flags = Int16(
+          POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGMASK)
         guard posix_spawnattr_setflags(&attributes, flags) == 0,
+          sigemptyset(&childSignalMask) == 0,
+          posix_spawnattr_setsigmask(&attributes, &childSignalMask) == 0,
           posix_spawnattr_setpgroup(&attributes, 0) == 0
         else {
           throw ManagedProcessError.processLaunchFailed(Int32(errno))
@@ -87,7 +96,8 @@ import Foundation
         workingDirectory: String?,
         standardInput: Int32,
         standardOutput: Int32,
-        standardError: Int32
+        standardError: Int32,
+        launchGate: Int32?
       ) throws {
         guard posix_spawn_file_actions_adddup2(&actions, standardInput, STDIN_FILENO) == 0,
           posix_spawn_file_actions_adddup2(&actions, standardOutput, STDOUT_FILENO) == 0,
@@ -98,6 +108,11 @@ import Foundation
             || posix_spawn_file_actions_addclose(&actions, standardError) == 0
         else {
           throw ManagedProcessError.processLaunchFailed(Int32(errno))
+        }
+        if let launchGate {
+          guard posix_spawn_file_actions_adddup2(&actions, launchGate, 3) == 0 else {
+            throw ManagedProcessError.processLaunchFailed(Int32(errno))
+          }
         }
         if let workingDirectory {
           let result: Int32
@@ -143,7 +158,8 @@ import Foundation
         environment: [String: String],
         standardInput: Int32,
         standardOutput: Int32,
-        standardError: Int32
+        standardError: Int32,
+        launchGate: Int32?
       ) throws -> pid_t {
         var actions = posix_spawn_file_actions_t()
         var attributes = posix_spawnattr_t()
@@ -166,12 +182,20 @@ import Foundation
         else {
           throw ManagedProcessError.processLaunchFailed(Int32(errno))
         }
+        if let launchGate {
+          guard posix_spawn_file_actions_adddup2(&actions, launchGate, 3) == 0 else {
+            throw ManagedProcessError.processLaunchFailed(Int32(errno))
+          }
+        }
         if let workingDirectory {
           let result = posix_spawn_file_actions_addchdir_np(&actions, workingDirectory)
           guard result == 0 else { throw ManagedProcessError.processLaunchFailed(result) }
         }
-        let flags = Int16(POSIX_SPAWN_SETPGROUP)
+        var childSignalMask = sigset_t()
+        let flags = Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGMASK)
         guard posix_spawnattr_setflags(&attributes, flags) == 0,
+          sigemptyset(&childSignalMask) == 0,
+          posix_spawnattr_setsigmask(&attributes, &childSignalMask) == 0,
           posix_spawnattr_setpgroup(&attributes, 0) == 0
         else {
           throw ManagedProcessError.processLaunchFailed(Int32(errno))

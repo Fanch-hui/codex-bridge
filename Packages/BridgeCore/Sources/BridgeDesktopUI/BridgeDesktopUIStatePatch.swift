@@ -49,6 +49,7 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       case connection
       case logs
       case appUpdate
+      case embeddedDSHReceipts
     }
 
     public enum CollectionMode: String, Codable, Equatable, Sendable {
@@ -71,6 +72,7 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
     public let connections: BridgeDesktopConnectionsState?
     public let logs: BridgeDesktopLogsState?
     public let appUpdate: BridgeDesktopAppUpdateState?
+    public let embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]?
 
     private init(
       kind: Kind,
@@ -87,7 +89,8 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       overview: BridgeDesktopOverviewState? = nil,
       connections: BridgeDesktopConnectionsState? = nil,
       logs: BridgeDesktopLogsState? = nil,
-      appUpdate: BridgeDesktopAppUpdateState? = nil
+      appUpdate: BridgeDesktopAppUpdateState? = nil,
+      embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]? = nil
     ) {
       self.kind = kind
       self.taskID = taskID
@@ -104,6 +107,7 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       self.connections = connections
       self.logs = logs
       self.appUpdate = appUpdate
+      self.embeddedDSHReceipts = embeddedDSHReceipts
     }
 
     public static func conversation(
@@ -162,6 +166,10 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
 
     public static func appUpdate(_ state: BridgeDesktopAppUpdateState?) -> Self {
       Self(kind: .appUpdate, appUpdate: state)
+    }
+
+    public static func embeddedDSHReceipts(_ receipts: [BridgeDesktopEmbeddedDSHReceipt]) -> Self {
+      Self(kind: .embeddedDSHReceipts, embeddedDSHReceipts: receipts)
     }
   }
 }

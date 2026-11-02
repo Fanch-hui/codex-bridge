@@ -37,11 +37,27 @@ extension BridgeServiceAppModel {
     connectionState = .idle
   }
 
-  public func shutdownForApplicationTermination() async {
+  @discardableResult
+  public func shutdownForApplicationTermination() async -> Bool {
     if !keepServiceRunningAfterAppExit {
+      let processIDs: [Int32]
+      do {
+        processIDs = try await registration.processIDsForShutdown()
+      } catch {
+        errorMessage = "无法检查后台服务退出状态：\(error.localizedDescription)"
+        return false
+      }
       await disableBackgroundService()
+      guard errorMessage == nil else { return false }
+      do {
+        try await registration.waitForShutdown(processIDs: processIDs)
+      } catch {
+        errorMessage = "后台服务尚未结束，请稍后重试。"
+        return false
+      }
     }
     await shutdownUI()
+    return true
   }
 
   func enableBackgroundService() async {
@@ -149,13 +165,15 @@ extension BridgeServiceAppModel {
   func refresh(
     silent: Bool,
     includeCatalog: Bool,
-    forceCatalogRefresh: Bool = false
+    forceCatalogRefresh: Bool = false,
+    includeSettings: Bool = false
   ) async {
     guard !stopped else { return }
     if refreshInProgress {
       pendingRefresh = true
       pendingVisibleRefresh = pendingVisibleRefresh || !silent
       pendingCatalogRefresh = pendingCatalogRefresh || includeCatalog
+      pendingSettingsRefresh = pendingSettingsRefresh || includeSettings
       pendingForceCatalogRefresh = pendingForceCatalogRefresh || forceCatalogRefresh
       return
     }
@@ -188,7 +206,8 @@ extension BridgeServiceAppModel {
         client: client,
         includeCatalog: includeCatalog,
         includeProjectResources: !silent,
-        forceCatalogRefresh: forceCatalogRefresh
+        forceCatalogRefresh: forceCatalogRefresh,
+        includeSettings: includeSettings
       )
     } catch {
       await closeClient()
@@ -204,15 +223,18 @@ extension BridgeServiceAppModel {
     guard pendingRefresh, !stopped else { return }
     let visible = pendingVisibleRefresh
     let includeCatalog = pendingCatalogRefresh
+    let includeSettings = pendingSettingsRefresh
     let forceCatalogRefresh = pendingForceCatalogRefresh
     pendingRefresh = false
     pendingVisibleRefresh = false
     pendingCatalogRefresh = false
+    pendingSettingsRefresh = false
     pendingForceCatalogRefresh = false
     await refresh(
       silent: !visible,
       includeCatalog: includeCatalog,
-      forceCatalogRefresh: forceCatalogRefresh
+      forceCatalogRefresh: forceCatalogRefresh,
+      includeSettings: includeSettings
     )
   }
 

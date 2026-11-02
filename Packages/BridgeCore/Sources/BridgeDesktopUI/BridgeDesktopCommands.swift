@@ -19,6 +19,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case openLogs
   case openSystemSettings
   case openTask
+  case openWorkbenchSession
   case browserBack
   case browserForward
   case browserReload
@@ -33,6 +34,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case selectTask
   case refreshTasks
   case submitDSHTask
+  case embeddedDSH
   case workbenchWorkspace
   case searchTaskHistory
   case selectTaskHistory
@@ -63,6 +65,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case setLogKindFilter
   case copyLogs
   case setMCPClientEnabled
+  case refreshMCPClients
   case setMCPClientExposure
   case copyMCPClientConfiguration
   case configureGeminiCloud
@@ -83,6 +86,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case beginAgentSetup
   case refreshAgentSetups
   case continueAgentSetup
+  case probeAgentSetupLogin
   case cancelAgentSetup
   case openAgentSetupLogin
   case connectAgent

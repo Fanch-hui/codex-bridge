@@ -50,6 +50,8 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let skillScanner: SkillScanner
   var taskQueueProcessor: Task<Void, Never>?
   var handoffOperations = Set<String>()
+  var unscopedWorkbenchExecutions: [String: String] = [:]
+  var workbenchMaintenanceAdmissions: [String: String] = [:]
   public let iso8601 = ISO8601DateFormatter()
 
   public init(

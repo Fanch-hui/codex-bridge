@@ -32,6 +32,7 @@ public actor ServiceComposition {
   public let catalog: ServiceCodexCatalog
   public let runtimeStatus: ServiceRuntimeStatus
   public let application: BridgeServiceApplication
+  public let embeddedDSH: ServiceEmbeddedDSHController
   public let tunnel: ServiceTunnelController
   public let mcpClients: ServiceMCPClientRegistry
   let geminiCloud: ServiceGeminiCloudController
@@ -237,11 +238,15 @@ public actor ServiceComposition {
         synchronizeCodexProjects: configuration.synchronizeCodexProjects
       )
     )
+    let embeddedDSHRoot = paths.agentStateURL.appendingPathComponent(
+      "EmbeddedDSH", isDirectory: true)
     let coordinator = ServiceExecutionCoordinator(
       tasks: tasks,
       projects: projects,
       execution: execution,
       agentRunner: agentRunner,
+      processOwnershipDirectory: embeddedDSHRoot.appendingPathComponent(
+        "AgentProcesses", isDirectory: true),
       providerDisplayNameResolver: {
         ServiceAgentProviderPolicyRegistry.displayName(for: $0)
       }
@@ -331,6 +336,12 @@ public actor ServiceComposition {
       catalog: catalog,
       runtimeStatus: runtimeStatus,
       application: application,
+      embeddedDSH: ServiceEmbeddedDSHAssembly.make(
+        application: application, projects: projects, tasks: tasks, store: store,
+        registry: agentRegistry, desktop: deepSeekDesktopProvider.controller,
+        secretStore: secretStore,
+        dataRoot: embeddedDSHRoot
+      ),
       setupRuntimeBindings: setupRuntimeBindings,
       tunnel: tunnel,
       mcpClients: mcpClients,
@@ -384,6 +395,7 @@ public actor ServiceComposition {
     catalog: ServiceCodexCatalog,
     runtimeStatus: ServiceRuntimeStatus,
     application: BridgeServiceApplication,
+    embeddedDSH: ServiceEmbeddedDSHController,
     setupRuntimeBindings: ServiceAgentSetupRuntimeBindings,
     tunnel: ServiceTunnelController,
     mcpClients: ServiceMCPClientRegistry,
@@ -415,6 +427,7 @@ public actor ServiceComposition {
     self.catalog = catalog
     self.runtimeStatus = runtimeStatus
     self.application = application
+    self.embeddedDSH = embeddedDSH
     self.tunnel = tunnel
     self.mcpClients = mcpClients
     geminiCloud = ServiceGeminiCloudController(settings: settings, clients: mcpClients)
@@ -611,6 +624,17 @@ public actor ServiceComposition {
     await geminiCloud.shutdown()
     await stopMCP()
     await application.shutdownTaskQueueProcessor()
+    do {
+      try await embeddedDSH.shutdown()
+    } catch {
+      let current = await runtimeStatus.current()
+      await runtimeStatus.update(
+        ServiceRuntimeStatusSnapshot(
+          mcpState: current.mcpState, tunnelState: current.tunnelState,
+          codexVersion: current.codexVersion, loginMode: current.loginMode,
+          degradations: current.degradations + ["内置 DSH 关闭未完成，执行组将在恢复时核对。"]
+        ))
+    }
     await coordinator.shutdown()
     await deepSeekDesktop.shutdown()
     await application.shutdownDirectOperations()

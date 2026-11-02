@@ -1,4 +1,11 @@
 @media (forced-colors: active) {
+  :root[data-platform="windows"] .new-conversation-button {
+    color: ButtonText;
+    border-color: ButtonText;
+    background: ButtonFace;
+    box-shadow: none;
+  }
+  :root[data-platform="windows"] .new-conversation-button .icon { color: ButtonText; }
   :root[data-platform="windows"] :is(.button.primary, .nav-item.is-selected, .list-row.selected, .project-row.selected, .log-row.selected) {
     color: HighlightText;
     border-color: Highlight;

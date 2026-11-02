@@ -6,6 +6,7 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
   public let selectedNavigation: BridgeDesktopNavigation
   public let connectionLabel: String
   public let connectionTone: BridgeDesktopStatusTone
+  public let serviceConnected: Bool?
   public let isRefreshing: Bool
   public let feedback: BridgeDesktopFeedback?
   public let overview: BridgeDesktopOverviewState?
@@ -22,6 +23,7 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
     selectedNavigation: BridgeDesktopNavigation,
     connectionLabel: String,
     connectionTone: BridgeDesktopStatusTone,
+    serviceConnected: Bool? = nil,
     isRefreshing: Bool,
     feedback: BridgeDesktopFeedback? = nil,
     overview: BridgeDesktopOverviewState?,
@@ -37,6 +39,7 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
     self.selectedNavigation = selectedNavigation
     self.connectionLabel = connectionLabel
     self.connectionTone = connectionTone
+    self.serviceConnected = serviceConnected
     self.isRefreshing = isRefreshing
     self.feedback = feedback
     self.overview = overview

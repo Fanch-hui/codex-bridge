@@ -37,6 +37,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     -> MCPProjectDetail
   func workbenchWorkspace(_ request: IPCWorkbenchWorkspaceRequest) async throws
     -> IPCWorkbenchWorkspaceResponse
+  func embeddedDSH(_ request: IPCEmbeddedDSHRequest) async throws -> IPCEmbeddedDSHResponse
   func setWorkbenchProject(projectID: String?) async throws
   func setWorkbenchPermissionMode(_ mode: String) async throws
   func agentCatalog() async throws -> IPCAgentCatalogResponse
@@ -45,6 +46,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func agentSetups() async throws -> [IPCAgentSetupState]
   func continueAgentSetup(_ request: IPCAgentSetupContinueRequest) async throws
     -> IPCAgentSetupState
+  func probeAgentSetupLogin(operationID: String) async throws -> IPCAgentSetupState
   func cancelAgentSetup(operationID: String) async throws -> IPCAgentSetupState
   func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
@@ -164,6 +166,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func readThread(_ request: IPCThreadReadRequest) async throws -> MCPThreadReadPage
   func tasks(_ request: IPCTaskListRequest) async throws -> [MCPServiceTaskSnapshot]
   func task(_ request: IPCTaskRequest) async throws -> MCPServiceTaskSnapshot
+  func localTaskHistory(_ request: IPCTaskRequest) async throws -> MCPServiceTaskSnapshot
   func stopTask(taskID: String) async throws
   func steerTask(
     taskID: String,

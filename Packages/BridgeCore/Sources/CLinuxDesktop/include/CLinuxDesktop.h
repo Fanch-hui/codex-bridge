@@ -12,5 +12,6 @@ void bridge_linux_browser_enabled(int enabled);
 void bridge_linux_copy(const char *text);
 void bridge_linux_open_uri(const char *uri);
 void bridge_linux_choose_file(const char *request_id, const char *title, int directory);
+void bridge_linux_save_file(const char *request_id, const char *title, const char *suggested);
 void bridge_linux_stop(void);
 #endif

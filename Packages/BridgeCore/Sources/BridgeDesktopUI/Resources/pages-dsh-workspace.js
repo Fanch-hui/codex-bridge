@@ -4,6 +4,7 @@
   function create(onAddImage) {
     var page = {}, emit = null, projectID = null, selectedPath = null, active = false, initialized = false;
     var directories = new Map(), expanded = new Set([""]), pending = null, queue = [], ack = null, diffPath = null, timer = null;
+    var refreshBatch = null, gitRefreshRequestID = null;
     var root = S.node("aside", "dsh-workspace-pane"); root.setAttribute("aria-label", "项目文件与变更");
     var selectedTab = "files", tabStorageKey = "codexbridge.dsh.workspace.tab.v1";
     try { if (global.localStorage.getItem(tabStorageKey) === "changes") selectedTab = "changes"; } catch (_) {}
@@ -40,47 +41,94 @@
       var value = S.button(title, null, {}, null, style || "small"); value.addEventListener("click", action);
       parent.appendChild(value); return value;
     }
-    button("刷新", refresh, header);
+    var refreshButton = button("刷新", function () { if (!refreshButton.disabled) refresh(true); }, header);
     var message = S.node("p", "hint dsh-workspace-message"); message.setAttribute("role", "status"); root.appendChild(message);
     var diagnostics = S.node("details", "dsh-workspace-error-details"); diagnostics.hidden = true;
     diagnostics.appendChild(S.node("summary", null, "诊断详情"));
     var diagnosticText = S.node("pre"); diagnostics.appendChild(diagnosticText); root.appendChild(diagnostics);
     var recovery = button("恢复请求", function () {
-      if (!pending || !emit) return;
-      ack = null;
+      if (!pending || !emit || recovery.disabled) return;
+      recovery.disabled = true; message.textContent = "正在确认原请求…"; message.hidden = false;
+      ack = null; armRecoveryTimer();
       emit("workbenchWorkspace", pending.payload, pending.requestID);
     }, root); recovery.hidden = true;
     var tree = S.node("nav", "dsh-file-tree"); tree.setAttribute("aria-label", "项目目录"); tree.tabIndex = -1; filesPanel.appendChild(tree);
     var editor = E.create(request, closeFile); filesPanel.appendChild(editor.root);
     var gitHeader = S.node("header", "dsh-workspace-heading"); gitHeader.appendChild(S.node("h3", null, "项目当前变更"));
-    button("刷新变更", function () { request("gitStatus", {}); }, gitHeader); changesPanel.appendChild(gitHeader);
+    var refreshChangesButton = button("刷新变更", function () {
+      if (refreshChangesButton.disabled) return;
+      var command = request("gitStatus", {}); if (command) gitRefreshRequestID = command.requestID;
+    }, gitHeader); changesPanel.appendChild(gitHeader);
     var changes = S.node("nav", "dsh-git-changes"); changes.setAttribute("aria-label", "Git 文件变更"); changesPanel.appendChild(changes);
     var diff = S.node("pre", "dsh-git-diff"); diff.setAttribute("aria-label", "Git Diff"); changesPanel.appendChild(diff);
     root.appendChild(filesPanel); root.appendChild(changesPanel); selectTab(selectedTab);
+    function requests() { return pending ? [pending].concat(queue) : queue; }
+    function hasRequest(action, path, value) {
+      return requests().some(function (command) {
+        return command.payload.action === action && (path === undefined || command.payload.path === path)
+          && (value === undefined || command.payload.value === value);
+      });
+    }
+    function updateRefreshButtons() {
+      var directory = requests().some(function (command) {
+        return command.payload.action === "listDirectory" && command.payload.path === "" && !command.payload.value;
+      }), git = hasRequest("gitStatus");
+      refreshButton.disabled = !projectID || directory || git;
+      refreshButton.textContent = directory || git ? "刷新中…" : "刷新";
+      refreshChangesButton.disabled = !projectID || git;
+      refreshChangesButton.textContent = git ? "刷新中…" : "刷新变更";
+    }
+    function armRecoveryTimer() {
+      if (timer) clearTimeout(timer);
+      var id = pending && pending.requestID;
+      timer = setTimeout(function () {
+        if (!pending || pending.requestID !== id) return;
+        message.textContent = "操作回执未确认，可恢复原请求。"; message.hidden = false;
+        recovery.hidden = false; recovery.disabled = false;
+      }, 15000);
+      if (timer && timer.unref) timer.unref();
+    }
     function drain() {
+      updateRefreshButtons();
       if (pending || !active || !emit || !queue.length) return;
       pending = queue.shift();
       if (pending.payload.projectID !== projectID) { pending = null; drain(); return; }
-      ack = null; recovery.hidden = true;
+      ack = null; recovery.hidden = true; recovery.disabled = true;
       message.hidden = true; diagnostics.hidden = true;
-      timer = setTimeout(function () {
-        if (!pending) return;
-        message.textContent = "操作回执未确认，可恢复原请求。"; message.hidden = false; recovery.hidden = false;
-      }, 15000);
-      if (timer && timer.unref) timer.unref();
+      armRecoveryTimer(); updateRefreshButtons();
       emit("workbenchWorkspace", pending.payload, pending.requestID);
     }
     function request(action, payload, requestID) {
       if (!projectID) return null;
-      var command = { requestID: requestID || global.CodexBridgeDesktopWorkbenchSubmissions.newRequestID(),
-        payload: Object.assign({ action: action, projectID: projectID }, payload) };
+      var body = Object.assign({ action: action, projectID: projectID }, payload);
+      var existing = requests().find(function (command) {
+        return requestID && command.requestID === requestID || !requestID
+          && ["listDirectory", "gitStatus", "gitDiff"].includes(action)
+          && JSON.stringify(command.payload) === JSON.stringify(body);
+      });
+      if (existing) return existing;
+      var command = { requestID: requestID || global.CodexBridgeDesktopWorkbenchSubmissions.newRequestID(), payload: body };
       queue.push(command); drain(); return command;
     }
-    function refresh() {
+    function refresh(manual) {
       if (!projectID) return;
-      request("listDirectory", { path: "", limit: 100 }); request("gitStatus", {});
+      var directory = request("listDirectory", { path: "", limit: 100 }), git = request("gitStatus", {});
+      if (manual) refreshBatch = new Set([directory.requestID, git.requestID]);
       if (selectedPath) request("readFile", { path: selectedPath, offset: 1, limit: 10000 });
       if (diffPath) request("gitDiff", { path: diffPath });
+    }
+    function finishRefresh(command, failed) {
+      if (refreshBatch && refreshBatch.has(command.requestID)) {
+        if (failed) refreshBatch = null;
+        else {
+          refreshBatch.delete(command.requestID);
+          if (!refreshBatch.size) { message.textContent = "目录与变更已刷新。"; message.hidden = false; refreshBatch = null; }
+        }
+      }
+      if (gitRefreshRequestID === command.requestID) {
+        gitRefreshRequestID = null;
+        if (!failed) { message.textContent = "变更已刷新。"; message.hidden = false; }
+      }
     }
     function openFile(path) {
       selectedPath = path; editor.select(projectID, path);
@@ -130,8 +178,11 @@
       if (directory.nextCursor) {
         var more = button("加载更多文件", function () {
           request("listDirectory", { path: path, value: directory.nextCursor, limit: 100 });
+          renderTree();
         }, tree);
         more.dataset.workspaceFocusKey = "more:" + path;
+        more.disabled = hasRequest("listDirectory", path, directory.nextCursor);
+        if (more.disabled) more.textContent = "加载中…";
       }
     }
     function renderTree(fallback) {
@@ -179,6 +230,7 @@
       if (state.errorMessage) {
         message.textContent = String(state.errorMessage).split("\n")[0]; message.hidden = false;
         diagnosticText.textContent = state.errorMessage; diagnostics.hidden = false; diagnostics.open = false;
+        if (command.payload.action === "listDirectory") renderTree();
       } else {
         message.textContent = ""; message.hidden = true; diagnostics.hidden = true;
         if (command.payload.action === "listDirectory" && state.directory) {
@@ -199,6 +251,7 @@
         }
       }
       editor.receive(state, command);
+      finishRefresh(command, !!state.errorMessage);
       if (command.payload.action === "applyWrite" && state.mutation && state.mutation.status === "applied") request("gitStatus", {});
       drain();
     }
@@ -211,6 +264,7 @@
       var nextProject = page.selectedProjectID || null;
       if (nextProject !== projectID) {
         projectID = nextProject; selectedPath = null; diffPath = null; pending = null; queue = []; ack = null;
+        refreshBatch = null; gitRefreshRequestID = null;
         if (timer) clearTimeout(timer); timer = null; recovery.hidden = true;
         directories.clear(); expanded = new Set([""]); initialized = false;
         editor.select(projectID, null); diff.textContent = ""; message.textContent = ""; message.hidden = true; diagnostics.hidden = true;

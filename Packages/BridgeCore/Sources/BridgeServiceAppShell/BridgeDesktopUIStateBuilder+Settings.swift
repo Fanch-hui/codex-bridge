@@ -56,7 +56,7 @@ extension BridgeDesktopUIStateBuilder {
       serviceStatusMessage: service.message,
       serviceStatusTone: service.tone,
       serviceActions: service.actions,
-      statusMessage: model.modelCatalogError ?? model.errorMessage,
+      statusMessage: model.errorMessage,
       modelCount: model.models.count,
       canRefreshModels: !model.isRefreshingModels,
       isRefreshingModels: model.isRefreshingModels,

@@ -23,6 +23,7 @@ public final class ACPRequestBroker: @unchecked Sendable {
   private var nextRequestID: Int64 = 1
   private var pending: [ACPRequestID: Pending] = [:]
   private var closed = false
+  private var closeTask: Task<Void, Never>?
 
   public init(
     transport: any ACPTransport,
@@ -158,14 +159,17 @@ public final class ACPRequestBroker: @unchecked Sendable {
   }
 
   public func close() async {
-    let shouldClose = lock.withLock { () -> Bool in
-      guard !closed else { return false }
+    let task = lock.withLock { () -> Task<Void, Never> in
+      if let closeTask { return closeTask }
       closed = true
-      return true
+      let task = Task {
+        failAll(with: ACPError.transportClosed)
+        await transport.close()
+      }
+      closeTask = task
+      return task
     }
-    guard shouldClose else { return }
-    failAll(with: ACPError.transportClosed)
-    await transport.close()
+    await task.value
   }
 
   private func allocateRequestID() throws -> ACPRequestID {

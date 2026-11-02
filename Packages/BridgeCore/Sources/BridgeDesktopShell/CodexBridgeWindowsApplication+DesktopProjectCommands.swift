@@ -34,9 +34,8 @@
           return true
         }
         Task { @MainActor in
-          await management.registerProject(name: name, path: path)
-          await model.connectAndRefresh()
-          await auxiliary.workspace.refreshSelected()
+          await registerWorkFolder(
+            name: name, path: path, model: model, management: management, auxiliary: auxiliary)
         }
       case .removeProject:
         guard let projectID = BridgeDesktopCommandValue.nonEmpty(payload.projectID),
@@ -67,6 +66,18 @@
         return false
       }
       return true
+    }
+
+    static func registerWorkFolder(
+      name: String, path: String, model: WindowsWorkbenchModel,
+      management: WindowsManagementModel, auxiliary: WindowsAuxiliaryRuntime
+    ) async {
+      guard let projectID = await management.registerProject(name: name, path: path) else { return }
+      await model.connectAndRefresh()
+      await model.selectWorkbenchProject(id: projectID)
+      auxiliary.agentDefaults.workbenchProjectID = projectID
+      await auxiliary.workspace.refresh()
+      await auxiliary.agentDefaults.refreshAllProviderModels()
     }
 
     private static func saveCommand(
