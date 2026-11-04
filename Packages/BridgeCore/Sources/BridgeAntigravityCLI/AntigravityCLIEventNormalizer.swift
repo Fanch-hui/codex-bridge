@@ -39,6 +39,32 @@ struct AntigravityToolContext: Equatable, Sendable {
   let itemID: String
   let name: String
   let stepIndex: Int
+  let target: String?
+  let rawParameters: String?
+
+  func isRemediationFor(denied: AntigravityToolContext) -> Bool {
+    guard name.caseInsensitiveCompare(denied.name) == .orderedSame else {
+      return false
+    }
+    // Explicit target comparison when both operations provide extractable targets
+    if let deniedTarget = denied.target, let currentTarget = self.target {
+      if deniedTarget == currentTarget {
+        return true
+      }
+      if deniedTarget.caseInsensitiveCompare(currentTarget) == .orderedSame {
+        return true
+      }
+      return false
+    }
+    // When neither provides an extracted target, require identical non-empty raw parameters
+    if let deniedRaw = denied.rawParameters, let currentRaw = self.rawParameters,
+      !deniedRaw.isEmpty, deniedRaw != "{}", deniedRaw != "null"
+    {
+      return deniedRaw == currentRaw
+    }
+    // Ambiguous target/parameters without proof of identical operation fails closed
+    return false
+  }
 }
 
 public actor AntigravityCLIEventNormalizer {
@@ -391,14 +417,74 @@ public actor AntigravityCLIEventNormalizer {
       || ["file", "source", "destination", "target", "uri", "workspace"].contains(normalized)
   }
 
+  static func extractTarget(from parameters: AntigravityJSONValue?) -> String? {
+    guard let parameters else { return nil }
+    switch parameters {
+    case .object(let dict):
+      return extractTarget(from: dict)
+    case .string(let str):
+      let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+      if trimmed.hasPrefix("{"), trimmed.hasSuffix("}"),
+        let data = trimmed.data(using: .utf8),
+        let jsonVal = try? JSONDecoder().decode(AntigravityJSONValue.self, from: data)
+      {
+        return extractTarget(from: jsonVal)
+      }
+      return trimmed.isEmpty ? nil : trimmed
+    default:
+      return nil
+    }
+  }
+
+  private static func extractTarget(from dict: [String: AntigravityJSONValue]) -> String? {
+    for key in ["command", "CommandLine", "cmd"] {
+      if let val = dict[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !val.isEmpty {
+        return val
+      }
+    }
+    for key in ["path", "Path", "filePath", "file_path", "target", "destination", "source", "file"] {
+      if let val = dict[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !val.isEmpty {
+        return val.replacingOccurrences(of: "\\", with: "/")
+      }
+    }
+    for key in ["url", "URL", "targetUrl", "target_url"] {
+      if let val = dict[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !val.isEmpty {
+        return val
+      }
+    }
+    for key in ["query", "Query", "q", "search", "pattern"] {
+      if let val = dict[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !val.isEmpty {
+        return val
+      }
+    }
+    if let typeName = dict["TypeName"]?.stringValue ?? dict["type_name"]?.stringValue ?? dict["typeName"]?.stringValue,
+      let trimmed = safeIdentifier(typeName)
+    {
+      return trimmed
+    }
+    let server = dict["server"]?.stringValue ?? dict["serverName"]?.stringValue ?? dict["server_name"]?.stringValue
+    let tool = dict["tool"]?.stringValue ?? dict["toolName"]?.stringValue ?? dict["tool_name"]?.stringValue
+    if let server = server?.trimmingCharacters(in: .whitespacesAndNewlines),
+      let tool = tool?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !server.isEmpty, !tool.isEmpty
+    {
+      return "\(server)/\(tool)"
+    }
+    return nil
+  }
+
   static func toolContext(for update: AntigravityStepUpdate) -> AntigravityToolContext? {
-    guard update.stepType == "tool",
+    guard update.stepType == "tool" || update.toolInfo != nil,
       let name = safeIdentifier(update.toolInfo?.name ?? update.toolName)
     else { return nil }
+    let target = extractTarget(from: update.toolInfo?.parameters)
+    let rawParameters = update.toolInfo?.parameters?.encodedString()
     return AntigravityToolContext(
       itemID: String(update.stepIndex),
       name: name,
-      stepIndex: update.stepIndex
+      stepIndex: update.stepIndex,
+      target: target,
+      rawParameters: rawParameters
     )
   }
 

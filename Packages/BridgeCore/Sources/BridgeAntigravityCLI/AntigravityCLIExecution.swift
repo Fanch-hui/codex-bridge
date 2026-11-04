@@ -32,7 +32,10 @@ public actor AntigravityCLIExecution {
   private var permissionDenied = false
   private var permissionDeniedTool: AntigravityToolContext?
   private var lastTool: AntigravityToolContext?
-  private var hasSuccessfulFollowupAfterDenial = false
+  private var unresolvedDeniedTools: [AntigravityToolContext] = []
+  private var hasHadDenial = false
+  private var hasUnresolvedAnonymousDenial = false
+  private var hasEverRemediatedDenial = false
   private var lastToolWasDenied = false
   private var permissionMode: String?
   private var nativeToolCapabilities: Set<AgentCapability> = []
@@ -211,17 +214,27 @@ public actor AntigravityCLIExecution {
         let currentTool = AntigravityCLIEventNormalizer.toolContext(for: update)
         if let currentTool { lastTool = currentTool }
         if Self.permissionDenied(in: update) {
-          permissionDenied = true
-          permissionDeniedTool =
+          let deniedTool =
             currentTool
             ?? precedingTool.flatMap {
               $0.stepIndex + 1 == update.stepIndex ? $0 : nil
             }
-          hasSuccessfulFollowupAfterDenial = false
+          if let deniedTool {
+            unresolvedDeniedTools.append(deniedTool)
+            permissionDeniedTool = deniedTool
+          } else {
+            hasUnresolvedAnonymousDenial = true
+          }
+          permissionDenied = true
+          hasHadDenial = true
           lastToolWasDenied = true
         } else if Self.isSuccessfulTool(update) {
-          if permissionDenied {
-            hasSuccessfulFollowupAfterDenial = true
+          if let currentTool {
+            let beforeCount = unresolvedDeniedTools.count
+            unresolvedDeniedTools.removeAll { currentTool.isRemediationFor(denied: $0) }
+            if unresolvedDeniedTools.count < beforeCount {
+              hasEverRemediatedDenial = true
+            }
           }
           lastToolWasDenied = false
         }
@@ -343,7 +356,7 @@ public actor AntigravityCLIExecution {
     let hasQueuedSteer = canContinue && !queuedSteers.isEmpty
     let terminalResult = !hasQueuedSteer
     await beforeResultNormalization()
-    let deniedTool = denied ? permissionDeniedTool ?? lastTool : nil
+    let deniedTool = denied ? (unresolvedDeniedTools.first ?? permissionDeniedTool) : nil
     for event in try await normalizer.normalize(
       result,
       permissionDenied: denied,
@@ -384,7 +397,10 @@ public actor AntigravityCLIExecution {
     permissionDenied = false
     permissionDeniedTool = nil
     lastTool = nil
-    hasSuccessfulFollowupAfterDenial = false
+    unresolvedDeniedTools.removeAll()
+    hasHadDenial = false
+    hasUnresolvedAnonymousDenial = false
+    hasEverRemediatedDenial = false
     lastToolWasDenied = false
     try await transport.send(frame)
     guard !terminal else { return }
@@ -414,18 +430,20 @@ public actor AntigravityCLIExecution {
     let isSuccessStatus = result.status.uppercased() == "SUCCESS"
     let hasExplicitRecovery =
       isSuccessStatus
-      && hasSuccessfulFollowupAfterDenial
+      && hasEverRemediatedDenial
+      && unresolvedDeniedTools.isEmpty
+      && !hasUnresolvedAnonymousDenial
       && !lastToolWasDenied
 
     if hasExplicitRecovery {
       return false
     }
 
-    return permissionDenied || stderrDenied
+    return hasHadDenial || stderrDenied || hasUnresolvedAnonymousDenial || !unresolvedDeniedTools.isEmpty
   }
 
   private static func isSuccessfulTool(_ update: AntigravityStepUpdate) -> Bool {
-    guard update.stepType == "tool" || update.subagentInfo != nil || update.toolInfo != nil else {
+    guard update.stepType == "tool" || update.toolInfo != nil else {
       return false
     }
     let error = update.toolInfo?.error ?? update.error
