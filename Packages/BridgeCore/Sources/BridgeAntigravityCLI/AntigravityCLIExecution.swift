@@ -32,6 +32,8 @@ public actor AntigravityCLIExecution {
   private var permissionDenied = false
   private var permissionDeniedTool: AntigravityToolContext?
   private var lastTool: AntigravityToolContext?
+  private var hasSuccessfulFollowupAfterDenial = false
+  private var lastToolWasDenied = false
   private var permissionMode: String?
   private var nativeToolCapabilities: Set<AgentCapability> = []
   private var terminal = false
@@ -215,6 +217,13 @@ public actor AntigravityCLIExecution {
             ?? precedingTool.flatMap {
               $0.stepIndex + 1 == update.stepIndex ? $0 : nil
             }
+          hasSuccessfulFollowupAfterDenial = false
+          lastToolWasDenied = true
+        } else if Self.isSuccessfulTool(update) {
+          if permissionDenied {
+            hasSuccessfulFollowupAfterDenial = true
+          }
+          lastToolWasDenied = false
         }
         for event in try await normalizer.normalize(update) {
           guard !terminal else { return }
@@ -375,6 +384,8 @@ public actor AntigravityCLIExecution {
     permissionDenied = false
     permissionDeniedTool = nil
     lastTool = nil
+    hasSuccessfulFollowupAfterDenial = false
+    lastToolWasDenied = false
     try await transport.send(frame)
     guard !terminal else { return }
     turnFinalizing = false
@@ -389,19 +400,48 @@ public actor AntigravityCLIExecution {
   }
 
   private func permissionWasDenied(result: AntigravityResult) async -> Bool {
-    if permissionDenied || AntigravityPermissionEvidence.detected(in: result.error) {
+    if AntigravityPermissionEvidence.detected(in: result.error) {
       return true
     }
     var output = await transport.standardErrorSnapshot()
-    if AntigravityPermissionEvidence.detected(in: output) { return true }
-    try? await Task.sleep(for: .milliseconds(25))
-    output = await transport.standardErrorSnapshot()
-    return AntigravityPermissionEvidence.detected(in: output)
+    var stderrDenied = AntigravityPermissionEvidence.detected(in: output)
+    if !stderrDenied {
+      try? await Task.sleep(for: .milliseconds(25))
+      output = await transport.standardErrorSnapshot()
+      stderrDenied = AntigravityPermissionEvidence.detected(in: output)
+    }
+
+    let isSuccessStatus = result.status.uppercased() == "SUCCESS"
+    let hasExplicitRecovery =
+      isSuccessStatus
+      && hasSuccessfulFollowupAfterDenial
+      && !lastToolWasDenied
+
+    if hasExplicitRecovery {
+      return false
+    }
+
+    return permissionDenied || stderrDenied
+  }
+
+  private static func isSuccessfulTool(_ update: AntigravityStepUpdate) -> Bool {
+    guard update.stepType == "tool" || update.subagentInfo != nil || update.toolInfo != nil else {
+      return false
+    }
+    let error = update.toolInfo?.error ?? update.error
+    let status = AntigravityToolStatus.resolve(state: update.state, error: error)
+    return status == .completed
   }
 
   private static func permissionDenied(in update: AntigravityStepUpdate) -> Bool {
-    AntigravityPermissionEvidence.detected(in: update.toolInfo?.error?.message)
+    if AntigravityPermissionEvidence.detected(in: update.toolInfo?.error?.message)
       || AntigravityPermissionEvidence.detected(in: update.error?.message)
+    {
+      return true
+    }
+    let error = update.toolInfo?.error ?? update.error
+    let status = AntigravityToolStatus.resolve(state: update.state, error: error)
+    return status == .declined
   }
 
   private func streamEnded(failure: (any Error)?) async {

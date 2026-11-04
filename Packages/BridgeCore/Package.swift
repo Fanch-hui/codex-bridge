@@ -298,6 +298,10 @@ let package = Package(
         .product(name: "Crypto", package: "swift-crypto"),
       ]
     ),
+    .testTarget(
+      name: "BridgeAntigravityCLITests",
+      dependencies: ["BridgeAntigravityCLI"]
+    ),
     .target(
       name: "BridgeServiceApplication",
       dependencies: [
