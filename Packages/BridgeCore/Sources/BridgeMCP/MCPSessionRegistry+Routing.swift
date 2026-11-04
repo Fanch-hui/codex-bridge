@@ -83,7 +83,8 @@ extension MCPSessionRegistry {
         requestTask: requestTask
       )
       let response = await withTaskCancellationHandler {
-        addingModernServerInfo(to: await requestTask.value)
+        addingModernServerInfo(
+          to: await requestTask.value, method: request.header("Mcp-Method"))
       } onCancel: {
         requestTask.cancel()
         Task { await createdServer.stop() }
@@ -196,7 +197,7 @@ extension MCPSessionRegistry {
     .error(statusCode: 400, .serverError(code: -32_020, message: message))
   }
 
-  func addingModernServerInfo(to response: HTTPResponse) -> HTTPResponse {
+  func addingModernServerInfo(to response: HTTPResponse, method: String?) -> HTTPResponse {
     guard case .data(let data, let headers) = response,
       var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
       var result = object["result"] as? [String: Any]
@@ -209,6 +210,15 @@ extension MCPSessionRegistry {
       "version": MCPServiceToolCatalog.contractVersion,
     ]
     result["_meta"] = metadata
+    // Add cache hints missing from the legacy SDK's list/read results.
+    switch method {
+    case "tools/list", "prompts/list", "resources/list", "resources/templates/list",
+      "resources/read":
+      result["ttlMs"] = result["ttlMs"] ?? 0
+      result["cacheScope"] = result["cacheScope"] ?? "private"
+    default:
+      break
+    }
     object["result"] = result
     guard let encoded = try? JSONSerialization.data(withJSONObject: object) else { return response }
     return .data(encoded, headers: headers)
@@ -230,6 +240,8 @@ extension MCPSessionRegistry {
       + "executed on the user's machine after local approval."
     let result: [String: Any] = [
       "resultType": "complete",
+      "ttlMs": 0,
+      "cacheScope": "private",
       "supportedVersions": [Self.modernProtocolVersion, Version.latest],
       "capabilities": ["tools": [:], "resources": [:]],
       "_meta": [
