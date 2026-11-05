@@ -68,7 +68,7 @@ extension MCPServiceToolDispatcher {
       maximumCount: 32,
       maximumElementUTF8Bytes: 4_096
     )
-    guard ([prompt] + criteria).allSatisfy(OutboundContentSecurity.isSafe) else {
+    guard ([prompt] + criteria).allSatisfy(OutboundContentSecurity.isSafeSecrets) else {
       throw BridgeMCPQueryError.unsafeContentDetected
     }
     return SubmissionContent(prompt: prompt, acceptanceCriteria: criteria)
