@@ -1,8 +1,10 @@
 import Foundation
 import GRDB
 
-#if !os(Windows)
+#if os(macOS)
   import Darwin
+#elseif os(Linux)
+  import Glibc
 #endif
 
 enum OpenCodeACPDatabaseSync {
