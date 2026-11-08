@@ -10,7 +10,10 @@ extension BridgeServiceRequestController {
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
       payload: IPCAppUpdatePreparationResponse(
-        canInstall: status.canInstall, waitingReason: status.waitingReason)
+        canInstall: status.canInstall, waitingReason: status.waitingReason,
+        blockers: status.blockers.map {
+          IPCAppUpdateBlocker(kind: $0.kind, id: $0.id, projectID: $0.projectID, label: $0.label)
+        })
     )
   }
 

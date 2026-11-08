@@ -2,15 +2,15 @@
 set -euo pipefail
 umask 077
 
-readonly TUNNEL_CLIENT_VERSION="0.0.18"
-readonly TUNNEL_CLIENT_COMMIT="274a5588414819f063d27100a4fb1096aae3830f"
+readonly TUNNEL_CLIENT_VERSION="0.0.19"
+readonly TUNNEL_CLIENT_COMMIT="01d67bb4da0d8359b808b4761f8db171ab682cd7"
 readonly AMD64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-amd64.zip"
 readonly ARM64_ARCHIVE_NAME="tunnel-client-v${TUNNEL_CLIENT_VERSION}-darwin-arm64.zip"
 readonly RELEASE_BASE_URL="https://github.com/openai/tunnel-client/releases/download/v${TUNNEL_CLIENT_VERSION}"
 readonly AMD64_ARCHIVE_URL="${RELEASE_BASE_URL}/${AMD64_ARCHIVE_NAME}"
 readonly ARM64_ARCHIVE_URL="${RELEASE_BASE_URL}/${ARM64_ARCHIVE_NAME}"
-readonly AMD64_ARCHIVE_SHA256="95595c6538b3f9872c1367592aede22e0d18ea7f6bdd51cd17fe0bf7e5ca8b26"
-readonly ARM64_ARCHIVE_SHA256="ba7a0994f7dd15bc8708aa1602ecf54371a492319a641ab9c33dc00f1fd56bfe"
+readonly AMD64_ARCHIVE_SHA256="dff97674c77cac59e6ab3d901e6cff50fb17a5784c01d8959d1f4adb3afdf4bf"
+readonly ARM64_ARCHIVE_SHA256="2243d024b77af8ee4b4ab7a1447949e5fc8d82bcd2d51b178927f2da9e47ecfd"
 readonly LICENSE_URL="https://raw.githubusercontent.com/openai/tunnel-client/${TUNNEL_CLIENT_COMMIT}/LICENSE"
 readonly LICENSE_SHA256="f4c1d7ba32ef5bcf5cf03e2eefec5825ebafedf50fa330a36700a49c605c1ef4"
 readonly NOTICE_SHA256="1364c020d86ecf948b78b7c655175032068203d13aece70fb0bfe112d7802dc2"

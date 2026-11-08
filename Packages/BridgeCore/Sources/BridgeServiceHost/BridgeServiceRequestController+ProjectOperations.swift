@@ -11,7 +11,9 @@ extension BridgeServiceRequestController {
     )
     return try BridgeServiceIPCCodec.success(
       requestID: request.requestID,
-      payload: IPCProjectListResponse(projects: result.projects, projectPaths: result.projectPaths)
+      payload: IPCProjectListResponse(
+        projects: result.projects, projectPaths: result.projectPaths,
+        defaultProjectID: result.defaultProjectID)
     )
   }
 

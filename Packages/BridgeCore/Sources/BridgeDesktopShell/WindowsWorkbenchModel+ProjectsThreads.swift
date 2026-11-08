@@ -7,51 +7,50 @@
   extension WindowsWorkbenchModel {
     func selectDefaultTaskIfNeeded() {
       guard selectedTaskID == nil, selectedThreadID == nil else { return }
+      let contextSessions =
+        selectedProjectID.map { projectID in allSessions.filter { $0.projectID == projectID } }
+        ?? allSessions
       guard
-        let session = visibleSessions.first(where: { $0.latestTask.isActive })
-          ?? visibleSessions.first
+        let session = contextSessions.first(where: { $0.latestTask.isActive })
+          ?? contextSessions.first
       else {
         return
       }
       let task = session.latestTask
+      alignContextProject(to: task.projectID)
       selectedTaskID = task.taskID
       selectedThreadID = task.isCodexTask ? task.threadID : nil
       selectedThreadPage = nil
       openConversation(for: task)
     }
 
+    /// Switches the project context and clears the open session; the project is a UI context only.
     public func selectWorkbenchProject(at index: Int) async {
       guard projects.indices.contains(index) else { return }
       let projectID = projects[index].projectID
-      let changed = projectID != selectedProjectID
-      guard changed || serviceStatus?.workbenchProjectID != projectID else { return }
-      if changed {
-        selectedProjectID = projectID
-        clearWorkbenchSelection()
-        threads = []
-      }
-      actionText = "正在保存工作台项目…"
+      guard projectID != selectedProjectID else { return }
+      selectedProjectID = projectID
+      clearWorkbenchSelection()
+      threads = []
       publishDisplay()
-      do {
-        try await synchronizeWorkbenchProject()
-        if changed { await loadTasks() }
-        guard selectedProjectID == projectID else { return }
-        actionText = "工作台项目已保存。"
-      } catch {
-        guard selectedProjectID == projectID else { return }
-        actionText = "保存工作台项目失败：\(BridgeServiceErrorMessage.message(error))"
-      }
-      publishDisplay()
+      await loadTasks()
     }
 
-    func synchronizeWorkbenchProject() async throws {
-      guard let projectID = selectedProjectID,
-        serviceStatus?.workbenchProjectID != projectID
-      else { return }
-      try await client.setWorkbenchProject(projectID: projectID)
-      let status = try await client.status()
-      guard selectedProjectID == projectID else { return }
-      serviceStatus = status
+    /// Moves the project context to the project of an opened session while keeping that session selected.
+    func alignContextProject(to projectID: String) {
+      guard selectedProjectID != projectID else { return }
+      selectedProjectID = projectID
+      threads = []
+    }
+
+    /// Keeps a valid context project: the current one, else the default workspace, else the first.
+    func reconcileProjectContext() {
+      if let selectedProjectID, projects.contains(where: { $0.projectID == selectedProjectID }) {
+        return
+      }
+      selectedProjectID =
+        projects.first(where: { $0.projectID == defaultProjectID })?.projectID
+        ?? projects.first?.projectID
     }
 
     public func selectWorkbenchPermission(at index: Int) async {
@@ -81,8 +80,9 @@
     }
 
     public func selectWorkbenchItem(at index: Int) async {
-      if visibleSessions.indices.contains(index) {
-        selectTask(id: visibleSessions[index].latestTask.taskID)
+      let sessions = allSessions
+      if sessions.indices.contains(index) {
+        selectTask(id: sessions[index].latestTask.taskID)
       }
     }
 
@@ -100,8 +100,8 @@
     private func openThread(_ threadID: String) async {
       guard let projectID = selectedProjectID else { return }
       if let task =
-        visibleTasks
-        .filter({ $0.isCodexTask && $0.threadID == threadID })
+        tasks
+        .filter({ $0.projectID == projectID && $0.isCodexTask && $0.threadID == threadID })
         .max(by: { $0.updatedAt < $1.updatedAt })
       {
         selectTask(id: task.taskID)

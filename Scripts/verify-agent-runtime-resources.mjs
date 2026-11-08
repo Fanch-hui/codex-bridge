@@ -9,6 +9,7 @@ const bundleRoot = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const manifests = [
   ["BridgePiRPC", "PiRuntimeResources.swift", "PiBridgeExtension"],
   ["BridgeQoderSDK", "QoderRuntimeResources.swift", "QoderHost"],
+  ["BridgeClaudeSDK", "ClaudeRuntimeResources.swift", "ClaudeHost"],
   ["BridgePiRPC", "PiNativeHistoryResources.swift", "PiNativeHistory"],
   ["BridgeDeepSeekHarnessDesktop", "DSHDesktopRuntimeResources.swift", "DSHDesktopConnector"],
 ];

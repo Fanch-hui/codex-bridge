@@ -13,7 +13,10 @@ const blocked = new Set(['.git', '.ssh', '.aws', 'secrets']);
 export function toolSelection(config) {
   const tools = [...reads, userInput, ...plans];
   if (config.mode === 'workspace-write') tools.push(...writes);
-  if (config.networkAllowed && config.mode === 'workspace-write') tools.push(...network, ...subagents);
+  if (config.networkAllowed && config.mode === 'workspace-write') {
+    tools.push(...network);
+    if (config.nativeSubagentsAllowed !== false) tools.push(...subagents);
+  }
   if (config.skills?.length) tools.push('Skill');
   return tools;
 }

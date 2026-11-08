@@ -330,7 +330,9 @@ public actor AntigravityCLIExecution {
     }
 
     let status = result.status.uppercased()
-    let canContinue = status == "SUCCESS" && !denied
+    let recovered = await normalizer.recoveredAfterRetry(result)
+    let succeeded = status == "SUCCESS" || recovered
+    let canContinue = succeeded && !denied
     let hasQueuedSteer = canContinue && !queuedSteers.isEmpty
     let terminalResult = !hasQueuedSteer
     await beforeResultNormalization()

@@ -104,7 +104,7 @@ public enum WorkbenchSessionCatalog {
     }
     let preferredOrder = [
       "codex", "antigravity", "opencode", "deepseek-harness", "deepseek-harness-desktop", "pi",
-      "qoder",
+      "qoder", "claude-code",
     ]
     var result: [WorkbenchProviderSessionGroup] = []
     for providerID in preferredOrder {

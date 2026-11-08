@@ -69,6 +69,12 @@ public enum SecureProjectImageReader {
     guard let data = try reader.readContent(relativePath: path, through: resolver) else {
       throw PathSecurityError.pathDoesNotExist
     }
+    return try verify(data, attachment: attachment)
+  }
+
+  public static func verify(_ data: Data, attachment: AgentImageAttachment) throws
+    -> SecureProjectImageData
+  {
     let mimeType = try Self.mimeType(of: data)
     let revision = SecureFileRevision.digest(of: data)
     guard Int64(data.count) == attachment.byteCount,
@@ -80,7 +86,7 @@ public enum SecureProjectImageReader {
     return SecureProjectImageData(attachment: attachment, data: data)
   }
 
-  private static func mimeType(of data: Data) throws -> String {
+  public static func mimeType(of data: Data) throws -> String {
     let bytes = [UInt8](data.prefix(12))
     guard !bytes.isEmpty else { throw SecureProjectImageError.emptyImage }
     if bytes.starts(with: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) {

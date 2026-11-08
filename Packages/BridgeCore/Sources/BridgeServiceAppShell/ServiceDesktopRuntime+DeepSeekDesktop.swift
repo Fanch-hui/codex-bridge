@@ -10,7 +10,7 @@ extension BridgeServiceAppModel {
     guard !deepSeekDesktopRefreshInFlight, connectionState == .connected else { return }
     let installations = agentInstallations.filter { $0.providerID == "deepseek-harness-desktop" }
     guard !installations.isEmpty else {
-      deepSeekDesktopStates = [:]
+      if !deepSeekDesktopStates.isEmpty { deepSeekDesktopStates = [:] }
       return
     }
     deepSeekDesktopRefreshInFlight = true

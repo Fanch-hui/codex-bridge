@@ -6,6 +6,7 @@ import WebKit
 final class ChatBrowserSessions {
   private let preferences: ChatBrowserPreferences
   private var webViews: [ChatBrowserSite: WKWebView] = [:]
+  private(set) var generation: UInt64 = 0
 
   init(defaults: UserDefaults) {
     preferences = ChatBrowserPreferences(defaults: defaults)
@@ -33,12 +34,17 @@ final class ChatBrowserSessions {
 
   func release() {
     rememberCurrentURLs()
+    generation &+= 1
     for webView in webViews.values {
-      webView.stopLoading()
-      webView.navigationDelegate = nil
-      webView.uiDelegate = nil
+      Self.detach(webView)
     }
     webViews.removeAll()
+  }
+
+  static func detach(_ webView: WKWebView) {
+    webView.stopLoading()
+    webView.navigationDelegate = nil
+    webView.uiDelegate = nil
   }
 
   private func rememberCurrentURLs() {

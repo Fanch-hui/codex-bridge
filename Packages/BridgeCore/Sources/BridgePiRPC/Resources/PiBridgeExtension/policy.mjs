@@ -11,6 +11,15 @@ const managedTools = new Set(["bridge_plan", "bridge_ask_user", "bridge_subtask"
 const permissionEffects = new Set(["allow", "ask", "deny"]);
 const blockedComponents = new Set([".git", ".ssh", ".aws", "secrets", "node_modules"]);
 
+/**
+ * Whether a tool may change the project directory. Native readers and the Bridge-managed tools
+ * (plan, questions, read-only subtasks) cannot; shells, file writers, MCP tools and anything
+ * unknown are treated as writers.
+ */
+export function mayWriteProject(toolName) {
+  return !readable.has(toolName) && !managedTools.has(toolName);
+}
+
 export function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -37,6 +46,9 @@ export function validateContext(value) {
       || value.taskID.length > 128 || !Array.isArray(value.tools) || value.tools.length > 16) {
     throw new Error("Invalid Bridge Pi execution context.");
   }
+  if (value.writeGate !== undefined && typeof value.writeGate !== "boolean") {
+    throw new Error("Invalid Bridge Pi write gate flag.");
+  }
   if (!Array.isArray(value.cliArgv) || value.cliArgv.length < 1 || value.cliArgv.length > 2
       || value.cliArgv.some(item => typeof item !== "string" || !item || item.includes("\0"))) {
     throw new Error("Invalid Bridge Pi CLI invocation.");
@@ -61,7 +73,8 @@ export function validateContext(value) {
       || mcpServers.some(server => !validMCPServer(server))) {
     throw new Error("Invalid Bridge Pi MCP configuration.");
   }
-  return Object.freeze({ ...value, tools: Object.freeze([...value.tools]),
+  return Object.freeze({ ...value, writeGate: value.writeGate === true,
+    tools: Object.freeze([...value.tools]),
     skillPaths: Object.freeze([...skillPaths]),
     nativePermissionRules: Object.freeze([...nativePermissionRules]),
     mcpServers: Object.freeze([...mcpServers]) });

@@ -62,6 +62,23 @@ extension BridgeServiceApplication {
     try await settings.setTaskStartApprovalMode(mode)
   }
 
+  public func serviceProjectWriteConcurrency(
+    deadline: ContinuousClock.Instant
+  ) async throws -> Int {
+    try Self.checkDeadline(deadline)
+    return try await settings.projectWriteConcurrency()
+  }
+
+  public func serviceSetProjectWriteConcurrency(
+    _ limit: Int,
+    deadline: ContinuousClock.Instant
+  ) async throws {
+    try Self.checkDeadline(deadline)
+    try await settings.setProjectWriteConcurrency(limit)
+    // A higher limit can admit tasks that are already waiting.
+    Task { [weak self] in await self?.drainQueuedTasks() }
+  }
+
   public func serviceApproveDirectApproval(
     approvalID: String,
     deadline: ContinuousClock.Instant

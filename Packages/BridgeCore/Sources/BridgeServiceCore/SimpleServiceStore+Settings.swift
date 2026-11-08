@@ -28,7 +28,7 @@ extension SimpleServiceStore {
     }
   }
 
-  func updateSettingsAtomically(
+  public func updateSettingsAtomically(
     keys: [String],
     updatedAt: Date,
     transform: @Sendable ([String: String]) throws -> [String: String]

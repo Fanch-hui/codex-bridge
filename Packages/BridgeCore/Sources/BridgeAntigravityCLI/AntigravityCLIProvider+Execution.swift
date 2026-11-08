@@ -31,7 +31,7 @@ extension AntigravityCLIProvider {
         projectRoot: launch.process.workingDirectory,
         requestedSessionID: request.requestedSessionID,
         expectedModel: request.model,
-        prompt: AntigravityCLIHeadlessPolicy.prompt(request.prompt),
+        prompt: AntigravityCLIHeadlessPolicy.prompt(request.executionPrompt),
         transport: connected,
         inactivityTimeout: configuration.inactivityTimeout,
         eventBufferLimit: configuration.eventBufferLimit,

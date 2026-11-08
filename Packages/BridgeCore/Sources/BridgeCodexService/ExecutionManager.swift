@@ -1,3 +1,4 @@
+import BridgeCodexRPC
 import BridgeDomain
 import BridgeServiceCore
 import Foundation
@@ -5,6 +6,7 @@ import Foundation
 public actor ExecutionManager {
   private let configuration: ExecutionManagerConfiguration
   private var sessions: [TaskID: ExecutionSession] = [:]
+  private var stopping: [TaskID: Task<Void, Never>] = [:]
 
   public init(configuration: ExecutionManagerConfiguration) {
     self.configuration = configuration
@@ -30,17 +32,19 @@ public actor ExecutionManager {
 
   public func start(_ request: ExecutionRequest) async throws -> ExecutionHandle {
     let taskID = request.task.id
-    guard sessions[taskID] == nil else {
+    guard sessions[taskID] == nil, stopping[taskID] == nil else {
       throw ExecutionServiceError.activeSession(taskID)
     }
-    guard sessions.count < configuration.maximumConcurrentSessions else {
+    guard sessions.count + stopping.count < configuration.maximumConcurrentSessions else {
       throw ExecutionServiceError.sessionLimitReached
     }
 
+    let appServer = try Self.launchConfiguration(request, configuration: configuration)
     let session = ExecutionSession(
       taskID: taskID,
       configuration: configuration,
-      projectRoot: request.project.root.canonicalPath,
+      appServer: appServer,
+      projectRoot: request.executionRootPath,
       approvalLimits: ExecutionApprovalLimits(request: request),
       onTermination: { [weak self] taskID, session in
         await self?.remove(taskID: taskID, matching: session)
@@ -59,6 +63,30 @@ public actor ExecutionManager {
       }
       await session.shutdown()
       throw error
+    }
+  }
+
+  private static func launchConfiguration(
+    _ request: ExecutionRequest,
+    configuration: ExecutionManagerConfiguration
+  ) throws -> AppServerConfiguration {
+    let launch = configuration.appServer.current()
+    let base = request.nativeSubagentsAllowed ? launch : launch.disablingNativeSubagents()
+    guard let workspace = request.isolatedWorkspace else { return base }
+    do {
+      try request.project.root.validateCurrentIdentity()
+      try workspace.root.validateCurrentIdentity()
+      try workspace.runtimeRoot.validateCurrentIdentity()
+      let isolated = try CodexIsolatedLaunch.prepare(
+        configuration: base,
+        workspaceRoot: URL(fileURLWithPath: workspace.root.canonicalPath),
+        runtimeDirectory: URL(fileURLWithPath: workspace.runtimeRoot.canonicalPath)
+      )
+      try workspace.root.validateCurrentIdentity()
+      try workspace.runtimeRoot.validateCurrentIdentity()
+      return isolated
+    } catch {
+      throw ExecutionServiceError.invalidRequest("isolatedWorkspace.confinement")
     }
   }
 
@@ -119,20 +147,25 @@ public actor ExecutionManager {
   }
 
   public func stop(taskID: TaskID) async {
+    if let pending = stopping[taskID] {
+      await pending.value
+      return
+    }
     guard let session = sessions.removeValue(forKey: taskID) else { return }
-    await session.shutdown()
+    let pending = Task { await session.shutdown() }
+    stopping[taskID] = pending
+    await pending.value
+    stopping.removeValue(forKey: taskID)
   }
 
   public func shutdown() async {
-    let active = Array(sessions.values)
-    sessions.removeAll(keepingCapacity: false)
-    for session in active {
-      await session.shutdown()
-    }
+    let active = Array(sessions.keys)
+    for taskID in active { await stop(taskID: taskID) }
+    for pending in Array(stopping.values) { await pending.value }
   }
 
   public func hasActiveSession(taskID: TaskID) -> Bool {
-    sessions[taskID] != nil
+    sessions[taskID] != nil || stopping[taskID] != nil
   }
 
   private func requiredSession(_ taskID: TaskID) throws -> ExecutionSession {

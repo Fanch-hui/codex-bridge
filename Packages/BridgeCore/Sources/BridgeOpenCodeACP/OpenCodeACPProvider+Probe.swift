@@ -63,11 +63,27 @@ extension OpenCodeACPProvider {
     }
   }
 
+  private static let supportedAgentNames: Set<String> = [
+    "opencode",
+    "@opencode/cli",
+    "opencode-cli",
+    "opencode-ai",
+  ]
+
+  static func isSupportedAgentIdentity(_ initialization: OpenCodeACPInitialization) -> Bool {
+    guard let name = initialization.agentName?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !name.isEmpty
+    else {
+      return false
+    }
+    return supportedAgentNames.contains(name.lowercased())
+  }
+
   func validate(_ initialization: OpenCodeACPInitialization) throws -> String {
     guard initialization.protocolVersion == 1 else {
       throw AgentRuntimeError.unsupportedProtocol(String(initialization.protocolVersion))
     }
-    guard initialization.agentName?.caseInsensitiveCompare("OpenCode") == .orderedSame else {
+    guard Self.isSupportedAgentIdentity(initialization) else {
       throw AgentRuntimeError.unsupportedProtocol("unexpected_agent")
     }
     guard let version = initialization.agentVersion,

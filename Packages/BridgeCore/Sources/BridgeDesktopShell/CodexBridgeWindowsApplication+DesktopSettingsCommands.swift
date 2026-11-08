@@ -19,6 +19,9 @@
       case .setTaskStartApprovalMode:
         guard let mode = BridgeDesktopCommandValue.nonEmpty(payload.mode) else { return true }
         Task { @MainActor in await auxiliary.settings.setTaskStartApprovalMode(mode) }
+      case .setProjectWriteConcurrency:
+        guard let limit = payload.limit, (1...4).contains(limit) else { return true }
+        Task { @MainActor in await auxiliary.settings.setProjectWriteConcurrency(limit) }
       case .saveSettings:
         guard let executionModel = BridgeDesktopCommandValue.nonEmpty(payload.executionModel),
           let executionEffort = payload.executionEffort,
@@ -63,6 +66,9 @@
       case .setKeepServiceRunning:
         auxiliary.settings.setKeepServiceRunningAfterExit(
           payload.keepServiceRunningAfterExit ?? true)
+      case .setWorkbenchEnabled:
+        guard let enabled = payload.enabled else { return true }
+        Task { @MainActor in await auxiliary.settings.setWorkbenchEnabled(enabled) }
       default:
         return false
       }

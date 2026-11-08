@@ -10,6 +10,37 @@ extension BridgeDesktopUIStateBuilder {
     guard let taskID = model.selectedTaskID,
       let task = model.tasks.first(where: { $0.taskID == taskID })
     else { return nil }
+    let entries = model.desktopConversationPresentationCache.update(
+      taskID: task.taskID,
+      providerID: task.providerIdentifier,
+      entries: model.conversation?.entries ?? []
+    )
+    return taskDetail(task, conversation: model.conversation, entries: entries, model: model)
+  }
+
+  /// Split-view panes, built like the selected task from each pane's own conversation.
+  static func paneTasks(from model: BridgeServiceAppModel) -> [BridgeDesktopTaskDetail]? {
+    let ids = model.paneConversations.paneTaskIDs
+    guard !ids.isEmpty else { return nil }
+    return ids.compactMap { taskID in
+      guard let task = model.tasks.first(where: { $0.taskID == taskID }) else { return nil }
+      let conversation = model.paneConversations.conversation(for: taskID)
+      var cache =
+        model.panePresentationCaches[taskID] ?? BridgeDesktopConversationPresentationCache()
+      let entries = cache.update(
+        taskID: taskID, providerID: task.providerIdentifier,
+        entries: conversation?.entries ?? [])
+      model.panePresentationCaches[taskID] = cache
+      return taskDetail(task, conversation: conversation, entries: entries, model: model)
+    }
+  }
+
+  private static func taskDetail(
+    _ task: MCPServiceTaskSnapshot,
+    conversation: TaskConversationModel?,
+    entries: [BridgeDesktopConversationEntry],
+    model: BridgeServiceAppModel
+  ) -> BridgeDesktopTaskDetail {
     let sessionTasks = WorkbenchSessionCatalog.sessionTasks(for: task, in: model.tasks)
     let session = WorkbenchSessionCatalog.sessions(tasks: sessionTasks).first
     let failure = task.failurePresentation
@@ -43,16 +74,12 @@ extension BridgeDesktopUIStateBuilder {
       changedFiles: task.changedFiles,
       attachmentPaths: task.attachmentPaths,
       activity: taskActivity(task),
-      conversation: model.desktopConversationPresentationCache.update(
-        taskID: task.taskID,
-        providerID: task.providerIdentifier,
-        entries: model.conversation?.entries ?? []
-      ),
+      conversation: entries,
       conversationState: BridgeDesktopConversationState(
-        conversation: model.conversation,
+        conversation: conversation,
         activity: CodexActivityPresentation(
           task: task,
-          activity: model.conversation?.activity ?? .idle,
+          activity: conversation?.activity ?? .idle,
           pendingUserInput: model.approvals.contains {
             $0.taskID == task.taskID && $0.kind == "user_input"
           },
@@ -63,8 +90,8 @@ extension BridgeDesktopUIStateBuilder {
       canStop: task.isActive,
       canSteer: TaskInspectorPresentation.canSteer(
         task,
-        providerSupportsSteer: model.agentProviders.first { $0.providerID == task.providerID }?
-          .supportsSteer == true
+        providerSupportsSteer: TaskInspectorPresentation.supportsConversationInsertion(
+          task, providers: model.agentProviders, installations: model.agentInstallations)
       ),
       canOpenNativeSession: task.canOpenNativeSession,
       permissionRemediation: permissionRemediation(for: task, model: model),

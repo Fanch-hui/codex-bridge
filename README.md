@@ -4,26 +4,26 @@
 
 [Published on the official MCP Registry.](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Fanch-hui%2Fcodex-bridge/versions/latest)
 
-Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、[OpenAI Dot](#通过-openai-dot-使用)、Qwen Studio、Gemini 和本机工作台接入已授权的本地项目，并统一管理 Codex、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
+Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 ChatGPT 网页版、[OpenAI Dot](#通过-openai-dot-使用)、Qwen Studio、Gemini 和本机工作台接入已授权的本地项目，并统一管理 Codex、Claude Code、OpenCode、DeepSeek Harness、Antigravity、Pi 与 Qoder 的任务、审批和会话。
 
 macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目目录授权、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 [v2.2.3](./docs/RELEASE_NOTES_v2.2.3.md)。
+当前版本为 [v3.0.0](./docs/RELEASE_NOTES_v3.0.0.md)。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v2.2.3 安装包 | 安装方式 |
+| 平台 | v3.0.0 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-2.2.3-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| macOS 14+，Intel | `CodexBridge-2.2.3-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-2.2.3-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows ARM64 | `CodexBridge-Windows-arm64-2.2.3-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-3.0.0-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-3.0.0-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-3.0.0-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-3.0.0-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-2.2.3.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-2.2.3.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-2.2.3.tar.gz` / `codex-bridge-linux-arm64-2.2.3.tar.gz` | 完整解压后运行 `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-3.0.0.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-3.0.0.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-3.0.0.tar.gz` / `codex-bridge-linux-arm64-3.0.0.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
@@ -98,6 +98,8 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 Gemini 的配置入口是 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，然后选择本地 MCP 或 Cloud MCP。**Gemini 的三种接入方式都无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。** 选择 Sites 时需要可使用 ChatGPT Sites 的账号；站点的两项 Secret 由 Bridge 生成。选择本地 MCP 或 ngrok 时，无需使用 ChatGPT Sites。
 
 **Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** 本地 MCP、Sites 和 ngrok 均适用。完成关联后，在 Gemini 的任务模式中启用 Codex Bridge 应用，再发送请求。
+
+工作台的“设置 → 模型连接”支持 ChatGPT、自定义 API、智谱 / Z.AI 的 Coding Plan 与 Start Plan，以及 WorkBuddy 国内版和国际版。智谱 / Z.AI 可网页登录，Coding Plan 也可使用 API Key；WorkBuddy 提供网页登录、API Key 和导入桌面登录，并可管理账号池、积分与模型筛选。连接完成后在对话输入区选择对应来源和模型。首次使用可点击“更多模型连接”进入配置。
 
 ### 委派 Agent 任务（可选）
 
@@ -209,6 +211,7 @@ Linux 桌面版使用 GTK 3 与 WebKitGTK，共用工作台与项目管理界面
 ## 许可与隐私
 
 - [Apache-2.0 许可证](./LICENSE)
+- 内置 ZCode 代理及其适配采用 [CC BY-NC-SA 4.0](./docs/DEPENDENCIES.md#zcode-proxy-license-and-source)，仅限非商业用途，并要求署名和相同方式共享。
 - [第三方声明](./NOTICE) · [依赖说明](./docs/DEPENDENCIES.md)
 - [隐私说明](./PRIVACY.md) · [安全政策](./SECURITY.md)
 

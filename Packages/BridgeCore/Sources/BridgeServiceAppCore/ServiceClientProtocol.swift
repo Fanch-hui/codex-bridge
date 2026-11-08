@@ -37,6 +37,9 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     -> MCPProjectDetail
   func workbenchWorkspace(_ request: IPCWorkbenchWorkspaceRequest) async throws
     -> IPCWorkbenchWorkspaceResponse
+  func embeddedDSH(_ request: IPCEmbeddedDSHRequest) async throws -> IPCEmbeddedDSHResponse
+  func workbenchSettings() async throws -> IPCWorkbenchSettings
+  func setWorkbenchEnabled(_ enabled: Bool) async throws -> IPCWorkbenchSettings
   func setWorkbenchProject(projectID: String?) async throws
   func setWorkbenchPermissionMode(_ mode: String) async throws
   func agentCatalog() async throws -> IPCAgentCatalogResponse
@@ -45,6 +48,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func agentSetups() async throws -> [IPCAgentSetupState]
   func continueAgentSetup(_ request: IPCAgentSetupContinueRequest) async throws
     -> IPCAgentSetupState
+  func probeAgentSetupLogin(operationID: String) async throws -> IPCAgentSetupState
   func cancelAgentSetup(operationID: String) async throws -> IPCAgentSetupState
   func registerAgentInstallation(
     _ request: IPCAgentRegistrationRequest
@@ -164,6 +168,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func readThread(_ request: IPCThreadReadRequest) async throws -> MCPThreadReadPage
   func tasks(_ request: IPCTaskListRequest) async throws -> [MCPServiceTaskSnapshot]
   func task(_ request: IPCTaskRequest) async throws -> MCPServiceTaskSnapshot
+  func localTaskHistory(_ request: IPCTaskRequest) async throws -> MCPServiceTaskSnapshot
   func stopTask(taskID: String) async throws
   func steerTask(
     taskID: String,
@@ -185,6 +190,8 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func setDirectApprovalMode(_ mode: String) async throws
   func taskStartApprovalMode() async throws -> String
   func setTaskStartApprovalMode(_ mode: String) async throws
+  func projectWriteConcurrency() async throws -> Int
+  func setProjectWriteConcurrency(_ limit: Int) async throws
   func setExposureMode(_ mode: MCPServiceExposureMode) async throws
   func geminiCloudStatus() async throws -> IPCGeminiCloudStatus
   func configureGeminiCloud(_ value: IPCGeminiCloudConfiguration) async throws
@@ -218,6 +225,14 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func workbenchSettings() async throws -> IPCWorkbenchSettings {
+    throw BridgeServiceClientError.serviceRestartRequired
+  }
+
+  public func setWorkbenchEnabled(_ enabled: Bool) async throws -> IPCWorkbenchSettings {
+    throw BridgeServiceClientError.serviceRestartRequired
+  }
+
   public func projectList() async throws -> IPCProjectListResponse {
     IPCProjectListResponse(projects: try await projects())
   }

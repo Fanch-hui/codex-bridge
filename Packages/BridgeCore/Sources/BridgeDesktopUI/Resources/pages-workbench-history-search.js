@@ -1,6 +1,7 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
+  var dialogModel = null, pendingNative = null;
   var statuses = [
     ["", "全部状态"], ["completed", "已完成"], ["failed", "失败"],
     ["interrupted", "已中断"], ["running", "运行中"], ["starting", "正在启动"],
@@ -88,20 +89,44 @@
     model.panel.querySelector("summary").hidden = true;
     model.input.autofocus = true;
     dialog.appendChild(body);
+    function syncViewport() {
+      if (global.CodexBridgeDesktopPages && global.CodexBridgeDesktopPages.measureBrowserViewport && model.emit) {
+        global.CodexBridgeDesktopPages.measureBrowserViewport(model.emit);
+      }
+    }
     var footer = S.node("div", "dialog-footer");
     var close = S.button("关闭", null, {}, null, "small");
     close.addEventListener("click", function () { dialog.close(); });
     footer.appendChild(close); dialog.appendChild(footer);
+    dialog.addEventListener("close", syncViewport);
+    dialog.addEventListener("click", function (event) {
+      if (event && event.target === dialog) dialog.close();
+    });
     model.trigger = S.button("历史", null, {}, null, "small");
     model.trigger.title = "查看历史会话";
     model.trigger.setAttribute("aria-label", "查看历史会话");
     model.trigger.setAttribute("aria-haspopup", "dialog");
     model.trigger.setAttribute("aria-controls", dialog.id);
-    model.trigger.addEventListener("click", function () { dialog.showModal(); });
+    model.trigger.addEventListener("click", function () { dialog.showModal(); syncViewport(); });
     model.results.addEventListener("click", function (event) {
       if (event.target.closest(".history-search-result")) dialog.close();
     });
     parent.appendChild(model.trigger); parent.appendChild(dialog);
+    model.openNative = function (request, emit) {
+      selectHistory("native", false);
+      if (!dialog.open) { dialog.showModal(); syncViewport(); }
+      model.__selectedTaskID = model.page && model.page.selectedTaskID;
+      var native = global.CodexBridgeDesktopNativeSessionDirectory;
+      if (native && native.reveal && request.matchAnchor) {
+        native.reveal(request.nativeSessionID, request.matchAnchor.messageID);
+      }
+      emit("manageNativeAgentSession", {
+        action: "read", projectID: request.projectID, installationID: request.installationID,
+        sessionID: request.nativeSessionID, offset: request.matchAnchor && request.matchAnchor.pageOffset || 0,
+        limit: 50
+      });
+    };
+    dialogModel = model;
     return model;
   }
 
@@ -159,6 +184,7 @@
   function update(model, page, emit) {
     model.page = page; model.emit = emit;
     if (model.updateNative) model.updateNative(page);
+    flushNative();
     var state = page.taskHistorySearch || {};
     if (model.fixedProviderID && state.providerID !== model.fixedProviderID) state = {};
     setOptions(model.provider, [["", "全部 Agent"]].concat(S.safeArray(state.providers).map(function (item) {
@@ -195,5 +221,19 @@
     });
   }
 
-  global.CodexBridgeDesktopTaskHistorySearch = { create: create, createDialog: createDialog, update: update };
+  function flushNative() {
+    if (!pendingNative || !dialogModel || !dialogModel.page
+      || dialogModel.page.selectedProjectID !== pendingNative.request.projectID) return;
+    var value = pendingNative; pendingNative = null;
+    dialogModel.openNative(value.request, value.emit);
+  }
+  function openNative(request, emit) {
+    if (!request || !request.projectID || !request.installationID || !request.nativeSessionID) return;
+    pendingNative = { request: request, emit: emit };
+    flushNative();
+  }
+
+  global.CodexBridgeDesktopTaskHistorySearch = {
+    create: create, createDialog: createDialog, update: update, openNative: openNative
+  };
 }(window));

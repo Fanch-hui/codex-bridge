@@ -188,7 +188,7 @@ jobs:
           Add-Content $env:GITHUB_ENV "SWIFT_BIN_PATH=$binPath"
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.2
+          node-version: 24.11.1
       - name: Verify installed Agent CLI contracts
         shell: pwsh
         timeout-minutes: 10
@@ -256,6 +256,12 @@ jobs:
         with:
           path: .build/tunnel-client/${{ matrix.architecture }}
           key: ${{ steps.tunnel-cache.outputs.cache-primary-key }}
+      - name: Build embedded DSH runtime
+        shell: pwsh
+        run: |
+          $runtime = Join-Path $env:GITHUB_WORKSPACE ".build\embedded-dsh\windows-${{ matrix.architecture }}"
+          node Scripts/build-embedded-dsh-runtime.mjs --platform windows --arch "${{ matrix.architecture }}" --output $runtime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Stage Windows portable package
         shell: pwsh
         run: |
@@ -275,6 +281,7 @@ jobs:
             Architecture = "${{ matrix.architecture }}"
             VcpkgTriplet = "${{ matrix.architecture }}-windows"
             TunnelClientDir = $tunnelClientDir
+            EmbeddedDSHRuntimeDir = Join-Path $env:GITHUB_WORKSPACE ".build\embedded-dsh\windows-${{ matrix.architecture }}"
           }
           if ($targetTriple) {
             $stageArguments["TargetTriple"] = $targetTriple
@@ -295,7 +302,7 @@ jobs:
             -OutputDir "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify Windows installer
-        timeout-minutes: 10
+        timeout-minutes: 45
         shell: pwsh
         run: |
           $installerRoot = "$env:GITHUB_WORKSPACE\.build\windows-installer\${{ matrix.architecture }}"

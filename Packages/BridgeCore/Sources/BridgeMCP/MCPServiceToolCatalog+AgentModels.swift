@@ -7,7 +7,7 @@ extension MCPServiceToolCatalog {
     description:
       "List the native model catalog and reasoning efforts for one registered Agent installation. "
       + "Use installation_id from list_agents. Pass project_id for project-specific models; omitting "
-      + "it uses the current Workbench project. Use model_id to resolve reasoning capabilities for "
+      + "it uses Bridge's default workspace. Use model_id to resolve reasoning capabilities for "
       + "a selected model, and force_refresh=true to refresh the cached catalog.",
     inputSchema: objectSchema(
       properties: [

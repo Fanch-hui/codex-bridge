@@ -5,8 +5,6 @@
   import BridgeServiceAppCore
 
   struct WindowsWorkbenchPresentationSnapshot {
-    let visibleTasks: [MCPServiceTaskSnapshot]
-    let visibleSessions: [WorkbenchSessionItem]
     let allSessions: [WorkbenchSessionItem]
     let taskCount: Int
     let runningTaskCount: Int
@@ -25,8 +23,8 @@
     }
 
     func providerSupportsSteer(for task: MCPServiceTaskSnapshot) -> Bool {
-      if task.isCodexTask { return true }
-      return providerByID[task.providerIdentifier]?.supportsSteer == true
+      TaskInspectorPresentation.supportsConversationInsertion(
+        task, providers: Array(providerByID.values), installations: Array(installationByID.values))
     }
 
     func providerSupportsSessionContinuation(for task: MCPServiceTaskSnapshot) -> Bool {
@@ -53,11 +51,7 @@
     private var providersDirty = true
     private var installationsDirty = true
     private var approvalsDirty = true
-    private var visibleProjectID: String?
-    private var hasVisibleProject = false
 
-    private var visibleTasks: [MCPServiceTaskSnapshot] = []
-    private var visibleSessions: [WorkbenchSessionItem] = []
     private var allSessions: [WorkbenchSessionItem] = []
     private var taskCount = 0
     private var runningTaskCount = 0
@@ -91,18 +85,13 @@
       installationsDirty = true
     }
 
-    mutating func selectedProjectDidChange() {
-      hasVisibleProject = false
-    }
-
     mutating func snapshot(
       tasks: [MCPServiceTaskSnapshot],
       projects: [MCPProjectSummary],
       providers: [IPCAgentProviderSummary],
       installations: [IPCAgentInstallationSummary],
       approvals: [IPCApprovalSummary],
-      directApprovals: [IPCPendingDirectApproval],
-      selectedProjectID: String?
+      directApprovals: [IPCPendingDirectApproval]
     ) -> WindowsWorkbenchPresentationSnapshot {
       if tasksDirty {
         taskByID = Self.indexTasks(tasks)
@@ -120,7 +109,6 @@
           }
         }
         tasksDirty = false
-        hasVisibleProject = false
       }
 
       if projectsDirty {
@@ -153,22 +141,7 @@
         approvalsDirty = false
       }
 
-      if !hasVisibleProject || visibleProjectID != selectedProjectID {
-        visibleProjectID = selectedProjectID
-        visibleTasks =
-          selectedProjectID.map { projectID in
-            tasks.filter { $0.projectID == projectID }
-          } ?? tasks
-        visibleSessions =
-          selectedProjectID.map { projectID in
-            allSessions.filter { $0.projectID == projectID }
-          } ?? allSessions
-        hasVisibleProject = true
-      }
-
       return WindowsWorkbenchPresentationSnapshot(
-        visibleTasks: visibleTasks,
-        visibleSessions: visibleSessions,
         allSessions: allSessions,
         taskCount: taskCount,
         runningTaskCount: runningTaskCount,

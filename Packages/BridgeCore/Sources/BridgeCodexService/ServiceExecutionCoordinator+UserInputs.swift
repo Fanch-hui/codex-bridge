@@ -81,6 +81,15 @@ extension ServiceExecutionCoordinator {
     response: AgentUserInputResponse
   ) async throws {
     let request = pending.request
+    let serializesInteractions = request.binding.providerID == .claudeCode
+    if serializesInteractions { await acquireAgentInteraction(request.taskID) }
+    defer { if serializesInteractions { releaseAgentInteraction(request.taskID) } }
+    if serializesInteractions {
+      try Task.checkCancellation()
+      guard pendingAgentUserInputs[pending.approvalID]?.request.inputID == request.inputID else {
+        throw ExecutionServiceError.approvalUnavailable(request.inputID)
+      }
+    }
     guard let run = activeAgentRuns[request.taskID],
       run.providerID == request.binding.providerID.rawValue,
       run.installationID == request.binding.installationID.rawValue,

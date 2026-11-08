@@ -15,6 +15,7 @@ public struct ACPProcessTransportConfiguration: Sendable {
   public let maximumStandardErrorBytes: Int
   public let maximumLifetime: Duration
   public let inputEOFGracePeriod: Duration
+  public let processGroupName: String?
 
   public init(
     argv: [String],
@@ -23,7 +24,8 @@ public struct ACPProcessTransportConfiguration: Sendable {
     maximumFrameBytes: Int = 1_048_576,
     maximumStandardErrorBytes: Int = 256 * 1_024,
     maximumLifetime: Duration = .seconds(24 * 60 * 60),
-    inputEOFGracePeriod: Duration = .zero
+    inputEOFGracePeriod: Duration = .zero,
+    processGroupName: String? = nil
   ) {
     self.argv = argv
     self.workingDirectory = workingDirectory
@@ -32,11 +34,13 @@ public struct ACPProcessTransportConfiguration: Sendable {
     self.maximumStandardErrorBytes = max(1, maximumStandardErrorBytes)
     self.maximumLifetime = maximumLifetime
     self.inputEOFGracePeriod = inputEOFGracePeriod
+    self.processGroupName = processGroupName
   }
 }
 
 public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
   public var incoming: AsyncThrowingStream<Data, any Error> { state.stream }
+  public var processIdentity: ManagedProcessIdentity? { process.identity }
 
   private let process: ManagedStdioProcess
   private let state: ProcessTransportState
@@ -46,6 +50,7 @@ public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
   private let inputEOFGracePeriod: Duration
   private let lock = NSLock()
   private var closing = false
+  private var closeTask: Task<Void, Never>?
   private var monitorTask: Task<Void, Never>?
 
   public static func launch(
@@ -60,6 +65,7 @@ public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
       workingDirectory: configuration.workingDirectory,
       environment: configuration.environment,
       mergeStandardError: false,
+      processGroupName: configuration.processGroupName,
       onStandardOutput: { state.receive($0) },
       onStandardError: { standardError.append($0) }
     )
@@ -107,14 +113,18 @@ public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
   }
 
   public func close() async {
-    let closeState = lock.withLock { () -> (Bool, Task<Void, Never>?) in
-      guard !closing else { return (false, nil) }
+    let task = lock.withLock { () -> Task<Void, Never> in
+      if let closeTask { return closeTask }
       closing = true
-      return (true, monitorTask)
+      let monitor = monitorTask
+      let task = Task { await finishClose(monitor: monitor) }
+      closeTask = task
+      return task
     }
-    guard closeState.0 else { return }
-    let task = closeState.1
+    await task.value
+  }
 
+  private func finishClose(monitor: Task<Void, Never>?) async {
     state.prepareToClose()
     process.closeStdin()
     if inputEOFGracePeriod > .zero, process.isRunning {
@@ -124,9 +134,9 @@ public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
         process.waitForExit(timeout: gracePeriod)
       }.value
     }
-    if let task {
-      task.cancel()
-      await task.value
+    if let monitor {
+      monitor.cancel()
+      await monitor.value
     } else {
       _ = process.terminateAndWait()
       process.drainRemainingOutput()
@@ -137,6 +147,14 @@ public final class ACPProcessTransport: ACPTransport, @unchecked Sendable {
 
   public func standardErrorSnapshot() -> BoundedProcessOutput {
     standardError.snapshot()
+  }
+
+  /// Stops surviving descendants and verifies the entire managed process tree exited.
+  public func terminateAndConfirmProcessTree() async -> Bool {
+    let process = process
+    return await Task.detached {
+      process.terminateProcessTreeAndWait()
+    }.value
   }
 
   private func startMonitoring() {

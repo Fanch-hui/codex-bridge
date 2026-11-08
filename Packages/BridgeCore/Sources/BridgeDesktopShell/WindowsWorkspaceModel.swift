@@ -18,6 +18,7 @@
     var selectedThreadPage: MCPThreadReadPage?
     var blacklists: [BridgeBlacklistDraft] = []
     var selectedProjectID: String?
+    private(set) var defaultProjectID: String?
     var selectedCommandID: String?
     var selectedSkillID: String?
     var selectedThreadID: String?
@@ -80,12 +81,10 @@
         publishDisplay()
       }
       do {
-        let status = try await client.status()
+        let snapshot = try await client.projectList()
         connectionState = .connected
-        projects = try await client.projects()
-        if projects.contains(where: { $0.projectID == status.workbenchProjectID }) {
-          selectedProjectID = status.workbenchProjectID
-        }
+        projects = snapshot.projects
+        defaultProjectID = snapshot.defaultProjectID
         reconcileProjectSelection()
         await loadSelectedWorkspace()
       } catch {
@@ -177,7 +176,9 @@
       if let selectedProjectID, projects.contains(where: { $0.projectID == selectedProjectID }) {
         return
       }
-      selectedProjectID = projects.first?.projectID
+      selectedProjectID =
+        projects.first(where: { $0.projectID == defaultProjectID })?.projectID
+        ?? projects.first?.projectID
     }
 
     private func reconcileCommandSelection() {

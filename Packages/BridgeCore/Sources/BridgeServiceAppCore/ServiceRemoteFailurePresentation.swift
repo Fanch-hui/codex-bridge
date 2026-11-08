@@ -34,8 +34,16 @@ enum ServiceRemoteFailurePresentation {
       "查看服务日志；如诊断提供关联编号，使用该编号查找对应错误。"
     ),
     (
-      ["unavailable", "codex_app_server_unavailable"], "所需的本机执行组件不可用。",
+      ["unavailable"], "所需的本机执行组件不可用。",
       "在连接页检查后台服务与对应执行引擎，查看诊断后重新连接。"
+    ),
+    (
+      ["codex_app_server_unavailable"], "Codex 暂时无法完成请求。",
+      "在 Codex 连接详情中查看具体诊断，检查后重试。"
+    ),
+    (
+      ["embedded_dsh_runtime"], "内置 DSH 请求未完成。",
+      "查看具体诊断；引擎已停止时，在开发台重启引擎。"
     ),
     (
       ["agent_connection_probe_failed", "agent_runtime_probe_failed", "agent_validation_failed"],
@@ -101,6 +109,10 @@ enum ServiceRemoteFailurePresentation {
     (
       ["workbench_file_too_large"], "此文件超过当前文本读取上限。",
       "使用本机编辑器打开较大文件；可在诊断详情中查看当前容量上限。"
+    ),
+    (
+      ["default_workspace_protected"], "默认工作区由 Bridge 管理，不能移除。",
+      "如不想使用，可在新对话和请求中选择其他项目。"
     ),
     (["timeout"], "本机操作未能在期限内完成。", "查看连接状态和诊断，确认操作结果后重试。"),
   ]

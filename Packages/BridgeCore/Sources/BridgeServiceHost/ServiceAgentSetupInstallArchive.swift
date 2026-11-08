@@ -28,7 +28,10 @@ struct ServiceAgentSetupInstallPlatform: Equatable, Sendable {
   }
 
   func checkSupport(providerID: AgentProviderID) throws {
-    guard [.openCode, .deepSeekHarness, .pi, .qoder, .antigravity].contains(providerID) else {
+    guard
+      [.openCode, .deepSeekHarness, .pi, .qoder, .antigravity, .claudeCode]
+        .contains(providerID)
+    else {
       throw ServiceAgentSetupInstallError.unsupported("此 Agent 不提供一键配置。")
     }
     if providerID == .qoder, os == "windows", architecture == "arm64" {

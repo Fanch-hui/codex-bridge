@@ -16,6 +16,7 @@ extension OpenCodeACPClient {
     let load = capabilities["loadSession"]?.boolValue == true
     let resume = sessionCapabilities["resume"] != nil
     let close = sessionCapabilities["close"] != nil
+    let delete = sessionCapabilities["delete"] != nil
     let info = object["agentInfo"]?.objectValue
 
     var advertised: Set<AgentCapability> = [
@@ -34,7 +35,8 @@ extension OpenCodeACPClient {
       advertisedCapabilities: advertised,
       supportsLoadSession: load,
       supportsResumeSession: resume,
-      supportsCloseSession: close
+      supportsCloseSession: close,
+      supportsDeleteSession: delete
     )
   }
 

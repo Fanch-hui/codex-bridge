@@ -126,6 +126,7 @@ actor ServiceGeminiCloudController {
         return
       }
       guard let baseURL = URL(string: value.baseURL) else { throw GeminiCloudError.invalidAddress }
+      accessGate.setEnabled(true)
       let transport = GeminiSitesRelayTransport(
         baseURL: baseURL, relayKey: GeminiCloudCredentials.relayKey(for: credential),
         endpoint: endpoint, credential: credential)

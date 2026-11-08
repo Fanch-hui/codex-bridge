@@ -8,14 +8,15 @@ extension BridgeServiceAppModel {
   public func registerProject(at url: URL) {
     runMutation { [weak self] client in
       guard let self else { return }
-      _ = try await client.registerProject(
+      let detail = try await client.registerProject(
         IPCProjectRegistrationRequest(
           name: url.lastPathComponent,
           absolutePath: url.standardizedFileURL.path
         )
       )
       await self.refresh(silent: true, includeCatalog: false)
-      self.postToast("已成功注册项目：\(url.lastPathComponent)")
+      self.selectProject(detail.projectID)
+      self.postToast("已打开工作文件夹：\(url.lastPathComponent)")
     }
   }
 
@@ -96,7 +97,6 @@ extension BridgeServiceAppModel {
       closeConversation()
     }
     selectedProjectID = projectID
-    persistWorkbenchProjectSelection(projectID)
     selectedTaskID = nil
     selectedThread = nil
     selectedThreadID = nil
@@ -106,21 +106,13 @@ extension BridgeServiceAppModel {
     loadSkills(projectID: projectID)
   }
 
-  func persistWorkbenchProjectSelection(_ projectID: String?) {
-    let precedingTask = workbenchProjectSyncTask
-    workbenchProjectSyncTask = Task { [weak self] in
-      await precedingTask?.value
-      guard let self, self.selectedProjectID == projectID else { return }
-      do {
-        let client = try self.currentClient()
-        try await client.setWorkbenchProject(projectID: projectID)
-        guard self.selectedProjectID == projectID else { return }
-        self.updateWorkbenchProjectState(projectID)
-      } catch {
-        guard self.selectedProjectID == projectID else { return }
-        self.errorMessage = Self.message(error)
-      }
-    }
+  /// Moves the project context to the project of an opened session while keeping that session selected.
+  func alignContextProject(to projectID: String) {
+    guard selectedProjectID != projectID else { return }
+    selectedProjectID = projectID
+    threads = []
+    loadProjectDetail(projectID: projectID)
+    loadSkills(projectID: projectID)
   }
 
   func setWorkbenchPermissionMode(_ mode: String) {

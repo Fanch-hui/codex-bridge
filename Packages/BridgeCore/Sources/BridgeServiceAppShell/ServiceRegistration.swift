@@ -17,17 +17,24 @@ public enum BridgeServiceRegistrationError: Error, LocalizedError, Sendable {
 @MainActor
 public protocol BridgeServiceRegistrationManaging: AnyObject {
   var status: BridgeServiceRegistrationStatus { get }
+  /// The same answer as `status`, resolved without blocking the main thread.
+  func probeStatus() async -> BridgeServiceRegistrationStatus
   var supportsAutomaticRecovery: Bool { get }
 
   func register() throws
   func unregister() async throws
+  func processIDsForShutdown() async throws -> [Int32]
+  func waitForShutdown(processIDs: [Int32]) async throws
   func openSystemSettings()
   func recoverUnavailableService() async throws -> Bool
 }
 
 extension BridgeServiceRegistrationManaging {
+  public func probeStatus() async -> BridgeServiceRegistrationStatus { status }
   public var supportsAutomaticRecovery: Bool { false }
   public func recoverUnavailableService() async throws -> Bool { false }
+  public func processIDsForShutdown() async throws -> [Int32] { [] }
+  public func waitForShutdown(processIDs: [Int32]) async throws {}
 }
 
 @MainActor
@@ -50,7 +57,22 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
   }
 
   public var status: BridgeServiceRegistrationStatus {
-    if isUserLaunchAgentActive() {
+    resolvedStatus(
+      userLaunchAgentActive: Self.isUserLaunchAgentActive(
+        plistPath: userLaunchAgentPlistURL.path, label: machServiceName))
+  }
+
+  public func probeStatus() async -> BridgeServiceRegistrationStatus {
+    let plistPath = userLaunchAgentPlistURL.path
+    let label = machServiceName
+    let active = await Task.detached {
+      SystemBridgeServiceRegistration.isUserLaunchAgentActive(plistPath: plistPath, label: label)
+    }.value
+    return resolvedStatus(userLaunchAgentActive: active)
+  }
+
+  private func resolvedStatus(userLaunchAgentActive: Bool) -> BridgeServiceRegistrationStatus {
+    if userLaunchAgentActive {
       return .enabled
     }
 
@@ -94,15 +116,28 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
     unregisterUserLaunchAgent()
   }
 
+  public func processIDsForShutdown() async throws -> [Int32] {
+    guard
+      let executable = locateServiceExecutable()
+        ?? Bundle.main.resourceURL?
+        .appendingPathComponent("CodexBridgeService")
+    else { throw BridgeServiceRegistrationError.executableNotFound }
+    return try await MacAppUpdateServiceExit.processIDs(serviceExecutableURL: executable)
+  }
+
+  public func waitForShutdown(processIDs: [Int32]) async throws {
+    try await MacAppUpdateServiceExit.wait(for: processIDs)
+  }
+
   public func openSystemSettings() {
     SMAppService.openSystemSettingsLoginItems()
   }
 
   public func recoverUnavailableService() async throws -> Bool {
-    guard status == .enabled else { return false }
+    guard await probeStatus() == .enabled else { return false }
     try await unregister()
     try register()
-    return status == .enabled
+    return await probeStatus() == .enabled
   }
 
   private var userLaunchAgentPlistURL: URL {
@@ -133,14 +168,16 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
     return nil
   }
 
-  private func isUserLaunchAgentActive() -> Bool {
-    guard FileManager.default.fileExists(atPath: userLaunchAgentPlistURL.path) else {
+  private nonisolated static func isUserLaunchAgentActive(
+    plistPath: String, label: String
+  ) -> Bool {
+    guard FileManager.default.fileExists(atPath: plistPath) else {
       return false
     }
     let uid = getuid()
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-    process.arguments = ["print", "gui/\(uid)/\(machServiceName)"]
+    process.arguments = ["print", "gui/\(uid)/\(label)"]
     process.standardOutput = Pipe()
     process.standardError = Pipe()
     do {

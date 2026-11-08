@@ -28,8 +28,9 @@
     }
 
     static func updateBrowserMemoryPolicy(model: WindowsWorkbenchModel) {
-      WindowsUIThread.shared.chatWebView()?.setLowMemoryUsage(
-        !model.isChatBrowserEnabled || isLongTermHidden)
+      guard let browser = WindowsUIThread.shared.chatWebView() else { return }
+      browser.setEnabled(model.isChatBrowserEnabled)
+      browser.setLowMemoryUsage(isLongTermHidden)
     }
 
     static func stopActivityScheduling() {

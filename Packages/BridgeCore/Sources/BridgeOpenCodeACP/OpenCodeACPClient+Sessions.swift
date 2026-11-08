@@ -96,11 +96,21 @@ extension OpenCodeACPClient {
   }
 
   public func prompt(sessionID: String, text: String) async throws -> OpenCodeACPPromptResult {
+    try await prompt(sessionID: sessionID, text: text, maximumBytes: 32 * 1_024)
+  }
+
+  func promptInitial(sessionID: String, text: String) async throws -> OpenCodeACPPromptResult {
+    try await prompt(sessionID: sessionID, text: text, maximumBytes: 64 * 1_024)
+  }
+
+  private func prompt(sessionID: String, text: String, maximumBytes: Int) async throws
+    -> OpenCodeACPPromptResult
+  {
     try requireInitialized()
     try validateIdentifier(sessionID)
     try requireSession(sessionID)
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      text.utf8.count <= 32 * 1_024,
+      text.utf8.count <= maximumBytes,
       !text.contains("\0")
     else {
       throw AgentRuntimeError.invalidRequest("prompt.text")
@@ -157,6 +167,20 @@ extension OpenCodeACPClient {
 
     _ = try await request(
       method: "session/close",
+      params: .object(["sessionId": .string(id)])
+    )
+    activeSessionID = nil
+  }
+
+  public func deleteSession(id: String) async throws {
+    try requireInitialized()
+    try validateIdentifier(id)
+    try requireSession(id)
+    try beginSessionOperation()
+    defer { endSessionOperation() }
+
+    _ = try await request(
+      method: "session/delete",
       params: .object(["sessionId": .string(id)])
     )
     activeSessionID = nil

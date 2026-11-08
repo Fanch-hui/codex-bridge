@@ -183,14 +183,21 @@ public struct IPCWorkbenchPermissionModeRequest: Codable, Equatable, Sendable {
 public struct IPCProjectListResponse: Codable, Equatable, Sendable {
   public let projects: [MCPProjectSummary]
   public let projectPaths: [String: String]?
+  /// Bridge-managed default workspace; new conversations use it when no project is chosen.
+  public let defaultProjectID: String?
 
-  public init(projects: [MCPProjectSummary], projectPaths: [String: String]? = nil) {
+  public init(
+    projects: [MCPProjectSummary], projectPaths: [String: String]? = nil,
+    defaultProjectID: String? = nil
+  ) {
     self.projects = projects
     self.projectPaths = projectPaths
+    self.defaultProjectID = defaultProjectID
   }
 
   private enum CodingKeys: String, CodingKey {
     case projects
     case projectPaths = "project_paths"
+    case defaultProjectID = "default_project_id"
   }
 }

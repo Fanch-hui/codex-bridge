@@ -12,6 +12,7 @@
     let feedback: WindowsDesktopFeedbackStore
 
     var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
+    lazy var workbenchSettingsController = makeWorkbenchSettingsController()
     var models: [MCPModelSummary] = []
     var directConfiguration: IPCDirectConfiguration?
     var directCommandProjects: [MCPProjectSummary] = []
@@ -28,6 +29,7 @@
     private(set) var instructions = ""
     private(set) var directMode = "require"
     private(set) var taskStartMode = "require"
+    private(set) var projectWriteConcurrency: Int?
     var isRefreshingModels = false
     var modelError: String?
     var keepServiceRunningAfterExit = true
@@ -106,17 +108,17 @@
         connectionState = .connected
       } catch {
         connectionState = .unavailable
+        workbenchSettingsController.invalidate()
         statusText = "设置读取失败：\(BridgeServiceErrorMessage.message(error))"
         publishDisplay()
         return
       }
+      await workbenchSettingsController.refresh()
       var failures: [String] = []
       if includeModelCatalog {
         isRefreshingModels = true
         publishDisplay()
-        if await loadModelCatalog(forceRefresh: forceModelRefresh) == nil {
-          failures.append("模型：\(modelError ?? "无法读取模型目录")")
-        }
+        _ = await loadModelCatalog(forceRefresh: forceModelRefresh)
         isRefreshingModels = false
       }
       do {
@@ -139,6 +141,11 @@
         taskStartMode = try await client.taskStartApprovalMode()
       } catch {
         failures.append("任务启动审批")
+      }
+      do {
+        projectWriteConcurrency = try await client.projectWriteConcurrency()
+      } catch {
+        failures.append("同项目并发上限")
       }
       serviceRegistered = DesktopServiceRegistration.isRegistered()
       if serviceRegistered {
@@ -186,7 +193,50 @@
       await setApprovalMode(mode, direct: false)
     }
 
+    func setProjectWriteConcurrency(_ limit: Int) async {
+      guard (1...4).contains(limit), connectionState == .connected, !busy else { return }
+      busy = true
+      statusText = "正在保存并发设置…"
+      publishDisplay()
+      defer {
+        busy = false
+        publishDisplay()
+      }
+      do {
+        try await client.setProjectWriteConcurrency(limit)
+        projectWriteConcurrency = limit
+        statusText =
+          limit == 1
+          ? "同一项目的完整权限 Agent 任务恢复为依次执行。"
+          : "同一项目最多同时运行 \(limit) 个完整权限 Agent 任务。"
+        feedback.postToast(statusText)
+      } catch {
+        statusText = "并发设置保存失败：\(BridgeServiceErrorMessage.message(error))"
+        feedback.postAlert(statusText)
+      }
+      publishDisplay()
+    }
+
     func refreshDisplaySnapshot() { publishDisplay() }
+
+    func setWorkbenchEnabled(_ enabled: Bool) async {
+      guard connectionState == .connected else { return }
+      await workbenchSettingsController.setEnabled(enabled)
+    }
+
+    private func makeWorkbenchSettingsController() -> WorkbenchSettingsController {
+      WorkbenchSettingsController(
+        read: { [weak self] in
+          guard let self else { throw BridgeServiceClientError.unavailable }
+          return try await self.client.workbenchSettings()
+        },
+        write: { [weak self] enabled in
+          guard let self else { throw BridgeServiceClientError.unavailable }
+          return try await self.client.setWorkbenchEnabled(enabled)
+        },
+        onChange: { [weak self] in self?.publishDisplay() }
+      )
+    }
 
     private func setApprovalMode(_ mode: String, direct: Bool) async {
       guard Self.approvalValues.contains(mode), connectionState == .connected, !busy else { return }
@@ -255,7 +305,7 @@
         saveInstructionsEnabled: connectionState == .connected && !busy,
         saveDirectApprovalEnabled: connectionState == .connected && !busy,
         saveTaskStartApprovalEnabled: connectionState == .connected && !busy,
-        statusText: statusText,
+        statusText: workbenchSettingsController.state.errorMessage ?? statusText,
         busy: busy,
         isRefreshingModels: isRefreshingModels,
         modelError: modelError,
@@ -264,7 +314,14 @@
         accessMode: current?.accessMode ?? "request-approval",
         directApprovalMode: directMode,
         taskStartApprovalMode: taskStartMode,
+        projectWriteConcurrency: projectWriteConcurrency,
         modelOptions: modelOptions,
+        workbenchEnabled: workbenchSettingsController.state.enabled ?? true,
+        workbenchSettingsLoaded: workbenchSettingsController.state.enabled != nil,
+        canChangeWorkbench: connectionState == .connected
+          && workbenchSettingsController.state.enabled != nil
+          && !workbenchSettingsController.state.isChanging,
+        isChangingWorkbench: workbenchSettingsController.state.isChanging,
         keepServiceRunningAfterExit: keepServiceRunningAfterExit,
         serviceRegistered: serviceRegistered,
         direct: directConfiguration.map {

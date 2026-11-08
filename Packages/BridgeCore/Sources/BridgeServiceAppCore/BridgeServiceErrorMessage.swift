@@ -3,6 +3,21 @@ import BridgeSecurity
 import Foundation
 
 public enum BridgeServiceErrorMessage {
+  public static func remoteFailure(_ error: any Error) -> (code: String, retryable: Bool)? {
+    guard let codec = error as? BridgeServiceIPCCodecError,
+      case .remoteError(let failure) = codec
+    else { return nil }
+    return (failure.code, failure.retryable)
+  }
+
+  /// Stable code for a request that never reached a connected service (transport loss, restart,
+  /// or reconnect in progress). Pages retry these reads once the connection is back.
+  public static let serviceUnavailableCode = "service_unavailable"
+
+  public static func isServiceUnavailable(_ error: any Error) -> Bool {
+    (error as? BridgeServiceClientError) == .unavailable
+  }
+
   /// Renders a user-facing message for IPC transport and remote errors.
   public static func message(_ error: any Error) -> String {
     if let codec = error as? BridgeServiceIPCCodecError {

@@ -171,7 +171,7 @@ extension BridgeServiceApplication {
     let supportsModelSelection = effectiveCapabilities.contains(.modelSelection)
     let mutationIntent: AgentMutationIntent =
       permission == .full ? .workspaceWrite : .readOnly
-    if providerID == .pi || providerID == .qoder,
+    if providerID == .pi || providerID == .qoder || providerID == .claudeCode,
       !effectiveCapabilities.isSuperset(of: mutationIntent.requiredCapabilities(for: providerID))
     {
       throw BridgeMCPQueryError.unavailable

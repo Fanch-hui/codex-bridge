@@ -5,16 +5,19 @@ public struct MCPServiceServerFactory: Sendable {
   private let appVersion: String
   private let catalog: MCPServiceToolCatalog
   private let dispatcher: MCPServiceToolDispatcher
+  private let activity: MCPClientCallActivity?
 
   public init(
     appVersion: String,
     service: any BridgeMCPServiceAPI,
     exposureMode: MCPServiceExposureMode,
     clientID: MCPClientID = .chatGPT,
+    activity: MCPClientCallActivity? = nil,
     logger: Logger = Logger(label: "CodexBridge.BridgeMCP.LightweightServer")
   ) {
     precondition(!appVersion.isEmpty)
     self.appVersion = appVersion
+    self.activity = activity
     catalog = MCPServiceToolCatalog(exposureMode: exposureMode)
     dispatcher = MCPServiceToolDispatcher(
       service: service,
@@ -27,6 +30,7 @@ public struct MCPServiceServerFactory: Sendable {
   public func makeServer() async -> Server {
     let definitions = catalog.definitions
     let dispatcher = dispatcher
+    let activity = activity
     let instructions = await serverInstructions()
     let server = Server(
       name: "codex-bridge",
@@ -47,7 +51,20 @@ public struct MCPServiceServerFactory: Sendable {
       let sessionID =
         Server.currentHandlerContext?.httpContext?
         .header(HTTPHeaderName.sessionID) ?? "direct"
-      return try await dispatcher.call(parameters, sessionID: sessionID)
+      let result = try await dispatcher.call(parameters, sessionID: sessionID)
+      let request = Server.currentHandlerContext?.httpContext
+      if result.isError != true, let request,
+        let route = request.header(MCPTrustedContextHeaders.route),
+        let rawGeneration = request.header(MCPTrustedContextHeaders.generation),
+        let generation = UInt64(rawGeneration)
+      {
+        let cloudGeneration = request.header(MCPTrustedContextHeaders.cloudGeneration).flatMap(
+          UInt64.init)
+        await activity?.record(
+          clientID: dispatcher.clientID, route: route, generation: generation,
+          cloudGeneration: cloudGeneration)
+      }
+      return result
     }
     return server
   }
@@ -94,10 +111,11 @@ public struct MCPServiceServerFactory: Sendable {
       + "Use list_models for Codex. For another Agent, use list_agents to obtain its installation_id, "
       + "then list_agent_models with that installation_id and the selected project_id to query its "
       + "native catalog and reasoning efforts. list_agent_models returns native catalogs even when models_summary is empty. "
-      + "Omitting project_id from list_agent_models uses the current Workbench project. Task submission never grants local "
-      + "approval; the user must approve execution in the desktop App. Use default_project_id from list_projects "
-      + "as the current default project. Omit project_id when submitting work unless the user explicitly "
-      + "selected a different project; Bridge resolves the latest Workbench selection. When submitting a task, "
+      + "Omitting project_id from list_agent_models uses Bridge's default workspace. Task submission never grants local "
+      + "approval; the user must approve execution in the desktop App. default_project_id from list_projects "
+      + "is Bridge's default workspace, used when project_id is omitted; it does not follow the project selected "
+      + "in the desktop App. Omit project_id only when the user named no project. When the user wants work in a "
+      + "specific project, call list_projects and pass that project_id explicitly. When submitting a task, "
       + "omit execution_model and execution_effort unless "
       + "the user explicitly requested a per-task override; Codex Bridge owns those defaults. "
       + "Set model_override to true only for such an explicit request. Task permissions are selected "

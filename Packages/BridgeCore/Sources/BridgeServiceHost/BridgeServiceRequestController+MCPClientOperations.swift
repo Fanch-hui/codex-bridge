@@ -16,7 +16,11 @@ extension BridgeServiceRequestController {
             enabled: status.profile.enabled,
             exposureMode: status.profile.exposureMode,
             activeSessionCount: status.activeSessionCount,
-            lastConnectedAt: status.lastConnectedAt.map(formatter.string(from:))
+            lastConnectedAt: status.lastConnectedAt.map(formatter.string(from:)),
+            successfulToolCalls: Dictionary(
+              uniqueKeysWithValues: status.successfulToolCalls.map {
+                ($0.route, formatter.string(from: $0.time))
+              })
           )
         }
       )

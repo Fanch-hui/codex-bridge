@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import Foundation
 import GRDB
 
@@ -29,8 +30,21 @@ extension SimpleServiceStore {
           {
             continue
           }
+          let embeddedDSH = try Self.isEmbeddedDSHTask(task.id, in: db)
+          let ownedProcess = embeddedDSH || task.providerID == AgentProviderID.claudeCode.rawValue
+          if ownedProcess, task.state.status == .unknown { continue }
           let wasNotStarted = task.state.status == .awaitingLocalApproval
-          let recoveredStatus: ServiceTaskStatus = .interrupted
+          let recoveredStatus: ServiceTaskStatus =
+            ownedProcess && !wasNotStarted ? .unknown : .interrupted
+          let recoverySummary: String
+          if recoveredStatus == .unknown {
+            recoverySummary =
+              "The service restarted; the provider process and result require reconciliation."
+          } else if wasNotStarted {
+            recoverySummary = "The service restarted before task execution began."
+          } else {
+            recoverySummary = "The service restarted without an attached provider run."
+          }
           let supervisorStatus: ServiceSupervisorStatus =
             task.state.supervisorStatus == .disabled ? .disabled : .degraded
           let state = try ServiceTaskState(
@@ -44,17 +58,18 @@ extension SimpleServiceStore {
             changedFiles: task.state.changedFiles,
             resultSummary: task.state.resultSummary,
             supervisorSummary: task.state.supervisorSummary,
-            failureCode: task.state.failureCode ?? "service_restarted"
+            failureCode: task.state.failureCode
+              ?? (recoveredStatus == .unknown
+                ? (embeddedDSH ? "dsh_recovery_pending" : "agent_process_recovery_pending")
+                : "service_restarted")
           )
           let recovered = try task.replacingState(state, updatedAt: date)
           try Self.validateTransition(from: task.state.status, to: recoveredStatus)
           try updateTaskRow(recovered, in: db)
           try Self.insert(
             ServiceTaskEventDraft(
-              kind: .taskInterrupted,
-              summary: wasNotStarted
-                ? "The service restarted before task execution began."
-                : "The service restarted without an attached provider run.",
+              kind: recoveredStatus == .unknown ? .taskMarkedUnknown : .taskInterrupted,
+              summary: recoverySummary,
               createdAt: date
             ),
             taskID: task.id,

@@ -49,6 +49,7 @@ public actor AntigravityCLIEventNormalizer {
   private var turnOrdinal = 0
   private var turnSummaries: [String] = []
   private var contents: [String: AgentProgressTextBuffer] = [:]
+  private var retryRecovery = AntigravityRetryRecovery()
   private static let maximumContentStreams = 64
   private static let maximumLocations = 128
 
@@ -71,6 +72,7 @@ public actor AntigravityCLIEventNormalizer {
       throw AntigravityCLIError.invalidMessage
     }
 
+    retryRecovery.observe(update)
     var events: [AgentEventEnvelope] = []
     switch update.stepType {
     case "agent_response":
@@ -125,6 +127,9 @@ public actor AntigravityCLIEventNormalizer {
     let completedTurnOrdinal = turnOrdinal
     turnOrdinal += 1
     contents.removeAll(keepingCapacity: true)
+    let status = result.status.uppercased()
+    let recoveredAfterRetry = recoveredAfterRetry(result)
+    retryRecovery.reset()
 
     guard terminal else { return events }
     if permissionDenied {
@@ -152,8 +157,16 @@ public actor AntigravityCLIEventNormalizer {
       return events
     }
 
-    let status = result.status.uppercased()
     switch status {
+    case _ where recoveredAfterRetry:
+      events.append(
+        try envelope(
+          .completed(
+            summary: AgentTurnSummary.combined(turnSummaries) ?? turnSummary,
+            stopReason: "SUCCESS_AFTER_RETRY"
+          )
+        )
+      )
     case "SUCCESS":
       events.append(
         try envelope(
@@ -180,6 +193,11 @@ public actor AntigravityCLIEventNormalizer {
       )
     }
     return events
+  }
+
+  /// Whether this turn's non-success result only repeats an error a later retry overcame.
+  public func recoveredAfterRetry(_ result: AntigravityResult) -> Bool {
+    retryRecovery.recovered(status: result.status.uppercased(), response: result.response)
   }
 
   public func failed(code: String, summary: String) throws -> AgentEventEnvelope {

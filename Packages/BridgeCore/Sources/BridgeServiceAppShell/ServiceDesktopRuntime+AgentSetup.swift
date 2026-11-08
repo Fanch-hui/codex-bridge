@@ -11,7 +11,9 @@ extension BridgeServiceAppModel {
       do {
         let client = try currentClient()
         let payload = envelope.payload
-        if [.beginAgentSetup, .continueAgentSetup, .cancelAgentSetup].contains(envelope.command) {
+        if [.beginAgentSetup, .continueAgentSetup, .probeAgentSetupLogin, .cancelAgentSetup]
+          .contains(envelope.command)
+        {
           agentSetupRequestGeneration &+= 1
         }
         switch envelope.command {
@@ -44,6 +46,10 @@ extension BridgeServiceAppModel {
         case .cancelAgentSetup:
           guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID) else { return }
           await applyAgentSetup(try await client.cancelAgentSetup(operationID: id), client: client)
+        case .probeAgentSetupLogin:
+          guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID) else { return }
+          await applyAgentSetup(
+            try await client.probeAgentSetupLogin(operationID: id), client: client)
         case .openAgentSetupLogin:
           guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID),
             let value = try await client.agentSetups().first(where: { $0.operationID == id }),
@@ -73,7 +79,7 @@ extension BridgeServiceAppModel {
       guard generation == agentSetupRequestGeneration else { return }
       for value in values { await applyAgentSetup(value, client: client) }
       guard generation == agentSetupRequestGeneration else { return }
-      agentSetupOperations = values
+      if agentSetupOperations != values { agentSetupOperations = values }
     } catch { errorMessage = Self.message(error) }
   }
 
@@ -82,11 +88,14 @@ extension BridgeServiceAppModel {
   ) async {
     let previous = agentSetupOperations.first { $0.operationID == value.operationID }
     if let index = agentSetupOperations.firstIndex(where: { $0.operationID == value.operationID }) {
-      agentSetupOperations[index] = value
+      if agentSetupOperations[index] != value { agentSetupOperations[index] = value }
     } else {
       agentSetupOperations.append(value)
     }
-    guard value.state == "ready", previous?.state != "ready" else { return }
+    // The Service keeps finished setups across launches, so the first sync after the app starts
+    // sees them as "ready" without any local baseline. Only a state change observed here counts
+    // as a completion that justifies re-reading that Agent's model catalog.
+    guard value.state == "ready", let previous, previous.state != "ready" else { return }
     if let catalog = try? await client.agentCatalog() { applyAgentCatalogSnapshot(catalog) }
     refreshAgentModelCatalog(installationID: value.installationID, providerID: value.providerID)
   }

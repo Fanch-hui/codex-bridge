@@ -2,21 +2,64 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var disclosures = new Map(), viewports = new Map(), viewportKey = null, activeContextKey = null;
+  var searchReveal = null;
+
+  function reveal(taskID, messageKey) {
+    searchReveal = taskID && messageKey
+      ? { taskID: String(taskID), key: String(messageKey), scrolled: false }
+      : null;
+  }
+
+  function hasSearchReveal(taskID) {
+    return !!(searchReveal && searchReveal.taskID === taskID);
+  }
+
+  function showSearchMatch(container, page, options) {
+    if (!hasSearchReveal(page.selectedTaskID)) return;
+    var match = Array.from(container.querySelectorAll("[data-message-key]")).find(function (item) {
+      return item.dataset.messageKey === searchReveal.key;
+    });
+    if (!match) return;
+    match.classList.add("is-search-match");
+    if (searchReveal.scrolled) return;
+    searchReveal.scrolled = true;
+    var anchor = searchReveal;
+    var scroll = function () {
+      if (searchReveal !== anchor || !match.isConnected) return;
+      var owner = options && options.owner;
+      if (owner && owner.__conversationFollow) owner.__conversationFollow.following = false;
+      match.scrollIntoView({ block: "center" });
+    };
+    if (global.requestAnimationFrame) global.requestAnimationFrame(scroll);
+    else scroll();
+  }
+
+  function returnToLatest(taskID, emit) {
+    searchReveal = null;
+    emit("refreshConversation", { taskID: taskID });
+  }
 
   function contextKey(page) {
     var task = page.selectedTask;
-    return JSON.stringify([page.selectedProjectID, task && task.providerID,
+    var projectID = task && task.projectID;
+    if (!projectID && task && Array.isArray(page.tasks)) {
+      var matched = page.tasks.find(function (item) { return item.taskID === task.taskID; });
+      if (matched) projectID = matched.projectID;
+    }
+    return JSON.stringify([projectID || page.selectedProjectID, task && task.providerID,
       task ? task.sessionID || task.taskID : page.history && page.history.selectedThreadID]);
   }
 
+  var recentContextKeys = [];
   function pruneContextState(page) {
     var key = contextKey(page);
     if (activeContextKey === key) return;
     activeContextKey = key;
-    // Contexts accumulate disclosure and viewport state forever otherwise;
-    // keep only the active conversation so long sessions stay bounded.
+    // Contexts accumulate disclosure and viewport state forever otherwise; keep the few
+    // conversations on screen (the split view shows up to four) so long sessions stay bounded.
+    recentContextKeys = [key].concat(recentContextKeys.filter(function (k) { return k !== key; })).slice(0, 6);
     [disclosures, viewports].forEach(function (map) {
-      Array.from(map.keys()).forEach(function (k) { if (k !== key) map.delete(k); });
+      Array.from(map.keys()).forEach(function (k) { if (recentContextKeys.indexOf(k) < 0) map.delete(k); });
     });
   }
 
@@ -70,7 +113,11 @@
     var process = global.CodexBridgeDesktopWorkbenchProcess;
     if (process) values = process.entries(values, page);
     var incremental = global.CodexBridgeDesktopWorkbenchConversationIncremental;
-    if (incremental) return incremental.render(container, values, page, emit, options);
+    if (incremental) {
+      incremental.render(container, values, page, emit, options);
+      showSearchMatch(container, page, options);
+      return;
+    }
     var state = page.selectedTask && page.selectedTask.conversationState;
     if (state && state.errorMessage) container.appendChild(conversationError(state.errorMessage));
     var list = S.node("div", "conversation-list");
@@ -108,18 +155,31 @@
       if (state && state.isLoadingEarlier) earlier.setAttribute("aria-busy", "true");
       actions.appendChild(earlier);
     }
+    if (hasSearchReveal(page.selectedTaskID)) {
+      var latest = S.button("返回最新消息", null, {}, null, "small", false);
+      latest.addEventListener("click", function () {
+        latest.disabled = true;
+        returnToLatest(page.selectedTaskID, emit);
+      });
+      actions.appendChild(latest);
+    }
     if (actions.childNodes.length) container.appendChild(actions);
+    showSearchMatch(container, page, options);
   }
 
   function conversationMessage(entry) {
+    var upstream = global.CodexBridgeDesktopDSHConversationView;
+    if (upstream) return upstream.create(entry);
     var item = S.node("article", "conversation-entry entry-message");
     updateMessage(item, entry);
     return item;
   }
 
   function updateMessage(item, entry) {
+    if (item.__dshHost) return global.CodexBridgeDesktopDSHConversationView.update(item, entry);
     var isUser = entry.role === "用户";
     item.className = "conversation-entry entry-message " + (isUser ? "entry-user" : "entry-agent") + (entry.isFinal ? "" : " entry-streaming");
+    item.dataset.messageKey = String(entry.id);
     if (!item.__text) {
       item.__text = S.markdown(entry.text, "entry-text markdown-body", entry.markdownHTML);
       item.appendChild(item.__text);
@@ -149,6 +209,8 @@
   }
 
   function conversationDisclosure(entry, context) {
+    var upstream = global.CodexBridgeDesktopDSHConversationView;
+    if (upstream) return upstream.create(entry, context);
     var item = S.node("details", "conversation-entry entry-disclosure");
     item.__disclosureKey = null;
     item.addEventListener("toggle", function () {
@@ -159,6 +221,7 @@
   }
 
   function updateDisclosure(item, entry, context) {
+    if (item.__dshHost) return global.CodexBridgeDesktopDSHConversationView.update(item, entry, context);
     var key = JSON.stringify([context, entry.id]);
     var isNewContext = item.__disclosureKey !== key;
     if (disclosures.has(key)) item.open = disclosures.get(key);
@@ -221,6 +284,7 @@
     if (item.__toolName) item.__toolName.hidden = true;
     if (item.__toolInput) item.__toolInput.hidden = true;
     if (item.__toolOutput) item.__toolOutput.hidden = true;
+    if (item.__toolJobs) item.__toolJobs.hidden = true;
   }
 
   function updateToolBody(item, entry) {
@@ -238,6 +302,7 @@
     }
     toolBlock(item, "__toolInput", "输入", "entry-arguments", entry.toolArguments);
     toolBlock(item, "__toolOutput", "输出", "entry-output", entry.text);
+    toolBlock(item, "__toolJobs", "后台任务", "entry-output", entry.jobDetails);
   }
 
   function childStatusTone(status) {
@@ -384,14 +449,20 @@
   }
 
   function updateActivityNode(item, state) {
+    // Background work reads as one quiet line, like a native agent's working indicator.
+    var text = String(state.detailText || state.statusText || "正在处理").replace(/[…\.]+$/, "");
+    if (item.__activityText === text) return item;
+    item.__activityText = text;
     S.clear(item.__activityCopy);
-    item.__activityCopy.appendChild(S.node("div", "conversation-state-title", state.statusText || "正在处理任务…"));
-    if (state.detailText) item.__activityCopy.appendChild(S.node("div", "conversation-state-detail", state.detailText));
+    item.__activityCopy.appendChild(S.node("span", "conversation-state-title workbench-working-indicator", text));
     return item;
   }
 
   global.CodexBridgeDesktopWorkbenchConversation = {
     render: addConversationBlock,
+    reveal: reveal,
+    hasSearchReveal: hasSearchReveal,
+    returnToLatest: returnToLatest,
     captureViewport: captureViewport,
     contextKey: contextKey,
     createMessage: conversationMessage,

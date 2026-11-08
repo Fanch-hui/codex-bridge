@@ -6,6 +6,9 @@ enum AgentSetupLoginScript {
     "PATH", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
     "QODER_CONFIG_DIR", "QODERCN_CONFIG_DIR", "PI_CODING_AGENT_DIR",
     "SystemRoot", "WINDIR", "TEMP", "TMP", "LANG", "LC_ALL", "TERM",
+    // Native logins store credentials per account: Claude Code keys its macOS Keychain item by
+    // USER, so a login without it is saved under "unknown" and never found again.
+    "USER", "LOGNAME", "USERNAME", "SHELL", "TMPDIR",
   ]
 
   static func environment(
@@ -29,6 +32,10 @@ enum AgentSetupLoginScript {
         result[canonical] = value
       }
     }
+    #if !os(Windows)
+      if result["USER"]?.isEmpty != false { result["USER"] = NSUserName() }
+      if result["LOGNAME"]?.isEmpty != false { result["LOGNAME"] = result["USER"] }
+    #endif
     return result
   }
 

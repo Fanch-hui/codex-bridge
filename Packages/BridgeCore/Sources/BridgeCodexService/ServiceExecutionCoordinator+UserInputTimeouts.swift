@@ -27,6 +27,11 @@ extension ServiceExecutionCoordinator {
   }
 
   func expireAgentUserInput(inputID: String) async {
+    guard let initial = pendingAgentUserInputs[inputID] else { return }
+    let taskID = initial.request.taskID
+    let serializesInteractions = initial.request.binding.providerID == .claudeCode
+    if serializesInteractions { await acquireAgentInteraction(taskID) }
+    defer { if serializesInteractions { releaseAgentInteraction(taskID) } }
     guard let pending = pendingAgentUserInputs.removeValue(forKey: inputID) else { return }
     agentUserInputTimeouts.removeValue(forKey: inputID)
     do {
@@ -70,10 +75,9 @@ extension ServiceExecutionCoordinator {
     finishedRuns.insert(taskID)
     clearAgentUserInputs(taskID: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
-    if let run = activeAgentRuns.removeValue(forKey: taskID) {
-      await run.shutdown()
-    }
+    await closeAgentRun(taskID: taskID)
     _ = await conversation.close(taskID: taskID)
+    guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
     _ = try? await tasks.fail(taskID: taskID, failureCode: code, summary: summary)
   }
 }

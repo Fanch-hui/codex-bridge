@@ -13,22 +13,8 @@ public struct BridgeServiceRootView: View {
     ZStack(alignment: .topLeading) {
       BridgeDesktopWebView(model: model)
 
-      if let viewport = model.chatBrowserViewport,
-        viewport.visible,
-        model.navigation == .workbench,
-        model.isChatBrowserEnabled
-      {
-        ChatGPTWebView(
-          site: model.chatBrowserSite,
-          initialURL: model.chatBrowserResumeURL,
-          reloadRequest: model.chatBrowserReloadRequest,
-          webViewReference: model.chatWebViewBinding(for: model.chatBrowserSite)
-        )
-        .id(model.chatBrowserSite.rawValue)
-        .frame(width: viewport.width, height: viewport.height)
-        .offset(x: viewport.x, y: viewport.y)
+      ChatBrowserOverlay(model: model, viewportState: model.chatBrowserViewport)
         .zIndex(10)
-      }
 
       if let toast = model.toast {
         ToastHUDView(toast: toast) {
@@ -40,6 +26,7 @@ public struct BridgeServiceRootView: View {
         .zIndex(100)
       }
     }
+    .ignoresSafeArea(.container, edges: .top)
     .navigationTitle("Codex Bridge")
     .task {
       model.start()
@@ -47,7 +34,7 @@ public struct BridgeServiceRootView: View {
     .alert(
       "操作失败",
       isPresented: Binding(
-        get: { model.errorMessage != nil },
+        get: { model.errorMessage != nil && !model.preferencesWindowIsKey },
         set: { visible in
           if !visible { model.errorMessage = nil }
         }
@@ -65,9 +52,12 @@ public struct BridgeServiceRootView: View {
 
 public struct BridgeServiceMenuBarView: View {
   @ObservedObject private var model: BridgeServiceAppModel
+  @Environment(\.openWindow) private var openWindow
+  private let mainWindowID: String
 
-  public init(model: BridgeServiceAppModel) {
+  public init(model: BridgeServiceAppModel, mainWindowID: String = "main") {
     self.model = model
+    self.mainWindowID = mainWindowID
   }
 
   public var body: some View {
@@ -96,13 +86,11 @@ public struct BridgeServiceMenuBarView: View {
 
       Button("打开工作台") {
         model.selection = .workbench
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first(where: \.canBecomeMain)?.makeKeyAndOrderFront(nil)
+        showMainWindow()
       }
 
       Button("打开主窗口") {
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first(where: \.canBecomeMain)?.makeKeyAndOrderFront(nil)
+        showMainWindow()
       }
 
       Button("立即刷新状态") {
@@ -118,6 +106,12 @@ public struct BridgeServiceMenuBarView: View {
     .padding(10)
     .task {
       model.start()
+    }
+  }
+
+  private func showMainWindow() {
+    if !BridgeDesktopWindowCoordinator.shared.showMainWindow() {
+      openWindow(id: mainWindowID)
     }
   }
 

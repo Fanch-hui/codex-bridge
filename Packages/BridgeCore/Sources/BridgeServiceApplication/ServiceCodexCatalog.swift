@@ -238,6 +238,7 @@ public actor ServiceCodexCatalog {
     deadline: ContinuousClock.Instant
   ) async throws -> MCPModelList {
     var refreshFailure: String?
+    var fallbackModels: [CodexModel] = []
     for attempt in 0..<2 {
       let outcome = try await withClient(configuration: configuration, deadline: deadline) {
         client in
@@ -245,21 +246,35 @@ public actor ServiceCodexCatalog {
       }
       switch outcome {
       case .models(let models):
-        return MCPModelList(
-          models: try models.enumerated().map {
-            try ServiceCodexCatalogModelProjection.model($0.element, index: $0.offset)
-          })
-      case .refreshFailed(let detail):
+        return try projectModels(models)
+      case .refreshFailed(let detail, let fallback):
         refreshFailure = detail
-        if attempt == 0 {
+        if !fallback.isEmpty {
+          fallbackModels = fallback
+        }
+        if attempt == 0,
+          fallbackModels.isEmpty || ContinuousClock.now.duration(to: deadline) >= .seconds(6)
+        {
           try await Task.sleep(for: .milliseconds(500))
           try checkDeadline(deadline)
+        } else {
+          break
         }
       }
+    }
+    if !fallbackModels.isEmpty {
+      return try projectModels(fallbackModels)
     }
     throw BridgeMCPQueryError.codexAppServerUnavailable(
       "Codex could not refresh its model catalog. \(refreshFailure ?? "No native refresh diagnostic was provided.")"
     )
+  }
+
+  private static func projectModels(_ models: [CodexModel]) throws -> MCPModelList {
+    MCPModelList(
+      models: try models.enumerated().map {
+        try ServiceCodexCatalogModelProjection.model($0.element, index: $0.offset)
+      })
   }
 
   private func withClient<Output: Sendable>(

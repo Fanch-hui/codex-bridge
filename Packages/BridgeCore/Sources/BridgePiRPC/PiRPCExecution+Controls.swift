@@ -7,7 +7,7 @@ extension PiRPCExecution {
   ) async throws {
     guard phase == .active else { throw AgentRuntimeError.processUnavailable }
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      text.utf8.count <= 32 * 1_024, !text.contains("\0"),
+      text.utf8.count <= (initial ? 64 : 32) * 1_024, !text.contains("\0"),
       pendingInputs.count < 32, pendingInputBytes + text.utf8.count <= 256 * 1_024
     else { throw AgentRuntimeError.invalidRequest("pi.input") }
     inFlightInputs += 1
@@ -106,6 +106,7 @@ extension PiRPCExecution {
       for input in inputs {
         try await client.answerUI(id: input.wireID, fields: ["cancelled": .bool(true)])
       }
+      await writeGate?.cancelPending()
       _ = try await client.request("clear_queue")
       pendingInputs.removeAll()
       pendingInputBytes = 0
@@ -118,6 +119,7 @@ extension PiRPCExecution {
         state.data?["pendingMessageCount"]?.integerValue == 0,
         normalizer.activeToolCount == 0
       else { throw PiRPCError.invalidArgument("pi_abort_not_idle") }
+      await writeGate?.releaseAll()
     } catch {
       await fail(error)
       throw error

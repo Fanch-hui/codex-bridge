@@ -6,6 +6,7 @@ import BridgeDeepSeekHarnessACP
 import BridgeDeepSeekHarnessDesktop
 import BridgeDirectCommand
 import BridgeDomain
+import BridgeFiles
 import BridgeLegacyImport
 import BridgeMCP
 import BridgeOpenCodeACP
@@ -32,6 +33,7 @@ public actor ServiceComposition {
   public let catalog: ServiceCodexCatalog
   public let runtimeStatus: ServiceRuntimeStatus
   public let application: BridgeServiceApplication
+  public let embeddedDSH: ServiceEmbeddedDSHController
   public let tunnel: ServiceTunnelController
   public let mcpClients: ServiceMCPClientRegistry
   let geminiCloud: ServiceGeminiCloudController
@@ -76,6 +78,10 @@ public actor ServiceComposition {
     let projects = ServiceProjectService(store: store)
     let tasks = ServiceTaskManager(store: store)
     let settings = ServiceSettings(store: store)
+    let defaultWorkspace = ServiceDefaultWorkspace(
+      rootURL: paths.defaultWorkspaceURL, projects: projects, settings: settings,
+      prepareDirectory: { try paths.prepareDefaultWorkspace() })
+    _ = try await defaultWorkspace.ensure()
     let deepSeekHarnessMCP = ServiceDeepSeekHarnessMCPConfiguration(
       settings: settings, secretStore: secretStore)
     let agentMCP = Dictionary(
@@ -124,6 +130,8 @@ public actor ServiceComposition {
       throw AgentRuntimeError.invalidRequest("qoder.distribution")
     }
     let agentProviders: [any AgentProvider] = [
+      try ServiceClaudeAssembly.make(
+        stateDirectory: paths.agentStateURL, runtimeBindings: setupRuntimeBindings, mcp: agentMCP),
       try QoderSDKProvider(
         configuration: QoderSDKProviderConfiguration(
           runtimeBaseDirectory: paths.agentStateURL
@@ -237,11 +245,19 @@ public actor ServiceComposition {
         synchronizeCodexProjects: configuration.synchronizeCodexProjects
       )
     )
+    let embeddedDSHRoot = paths.agentStateURL.appendingPathComponent(
+      "EmbeddedDSH", isDirectory: true)
+    let workspaces = AgentWorkspaceStore(
+      directory: embeddedDSHRoot.appendingPathComponent("AgentWorkspaces", isDirectory: true))
     let coordinator = ServiceExecutionCoordinator(
       tasks: tasks,
       projects: projects,
       execution: execution,
       agentRunner: agentRunner,
+      processOwnershipDirectory: embeddedDSHRoot.appendingPathComponent(
+        "AgentProcesses", isDirectory: true),
+      executionWorkspaceResolver: ServiceEmbeddedDSHAssembly.workspaceResolver(
+        store: store, workspaces: workspaces),
       providerDisplayNameResolver: {
         ServiceAgentProviderPolicyRegistry.displayName(for: $0)
       }
@@ -279,6 +295,7 @@ public actor ServiceComposition {
       coordinator: coordinator,
       catalog: catalog,
       runtimeStatus: runtimeStatus,
+      defaultWorkspace: defaultWorkspace,
       agentRegistry: agentRegistry,
       agentCredentials: agentCredentials,
       deepSeekDesktop: desktopController,
@@ -290,6 +307,17 @@ public actor ServiceComposition {
         historyFileURL: paths.rootURL.appending(path: "direct-command-history.json")
       )
     )
+    let embeddedDSH = ServiceEmbeddedDSHAssembly.make(
+      application: application, projects: projects, tasks: tasks, store: store, settings: settings,
+      registry: agentRegistry, providers: agentProviders,
+      desktop: deepSeekDesktopProvider.controller,
+      secretStore: secretStore,
+      dataRoot: embeddedDSHRoot, workspaces: workspaces
+    )
+    await coordinator.setToolWriteGateProvider(embeddedDSH)
+    try await embeddedDSH.restoreWorkspaceMergeRecoveryMarkers()
+    await embeddedDSH.startNativeWriteRecovery()
+    try await coordinator.recoverClaudeProcesses()
     await application.startTaskQueueProcessor()
     let resolvedTunnelFactory =
       tunnelFactory
@@ -331,6 +359,7 @@ public actor ServiceComposition {
       catalog: catalog,
       runtimeStatus: runtimeStatus,
       application: application,
+      embeddedDSH: embeddedDSH,
       setupRuntimeBindings: setupRuntimeBindings,
       tunnel: tunnel,
       mcpClients: mcpClients,
@@ -384,6 +413,7 @@ public actor ServiceComposition {
     catalog: ServiceCodexCatalog,
     runtimeStatus: ServiceRuntimeStatus,
     application: BridgeServiceApplication,
+    embeddedDSH: ServiceEmbeddedDSHController,
     setupRuntimeBindings: ServiceAgentSetupRuntimeBindings,
     tunnel: ServiceTunnelController,
     mcpClients: ServiceMCPClientRegistry,
@@ -415,6 +445,7 @@ public actor ServiceComposition {
     self.catalog = catalog
     self.runtimeStatus = runtimeStatus
     self.application = application
+    self.embeddedDSH = embeddedDSH
     self.tunnel = tunnel
     self.mcpClients = mcpClients
     geminiCloud = ServiceGeminiCloudController(settings: settings, clients: mcpClients)
@@ -611,6 +642,17 @@ public actor ServiceComposition {
     await geminiCloud.shutdown()
     await stopMCP()
     await application.shutdownTaskQueueProcessor()
+    do {
+      try await embeddedDSH.shutdown()
+    } catch {
+      let current = await runtimeStatus.current()
+      await runtimeStatus.update(
+        ServiceRuntimeStatusSnapshot(
+          mcpState: current.mcpState, tunnelState: current.tunnelState,
+          codexVersion: current.codexVersion, loginMode: current.loginMode,
+          degradations: current.degradations + ["内置 DSH 关闭未完成，执行组将在恢复时核对。"]
+        ))
+    }
     await coordinator.shutdown()
     await deepSeekDesktop.shutdown()
     await application.shutdownDirectOperations()

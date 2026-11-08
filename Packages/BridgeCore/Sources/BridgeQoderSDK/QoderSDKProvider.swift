@@ -91,7 +91,7 @@ public struct QoderSDKProvider: AgentProvider, AgentInstallationArtifactProvidin
         return runtime.distribution
       })
     descriptor = try AgentProviderDescriptor(
-      providerID: .qoder, displayName: "Qoder", adapterRevision: 1)
+      providerID: .qoder, displayName: "Qoder", adapterRevision: 2)
   }
 
   public func probe(_ request: AgentProbeRequest) async -> AgentProbeResult {
@@ -128,6 +128,33 @@ public struct QoderSDKProvider: AgentProvider, AgentInstallationArtifactProvidin
   {
     let metadata = try await inspect(installation: installation)
     return try QoderModelCatalog.parse(metadata["models"] ?? .array([]))
+  }
+
+  /// Queries the native account without starting a model task.
+  public func isAuthenticated(installation: AgentInstallation) async throws -> Bool {
+    let profile = try await QoderRuntimeProfile.make(
+      installation: installation, configuration: configuration)
+    let cwd = URL(fileURLWithPath: installation.executablePath).deletingLastPathComponent().path
+    let client = try profile.client(cwd: cwd, factory: configuration.transportFactory)
+    do {
+      let result = try await client.request(
+        "qoder/account_scope",
+        params: profile.parameters(
+          cwd: cwd, sessionID: UUID().uuidString.lowercased(), request: nil, resources: .init(),
+          proxy: configuration.proxy))
+      guard let digest = result.objectValue?["digest"]?.stringValue, digest.utf8.count == 64,
+        digest.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
+      else { throw AgentRuntimeError.invalidRequest("qoder.account_scope") }
+      await client.shutdown()
+      return true
+    } catch let error as ACPError {
+      await client.shutdown()
+      if case .remote(_, let code) = error, code == "authentication_required" { return false }
+      throw error
+    } catch {
+      await client.shutdown()
+      throw error
+    }
   }
 
   private func inspect(installation: AgentInstallation) async throws -> QoderJSONValue {
@@ -286,7 +313,7 @@ public struct QoderSDKProvider: AgentProvider, AgentInstallationArtifactProvidin
     if queryMethods.contains("getContextUsage") || queryMethods.contains("getUsageInfo") {
       capabilities.insert(.usage)
     }
-    if models.count > 1 { capabilities.insert(.modelSelection) }
+    if !models.isEmpty { capabilities.insert(.modelSelection) }
     if !resources.mcpServers.isEmpty,
       metadata["mcpServers"]?.arrayValue?.isEmpty == false
         || !tools.filter({ $0.hasPrefix("mcp__") }).isEmpty

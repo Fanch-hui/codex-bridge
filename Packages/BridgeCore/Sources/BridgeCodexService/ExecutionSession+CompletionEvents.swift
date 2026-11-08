@@ -181,14 +181,16 @@ extension ExecutionSession {
   private func finish(with event: ExecutionEvent) async {
     guard !terminal else { return }
     terminal = true
+    finishingTask = Task { await self.finishAfterStoppingClient(event) }
+  }
+
+  private func finishAfterStoppingClient(_ event: ExecutionEvent) async {
+    await stopClient()
     await enqueue(event)
     continuation.finish()
     eventTask?.cancel()
     lifetimeTask?.cancel()
-    Task { [client, onTermination, taskID] in
-      await client.stop()
-      await onTermination(taskID, self)
-    }
+    await onTermination(taskID, self)
   }
 
   func yield(_ event: ExecutionEvent) async {

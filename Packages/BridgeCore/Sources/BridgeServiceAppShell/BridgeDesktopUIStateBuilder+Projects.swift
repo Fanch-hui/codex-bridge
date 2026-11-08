@@ -2,12 +2,14 @@ import BridgeDesktopUI
 import BridgeMCP
 
 extension BridgeDesktopUIStateBuilder {
-  static func projects(from model: BridgeServiceAppModel) -> BridgeDesktopProjectsState {
+  static func projects(
+    from model: BridgeServiceAppModel,
+    cache: BridgeDesktopUIStateCache = BridgeDesktopUIStateCache()
+  ) -> BridgeDesktopProjectsState {
     let selected = model.projects.first { $0.projectID == model.selectedProjectID }
     let detail = model.selectedProjectID.flatMap { model.projectDetails[$0] }
-    let projectTasks = model.tasks.filter { $0.projectID == model.selectedProjectID }
-    let sessions = WorkbenchSessionCatalog.sessions(tasks: projectTasks)
-      .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
+    let sessions = cache.sessions(for: model.tasks)
+      .filter { $0.projectID == model.selectedProjectID }
     return BridgeDesktopProjectsState(
       header: BridgeDesktopPageHeader(
         title: "项目",
@@ -20,7 +22,8 @@ extension BridgeDesktopUIStateBuilder {
           name: project.name,
           path: model.projectPaths[project.projectID],
           gitState: project.gitState,
-          selected: project.projectID == model.selectedProjectID
+          selected: project.projectID == model.selectedProjectID,
+          isDefault: project.projectID == model.defaultProjectID
         )
       },
       selectedProjectID: selected?.projectID,
@@ -61,7 +64,8 @@ extension BridgeDesktopUIStateBuilder {
       },
       skills: model.skills.map(skillRow),
       canRegister: model.connectionState == .connected,
-      canRemove: selected != nil && model.connectionState == .connected
+      canRemove: selected != nil && selected?.projectID != model.defaultProjectID
+        && model.connectionState == .connected
     )
   }
 

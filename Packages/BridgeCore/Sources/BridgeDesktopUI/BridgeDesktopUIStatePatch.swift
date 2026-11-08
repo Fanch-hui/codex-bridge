@@ -46,9 +46,12 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       case selectedTask
       case browser
       case overview
+      case projects
       case connection
       case logs
       case appUpdate
+      case embeddedDSHReceipts
+      case paneTasks
     }
 
     public enum CollectionMode: String, Codable, Equatable, Sendable {
@@ -68,9 +71,12 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
     public let selectedTask: BridgeDesktopTaskDetail?
     public let browser: BridgeDesktopBrowserSlot?
     public let overview: BridgeDesktopOverviewState?
+    public let projects: BridgeDesktopProjectsState?
     public let connections: BridgeDesktopConnectionsState?
     public let logs: BridgeDesktopLogsState?
     public let appUpdate: BridgeDesktopAppUpdateState?
+    public let embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]?
+    public let paneTasks: [BridgeDesktopTaskDetail]?
 
     private init(
       kind: Kind,
@@ -85,9 +91,12 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       selectedTask: BridgeDesktopTaskDetail? = nil,
       browser: BridgeDesktopBrowserSlot? = nil,
       overview: BridgeDesktopOverviewState? = nil,
+      projects: BridgeDesktopProjectsState? = nil,
       connections: BridgeDesktopConnectionsState? = nil,
       logs: BridgeDesktopLogsState? = nil,
-      appUpdate: BridgeDesktopAppUpdateState? = nil
+      appUpdate: BridgeDesktopAppUpdateState? = nil,
+      embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]? = nil,
+      paneTasks: [BridgeDesktopTaskDetail]? = nil
     ) {
       self.kind = kind
       self.taskID = taskID
@@ -101,9 +110,12 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       self.selectedTask = selectedTask
       self.browser = browser
       self.overview = overview
+      self.projects = projects
       self.connections = connections
       self.logs = logs
       self.appUpdate = appUpdate
+      self.embeddedDSHReceipts = embeddedDSHReceipts
+      self.paneTasks = paneTasks
     }
 
     public static func conversation(
@@ -152,6 +164,10 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
       Self(kind: .overview, overview: state)
     }
 
+    public static func projects(_ state: BridgeDesktopProjectsState?) -> Self {
+      Self(kind: .projects, projects: state)
+    }
+
     public static func connection(_ state: BridgeDesktopConnectionsState?) -> Self {
       Self(kind: .connection, connections: state)
     }
@@ -162,6 +178,19 @@ public struct BridgeDesktopUIStatePatch: Codable, Equatable, Sendable {
 
     public static func appUpdate(_ state: BridgeDesktopAppUpdateState?) -> Self {
       Self(kind: .appUpdate, appUpdate: state)
+    }
+
+    /// Split-view panes: changed panes (upsert) or the whole ordered list (replace).
+    public static func paneTasks(
+      mode: CollectionMode,
+      tasks: [BridgeDesktopTaskDetail],
+      removedIDs: [String] = []
+    ) -> Self {
+      Self(kind: .paneTasks, removedIDs: removedIDs, collectionMode: mode, paneTasks: tasks)
+    }
+
+    public static func embeddedDSHReceipts(_ receipts: [BridgeDesktopEmbeddedDSHReceipt]) -> Self {
+      Self(kind: .embeddedDSHReceipts, embeddedDSHReceipts: receipts)
     }
   }
 }

@@ -10,10 +10,7 @@ extension BridgeServiceAppModel {
       ?? projects.first?.projectID
     guard let targetProjectID else { return }
 
-    if selectedProjectID != targetProjectID {
-      selectedProjectID = targetProjectID
-      persistWorkbenchProjectSelection(targetProjectID)
-    }
+    alignContextProject(to: targetProjectID)
     selectedThreadID = threadID
 
     let relatedTask =
@@ -53,9 +50,7 @@ extension BridgeServiceAppModel {
   package func openSession(_ session: WorkbenchSessionItem) {
     let latest = session.latestTask
     let priorTaskIDs = session.tasks.dropLast().map(\.taskID)
-    if selectedProjectID != latest.projectID {
-      selectProject(latest.projectID)
-    }
+    alignContextProject(to: latest.projectID)
     selectedTaskID = latest.taskID
     selectedThread = nil
     selectedThreadID = latest.isCodexTask ? latest.threadID : nil
@@ -63,11 +58,13 @@ extension BridgeServiceAppModel {
   }
 
   public func openTask(_ taskID: String) {
-    guard let task = tasks.first(where: { $0.taskID == taskID }) else { return }
-
-    if selectedProjectID != task.projectID {
-      selectProject(task.projectID)
+    guard let task = tasks.first(where: { $0.taskID == taskID }) else {
+      pendingOpenTaskID = taskID
+      return
     }
+    if pendingOpenTaskID == taskID { pendingOpenTaskID = nil }
+
+    alignContextProject(to: task.projectID)
     selectedTaskID = task.taskID
     selectedThread = nil
     selectedThreadID = task.isCodexTask ? task.threadID : nil

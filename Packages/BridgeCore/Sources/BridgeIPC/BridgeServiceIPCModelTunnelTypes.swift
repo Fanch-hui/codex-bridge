@@ -116,6 +116,15 @@ public struct IPCTaskStartApprovalModeRequest: Codable, Equatable, Sendable {
   }
 }
 
+/// Full-permission Agent tasks one project may run at once (1...4).
+public struct IPCProjectWriteConcurrency: Codable, Equatable, Sendable {
+  public let limit: Int
+
+  public init(limit: Int) {
+    self.limit = limit
+  }
+}
+
 public struct IPCTaskStartApprovalModeResponse: Codable, Equatable, Sendable {
   public let mode: String
 

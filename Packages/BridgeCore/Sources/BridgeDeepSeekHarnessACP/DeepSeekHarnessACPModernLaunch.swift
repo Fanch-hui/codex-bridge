@@ -44,6 +44,7 @@ enum DeepSeekHarnessACPModernLaunch {
     catalogModelIDs: [String]? = nil,
     reasoningEffort: String?,
     mutationIntent: AgentMutationIntent,
+    nativeSubagentsAllowed: Bool = true,
     sourceEnvironment: [String: String] = [:],
     usesMessagesProvider: Bool = false
   ) throws -> String {
@@ -87,6 +88,9 @@ enum DeepSeekHarnessACPModernLaunch {
         "\n- insert:\n"
         + additional.split(separator: "\n", omittingEmptySubsequences: false)
         .map { "    " + $0 }.joined(separator: "\n") + "\n"
+    }
+    if !nativeSubagentsAllowed {
+      patch += "\n" + DeepSeekHarnessACPSubagentPolicy.patch
     }
     let profile = try DeepSeekHarnessACPPathSupport.append(
       "modern-profile",

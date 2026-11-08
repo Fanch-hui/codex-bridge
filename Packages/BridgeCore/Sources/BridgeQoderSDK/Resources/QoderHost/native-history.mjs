@@ -1,4 +1,4 @@
-import { loadSDK } from './sdk.mjs';
+import { loadSDK, sdkLifecycle } from './sdk.mjs';
 import { absolute, deadline, distribution, identifier, object, requireValue, samePath, text, uuid } from './validation.mjs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -25,6 +25,10 @@ export async function manageNativeHistory(raw, loader = loadSDK) {
     && Number.isSafeInteger(limit) && limit >= 1 && limit <= maximumPageSize, 'invalid_history_page');
 
   const { sdk } = await loader(config);
+  return sdkLifecycle.using(sdk, () => operate(sdk, config, raw, operation, offset, limit));
+}
+
+async function operate(sdk, config, raw, operation, offset, limit) {
   for (const method of ['listSessions', 'getSessionInfo', 'getSessionMessages', 'renameSession', 'deleteSession']) {
     requireValue(typeof sdk[method] === 'function', 'sdk_history_contract_unavailable');
   }

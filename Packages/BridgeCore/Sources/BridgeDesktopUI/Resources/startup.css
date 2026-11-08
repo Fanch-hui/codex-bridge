@@ -1,0 +1,29 @@
+.startup-screen { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: var(--surface, #fff); color: var(--text); opacity: 1; transition: opacity 180ms ease-out; }
+.startup-screen[hidden], [data-surface="preferences"] .startup-screen { display: none; }
+.startup-screen[data-state="leaving"] { opacity: 0; pointer-events: none; }
+.startup-content { position: relative; display: flex; flex-direction: column; align-items: center; max-width: min(360px, calc(100vw - 48px)); text-align: center; }
+.startup-mark { width: 120px; height: 96px; overflow: visible; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.startup-bracket { stroke: var(--text); stroke-width: 8; transform-box: view-box; transform-origin: center; animation: startup-connect 2400ms ease-in-out infinite; }
+.startup-bracket-right { animation-name: startup-connect-right; }
+.startup-link-track { stroke: var(--accent, #3189df); stroke-width: 5; opacity: .2; }
+.startup-link-flow { stroke: var(--accent, #3189df); stroke-width: 5; stroke-dasharray: 24 76; animation: startup-transfer 1600ms linear infinite; }
+.startup-shield { fill: var(--surface, #fff); stroke: var(--accent, #3189df); stroke-width: 2.5; }
+.startup-check { stroke: var(--accent, #3189df); stroke-width: 3; stroke-dasharray: 100; animation: startup-confirm 2400ms ease-in-out infinite; }
+.startup-status { position: absolute; width: min(360px, calc(100vw - 48px)); margin: 0; top: calc(100% + 24px); color: var(--text-secondary); font-size: 13px; line-height: 1.5; opacity: 0; animation: startup-status-appear 200ms ease-out 6s forwards; }
+.startup-actions { position: absolute; top: calc(100% + 88px); display: flex; justify-content: center; gap: 8px; }
+.startup-actions[hidden] { display: none; }
+.startup-screen[data-state="error"] .startup-mark * { animation-play-state: paused; }
+.startup-screen[data-state="error"] .startup-status, .startup-screen[data-state="slow"] .startup-status { opacity: 1; animation: none; }
+.startup-screen[data-state="error"] .startup-content { gap: 24px; }
+.startup-screen[data-state="error"] :is(.startup-status, .startup-actions) { position: static; }
+@keyframes startup-connect { 0%, 100% { transform: translateX(-3px); opacity: .6; } 50% { transform: translateX(0); opacity: 1; } }
+@keyframes startup-connect-right { 0%, 100% { transform: translateX(3px); opacity: .6; } 50% { transform: translateX(0); opacity: 1; } }
+@keyframes startup-transfer { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes startup-confirm { 0%, 15% { stroke-dashoffset: 100; opacity: .4; } 50%, 85% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: .4; } }
+@keyframes startup-status-appear { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .startup-screen { transition: none; }
+  .startup-mark *, .startup-status { animation: none; }
+  .startup-link-flow { stroke-dasharray: none; opacity: .6; }
+  .startup-status { opacity: 1; }
+}

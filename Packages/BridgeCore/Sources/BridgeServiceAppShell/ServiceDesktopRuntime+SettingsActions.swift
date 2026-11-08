@@ -16,6 +16,19 @@ extension BridgeServiceAppModel {
     }
   }
 
+  func setProjectWriteConcurrency(_ limit: Int) {
+    guard (1...4).contains(limit) else { return }
+    runMutation { [weak self] client in
+      try await client.setProjectWriteConcurrency(limit)
+      self?.projectWriteConcurrency = limit
+      self?.postToast(
+        limit == 1
+          ? "同一项目的完整权限 Agent 任务恢复为依次执行"
+          : "同一项目最多同时运行 \(limit) 个完整权限 Agent 任务"
+      )
+    }
+  }
+
   func saveCustomInstructions(_ instructions: String) {
     guard !isSavingCustomInstructions else { return }
     isSavingCustomInstructions = true

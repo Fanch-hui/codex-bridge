@@ -43,6 +43,7 @@ extension BridgeServiceAppModel {
   func updateAgentModelScope(_ scope: AgentModelCatalogScope, providerID: String) {
     guard agentModelCatalogScopes[providerID] != scope else { return }
     agentModelCatalogScopes[providerID] = scope
+    agentModelCatalogLoadedProviders.remove(providerID)
     incrementAgentModelCatalogGeneration(for: providerID)
     incrementAgentModelRefreshGeneration(for: providerID)
     incrementAgentModelDefaultLoadGeneration(for: providerID)

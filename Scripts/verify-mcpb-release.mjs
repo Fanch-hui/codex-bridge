@@ -14,9 +14,12 @@ assert.equal(tag, `v${configuration.version}`, 'Release tag must match the app v
 if (repository) assert.equal(repository, configuration.repositoryName, 'Release repository must match');
 const server = JSON.parse(await readFile(metadata, 'utf8'));
 verifyRegistryMetadata(server, await registryMetadata(configuration, bundle));
-const manifest = JSON.parse(execFileSync('unzip', ['-p', resolve(bundle), 'manifest.json'], {
-  encoding: 'utf8', maxBuffer: 1024 * 1024,
-}));
+const archive = resolve(bundle);
+const manifest = JSON.parse(execFileSync(
+  process.platform === 'win32' ? 'tar.exe' : 'unzip',
+  process.platform === 'win32' ? ['-xOf', archive, 'manifest.json'] : ['-p', archive, 'manifest.json'],
+  { encoding: 'utf8', maxBuffer: 1024 * 1024 },
+));
 assert.equal(manifest.version, configuration.version, 'Bundled manifest version must match');
 assert.equal(manifest.name, configuration.manifest.name, 'Bundled identity must match');
 assert.equal(manifest.repository?.url, configuration.manifest.repository.url, 'Bundled repository must match');

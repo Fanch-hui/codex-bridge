@@ -9,6 +9,9 @@
     button.disabled = true;
     button.textContent = "请求中…";
     context.emit(command, {});
+    if (command === "connectTunnel" && global.CodexBridgeDesktopConnectionsPage) {
+      global.CodexBridgeDesktopConnectionsPage.watchClients();
+    }
   }
 
   function recoverPending(container, context, allowed) {
@@ -55,28 +58,31 @@
   function renderTunnel(
     badge,
     diagnostics,
+    diagnosticStats,
     editor,
     actions,
+    maintenance,
     tunnel,
     context
   ) {
     var currentState = state(tunnel);
     S.updateStatus(badge, currentState.label, currentState.tone);
     S.clear(diagnostics);
+    S.clear(diagnosticStats);
     actions.__tunnelDiagnostic = diagnosticText(tunnel);
     if (tunnel.lastSuccessfulPollAt) {
       var poll = new Date(tunnel.lastSuccessfulPollAt);
-      if (!isNaN(poll.getTime())) diagnostics.appendChild(S.node("p", "hint",
+      if (!isNaN(poll.getTime())) diagnosticStats.appendChild(S.node("p", "hint",
         "最近成功轮询：" + poll.toLocaleString()));
     }
-    if (tunnel.localHealthReady != null) diagnostics.appendChild(S.node("p", "hint",
+    if (tunnel.localHealthReady != null) diagnosticStats.appendChild(S.node("p", "hint",
       "本机健康检查：" + (tunnel.localHealthReady ? "已就绪" : "未就绪")));
     if (tunnel.isReconnecting) diagnostics.appendChild(S.node("div", "page-message",
       "正在自动重连，连接恢复后继续接收远程请求。"));
     else if (tunnel.lifecycle === "degraded" && !tunnel.actionRequired) diagnostics.appendChild(
       S.node("div", "page-message warning", "远程通信暂时异常，持续降级 90 秒后自动重连。"));
     if (!tunnel.helperAvailable) {
-      diagnostics.appendChild(S.node("div", "page-message warning", "Helper 辅助工具缺失，本地 MCP 仍可用，但远程隧道不能启动。"));
+      diagnostics.appendChild(S.node("div", "page-message warning", "远程连接组件不可用，请检查安装。"));
     }
     if (tunnel.actionRequired) {
       diagnostics.appendChild(S.node("div", "page-message warning", "Tunnel 需要本机处理，请检查连接配置、凭据与工作区权限。"));
@@ -85,8 +91,12 @@
     recoverPending(actions, context, {
       connectTunnel: tunnel.canConnect, disconnectTunnel: tunnel.canDisconnect, clearTunnel: tunnel.canClear
     });
+    recoverPending(maintenance, context, {
+      connectTunnel: tunnel.canConnect, disconnectTunnel: tunnel.canDisconnect, clearTunnel: tunnel.canClear
+    });
     var renderActions = function () {
       S.clear(actions);
+      S.clear(maintenance);
       var copy = S.button("复制连接诊断", null, {}, null, "small", false);
       copy.addEventListener("click", function () {
         var details = global.CodexBridgeDesktopWorkbenchDetails;
@@ -95,10 +105,10 @@
           copy.textContent = "已复制";
         }, function () { copy.textContent = "复制失败，请重试"; });
       });
-      actions.appendChild(copy);
+      maintenance.appendChild(copy);
       var logs = S.button("打开日志", null, {}, null, "small", false);
       logs.addEventListener("click", function () { context.emit("selectPage", { navigation: "logs" }); });
-      actions.appendChild(logs);
+      maintenance.appendChild(logs);
       if (tunnel.canConnect) {
         var connect = S.button("连接", null, {}, null, "small primary", false);
         connect.addEventListener("click", function () {
@@ -111,7 +121,7 @@
         disconnect.addEventListener("click", function () {
           sendPending(disconnect, "断开", "disconnectTunnel", context);
         });
-        actions.appendChild(disconnect);
+        maintenance.appendChild(disconnect);
       }
       if (tunnel.canClear) {
         var clear = S.button("清除配置", null, {}, null, "small danger", false);
@@ -121,8 +131,9 @@
             sendPending(clear, "清除配置", "clearTunnel", context);
           }
         });
-        actions.appendChild(clear);
+        maintenance.appendChild(clear);
       }
+      actions.hidden = actions.children.length === 0;
     };
     var stable = global.CodexBridgeDesktopStableRender;
     var signature = JSON.stringify([
@@ -137,7 +148,7 @@
     if (tunnel.actionRequired) return { label: "需要处理", tone: "warning" };
     if (tunnel.isReconnecting) return { label: "自动重连中", tone: "running" };
     var states = {
-      ready: { label: "已连接", tone: "success" },
+      ready: { label: "服务就绪", tone: "success" },
       stopped: { label: "未连接", tone: "neutral" },
       starting: { label: "启动中", tone: "running" },
       authenticating: { label: "认证中", tone: "running" },

@@ -16,8 +16,10 @@ extension BridgeServiceRequestController {
     let providers = try await composition.application.serviceManagedAgentProviderDescriptors(
       deadline: deadline
     )
+    // 目录只用于界面展示、发现比对与活动项选择，均不读取运行时工件。
     let installations = try await composition.application.serviceManagedAgentInstallations(
-      deadline: deadline
+      deadline: deadline,
+      includeRuntimeArtifacts: false
     )
     _ = try await composition.application.serviceQoderRuntimeSettings(deadline: deadline)
     let qoderSnapshot = try await composition.settings.qoderRuntimeSettingsSnapshot()

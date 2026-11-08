@@ -9,24 +9,24 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$release = 'v0.0.18'
+$release = 'v0.0.19'
 if ($Architecture -eq 'ARM64') {
   $platform = @{
     Name = 'arm64'
     Machine = [UInt16]0xAA64
-    ArchiveSHA256 = 'b73237513d50bf7acbeb960d80d9cbb6513879292f80ec1bd04b886fac1fe1c8'
-    TunnelClientSHA256 = '71e8350e6dc14334b0d0ac2a637f98cdc0f0f1aac4dcd2f883354b2f9cbec70f'
+    ArchiveSHA256 = 'a054bfb19d72b446cc9802a7987a17eab517502355d27b18e51814bbb0b32731'
+    TunnelClientSHA256 = '501ae14cfcc67915f29233988599eac1903946c4bf024f3e24d6669d01ecf6d0'
     LicensesSHA256 = '4f0ad0501bf260d39369e6879661b5adf58b1d5ff01e4668605e0a32738d4445'
-    SBOMSHA256 = '7aebe4c63a96bbdae601b65935fd60c760482ac9902b888c948d75b3c2cb3dd7'
+    SBOMSHA256 = '2641e6fadaeea4eab18c060e50a385fedce20b4224999f707a8a88992d8fea0b'
   }
 } else {
   $platform = @{
     Name = 'amd64'
     Machine = [UInt16]0x8664
-    ArchiveSHA256 = '8d0da1ce79532d44ccc5ed5d8bd36cdfffba37dfd287c602d69635c8bb5db2b2'
-    TunnelClientSHA256 = '9d0a22b7eb64fe7c5e34dfc97273ffcab6a07557855cf9e7f8869068402caf6b'
+    ArchiveSHA256 = '1d0ecc3a54f2a51e27a635ac155f40fbb95df58c52cdeddf6c75532cc0bbeb25'
+    TunnelClientSHA256 = '7e93a39a567c87154a0aef2091b81100d78f9093c4603412cc2b55bed3dfe5ea'
     LicensesSHA256 = '2b1def83c55dea817579ea1a7206119356c6a97a190c31181fe7817ae60c29ec'
-    SBOMSHA256 = '6fdf06f5663980bb01e63417a6fa9dc0f42a20aa7f5498b7e444e6977bcc43d7'
+    SBOMSHA256 = 'd3665e98422d1e429fade374f29b2b42127575352fc35153c2abf1091ba7568f'
   }
 }
 
@@ -152,7 +152,7 @@ try {
     archiveSHA256 = $platform.ArchiveSHA256
     tunnelClientSHA256 = $platform.TunnelClientSHA256
     sourceURL = $url
-    upstreamCommit = '274a5588414819f063d27100a4fb1096aae3830f'
+    upstreamCommit = '01d67bb4da0d8359b808b4761f8db171ab682cd7'
     attributionSHA256 = $attributionHashes
   }
   $utf8NoBom = [Text.UTF8Encoding]::new($false)

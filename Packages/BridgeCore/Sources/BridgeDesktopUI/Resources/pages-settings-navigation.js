@@ -2,6 +2,7 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var M = global.CodexBridgeDesktopSettingsModels;
+  var storageKey = "codex-bridge.settings.section";
 
   function choiceTitle(value, choices) {
     var choice = S.safeArray(choices).find(function (item) { return item.id === value; });
@@ -13,148 +14,240 @@
     return option ? option.displayName : value || "Agent 默认";
   }
 
-  function effortTitle(value, choices) {
-    return value ? choiceTitle(value, choices) : "默认强度";
-  }
-
   function agentSummary(item) {
-    if (!item.installationID) return "";
+    if (!item.installationID) return "未连接";
     var parts = [modelTitle(item.model, item.modelOptions)];
     if (item.providerID !== "antigravity" && item.canSelectEffort !== false) {
-      parts.push(effortTitle(item.effort, item.effortOptions));
+      parts.push(choiceTitle(item.effort, item.effortOptions));
     }
-    parts.push(choiceTitle(item.permissionMode, item.permissionOptions));
     return parts.join(" · ");
   }
 
-  function agentStatus(status, item) {
-    var label = "就绪", tone = "success";
-    var desktopNotRunning = global.CodexBridgeDesktopSettingsAgents.desktopNotRunning(item);
-    if (desktopNotRunning) { label = "DSH 桌面版未打开"; tone = "neutral"; }
-    else if (!item.installationID) { label = "未连接"; tone = "warning"; }
-    else if (item.isRefreshingModels) { label = "正在获取模型"; tone = "running"; }
-    else if (item.errorMessage) { label = "设置异常"; tone = "error"; }
-    status.hidden = tone === "success";
-    S.updateStatus(status, label, tone);
-    if (item.errorMessage && tone !== "running" && !desktopNotRunning) status.title = item.errorMessage;
+  function linkRow(title, detail, action) {
+    var root = S.node("div", "settings-link-row");
+    var copy = S.node("div", "settings-link-copy");
+    var name = S.node("h3", null, title), value = S.node("p", "hint", detail || "");
+    var button = S.button("管理", null, {}, null, "small", false);
+    value.hidden = !detail;
+    copy.appendChild(name); copy.appendChild(value);
+    button.setAttribute("aria-label", "管理" + title);
+    button.addEventListener("click", action);
+    root.appendChild(copy); root.appendChild(button);
+    return { root: root, name: name, value: value, button: button };
+  }
+
+  function group(body, title) {
+    var section = S.node("section", "settings-subsection settings-link-group");
+    section.appendChild(S.node("h3", null, title));
+    var list = S.node("div", "settings-link-list"); section.appendChild(list); body.appendChild(section);
+    return list;
+  }
+
+  function categoryNavigation(sidebar, sections) {
+    var entries = new Map(), selected = null;
+
+    function add(id, title) {
+      var button = S.node("button", "settings-sidebar-item", title);
+      button.type = "button";
+      var pane = S.node("section", "settings-pane");
+      pane.id = "settings-pane-" + id;
+      button.setAttribute("aria-controls", pane.id);
+      var heading = S.node("h2", "settings-pane-title", title);
+      heading.id = pane.id + "-title";
+      pane.setAttribute("aria-labelledby", heading.id);
+      var inner = S.node("div", "settings-pane-inner");
+      var body = S.node("div", "settings-stack");
+      inner.appendChild(heading); inner.appendChild(body); pane.appendChild(inner);
+      sidebar.appendChild(button); sections.appendChild(pane);
+      entries.set(id, { button: button, pane: pane });
+      button.addEventListener("click", function () { select(id); });
+      return body;
+    }
+
+    function select(id) {
+      if (!entries.has(id)) return false;
+      selected = id;
+      entries.forEach(function (entry, key) {
+        var active = key === id;
+        entry.pane.hidden = !active;
+        if (active) entry.button.setAttribute("aria-current", "page");
+        else entry.button.removeAttribute("aria-current");
+      });
+      try { global.localStorage.setItem(storageKey, id); } catch (_) {}
+      return true;
+    }
+
+    return { add: add, select: select, has: function (id) { return entries.has(id); },
+      selectedID: function () { return selected; } };
   }
 
   function create(container, page, emit) {
-    var details = global.CodexBridgeDesktopDetailPages.create(container);
-    var openDetail = details.open;
     var context = { emit: emit };
-    var mounts = new Map();
-    details.open = function (id) {
-      if (id === "direct") id = "permissions";
-      if (id === "agent:deepseek-harness" && global.CodexBridgeDesktopDSHWorkbench) {
-        global.CodexBridgeDesktopDSHWorkbench.openSettings();
-      } else if ((id === "codex" || id.indexOf("agent:") === 0) && global.CodexBridgeDesktopConnectionsPage) {
-        global.CodexBridgeDesktopConnectionsPage.openDetail(id, context.emit);
-      } else openDetail(id);
-    };
-    var summaries = S.node("div", "page-card detail-list settings-summary-list");
-    details.overview.appendChild(summaries);
-    var agentsGroup = S.node("div", "settings-agent-storage");
-    agentsGroup.hidden = true; container.appendChild(agentsGroup);
-    var execution = S.node("div", "settings-stack");
-    var permissionEntry = details.register("permissions", "权限与审批", execution);
-    summaries.appendChild(permissionEntry.root);
-    var application = S.node("div", "settings-stack");
-    var codex = M.preferences(page, emit, true);
-    var codexEntry = details.register("codex", "Codex", codex.root);
-    agentsGroup.appendChild(codexEntry.root);
-    var codexStatus = S.status("就绪", "success");
-    codexEntry.accessory.appendChild(codexStatus);
-    var direct = global.CodexBridgeDesktopDirect.create();
-    var directEntry = details.register("direct", "Direct 命令规则", direct.root);
-    execution.appendChild(direct.root);
-    agentsGroup.appendChild(directEntry.root);
-    var instructions = global.CodexBridgeDesktopSettingsInstructions.create(page, emit);
-    var instructionsEntry = details.register("instructions", "客户端指令", instructions.root);
-    summaries.appendChild(instructionsEntry.root);
-    var applicationEntry = details.register("application", "应用", application);
-    summaries.appendChild(applicationEntry.root);
-    var diagnostics = S.node("div", "settings-stack");
+    var sidebar = S.node("aside", "settings-sidebar");
+    var categoryList = S.node("nav", "settings-sidebar-list");
+    categoryList.setAttribute("aria-label", "设置分类");
+    var sidebarFooter = S.node("div", "settings-sidebar-footer");
+    var refresh = S.button("", null, {}, null, "settings-sidebar-refresh", true);
+    refresh.appendChild(S.icon("arrow.clockwise"));
+    refresh.title = "刷新设置"; refresh.setAttribute("aria-label", refresh.title);
+    refresh.addEventListener("click", function () { context.emit("refresh", {}); });
+    sidebarFooter.appendChild(refresh);
+    sidebar.appendChild(categoryList); sidebar.appendChild(sidebarFooter);
+    var sections = S.node("div", "settings-panes");
+    var main = S.node("div", "settings-main");
+    var status = S.node("div", "page-message settings-status");
+    status.setAttribute("role", "status");
+    var storage = S.node("div", "settings-editor-storage"); storage.hidden = true;
+    main.appendChild(sections); main.appendChild(status);
+    container.appendChild(sidebar); container.appendChild(main); container.appendChild(storage);
+    var categories = categoryNavigation(categoryList, sections);
 
+    function openDSH(category) {
+      if (document.documentElement.dataset.surface === "preferences") {
+        context.emit("selectPage", { navigation: "workbench", kind: "dsh-settings", value: category });
+      } else if (global.CodexBridgeDesktopDSHWorkbench) {
+        global.CodexBridgeDesktopDSHWorkbench.openSettings(category);
+      }
+    }
+
+    function openConnection(id) {
+      if (document.documentElement.dataset.surface === "preferences") {
+        context.emit("selectPage", { navigation: "connections", kind: "connection-detail", value: id });
+      } else if (global.CodexBridgeDesktopConnectionsPage) {
+        global.CodexBridgeDesktopConnectionsPage.openDetail(id, context.emit);
+      }
+    }
+
+    var application = categories.add("application", "通用");
+    var models = categories.add("models", "账户与模型");
+    var execution = categories.add("execution", "执行与审批");
+    var clients = categories.add("clients", "客户端与指令");
+    var extensions = categories.add("extensions", "技能与扩展");
+    var diagnostics = categories.add("diagnostics", "诊断与日志");
+
+    var modelList = group(models, "模型连接");
+    modelList.appendChild(linkRow("工作台", "ChatGPT 与自定义 API", function () { openDSH("models"); }).root);
+    var agentsList = group(models, "Agent 默认模型");
+    var codexRow = linkRow("Codex", "", function () { openConnection("codex"); });
+    agentsList.appendChild(codexRow.root);
+    var agents = agentEditors({ page: page, emit: emit, storage: storage, codexRow: codexRow,
+      agentsList: agentsList, openConnection: openConnection });
+    var direct = global.CodexBridgeDesktopDirect.create();
+    execution.appendChild(direct.root);
+    var instructions = global.CodexBridgeDesktopSettingsInstructions.create(page, emit);
+    clients.appendChild(instructions.root);
+    var extensionList = group(extensions, "工作台");
+    [
+      ["技能", "skills"], ["MCP 服务", "mcp"], ["插件", "plugins"], ["原生权限", "permissions"]
+    ].forEach(function (item) {
+      extensionList.appendChild(linkRow(item[0], "", function () { openDSH(item[1]); }).root);
+    });
+    var agentTools = group(extensions, "Agent");
+    agentTools.appendChild(linkRow("Agent MCP 服务", "", function () { openConnection("agent-mcp"); }).root);
     var logs = S.button("打开日志", null, {}, null, "small", false);
-    logs.addEventListener("click", function () { context.emit("selectPage", { navigation: "logs" }); });
-    diagnostics.appendChild(logs);
-    var diagnosticsEntry = details.register("diagnostics", "诊断与日志", diagnostics);
-    summaries.appendChild(diagnosticsEntry.root);
+    logs.addEventListener("click", function () { context.emit("openLogs", {}); });
+    var logsSection = S.node("section", "settings-subsection");
+    logsSection.appendChild(S.node("h3", null, "运行日志"));
+    logsSection.appendChild(logs); diagnostics.appendChild(logsSection);
+    function update(next, nextEmit, state) {
+      context.emit = nextEmit;
+      if (state) {
+        refresh.disabled = !!state.isRefreshing;
+        refresh.classList.toggle("is-refreshing", !!state.isRefreshing);
+      }
+      agents.update(next, nextEmit);
+      direct.update(next.direct, nextEmit);
+      instructions.update(next, nextEmit);
+    }
+
+    function open(id) {
+      if (typeof id !== "string") return false;
+      if (id === "codex" || id.indexOf("agent:") === 0) { openConnection(id); return true; }
+      var target = id;
+      if (id === "permissions" || id === "instructions") target = "clients";
+      if (id === "direct") target = "execution";
+      return categories.select(target);
+    }
+
+    var initial = null;
+    try { initial = global.localStorage.getItem(storageKey); } catch (_) {}
+    categories.select(categories.has(initial) ? initial : "application");
+    return { details: { open: open, selectedID: categories.selectedID },
+      execution: execution, clients: clients, application: application,
+      diagnostics: diagnostics, status: status, mountAgent: agents.mountAgent, update: update };
+  }
+
+  function agentEditors(options) {
+    var providers = new Map(), mounts = new Map();
+    var codex = M.preferences(options.page, options.emit, true);
     var qoder = global.CodexBridgeDesktopSettingsQoderPermissions.create();
-    var providers = new Map();
+    options.storage.appendChild(codex.root);
 
     function provider(id, title) {
       var current = providers.get(id);
       if (current) return current;
       var body = S.node("div", "settings-stack settings-provider-detail");
-      current = { body: body, editors: new Map(), keys: new Set(), entry: details.register("agent:" + id, title, body) };
-      current.status = S.status("就绪", "success");
-      current.entry.accessory.appendChild(current.status);
-      providers.set(id, current);
-      agentsGroup.appendChild(current.entry.root);
+      var row = linkRow(title, "", function () { options.openConnection("agent:" + id); });
+      current = { body: body, row: row, editors: new Map() };
+      providers.set(id, current); options.storage.appendChild(body); options.agentsList.appendChild(row.root);
       if (id === "qoder") body.appendChild(qoder.root);
       return current;
     }
 
-    function update(next, nextEmit) {
-      context.emit = nextEmit;
-      codex.update(next, nextEmit);
-      codexStatus.hidden = !next.modelError && !next.isRefreshingModels;
-      S.updateStatus(codexStatus, next.modelError ? "模型获取失败" : "正在获取模型", next.modelError ? "error" : "running");
-      codexEntry.update({ value: [modelTitle(next.executionModel, next.models),
-        effortTitle(next.executionEffort, next.effortOptions), choiceTitle(next.accessMode, next.accessOptions)].join(" · ") });
-      permissionEntry.update({ value: "客户端权限、命令规则与审批" });
-      applicationEntry.update({ value: next.keepServiceRunningAfterExit ? "退出后继续运行后台服务" : "后台运行与更新" });
-      diagnosticsEntry.update({ value: next.serviceStatusTitle || "后台服务与运行记录" });
+    function updateItem(item, emit, keys) {
+      var current = provider(item.providerID, item.providerName);
+      var key = item.installationID || "default";
+      if (!keys.has(item.providerID)) keys.set(item.providerID, new Set());
+      keys.get(item.providerID).add(key);
+      var editor = current.editors.get(key);
+      if (!editor) {
+        editor = global.CodexBridgeDesktopSettingsAgents.editor(item, emit);
+        current.editors.set(key, editor); current.body.appendChild(editor.root);
+      }
+      editor.root.hidden = false; editor.update(item, emit);
+      current.row.name.textContent = item.providerName;
+      current.row.button.setAttribute("aria-label", "管理" + item.providerName);
+      var desktopNotRunning = global.CodexBridgeDesktopSettingsAgents.desktopNotRunning(item);
+      var summary = item.errorMessage || agentSummary(item);
+      if (item.isRefreshingModels) summary = "正在获取模型…";
+      if (desktopNotRunning) summary = "DSH 桌面版未打开";
+      current.row.value.textContent = summary;
+      current.row.value.hidden = !current.row.value.textContent;
+    }
 
-      direct.update(next.direct, nextEmit);
-      directEntry.update({ available: !!next.direct, value: next.direct
-        ? choiceTitle(next.direct.commandMode, [{ id: "denied", title: "关闭" }, { id: "safe", title: "安全模式" }, { id: "full", title: "完整模式" }]) : "" });
-      instructions.update(next, nextEmit);
-      instructionsEntry.update({ value: next.customInstructions ? "已设置" : "未设置" });
+    function update(next, emit) {
+      codex.update(next, emit);
+      var summary = modelTitle(next.executionModel, next.models);
+      if (next.modelError) summary = "模型获取失败：" + next.modelError;
+      if (next.isRefreshingModels) summary = "正在获取模型…";
+      options.codexRow.value.textContent = summary;
+      options.codexRow.value.hidden = !options.codexRow.value.textContent;
       var visible = new Set(), keys = new Map();
       S.safeArray(next.agentDefaults).forEach(function (item) {
-        if (item.providerID === "deepseek-harness") return;
-        visible.add(item.providerID);
-        var current = provider(item.providerID, item.providerName);
-        var key = item.installationID || "default";
-        if (!keys.has(item.providerID)) keys.set(item.providerID, new Set());
-        keys.get(item.providerID).add(key);
-        var editor = current.editors.get(key);
-        if (!editor) {
-          editor = global.CodexBridgeDesktopSettingsAgents.editor(item, nextEmit);
-          current.editors.set(key, editor);
-          current.body.appendChild(editor.root);
-        }
-        editor.root.hidden = false;
-        editor.update(item, nextEmit);
-        agentStatus(current.status, item);
-        current.entry.update({ title: item.providerName, value: agentSummary(item) });
+        visible.add(item.providerID); updateItem(item, emit, keys);
       });
-      var nativePolicy = next.nativePermissionPolicy;
-      if (nativePolicy && nativePolicy.providerID === "qoder") {
-        visible.add("qoder");
-        provider("qoder", nativePolicy.providerName || "Qoder");
+      var policy = next.nativePermissionPolicy;
+      if (policy && policy.providerID === "qoder") {
+        visible.add("qoder"); provider("qoder", policy.providerName || "Qoder");
       }
-      qoder.update(next, nextEmit);
+      qoder.update(next, emit);
       providers.forEach(function (current, id) {
         var nextKeys = keys.get(id) || new Set();
-        var removed = Array.from(current.keys).some(function (key) { return key !== "default" && !nextKeys.has(key); });
-        if (removed) current.entry.update({ available: false });
         current.editors.forEach(function (editor, key) { editor.root.hidden = !nextKeys.has(key); });
-        current.keys = nextKeys;
-        current.entry.update({ available: visible.has(id) });
+        current.row.root.hidden = !visible.has(id);
       });
       mounts.forEach(function (target, id) { mountAgent(id, target); });
     }
+
     function mountAgent(id, target) {
       mounts.set(id, target);
-      var body = id === "codex" ? codex.root : providers.has(id) ? providers.get(id).body : null;
+      var body = null;
+      if (id === "codex") body = codex.root;
+      else if (providers.has(id)) body = providers.get(id).body;
       if (body && body.parentNode !== target) target.appendChild(body);
     }
-    return { details: details, execution: execution, application: application,
-      diagnostics: diagnostics, mountAgent: mountAgent, update: update };
+
+    return { update: update, mountAgent: mountAgent };
   }
 
   global.CodexBridgeDesktopSettingsNavigation = { create: create };

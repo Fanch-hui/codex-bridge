@@ -9,7 +9,7 @@
       taskLoadInProgress = true
       defer { taskLoadInProgress = false }
       do {
-        let recent = try await client.tasks(IPCTaskListRequest())
+        let recent = try await client.tasks(IPCTaskListRequest(limit: 200))
         let nextTasks = WorkbenchTaskHistorySearch.retainingSelection(
           in: recent, prior: tasks, selectedTaskID: selectedTaskID,
           historyTaskID: selectedHistoryTaskID)
@@ -18,6 +18,7 @@
         let stateChanged = connectionState != .connected || errorMessage != nil
         if tasksChanged {
           tasks = nextTasks
+          paneConversations.sync(tasks: nextTasks, client: client)
         }
         errorMessage = nil
         connectionState = .connected
@@ -35,10 +36,7 @@
 
     func reconcileSelectedTask() {
       guard let selectedTaskID else { return }
-      guard
-        let task = workbenchDisplaySnapshot.taskByID[selectedTaskID],
-        selectedProjectID == nil || task.projectID == selectedProjectID
-      else {
+      guard let task = workbenchDisplaySnapshot.taskByID[selectedTaskID] else {
         self.selectedTaskID = nil
         closeConversation()
         conversationWasTerminal = false

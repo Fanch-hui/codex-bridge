@@ -4,9 +4,14 @@ import BridgeServiceAppCore
 
 extension BridgeServiceAppModel {
   func performWorkbenchWorkspace(_ envelope: BridgeDesktopCommandEnvelope) {
+    // Bind the answer to the selected project first so even a rejection is acknowledged by the page.
+    workspaceModel.selectProject(selectedProjectID)
+    guard connectionState == .connected else {
+      workspaceModel.rejectUnavailable(requestID: envelope.requestID)
+      return
+    }
     let request: IPCWorkbenchWorkspaceRequest
     do {
-      guard connectionState == .connected else { throw BridgeServiceClientError.unavailable }
       let payload = envelope.payload
       request = try WorkbenchWorkspaceRequestBuilder.request(
         action: payload.action, projectID: payload.projectID,
@@ -19,7 +24,6 @@ extension BridgeServiceAppModel {
       workspaceModel.reject(requestID: envelope.requestID, message: Self.message(error))
       return
     }
-    workspaceModel.selectProject(selectedProjectID)
     Task { [weak self] in
       guard let self else { return }
       await self.workspaceModel.perform(request)

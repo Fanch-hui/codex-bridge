@@ -11,6 +11,7 @@ readonly resource_specs=(
   "BridgeCore_BridgeDeepSeekHarnessACP.bundle:cordis.yml"
   "BridgeCore_BridgePiRPC.bundle:PiBridgeExtension/index.mjs"
   "BridgeCore_BridgeQoderSDK.bundle:QoderHost/index.mjs"
+  "BridgeCore_BridgeClaudeSDK.bundle:ClaudeHost/index.mjs"
   "BridgeCore_BridgeDeepSeekHarnessDesktop.bundle:DSHDesktopConnector/index.mjs"
 )
 temporary_root="$(/usr/bin/mktemp -d "${TARGET_BUILD_DIR}/.codex-bridge-service-resources.XXXXXX")"
@@ -65,4 +66,29 @@ for spec in "${resource_specs[@]}"; do
   fi
   /bin/mv "${staged_bundle}" "${destination_bundle}"
 done
+
+architectures=(${(z)ARCHS})
+(( ${#architectures} == 1 )) || {
+  print -u2 "The embedded DSH runtime requires one target architecture."
+  exit 64
+}
+case "${architectures[1]}" in
+  arm64) runtime_architecture=arm64 ;;
+  x86_64) runtime_architecture=x64 ;;
+  *) print -u2 "Unsupported embedded DSH architecture."; exit 64 ;;
+esac
+readonly runtime_source="${EMBEDDED_DSH_RUNTIME_DIRECTORY:-${SRCROOT}/.build/embedded-dsh/darwin-${runtime_architecture}}"
+readonly runtime_destination="${resources_directory}/EmbeddedDSH"
+readonly runtime_verifier="${SRCROOT}/Scripts/verify-embedded-dsh-runtime.mjs"
+[[ -d "${runtime_source}" && ! -L "${runtime_source}" && ! -L "${runtime_destination}" ]] || {
+  print -u2 "The embedded DSH runtime for ${runtime_architecture} is missing or unsafe."
+  exit 66
+}
+node "${runtime_verifier}" "${runtime_source}" darwin "${runtime_architecture}"
+/usr/bin/ditto "${runtime_source}" "${temporary_root}/EmbeddedDSH"
+node "${runtime_verifier}" "${temporary_root}/EmbeddedDSH" darwin "${runtime_architecture}"
+if [[ -e "${runtime_destination}" ]]; then
+  /bin/rm -rf -- "${runtime_destination}"
+fi
+/bin/mv "${temporary_root}/EmbeddedDSH" "${runtime_destination}"
 print "Staged Agent resources for the embedded Service."

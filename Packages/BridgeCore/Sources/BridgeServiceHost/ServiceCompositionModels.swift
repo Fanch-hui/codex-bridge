@@ -1,4 +1,5 @@
 import BridgeCodexRPC
+import BridgeMCP
 import Foundation
 
 public enum ServiceLocalMCPError: Error, Equatable, Sendable {
@@ -15,15 +16,18 @@ public struct ServiceMCPClientStatus: Equatable, Sendable {
   public let profile: ServiceMCPClientProfile
   public let activeSessionCount: Int
   public let lastConnectedAt: Date?
+  public let successfulToolCalls: [MCPClientSuccessfulCall]
 
   public init(
     profile: ServiceMCPClientProfile,
     activeSessionCount: Int,
-    lastConnectedAt: Date?
+    lastConnectedAt: Date?,
+    successfulToolCalls: [MCPClientSuccessfulCall] = []
   ) {
     self.profile = profile
     self.activeSessionCount = activeSessionCount
     self.lastConnectedAt = lastConnectedAt
+    self.successfulToolCalls = successfulToolCalls
   }
 }
 

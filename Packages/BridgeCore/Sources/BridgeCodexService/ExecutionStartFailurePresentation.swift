@@ -22,6 +22,10 @@ enum ExecutionStartFailurePresentation {
   private static func executionReason(_ error: any Error) -> String? {
     guard let error = error as? ExecutionServiceError else { return nil }
     switch error {
+    case .invalidRequest("isolatedWorkspace.mcpUnavailable"):
+      return "隔离工作区无法确认 MCP 连接安全。请检查 Codex 的 MCP 配置后重试。"
+    case .invalidRequest("isolatedWorkspace.confinement"):
+      return "隔离工作区的进程保护不可用。请检查系统沙箱和目录后重试。"
     case .projectUnavailable, .projectIdentityChanged:
       return "注册项目目录已不可访问或身份发生变化。请检查目录并重新注册项目。"
     case .projectPermissionDenied:

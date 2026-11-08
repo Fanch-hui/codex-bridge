@@ -16,7 +16,8 @@ extension ServiceComposition {
         ServiceMCPClientStatus(
           profile: profile,
           activeSessionCount: await mcpServer?.activeSessionCount(for: profile.clientID) ?? 0,
-          lastConnectedAt: mcpClients.authenticator.lastAuthenticationDate(for: profile.clientID)
+          lastConnectedAt: mcpClients.authenticator.lastAuthenticationDate(for: profile.clientID),
+          successfulToolCalls: await mcpServer?.successfulToolCalls(for: profile.clientID) ?? []
         )
       )
     }

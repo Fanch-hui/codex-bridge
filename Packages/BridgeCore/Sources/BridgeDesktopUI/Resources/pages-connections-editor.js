@@ -6,7 +6,7 @@
     var context = { canConfigure: false, emit: emit };
     var form = S.node("div", "form-grid tunnel-credentials");
     var id = S.textField("Tunnel ID", "", "输入 Tunnel ID");
-    var key = S.textField("Runtime Key", "", "不会写入 UI 状态");
+    var key = S.textField("Runtime Key", "", "输入 Runtime Key");
     key.control.type = "password";
     key.control.autocomplete = "off";
     form.appendChild(id.wrapper);
@@ -104,6 +104,9 @@
     function guideText(item) {
       if (!item) return "请选择要登记的 Agent。";
       var id = (item.providerID || "").toLowerCase();
+      if (id === "claude-code") {
+        return "选择已安装的 Claude Code 命令，登录沿用官方 Claude Code 配置。";
+      }
       if (id === "qoder") {
         return "Qoder SDK 引擎。选择 CLI 所属地区；认证、模型偏好和原生会话严格按地区隔离。CN 使用 qodercn / qoderclicn，国际版使用 qoder / qodercli。";
       }

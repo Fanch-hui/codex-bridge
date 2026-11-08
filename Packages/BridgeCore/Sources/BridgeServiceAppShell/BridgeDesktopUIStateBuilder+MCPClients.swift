@@ -63,6 +63,7 @@ extension BridgeDesktopUIStateBuilder {
       exposureOptions: exposureOptions,
       activeSessionCount: client.activeSessionCount,
       lastConnectedAt: client.lastConnectedAt,
+      successfulToolCalls: client.successfulToolCalls,
       canToggle: local && connected,
       canCopyConfiguration: local && connected && canCopy,
       canRotateCredential: local && connected

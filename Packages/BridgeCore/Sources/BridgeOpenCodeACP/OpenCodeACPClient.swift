@@ -23,6 +23,7 @@ public struct OpenCodeACPInitialization: Equatable, Sendable {
   public let supportsLoadSession: Bool
   public let supportsResumeSession: Bool
   public let supportsCloseSession: Bool
+  public let supportsDeleteSession: Bool
 
   public init(
     protocolVersion: Int,
@@ -32,7 +33,8 @@ public struct OpenCodeACPInitialization: Equatable, Sendable {
     advertisedCapabilities: Set<AgentCapability>,
     supportsLoadSession: Bool,
     supportsResumeSession: Bool,
-    supportsCloseSession: Bool
+    supportsCloseSession: Bool,
+    supportsDeleteSession: Bool = false
   ) {
     self.protocolVersion = protocolVersion
     self.agentName = agentName
@@ -42,6 +44,7 @@ public struct OpenCodeACPInitialization: Equatable, Sendable {
     self.supportsLoadSession = supportsLoadSession
     self.supportsResumeSession = supportsResumeSession
     self.supportsCloseSession = supportsCloseSession
+    self.supportsDeleteSession = supportsDeleteSession
   }
 }
 

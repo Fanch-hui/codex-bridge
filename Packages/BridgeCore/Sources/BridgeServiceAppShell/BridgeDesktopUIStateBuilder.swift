@@ -6,7 +6,14 @@ import Foundation
 
 @MainActor
 enum BridgeDesktopUIStateBuilder {
-  static func build(from model: BridgeServiceAppModel) -> BridgeDesktopUIState {
+  /// Builds every page. A `cache` kept by the caller across builds lets a page whose inputs
+  /// are unchanged reuse its previous product; the default builds everything afresh.
+  static func build(
+    from model: BridgeServiceAppModel,
+    selectionOverride: BridgeServiceNavigation? = nil,
+    includeWorkbench: Bool = true,
+    cache: BridgeDesktopUIStateCache = BridgeDesktopUIStateCache()
+  ) -> BridgeDesktopUIState {
     let startedAt = ContinuousClock.now
     let navigation = BridgeDesktopNavigation.allCases.map { item in
       BridgeDesktopNavigationItem(
@@ -14,20 +21,41 @@ enum BridgeDesktopUIStateBuilder {
         badge: navigationBadge(for: item, model: model)
       )
     }
-    let selected = model.navigation
-    let connectionsState = connections(from: model)
+    let selected = selectionOverride ?? model.navigation
+    let tasksRevision = cache.tasksRevision(for: model.tasks)
+    let connectionsInput = DesktopConnectionsInput(model)
+    let connectionsState = cache.connections.value(for: connectionsInput) {
+      connections(from: model)
+    }
+    let overviewState = cache.overview.value(
+      for: DesktopOverviewInput(model, connections: connectionsInput)
+    ) {
+      overview(from: model, connections: connectionsState)
+    }
+    let projectsState = cache.projects.value(
+      for: DesktopProjectsInput(model, tasksRevision: tasksRevision)
+    ) {
+      projects(from: model, cache: cache)
+    }
+    let logsState = cache.logs.value(for: DesktopLogsInput(model, tasksRevision: tasksRevision)) {
+      logs(from: model)
+    }
+    let settingsState = cache.settings.value(for: DesktopSettingsInput(model)) {
+      settings(from: model)
+    }
     let state = BridgeDesktopUIState(
       navigation: navigation,
       selectedNavigation: selected.desktopNavigation,
       connectionLabel: model.connectionState.label,
       connectionTone: connectionTone(for: model.connectionState),
+      serviceConnected: model.connectionState == .connected,
       isRefreshing: model.isRefreshing,
-      overview: overview(from: model, connections: connectionsState),
-      workbench: workbench(from: model),
-      projects: projects(from: model),
-      logs: logs(from: model),
+      overview: overviewState,
+      workbench: includeWorkbench ? workbench(from: model, cache: cache) : nil,
+      projects: projectsState,
+      logs: logsState,
       connections: connectionsState,
-      settings: settings(from: model),
+      settings: settingsState,
       appUpdate: model.appUpdateState
     )
     ConversationPerformanceRecorder.shared.record(

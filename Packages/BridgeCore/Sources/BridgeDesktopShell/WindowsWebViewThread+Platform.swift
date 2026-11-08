@@ -4,13 +4,16 @@
 
   extension WindowsWebViewThread {
     func complete() {
-      let notification = lock.withLock { () -> (window: HWND, message: UINT)? in
+      let completion = lock.withLock {
+        () -> (notification: (window: HWND, message: UINT)?, callbacks: [@Sendable () -> Void]) in
         completed = true
         threadID = 0
-        return shutdownNotification
+        defer { shutdownCompletions.removeAll() }
+        return (shutdownNotification, shutdownCompletions)
       }
       if let finished { _ = SetEvent(finished) }
-      if let notification {
+      for callback in completion.callbacks { callback() }
+      if let notification = completion.notification {
         _ = PostMessageW(notification.window, notification.message, 0, 0)
       }
     }

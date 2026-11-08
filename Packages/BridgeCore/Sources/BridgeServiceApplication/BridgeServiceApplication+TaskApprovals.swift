@@ -30,7 +30,13 @@ extension BridgeServiceApplication {
       approvalID = Self.approvalID(for: task.id)
       taskID = task.id.rawValue
       projectID = task.projectID.rawValue
-      clientID = task.source == .chatGPT ? MCPClientID.chatGPT.rawValue : task.sourceClientID
+      if task.source == .chatGPT {
+        clientID = MCPClientID.chatGPT.rawValue
+      } else if task.sourceClientID.hasPrefix("embedded.dsh.") {
+        clientID = "embedded.dsh"
+      } else {
+        clientID = task.sourceClientID
+      }
       prompt = task.prompt
       providerID = task.providerID
       permissionMode = task.permissionMode.rawValue
@@ -56,7 +62,8 @@ extension BridgeServiceApplication {
     for task in taskList {
       guard !task.isQueued,
         task.state.status == .awaitingLocalApproval,
-        task.requiresLocalStartApproval
+        task.requiresLocalStartApproval,
+        !task.sourceClientID.hasPrefix("embedded.dsh.")
       else {
         continue
       }
@@ -114,22 +121,26 @@ extension BridgeServiceApplication {
   func submitTaskWithAdmission(
     _ request: ServiceTaskRequest,
     projectID: ProjectID,
-    handoffID: String? = nil
+    handoffID: String? = nil,
+    embeddedDSHSubagent: EmbeddedDSHSubagentIdentity? = nil
   ) async throws -> ServiceTaskCreationResult {
     // Read-only submissions never occupy the project write slot, so they do
     // not take the Codex admission token.
     if request.permissionMode == .readOnly {
       do {
-        return try await tasks.submit(request, handoffID: handoffID)
+        return try await tasks.submit(
+          request, handoffID: handoffID, embeddedDSHSubagent: embeddedDSHSubagent)
       } catch let storeError as ServiceStoreError {
         throw Self.publicStoreError(storeError)
       }
     }
     let wantsQueue = request.queueIfBusy
     if wantsQueue {
-      let activeWriteTask = try await tasks.activeWriteTask(projectID: projectID)
+      let hasCapacity = try await tasks.hasProjectWriteCapacity(projectID: projectID)
+      // Another submission's admission is transient; the store transaction decides capacity.
       let workspaceBusy = try await workspaceGate.workspaceBusyDetail(projectID: projectID)
-      if activeWriteTask != nil || workspaceBusy != nil {
+        .flatMap { $0 == .codexAdmissionPending() ? nil : $0 }
+      if !hasCapacity || workspaceBusy != nil {
         return try await tasks.submit(request, queued: true, handoffID: handoffID)
       }
     }
@@ -145,7 +156,8 @@ extension BridgeServiceApplication {
     do {
       let result: ServiceTaskCreationResult
       do {
-        result = try await tasks.submit(request, handoffID: handoffID)
+        result = try await tasks.submit(
+          request, handoffID: handoffID, embeddedDSHSubagent: embeddedDSHSubagent)
       } catch ServiceStoreError.activeWriteTaskExists where wantsQueue {
         await workspaceGate.endCodexAdmission(projectID: projectID, token: admissionToken)
         return try await tasks.submit(request, queued: true, handoffID: handoffID)

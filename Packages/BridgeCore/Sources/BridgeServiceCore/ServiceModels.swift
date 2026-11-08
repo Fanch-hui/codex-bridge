@@ -110,24 +110,31 @@ public struct ServiceRootIdentity: Codable, Equatable, Hashable, Sendable {
   }
 
   public func validateCurrentIdentity() throws {
-    let current = try ServiceRootIdentity(
+    let current = try RegisteredRoot(
       capturing: URL(fileURLWithPath: canonicalPath, isDirectory: true)
     )
-    let matchesStableIdentity: Bool
-    if let volumeUUID {
-      matchesStableIdentity =
-        current.canonicalPath == canonicalPath
-        && current.inode == inode
-        && current.volumeUUID == volumeUUID
-    } else {
-      matchesStableIdentity =
-        current.canonicalPath == canonicalPath
-        && current.device == device
-        && current.inode == inode
-    }
-    guard matchesStableIdentity else {
+    guard matches(current) else {
       throw ServiceStoreError.invalidArgument("project.rootIdentity")
     }
+  }
+
+  /// Whether a root captured now is this registered root. External volumes get a new device
+  /// number when they are mounted again, so a recorded volume UUID stands in for the device.
+  public func matches(_ root: RegisteredRoot) -> Bool {
+    guard root.canonicalPath == canonicalPath, root.identity.inode == inode else { return false }
+    guard let volumeUUID else { return root.identity.device == device }
+    return (try? Self.volumeUUID(atPath: root.canonicalPath)) == volumeUUID
+  }
+
+  /// Whether a root recorded earlier (a workspace snapshot or journal) refers to this root.
+  /// Callers validate the current root separately; the device may predate a remount.
+  public func identifies(
+    canonicalPath path: String, device otherDevice: UInt64, inode otherInode: UInt64
+  )
+    -> Bool
+  {
+    guard path == canonicalPath, otherInode == inode else { return false }
+    return volumeUUID != nil || otherDevice == device
   }
 
   private static func volumeUUID(atPath path: String) throws -> String? {

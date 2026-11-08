@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import hashlib
+import json
 from pathlib import Path
 import struct
 import sys
@@ -9,6 +10,11 @@ machine = {"x64": 62, "arm64": 183}[sys.argv[2]]
 binaries = [root / name for name in (
     "codex-bridge-linux-app", "codex-bridge-service", "tunnel-client"
 )]
+runtime = root / "EmbeddedDSH"
+manifest = json.loads((runtime / "runtime.json").read_text(encoding="utf-8"))
+if manifest["platform"] != "linux" or manifest["architecture"] != sys.argv[2]:
+    raise SystemExit("Embedded DSH platform or architecture mismatch")
+binaries.append(runtime / manifest["node"])
 binaries += list((root / "lib").glob("*.so*"))
 for path in binaries:
     with path.open("rb") as source:
@@ -16,7 +22,7 @@ for path in binaries:
     if header[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", header, 18)[0] != machine:
         raise SystemExit(f"ELF architecture mismatch: {path.name}")
 for resource in ("BridgeDesktopUI", "BridgeDeepSeekHarnessACP", "BridgePiRPC", "BridgeQoderSDK",
-                 "BridgeDeepSeekHarnessDesktop"):
+                 "BridgeClaudeSDK", "BridgeDeepSeekHarnessDesktop"):
     if not any(path.is_dir() for path in root.glob(f"BridgeCore_{resource}.*")):
         raise SystemExit(f"Missing Swift resource bundle: {resource}")
 digest = hashlib.sha256((root / "tunnel-client").read_bytes()).hexdigest()

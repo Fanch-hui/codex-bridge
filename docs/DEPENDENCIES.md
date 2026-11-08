@@ -9,8 +9,9 @@ The package manifests and `Package.resolved` define the Swift dependencies used 
 | swift-log | 1.15.0 | Structured logging |
 | swift-nio | `1a69138cb7f2e63de709c9716e0348ffd6522ac7` | Local HTTP transport; Windows loopback wakeup support |
 | swift-crypto | 3.12.0 | Cryptographic hashes and primitives |
-| OpenAI tunnel-client | 0.0.18, commit `274a5588414819f063d27100a4fb1096aae3830f` | Secure MCP Tunnel |
+| OpenAI tunnel-client | 0.0.19, commit `01d67bb4da0d8359b808b4761f8db171ab682cd7` | Secure MCP Tunnel |
 | WebView2 SDK | 1.0.4191.47 | Windows embedded browser loader |
+| zcode-api and proxy adaptations | `158e7653b738cbed0996243eeabd26f816638e81`, included in dsh-zcode 0.2.1 | ZCode model connection; CC BY-NC-SA 4.0 |
 
 macOS uses WKWebView and XPC. Windows uses WebView2 and named pipes. Both platforms load the shared local `BridgeDesktopUI` resources.
 
@@ -26,17 +27,23 @@ Codex, OpenCode, DeepSeek Harness, and Antigravity run as separate agent process
 
 See [NOTICE](../NOTICE) and the bundled dependency licenses for third-party attribution.
 
+## ZCode proxy license and source
+
+The embedded dsh-zcode package includes zcode-api by TriDefender and contributors and adaptations of its proxy. These components are licensed under [CC BY-NC-SA 4.0](../Integrations/EmbeddedDSH/licenses/ZCODE-UPSTREAM-LICENSE), which requires attribution, noncommercial use and share-alike. The adapter's remaining source is Apache-2.0; see the [third-party notices](../Integrations/EmbeddedDSH/licenses/ZCODE-THIRD-PARTY-NOTICES.md) for attribution and component details.
+
+Release packages include the license and notices in `EmbeddedDSH/licenses/`, and the corresponding upstream and integration source in `EmbeddedDSH/vendor/dsh-zcode-0.2.1.tgz` (the archive's `package/vendor/zcode-api/` and `package/integration/` directories). On macOS, `EmbeddedDSH` is in the app's `Contents/Resources/`; on Windows and Linux it is in the installed payload.
+
 ## Tunnel helper supply pin
 
-The official v0.0.18 full-client ZIP files were checked against GitHub Release asset digests on 2026-10-28. Build and staging scripts pin these SHA-256 values and preserve upstream LICENSE, NOTICE, third-party licenses and SPDX metadata. The macOS Universal 2 helper is derived from the two verified thin executables.
+The official v0.0.19 full-client ZIP files were checked against GitHub Release asset digests on 2026-11-06. Build and staging scripts pin these SHA-256 values and preserve upstream LICENSE, NOTICE, third-party licenses and SPDX metadata. The macOS Universal 2 helper is derived from the two verified thin executables.
 
 | Platform | ZIP SHA-256 | Client SHA-256 |
 | --- | --- | --- |
-| darwin-amd64 | `95595c6538b3f9872c1367592aede22e0d18ea7f6bdd51cd17fe0bf7e5ca8b26` | `93c019b236d834073bc9abc94b07264f8e21fabf994226f72e8d1c387c1e89d1` |
-| darwin-arm64 | `ba7a0994f7dd15bc8708aa1602ecf54371a492319a641ab9c33dc00f1fd56bfe` | `5a55fd3dde505b2ee27f970dad18e6c08e04ffb9d7bc4256c507b8f312c1d6e8` |
-| windows-amd64 | `8d0da1ce79532d44ccc5ed5d8bd36cdfffba37dfd287c602d69635c8bb5db2b2` | `9d0a22b7eb64fe7c5e34dfc97273ffcab6a07557855cf9e7f8869068402caf6b` |
-| windows-arm64 | `b73237513d50bf7acbeb960d80d9cbb6513879292f80ec1bd04b886fac1fe1c8` | `71e8350e6dc14334b0d0ac2a637f98cdc0f0f1aac4dcd2f883354b2f9cbec70f` |
-| linux-amd64 | `3c82307316acd93c88a384b62af1d81d3f4cb0efa975f9c0bfaef922866a04c4` | `55c48566e682473a602eea4951978d27acc0f2c8de2340b684a8b114feba7a83` |
-| linux-arm64 | `a5f3d70efc75f5e66ab5c67c44d272aa80b2736f93f875f165140517750ec035` | `5e0c8e2cc3b49ea718a81866001625ad8ea4a19771ec3c4efaaccda0c71e715a` |
+| darwin-amd64 | `dff97674c77cac59e6ab3d901e6cff50fb17a5784c01d8959d1f4adb3afdf4bf` | `dfd9f50aa6846ba76223d4ceb86ab9408b794881b650b000ec0ef6fd2a8b775b` |
+| darwin-arm64 | `2243d024b77af8ee4b4ab7a1447949e5fc8d82bcd2d51b178927f2da9e47ecfd` | `4a82a4591933241850966ab3484cb39e65fad11b7e83b43891f6599f9638bd7f` |
+| windows-amd64 | `1d0ecc3a54f2a51e27a635ac155f40fbb95df58c52cdeddf6c75532cc0bbeb25` | `7e93a39a567c87154a0aef2091b81100d78f9093c4603412cc2b55bed3dfe5ea` |
+| windows-arm64 | `a054bfb19d72b446cc9802a7987a17eab517502355d27b18e51814bbb0b32731` | `501ae14cfcc67915f29233988599eac1903946c4bf024f3e24d6669d01ecf6d0` |
+| linux-amd64 | `9ee9448592345a9dd1517fb79791ab54d24f051142eb92bcbe8cd355effc9142` | `56d0120886ce91bfe31e7a5600f6a6594199a02e9b3eac671d5da0d7480c97a3` |
+| linux-arm64 | `5a19e556c4a8736ab7a6fde6f0568f6e7411fa2dff21186fc15bc30e9b98a603` | `8a50b25d6055bc6e3e3a5c18c098637ab2be63f6e453b8ebebd02433deadba04` |
 
-Official source and artifacts: [OpenAI tunnel-client v0.0.18](https://github.com/openai/tunnel-client/releases/tag/v0.0.18).
+Official source and artifacts: [OpenAI tunnel-client v0.0.19](https://github.com/openai/tunnel-client/releases/tag/v0.0.19).

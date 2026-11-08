@@ -2,14 +2,15 @@ import Darwin
 import Foundation
 
 enum MacAppUpdateServiceExit {
-  static func processIDs() async throws -> [Int32] {
+  static func processIDs(
+    serviceExecutableURL: URL = URL(
+      fileURLWithPath: "/Applications/CodexBridge.app/Contents/Resources/CodexBridgeService")
+  ) async throws -> [Int32] {
     try await Task.detached {
       let process = Process()
       let output = Pipe()
       process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-      process.arguments = [
-        "-f", "^/Applications/CodexBridge\\.app/Contents/Resources/CodexBridgeService$",
-      ]
+      process.arguments = ["-f", exactCommandPattern(serviceExecutableURL.path)]
       process.standardOutput = output
       process.standardError = FileHandle.nullDevice
       try process.run()
@@ -21,6 +22,13 @@ enum MacAppUpdateServiceExit {
       return String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline)
         .compactMap { Int32($0) }.filter { $0 > 1 }
     }.value
+  }
+
+  static func exactCommandPattern(_ path: String) -> String {
+    let special = CharacterSet(charactersIn: "\\.^$|?*+()[]{}")
+    let escaped = path.unicodeScalars.map { special.contains($0) ? "\\" + String($0) : String($0) }
+      .joined()
+    return "^" + escaped + "$"
   }
 
   static func wait(for pids: [Int32]) async throws {

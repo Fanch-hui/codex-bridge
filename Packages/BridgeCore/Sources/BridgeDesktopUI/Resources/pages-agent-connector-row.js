@@ -13,12 +13,13 @@
     var currentInstallations = [];
     var rowsForInstallation = new Map();
 
-    var row = S.node("article", "page-card connection-card agent-connect-row");
+    var row = S.node("article", (dependencies.detail ? "connection-detail " : "page-card ") + "connection-card agent-connect-row");
     var header = S.node("div", "agent-connect-header");
     if (!dependencies.detail) header.appendChild(S.icon("cpu.fill", "service-icon"));
     var main = S.node("div", "agent-connect-main");
     var heading = S.node("div", "client-heading");
     var title = S.node("div", "row-title");
+    title.hidden = !!dependencies.detail;
     var status = S.badge("正在查找", "neutral");
     heading.appendChild(title);
     heading.appendChild(status);
@@ -47,18 +48,27 @@
     var desktop = global.CodexBridgeDesktopDSHDesktop.create(S, function (command, payload) { context.emit(command, payload); });
     row.appendChild(desktop.root);
     var qoderSettings = global.CodexBridgeDesktopQoderRuntimeSettings.create(refreshAction);
-
+    var regionPicker = dependencies.detail && qoderSettings.root.querySelector(".form-grid > .field");
+    if (regionPicker) {
+      regionPicker.classList.add("agent-region-picker");
+      row.appendChild(regionPicker);
+    }
 
     var actionBar = S.node("div", "agent-connect-actionbar");
     var action = S.button("连接", null, {}, null, "small primary", true);
     var actionHint = S.node("span", "agent-action-hint");
     actionBar.appendChild(action);
-    actionBar.appendChild(actionHint);
-    var setupAction = S.button("一键配置", null, {}, null, "small", false);
-    var setupProgress = S.button("查看配置进度", null, {}, null, "small", false);
-    actionBar.appendChild(setupAction);
+    if (!dependencies.detail) actionBar.appendChild(actionHint);
+    var setupPrimary = S.button("安装并连接", null, {}, null, "small primary", false);
+    var setupHelp = S.button("登录或配置", null, {}, null, "small", false);
+    var setupAction = S.button("重新配置", null, {}, null, "small", false);
+    var setupProgress = S.button("查看配置进度", null, {}, null, "small primary", false);
+    var setupHistory = S.button("查看配置结果", null, {}, null, "small", false);
+    actionBar.appendChild(setupPrimary);
     actionBar.appendChild(setupProgress);
+    actionBar.appendChild(setupHelp);
     row.appendChild(actionBar);
+    if (dependencies.detail) row.appendChild(actionHint);
     var setup = global.CodexBridgeDesktopAgentSetup.create(context, provider, beginSetup);
     row.appendChild(setup.root);
     var installOptions = S.node("details", "agent-details");
@@ -72,9 +82,14 @@
         installationID: currentProvider.providerID === "qoder" ? qoderSettings.installationID() : null,
         installDirectory: installDirectory.control.value.trim() || null });
       setupAction.disabled = true;
+      setupPrimary.disabled = true;
+      setupHelp.disabled = true;
     }
+    setupPrimary.addEventListener("click", beginSetup);
+    setupHelp.addEventListener("click", beginSetup);
     setupAction.addEventListener("click", beginSetup);
     setupProgress.addEventListener("click", function () { setup.open(); });
+    setupHistory.addEventListener("click", function () { setup.open(); });
     var reviewConfirmation = Details.confirmation(S, "确认新的 Agent 文件并重新检查？", function () {
         var installation = primaryInstallation(currentInstallations);
         if (installation && installation.canReprobe) sendReprobe(installation, context.acceptReplacement);
@@ -92,7 +107,9 @@
     detailsBody.appendChild(providerDetail);
     detailsBody.appendChild(qoderSettings.root);
     detailsBody.appendChild(installOptions);
-    if (dependencies.openMCP && (provider.providerID === "pi" || provider.providerID === "qoder")) {
+    detailsBody.appendChild(setupAction);
+    detailsBody.appendChild(setupHistory);
+    if (dependencies.openMCP && ["deepseek-harness", "pi", "qoder"].indexOf(provider.providerID) >= 0) {
       var mcp = S.button("MCP 服务", null, {}, null, "small", false);
       mcp.addEventListener("click", function () {
         dependencies.openMCP(currentProvider.providerID === "qoder"
@@ -133,6 +150,40 @@
       return currentInstallations.length > 0 || !!currentProvider.discoveredConfigurationPath;
     }
 
+    function updateDesktopAction(primary) {
+      actionBar.hidden = false; action.hidden = false; actionMode = "desktop";
+      configPanel.hidden = true; setupAction.hidden = true; setupPrimary.hidden = true;
+      setupProgress.hidden = true; setupHistory.hidden = true; setupHelp.hidden = true; installOptions.hidden = true;
+      var native = desktop.presentation();
+      S.updateStatus(status, native.label, native.tone);
+      if (primary && primary.availability === "needs_review") {
+        actionMode = "review";
+        action.textContent = primary.enabled ? "确认更新并连接" : "确认更新并检查";
+        action.disabled = !context.canConnect || context.busy || !primary.canReprobe || !!pending;
+      } else {
+        var connected = desktop.connected();
+        actionMode = connected ? "use" : "desktop";
+        action.hidden = native.actionHidden && !connected;
+        action.textContent = connected ? "打开工作台" : native.actionTitle;
+        action.disabled = !connected && (!context.canConnect || context.busy || !native.canAct);
+      }
+      actionHint.textContent = native.actionHint;
+    }
+
+    function updateSetupActions(operation, noCandidate, connected) {
+      var running = global.CodexBridgeDesktopAgentSetup.running(operation);
+      setupAction.disabled = !context.canConnect || context.busy || running;
+      setupPrimary.hidden = !noCandidate;
+      setupPrimary.disabled = !context.canConnect || context.busy || running;
+      var needsSetup = !!operation && (running || operation.state === "needs_user_action"
+        || !connected && ["failed", "interrupted"].indexOf(operation.state) >= 0);
+      setupProgress.hidden = !needsSetup;
+      setupHistory.hidden = !operation || needsSetup;
+      setupProgress.textContent = operation && operation.state === "needs_user_action" ? "继续连接"
+        : operation && operation.state === "failed" ? "查看失败原因" : "查看连接进度";
+      return needsSetup;
+    }
+
     function refreshAction() {
       var scopedOperation = S.safeArray(context.setupOperations).filter(function (item) {
         return item.providerID === currentProvider.providerID
@@ -141,21 +192,17 @@
       setup.update(scopedOperation, currentProvider);
       var scoped = scopedInstallations();
       var primary = primaryInstallation(scoped);
+      if (currentProvider.providerID === "qoder") {
+        var selectedConnected = scoped.some(isConnected);
+        S.updateStatus(status, stateLabel(currentProvider, primary, selectedConnected),
+          stateTone(currentProvider, primary, selectedConnected));
+        detail.textContent = scopedOperation ? scopedOperation.message
+          : rowDetail(currentProvider, scoped, primary, selectedConnected);
+        updateDetails(currentProvider, scoped, primary);
+        if (dependencies.onStateChange) dependencies.onStateChange();
+      }
       if (desktop.isDesktop()) {
-        actionBar.hidden = false; action.hidden = false; actionMode = "desktop";
-        configPanel.hidden = true; setupAction.hidden = true; setupProgress.hidden = true; installOptions.hidden = true;
-        var native = desktop.presentation();
-        S.updateStatus(status, native.label, native.tone);
-        if (primary && primary.availability === "needs_review") {
-          actionMode = "review";
-          action.textContent = primary.enabled ? "确认更新并连接" : "确认更新并检查";
-          action.disabled = !context.canConnect || context.busy || !primary.canReprobe || !!pending;
-        } else {
-          action.hidden = native.actionHidden;
-          action.textContent = native.actionTitle;
-          action.disabled = !context.canConnect || context.busy || !native.canAct;
-        }
-        actionHint.textContent = native.actionHint;
+        updateDesktopAction(primary);
         return;
       }
       setupAction.hidden = false; installOptions.hidden = false;
@@ -170,9 +217,10 @@
       actionMode = null;
       var operation = setup.operation();
       actionBar.hidden = false;
-      setupAction.disabled = !context.canConnect || global.CodexBridgeDesktopAgentSetup.running(operation);
-      setupProgress.hidden = !operation;
-      setupProgress.textContent = operation && operation.state === "needs_user_action" ? "继续配置" : "查看配置进度";
+      var needsSetup = updateSetupActions(operation, noCandidate, isConnectedValue);
+      setupHelp.hidden = isConnectedValue || noCandidate
+        || !(primary && primary.availability === "unavailable" || discoveryState(currentProvider) === "failed");
+      setupHelp.disabled = !context.canConnect || context.busy || global.CodexBridgeDesktopAgentSetup.running(operation);
       action.hidden = isConnectedValue || (!primary && discoveryState(currentProvider) === "discovering")
         || (!primary && discoveryState(currentProvider) === "not_found");
       configPanel.hidden = !currentProvider.requiresConfiguration || noCandidate
@@ -182,16 +230,32 @@
       if (pending) {
         actionBar.hidden = false;
         action.hidden = false;
+        setupPrimary.hidden = setupProgress.hidden = setupHelp.hidden = true;
         action.textContent = "处理中…";
         action.disabled = true;
         actionHint.textContent = "正在更新本机连接状态";
         return;
       }
+      if (needsSetup) {
+        action.hidden = setupPrimary.hidden = setupHelp.hidden = true;
+        actionHint.textContent = "";
+        return;
+      }
       if (review) {
+        setupPrimary.hidden = setupHelp.hidden = true;
+        action.hidden = false;
         actionMode = "review";
         action.textContent = primary.enabled ? "确认更新并连接" : "确认更新并检查";
         action.disabled = !ready || !primary.canReprobe;
         actionHint.textContent = "需要确认本机 Agent 文件已由你更新。";
+        return;
+      }
+      if (isConnectedValue) {
+        actionMode = "use";
+        action.hidden = false;
+        action.textContent = "打开工作台";
+        action.disabled = false;
+        actionHint.textContent = "";
         return;
       }
       if (!action.hidden) {
@@ -270,6 +334,7 @@
         canEdit: context.canConnect,
         busy: context.busy
       }, context.emit);
+      if (regionPicker) regionPicker.hidden = nextProvider.providerID !== "qoder";
       if (lastBusy === true && !context.busy) pending = null;
       lastBusy = context.busy;
       finishPending();
@@ -299,7 +364,7 @@
       if (isConnectedValue && configPanel.parentNode !== detailsBody) {
         detailsBody.insertBefore(configPanel, detailsBody.firstChild.nextSibling);
       } else if (!isConnectedValue && configPanel.parentNode !== row) {
-        row.insertBefore(configPanel, actionBar);
+        row.insertBefore(configPanel, desktop.root);
       }
       updateDetails(nextProvider, scoped, primary);
       inferenceProtocol.wrapper.hidden = nextProvider.providerID !== "deepseek-harness";
@@ -371,15 +436,23 @@
       control.addEventListener("compositionend", refreshAction);
     });
     action.addEventListener("click", function () {
-      if (actionMode === "desktop") { desktop.connect(); refreshAction(); }
+      if (actionMode === "use" && global.CodexBridgeDesktopDSHWorkbench) {
+        global.CodexBridgeDesktopDSHWorkbench.openCollaboration();
+      } else if (actionMode === "desktop") { desktop.connect(); refreshAction(); }
       else if (actionMode === "review") reviewConfirmation.open();
       else if (actionMode === "connect") {
+        if (currentProvider.providerID === "claude-code") {
+          action.disabled = true;
+          beginSetup();
+          return;
+        }
         if (HeadlessConsent.required(currentProvider)) headlessConfirmation.open();
         else sendConnect(action, false);
       }
     });
     configSave.addEventListener("click", function () { sendConnect(configSave); });
     return { root: row, update: update, advanced: detailsBody, defaults: defaultsBody,
+      primaryActions: actionBar, status: status, selectedDistribution: qoderSettings.distribution,
       selectDistribution: qoderSettings.selectDistribution };
   }
 

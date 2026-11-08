@@ -17,6 +17,7 @@ public struct AgentProviderID: AgentStringIdentifier {
   public static let antigravity = AgentProviderID(rawValue: "antigravity")
   public static let pi = AgentProviderID(rawValue: "pi")
   public static let qoder = AgentProviderID(rawValue: "qoder")
+  public static let claudeCode = AgentProviderID(rawValue: "claude-code")
 }
 
 public struct AgentInstallationID: AgentStringIdentifier {

@@ -27,20 +27,21 @@ enum QoderRuntimeResources {
   }
 
   static let hashes: [String: String] = [
-    "account-scope.mjs": "1dc5734ba341fb95b6eace2c55522fa22dfdbf0501121a0614904bdecca746e3",
-    "configuration.mjs": "2162d4bcf032e442f36d9544d5154bd1a6592e22ec1c0e24f39082e63caa0685",
+    "account-scope.mjs": "a2c27fb5046d1bbd52a3c287d43e77f7db6ad277a84302599a7e35aeba763577",
+    "configuration.mjs": "3666b660e4a4895fc17a5b79dc2d41d16faa8fd18ee79035a65689b504f1dfa6",
     "process.mjs": "96d78d8db77b527689da9fefd2917ebfbdf99b3a4acd87c4108e8fc5ea5b145c",
-    "native-history.mjs": "390e08ce53c6c5a299729d4aca4afc99e1cb45cad79f51059a86c29ce6e34f7b",
+    "native-history.mjs": "dd76799e95c9b2731980d7582c406efcaacfde36822cb998cc2e9998f4779342",
     "events.mjs": "537ceadd7db1f4914d51d987f910068a498e19fa839f50f266ec83a2817be0d2",
-    "index.mjs": "273b1e479951eaa1e306af5c38f23e9f6c2bfdf5409d6728f6df6402d4cf6dd3",
-    "input.mjs": "1ee8b9841d3c17b3175d5dfb0525a135ff3fc49e61680b9619d47af169c3f268",
+    "index.mjs": "5d4b7ce66afb3821661e48fe5c8f63955d6d0033676fc609671756bed241a31b",
+    "input.mjs": "04a19989345ba2b9725bec1766c97ac09c8656f41f839920d98eeaea36194ff5",
     "models.mjs": "44442327ff6a9d555993b0d6645abfb4aae97876b380884f7c9a7af7395cf877",
-    "policy.mjs": "71086a874e8639a51b21f95b0b7f5d494ef4cd54545119d5b8df7d56548a843a",
-    "rpc.mjs": "3de8b0274634185bf88789fe5670afca5a1d9d01c7c8e7617697a48fe4a9292b",
-    "sdk.mjs": "f08f5c96b53d0bab6b8ff0a363c5b17565baff3dd7269625efaf7bf82a203fd0",
-    "session.mjs": "1b471104181da4fc1577a931ad3b063e8fd48246f86f32c2a9724c7bb555eb4d",
+    "policy.mjs": "d84967a80c006f1fb945a90b8603634f39ec3d72c9fe280eddeeb57f57f28599",
+    "rpc.mjs": "c06d84d9262eaa5f45896b4d97ae327853211a807cc90d998366f16a5f50084e",
+    "sdk.mjs": "ba11d283ba44c89ee99a275ac10b83fa2c02ba13da22b739caa74cd0ece7146e",
+    "session.mjs": "ba6564a025bfc253ba1de192da69e47db48d8c1c388564d1088c86ecff7c2e7d",
     "skill-resources.mjs": "bc72e4bb849050ff2093d054c910b75c4097c06631aad44ddd70824b4e14524c",
     "usage.mjs": "ccb9b84eea18c2721793e8770627b3a501ab834ddf89a565184a6f6a66ff65e3",
-    "validation.mjs": "5a058e471b5038683c7ac3b94dac5a09e2072f3271b9a74e5ecc841e650cedc3",
+    "validation.mjs": "1f93c8d0f5b22c0d735466143adfe4a132edf28e847768c0c85f5ed736d709ec",
+    "write-admission.mjs": "454539d3dca1bba3ecc1d46cda5a8254c6d75d5feff2f99d524e41608c5686c0",
   ]
 }

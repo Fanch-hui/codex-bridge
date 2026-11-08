@@ -46,10 +46,13 @@ package actor ExecutionSession {
   var deferredCompletion: TurnNotification?
   var seenSemanticSources: Set<String> = []
   var terminal = false
+  var finishingTask: Task<Void, Never>?
+  var stoppingClient: Task<Void, Never>?
 
   init(
     taskID: TaskID,
     configuration: ExecutionManagerConfiguration,
+    appServer: AppServerConfiguration,
     projectRoot: String,
     approvalLimits: ExecutionApprovalLimits,
     onTermination: @escaping @Sendable (TaskID, ExecutionSession) async -> Void
@@ -64,7 +67,7 @@ package actor ExecutionSession {
     self.approvalLimits = approvalLimits
     self.onTermination = onTermination
     client = CodexAppServerClient(
-      configuration: configuration.appServer.current(),
+      configuration: appServer,
       defaultTimeoutNanoseconds: configuration.requestTimeoutNanoseconds,
       eventBufferLimit: configuration.eventBufferLimit
     )
@@ -78,6 +81,8 @@ package actor ExecutionSession {
     }
     do {
       try request.project.root.validateCurrentIdentity()
+      try request.isolatedWorkspace?.root.validateCurrentIdentity()
+      try request.isolatedWorkspace?.runtimeRoot.validateCurrentIdentity()
     } catch {
       throw ExecutionServiceError.projectIdentityChanged(request.project.id)
     }
@@ -91,6 +96,9 @@ package actor ExecutionSession {
           experimentalAPI: configuration.synchronizeCodexProjects
         )
       )
+      if request.isolatedWorkspace != nil {
+        try await validateIsolatedMCP(threadID: nil)
+      }
       let fastTierID = try await validateModel(
         model: request.task.executionModel,
         effort: request.task.executionEffort,
@@ -103,10 +111,13 @@ package actor ExecutionSession {
       )
       let threadID = try await prepareThread(request, posture: posture)
       expectedThreadID = threadID
+      if request.isolatedWorkspace != nil {
+        try await validateIsolatedMCP(threadID: threadID)
+      }
       let turn = try await client.startTurn(
         TurnStartParams(
           threadId: threadID,
-          text: request.task.prompt,
+          text: request.executionPrompt,
           sandboxPolicy: posture.sandboxPolicy,
           approvalPolicy: posture.approvalPolicy,
           approvalsReviewer: posture.approvalsReviewer,
@@ -219,15 +230,25 @@ package actor ExecutionSession {
   }
 
   func shutdown() async {
-    guard !terminal else {
-      await client.stop()
-      return
-    }
-    terminal = true
+    if !terminal { terminal = true }
     eventTask?.cancel()
     lifetimeTask?.cancel()
     continuation.finish()
-    await client.stop()
+    if let finishingTask {
+      await finishingTask.value
+    } else {
+      await stopClient()
+    }
+  }
+
+  func stopClient() async {
+    if let stoppingClient {
+      await stoppingClient.value
+      return
+    }
+    let task = Task { [client] in await client.stop() }
+    stoppingClient = task
+    await task.value
   }
 
   private func beginConsumingEvents() {

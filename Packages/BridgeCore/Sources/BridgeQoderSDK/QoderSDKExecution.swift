@@ -19,6 +19,7 @@ actor QoderSDKExecution {
   private let request: AgentExecutionRequest
   private let binding: AgentBinding
   private let distribution: QoderDistribution
+  private let writeAdmission: QoderWriteAdmission?
   private let normalizer = QoderEventNormalizer()
   private var collector: Task<Void, Never>?
   private var terminal = false
@@ -36,6 +37,7 @@ actor QoderSDKExecution {
     self.request = request
     self.binding = binding
     self.distribution = distribution
+    writeAdmission = request.toolWriteGate.map { QoderWriteAdmission(gate: $0, client: client) }
     let stream = AsyncThrowingStream.makeStream(
       of: AgentEventEnvelope.self, throwing: (any Error).self,
       bufferingPolicy: .bufferingOldest(128))
@@ -58,13 +60,15 @@ actor QoderSDKExecution {
     }
     Task { [weak self] in
       guard let self else { return }
-      do { try await self.send(self.request.prompt, initial: true) } catch { await self.fail() }
+      do { try await self.send(self.request.executionPrompt, initial: true) } catch {
+        await self.fail()
+      }
     }
   }
 
   func send(_ text: String, initial: Bool = false, interrupt: Bool = false) async throws {
     guard !terminal, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      text.utf8.count <= 32768, !text.contains("\0"), inputs.count < 32
+      text.utf8.count <= (initial ? 65536 : 32768), !text.contains("\0"), inputs.count < 32
     else { throw AgentRuntimeError.invalidRequest("qoder.input") }
     let id = UUID().uuidString.lowercased()
     var fields: [String: QoderJSONValue] = ["id": .string(id), "text": .string(text)]
@@ -154,6 +158,9 @@ actor QoderSDKExecution {
     switch event {
     case .permission(let id, let value): try await permission(id, value: value)
     case .userInput(let id, let value): try await userInput(id, value: value)
+    case .workspaceWrite(let id, let value):
+      guard let writeAdmission else { throw ACPError.invalidMessage }
+      try await writeAdmission.handle(id, value)
     case .update(let value):
       guard value["sessionID"]?.stringValue == binding.providerSessionID,
         value["distribution"]?.stringValue == distribution.rawValue
@@ -278,11 +285,26 @@ actor QoderSDKExecution {
     userInputs.removeAll()
     inputs.removeAll()
     await client.shutdown()
+    await writeAdmission?.close(releasingHeld: Self.confirmsProcessExit(event))
     do {
       if let event { try await emit(event) }
       continuation.finish()
     } catch {
       continuation.finish(throwing: error)
+    }
+  }
+
+  /// The host publishes its own terminal events only after confirming that every process it owns
+  /// has exited; a closed channel or an explicit shutdown confirms nothing.
+  private static func confirmsProcessExit(_ event: AgentEvent?) -> Bool {
+    switch event {
+    case .completed, .interrupted: true
+    case .failed(let code, _):
+      ![
+        "qoder_process_exit_unconfirmed", "qoder_process_tree_exit_unconfirmed",
+        "qoder_windows_system_root_missing", "qoder_cleanup_failed", "qoder_transport_failed",
+      ].contains(code)
+    default: false
     }
   }
 

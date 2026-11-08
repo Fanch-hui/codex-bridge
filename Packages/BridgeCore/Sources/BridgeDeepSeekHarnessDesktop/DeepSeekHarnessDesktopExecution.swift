@@ -32,7 +32,7 @@ actor DeepSeekHarnessDesktopExecution {
     }
     var params: [String: ACPJSONValue] = [
       "requestID": .string(runtime.requestID), "projectPath": .string(request.projectRoot),
-      "text": .string(request.prompt), "accessMode": .string("full"),
+      "text": .string(request.executionPrompt), "accessMode": .string("full"),
     ]
     if let sessionID = request.requestedSessionID { params["sessionID"] = .string(sessionID) }
     if let model = request.model { params["modelID"] = .string(model) }

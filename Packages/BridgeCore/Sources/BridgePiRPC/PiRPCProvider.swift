@@ -113,7 +113,8 @@ public struct PiRPCProvider: AgentProvider, Sendable {
       }
       if let effort = request.effort { try await selectEffort(effort, client: client) }
       let usageAvailable = await Self.supportsSessionStats(client)
-      let capabilities = Self.capabilities(usageAvailable: usageAvailable)
+      let capabilities = Self.capabilities(
+        usageAvailable: usageAvailable, subagentsAvailable: request.nativeSubagentsAllowed)
       guard capabilities.supports(request.requiredCapabilities) else {
         throw AgentRuntimeError.invalidRequest("pi.required_capability")
       }
@@ -175,10 +176,8 @@ public struct PiRPCProvider: AgentProvider, Sendable {
       validHandshakeTools(
         handshake["tools"], expected: profile.tools,
         mcpToolCount: handshake["mcp"]?["toolCount"]?.integerValue),
-      handshake["capabilities"]?.arrayValue == [
-        PiJSONValue.string("plan"), PiJSONValue.string("user_input"),
-        PiJSONValue.string("mcp_client"), PiJSONValue.string("subagents"),
-      ],
+      handshake["capabilities"]?.arrayValue
+        == Self.extensionCapabilities(tools: profile.tools, writeGate: profile.writeGate),
       validMCPState(handshake["mcp"], expected: profile.mcpServerIDs)
     else { throw PiRPCError.incompatibleRuntime }
     if !profile.mcpServerIDs.isEmpty,
@@ -235,9 +234,19 @@ public struct PiRPCProvider: AgentProvider, Sendable {
       && Set(connectedIDs + failedIDs) == Set(expected)
   }
 
-  static func capabilities(usageAvailable: Bool) -> AgentCapabilitySnapshot {
+  static func extensionCapabilities(tools: [String], writeGate: Bool) -> [PiJSONValue] {
+    var values: [PiJSONValue] = [.string("plan"), .string("user_input"), .string("mcp_client")]
+    if tools.contains("bridge_subtask") { values.append(.string("subagents")) }
+    if writeGate { values.append(.string("write_gate")) }
+    return values
+  }
+
+  static func capabilities(
+    usageAvailable: Bool, subagentsAvailable: Bool = true
+  ) -> AgentCapabilitySnapshot {
     var observed = supportedCapabilities
     if !usageAvailable { observed.remove(.usage) }
+    if !subagentsAvailable { observed.subtract([.subagents, .childRuns]) }
     return AgentCapabilitySnapshot(
       advertised: supportedCapabilities,
       observed: observed, enforced: observed)

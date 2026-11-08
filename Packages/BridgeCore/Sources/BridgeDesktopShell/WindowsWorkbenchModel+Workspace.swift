@@ -5,9 +5,9 @@
 
   extension WindowsWorkbenchModel {
     func performWorkbenchWorkspace(_ envelope: BridgeDesktopCommandEnvelope) async {
+      workspaceModel.selectProject(selectedProjectID)
       guard connectionState == .connected, !isShuttingDown else {
-        workspaceModel.reject(
-          requestID: envelope.requestID, message: "后台 Service 未连接，无法操作项目文件。")
+        workspaceModel.rejectUnavailable(requestID: envelope.requestID)
         return
       }
       let payload = envelope.payload

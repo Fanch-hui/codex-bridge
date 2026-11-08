@@ -1,6 +1,6 @@
 /// Produces a small patch when the new state differs only in a patchable
 /// domain: the workbench collections, the selected task's conversation, or
-/// the volatile page domains (overview, connections, logs, appUpdate). It
+/// the volatile page domains (overview, projects, connections, logs, appUpdate). It
 /// deliberately falls back to a full snapshot for any ambiguous change so
 /// the page never applies a partial state over the wrong base revision.
 public struct BridgeDesktopUIStatePatchBuilder: Sendable {
@@ -65,6 +65,9 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     if old.overview != new.overview {
       changes.append(.overview(new.overview))
     }
+    if old.projects != new.projects {
+      changes.append(.projects(new.projects))
+    }
     if old.connections != new.connections {
       changes.append(.connection(new.connections))
     }
@@ -88,6 +91,17 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     if oldWorkbench.approvals != newWorkbench.approvals {
       changes.append(.approvals(newWorkbench.approvals))
     }
+    if oldWorkbench.paneTasks != newWorkbench.paneTasks {
+      let (mode, panes, removedIDs) = rowsPatch(
+        old: oldWorkbench.paneTasks ?? [],
+        new: newWorkbench.paneTasks ?? [],
+        id: \.taskID
+      )
+      changes.append(.paneTasks(mode: mode, tasks: panes, removedIDs: removedIDs))
+    }
+    if oldWorkbench.embeddedDSHReceipts != newWorkbench.embeddedDSHReceipts {
+      changes.append(.embeddedDSHReceipts(newWorkbench.embeddedDSHReceipts ?? []))
+    }
 
     guard oldWorkbench.selectedTaskID == newWorkbench.selectedTaskID else {
       return nil
@@ -108,9 +122,10 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
   }
 
   /// Everything a patch cannot express must be identical for the patch path.
-  /// The volatile page domains (overview, connections, logs, appUpdate) are
-  /// excluded here: they churn on every poll tick or log line and are carried
-  /// by their own change kinds instead of forcing a full snapshot.
+  /// The volatile page domains (overview, projects, connections, logs, appUpdate)
+  /// are excluded here: they churn on every poll tick or log line (the project
+  /// session rows carry `updatedAt`) and are carried by their own change kinds
+  /// instead of forcing a full snapshot.
   private func sameGlobalState(
     _ old: BridgeDesktopUIState,
     _ new: BridgeDesktopUIState
@@ -120,9 +135,9 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.selectedNavigation == new.selectedNavigation
       && old.connectionLabel == new.connectionLabel
       && old.connectionTone == new.connectionTone
+      && old.serviceConnected == new.serviceConnected
       && old.isRefreshing == new.isRefreshing
       && old.feedback == new.feedback
-      && old.projects == new.projects
       && old.settings == new.settings
   }
 
@@ -133,6 +148,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     old.header == new.header
       && old.projects == new.projects
       && old.selectedProjectID == new.selectedProjectID
+      && old.defaultProjectID == new.defaultProjectID
       && old.permissionMode == new.permissionMode
       && old.permissionOptions == new.permissionOptions
       && old.selectedTaskID == new.selectedTaskID
@@ -241,7 +257,10 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
   ) -> (BridgeDesktopUIStatePatch.Change.CollectionMode, [Row], [String]) {
     let oldIDs = old.map { $0[keyPath: id] }
     let newIDs = new.map { $0[keyPath: id] }
-    guard oldIDs.filter({ newIDs.contains($0) }) == newIDs.filter({ oldIDs.contains($0) }) else {
+    let survivingOldIDs = oldIDs.filter { newIDs.contains($0) }
+    guard survivingOldIDs == newIDs.filter({ oldIDs.contains($0) }),
+      newIDs.starts(with: survivingOldIDs)
+    else {
       return (.replace, new, [])
     }
     let oldByID = Dictionary(uniqueKeysWithValues: old.map { ($0[keyPath: id], $0) })

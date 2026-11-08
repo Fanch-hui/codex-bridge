@@ -38,7 +38,6 @@
           global.CodexBridgeDesktopSettingsPage.openDetail("permissions", context.emit);
         }
       });
-      controls.appendChild(permissionLink);
       var toggle = S.node("label", "check-field");
       var checkbox = S.node("input");
       var toggleText = S.node("span");
@@ -49,6 +48,8 @@
           enabled: checkbox.checked
         });
         checkbox.setAttribute("aria-busy", "true");
+        checkbox.disabled = true;
+        if (global.CodexBridgeDesktopConnectionsPage) global.CodexBridgeDesktopConnectionsPage.watchClients();
       });
       toggle.appendChild(checkbox);
       toggle.appendChild(toggleText);
@@ -68,8 +69,14 @@
           context.emit("rotateMCPClientCredential", { clientID: row.dataset.clientID });
         }
       });
-      actions.appendChild(rotate);
       controls.appendChild(actions);
+      var advanced = S.node("details", "client-advanced");
+      advanced.appendChild(S.node("summary", null, "更多选项"));
+      var advancedActions = S.node("div", "client-settings-actions");
+      advancedActions.appendChild(permissionLink);
+      advancedActions.appendChild(rotate);
+      advanced.appendChild(advancedActions);
+      controls.appendChild(advanced);
       row.appendChild(controls);
       var draft = D.bind(connectionOnly ? { enabled: checkbox } : { exposure: exposure.control, enabled: checkbox });
       return {
@@ -82,7 +89,8 @@
         draft: draft,
         copy: copy,
         rotate: rotate,
-        actions: actions
+        actions: actions,
+        advanced: advanced
       };
     }
     function updateRow(row, client, nextEmit, singleClient) {
@@ -93,7 +101,10 @@
         client.enabled ? "已启用" : "已停用", client.enabled ? "success" : "neutral");
       var details = [];
       if (client.activeSessionCount) details.push("活动会话 " + client.activeSessionCount);
-      if (client.lastConnectedAt) details.push("最近连接：" + client.lastConnectedAt);
+      var calls = client.successfulToolCalls || {};
+      [["local", "本机"], ["cloud", "云端"], ["shared", "客户端"]].forEach(function (entry) {
+        if (calls[entry[0]]) details.push(entry[1] + "最近成功调用：" + calls[entry[0]]);
+      });
       row.detail.textContent = details.join(" · ");
       row.detail.hidden = !row.detail.textContent;
       D.selectOptions(row.exposure, client.exposureOptions || [], false);
@@ -103,14 +114,15 @@
       row.exposure.setAttribute("aria-busy", "false");
       row.checkbox.setAttribute("aria-busy", "false");
       row.toggle.hidden = permissionsOnly || !client.canToggle;
-      row.state.hidden = permissionsOnly;
+      row.state.hidden = permissionsOnly || connectionOnly && client.canToggle;
       var gemini = client.clientID === "google.gemini";
       row.toggleText.textContent = singleClient ? "启用连接" : "启用 " + client.displayName;
       row.copy.textContent = gemini ? "复制本地启动命令" : "复制 Qwen JSON 配置";
       row.rotate.textContent = gemini ? "重置连接" : "重新生成凭证";
       row.copy.hidden = permissionsOnly || !client.canCopyConfiguration || options.hideCopy === true;
       row.rotate.hidden = permissionsOnly || !client.canRotateCredential;
-      row.actions.hidden = row.copy.hidden && row.rotate.hidden;
+      row.actions.hidden = row.copy.hidden;
+      row.advanced.hidden = !connectionOnly;
       row.copy.disabled = !client.enabled || !client.canCopyConfiguration;
       row.rotate.disabled = !client.enabled || !client.canRotateCredential;
       row.detail.hidden = permissionsOnly || !row.detail.textContent;

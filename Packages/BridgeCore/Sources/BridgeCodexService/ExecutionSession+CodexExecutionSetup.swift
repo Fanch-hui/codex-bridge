@@ -5,6 +5,25 @@ import BridgeServiceCore
 import Foundation
 
 extension ExecutionSession {
+  func validateIsolatedMCP(threadID: String?) async throws {
+    var params: [String: JSONValue] = ["limit": .integer(1)]
+    if let threadID { params["threadId"] = .string(threadID) }
+    do {
+      let response = try await client.request(
+        method: "mcpServerStatus/list", params: .object(params))
+      guard let value = response.objectValue,
+        case .array(let servers)? = value["data"], servers.isEmpty,
+        value["nextCursor"] == nil || value["nextCursor"] == .null
+      else {
+        throw ExecutionServiceError.invalidRequest("isolatedWorkspace.mcpUnavailable")
+      }
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch {
+      throw ExecutionServiceError.invalidRequest("isolatedWorkspace.mcpUnavailable")
+    }
+  }
+
   func validateModel(
     model: String,
     effort: String,
@@ -45,7 +64,12 @@ extension ExecutionSession {
     _ request: ExecutionRequest,
     posture: ExecutionPosture
   ) async throws -> String {
-    let projectID = try await codexProjectID(for: request.project)
+    let projectID =
+      if request.isolatedWorkspace == nil {
+        try await codexProjectID(for: request.project)
+      } else {
+        nil as String?
+      }
     if let threadID = request.task.requestedThreadID {
       return try await resumeThread(
         threadID,
@@ -187,7 +211,8 @@ extension ExecutionSession {
     fastServiceTierID: String?
   ) -> ExecutionPosture {
     let task = request.task
-    let fullAccess = task.accessMode == .fullAccess && task.permissionMode == .full
+    let isolated = request.isolatedWorkspace != nil
+    let fullAccess = isolated || (task.accessMode == .fullAccess && task.permissionMode == .full)
     let sandboxPolicy: CodexSandboxPolicy
     if fullAccess {
       sandboxPolicy = .dangerFullAccess
@@ -209,8 +234,8 @@ extension ExecutionSession {
       threadSandbox: fullAccess
         ? .dangerFullAccess : (task.permissionMode == .readOnly ? .readOnly : .workspaceWrite),
       sandboxPolicy: sandboxPolicy,
-      approvalPolicy: task.accessMode == .fullAccess ? .never : .onRequest,
-      approvalsReviewer: task.accessMode == .autoReview ? "auto_review" : "user",
+      approvalPolicy: isolated || task.accessMode == .fullAccess ? .never : .onRequest,
+      approvalsReviewer: !isolated && task.accessMode == .autoReview ? "auto_review" : "user",
       serviceTier: fastServiceTierID
     )
   }

@@ -87,11 +87,26 @@ extension DeepSeekHarnessACPClient {
   public func prompt(
     sessionID: String, text: String, images: [DeepSeekHarnessACPImageInput] = []
   ) async throws -> DeepSeekHarnessACPPromptResult {
+    try await prompt(
+      sessionID: sessionID, text: text, images: images, maximumTextBytes: 32 * 1_024)
+  }
+
+  func promptForInitialExecution(
+    sessionID: String, text: String, images: [DeepSeekHarnessACPImageInput]
+  ) async throws -> DeepSeekHarnessACPPromptResult {
+    try await prompt(
+      sessionID: sessionID, text: text, images: images, maximumTextBytes: 64 * 1_024)
+  }
+
+  private func prompt(
+    sessionID: String, text: String, images: [DeepSeekHarnessACPImageInput],
+    maximumTextBytes: Int
+  ) async throws -> DeepSeekHarnessACPPromptResult {
     try requireInitialized()
     try validateIdentifier(sessionID, field: "session.id")
     try requireSession(sessionID)
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      text.utf8.count <= 32 * 1_024,
+      text.utf8.count <= maximumTextBytes,
       !text.contains("\0")
     else {
       throw AgentRuntimeError.invalidRequest("prompt.text")

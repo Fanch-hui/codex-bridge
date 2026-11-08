@@ -11,7 +11,6 @@
     if (header.parentNode !== card) card.appendChild(header);
     if (conversation.parentNode !== card) card.appendChild(conversation);
     if (card.firstChild !== header) card.insertBefore(header, card.firstChild);
-    if (card.lastChild !== conversation) card.appendChild(conversation);
     if (!header.__presentation) {
       var summary = S.node("div", "task-detail-summary");
       var step = S.node("div", "current-step-card");
@@ -24,14 +23,19 @@
       var files = S.node("div", "task-detail-files"); metadata.appendChild(files);
       metadata.addEventListener("toggle", function () {
         expanded.set(metadata.__taskKey, !!metadata.open); metadata.hidden = !metadata.open;
-        header.hidden = step.hidden && failure.hidden && metadata.hidden;
+        header.hidden = step.hidden && metadata.hidden;
         if (!metadata.open && metadata.__returnFocus && metadata.contains(document.activeElement)) metadata.__returnFocus.focus();
       });
-      [summary, failure, metadata].forEach(function (node) { header.appendChild(node); });
+      [summary, metadata].forEach(function (node) { header.appendChild(node); });
       header.__presentation = {
         header: header, step: step, stepText: stepText, failure: failure,
         metadata: metadata, grid: grid, files: files, conversation: conversation
       };
+    }
+    // A failure reads where the conversation ends, like a native agent's error turn.
+    var failureNode = header.__presentation.failure;
+    if (conversation.nextSibling !== failureNode || card.lastChild !== failureNode) {
+      card.appendChild(conversation); card.appendChild(failureNode);
     }
     return header.__presentation;
   }
@@ -44,13 +48,20 @@
     }
     currentView = view;
     view.metadata.hidden = !view.metadata.open;
-    view.step.hidden = !detail.currentStep || detail.isTerminal === true;
+    view.step.hidden = true;
     view.stepText.textContent = detail.currentStep || "";
     S.clear(view.failure);
     view.failure.hidden = !detail.failureReason && !detail.failureNextAction;
     if (detail.failureReason) view.failure.appendChild(S.node("p", "error-text", detail.failureReason));
     if (detail.failureNextAction) view.failure.appendChild(S.node("p", null, detail.failureNextAction));
-    view.header.hidden = view.step.hidden && view.failure.hidden && view.metadata.hidden;
+    if (detail.failureDiagnostic || detail.failureCode) {
+      var diagnostics = S.node("details", "task-failure-diagnostics");
+      diagnostics.appendChild(S.node("summary", "disclosure-summary", "诊断详情"));
+      if (detail.failureCode) diagnostics.appendChild(S.node("p", "mono", detail.failureCode));
+      if (detail.failureDiagnostic) diagnostics.appendChild(S.node("pre", "mono", detail.failureDiagnostic));
+      view.failure.appendChild(diagnostics);
+    }
+    view.header.hidden = view.step.hidden && view.metadata.hidden;
     S.clear(view.grid);
     addDetail(view.grid, "项目", detail.projectName);
     addDetail(view.grid, "Agent", detail.provider);

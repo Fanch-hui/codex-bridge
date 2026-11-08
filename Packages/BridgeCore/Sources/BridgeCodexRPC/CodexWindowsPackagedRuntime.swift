@@ -231,18 +231,8 @@
     }
 
     private static func publish(_ staging: URL, at target: URL) throws {
-      let fileManager = FileManager.default
       do {
-        if fileManager.fileExists(atPath: target.path) {
-          _ = try fileManager.replaceItemAt(
-            target,
-            withItemAt: staging,
-            backupItemName: nil,
-            options: []
-          )
-        } else {
-          try fileManager.moveItem(at: staging, to: target)
-        }
+        try FileReplacement.publish(staging, at: target)
       } catch {
         throw CodexWindowsPackagedRuntimeError.publishFailed
       }

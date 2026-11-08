@@ -75,22 +75,18 @@
         didHandshake = true
         serviceStatus = status
         do {
-          let refreshedProjects = try await client.projects()
+          let snapshot = try await client.projectList()
           guard isCurrentConnection(requestGeneration) else { return didHandshake }
-          if projects != refreshedProjects {
-            projects = refreshedProjects
+          if projects != snapshot.projects {
+            projects = snapshot.projects
           }
+          defaultProjectID = snapshot.defaultProjectID
           projectLoadError = nil
         } catch {
           guard isCurrentConnection(requestGeneration) else { return didHandshake }
           projectLoadError = "项目查询失败：\(BridgeServiceErrorMessage.message(error))"
         }
-        selectedProjectID =
-          projects.first(where: { $0.projectID == status.workbenchProjectID })?.projectID
-          ?? selectedProjectID
-          ?? projects.first?.projectID
-        try await synchronizeWorkbenchProject()
-        guard isCurrentConnection(requestGeneration) else { return didHandshake }
+        reconcileProjectContext()
         if let mode = status.workbenchPermissionMode,
           BridgeDesktopWorkbenchPermissionMode(rawValue: mode) != nil
         {
@@ -215,6 +211,8 @@
           self.serviceChangeRefreshPending = false
           guard self.isCurrentConnection(generation) else { break }
           await self.refreshTasks()
+          // Fold the burst of task changes from a streaming Agent into one refresh per window.
+          try? await Task.sleep(for: .milliseconds(300))
         } while self.serviceChangeRefreshPending && !Task.isCancelled
         self.serviceChangeRefreshTask = nil
       }

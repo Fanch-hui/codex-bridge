@@ -27,6 +27,7 @@
         ),
         projects: projects,
         selectedProjectID: display.selectedProjectID,
+        defaultProjectID: display.defaultProjectID,
         permissionMode: display.permissionMode,
         permissionOptions: BridgeDesktopWorkbenchPermissionMode.choices,
         tasks: display.taskItems,
@@ -55,7 +56,9 @@
         isRefreshingModels: modelRefreshInProgress,
         modelError: display.modelError,
         commandReceipt: display.commandReceipt,
-        workspace: display.workspace
+        embeddedDSHReceipts: display.embeddedDSHReceipts,
+        workspace: display.workspace,
+        paneTasks: display.paneTasks
       )
     }
 

@@ -17,8 +17,14 @@ public actor SimpleServiceStore {
     var configuration = Configuration()
     configuration.busyMode = .timeout(5)
     configuration.foreignKeysEnabled = true
+    if SimpleServiceStore.supportsWAL(path: path) {
+      // 单连接下 WAL 的收益来自每次提交少做 fsync；操作回执与恢复依赖已提交记录在断电后仍在，
+      // 因此覆盖 GRDB 在 WAL 下默认的 synchronous=NORMAL，保持 FULL。
+      configuration.journalMode = .wal
+    }
     do {
       let openedDatabase = try DatabaseQueue(path: path, configuration: configuration)
+      try openedDatabase.inDatabase { try $0.execute(sql: "PRAGMA synchronous = FULL") }
       try ServiceStoreSchema.createPreMigrationBackupIfNeeded(
         openedDatabase,
         sourcePath: path
@@ -35,6 +41,17 @@ public actor SimpleServiceStore {
 
   public static func inMemory() throws -> SimpleServiceStore {
     try SimpleServiceStore(path: ":memory:")
+  }
+
+  /// WAL 需要 `-wal` / `-shm` 旁路文件，网络文件系统上不可靠；内存库没有日志文件。
+  /// 数据目录位于 Windows UNC 路径时沿用回滚日志模式，其余本地路径统一使用 WAL。
+  private static func supportsWAL(path: String) -> Bool {
+    guard path != ":memory:" else { return false }
+    #if os(Windows)
+      return !path.hasPrefix("\\\\") && !path.hasPrefix("//")
+    #else
+      return true
+    #endif
   }
 }
 

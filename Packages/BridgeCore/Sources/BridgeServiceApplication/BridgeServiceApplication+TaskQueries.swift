@@ -62,12 +62,14 @@ extension BridgeServiceApplication {
       .map(\.updatedAt)
       .max()
     let effectiveUpdatedAt = max(task.updatedAt, activityUpdatedAt ?? task.updatedAt)
+    var sourceClientID: String? = task.sourceClientID.isEmpty ? nil : task.sourceClientID
+    if task.sourceClientID.hasPrefix("embedded.dsh.") { sourceClientID = "embedded.dsh" }
     return MCPServiceTaskSnapshot(
       taskID: task.id.rawValue,
       projectID: task.projectID.rawValue,
       prompt: task.prompt,
       source: task.source.rawValue,
-      sourceClientID: task.sourceClientID.isEmpty ? nil : task.sourceClientID,
+      sourceClientID: sourceClientID,
       status: task.isQueued ? "queued" : task.state.status.rawValue,
       providerID: task.providerID,
       installationID: task.installationID,

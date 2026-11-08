@@ -97,6 +97,7 @@ public struct BridgeDesktopMCPClientRow: Codable, Equatable, Sendable {
   public let exposureOptions: [BridgeDesktopChoice]
   public let activeSessionCount: Int
   public let lastConnectedAt: String?
+  public let successfulToolCalls: [String: String]?
   public let canToggle: Bool
   public let canCopyConfiguration: Bool
   public let canRotateCredential: Bool
@@ -109,6 +110,7 @@ public struct BridgeDesktopMCPClientRow: Codable, Equatable, Sendable {
     exposureOptions: [BridgeDesktopChoice] = [],
     activeSessionCount: Int,
     lastConnectedAt: String? = nil,
+    successfulToolCalls: [String: String]? = nil,
     canToggle: Bool = true,
     canCopyConfiguration: Bool = false,
     canRotateCredential: Bool = false
@@ -120,6 +122,7 @@ public struct BridgeDesktopMCPClientRow: Codable, Equatable, Sendable {
     self.exposureOptions = exposureOptions
     self.activeSessionCount = activeSessionCount
     self.lastConnectedAt = lastConnectedAt
+    self.successfulToolCalls = successfulToolCalls
     self.canToggle = canToggle
     self.canCopyConfiguration = canCopyConfiguration
     self.canRotateCredential = canRotateCredential

@@ -43,7 +43,7 @@ export class TurnQueue {
   constructor() { this.pending = []; this.current = null; this.ids = new Set(); this.bytes = 0; this.imageBytes = 0; }
   push(value) {
     const imageInput = images(value.images);
-    const item = { id: uuid(value.id), text: text(value.text), images: imageInput.blocks,
+    const item = { id: uuid(value.id), text: text(value.text, 65536), images: imageInput.blocks,
       imageBytes: imageInput.bytes };
     requireValue(!this.ids.has(item.id) && this.ids.size < 4096, 'duplicate_input');
     requireValue(this.pending.length < 32 && this.bytes + Buffer.byteLength(item.text) <= 262144

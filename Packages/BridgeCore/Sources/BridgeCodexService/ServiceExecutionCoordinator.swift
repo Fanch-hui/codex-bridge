@@ -37,17 +37,29 @@ public actor ServiceExecutionCoordinator {
   let conversationCoordinator: ServiceExecutionConversationCoordinator
   let agentEventProcessor: ServiceExecutionAgentEventProcessor
   let agentRunner: (any AgentTaskRunning)?
+  let processOwnershipDirectory: URL?
+  let executionWorkspaceResolver: ServiceExecutionWorkspaceResolver?
   let providerDisplayNameResolver: @Sendable (AgentProviderID) -> String
+  var toolWriteGateProvider: (any ServiceToolWriteGateProviding)?
   var collectors: [TaskID: Task<Void, Never>] = [:]
   var activeAgentRuns: [TaskID: ActiveAgentRun] = [:]
+  var closingAgentRuns: [TaskID: Task<Void, Never>] = [:]
+  var ownedProcessReconciliations: [TaskID: Task<Bool, Never>] = [:]
+  var claudeRecoveryMonitor: Task<Void, Never>?
+  var claudeRecoveryGeneration: UInt64 = 0
   var workspaceChangeTrackers: [TaskID: ServiceWorkspaceChangeTracker] = [:]
   var presentedCodexApprovals: [TaskID: Set<String>] = [:]
   var pendingAgentApprovals: [String: PendingAgentApproval] = [:]
   var pendingAgentUserInputs: [String: PendingAgentUserInput] = [:]
   var agentUserInputTimeouts: [String: Task<Void, Never>] = [:]
+  var agentInteractionOwners: Set<TaskID> = []
+  var agentInteractionWaiters: [TaskID: [CheckedContinuation<Void, Never>]] = [:]
+  var agentCancellationVersions: [TaskID: UInt64] = [:]
+  var agentCancellationWaiters: [TaskID: [CheckedContinuation<Void, Never>]] = [:]
   var finishedRuns: Set<TaskID> = []
   var scheduledStarts: [TaskID: Task<Void, Never>] = [:]
   private var startingTasks: Set<TaskID> = []
+  private var startingWaiters: [TaskID: [CheckedContinuation<Void, Never>]] = [:]
   var isShuttingDown = false
   let agentApprovalLifetime: TimeInterval = 5 * 60
 
@@ -57,6 +69,8 @@ public actor ServiceExecutionCoordinator {
     execution: ExecutionManager,
     conversation: TaskConversationBuffer? = nil,
     agentRunner: (any AgentTaskRunning)? = nil,
+    processOwnershipDirectory: URL? = nil,
+    executionWorkspaceResolver: ServiceExecutionWorkspaceResolver? = nil,
     providerDisplayNameResolver: @escaping @Sendable (AgentProviderID) -> String = {
       if $0 == .codex { return "Codex" }
       if $0 == .openCode { return "OpenCode" }
@@ -80,6 +94,8 @@ public actor ServiceExecutionCoordinator {
       conversation: conversation
     )
     self.agentRunner = agentRunner
+    self.processOwnershipDirectory = processOwnershipDirectory
+    self.executionWorkspaceResolver = executionWorkspaceResolver
     self.providerDisplayNameResolver = providerDisplayNameResolver
   }
 
@@ -93,11 +109,15 @@ public actor ServiceExecutionCoordinator {
       throw ExecutionServiceError.processUnavailable
     }
     guard collectors[taskID] == nil, activeAgentRuns[taskID] == nil,
+      closingAgentRuns[taskID] == nil, ownedProcessReconciliations[taskID] == nil,
       startingTasks.insert(taskID).inserted
     else {
       throw ExecutionServiceError.activeSession(taskID)
     }
-    defer { startingTasks.remove(taskID) }
+    defer {
+      startingTasks.remove(taskID)
+      for waiter in startingWaiters.removeValue(forKey: taskID) ?? [] { waiter.resume() }
+    }
     guard let task = try await tasks.task(id: taskID) else {
       throw ServiceStoreError.unknownTask(taskID)
     }
@@ -112,7 +132,20 @@ public actor ServiceExecutionCoordinator {
 
     let handle: ExecutionHandle
     do {
-      handle = try await execution.start(try ExecutionRequest(task: task, project: project))
+      let workspace = try await executionWorkspaceResolver?(task, project)
+      try ensureStartIsActive(taskID)
+      if workspace != nil {
+        guard task.source == .mcpClient, task.sourceClientID.hasPrefix("embedded.dsh.") else {
+          throw ExecutionServiceError.invalidRequest("isolatedWorkspace.owner")
+        }
+      }
+      let request = try ExecutionRequest(
+        task: task, project: project, isolatedWorkspace: workspace,
+        nativeSubagentsAllowed: !(try await tasks.isEmbeddedDSHTask(task.id)))
+      let execution = self.execution
+      handle = try await withProcessOwnership(taskID: taskID) {
+        try await execution.start(request)
+      }
       try ensureStartIsActive(taskID)
       _ = try await tasks.markExecutionStarted(
         taskID: taskID,
@@ -123,14 +156,18 @@ public actor ServiceExecutionCoordinator {
     } catch {
       await execution.stop(taskID: taskID)
       let conversationPersisted = await conversation.close(taskID: taskID)
-      _ = try? await tasks.fail(
-        taskID: taskID,
-        failureCode: conversationPersisted
-          ? "execution_start_failed" : "conversation_persistence_failed",
-        summary: conversationPersisted
-          ? ExecutionStartFailurePresentation.summary(error, provider: "Codex")
-          : "The task conversation could not be persisted."
-      )
+      if !finishedRuns.contains(taskID), !isShuttingDown,
+        await confirmOwnedProcessesStopped(taskID: taskID)
+      {
+        _ = try? await tasks.fail(
+          taskID: taskID,
+          failureCode: conversationPersisted
+            ? "execution_start_failed" : "conversation_persistence_failed",
+          summary: conversationPersisted
+            ? ExecutionStartFailurePresentation.summary(error, provider: "Codex")
+            : "The task conversation could not be persisted."
+        )
+      }
       throw error
     }
 
@@ -159,11 +196,25 @@ public actor ServiceExecutionCoordinator {
       guard let steer else {
         throw ExecutionServiceError.sessionUnavailable(taskID)
       }
+      let serializesInteractions =
+        interruptCurrentPrompt && run.providerID == AgentProviderID.claudeCode.rawValue
+      if serializesInteractions { await acquireAgentInteraction(taskID) }
+      defer { if serializesInteractions { releaseAgentInteraction(taskID) } }
+      if serializesInteractions {
+        try Task.checkCancellation()
+        guard activeAgentRuns[taskID]?.effectiveRunID == expectedTurnID else {
+          throw ExecutionServiceError.bindingMismatch
+        }
+      }
+      let cancellationVersion = agentCancellationVersions[taskID, default: 0]
       let immediateReceipt =
         interruptCurrentPrompt
         ? await conversation.presentImmediateSteer(taskID: taskID, content: text) : nil
       do {
         try await steer(text)
+        if serializesInteractions {
+          await waitForAgentCancellation(taskID, after: cancellationVersion)
+        }
       } catch {
         if let immediateReceipt {
           await conversation.discardImmediateSteerReceipt(taskID: taskID, id: immediateReceipt)
@@ -194,7 +245,20 @@ public actor ServiceExecutionCoordinator {
     guard let run = activeAgentRuns[taskID], run.effectiveRunID == expectedRunID else {
       throw ExecutionServiceError.threadMismatch(expectedRunID)
     }
+    let serializesInteractions = run.providerID == AgentProviderID.claudeCode.rawValue
+    if serializesInteractions { await acquireAgentInteraction(taskID) }
+    defer { if serializesInteractions { releaseAgentInteraction(taskID) } }
+    if serializesInteractions {
+      try Task.checkCancellation()
+      guard activeAgentRuns[taskID]?.effectiveRunID == expectedRunID else {
+        throw ExecutionServiceError.threadMismatch(expectedRunID)
+      }
+    }
+    let cancellationVersion = agentCancellationVersions[taskID, default: 0]
     try await run.interrupt()
+    if serializesInteractions {
+      await waitForAgentCancellation(taskID, after: cancellationVersion)
+    }
   }
 
   public func subscribeConversation(
@@ -235,13 +299,21 @@ public actor ServiceExecutionCoordinator {
     summary: String = "The local service stopped the task."
   ) async {
     scheduledStarts.removeValue(forKey: taskID)?.cancel()
-    startingTasks.remove(taskID)
     presentedCodexApprovals.removeValue(forKey: taskID)
     finishedRuns.insert(taskID)
     workspaceChangeTrackers.removeValue(forKey: taskID)
     collectors.removeValue(forKey: taskID)?.cancel()
+    await waitForStart(taskID)
+    if activeAgentRuns[taskID] == nil, closingAgentRuns[taskID] == nil,
+      !(await execution.hasActiveSession(taskID: taskID)),
+      let task = try? await tasks.task(id: taskID), task.state.status == .unknown,
+      (try? await tasks.isEmbeddedDSHTask(taskID)) != false
+    {
+      return
+    }
     await stopAgentRun(taskID: taskID)
     await execution.stop(taskID: taskID)
+    guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
     if await conversation.close(taskID: taskID) {
       _ = try? await tasks.interrupt(taskID: taskID, summary: summary)
     } else {
@@ -255,29 +327,32 @@ public actor ServiceExecutionCoordinator {
 
   public func shutdown() async {
     isShuttingDown = true
+    let recoveryMonitor = claudeRecoveryMonitor
+    claudeRecoveryMonitor = nil
+    recoveryMonitor?.cancel()
+    await recoveryMonitor?.value
     finishedRuns.formUnion(scheduledStarts.keys)
     finishedRuns.formUnion(startingTasks)
     finishedRuns.formUnion(activeAgentRuns.keys)
     let scheduledTasks = Array(scheduledStarts.values)
     scheduledStarts.removeAll(keepingCapacity: false)
     for task in scheduledTasks { task.cancel() }
-    startingTasks.removeAll(keepingCapacity: false)
     let executionTasks = collectors.values
     collectors.removeAll(keepingCapacity: false)
     pendingAgentApprovals.removeAll(keepingCapacity: false)
     clearAgentUserInputs()
     presentedCodexApprovals.removeAll(keepingCapacity: false)
     for task in executionTasks { task.cancel() }
-    let shutdowns = activeAgentRuns.values.map(\.shutdown)
-    activeAgentRuns.removeAll(keepingCapacity: false)
+    let shutdownTaskIDs = Array(activeAgentRuns.keys)
+    let pendingAgentShutdowns = Array(closingAgentRuns.values)
     workspaceChangeTrackers.removeAll(keepingCapacity: false)
-    for shutdown in shutdowns {
-      await shutdown()
-    }
+    for taskID in shutdownTaskIDs { await closeAgentRun(taskID: taskID) }
+    for shutdown in pendingAgentShutdowns { await shutdown.value }
     await execution.shutdown()
     for task in scheduledTasks { await task.value }
     let failedConversationTasks = await conversation.closeAll()
     for taskID in failedConversationTasks {
+      guard await confirmOwnedProcessesStopped(taskID: taskID) else { continue }
       _ = try? await tasks.fail(
         taskID: taskID,
         failureCode: "conversation_persistence_failed",
@@ -292,8 +367,27 @@ public actor ServiceExecutionCoordinator {
     workspaceChangeTrackers.removeValue(forKey: taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
     clearAgentUserInputs(taskID: taskID)
-    if let run = activeAgentRuns.removeValue(forKey: taskID) {
-      await run.shutdown()
+    await closeAgentRun(taskID: taskID)
+  }
+
+  func closeAgentRun(taskID: TaskID) async {
+    if let closing = closingAgentRuns[taskID] {
+      await closing.value
+      return
+    }
+    guard let run = activeAgentRuns.removeValue(forKey: taskID) else { return }
+    acknowledgeAgentCancellation(taskID)
+    agentCancellationVersions.removeValue(forKey: taskID)
+    let closing = Task { await run.shutdown() }
+    closingAgentRuns[taskID] = closing
+    await closing.value
+    closingAgentRuns.removeValue(forKey: taskID)
+  }
+
+  private func waitForStart(_ taskID: TaskID) async {
+    guard startingTasks.contains(taskID) else { return }
+    await withCheckedContinuation { continuation in
+      startingWaiters[taskID, default: []].append(continuation)
     }
   }
 

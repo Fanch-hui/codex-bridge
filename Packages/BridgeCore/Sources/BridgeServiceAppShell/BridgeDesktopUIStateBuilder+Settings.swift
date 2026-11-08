@@ -37,9 +37,16 @@ extension BridgeDesktopUIStateBuilder {
         values: ["require", "auto"],
         titles: ["require": "每次需要批准", "auto": "自动批准"]
       ),
+      projectWriteConcurrency: model.projectWriteConcurrency,
       customInstructions: model.customInstructions ?? "",
       agentDefaults: agentDefaults(from: model),
       nativePermissionPolicy: nativePermissionPolicy(from: model),
+      workbenchEnabled: model.workbenchSettingsController.state.enabled ?? true,
+      workbenchSettingsLoaded: model.workbenchSettingsController.state.enabled != nil,
+      canChangeWorkbench: model.connectionState == .connected
+        && model.workbenchSettingsController.state.enabled != nil
+        && !model.workbenchSettingsController.state.isChanging,
+      isChangingWorkbench: model.workbenchSettingsController.state.isChanging,
       keepServiceRunningAfterExit: model.keepServiceRunningAfterAppExit,
       serviceRegistered: model.registrationStatus == .enabled,
       canSavePreferences: preferences != nil && !model.models.isEmpty
@@ -56,7 +63,7 @@ extension BridgeDesktopUIStateBuilder {
       serviceStatusMessage: service.message,
       serviceStatusTone: service.tone,
       serviceActions: service.actions,
-      statusMessage: model.modelCatalogError ?? model.errorMessage,
+      statusMessage: model.workbenchSettingsController.state.errorMessage ?? model.errorMessage,
       modelCount: model.models.count,
       canRefreshModels: !model.isRefreshingModels,
       isRefreshingModels: model.isRefreshingModels,

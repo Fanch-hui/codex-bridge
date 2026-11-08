@@ -6,9 +6,9 @@ import { HostError, deadline } from './validation.mjs';
 
 export async function queryAccountScope(sdk, config) {
   const processes = new SDKProcessOwner();
-  let warm; let query; let drain; let expired = false;
+  let startup; let warm; let query; let drain; let expired = false; let operationError;
   try {
-    warm = await deadline(sdk.startup({
+    startup = Promise.resolve().then(() => sdk.startup({
       options: {
         auth: authentication(sdk, config), cwd: config.cwd,
         pathToQoderCLIExecutable: config.cliPath, transport: sdk.ProcessTransport.default,
@@ -19,7 +19,8 @@ export async function queryAccountScope(sdk, config) {
         ...(config.proxy ? { proxy: config.proxy } : {}),
       },
       initializeTimeoutMs: 30000,
-    }), 35000);
+    })).then(value => { warm = value; return value; });
+    await deadline(startup, 35000);
     query = warm.query(new MessageInput());
     validateSDKQuery(query);
     drain = (async () => { for await (const _message of query) {} })();
@@ -27,15 +28,23 @@ export async function queryAccountScope(sdk, config) {
     return await accountScopeFromQuery(query, config);
   } catch (error) {
     if (expired || isSDKAuthenticationError(error)) {
-      throw new HostError('authentication_required');
+      operationError = new HostError('authentication_required', error);
+    } else {
+      operationError = error instanceof HostError ? error : new HostError('account_scope_unavailable', error);
     }
-    if (error instanceof HostError) throw error;
-    throw new HostError('account_scope_unavailable');
+    throw operationError;
   } finally {
-    try { await query?.close(); } catch {}
-    try { await warm?.close(); } catch {}
-    try { await deadline(drain, 2000); } catch {}
-    await processes.close();
+    try { await startup; } catch {}
+    const errors = [];
+    for (const close of [() => query?.close(), () => warm?.close(),
+      () => drain && deadline(drain, 2000), () => processes.close()]) {
+      try { await close(); } catch (error) { errors.push(error); }
+    }
+    if (errors.length) {
+      const code = errors.some(error => error?.code === 'process_exit_unconfirmed')
+        ? 'process_exit_unconfirmed' : 'cleanup_failed';
+      throw new HostError(code, new AggregateError(operationError ? [operationError, ...errors] : errors));
+    }
   }
 }
 
@@ -45,9 +54,9 @@ export async function accountScopeFromQuery(query, config) {
   try { account = await deadline(query.accountInfo()); }
   catch (error) {
     if (isSDKAuthenticationError(error)) {
-      throw new HostError('authentication_required');
+      throw new HostError('authentication_required', error);
     }
-    throw new HostError('account_scope_unavailable');
+    throw new HostError('account_scope_unavailable', error);
   }
   if (typeof account?.userId !== 'string' || !account.userId.trim()
     || Buffer.byteLength(account.userId) > 512 || /[\x00-\x1f\x7f]/u.test(account.userId)) {

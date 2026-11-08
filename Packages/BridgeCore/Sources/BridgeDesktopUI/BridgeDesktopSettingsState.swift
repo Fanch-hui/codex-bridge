@@ -201,9 +201,15 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let directApprovalOptions: [BridgeDesktopChoice]
   public let taskStartApprovalMode: String
   public let taskStartApprovalOptions: [BridgeDesktopChoice]
+  /// Full-permission Agent tasks one project may run at once; nil until loaded.
+  public let projectWriteConcurrency: Int?
   public let customInstructions: String
   public let agentDefaults: [BridgeDesktopAgentDefaultState]
   public let nativePermissionPolicy: BridgeDesktopNativePermissionState?
+  public let workbenchEnabled: Bool?
+  public let workbenchSettingsLoaded: Bool?
+  public let canChangeWorkbench: Bool?
+  public let isChangingWorkbench: Bool?
   public let keepServiceRunningAfterExit: Bool
   public let serviceRegistered: Bool
   public let canSavePreferences: Bool
@@ -237,9 +243,14 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     directApprovalOptions: [BridgeDesktopChoice] = [],
     taskStartApprovalMode: String = "require",
     taskStartApprovalOptions: [BridgeDesktopChoice] = [],
+    projectWriteConcurrency: Int? = nil,
     customInstructions: String = "",
     agentDefaults: [BridgeDesktopAgentDefaultState] = [],
     nativePermissionPolicy: BridgeDesktopNativePermissionState? = nil,
+    workbenchEnabled: Bool = true,
+    workbenchSettingsLoaded: Bool = true,
+    canChangeWorkbench: Bool = false,
+    isChangingWorkbench: Bool = false,
     keepServiceRunningAfterExit: Bool = true,
     serviceRegistered: Bool = false,
     canSavePreferences: Bool = true,
@@ -272,9 +283,14 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     self.directApprovalOptions = directApprovalOptions
     self.taskStartApprovalMode = taskStartApprovalMode
     self.taskStartApprovalOptions = taskStartApprovalOptions
+    self.projectWriteConcurrency = projectWriteConcurrency
     self.customInstructions = customInstructions
     self.agentDefaults = agentDefaults
     self.nativePermissionPolicy = nativePermissionPolicy
+    self.workbenchEnabled = workbenchEnabled
+    self.workbenchSettingsLoaded = workbenchSettingsLoaded
+    self.canChangeWorkbench = canChangeWorkbench
+    self.isChangingWorkbench = isChangingWorkbench
     self.keepServiceRunningAfterExit = keepServiceRunningAfterExit
     self.serviceRegistered = serviceRegistered
     self.canSavePreferences = canSavePreferences

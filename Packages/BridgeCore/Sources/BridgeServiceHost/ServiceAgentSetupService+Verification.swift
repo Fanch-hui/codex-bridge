@@ -1,4 +1,5 @@
 import BridgeAgentCore
+import BridgeClaudeSDK
 import BridgeIPC
 import BridgeServiceCore
 import Foundation
@@ -16,6 +17,16 @@ extension ServiceAgentSetupService {
       try Task.checkCancellation()
       try await requireIdleConfiguration(providerID, input: input)
       try await configure(request, runtime: runtime)
+      let claudeAuth: ClaudeAuthenticationStatus?
+      if providerID == .claudeCode {
+        let auth = try await claudeAuthenticationStatus(runtime)
+        guard auth.authenticated else {
+          throw ServiceAgentSetupError.userAction("Claude Code 尚未登录，请完成官方登录后返回验证。")
+        }
+        claudeAuth = auth
+      } else {
+        claudeAuth = nil
+      }
       let distribution = request.qoderDistribution.flatMap(QoderDistribution.init(rawValue:))
       if let distribution {
         await stageQoder(runtime, previous: previous, distribution: distribution)
@@ -27,7 +38,15 @@ extension ServiceAgentSetupService {
       {
         throw ServiceAgentSetupError.userAction("安装与接口已准备，请完成原生登录或确认已有登录，再验证连接。")
       }
-      try await verifyModels(record)
+      var modelsAvailable = true
+      do {
+        try await verifyModels(record)
+      } catch is CancellationError {
+        throw CancellationError()
+      } catch {
+        guard providerID == .claudeCode else { throw error }
+        modelsAvailable = false
+      }
       try Task.checkCancellation()
       if let distribution {
         try await selectQoder(record, runtime: runtime, distribution: distribution)
@@ -35,11 +54,18 @@ extension ServiceAgentSetupService {
       _ = await discovery.summaries(
         providerIDs: [providerID], existingInstallations: try await registry.installations(),
         forceRefresh: true)
+      let message: String
+      if let claudeAuth {
+        message =
+          "配置完成，认证来源：\(Self.claudeAuthenticationName(claudeAuth.method))。"
+          + (modelsAvailable ? "" : "模型目录暂不可用，请刷新。")
+      } else if providerID == .qoder {
+        message = "配置完成，原生账号与模型目录已验证。"
+      } else {
+        message = "配置完成，接口与模型目录已检测。认证和额度以实际任务结果为准。"
+      }
       return ServiceAgentSetupVerification(
-        installationID: record.id.rawValue, version: record.version,
-        message: providerID == .qoder
-          ? "配置完成，原生账号与模型目录已验证。"
-          : "配置完成，接口与模型目录已检测。认证和额度以实际任务结果为准。")
+        installationID: record.id.rawValue, version: record.version, message: message)
     } catch {
       await bindings.remove(runtime.executablePath)
       if previous?.isSelectable != true,
@@ -50,6 +76,17 @@ extension ServiceAgentSetupService {
         _ = try? await registry.setEnabled(false, installationID: record.id)
       }
       throw error
+    }
+  }
+
+  static func claudeAuthenticationName(_ method: String?) -> String {
+    switch method {
+    case "claude.ai": "Claude 账号（订阅）"
+    case "api_key": "API Key"
+    case "api_key_helper": "API Key（凭据助手）"
+    case "third_party": "第三方云服务"
+    case "oauth_token": "OAuth 令牌"
+    default: "未识别"
     }
   }
 

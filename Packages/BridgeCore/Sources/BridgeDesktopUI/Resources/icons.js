@@ -4,6 +4,7 @@
     "gauge.with.needle": '<path d="M4 14a8 8 0 1 1 16 0"/><path d="m12 12 4-4"/><path d="M5.5 17h13"/>',
     "bubble.left.and.text.bubble.right.fill": '<path d="M4 5.5A3.5 3.5 0 0 1 7.5 2h5A3.5 3.5 0 0 1 16 5.5v3A3.5 3.5 0 0 1 12.5 12H9l-3.5 2v-2.4A3.5 3.5 0 0 1 4 8.5z"/><path d="M10 14.5A3.5 3.5 0 0 0 13.5 18h2l3 2v-2.3A3.5 3.5 0 0 0 20 15v-1"/>',
     "folder.fill": '<path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H9l2 2h7.5A2.5 2.5 0 0 1 21 8.5v7A2.5 2.5 0 0 1 18.5 18h-13A2.5 2.5 0 0 1 3 15.5z"/>',
+    "folder.badge.plus": '<path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H9l2 2h7.5A2.5 2.5 0 0 1 21 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 15.5z"/><path d="M12 9.5v5M9.5 12h5"/>',
     "list.dash.header.rectangle": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 13h3M7 16h6"/>',
     "point.3.connected.trianglepath.dotted": '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="m7 7 3.5 8M17 7l-3.5 8M7 6h10"/>',
     "gearshape": '<circle cx="12" cy="12" r="3"/><path d="m19 13 2-1-2-1-.5-2 1-1.7-2.3-2.3-1.7 1-2-.5-1-2-1 2-2 .5-1.7-1L5.5 6.3l1 1.7-.5 2-2 1 2 1 .5 2-1 1.7 2.3 2.3 1.7-1 2 .5 1 2 1-2 2-.5 1.7 1 2.3-2.3-1-1.7z"/>',

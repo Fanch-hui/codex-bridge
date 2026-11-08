@@ -17,6 +17,10 @@ extension BridgeServiceClientProtocol {
   public func cancelAgentSetup(operationID: String) async throws -> IPCAgentSetupState {
     throw AgentSetupClientError.unsupported
   }
+
+  public func probeAgentSetupLogin(operationID: String) async throws -> IPCAgentSetupState {
+    throw AgentSetupClientError.unsupported
+  }
 }
 
 private enum AgentSetupClientError: LocalizedError {

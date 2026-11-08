@@ -71,6 +71,22 @@ public struct ServiceDataPaths: Sendable {
     )
   }
 
+  /// Bridge-owned directory registered as the default workspace project.
+  public var defaultWorkspaceURL: URL {
+    rootURL.appending(path: "Workspaces", directoryHint: .isDirectory)
+      .appending(path: "Default", directoryHint: .isDirectory)
+  }
+
+  /// Agents work inside the default workspace and may legitimately change its mode, so an
+  /// existing directory is kept as is; only a missing (or non-directory) entry is rebuilt private.
+  public func prepareDefaultWorkspace() throws {
+    try Self.preparePrivateDirectory(
+      defaultWorkspaceURL.deletingLastPathComponent(), createParents: false)
+    let type = try? FileManager.default.attributesOfItem(atPath: defaultWorkspaceURL.path)[.type]
+    guard (type as? FileAttributeType) != .typeDirectory else { return }
+    try Self.preparePrivateDirectory(defaultWorkspaceURL, createParents: false)
+  }
+
   public static func defaultRoot() -> URL {
     #if os(Linux)
       let configured = ProcessInfo.processInfo.environment["XDG_DATA_HOME"]

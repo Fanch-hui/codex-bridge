@@ -87,11 +87,23 @@ static void apply_viewport(void) {
                                   MAX(1, bridge_desktop.browser_height));
     }
     gtk_widget_set_visible(GTK_WIDGET(browser->view), selected &&
-                           bridge_desktop.browser_visible && bridge_desktop.browser_enabled);
+                           bridge_desktop.browser_visible && bridge_desktop.browser_enabled &&
+                           bridge_desktop.browser_presentation_visible);
   }
 }
 
 typedef struct { gchar *site; gchar *uri; } BrowserSelection;
+
+static void browser_create(BridgeBrowser *browser) {
+  if (!browser || browser->view || !bridge_desktop.browser_enabled) return;
+  browser->state = "loading";
+  g_clear_pointer(&browser->error, g_free);
+  browser->view = bridge_make_view(bridge_desktop.data_root,
+      g_str_equal(browser->site, "gemini") ? "Gemini" : "ChatGPT");
+  gtk_fixed_put(GTK_FIXED(bridge_desktop.layout), GTK_WIDGET(browser->view), 0, 0);
+  connect_browser(browser);
+  webkit_web_view_load_uri(browser->view, browser->resume_uri);
+}
 
 static gboolean browser_select_idle(gpointer raw) {
   BrowserSelection *selection = raw;
@@ -100,15 +112,13 @@ static gboolean browser_select_idle(gpointer raw) {
   if (!browser->view) {
     browser->site = gemini ? "gemini" : "chatgpt";
     browser->home = gemini ? "https://gemini.google.com/app" : "https://chatgpt.com/";
-    browser->state = "loading";
-    browser->view = bridge_make_view(bridge_desktop.data_root, gemini ? "Gemini" : "ChatGPT");
-    gtk_fixed_put(GTK_FIXED(bridge_desktop.layout), GTK_WIDGET(browser->view), 0, 0);
-    connect_browser(browser);
-    webkit_web_view_load_uri(browser->view, selection->uri);
+    g_free(browser->resume_uri);
+    browser->resume_uri = g_strdup(selection->uri);
   }
   bridge_desktop.browser = browser;
+  browser_create(browser);
   apply_viewport();
-  browser_snapshot(browser);
+  if (browser->view) browser_snapshot(browser);
   g_free(selection->site); g_free(selection->uri); g_free(selection);
   return G_SOURCE_REMOVE;
 }
@@ -121,7 +131,7 @@ void bridge_linux_browser_select(const char *site, const char *resume_uri) {
 }
 
 static gboolean browser_action_idle(gpointer value) {
-  if (!bridge_desktop.browser) return G_SOURCE_REMOVE;
+  if (!bridge_desktop.browser || !bridge_desktop.browser->view) return G_SOURCE_REMOVE;
   WebKitWebView *view = bridge_desktop.browser->view;
   switch (GPOINTER_TO_INT(value)) {
     case 0: webkit_web_view_go_back(view); break;
@@ -154,7 +164,31 @@ void bridge_linux_browser_viewport(double x, double y, double width, double heig
 
 static gboolean browser_enabled_idle(gpointer raw) {
   bridge_desktop.browser_enabled = GPOINTER_TO_INT(raw);
+  if (bridge_desktop.browser_enabled) {
+    browser_create(bridge_desktop.browser);
+  } else {
+    for (guint i = 0; i < G_N_ELEMENTS(bridge_desktop.browsers); i++) {
+      BridgeBrowser *browser = &bridge_desktop.browsers[i];
+      if (!browser->view) continue;
+      browser_snapshot(browser);
+      g_signal_handlers_disconnect_by_data(browser->view, browser);
+      webkit_web_view_stop_loading(browser->view);
+      gtk_widget_destroy(GTK_WIDGET(browser->view));
+      browser->view = NULL;
+      g_clear_pointer(&browser->error, g_free);
+    }
+    bridge_push_event(g_strdup("browser-closed\n"));
+  }
   apply_viewport();
   return G_SOURCE_REMOVE;
 }
 void bridge_linux_browser_enabled(int enabled) { g_idle_add(browser_enabled_idle, GINT_TO_POINTER(enabled)); }
+
+static gboolean browser_presentation_visible_idle(gpointer raw) {
+  bridge_desktop.browser_presentation_visible = GPOINTER_TO_INT(raw);
+  apply_viewport();
+  return G_SOURCE_REMOVE;
+}
+void bridge_linux_browser_presentation_visible(int visible) {
+  g_idle_add(browser_presentation_visible_idle, GINT_TO_POINTER(visible));
+}

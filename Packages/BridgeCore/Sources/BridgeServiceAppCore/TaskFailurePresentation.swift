@@ -33,6 +33,50 @@ public struct TaskFailurePresentation: Equatable, Sendable {
 
   private static let guidanceRows: [([String], String, String)] = [
     (
+      [
+        "claude_authentication_required", "claude_authentication_failed",
+        "claude_oauth_org_not_allowed",
+      ],
+      "Claude Code 的认证或组织授权未通过。",
+      "在连接页完成官方登录并核对组织授权，再继续原会话。"
+    ),
+    (
+      ["claude_rate_limit"], "Claude 服务返回用量或请求频率限制。",
+      "查看官方账号的限制与恢复时间，稍后继续原会话。"
+    ),
+    (
+      ["claude_account_on_hold", "claude_verification_required"], "Claude 账号需要处理验证或账号限制。",
+      "在官方账号页面完成对应处理，再继续原会话。"
+    ),
+    (
+      ["claude_cloud_credential_error"], "Claude Code 未能取得当前云服务的认证。",
+      "完成对应云服务的原生登录，再检查 Claude Code 连接。"
+    ),
+    (
+      ["claude_billing_error"], "Claude 服务返回计费错误。",
+      "核对当前认证来源及对应官方计费状态，再继续任务。"
+    ),
+    (
+      ["claude_model_not_found"], "Claude 当前认证来源无法使用所选模型。",
+      "刷新 Claude Code 模型目录，选择当前来源可用的模型。"
+    ),
+    (
+      ["claude_overloaded", "claude_server_error"], "Claude 服务暂时无法处理本次请求。",
+      "稍后继续原会话，重试前核对已发生的文件变更。"
+    ),
+    (
+      ["claude_cli_incompatible"], "Claude Code 运行时不支持当前执行协议。",
+      "在连接页更新或修复 Claude Code，然后重新验证连接。"
+    ),
+    (
+      ["claude_permission_denied", "claude_sandbox_unavailable"], "Claude Code 无法按当前权限执行工具。",
+      "核对本机任务权限和原生运行环境，再决定是否重新授权。"
+    ),
+    (
+      ["claude_session_busy"], "Claude 原生会话仍被其他执行占用。",
+      "结束该会话的已有执行后，再继续原会话。"
+    ),
+    (
       ["execution_start_failed", "agent_start_failed", "queued_start_failed"],
       "执行器未能启动任务。",
       "先查看诊断详情；在连接页检查执行器状态，排除启动问题后重试任务。"

@@ -129,7 +129,12 @@
     var accessMode: String = "request-approval"
     var directApprovalMode: String = "require"
     var taskStartApprovalMode: String = "require"
+    var projectWriteConcurrency: Int? = nil
     var modelOptions: [BridgeDesktopModelOption] = []
+    var workbenchEnabled: Bool = true
+    var workbenchSettingsLoaded: Bool = false
+    var canChangeWorkbench: Bool = false
+    var isChangingWorkbench: Bool = false
     var keepServiceRunningAfterExit: Bool = true
     var serviceRegistered: Bool = false
     var direct: BridgeDesktopDirectState? = nil

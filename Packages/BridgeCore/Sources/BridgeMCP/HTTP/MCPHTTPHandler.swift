@@ -12,6 +12,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
     let authentication: MCPClientAuthentication
     let sessionID: String?
     let isGeminiCloud: Bool
+    let cloudGeneration: UInt64?
     var body: ByteBuffer
     var byteCount: Int
   }
@@ -129,10 +130,12 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
     }
     let isOAuth = head.method == .GET && isOAuthProtectedResourceRoute(head.uri)
     let isGeminiCloud = head.uri.hasPrefix(GeminiCloudHTTPRequest.pathPrefix)
+    let cloudGeneration =
+      isGeminiCloud ? configuration.geminiCloudAccessGate?.currentGeneration : nil
     let authentication: MCPClientAuthentication
     if !isOAuth {
       if isGeminiCloud {
-        guard configuration.geminiCloudAccessGate?.isEnabled == true,
+        guard cloudGeneration != nil,
           let key = GeminiCloudHTTPRequest.accessKey(from: head),
           let authenticated = configuration.clientAuthenticator?.authenticateGeminiCloud(
             key, admission: clientAdmission)
@@ -187,6 +190,7 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
         authentication: authentication,
         sessionID: head.headers.first(name: HTTPHeaderName.sessionID),
         isGeminiCloud: isGeminiCloud,
+        cloudGeneration: cloudGeneration,
         body: context.channel.allocator.buffer(capacity: capacity),
         byteCount: 0
       )
@@ -434,12 +438,23 @@ package final class MCPHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
   private func makeRequest(_ state: RequestState) -> AuthenticatedMCPRequest {
     var headers: [String: String] = [:]
     for (name, value) in state.head.headers {
-      guard name.lowercased() != MCPHTTPConfiguration.tunnelAuthenticationHeader.lowercased()
+      guard name.lowercased() != MCPHTTPConfiguration.tunnelAuthenticationHeader.lowercased(),
+        !MCPTrustedContextHeaders.names.contains(name.lowercased())
       else { continue }
       if let existing = headers[name] {
         headers[name] = "\(existing), \(value)"
       } else {
         headers[name] = value
+      }
+    }
+    if let token = state.authentication.admissionToken {
+      headers[MCPTrustedContextHeaders.generation] = String(token.generation)
+      headers[MCPTrustedContextHeaders.route] =
+        state.isGeminiCloud
+        ? "cloud"
+        : state.authentication.clientID == .chatGPT ? "shared" : "local"
+      if let generation = state.cloudGeneration {
+        headers[MCPTrustedContextHeaders.cloudGeneration] = String(generation)
       }
     }
     let body = state.body.getBytes(at: 0, length: state.body.readableBytes).map { Data($0) }

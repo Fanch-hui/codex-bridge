@@ -7,6 +7,78 @@ import { execFile } from 'node:child_process';
 import { requireValue, distribution, absolute, identifier, contained, HostError } from './validation.mjs';
 
 const execute = promisify(execFile);
+
+export class SDKLifecycle {
+  constructor() { this.states = new Map(); this.closed = false; this.closing = null; }
+  async acquire(sdk) {
+    while (true) {
+      requireValue(!this.closed, 'qoder_host_closed');
+      let state = this.states.get(sdk);
+      if (state?.stopping) {
+        const error = await state.idle;
+        if (error) throw error;
+        continue;
+      }
+      if (state?.failure) throw state.failure;
+      if (!state) {
+        state = { users: 0, stopping: false, failure: null };
+        state.idle = new Promise(resolve => { state.resolveIdle = resolve; });
+        this.states.set(sdk, state);
+      }
+      state.users += 1;
+      let released;
+      return { release: (waitForShutdown = false) => {
+        if (!released) released = this.release(sdk, state, waitForShutdown);
+        return released;
+      } };
+    }
+  }
+  async release(sdk, state, waitForShutdown) {
+    state.users -= 1;
+    if (state.users > 0) {
+      if (waitForShutdown) {
+        const error = await state.idle;
+        if (error) throw error;
+      }
+      return;
+    }
+    state.stopping = true;
+    try {
+      if (typeof sdk.shutdownDaemon === 'function') await sdk.shutdownDaemon();
+    } catch (error) {
+      state.failure = new HostError('process_exit_unconfirmed', error);
+    }
+    state.stopping = false;
+    if (!state.failure) this.states.delete(sdk);
+    state.resolveIdle(state.failure);
+    if (state.failure) throw state.failure;
+  }
+  close() {
+    if (!this.closing) {
+      this.closed = true;
+      this.closing = Promise.all([...this.states.values()].map(state => state.idle)).then(errors => {
+        const failure = errors.find(Boolean);
+        if (failure) throw failure;
+      });
+    }
+    return this.closing;
+  }
+  async using(sdk, operation) {
+    const lease = await this.acquire(sdk);
+    let result; let failure; let failed = false;
+    try { result = await operation(); } catch (error) { failed = true; failure = error; }
+    try { await lease.release(); }
+    catch (error) {
+      if (failed) throw new HostError('process_exit_unconfirmed', new AggregateError([failure, error]));
+      throw error;
+    }
+    if (failed) throw failure;
+    return result;
+  }
+}
+
+export const sdkLifecycle = new SDKLifecycle();
+
 export function packageName(region) {
   return distribution(region) === 'cn' ? '@qodercn-ai/qodercn-agent-sdk' : '@qoder-ai/qoder-agent-sdk';
 }

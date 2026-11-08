@@ -29,16 +29,27 @@
         updateBrowserMemoryPolicy(model: model)
       case .openBrowserExternally:
         onUI { openChatExternally() }
+      case .setWorkbenchPanes:
+        let ids = (payload.taskIDs ?? []).prefix(WorkbenchPaneConversations.maximumPanes)
+          .compactMap { BridgeDesktopCommandValue.nonEmpty($0) }
+        model.setWorkbenchPanes(Array(ids))
       case .loadEarlierConversation:
-        guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID),
-          model.selectedTaskID == taskID,
-          let conversation = model.conversation,
+        guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID) else { return true }
+        if model.selectedTaskID == taskID, let conversation = model.conversation,
           conversation.taskID == taskID
-        else { return true }
-        Task { @MainActor in
-          await conversation.loadEarlier()
-          guard model.selectedTaskID == taskID, model.conversation === conversation else { return }
-          model.refreshDisplaySnapshot()
+        {
+          Task { @MainActor in
+            await conversation.loadEarlier()
+            guard model.selectedTaskID == taskID, model.conversation === conversation else {
+              return
+            }
+            model.refreshDisplaySnapshot()
+          }
+        } else if let conversation = model.paneConversations.conversation(for: taskID) {
+          Task { @MainActor in
+            await conversation.loadEarlier()
+            model.refreshDisplaySnapshot()
+          }
         }
       case .refreshConversation:
         guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID),
@@ -58,10 +69,19 @@
         synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
         selectedPage = .workbench
         onUI { DesktopPlatformHost.selectPage(.workbench) }
+      case .openWorkbenchSession:
+        guard BridgeDesktopCommandValue.nonEmpty(payload.sessionID) != nil else { return true }
+        selectedPage = .workbench
+        onUI { DesktopPlatformHost.selectPage(.workbench) }
       case .searchTaskHistory:
         Task { @MainActor in await model.searchTaskHistory(payload) }
       case .selectTaskHistory:
-        model.selectTaskHistory(payload.taskID)
+        model.selectTaskHistory(
+          payload.taskID, requestID: envelope.requestID,
+          messageID: payload.value.flatMap(Int64.init)
+        ) {
+          synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
+        }
       case .selectTask:
         guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID) else { return true }
         model.selectTask(id: taskID)
@@ -92,8 +112,26 @@
             synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
           }
         }
+      case .submitAgentTask:
+        Task { @MainActor in
+          if await model.submitAgentTask(envelope) {
+            synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
+          }
+        }
       case .workbenchWorkspace:
         Task { @MainActor in await model.performWorkbenchWorkspace(envelope) }
+      case .embeddedDSH:
+        if payload.action == "attachments.pick" {
+          pickWorkbenchAttachment(envelope, model: model)
+        } else if payload.action == "skills.pick" {
+          importPickedSkills(envelope, model: model)
+        } else if payload.action == "workspace.pick" {
+          pickWorkbenchWorkspace(envelope, model: model, management: management)
+        } else if payload.action == "content.export" {
+          exportWorkbenchContent(envelope, model: model)
+        } else {
+          Task { @MainActor in await model.performEmbeddedDSH(envelope) }
+        }
       case .steerTask:
         steerTask(envelope, model: model)
       case .resumeTask:

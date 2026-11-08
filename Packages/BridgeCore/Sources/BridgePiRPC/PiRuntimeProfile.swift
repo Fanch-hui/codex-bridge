@@ -9,6 +9,7 @@ struct PiRuntimeProfile: Sendable {
   let continuation: PiSessionContinuation?
   let store: PiSessionStore?
   let tools: [String]
+  let writeGate: Bool
   let mcpServerIDs: [String]
   let selectedSkillStage: PiSelectedSkillStage?
   let artifacts: [AgentInstallationArtifact]
@@ -93,7 +94,8 @@ struct PiRuntimeProfile: Sendable {
         "target": .string(rule.target),
       ])
     }
-    let context = PiJSONValue.object([
+    let writeGate = request?.toolWriteGate != nil
+    var contextFields: [String: PiJSONValue] = [
       "revision": .integer(1), "nonce": .string(nonce),
       "projectRoot": .string(project.canonicalPath),
       "taskID": .string(request?.taskID.rawValue ?? "probe"),
@@ -104,8 +106,9 @@ struct PiRuntimeProfile: Sendable {
       "skillPaths": .array(skillPaths.map(PiJSONValue.string)),
       "nativePermissionRules": .array(permissionRules),
       "mcpServers": .array(try PiMCPServerContext.values(activeMCPServers)),
-    ])
-    environment["CODEX_BRIDGE_PI_CONTEXT"] = try context.text()
+    ]
+    if writeGate { contextFields["writeGate"] = .bool(true) }
+    environment["CODEX_BRIDGE_PI_CONTEXT"] = try PiJSONValue.object(contextFields).text()
     let selectedSkillStage = try PiSelectedSkillStage.create(
       skills: request?.selectedSkills ?? [], runtimeRoot: root, nonce: nonce)
     for directory in selectedSkillStage?.skillDirectories ?? [] {
@@ -116,15 +119,16 @@ struct PiRuntimeProfile: Sendable {
         argv: argv, executableArgv: invocation.executableArgv,
         workingDirectory: project.canonicalPath, environment: environment),
       nonce: nonce, sessionID: sessionID, continuation: continuation, store: store, tools: tools,
-      mcpServerIDs: activeMCPServers.map(\.id),
+      writeGate: writeGate, mcpServerIDs: activeMCPServers.map(\.id),
       selectedSkillStage: selectedSkillStage,
       artifacts: [artifact(resource.entry, role: .launchConfiguration)] + invocation.artifacts + [
         artifact(nodeSnapshot, role: .nodeInterpreter)
       ])
   }
 
-  private static func activeTools(request: AgentExecutionRequest?) -> [String] {
-    var tools = ["read", "grep", "find", "ls", "bridge_plan", "bridge_ask_user", "bridge_subtask"]
+  static func activeTools(request: AgentExecutionRequest?) -> [String] {
+    var tools = ["read", "grep", "find", "ls", "bridge_plan", "bridge_ask_user"]
+    if request?.nativeSubagentsAllowed ?? true { tools.append("bridge_subtask") }
     guard request?.mutationIntent == .workspaceWrite else { return tools }
     tools += ["write", "edit"]
     if request?.networkAccessRequested == true {

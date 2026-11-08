@@ -1,0 +1,36 @@
+{
+  "dsh": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "version": "0.2.2-rc.1",
+    "commit": "66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db",
+    "license": "licenses/DSH-LICENSE",
+    "patch": "Give Agent Teams distinct control tools; coordinate scheduled admissions and pauses; persist prompt admission before wake, support trusted project binding and bounded history reads"
+  },
+  "zcode": {
+    "package": "dsh-zcode",
+    "version": "0.2.1",
+    "commit": "b26cb498723c2fad80ca454d0fc0a49a4e738ae1",
+    "archive": "vendor/dsh-zcode-0.2.1.tgz",
+    "sha256": "099f4be7d9a9175a189c0149a3f81768a0a99cf3c5c75a97ab6888f082ca5a18",
+    "license": "licenses/ZCODE-LICENSE",
+    "upstreamLicense": "licenses/ZCODE-UPSTREAM-LICENSE",
+    "upstreamNotice": "licenses/ZCODE-UPSTREAM.md"
+  },
+  "workbuddy": {
+    "package": "dsh-workbuddy-manager",
+    "version": "0.4.3",
+    "commit": "502f507c31fef4f101ecd816e7b416868320e5a3",
+    "archive": "vendor/dsh-workbuddy-manager-0.4.3.tgz",
+    "sha256": "a080fe9bab89eaf3a3689bf19f1a805a194db8cadb377d1f815e120535e8970b",
+    "license": "licenses/WORKBUDDY-LICENSE"
+  },
+  "chatgptSiwc": {
+    "package": "dsh-plugin-chatgpt-siwc",
+    "version": "0.9.7",
+    "license": "licenses/SIWC-LICENSE",
+    "patch": "agent_name_hint is Codex Bridge; restore conversation after ChatGPT quota resets",
+    "backportCommit": "a7922c89e3672239da4304c0df31644fb92c114a"
+  },
+  "node": "24.11.1",
+  "pnpm": "11.28.5"
+}

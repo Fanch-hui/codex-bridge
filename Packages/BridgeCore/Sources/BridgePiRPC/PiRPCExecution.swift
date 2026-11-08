@@ -12,6 +12,7 @@ actor PiRPCExecution {
   let nonce: String
   let usageEnabled: Bool
   let selectedSkillStage: PiSelectedSkillStage?
+  let writeGate: PiToolWriteGateCoordinator?
   let continuation: AsyncThrowingStream<AgentEventEnvelope, any Error>.Continuation
   let initialSequence: Int64
   var normalizer = PiEventNormalizer()
@@ -47,6 +48,7 @@ actor PiRPCExecution {
     self.nonce = nonce
     self.usageEnabled = usageEnabled
     self.selectedSkillStage = selectedSkillStage
+    writeGate = request.toolWriteGate.map { PiToolWriteGateCoordinator(gate: $0, client: client) }
     self.initialSequence = initialSequence
     consumedSequence = initialSequence
     let stream = AsyncThrowingStream.makeStream(
@@ -83,7 +85,8 @@ actor PiRPCExecution {
 
   private func sendInitialPrompt() async {
     do {
-      try await sendInput(request.prompt, command: "prompt", initial: true, images: initialImages)
+      try await sendInput(
+        request.executionPrompt, command: "prompt", initial: true, images: initialImages)
       initialImages.removeAll(keepingCapacity: false)
     } catch {
       await fail(error)
@@ -111,6 +114,10 @@ actor PiRPCExecution {
           try await emit(.plan(entries))
         }
       case "message_start": try await observeUserInput(event.value)
+      case "tool_execution_end":
+        if let callID = event.value["toolCallId"]?.stringValue {
+          await writeGate?.toolEnded(callID)
+        }
       default: break
       }
       for normalized in try normalizer.normalize(event.value) { try await emit(normalized) }
@@ -149,7 +156,7 @@ actor PiRPCExecution {
       ?? message["content"]?.arrayValue?.compactMap { $0["text"]?.stringValue }.joined(
         separator: "\n")
     guard let text else { return }
-    if !initialInputSeen && text == request.prompt {
+    if !initialInputSeen && text == request.executionPrompt {
       initialInputSeen = true
       return
     }
@@ -160,6 +167,12 @@ actor PiRPCExecution {
   }
 
   private func handleUI(_ value: PiJSONValue) async throws {
+    if let gateRequest = try PiToolWriteGateRequest.parse(
+      value, nonce: nonce, taskID: request.taskID)
+    {
+      try await admitWriteGate(gateRequest)
+      return
+    }
     if let approval = try PiExtensionUIBridge.approval(
       value, nonce: nonce, taskID: request.taskID, binding: binding)
     {
@@ -265,6 +278,8 @@ actor PiRPCExecution {
     guard phase == .active, approvals.isEmpty, userInputs.isEmpty,
       ContinuousClock.now - lastActivity > .seconds(10 * 60)
     else { return }
+    // Waiting for another Agent's write is not task inactivity.
+    if let writeGate, await writeGate.isWaiting { return }
     await fail(PiRPCError.timedOut)
   }
 
@@ -279,7 +294,9 @@ actor PiRPCExecution {
     for input in inputs {
       try? await client.answerUI(id: input.wireID, fields: ["cancelled": .bool(true)])
     }
+    await writeGate?.cancelPending()
     await client.shutdown()
+    await writeGate?.releaseAll()
     selectedSkillStage?.cleanup()
     reader?.cancel()
     approvals.removeAll()

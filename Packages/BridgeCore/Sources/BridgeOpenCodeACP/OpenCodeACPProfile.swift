@@ -73,17 +73,23 @@ public struct OpenCodeACPLaunchConfiguration: Sendable {
   public let runDirectory: String
   public let resolvedExecutablePath: String
   public let readOnlyModeID: String?
+  public let singleAgentModeID: String?
+  public let singleAgentMajorVersion: Int?
 
   public init(
     process: OpenCodeACPProcessTransportConfiguration,
     runDirectory: String,
     resolvedExecutablePath: String,
-    readOnlyModeID: String? = nil
+    readOnlyModeID: String? = nil,
+    singleAgentModeID: String? = nil,
+    singleAgentMajorVersion: Int? = nil
   ) {
     self.process = process
     self.runDirectory = runDirectory
     self.resolvedExecutablePath = resolvedExecutablePath
     self.readOnlyModeID = readOnlyModeID
+    self.singleAgentModeID = singleAgentModeID
+    self.singleAgentMajorVersion = singleAgentMajorVersion
   }
 }
 
@@ -109,6 +115,7 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
     persistentStateDirectory: String? = nil,
     networkAllowed: Bool,
     readOnly: Bool? = nil,
+    nativeSubagentsAllowed: Bool = true,
     sourceEnvironment: [String: String] = ProcessInfo.processInfo.environment
   ) throws -> OpenCodeACPLaunchConfiguration {
     guard installation.providerID == .openCode else {
@@ -124,8 +131,16 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
       source: sourceEnvironment
     )
     let policy = (readOnly ?? !networkAllowed) ? OpenCodeACPReadOnlyPolicy() : nil
+    let singleAgentPolicy =
+      if policy == nil && !nativeSubagentsAllowed {
+        OpenCodeACPSingleAgentPolicy(version: installation.version)
+      } else {
+        nil as OpenCodeACPSingleAgentPolicy?
+      }
     if let policy {
       environment["OPENCODE_CONFIG_CONTENT"] = try policy.configuration()
+    } else if let singleAgentPolicy {
+      environment["OPENCODE_CONFIG_CONTENT"] = try singleAgentPolicy.configuration()
     }
     let argv = [executable, "acp"]
     return OpenCodeACPLaunchConfiguration(
@@ -139,7 +154,9 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
       ),
       runDirectory: runtime,
       resolvedExecutablePath: executable,
-      readOnlyModeID: policy?.modeID
+      readOnlyModeID: policy?.modeID,
+      singleAgentModeID: singleAgentPolicy?.modeID,
+      singleAgentMajorVersion: singleAgentPolicy?.majorVersion
     )
   }
 
@@ -184,6 +201,11 @@ public struct OpenCodeACPLaunchBuilder: Sendable {
     for path in [cache, state, temporary] {
       try createPrivateDirectory(path)
     }
+    OpenCodeACPDatabaseSync.synchronizeNativeAuthIfAvailable(
+      dataHome: dataHome,
+      destinationDatabasePath: database,
+      sourceEnvironment: source
+    )
 
     var environment: [String: String] = [
       "HOME": sourceHome,

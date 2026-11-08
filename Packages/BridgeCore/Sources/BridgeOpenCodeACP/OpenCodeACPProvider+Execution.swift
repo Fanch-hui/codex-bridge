@@ -22,12 +22,16 @@ extension OpenCodeACPProvider {
         persistentStateDirectory: persistentStateDirectory,
         networkAllowed: request.networkAccessRequested,
         readOnly: request.mutationIntent == .readOnly,
+        nativeSubagentsAllowed: request.nativeSubagentsAllowed,
         sourceEnvironment: configuration.sourceEnvironment
       )
       let connected = makeClient(transport: try configuration.transportFactory(launch))
       client = connected
       let initialization = try await connected.initialize()
-      _ = try validate(initialization)
+      let version = try validate(initialization)
+      let singleAgentModeID =
+        OpenCodeACPSemanticVersion(version)?.major == launch.singleAgentMajorVersion
+        ? launch.singleAgentModeID : nil
       let capabilities = capabilities(initialization)
       try require(request.requiredCapabilities, from: capabilities)
 
@@ -40,6 +44,7 @@ extension OpenCodeACPProvider {
       let mode = try Self.modeValue(
         for: request.mutationIntent,
         readOnlyModeID: launch.readOnlyModeID,
+        singleAgentModeID: singleAgentModeID,
         in: session
       )
       var configOptions = try await connected.setSessionConfigOption(
@@ -47,6 +52,13 @@ extension OpenCodeACPProvider {
         configID: "mode",
         value: mode
       )
+      let normalizedEffort: String? = {
+        guard let effort = request.effort?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !effort.isEmpty,
+          effort.caseInsensitiveCompare("default") != .orderedSame
+        else { return nil }
+        return effort
+      }()
       if let requestedModel = request.model {
         let model = try Self.resolveModel(requestedModel, from: session)
         configOptions = try await connected.setSessionConfigOption(
@@ -54,7 +66,7 @@ extension OpenCodeACPProvider {
           configID: "model",
           value: model
         )
-      } else if request.effort != nil,
+      } else if normalizedEffort != nil,
         let model = Self.availableCurrentModelID(in: session)
       {
         configOptions = try await connected.setSessionConfigOption(
@@ -63,10 +75,11 @@ extension OpenCodeACPProvider {
           value: model
         )
       }
-      let hasEffortOption = configOptions.contains {
-        $0.id == "effort" && !$0.values.isEmpty
+      let hasEffortOption = configOptions.contains { option in
+        option.id == "effort"
+          && option.values.contains { $0.value.caseInsensitiveCompare("default") != .orderedSame }
       }
-      if let requestedEffort = request.effort {
+      if let requestedEffort = normalizedEffort {
         guard let option = configOptions.first(where: { $0.id == "effort" }) else {
           throw AgentRuntimeError.capabilityUnavailable(.effortSelection)
         }
@@ -103,8 +116,8 @@ extension OpenCodeACPProvider {
         client: connected,
         normalizer: normalizer,
         sessionID: session.id,
-        prompt: request.prompt,
-        literalInput: request.mutationIntent == .readOnly,
+        prompt: request.executionPrompt,
+        literalInput: request.mutationIntent == .readOnly || !request.nativeSubagentsAllowed,
         initialClientEventSequence: initialSequence,
         inactivityTimeout: configuration.inactivityTimeout,
         eventBufferLimit: configuration.eventBufferLimit,

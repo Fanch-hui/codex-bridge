@@ -19,7 +19,7 @@ jobs:
     name: Build Linux ${{ matrix.architecture }}
     runs-on: ${{ matrix.runner }}
     container: swift:6.3.3-noble
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -40,7 +40,7 @@ jobs:
             libsecret-tools gnome-keyring bubblewrap dbus-x11 python3 unzip curl
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.2
+          node-version: 24.11.1
       - name: Restore SwiftPM dependency repositories
         id: dependencies-cache
         uses: actions/cache/restore@v6

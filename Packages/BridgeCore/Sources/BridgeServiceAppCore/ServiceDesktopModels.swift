@@ -21,7 +21,7 @@ extension MCPServiceTaskSnapshot {
   }
 
   public var canStop: Bool {
-    isActive
+    isActive || (providerIdentifier == "claude-code" && status == "unknown")
   }
 
   public var providerIdentifier: String {
@@ -125,6 +125,7 @@ public enum AgentProviderPresentation {
     case "antigravity": return "Antigravity"
     case "pi": return "Pi"
     case "qoder": return "Qoder"
+    case "claude-code": return "Claude Code"
     default:
       let value = providerID.trimmingCharacters(in: .whitespacesAndNewlines)
       return value.isEmpty ? "Codex" : value
@@ -139,6 +140,7 @@ public enum AgentProviderPresentation {
     case "antigravity": return "sparkles"
     case "pi": return "terminal.fill"
     case "qoder": return "chevron.left.forwardslash.chevron.right"
+    case "claude-code": return "terminal.fill"
     default: return "point.3.connected.trianglepath.dotted"
     }
   }

@@ -4,8 +4,9 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var acceptedTypes = ["image/png", "image/jpeg", "image/webp"];
 
-  function create(detail, draft, onChange, pathsKey, label) {
+  function create(detail, draft, onChange, pathsKey, label, options) {
     pathsKey = pathsKey || "attachmentPaths";
+    options = options || {};
     var errorKey = pathsKey === "attachmentPaths" ? "attachmentError" : pathsKey + "Error";
     if (!Array.isArray(draft[pathsKey])) draft[pathsKey] = [];
     var canChoose = detail.providerID === "pi" || detail.providerID === "qoder"
@@ -13,16 +14,20 @@
     if (!canChoose && draft[pathsKey].length === 0) return null;
     var wrapper = S.node("div", "workbench-attachments");
     var actions = S.node("div", "form-actions workbench-attachment-actions");
-    var input = null, choose = null, disabled = false;
+    var input = null, choose = null, disabled = false, picking = false;
     if (canChoose) {
-      input = S.node("input");
-      input.type = "file";
-      input.accept = acceptedTypes.join(",");
-      input.setAttribute("webkitdirectory", "");
-      input.multiple = true;
-      input.hidden = true;
       choose = S.button(label || "选择项目图片", null, {}, null, "small", false);
-      choose.addEventListener("click", function () { input.click(); });
+      if (options.pick) {
+        choose.addEventListener("click", pick);
+      } else {
+        input = S.node("input");
+        input.type = "file";
+        input.accept = acceptedTypes.join(",");
+        input.setAttribute("webkitdirectory", "");
+        input.multiple = true;
+        input.hidden = true;
+        choose.addEventListener("click", function () { input.click(); });
+      }
       actions.appendChild(choose);
     }
     var clear = S.button("清除", null, {}, null, "small", false);
@@ -54,17 +59,34 @@
     wrapper.appendChild(actions);
     wrapper.appendChild(hint);
 
+    function pick() {
+      if (disabled || picking) return;
+      picking = true; update();
+      Promise.resolve().then(options.pick).then(function (paths) {
+        if (options.isCurrent && !options.isCurrent()) return;
+        var combined = Array.from(new Set(draft[pathsKey].concat(paths)));
+        if (combined.length > 8) throw new Error("一次最多选择 8 张图片。");
+        draft[pathsKey] = combined;
+        draft[errorKey] = "";
+        onChange();
+      }).catch(function (error) {
+        if (options.isCurrent && !options.isCurrent()) return;
+        draft[errorKey] = error && error.message || "选择图片失败，请重试。";
+        onChange();
+      }).finally(function () { picking = false; update(); });
+    }
+
     function update() {
       summary.textContent = draft[pathsKey].length
         ? "已选 " + draft[pathsKey].length + " 张：" + draft[pathsKey].join("、")
         : "";
-      hint.textContent = draft[errorKey]
-        || (canChoose
-          ? "请选择项目根目录；仅提交项目内相对路径，服务会校验图像内容和模型能力。"
-          : "保留原图片路径以按原内容重开，或清除后重新开始；服务会校验原图片未变化。");
+      var guidance = options.pick ? "图片须位于当前项目内。"
+        : "请选择项目根目录；仅提交项目内相对路径，服务会校验图像内容和模型能力。";
+      hint.textContent = draft[errorKey] || (canChoose ? guidance
+        : "保留原图片路径以按原内容重开，或清除后重新开始；服务会校验原图片未变化。");
       hint.hidden = !draft[errorKey] && draft[pathsKey].length === 0;
       clear.disabled = disabled || draft[pathsKey].length === 0 && !draft[errorKey];
-      if (choose) choose.disabled = disabled;
+      if (choose) choose.disabled = disabled || picking;
       if (input) input.disabled = disabled;
     }
 

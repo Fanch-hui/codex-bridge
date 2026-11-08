@@ -35,8 +35,9 @@ struct PiRuntimeResources {
   }
 
   private static let expectedHashes = [
-    "index.mjs": "27ee5f7951dbe5b929c8b8f27780466fefaa60d4ad5ae65315c2a2859f3aaaa7",
-    "policy.mjs": "8bc367d56c9e48a4c2b9cb6e0e9de0539bd3630ae1a186037921601f39977a54",
+    "index.mjs": "d3bb0ce543afafe8aed86dc53aee8d3c456ec3e4fbeedcc46981628995199990",
+    "policy.mjs": "d9a800f8d7504704eebf85169808908dd846b3ca30b2a242ca598aec658c6f69",
+    "write-gate.mjs": "a7cda5a777202832d7d10b9f60091636710d82cb97b5a7aa5d54a86228786b3e",
     "plan.mjs": "c0b99244c69ff306cb40c8b43db9ca2e0ad0850797474a384e94554ad82406f2",
     "ask-user.mjs": "8872ba9a6ab74f621d2113dcdf255c89cd35b1d81ea79b2740b96c73fc5535c9",
     "mcp.mjs": "13a7ea8af6fed5f010ba8480228a5b016c84d5b682c6296f67c52d0740355f99",

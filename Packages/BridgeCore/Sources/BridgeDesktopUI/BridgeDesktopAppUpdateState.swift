@@ -8,6 +8,7 @@ public struct BridgeDesktopAppUpdateState: Codable, Equatable, Sendable {
   public let notes: String?
   public let progress: Double?
   public let message: String?
+  public let blockers: [AppUpdateBlocker]?
   public let isDeferred: Bool
 
   public init(
@@ -17,6 +18,7 @@ public struct BridgeDesktopAppUpdateState: Codable, Equatable, Sendable {
     notes: String? = nil,
     progress: Double? = nil,
     message: String? = nil,
+    blockers: [AppUpdateBlocker]? = nil,
     isDeferred: Bool = false
   ) {
     self.phase = phase
@@ -25,6 +27,7 @@ public struct BridgeDesktopAppUpdateState: Codable, Equatable, Sendable {
     self.notes = notes
     self.progress = progress
     self.message = message
+    self.blockers = blockers
     self.isDeferred = isDeferred
   }
 
@@ -36,6 +39,7 @@ public struct BridgeDesktopAppUpdateState: Codable, Equatable, Sendable {
       notes: status.notes,
       progress: status.progress,
       message: status.message,
+      blockers: status.blockers,
       isDeferred: status.isDeferred
     )
   }

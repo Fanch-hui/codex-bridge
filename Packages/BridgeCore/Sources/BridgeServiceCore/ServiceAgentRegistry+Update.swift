@@ -17,7 +17,14 @@ extension ServiceAgentRegistry {
       )
     }
     guard record.isEnabled else { return try current.get() }
-    if case .success(let candidate) = current,
+    let prefersOpenCodeV2Replacement =
+      record.providerID == .openCode
+      && record.executableIdentity.canonicalPath
+        .replacingOccurrences(of: "\\", with: "/")
+        .lowercased()
+        .contains("/node_modules/opencode-ai/")
+    if !prefersOpenCodeV2Replacement,
+      case .success(let candidate) = current,
       candidate.identity.hasSameContent(as: record.executableIdentity),
       artifactsHaveSameContent(candidate.artifacts, record.artifacts)
     {

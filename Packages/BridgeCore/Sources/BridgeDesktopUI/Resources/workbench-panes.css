@@ -1,0 +1,45 @@
+/* Split view of the web workbench: layout menu in the window toolbar and the pane grid. */
+.workbench-layout-control { position: relative; display: inline-flex; flex: 0 0 auto; }
+.button.workbench-layout-button { padding-inline: 8px; }
+.workbench-layout-button:focus-visible, .workbench-layout-option:focus-visible { outline: 1px solid var(--focus-ring); outline-offset: -1px; }
+.workbench-layout-glyph { display: grid; width: 18px; height: 13px; gap: 1.5px; padding: 1.5px; border: 1.5px solid currentColor; border-radius: 3px; }
+.workbench-layout-glyph > span { border-radius: 1px; background: currentColor; }
+.workbench-layout-glyph[data-layout="columns"] { grid-template-columns: 1fr 1fr; }
+.workbench-layout-glyph[data-layout="main-stack"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.workbench-layout-glyph[data-layout="main-stack"] > span:first-child { grid-row: 1 / span 2; }
+.workbench-layout-glyph[data-layout="grid"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.workbench-layout-menu { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; padding: 10px 12px 12px; border: 1px solid var(--separator); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-overlay); }
+.workbench-layout-menu[hidden] { display: none; }
+.workbench-layout-menu-title { margin: 0 0 8px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.workbench-layout-options { display: flex; gap: 8px; }
+.workbench-layout-option { display: inline-grid; place-items: center; width: 44px; height: 34px; border: 1px solid transparent; border-radius: 8px; color: var(--text-secondary); background: var(--surface-muted); cursor: pointer; }
+.workbench-layout-option .workbench-layout-glyph { width: 26px; height: 18px; }
+.workbench-layout-option:hover { color: var(--text); background: var(--surface-hover); }
+.workbench-layout-option.is-selected { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+.inspector-pane.is-split > .workbench-conversation-viewport,
+.inspector-pane.is-split > .inspector-header,
+.inspector-pane.is-split > .inspector-native-sessions,
+.inspector-pane.is-split > .inspector-footer { display: none; }
+.workbench-panes { display: grid; flex: 1 1 auto; min-height: 0; gap: 8px; padding: 8px; background: var(--surface-muted); }
+.workbench-panes[hidden] { display: none; }
+.workbench-panes[data-layout="columns"] { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+.workbench-panes[data-layout="main-stack"] { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.workbench-panes[data-layout="main-stack"] > .workbench-pane:first-child { grid-row: 1 / span 2; }
+.workbench-panes[data-layout="grid"] { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.workbench-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--separator); border-radius: 10px; background: var(--surface); }
+.workbench-pane.is-focused { border-color: color-mix(in srgb, var(--accent) 45%, var(--separator)); }
+.workbench-pane-header { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px; border-bottom: 1px solid var(--separator); }
+.workbench-pane-picker { flex: 1 1 auto; min-width: 0; max-width: 100%; }
+.workbench-pane-status { flex: 0 0 auto; max-width: 40%; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.workbench-pane.is-running .workbench-pane-status { color: var(--accent); }
+.workbench-pane-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px; }
+.workbench-pane-empty { margin: 24px 8px; color: var(--text-secondary); font-size: 13px; text-align: center; }
+.workbench-pane-composer { flex: 0 0 auto; padding: 8px 10px 10px; border-top: 1px solid var(--separator); }
+.workbench-pane-composer .message-composer-toolbar { flex-wrap: wrap; }
+.workbench-pane-body > .workbench-new-task { min-height: 100%; }
+
+@media (max-width: 760px) {
+  .workbench-panes:not([hidden]) { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: none !important; grid-auto-rows: minmax(320px, 1fr); overflow-y: auto; }
+  .workbench-panes[data-layout="main-stack"] > .workbench-pane:first-child { grid-row: auto; }
+}

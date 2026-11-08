@@ -18,6 +18,10 @@ extension BridgeServiceRequestController {
       let payload = try BridgeServiceIPCCodec.payload(IPCAgentSetupIDRequest.self, from: request)
       return try BridgeServiceIPCCodec.success(
         requestID: request.requestID, payload: await setup.cancel(payload.operationID))
+    case .probeAgentSetupLogin:
+      let payload = try BridgeServiceIPCCodec.payload(IPCAgentSetupIDRequest.self, from: request)
+      return try BridgeServiceIPCCodec.success(
+        requestID: request.requestID, payload: await setup.probeLogin(payload.operationID))
     default:
       return try BridgeServiceIPCCodec.success(
         requestID: request.requestID, payload: await setup.snapshots())

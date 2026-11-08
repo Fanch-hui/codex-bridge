@@ -103,6 +103,16 @@ public actor ServiceProjectService {
     return updated
   }
 
+  /// Rebinds a Bridge-owned project to its recreated root; see `rebindProjectRoot`.
+  public func rebindRoot(
+    projectID: ProjectID,
+    expected: ServiceRootIdentity,
+    replacement: ServiceRootIdentity
+  ) async throws {
+    try await store.rebindProjectRoot(
+      projectID: projectID, expected: expected, replacement: replacement)
+  }
+
   public func remove(projectID: ProjectID) async throws {
     try await store.removeProject(id: projectID)
   }

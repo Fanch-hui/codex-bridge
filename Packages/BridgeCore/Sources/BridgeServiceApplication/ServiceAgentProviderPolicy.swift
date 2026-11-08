@@ -138,6 +138,11 @@ public struct ServiceAgentProviderPolicy: Equatable, Sendable {
   }
 
   public func registrationArtifactRolesMatch(_ roles: Set<AgentInstallationArtifactRole>) -> Bool {
+    if providerID == .pi || providerID == .claudeCode {
+      // One-click setup may pin the Node interpreter it installed or verified for the SDK host;
+      // the provider Probe captures and validates it with the other runtime artifacts.
+      return roles.subtracting([.nodeInterpreter]) == requiredArtifactRoles
+    }
     guard providerID == .deepSeekHarness || providerID == .deepSeekHarnessDesktop else {
       return roles == requiredArtifactRoles
     }
@@ -256,7 +261,35 @@ public enum ServiceAgentProviderPolicyRegistry {
   )
 
   public static let all: [ServiceAgentProviderPolicy] =
-    [codex, openCode, deepSeekHarness, deepSeekHarnessDesktop, antigravity, pi, qoder]
+    [codex, openCode, deepSeekHarness, deepSeekHarnessDesktop, antigravity, pi, qoder, claudeCode]
+
+  public static let claudeCode = ServiceAgentProviderPolicy(
+    providerID: .claudeCode,
+    displayName: "Claude Code",
+    supportsWorkspaceWrite: true,
+    supportsSessionContinuation: true,
+    supportsSteer: true,
+    supportsInteractiveApproval: true,
+    supportsModelSelection: true,
+    supportsEffortSelection: true,
+    supportsSkillSelection: true,
+    allowsNetworkAccess: true,
+    workspaceEnforcement: "provider_hooks",
+    approvalEnforcement: "local_app",
+    networkEnforcement: "provider_tool_policy",
+    allowedCapabilities: [
+      .sessionCreate, .sessionContinue, .interrupt, .steer, .steerInterruptAndContinue,
+      .textDelta, .reasoningDelta, .toolLifecycle, .oneShotApproval, .sessionRuleApproval,
+      .structuredApprovalPayload, .workspaceRead, .workspaceWriteInPlace,
+      .modelSelection, .effortSelection, .skills, .readOnlyExecution, .structuredUserInput,
+      .plan, .usage, .mcpClient, .webSearch, .webFetch, .shell, .subagents, .childRuns,
+    ],
+    requiredProtocolRevision: "claude-sdk-v1",
+    registrationTrustProfile: .userTrusted,
+    registrationSecurityProfileID: AgentProfileID(rawValue: "claude-managed"),
+    requiresExactRegistrationProfile: true,
+    selectionsRequireObservedCapabilities: true
+  )
 
   public static let qoder = ServiceAgentProviderPolicy(
     providerID: .qoder,

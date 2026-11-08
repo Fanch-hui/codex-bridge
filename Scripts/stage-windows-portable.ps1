@@ -16,7 +16,8 @@ param(
   [string]$VCRedistRoot = "",
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
-  [string]$TunnelClientDir
+  [string]$TunnelClientDir,
+  [string]$EmbeddedDSHRuntimeDir = ""
 )
 
 Set-StrictMode -Version Latest
@@ -147,6 +148,29 @@ try {
   Stage-File (Join-Path $repoRoot "LICENSE") "LICENSE.txt"
   Stage-File (Join-Path $repoRoot "NOTICE") "NOTICE.txt"
 
+  if ([string]::IsNullOrWhiteSpace($EmbeddedDSHRuntimeDir)) {
+    $EmbeddedDSHRuntimeDir = Join-Path $repoRoot ".build\embedded-dsh\windows-$Architecture"
+  }
+  $embeddedDSHSource = Get-FullPath $EmbeddedDSHRuntimeDir
+  Assert-Directory $embeddedDSHSource | Out-Null
+  $embeddedDSHVerifier = Join-Path $repoRoot "Scripts\verify-embedded-dsh-runtime.mjs"
+  & node $embeddedDSHVerifier $embeddedDSHSource "windows" $Architecture
+  if ($LASTEXITCODE -ne 0) { throw "Embedded DSH runtime verification failed." }
+  $embeddedDSHManifest = Get-Content -LiteralPath (Join-Path $embeddedDSHSource "runtime.json") -Raw | ConvertFrom-Json
+  if (@($embeddedDSHManifest.links).Count -ne 0) {
+    throw "Windows embedded DSH resources cannot contain reparse points."
+  }
+  $embeddedNode = Join-Path $embeddedDSHSource ($embeddedDSHManifest.node -replace "/", "\")
+  Assert-RegularFile $embeddedNode | Out-Null
+  if ((Get-PEMachine $embeddedNode) -ne $expectedMachine) {
+    throw "Embedded DSH Node has the wrong architecture."
+  }
+  $embeddedDSHDestination = Join-Path $outFull "EmbeddedDSH"
+  & robocopy $embeddedDSHSource $embeddedDSHDestination /E /COPY:DAT /DCOPY:DAT /R:1 /W:1 /NJH /NJS /NP
+  if ($LASTEXITCODE -gt 7) { throw "Could not stage embedded DSH runtime." }
+  & node $embeddedDSHVerifier $embeddedDSHDestination "windows" $Architecture
+  if ($LASTEXITCODE -ne 0) { throw "Staged embedded DSH runtime verification failed." }
+
   $tunnelClientFull = Get-FullPath $TunnelClientDir
   Assert-Directory $tunnelClientFull | Out-Null
   $tunnelExecutablePath = Join-Path $tunnelClientFull "tunnel-client.exe"
@@ -261,6 +285,7 @@ try {
     @{ Name = "BridgeCore_BridgeMCP"; Entry = "FileTransfer/index.html" },
     @{ Name = "BridgeCore_BridgePiRPC"; Entry = "PiBridgeExtension/index.mjs" },
     @{ Name = "BridgeCore_BridgeQoderSDK"; Entry = "QoderHost/index.mjs" },
+    @{ Name = "BridgeCore_BridgeClaudeSDK"; Entry = "ClaudeHost/index.mjs" },
     @{ Name = "BridgeCore_BridgeDeepSeekHarnessDesktop"; Entry = "DSHDesktopConnector/index.mjs" }
   )
   foreach ($spec in $agentResourceSpecs) {
@@ -355,6 +380,8 @@ try {
     vcRedistVersion = (Split-Path -Leaf $vcRedistRootFull)
     vcRuntimeDirectory = $vcRuntimeDirectory.Name
     tunnelClientSHA256 = $tunnelClientSHA256
+    embeddedDSHVersion = $embeddedDSHManifest.dshVersion
+    embeddedDSHCommit = $embeddedDSHManifest.dshCommit
   }
   $buildInfoPath = Join-Path $outFull "BUILD-INFO.json"
   $utf8NoBom = [Text.UTF8Encoding]::new($false)
@@ -364,7 +391,7 @@ try {
     $utf8NoBom)
 
   $sumPath = Join-Path $outFull "SHA256SUMS.txt"
-  $sumLines = @(Get-ChildItem -LiteralPath $outFull -File -Recurse |
+  $sumLines = @(Get-ChildItem -LiteralPath $outFull -File -Recurse -Force |
       Where-Object { $_.FullName -ne $sumPath } |
       ForEach-Object {
         $relative = $_.FullName.Substring($outFull.Length) -replace "^[\\/]+", "" -replace "\\", "/"
@@ -373,12 +400,9 @@ try {
       Sort-Object Relative | Select-Object -ExpandProperty Line)
   [IO.File]::WriteAllLines($sumPath, [string[]]$sumLines, $utf8NoBom)
 
-  Push-Location $outFull
-  try {
-    Compress-Archive -Path .\* -DestinationPath $zipPath -CompressionLevel Optimal -Force
-  } finally {
-    Pop-Location
-  }
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  [IO.Compression.ZipFile]::CreateFromDirectory(
+    $outFull, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $false)
   Write-Host "Portable directory: $outFull"
   Write-Host "Portable ZIP: $zipPath"
 } finally {

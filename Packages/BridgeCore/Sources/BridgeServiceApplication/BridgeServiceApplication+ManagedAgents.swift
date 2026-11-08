@@ -18,11 +18,15 @@ extension BridgeServiceApplication {
     return try await settings.string(for: .deepSeekHarnessBaseURL)
   }
 
+  /// `includeRuntimeArtifacts: false` 返回的记录不含运行时工件，仅供界面展示与按 ID 查找，
+  /// 不得用于校验、回写或与完整记录比较。
   public func serviceManagedAgentInstallations(
-    deadline: ContinuousClock.Instant
+    deadline: ContinuousClock.Instant,
+    includeRuntimeArtifacts: Bool = true
   ) async throws -> [ServiceAgentInstallationRecord] {
     try Self.checkDeadline(deadline)
-    return try await requiredAgentRegistry().installations()
+    return try await requiredAgentRegistry().installations(
+      includeRuntimeArtifacts: includeRuntimeArtifacts)
   }
 
   public func serviceRegisterManagedAgent(
@@ -201,8 +205,16 @@ extension BridgeServiceApplication {
   ) async throws -> [ServiceAgentModelListItem] {
     try Self.checkDeadline(deadline)
     let registry = try requiredAgentRegistry()
-    guard let installation = try await registry.installation(id: installationID) else {
+    guard var installation = try await registry.installation(id: installationID) else {
       throw BridgeMCPQueryError.unavailable
+    }
+    if !installation.capabilities.effective.contains(.modelSelection),
+      let providerDescriptor = await registry.providerDescriptors().first(where: {
+        $0.providerID == installation.providerID
+      }),
+      providerDescriptor.adapterRevision != installation.adapterRevision
+    {
+      installation = try await registry.refreshForDisplay(installationID: installationID)
     }
     guard installation.capabilities.effective.contains(.modelSelection) else {
       return []
@@ -216,9 +228,6 @@ extension BridgeServiceApplication {
     if let modelID {
       selectedModelID = modelID
     } else if useStoredDefault {
-      guard let installation = try await registry.installation(id: installationID) else {
-        throw BridgeMCPQueryError.unavailable
-      }
       selectedModelID = try await serviceAgentModelDefault(
         providerID: installation.providerID,
         deadline: deadline
@@ -283,7 +292,7 @@ extension BridgeServiceApplication {
     if let projectID {
       selectedID = projectID
     } else {
-      selectedID = try await serviceWorkbenchProjectID(deadline: deadline)
+      selectedID = try await defaultWorkspaceProjectID()
     }
     guard let selectedID, !selectedID.isEmpty else { return nil }
     try Self.checkDeadline(deadline)

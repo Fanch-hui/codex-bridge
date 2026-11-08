@@ -14,38 +14,37 @@ enum BridgeDesktopLogPresentation {
   static func rows(from model: BridgeServiceAppModel) -> [BridgeDesktopLogRow] {
     let query = model.desktopLogSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
       .lowercased()
-    return model.tasks
-      .flatMap { task in
-        task.recentEvents.compactMap { event in
-          let category = category(for: event.kind, summary: event.summary)
-          guard
-            matches(
-              task: task,
-              event: event,
-              category: category,
-              projectID: model.desktopLogProjectID,
-              kind: model.desktopLogKind,
-              query: query,
-              model: model
-            )
-          else { return nil }
-          return BridgeDesktopLogRow(
+    let projectID = model.desktopLogProjectID
+    let kind = model.desktopLogKind
+    var rows: [BridgeDesktopLogRow] = []
+    for task in model.tasks where projectID == nil || projectID == task.projectID {
+      let projectName = model.projectName(for: task.projectID)
+      let projectMatchesQuery = !query.isEmpty && projectName.lowercased().contains(query)
+      for event in task.recentEvents {
+        let category = category(for: event.kind, summary: event.summary)
+        guard kind == "all" || kind == category else { continue }
+        guard
+          query.isEmpty || projectMatchesQuery || event.summary.lowercased().contains(query)
+            || event.kind.lowercased().contains(query)
+        else { continue }
+        rows.append(
+          BridgeDesktopLogRow(
             id: "\(task.taskID)-\(event.sequence)",
             sequence: event.sequence,
             taskID: task.taskID,
             projectID: task.projectID,
-            projectName: model.projectName(for: task.projectID),
+            projectName: projectName,
             kind: category,
             kindLabel: label(for: category, rawKind: event.kind, summary: event.summary),
             summary: event.summary,
             timestamp: event.occurredAt
-          )
-        }
+          ))
       }
-      .sorted { lhs, rhs in
-        if lhs.sequence != rhs.sequence { return lhs.sequence > rhs.sequence }
-        return lhs.id > rhs.id
-      }
+    }
+    return rows.sorted { lhs, rhs in
+      if lhs.sequence != rhs.sequence { return lhs.sequence > rhs.sequence }
+      return lhs.id > rhs.id
+    }
   }
 
   static func copyText(rows: [BridgeDesktopLogRow]) -> String {
@@ -78,24 +77,6 @@ enum BridgeDesktopLogPresentation {
       let value = "\(rawKind) \(summary)".lowercased()
       return value.contains("failed") || value.contains("error") ? "错误" : "事件"
     }
-  }
-
-  private static func matches(
-    task: MCPServiceTaskSnapshot,
-    event: MCPServiceTaskEvent,
-    category: String,
-    projectID: String?,
-    kind: String,
-    query: String,
-    model: BridgeServiceAppModel
-  ) -> Bool {
-    guard projectID == nil || projectID == task.projectID else { return false }
-    guard kind == "all" || kind == category else { return false }
-    guard !query.isEmpty else { return true }
-    let projectName = model.projectName(for: task.projectID).lowercased()
-    return event.summary.lowercased().contains(query)
-      || event.kind.lowercased().contains(query)
-      || projectName.contains(query)
   }
 }
 

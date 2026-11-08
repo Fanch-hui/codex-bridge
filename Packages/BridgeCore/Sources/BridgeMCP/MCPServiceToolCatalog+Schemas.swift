@@ -23,7 +23,7 @@ extension MCPServiceToolCatalog {
       "provider_id": [
         "type": "string",
         "description":
-          "Provider identifier. Omit for Codex. Set to opencode, deepseek-harness, deepseek-harness-desktop, antigravity, pi, or qoder only when the user explicitly selected a registered installation; list_agents is authoritative for effective capabilities and enforcement. Qoder regional installations share one provider with separate native sessions and model defaults. Pi uses native RPC with a Bridge-managed extension.",
+          "Provider identifier. Omit for Codex. Set to opencode, deepseek-harness, deepseek-harness-desktop, antigravity, pi, qoder, or claude-code only when the user explicitly selected a registered installation; list_agents is authoritative for effective capabilities and enforcement. Qoder regional installations share one provider with separate native sessions and model defaults. Pi uses native RPC with a Bridge-managed extension. Claude Code uses the official Agent SDK and its registered CLI.",
       ],
       "installation_id": stringSchema,
       "display_name": stringSchema,

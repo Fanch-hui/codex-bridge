@@ -3,6 +3,39 @@ import BridgeIPC
 import Foundation
 
 extension ServiceAgentSetupCoordinator {
+  func probeLogin(_ id: String) throws -> IPCAgentSetupState {
+    guard !stopped, let operation = operations[id] else {
+      throw ServiceAgentSetupError.operationNotFound
+    }
+    guard workers[id] == nil else { return operation.snapshot }
+    guard operation.snapshot.state == "needs_user_action", operation.snapshot.userAction == "login",
+      operation.runtime != nil
+    else { throw ServiceAgentSetupError.invalidRequest }
+    update(id, state: "checking", message: "正在检测登录状态…")
+    workers[id] = Task { await runLoginProbe(id) }
+    return operations[id]!.snapshot
+  }
+
+  private func runLoginProbe(_ id: String) async {
+    guard let operation = operations[id], let runtime = operation.runtime else {
+      workers.removeValue(forKey: id)
+      return
+    }
+    let authenticated = try? await dependencies.probeLogin(operation.request, runtime)
+    guard !Task.isCancelled, operations[id]?.snapshot.state == "checking" else {
+      workers.removeValue(forKey: id)
+      return
+    }
+    workers.removeValue(forKey: id)
+    update(
+      id, state: "needs_user_action",
+      message: authenticated == true ? "登录已确认，正在继续配置…" : "请完成登录后重新检测。",
+      userAction: "login")
+    if authenticated == true {
+      _ = try? resume(IPCAgentSetupContinueRequest(operationID: id))
+    }
+  }
+
   func prepare(_ id: String) async {
     defer { workers.removeValue(forKey: id) }
     do {

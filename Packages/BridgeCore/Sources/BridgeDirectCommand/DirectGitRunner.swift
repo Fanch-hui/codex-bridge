@@ -18,16 +18,24 @@ public struct DirectGitResult: Equatable, Sendable {
   public let exitCode: Int32
   public let output: DirectCommandOutputBuffer
   public let completeOutput: Data?
+  /// Standard error, captured apart from `output` when the caller asked for
+  /// `separateStandardError`; `nil` when both streams were merged into `output`.
+  public let standardError: DirectCommandOutputBuffer?
 
   public init(
     exitCode: Int32,
     output: DirectCommandOutputBuffer,
-    completeOutput: Data? = nil
+    completeOutput: Data? = nil,
+    standardError: DirectCommandOutputBuffer? = nil
   ) {
     self.exitCode = exitCode
     self.output = output
     self.completeOutput = completeOutput
+    self.standardError = standardError
   }
+
+  /// Text to inspect for Git's own failure message (`fatal: ...`).
+  public var diagnosticHead: String { (standardError ?? output).head }
 }
 
 /// Runs one bounded, non-interactive git command inside the project root and
@@ -73,7 +81,8 @@ public struct DirectGitRunner: Sendable {
     timeout: Duration? = nil,
     environment overrides: [String: String]? = nil,
     maximumOutputBytes: Int = 256 * 1_024,
-    restrictedEnvironment: Bool = false
+    restrictedEnvironment: Bool = false,
+    separateStandardError: Bool = false
   ) async throws -> DirectGitResult {
     guard let executable = argv.first, !executable.isEmpty, argv.count <= 128,
       maximumOutputBytes > 0, maximumOutputBytes <= 20 * 1_024 * 1_024
@@ -85,7 +94,8 @@ public struct DirectGitRunner: Sendable {
       try await execute(
         argv: launchArgv, workingDirectory: workingDirectory,
         timeout: timeout ?? defaultTimeout, overrides: overrides,
-        maximumOutputBytes: maximumOutputBytes, restrictedEnvironment: restrictedEnvironment
+        maximumOutputBytes: maximumOutputBytes, restrictedEnvironment: restrictedEnvironment,
+        separateStandardError: separateStandardError
       )
     }
     return try await withTaskCancellationHandler {
@@ -97,7 +107,8 @@ public struct DirectGitRunner: Sendable {
 
   private func execute(
     argv: [String], workingDirectory: String, timeout: Duration,
-    overrides: [String: String]?, maximumOutputBytes: Int, restrictedEnvironment: Bool
+    overrides: [String: String]?, maximumOutputBytes: Int, restrictedEnvironment: Bool,
+    separateStandardError: Bool
   ) async throws -> DirectGitResult {
     try Task.checkCancellation()
     // Inspection relies on the process whitelist and excludes Git repository/config redirection.
@@ -109,11 +120,14 @@ public struct DirectGitRunner: Sendable {
       environment.merge(permitted) { _, replacement in replacement }
     }
     let collector = DirectCommandOutputCollector(maximumBytes: maximumOutputBytes)
+    // Structured readers (`status -z`, `diff`) must not see warnings interleaved with records.
+    let errorCollector =
+      separateStandardError ? DirectCommandOutputCollector(maximumBytes: 64 * 1_024) : nil
     let process: DirectProcessLifetime
     do {
       process = try DirectProcessLifetime(
         argv: argv, workingDirectory: workingDirectory, environment: environment,
-        usePTY: false, output: collector
+        usePTY: false, output: collector, standardError: errorCollector
       )
     } catch {
       throw DirectGitError.launchFailed
@@ -134,7 +148,8 @@ public struct DirectGitRunner: Sendable {
     let exitCode: Int32
     if case .exited(let code) = termination { exitCode = code } else { exitCode = -1 }
     return DirectGitResult(
-      exitCode: exitCode, output: collector.snapshot(), completeOutput: collector.completeData()
+      exitCode: exitCode, output: collector.snapshot(), completeOutput: collector.completeData(),
+      standardError: errorCollector?.snapshot()
     )
   }
 

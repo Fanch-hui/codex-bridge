@@ -109,15 +109,15 @@ extension MCPServiceToolCatalog {
       + "approval, execution, or an explicit local_approval_denied result. Risky Codex operations "
       + "can still require additional local approval after execution starts. "
       + "Codex is the default execution path. Prefer this tool unless the user explicitly asked "
-      + "the MCP client to modify files or run commands directly. Omit project_id to use the "
-      + "project currently selected in the Codex Bridge workbench; an explicit project_id overrides "
-      + "that default. Omit all model and effort fields unless the user explicitly requests a "
+      + "the MCP client to modify files or run commands directly. Omit project_id to use "
+      + "Bridge's default workspace; pass project_id (from list_projects) to work in a project "
+      + "the user named. Omit all model and effort fields unless the user explicitly requests a "
       + "different model for this task; omitted values use the defaults configured in Codex Bridge. "
       + "Model and effort fields are applied only when model_override is true. "
       + "Task permissions are selected by the local user in the Workbench: read-only or full. "
       + "Full includes file writes and network access. This tool uses that selection and cannot override it. "
       + "Set provider_id to route the task to another registered agent provider (for example "
-      + "opencode, deepseek-harness, deepseek-harness-desktop, pi, or qoder). Qoder uses its registered regional SDK and CLI. "
+      + "opencode, deepseek-harness, deepseek-harness-desktop, pi, qoder, or claude-code). Qoder uses its registered regional SDK and CLI. "
       + "For an image-capable Pi or Qoder model, attachment_paths may list up to eight image paths "
       + "relative to the selected project. Include only files the user explicitly chose; Bridge "
       + "validates and binds their content before scheduling. Do not send image bytes or base64. "
@@ -175,7 +175,7 @@ extension MCPServiceToolCatalog {
         "provider_id": nullableStringSchema(
           maximum: 64,
           description:
-            "Omit for Codex. Set to opencode, deepseek-harness, deepseek-harness-desktop, antigravity, pi, or qoder only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
+            "Omit for Codex. Set to opencode, deepseek-harness, deepseek-harness-desktop, antigravity, pi, qoder, or claude-code only when the user explicitly selected a locally registered installation; list_agents shows availability, effective capabilities, and enforcement."
         ),
         "installation_id": nullableStringSchema(
           maximum: 256,

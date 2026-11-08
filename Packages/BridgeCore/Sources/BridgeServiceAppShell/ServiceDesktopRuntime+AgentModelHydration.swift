@@ -58,8 +58,11 @@ extension BridgeServiceAppModel {
     guard !Task.isCancelled,
       agentModelCatalogScopes[providerID] == scope, selectedProjectID == projectID
     else { return }
-    if catalogGeneration == agentModelCatalogGeneration(for: providerID), let modelResponse {
-      setAgentModelOptions(modelResponse.models, providerID: providerID)
+    if catalogGeneration == agentModelCatalogGeneration(for: providerID) {
+      if let modelResponse { setAgentModelOptions(modelResponse.models, providerID: providerID) }
+      if modelResponse != nil || (normalizedInstallationID == nil && defaultReadError == nil) {
+        agentModelCatalogLoadedProviders.insert(providerID)
+      }
     }
     guard defaultLoadGeneration == agentModelDefaultLoadGeneration(for: providerID),
       defaultRevision == agentModelDefaultRevision(for: providerID)

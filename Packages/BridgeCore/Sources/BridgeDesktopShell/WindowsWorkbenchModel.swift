@@ -49,6 +49,7 @@
     public var projectRows: [String]
     public var selectedProjectIndex: Int?
     public var selectedProjectID: String? = nil
+    public var defaultProjectID: String? = nil
     public var permissionRows: [String]
     public var selectedPermissionIndex: Int?
     public var permissionMode: String = "full"
@@ -85,7 +86,9 @@
     public var availableModelCount: Int = 0
     public var modelError: String? = nil
     public var commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil
+    public var embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt] = []
     public var workspace: WorkbenchWorkspaceState? = nil
+    public var paneTasks: [BridgeDesktopTaskDetail]? = nil
   }
 
   /// Lock-guarded bridge between main-actor model updates and the
@@ -184,15 +187,16 @@
       didSet { workbenchDisplayCache.tasksDidChange() }
     }
     var threads: [MCPThreadSummary] = []
+    /// Project the inspector, skills and model catalogs follow; sessions of every project stay listed.
     var selectedProjectID: String? {
       didSet {
-        workbenchDisplayCache.selectedProjectDidChange()
         if oldValue != selectedProjectID {
-          clearTaskHistorySearch()
           workspaceModel.selectProject(selectedProjectID)
         }
       }
     }
+    /// Bridge-managed default workspace reported by the service; the fallback project context.
+    var defaultProjectID: String?
     var selectedThreadID: String?
     var selectedThreadPage: MCPThreadReadPage?
     var workbenchPermissionMode = "full"
@@ -200,12 +204,17 @@
     var isChatBrowserEnabled: Bool
     var selectedTaskID: String?
     var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+    var embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt] = []
     var nativeSessionDirectory: BridgeDesktopNativeSessionDirectoryState?
     var nativeSessionDirectoryGeneration: UInt64 = 0
     var conversation: TaskConversationModel?
     var conversationPresentationCache = TaskConversationPresentationCache()
     var windowsConversationPresentationCache = WindowsConversationPresentationCache()
     var conversationWasTerminal = false
+    /// Split-view panes of the web workbench, each with its own live conversation.
+    lazy var paneConversations = WorkbenchPaneConversations { [weak self] in
+      self?.publishDisplay()
+    }
     var actionText: String?
     var approvals: [IPCApprovalSummary] = [] {
       didSet { if approvals != oldValue { workbenchDisplayCache.approvalsDidChange() } }

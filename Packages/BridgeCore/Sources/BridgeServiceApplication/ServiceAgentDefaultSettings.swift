@@ -54,6 +54,9 @@ struct ServiceAgentDefaultSettings: Sendable {
   }
 
   private static let all: [AgentProviderID: Self] = [
+    .claudeCode: Self(
+      modelKey: .claudeCodeDefaultModel, effortKey: .claudeCodeDefaultEffort,
+      permissionKey: .claudeCodeDefaultPermissionMode, requiresKnownModel: false),
     .openCode: Self(
       modelKey: .openCodeDefaultModel, effortKey: .openCodeDefaultEffort,
       permissionKey: .openCodeDefaultPermissionMode, requiresKnownModel: false),

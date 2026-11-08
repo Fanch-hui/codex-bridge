@@ -11,10 +11,14 @@ public enum TaskRetrySubmission {
   ) throws -> IPCAgentSubmitRequest {
     let selection: DSHConversationExecutionSelection?
     if let executionSelection {
-      guard task.providerIdentifier == "deepseek-harness", threadID != nil else {
+      guard threadID != nil else {
         throw DSHWorkbenchTaskSubmission.SubmissionError.invalidInput
       }
-      selection = try executionSelection.validated()
+      // DSH conversations stay full-access; other Agents continue with the workbench task mode.
+      selection =
+        task.providerIdentifier == "deepseek-harness"
+        ? try executionSelection.validated()
+        : try executionSelection.validatedContinuation()
     } else {
       selection = nil
     }

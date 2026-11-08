@@ -22,15 +22,29 @@ extension BridgeServiceApplication {
     }
     let modelCatalog: [AgentModelDescriptor]?
     if context.supportsModelSelection {
-      modelCatalog = try? await serviceAgentModelCatalog(
-        registry: context.registry,
-        installationID: context.record.id,
-        projectRoot: project.root.canonicalPath,
-        selectedModelID: Self.agentCatalogModelID(
-          providerID: context.policy.providerID, modelID: context.resolvedModel),
-        requireSelectedModel: context.policy.providerID != .pi,
-        runtimeBinding: context.runtimeBinding
-      )
+      let selectedCatalogModelID = Self.agentCatalogModelID(
+        providerID: context.policy.providerID, modelID: context.resolvedModel)
+      do {
+        modelCatalog = try await serviceAgentModelCatalog(
+          registry: context.registry,
+          installationID: context.record.id,
+          projectRoot: project.root.canonicalPath,
+          selectedModelID: selectedCatalogModelID,
+          requireSelectedModel: context.policy.providerID != .pi,
+          runtimeBinding: context.runtimeBinding
+        )
+      } catch AgentRuntimeError.modelUnavailable where selectedCatalogModelID != nil {
+        modelCatalog = try? await serviceAgentModelCatalog(
+          registry: context.registry,
+          installationID: context.record.id,
+          projectRoot: project.root.canonicalPath,
+          selectedModelID: nil,
+          requireSelectedModel: false,
+          runtimeBinding: context.runtimeBinding
+        )
+      } catch {
+        modelCatalog = nil
+      }
     } else {
       modelCatalog = nil
     }
@@ -77,7 +91,13 @@ extension BridgeServiceApplication {
           AgentModelMatcher.match($0, in: catalog)
         }
     }
-    if providerID == .qoder { return catalog.first(where: { $0.isDefaultModel == true }) }
+    if providerID == .qoder {
+      return catalog.first(where: { $0.isDefaultModel == true })
+        ?? (catalog.count == 1 ? catalog.first : nil)
+    }
+    if providerID == .claudeCode {
+      return catalog.first(where: { $0.isDefaultModel == true })
+    }
     return catalog.first(where: { !$0.supportedReasoningEfforts.isEmpty })
   }
 

@@ -155,13 +155,20 @@ public actor OpenCodeACPExecution {
   private func runPrompt() async {
     do {
       var prompt = initialPrompt
+      var initial = true
       while true {
         if interruptRequested {
           await finishInterrupted()
           return
         }
         let text = literalInput ? OpenCodeACPReadOnlyPolicy.literalPrompt(prompt) : prompt
-        let result = try await client.prompt(sessionID: sessionID, text: text)
+        let result =
+          if initial {
+            try await client.promptInitial(sessionID: sessionID, text: text)
+          } else {
+            try await client.prompt(sessionID: sessionID, text: text)
+          }
+        initial = false
         try await waitUntilConsumed(result.eventSequenceBarrier)
         guard !terminal else { return }
         if result.stopReason == "cancelled" || interruptRequested {

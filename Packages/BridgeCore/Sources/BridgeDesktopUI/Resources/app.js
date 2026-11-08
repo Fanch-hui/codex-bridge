@@ -7,6 +7,9 @@
   var requestSequence = 0;
   var navigationNodes = new Map();
   var iconPaths = window.CodexBridgeDesktopIcons;
+  if (new URLSearchParams(window.location && window.location.search || "").get("surface") === "preferences") {
+    document.documentElement.dataset.surface = "preferences";
+  }
 
   function iconMarkup(symbol) {
     return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (iconPaths[symbol] || iconPaths["circle.dashed"]) + "</svg>";
@@ -36,7 +39,8 @@
   }
 
   function emit(command, payload, requestID) {
-    var envelope = { version: 1, requestID: requestID || "desktop-ui-" + (++requestSequence), command: command, payload: payload || {} };
+    var prefix = document.documentElement.dataset.surface === "preferences" ? "desktop-preferences-ui-" : "desktop-ui-";
+    var envelope = { version: 1, requestID: requestID || prefix + (++requestSequence), command: command, payload: payload || {} };
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bridgeDesktopUI) {
       window.webkit.messageHandlers.bridgeDesktopUI.postMessage(envelope);
     }
@@ -47,43 +51,99 @@
     return envelope.requestID;
   }
 
+  function workbenchMode() {
+    var workbench = window.CodexBridgeDesktopDSHWorkbench;
+    return workbench && workbench.mode ? workbench.mode() : "dsh";
+  }
+
+  function navigate(destination) {
+    var workbench = window.CodexBridgeDesktopDSHWorkbench;
+    if (destination === "development" && workbench && workbench.showDevelopment) {
+      if (workbench.showDevelopment() === false) emit("selectPage", { navigation: "workbench" });
+    } else if (destination === "collaboration" && workbench && workbench.openCollaboration) {
+      if (workbench.openCollaboration() === false) emit("selectPage", { navigation: "workbench" });
+    } else if (destination === "settings") {
+      emit("openSettings");
+    } else {
+      emit("selectPage", { navigation: destination });
+    }
+    refreshNavigation();
+  }
+
   function renderNavigation(items, selected) {
     var primary = document.getElementById("navigation");
-    var secondary = document.getElementById("secondary-navigation") || primary;
+    var secondary = document.getElementById("secondary-navigation");
+    var itemByID = new Map((items || []).map(function (item) { return [item.navigation, item]; }));
+    var entries = [
+      { key: "development", page: "workbench", title: "工作台", symbol: "sparkles" },
+      { key: "collaboration", page: "workbench", title: "网页工作台", symbol: "person.2" },
+      { key: "projects", page: "projects", title: "项目", symbol: "folder.fill" },
+      { key: "overview", page: "overview", title: "动态", symbol: "list.bullet.rectangle" },
+      { key: "connections", page: "connections", title: "连接", symbol: "link", secondary: true },
+      { key: "settings", page: "settings", title: "设置", symbol: "gearshape", secondary: true }
+    ];
     var active = new Set();
-    var order = ["overview", "connections", "projects", "workbench", "settings"];
-    order.map(function (id) {
-      return (items || []).find(function (item) { return item.navigation === id; });
-    }).filter(Boolean).forEach(function (item, index) {
-      var container = item.navigation === "settings" ? secondary : primary;
-      if (item.navigation === "settings" && secondary !== primary) index = 0;
-      active.add(item.navigation);
-      var button = navigationNodes.get(item.navigation);
+    var positions = { primary: 0, secondary: 0 };
+    entries.forEach(function (entry) {
+      var source = itemByID.get(entry.page);
+      if (!source) return;
+      var container = entry.secondary ? secondary : primary;
+      var positionKey = entry.secondary ? "secondary" : "primary";
+      var index = positions[positionKey]++;
+      active.add(entry.key);
+      var navNode = navigationNodes.get(entry.key);
+      var button = navNode && (entry.key === "development" ? navNode.firstChild : navNode);
       if (!button) {
         button = document.createElement("button"); button.type = "button";
-        button.appendChild(iconElement(item.symbol, "icon"));
-        button.appendChild(elementWithText("span", "nav-title", item.title));
+        button.appendChild(iconElement(entry.symbol, "icon"));
+        button.appendChild(elementWithText("span", "nav-title", entry.title));
         button.appendChild(elementWithText("span", "nav-badge", ""));
-        button.addEventListener("click", function () { emit("selectPage", { navigation: item.navigation }); });
-        navigationNodes.set(item.navigation, button);
+        button.addEventListener("click", function () { navigate(entry.key); });
+        navNode = button;
+        if (entry.key === "development") {
+          navNode = document.createElement("div"); navNode.className = "nav-item-with-help";
+          navNode.appendChild(button);
+          navNode.appendChild(window.CodexBridgeDesktopPageSupport.helpTooltip("工作台说明", "（基于DeepSeek harness开发）"));
+        }
+        navigationNodes.set(entry.key, navNode);
         setIcons(button);
       }
-      button.title = item.title;
-      button.setAttribute("aria-label", item.title + (item.badge == null ? "" : "，" + item.badge));
-      var isSelected = item.navigation === selected || (item.navigation === "settings" && selected === "logs");
+      var badgeValue = entry.key === "development" ? null : source.badge;
+      button.title = entry.title;
+      button.setAttribute("aria-label", entry.title + (badgeValue == null ? "" : "，" + badgeValue));
+      var isSelected = selected === entry.page;
+      if (entry.page === "workbench") {
+        isSelected = isSelected && (entry.key === "development" ? workbenchMode() === "dsh" : workbenchMode() !== "dsh");
+      } else if (entry.key === "settings" && selected === "logs") {
+        isSelected = true;
+      }
       button.className = "nav-item" + (isSelected ? " is-selected" : "");
       button.setAttribute("aria-current", isSelected ? "page" : "false");
-      button.querySelector(".nav-title").textContent = item.title;
       var badge = button.querySelector(".nav-badge");
-      badge.hidden = item.badge == null; badge.textContent = item.badge == null ? "" : item.badge;
-      if (container.children[index] !== button) {
-        if (container.children[index]) container.insertBefore(button, container.children[index]);
-        else container.appendChild(button);
-      }
+      badge.hidden = badgeValue == null; badge.textContent = badgeValue == null ? "" : badgeValue;
+      if (container && container.children[index] !== navNode) container.insertBefore(navNode, container.children[index] || null);
     });
-    navigationNodes.forEach(function (button, key) {
-      if (!active.has(key)) { button.remove(); navigationNodes.delete(key); }
+    navigationNodes.forEach(function (node, key) {
+      if (!active.has(key)) { node.remove(); navigationNodes.delete(key); }
     });
+  }
+
+  function refreshNavigation() {
+    if (!state) return;
+    renderNavigation(state.navigation, state.selectedNavigation);
+    var pageTitle = document.getElementById("page-title");
+    if (state.selectedNavigation === "workbench") {
+      pageTitle.textContent = workbenchMode() === "dsh" ? "工作台" : "网页工作台";
+      pageTitle.title = pageTitle.textContent;
+      var workbenchPage = document.getElementById("workbench-page");
+      if (workbenchPage) workbenchPage.setAttribute("aria-label", pageTitle.textContent);
+    }
+    var outsideWorkbench = state.selectedNavigation !== "workbench";
+    ["workspace-navigator", "workspace-toolbar-context", "workspace-toolbar-actions"].forEach(function (id) {
+      var node = document.getElementById(id);
+      if (node) node.hidden = outsideWorkbench;
+    });
+    document.getElementById("app-shell").dataset.workbenchMode = workbenchMode();
   }
 
   function iconElement(symbol, className) {
@@ -100,141 +160,6 @@
     return element;
   }
 
-  function renderOverview(overview) {
-    if (!overview) return;
-    renderServices(overview.clientConnections || overview.services, overview.serviceActions);
-    renderOnboarding(overview.onboardingSteps);
-    renderRecentTasks(overview.recentTasks);
-    renderNotices(overview.notices);
-    if (window.CodexBridgeDesktopAppUpdate) {
-      window.CodexBridgeDesktopAppUpdate.renderOverview(
-        document.getElementById("app-update"),
-        state && state.appUpdate,
-        emit
-      );
-    }
-    var pending = document.getElementById("pending-section");
-    var update = document.getElementById("app-update");
-    if (pending) pending.hidden = !(overview.notices || []).length && (!update || update.hidden);
-  }
-
-  function openDestination(destination, detailID, options) {
-    var connections = window.CodexBridgeDesktopConnectionsPage;
-    if (destination === "connections" && detailID && connections && connections.openDetail) {
-      connections.openDetail(detailID, emit, options);
-    } else emit("selectPage", { navigation: destination });
-  }
-
-  function renderOnboarding(steps) {
-    var section = document.getElementById("onboarding-section");
-    var container = document.getElementById("onboarding-steps");
-    if (!section || !container) return;
-    section.hidden = !(steps || []).length;
-    window.CodexBridgeDesktopPageSupport.clear(container);
-    (steps || []).forEach(function (step, index) {
-      var button = elementWithText("button", "button", (index + 1) + ". " + step.title);
-      button.type = "button";
-      button.addEventListener("click", function () {
-        emit(step.command, { navigation: step.destination || null, taskID: step.taskID || null });
-      });
-      container.appendChild(button);
-    });
-  }
-
-  function renderServices(rows, actions) {
-    var container = document.getElementById("services");
-    window.CodexBridgeDesktopPageSupport.clear(container);
-    (rows || []).forEach(function (row) {
-      var element = document.createElement(row.destination ? "button" : "div");
-      element.className = "service-row tone-" + toneClass(row.tone);
-      if (row.destination) { element.type = "button"; element.addEventListener("click", function () { openDestination(row.destination, { "openai.chatgpt": "chatgpt", "qwen.studio": "qwen", "google.gemini": "gemini" }[row.id] || row.id); }); }
-      element.appendChild(iconElement(row.symbol, "service-icon"));
-      element.appendChild(elementWithText("span", "service-title", row.title));
-      element.appendChild(window.CodexBridgeDesktopPageSupport.status(row.value, toneClass(row.tone)));
-      container.appendChild(element);
-    });
-    if (actions && actions.length) {
-      var actionBar = document.createElement("div");
-      actionBar.className = "service-actions";
-      actions.forEach(function (action) {
-        var button = document.createElement("button");
-        button.type = "button";
-        button.className = "link-button";
-        button.textContent = action.title;
-        button.addEventListener("click", function () { emit(action.command, { navigation: action.destination || null, taskID: action.taskID || null }); });
-        actionBar.appendChild(button);
-      });
-      container.appendChild(actionBar);
-    }
-    setIcons(container);
-  }
-
-  function recentTaskTone(status) {
-    if (status === "completed" || status === "已完成" || status === "已创建") return "success";
-    if (status === "failed" || status === "失败") return "error";
-    if (["running", "starting", "运行中", "正在启动"].includes(status)) return "running";
-    if (/approval|等待|审批/.test(status)) return "warning";
-    return "neutral";
-  }
-
-  function renderRecentTasks(tasks) {
-    var section = document.getElementById("recent-section");
-    var container = document.getElementById("recent-tasks");
-    section.hidden = !tasks || tasks.length === 0;
-    window.CodexBridgeDesktopPageSupport.clear(container);
-    (tasks || []).slice(0, 4).forEach(function (task) {
-      var row = document.createElement("button");
-      row.type = "button";
-      row.className = "recent-task";
-      var copy = document.createElement("span");
-      copy.className = "recent-main";
-      copy.appendChild(elementWithText("span", "recent-title", task.title));
-      copy.appendChild(elementWithText("span", "recent-project", task.projectName));
-      copy.title = [task.title, task.projectName].filter(Boolean).join(" · ");
-      row.appendChild(copy);
-      var status = window.CodexBridgeDesktopPageSupport.status(task.status, recentTaskTone(task.status));
-      status.className += " recent-status";
-      row.appendChild(status);
-      row.appendChild(elementWithText("span", "recent-source", task.source));
-      row.appendChild(elementWithText("span", "recent-time", task.updatedAt));
-      row.appendChild(elementWithText("span", "recent-chevron", "›"));
-      row.addEventListener("click", function () { emit("openTask", { taskID: task.id }); });
-      container.appendChild(row);
-    });
-  }
-
-  function renderNotices(notices) {
-    var container = document.getElementById("notices");
-    window.CodexBridgeDesktopPageSupport.clear(container);
-    (notices || []).forEach(function (notice) {
-      var element = document.createElement("div");
-      element.className = "notice " + toneClass(notice.tone);
-      element.appendChild(iconElement(notice.symbol, "icon"));
-      var copy = document.createElement("div");
-      copy.appendChild(document.createElement("h4"));
-      copy.lastChild.textContent = notice.title;
-      copy.appendChild(document.createElement("p"));
-      copy.lastChild.textContent = notice.message;
-      element.appendChild(copy);
-      if (notice.command || notice.destination) {
-        var action = document.createElement("button");
-        action.type = "button";
-        action.className = "link-button";
-        action.textContent = notice.command === "openSystemSettings" ? "打开登录项设置" : "处理 →";
-        action.addEventListener("click", function () {
-          if (notice.command) {
-            emit(notice.command, { navigation: notice.destination || null });
-          } else {
-            openDestination(notice.destination, notice.detailID, { distribution: notice.distribution, installationID: notice.installationID });
-          }
-        });
-        element.appendChild(action);
-      }
-      container.appendChild(element);
-    });
-    setIcons(container);
-  }
-
   function renderState(nextState, revision) {
     state = nextState;
     if (Number.isInteger(revision)) stateRevision = revision;
@@ -243,18 +168,23 @@
     var shell = document.getElementById("app-shell");
     var loading = document.getElementById("loading-state");
     loading.hidden = !!state;
+    var newConvButton = document.querySelector(".new-conversation-button");
+    if (newConvButton) newConvButton.disabled = !state;
     shell.dataset.state = state ? "ready" : "loading";
     if (!state) {
+      ["workspace-navigator", "workspace-toolbar-context", "workspace-toolbar-actions"].forEach(function (id) {
+        var node = document.getElementById(id);
+        if (node) node.hidden = true;
+      });
       renderFeedback(null);
       globalPages(null, emit);
       return;
     }
-    renderNavigation(state.navigation, state.selectedNavigation);
     var selectedItem = (state.navigation || []).find(function (item) { return item.navigation === state.selectedNavigation; }) || {};
     var pageState = state[state.selectedNavigation];
     var pageTitle = document.getElementById("page-title");
-    pageTitle.textContent = state.selectedNavigation === "overview" && state.overview
-      ? state.overview.title : pageState && pageState.header ? pageState.header.title : selectedItem.title || "Codex Bridge";
+    pageTitle.textContent = state.selectedNavigation === "overview"
+      ? "动态" : pageState && pageState.header ? pageState.header.title : selectedItem.title || "Codex Bridge";
     pageTitle.title = pageTitle.textContent;
     var indicator = document.getElementById("connection-indicator");
     indicator.className = "connection-indicator " + toneClass(state.connectionTone);
@@ -267,8 +197,17 @@
     document.querySelector(".refresh-button").classList.toggle("is-refreshing", !!state.isRefreshing);
     document.querySelector(".refresh-button").disabled = !!state.isRefreshing;
     renderFeedback(state.feedback);
-    if (state.selectedNavigation === "overview") renderOverview(state.overview);
+    if (window.CodexBridgeDesktopAppUpdate && window.CodexBridgeDesktopAppUpdate.renderSidebar) {
+      window.CodexBridgeDesktopAppUpdate.renderSidebar(state.appUpdate, emit);
+    }
+    if (state.selectedNavigation === "overview" && window.CodexBridgeDesktopOverviewPage) {
+      window.CodexBridgeDesktopOverviewPage.render(state.overview, state.appUpdate, emit);
+    }
     globalPages(state, emit);
+    refreshNavigation();
+    if (state.selectedNavigation !== "workbench" && window.CodexBridgeDesktopStartup) {
+      window.CodexBridgeDesktopStartup.update({ status: "ready" });
+    }
   }
 
   function isStatePatch(value) {
@@ -338,6 +277,8 @@
         next.overview = change.overview || null;
       } else if (change.kind === "connection") {
         next.connections = change.connections || null;
+      } else if (change.kind === "projects") {
+        next.projects = change.projects || null;
       } else if (change.kind === "logs") {
         next.logs = change.logs || null;
       } else if (change.kind === "appUpdate") {
@@ -357,9 +298,21 @@
             ? change.taskRows.slice()
             : upsertRows(workbench.tasks, change.taskRows, change.removedIDs, "taskID");
         }
+      } else if (change.kind === "paneTasks") {
+        if ((change.collectionMode !== "replace" && change.collectionMode !== "upsert")
+          || !Array.isArray(change.paneTasks) || !Array.isArray(change.removedIDs)) {
+          valid = false;
+        } else {
+          workbench.paneTasks = change.collectionMode === "replace"
+            ? change.paneTasks.slice()
+            : upsertRows(workbench.paneTasks, change.paneTasks, change.removedIDs, "taskID");
+        }
       } else if (change.kind === "approvals") {
         if (!Array.isArray(change.approvalRows)) valid = false;
         else workbench.approvals = change.approvalRows.slice();
+      } else if (change.kind === "embeddedDSHReceipts") {
+        if (!Array.isArray(change.embeddedDSHReceipts)) valid = false;
+        else workbench.embeddedDSHReceipts = change.embeddedDSHReceipts.slice();
       } else if (change.kind === "selectedTask" && change.selectedTask) {
         workbench.selectedTask = change.selectedTask;
         workbench.selectedTaskID = change.taskID || change.selectedTask.taskID || null;
@@ -428,6 +381,7 @@
     }
     var action = event.target.closest("[data-action]");
     if (!action) return;
+    if (action.dataset.action === "new-conversation") window.CodexBridgeDesktopDSHWorkbench.openConversation();
     if (action.dataset.action === "refresh") emit("refresh");
     if (action.dataset.action === "select-page") emit("selectPage", { navigation: action.dataset.page });
   });
@@ -436,15 +390,45 @@
       event.preventDefault();
     }
   });
+  document.addEventListener("keydown", function (event) {
+    var platform = document.documentElement.dataset.platform;
+    if (document.documentElement.dataset.surface === "preferences"
+      || !state || event.defaultPrevented || event.repeat || event.altKey || event.shiftKey
+      || !event.ctrlKey || platform !== "windows" && platform !== "linux"
+      || document.querySelector("dialog[open]")) return;
+    var key = event.key.toLowerCase();
+    if (key === "n") {
+      event.preventDefault(); window.CodexBridgeDesktopDSHWorkbench.openConversation();
+    } else if (key === "o") {
+      event.preventDefault(); emit("registerProject");
+    } else if (key === ",") {
+      event.preventDefault(); emit("openSettings");
+    }
+  });
   window.addEventListener("resize", function () {
     if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) window.CodexBridgeDesktopPages.measureBrowserViewport(emit);
   });
+  window.addEventListener("codex-bridge-workbench-mode-changed", refreshNavigation);
+  var overlayObservers = [];
+  function observeOverlayHeight(element, property) {
+    if (!element || typeof window.ResizeObserver !== "function") return;
+    var observer = new window.ResizeObserver(function () {
+      document.documentElement.style.setProperty(property, Math.ceil(element.getBoundingClientRect().height) + "px");
+    });
+    observer.observe(element);
+    overlayObservers.push(observer);
+  }
+  observeOverlayHeight(document.querySelector(".toolbar"), "--app-toolbar-height");
+  observeOverlayHeight(document.getElementById("workbench-inspector-footer"), "--workbench-footer-height");
   var contentScroller = document.querySelector(".content-scroll");
+  var scrollViewportFrame = 0;
   if (contentScroller) {
     contentScroller.addEventListener("scroll", function () {
-      if (state && state.selectedNavigation === "workbench" && window.CodexBridgeDesktopPages) {
-        window.requestAnimationFrame(function () { window.CodexBridgeDesktopPages.measureBrowserViewport(emit); });
-      }
+      if (scrollViewportFrame || !state || state.selectedNavigation !== "workbench" || !window.CodexBridgeDesktopPages) return;
+      scrollViewportFrame = window.requestAnimationFrame(function () {
+        scrollViewportFrame = 0;
+        window.CodexBridgeDesktopPages.measureBrowserViewport(emit);
+      });
     }, { passive: true });
   }
 
@@ -455,6 +439,9 @@
     getStateRevision: function () { return stateRevision; },
     sendCommand: emit
   };
+  if (window.CodexBridgeDesktopStartup) {
+    window.CodexBridgeDesktopStartup.update({ status: "loading", retry: function () { emit("refresh"); } });
+  }
   if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
     window.chrome.webview.addEventListener("message", function (event) {
       var incoming = event.data;

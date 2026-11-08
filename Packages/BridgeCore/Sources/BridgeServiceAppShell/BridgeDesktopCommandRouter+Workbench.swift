@@ -26,9 +26,13 @@ extension BridgeDesktopCommandRouter {
     case .setBrowserEnabled:
       guard let enabled = payload.enabled else { return }
       model.isChatBrowserEnabled = enabled
-      if !enabled { model.chatBrowserViewport = nil }
+      if !enabled { model.chatBrowserViewport.update(nil) }
     case .openBrowserExternally:
       openBrowserExternally(model)
+    case .setWorkbenchPanes:
+      let ids = (payload.taskIDs ?? []).prefix(WorkbenchPaneConversations.maximumPanes)
+        .compactMap { validatedID($0) }
+      model.setWorkbenchPanes(ids)
     case .loadEarlierConversation:
       loadEarlier(payload.taskID, model: model)
     case .refreshConversation:
@@ -42,11 +46,13 @@ extension BridgeDesktopCommandRouter {
     case .searchTaskHistory:
       model.searchTaskHistory(payload)
     case .selectTaskHistory:
-      model.selectTaskHistory(payload.taskID)
+      model.selectTaskHistory(
+        payload.taskID, requestID: envelope.requestID,
+        messageID: payload.value.flatMap(Int64.init))
     case .selectTask:
-      guard let taskID = validatedID(payload.taskID),
-        model.tasks.contains(where: { $0.taskID == taskID })
-      else { return }
+      guard let taskID = validatedID(payload.taskID) else { return }
+      // A task submitted moments ago may not be listed yet; it then opens on the next refresh.
+      if model.pendingOpenTaskID != taskID { model.pendingOpenTaskID = nil }
       model.openTask(taskID)
       model.selection = .workbench
     case .refreshTasks:
@@ -55,6 +61,10 @@ extension BridgeDesktopCommandRouter {
       model.performWorkbenchWorkspace(envelope)
     case .submitDSHTask:
       model.submitDSHTask(envelope)
+    case .submitAgentTask:
+      model.submitAgentTask(envelope)
+    case .embeddedDSH:
+      model.performEmbeddedDSH(envelope)
     case .interruptTask:
       guard let task = task(payload.taskID, in: model),
         connected(model),
@@ -167,8 +177,8 @@ extension BridgeDesktopCommandRouter {
 
   private static func loadEarlier(_ taskID: String?, model: BridgeServiceAppModel) {
     guard let taskID = validatedID(taskID),
-      let conversation = model.conversation,
-      conversation.taskID == taskID,
+      let conversation = model.conversation?.taskID == taskID
+        ? model.conversation : model.paneConversations.conversation(for: taskID),
       conversation.canLoadEarlier
     else { return }
     Task { await conversation.loadEarlier() }
@@ -192,10 +202,8 @@ extension BridgeDesktopCommandRouter {
       let task = task(payload.taskID, in: model), connected(model),
       TaskInspectorPresentation.canSteer(
         task,
-        providerSupportsSteer: task.isCodexTask
-          || task.providerID.flatMap { providerID in
-            model.agentProviders.first(where: { $0.providerID == providerID })?.supportsSteer
-          } == true
+        providerSupportsSteer: TaskInspectorPresentation.supportsConversationInsertion(
+          task, providers: model.agentProviders, installations: model.agentInstallations)
       ),
       let input = validatedText(payload.input, maximumBytes: IPCTaskSteerRequest.maximumInputBytes),
       TaskInspectorPresentation.steerValidationMessage(input) == nil
@@ -205,7 +213,7 @@ extension BridgeDesktopCommandRouter {
         command: BridgeDesktopCommand.steerTask.rawValue,
         taskID: payload.taskID,
         input: payload.input,
-        message: "当前任务不接受这次 Steer。"
+        message: "当前 Agent 不支持插入对话，请等待完成后再发送。"
       )
       return
     }

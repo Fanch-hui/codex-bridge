@@ -37,6 +37,7 @@ public actor MCPBridgeServer {
   private let httpConfiguration: MCPHTTPConfiguration
   private let sessionLimits: MCPSessionRegistry.Limits
   private let clientAdmission: MCPClientAdmissionGate?
+  private let callActivity: MCPClientCallActivity
   private var lifecycle = Lifecycle.stopped
   private var currentStopID: UUID?
   private var stopWaiters: [CheckedContinuation<Void, Never>] = []
@@ -50,12 +51,15 @@ public actor MCPBridgeServer {
     clientAdmission: MCPClientAdmissionGate? = nil
   ) {
     precondition(!appVersion.isEmpty)
-    let factory = MCPServiceServerFactory(
-      appVersion: appVersion,
-      service: service,
-      exposureMode: exposureMode
-    )
-    makeServer = { _ in await factory.makeServer() }
+    let activity = MCPClientCallActivity(
+      admission: clientAdmission, cloudGate: httpConfiguration.geminiCloudAccessGate)
+    self.callActivity = activity
+    makeServer = { clientID in
+      await MCPServiceServerFactory(
+        appVersion: appVersion, service: service, exposureMode: exposureMode,
+        clientID: clientID, activity: activity
+      ).makeServer()
+    }
     discoveryInstructions = { clientID in
       let deadline = ContinuousClock().now.advanced(by: .seconds(5))
       let custom = try? await service.serviceCustomInstructions(deadline: deadline)
@@ -78,13 +82,17 @@ public actor MCPBridgeServer {
     clientAdmission: MCPClientAdmissionGate? = nil
   ) {
     precondition(!appVersion.isEmpty)
+    let activity = MCPClientCallActivity(
+      admission: clientAdmission, cloudGate: httpConfiguration.geminiCloudAccessGate)
+    self.callActivity = activity
     makeServer = { clientID in
       let mode = await exposureMode(clientID)
       return await MCPServiceServerFactory(
         appVersion: appVersion,
         service: service,
         exposureMode: mode,
-        clientID: clientID
+        clientID: clientID,
+        activity: activity
       ).makeServer()
     }
     discoveryInstructions = { clientID in
@@ -222,6 +230,10 @@ public actor MCPBridgeServer {
   public func activeSessionCount(for clientID: MCPClientID) async -> Int {
     guard case .running(_, _, let router, _) = lifecycle else { return 0 }
     return await router.activeSessionCount(for: clientID)
+  }
+
+  public func successfulToolCalls(for clientID: MCPClientID) async -> [MCPClientSuccessfulCall] {
+    await callActivity.successes(for: clientID)
   }
 
   private func isStarting(_ identifier: UUID) -> Bool {

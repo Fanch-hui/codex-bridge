@@ -11,9 +11,11 @@ package struct PreparedExecutionApproval: Sendable {
 
 package struct ExecutionApprovalLimits: Sendable {
   let taskPermissionMode: ServicePermissionMode
+  let isolated: Bool
 
   init(request: ExecutionRequest) {
     taskPermissionMode = request.task.permissionMode
+    isolated = request.isolatedWorkspace != nil
   }
 }
 

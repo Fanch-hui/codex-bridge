@@ -14,6 +14,7 @@
         FileHandle.standardError.write(Data("无法初始化 GTK / WebKitGTK 桌面环境。\n".utf8))
         return
       }
+      updateBrowserMemoryPolicy(model: model)
       model.onConnected = { [weak model, weak management, weak auxiliary] in
         guard let model, !model.isShuttingDown, let management, let auxiliary else { return }
         await management.refreshProjects()
@@ -44,10 +45,11 @@
         try? await Task.sleep(for: .milliseconds(30))
       }
       appUpdater?.cancel()
-      if !auxiliary.settings.keepServiceRunningAfterExit,
-        let client = model.client as? BridgeServiceClient
-      {
-        _ = try? await client.shutdownService()
+      model.stopSchedulingForApplicationExit()
+      if !auxiliary.settings.keepServiceRunningAfterExit {
+        do { try await LinuxServiceControl.shutdownAndWait() } catch {
+          FileHandle.standardError.write(Data("后台服务尚未结束：\(error)\n".utf8))
+        }
       }
       await model.shutdown()
     }
@@ -119,8 +121,8 @@
           browserCanGoBack: browser.canGoBack, browserCanGoForward: browser.canGoForward,
           feedback: feedback, appUpdate: CodexBridgeDesktopApplication.appUpdateState)
         state = nextState
-        LinuxDesktopHost.setBrowserEnabled(
-          display.browserEnabled && nextPage == .workbench && feedback?.kind != .alert)
+        LinuxDesktopHost.setBrowserPresentationVisible(
+          nextPage == .workbench && feedback?.kind != .alert)
         let patch = patchBuilder.makePatch(state: nextState, nextRevision: revision)
         if !fullState { LinuxDesktopHost.send(patch) }
       }

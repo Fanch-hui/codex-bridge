@@ -10,6 +10,7 @@ Secrets/
 *.runtime-key
 /.mcpregistry*
 /Integrations/MCPB/node_modules/
+/Integrations/EmbeddedDSH/node_modules/
 
 # AI Agent Memory
 AGENTS.md

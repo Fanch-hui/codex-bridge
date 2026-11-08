@@ -12,17 +12,8 @@
         providers: agentProviders,
         installations: agentInstallations,
         approvals: approvals,
-        directApprovals: directApprovals,
-        selectedProjectID: selectedProjectID
+        directApprovals: directApprovals
       )
-    }
-
-    var visibleTasks: [MCPServiceTaskSnapshot] {
-      workbenchDisplaySnapshot.visibleTasks
-    }
-
-    var visibleSessions: [WorkbenchSessionItem] {
-      workbenchDisplaySnapshot.visibleSessions
     }
 
     var allSessions: [WorkbenchSessionItem] {
@@ -34,7 +25,7 @@
       let task = selectedTaskID.flatMap { cached.taskByID[$0] }
       let selectedSession = task.flatMap { cached.sessionByTaskID[$0.taskID] }
       let selectedSessionIndex = selectedSession.flatMap { selected in
-        cached.visibleSessions.firstIndex { $0.id == selected.id }
+        cached.allSessions.firstIndex { $0.id == selected.id }
       }
       let sessionStatus: (WorkbenchSessionItem) -> String = { session in
         let task = session.latestTask
@@ -47,7 +38,7 @@
           )
         )
       }
-      let workbenchRows = cached.visibleSessions.map {
+      let workbenchRows = cached.allSessions.map {
         Self.sessionRowText($0, status: sessionStatus($0))
       }
       let selectedIndex = selectedSessionIndex
@@ -72,7 +63,7 @@
         && selectedApproval != nil
         && !approvalResolving
         && !approvalRefreshInProgress
-      let taskItems = cached.visibleSessions.map { session in
+      let taskItems = cached.allSessions.map { session in
         let latest = session.latestTask
         return Self.sessionItem(
           session,
@@ -140,6 +131,7 @@
             projects.firstIndex(where: { $0.projectID == selectedID })
           },
           selectedProjectID: selectedProjectID,
+          defaultProjectID: defaultProjectID,
           permissionRows: ["只读", "可写"],
           selectedPermissionIndex: BridgeDesktopWorkbenchPermissionMode.allCases.firstIndex {
             $0.rawValue == workbenchPermissionMode
@@ -193,14 +185,17 @@
           browserEnabled: isChatBrowserEnabled,
           supportsImmediateSteer: task?.installationID.flatMap { installationID in
             cached.installationByID[installationID]
-          }?.effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true,
+          }?.effectiveCapabilities.contains(
+            TaskInspectorPresentation.interruptAndContinueCapability) == true,
           canLoadEarlierConversation: conversation?.canLoadEarlier == true,
           defaultModel: modelPreferences?.executionModel ?? models.first?.displayName
             ?? models.first?.modelID,
           availableModelCount: models.count,
           modelError: modelError,
           commandReceipt: workbenchCommandReceipt,
-          workspace: workspaceModel.state
+          embeddedDSHReceipts: embeddedDSHReceipts,
+          workspace: workspaceModel.state,
+          paneTasks: paneTaskDetails(cached)
         )
       )
     }

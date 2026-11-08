@@ -8,6 +8,8 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
   public let detail: String?
   public let gitState: String?
   public let selected: Bool
+  /// Bridge-managed default workspace; it cannot be removed.
+  public let isDefault: Bool
 
   public init(
     projectID: String,
@@ -15,7 +17,8 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
     path: String? = nil,
     detail: String? = nil,
     gitState: String? = nil,
-    selected: Bool = false
+    selected: Bool = false,
+    isDefault: Bool = false
   ) {
     self.projectID = projectID
     self.name = name
@@ -23,6 +26,7 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
     self.detail = detail
     self.gitState = gitState
     self.selected = selected
+    self.isDefault = isDefault
   }
 }
 

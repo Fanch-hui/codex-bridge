@@ -18,7 +18,13 @@ public struct AgentTaskBrief: Sendable {
   public let runtimeBinding: AgentRuntimeBinding?
   public var networkAllowed: Bool { permissionMode == .full }
   public let attachments: [AgentImageAttachment]
+  public let attachmentContents: [AgentImageContent]?
   public let selectedSkills: [AgentSelectedSkill]
+  public let isolatedWorkspace: ServiceExecutionWorkspace?
+  public let nativeSubagentsAllowed: Bool
+  /// Present when the task shares the project directory with other writers and the provider
+  /// holds the project write lease only while a writing tool runs.
+  public let toolWriteGate: AgentToolWriteGate?
   // Retained for source compatibility; external providers own their tool approval policy.
   public let accessMode: ServiceAccessMode
 
@@ -42,7 +48,11 @@ public struct AgentTaskBrief: Sendable {
     networkAllowed _: Bool = false,
     accessMode: ServiceAccessMode = .requestApproval,
     attachments: [AgentImageAttachment] = [],
-    selectedSkills: [AgentSelectedSkill] = []
+    attachmentContents: [AgentImageContent]? = nil,
+    selectedSkills: [AgentSelectedSkill] = [],
+    isolatedWorkspace: ServiceExecutionWorkspace? = nil,
+    nativeSubagentsAllowed: Bool = true,
+    toolWriteGate: AgentToolWriteGate? = nil
   ) {
     self.taskID = taskID
     self.providerID = providerID
@@ -58,7 +68,11 @@ public struct AgentTaskBrief: Sendable {
     self.runtimeBinding = runtimeBinding
     self.accessMode = accessMode
     self.attachments = attachments
+    self.attachmentContents = attachmentContents
     self.selectedSkills = selectedSkills
+    self.isolatedWorkspace = isolatedWorkspace
+    self.nativeSubagentsAllowed = nativeSubagentsAllowed
+    self.toolWriteGate = toolWriteGate
   }
 }
 
@@ -164,10 +178,16 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
     // The frozen canonical path from registration time is the only executable
     // identity this runner will launch.
     let installation = try record.agentInstallation()
+    if let workspace = brief.isolatedWorkspace {
+      guard brief.permissionMode == .full, provider is any AgentWorkspaceIsolationProviding else {
+        throw AgentRuntimeError.invalidRequest("workspaceIsolation.providerUnavailable")
+      }
+      try workspace.validate(projectRoot: brief.projectRoot)
+    }
     let request = try AgentExecutionRequest(
       taskID: brief.taskID,
       projectID: brief.projectID,
-      projectRoot: brief.projectRoot,
+      projectRoot: brief.isolatedWorkspace?.root.canonicalPath ?? brief.projectRoot,
       prompt: brief.prompt,
       requestedSessionID: brief.requestedSessionID,
       model: brief.model,
@@ -175,13 +195,20 @@ public struct ServiceAgentTaskRunner: AgentTaskRunning {
       profileID: brief.profileID ?? record.securityProfileID,
       runtimeBinding: brief.runtimeBinding,
       mutationIntent: brief.permissionMode == .full ? .workspaceWrite : .readOnly,
-      workspaceStrategy: brief.permissionMode == .full
-        ? .exclusiveProject : .sharedProject,
+      workspaceStrategy: brief.isolatedWorkspace != nil
+        ? .isolatedGitWorktree
+        : (brief.permissionMode == .full ? .exclusiveProject : .sharedProject),
+      workspaceIsolation: try brief.isolatedWorkspace.map {
+        try AgentWorkspaceIsolation(runtimeDirectory: $0.runtimeRoot.canonicalPath)
+      },
       networkAccessRequested: brief.networkAllowed,
       toolApprovalPolicy: brief.toolApprovalPolicy,
+      nativeSubagentsAllowed: brief.nativeSubagentsAllowed,
       requiredCapabilities: requiredCapabilities,
       attachments: brief.attachments,
-      selectedSkills: brief.selectedSkills
+      attachmentContents: brief.attachmentContents,
+      selectedSkills: brief.selectedSkills,
+      toolWriteGate: brief.toolWriteGate
     )
     let handle = try await provider.start(request, installation: installation)
     guard handle.taskID == brief.taskID,

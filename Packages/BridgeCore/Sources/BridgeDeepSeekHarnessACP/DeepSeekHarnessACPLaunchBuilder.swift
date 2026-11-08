@@ -51,6 +51,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
     catalogModelIDs: [String]? = nil,
     reasoningEffort: String? = nil,
     mutationIntent: AgentMutationIntent = .readOnly,
+    nativeSubagentsAllowed: Bool = true,
     networkAllowed _: Bool,
     sourceEnvironment: [String: String] = ProcessInfo.processInfo.environment
   ) throws -> DeepSeekHarnessACPLaunchConfiguration {
@@ -98,6 +99,7 @@ public struct DeepSeekHarnessACPLaunchBuilder: Sendable {
         catalogModelIDs: catalogModelIDs,
         reasoningEffort: reasoningEffort,
         mutationIntent: mutationIntent,
+        nativeSubagentsAllowed: nativeSubagentsAllowed,
         sourceEnvironment: sourceEnvironment,
         usesMessagesProvider: layout.usesMessagesProvider
       )

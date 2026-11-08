@@ -4,23 +4,24 @@ export { validateConfiguration } from './configuration.mjs';
 import { createPolicy } from './policy.mjs';
 import { MessageProjection, stopChildren } from './events.mjs';
 import { catalog, modelPolicy, validateSelection } from './models.mjs';
-import { loadSDK, authentication, isSDKAuthenticationError, validateSDKQuery, sdkPermissionMode } from './sdk.mjs';
+import { loadSDK, authentication, isSDKAuthenticationError, validateSDKQuery, sdkPermissionMode, sdkLifecycle } from './sdk.mjs';
 import { SDKProcessOwner } from './process.mjs';
 import { queryAccountScope, accountScopeFromQuery } from './account-scope.mjs';
 import { stageSelectedSkills } from './skill-resources.mjs';
 import { usageStatistics, contextView, usageInfoView } from './usage.mjs';
 import { requireValue, absolute, identifier, deadline, HostError, samePath } from './validation.mjs';
+import { WriteAdmission, hookTimeoutSeconds } from './write-admission.mjs';
 
 export class QoderSession {
-  constructor(emit, ask, loader = loadSDK) {
-    this.emit = emit; this.ask = ask; this.loader = loader; this.phase = 'new';
+  constructor(emit, ask, loader = loadSDK, lifecycle = sdkLifecycle) {
+    this.emit = emit; this.ask = ask; this.loader = loader; this.lifecycle = lifecycle; this.phase = 'new';
     this.input = new MessageInput(); this.queue = new TurnQueue();
     this.projection = new MessageProjection(value => this.publish(value));
     this.interactions = new AbortController(); this.closing = null; this.resultWaiter = null;
     this.sequence = 0; this.query = null; this.warm = null; this.nativeCapabilities = new Set();
     this.nativeTools = new Set(); this.nativeSkills = []; this.mcpServers = [];
     this.nativeInitialization = new Promise(resolve => { this.resolveNativeInitialization = resolve; });
-    this.processes = new SDKProcessOwner();
+    this.processes = new SDKProcessOwner(); this.admission = null;
   }
   publish(value) {
     if (this.phase === 'closed') return;
@@ -30,16 +31,23 @@ export class QoderSession {
   }
   async open(raw) {
     requireValue(this.phase === 'new', 'session_already_open'); this.phase = 'opening';
-    this.config = validateConfiguration(raw);
+    this.openingWork = new Promise(resolve => { this.finishOpeningWork = resolve; });
     try {
+      this.config = validateConfiguration(raw);
       const loaded = await this.loader(this.config);
-      requireValue(this.phase === 'opening', 'session_closed'); this.sdk = loaded.sdk;
+      requireValue(this.phase === 'opening', 'session_closed');
+      const lease = await this.lifecycle.acquire(loaded.sdk);
+      if (this.phase !== 'opening') { await lease.release(); throw new HostError('session_closed'); }
+      this.sdkLease = lease; this.sdk = loaded.sdk;
       this.skillStage = await stageSelectedSkills(this.config.selectedSkills);
+      requireValue(this.phase === 'opening', 'session_closed');
       if (this.config.resume) {
         this.accountScopeDigest = await queryAccountScope(this.sdk, this.config);
+        requireValue(this.phase === 'opening', 'session_closed');
         requireValue(!this.config.expectedAccountScope || this.config.expectedAccountScope === this.accountScopeDigest,
           'session_account_mismatch');
         const previous = await deadline(this.sdk.getSessionInfo(this.config.sessionID, { dir: this.config.cwd }));
+        requireValue(this.phase === 'opening', 'session_closed');
         requireValue(previous?.sessionId === this.config.sessionID && previous.cwd
           && samePath(absolute(previous.cwd), this.config.cwd), 'session_binding_mismatch');
       }
@@ -48,10 +56,13 @@ export class QoderSession {
       (value, signal) => this.ask('qoder/question', value,
         AbortSignal.any([signal ?? new AbortController().signal, this.interactions.signal])),
       { additionalReadRoots: this.skillStage ? [this.skillStage.root] : [] });
+      requireValue(this.phase === 'opening', 'session_closed');
+      if (this.config.writeGate) this.admission = new WriteAdmission((...request) => this.writeRequest(...request));
       const options = this.options();
-      const warm = await deadline(this.sdk.startup({ options, initializeTimeoutMs: 30000 }), 35000);
-      if (this.phase !== 'opening') { await warm.close(); throw new HostError('session_closed'); }
-      this.warm = warm;
+      this.startup = Promise.resolve().then(() => this.sdk.startup({ options, initializeTimeoutMs: 30000 }))
+        .then(warm => { this.warm = warm; return warm; });
+      await deadline(this.startup, 35000);
+      requireValue(this.phase === 'opening', 'session_closed');
       this.query = this.warm.query(this.input); validateSDKQuery(this.query);
       this.pump = this.consume();
       const initialization = await deadline(this.query.initializationResult());
@@ -82,10 +93,20 @@ export class QoderSession {
         queryMethods: ['interrupt', 'stopTask', 'getContextUsage', 'getUsageInfo', 'setPlanMode', 'getPlanMode', 'setMcpServers']
           .filter(name => typeof this.query[name] === 'function') };
     } catch (error) {
-      await this.close();
+      this.finishOpeningWork?.(); this.finishOpeningWork = null;
+      try { await this.close(); }
+      catch (cleanup) { throw new HostError('process_exit_unconfirmed', new AggregateError([error, cleanup])); }
       if (this.authenticationExpired || isSDKAuthenticationError(error)) throw new HostError('authentication_required');
       throw error;
+    } finally {
+      this.finishOpeningWork?.(); this.finishOpeningWork = null;
     }
+  }
+  // Acquiring follows the interaction lifecycle; releasing must still go out after an interrupt.
+  writeRequest(phase, toolUseID, signal) {
+    const value = { phase, toolUseID };
+    return this.ask('qoder/workspaceWrite', value, phase === 'acquire'
+      ? AbortSignal.any([signal ?? new AbortController().signal, this.interactions.signal]) : undefined);
   }
   options() {
     const config = this.config;
@@ -101,17 +122,29 @@ export class QoderSession {
       settings: {}, tools: this.policy.tools, skills: config.skills, mcpServers: config.mcpServers,
       strictMcpConfig: true, permissionMode: sdkPermissionMode(config.permissionMode), maxTurns: 100,
       ...(config.proxy ? { proxy: config.proxy } : {}),
-      hooks: { PreToolUse: [{ hooks: [async (input, id, options) => {
-        if (input.tool_input?.run_in_background && !this.nativeCapabilities.has('background_tasks_v1')) {
-          return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny',
-            permissionDecisionReason: 'Background task control is unavailable.' } };
-        }
-        return this.policy.preTool(input, id, options);
-      }] }], PostToolUse: [{ hooks: [async (_input, id) => { this.policy.finishTool(id); return {}; }] }],
-      PostToolUseFailure: [{ hooks: [async (_input, id) => { this.policy.finishTool(id); return {}; }] }] },
+      hooks: { PreToolUse: [{ ...(this.admission ? { timeout: hookTimeoutSeconds } : {}),
+        hooks: [(input, id, options) => this.preTool(input, id, options)] }],
+      PostToolUse: [{ hooks: [async (input, id) => { await this.postTool(input, id); return {}; }] }],
+      PostToolUseFailure: [{ hooks: [async (input, id) => { await this.postTool(input, id); return {}; }] }] },
       canUseTool: (tool, input, options) => this.policy.decide(tool, input, options).catch(() => ({
-        behavior: 'deny', message: 'The operation is outside the approved task policy.' })),
+        behavior: 'deny', message: 'The operation is outside the approved task policy.' }))
+        .then(decision => this.admission?.approved(tool, options.toolUseID, decision, options.signal) ?? decision),
     };
+  }
+  async preTool(input, id, options) {
+    const deny = reason => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny',
+      permissionDecisionReason: reason } });
+    if (input.tool_input?.run_in_background) {
+      if (!this.nativeCapabilities.has('background_tasks_v1')) return deny('Background task control is unavailable.');
+      // A detached command would keep writing after its tool call, and so its lease, has ended.
+      if (this.admission && input.tool_name !== 'Agent') return deny('Background execution is unavailable while the project is shared.');
+    }
+    const result = await this.policy.preTool(input, id, options);
+    return this.admission?.preTool(input.tool_name, input.tool_use_id ?? id, result, options?.signal) ?? result;
+  }
+  async postTool(input, id) {
+    this.policy.finishTool(id);
+    await this.admission?.release(input?.tool_use_id ?? id);
   }
   async dispatchInput(value) {
     requireValue(this.phase === 'ready' || this.phase === 'running', 'session_not_accepting_input');
@@ -173,6 +206,7 @@ export class QoderSession {
     const statistics = usageStatistics(value, context);
     if (statistics) this.publish({ kind: 'usage_statistics', statistics });
     this.queue.finish();
+    await this.admission?.releaseAll(); // No tool is in flight between turns.
     if (value.subtype !== 'success' || value.is_error) { await this.fail('qoder_incomplete_result'); return; }
     requireValue(this.projection.mainTools.length === 0, 'unfinished_tools');
     const summary = typeof value.result === 'string' ? value.result : '';
@@ -212,6 +246,7 @@ export class QoderSession {
       if (continuation) {
         requireValue(this.projection.unsettledChildren.length === 0 && this.projection.tools.size === 0,
           'execution_not_idle');
+        await this.admission?.releaseAll();
         this.queue.finish(); this.interactions = new AbortController(); this.phase = 'ready';
         return this.dispatchInput(continuation);
       }
@@ -237,7 +272,9 @@ export class QoderSession {
   }
   async fail(code) {
     if (this.phase === 'closed') return;
-    this.phase = 'closing'; await this.closeResources();
+    this.phase = 'closing';
+    try { await this.closeResources(); }
+    catch (error) { code = error instanceof HostError ? error.code : 'cleanup_failed'; }
     this.publish({ kind: 'failed', code }); this.phase = 'closed';
   }
   cleanupDiagnostic(stage, error) {
@@ -248,6 +285,9 @@ export class QoderSession {
   async closeResources() {
     if (!this.closing) this.closing = (async () => {
       this.interactions.abort(); this.queue.cancelPending(); this.input.close();
+      // Opening can include an account preflight as well as SDK prewarming.
+      await this.openingWork;
+      try { await this.startup; } catch {}
       for (const [stage, close] of [
         ['background', () => stopChildren(this.query, this.projection, this.nativeCapabilities)],
         ['query', () => this.query?.close()], ['startup', () => this.warm?.close()],
@@ -255,11 +295,20 @@ export class QoderSession {
         try { await close(); } catch (error) { this.cleanupDiagnostic(stage, error); }
       }
       // A terminal event is safe only after every owned process has exited.
-      await this.processes.close();
+      const failures = [];
+      for (const close of [() => this.processes.close(), () => this.sdkLease?.release(true)]) {
+        try { await close(); } catch (error) { failures.push(error); }
+      }
+      // Leases stay held while an owned process may still be writing.
+      if (failures.length === 0) {
+        try { await this.admission?.releaseAll(); } catch (error) { failures.push(error); }
+      }
       this.projection.cancelTools(); this.policy?.close();
       try { await this.skillStage?.close(); }
       catch (error) { this.cleanupDiagnostic('skills', error); }
       this.skillStage = null;
+      if (failures.length === 1) throw failures[0];
+      if (failures.length > 1) throw new HostError('process_exit_unconfirmed', new AggregateError(failures));
     })();
     return this.closing;
   }

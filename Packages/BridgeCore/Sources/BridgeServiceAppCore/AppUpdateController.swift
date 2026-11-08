@@ -1,5 +1,19 @@
 import Foundation
 
+public struct AppUpdateBlocker: Codable, Equatable, Sendable {
+  public let kind: String
+  public let id: String
+  public let projectID: String?
+  public let label: String
+
+  public init(kind: String, id: String, projectID: String?, label: String) {
+    self.kind = kind
+    self.id = id
+    self.projectID = projectID
+    self.label = label
+  }
+}
+
 public struct AppUpdateStatus: Equatable, Sendable {
   public var phase = "idle"
   public let currentVersion: String
@@ -7,6 +21,7 @@ public struct AppUpdateStatus: Equatable, Sendable {
   public var notes: String?
   public var progress: Double?
   public var message: String?
+  public var blockers: [AppUpdateBlocker] = []
   public var isDeferred = false
 
   public init(currentVersion: String) {
@@ -17,10 +32,14 @@ public struct AppUpdateStatus: Equatable, Sendable {
 public struct AppUpdateInstallationReadiness: Sendable {
   public let canInstall: Bool
   public let waitingReason: String?
+  public let blockers: [AppUpdateBlocker]
 
-  public init(canInstall: Bool, waitingReason: String? = nil) {
+  public init(
+    canInstall: Bool, waitingReason: String? = nil, blockers: [AppUpdateBlocker] = []
+  ) {
     self.canInstall = canInstall
     self.waitingReason = waitingReason
+    self.blockers = blockers
   }
 }
 
@@ -81,6 +100,7 @@ public final class AppUpdateController {
     operationID = id
     state.phase = "checking"
     state.message = nil
+    state.blockers = []
     state.isDeferred = false
     operation = Task { [weak self] in
       guard let self else { return }
@@ -114,6 +134,7 @@ public final class AppUpdateController {
     state.phase = "downloading"
     state.progress = 0
     state.message = nil
+    state.blockers = []
     state.isDeferred = false
     operation = Task { [weak self] in
       guard let self else { return }
@@ -144,10 +165,14 @@ public final class AppUpdateController {
         let readiness = try await acquireInstallation()
         try Task.checkCancellation()
         if readiness.canInstall { break }
-        state.message = readiness.waitingReason ?? "正在等待后台任务、命令和工作区操作完成。"
+        var waiting = state
+        waiting.message = readiness.waitingReason ?? "正在等待后台任务、命令和工作区操作完成。"
+        waiting.blockers = readiness.blockers
+        state = waiting
         try await Task.sleep(for: .seconds(2))
       }
       state.message = nil
+      state.blockers = []
       failurePhase = "installing"
       state.phase = "installing"
       try await installPackage()
@@ -164,6 +189,7 @@ public final class AppUpdateController {
         restoreAvailableState()
       } else {
         state.progress = nil
+        state.blockers = []
         state.message = AppUpdateFailurePresentation.message(error, phase: failurePhase)
         state.phase = "failed"
       }
@@ -177,10 +203,13 @@ public final class AppUpdateController {
   }
 
   private func restoreAvailableState() {
-    state.progress = nil
-    state.message = nil
-    state.isDeferred = false
-    state.phase = release == nil ? "idle" : "available"
+    var restored = state
+    restored.progress = nil
+    restored.message = nil
+    restored.blockers = []
+    restored.isDeferred = false
+    restored.phase = release == nil ? "idle" : "available"
+    state = restored
   }
 
   public func deferUpdate() {

@@ -39,7 +39,7 @@
         var preferred = selected && selected.defaultReasoningEffort;
         current = options.some(function (choice) { return choice.id === preferred; }) ? preferred : options[0].id;
       }
-      D.selectOptions(view.effort, S.choices(current, options), false); view.effort.value = current || "";
+      D.selectOptions(view.effort, V.localizeEfforts(S.choices(current, options)), false); view.effort.value = current || "";
       view.effortWrapper.hidden = options.length === 0 || selected && selected.reasoningCapabilitiesAvailable === false;
       view.effort.disabled = !!pending || running() || choices.length === 0
         || selected && selected.reasoningCapabilitiesAvailable === false;
@@ -70,7 +70,14 @@
       var allowed = canAttachImages(), signature = JSON.stringify([draftKey, allowed, !!attachmentDraft.attachmentPaths.length]);
       if (signature !== attachmentSignature) {
         attachmentSignature = signature;
-        attachments = V.attachments(view.attachmentSlot, attachmentDraft, allowed, function () { saveInput(); validate(); });
+        var projectID = (context.page || {}).selectedProjectID, activeDraft = draftKey;
+        attachments = V.attachments(view.attachmentSlot, attachmentDraft, allowed, function () { saveInput(); validate(); }, {
+          projectID: projectID,
+          isCurrent: function () {
+            return draftKey === activeDraft && (context.page || {}).selectedProjectID === projectID
+              && !pending && !running() && canAttachImages();
+          }
+        });
       }
       if (attachments) { attachments.update(); attachments.setDisabled(!!pending || running()); }
     }
@@ -185,7 +192,7 @@
       view.input.value = input; saveInput(); persist(); validate(); view.input.focus();
     });
     view.input.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !composing) { event.preventDefault(); submit(); }
+      if (event.key === "Enter" && !event.shiftKey && !composing && !global.CodexBridgeDesktopPageSupport.isIMEKeyEvent(event)) { event.preventDefault(); submit(); }
     });
     function update(page, settings, emit) {
       var task = page && page.selectedTask || {};

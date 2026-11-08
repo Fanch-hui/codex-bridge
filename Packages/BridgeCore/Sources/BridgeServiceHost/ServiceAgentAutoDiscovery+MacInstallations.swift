@@ -11,6 +11,8 @@ extension ServiceAgentAutoDiscovery {
       guard let home = homeDirectory(environment: environment) else { return [] }
 
       var directories = [
+        "/opt/homebrew/opt/opencode-v2/bin",
+        "/usr/local/opt/opencode-v2/bin",
         "/opt/homebrew/bin",
         "/usr/local/bin",
         pathJoin(home, "bin"),
@@ -34,7 +36,6 @@ extension ServiceAgentAutoDiscovery {
 
       for applications in ["/Applications", pathJoin(home, "Applications")] {
         for bundle in ["OpenCode.app", "opencode.app"] {
-          directories.append(pathJoin(applications, bundle, "Contents", "MacOS"))
           directories.append(pathJoin(applications, bundle, "Contents", "Resources"))
         }
       }

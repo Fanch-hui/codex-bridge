@@ -3,7 +3,7 @@
   var S = global.CodexBridgeDesktopPageSupport;
   function create() {
     var root = S.node("section", "settings-subsection direct-settings-card");
-    root.appendChild(S.node("p", "hint", "所有项目共用。黑名单优先于白名单，再检查安全模式规则；命令按参数前缀匹配。项目目录边界和本机审批仍生效。"));
+    root.appendChild(S.node("h3", null, "Direct 命令规则"));
     var context = { value: null, emit: null };
     var pending = Object.create(null);
     var mode = S.selectField("命令模式", "safe", [
@@ -11,10 +11,16 @@
     ], function (value) { save({ commandMode: value }); }, "");
     root.appendChild(mode.wrapper);
     var allowed = list("白名单", "allowedCommands", "例如：git status"), denied = list("黑名单", "deniedCommands", "例如：git push");
-    root.appendChild(allowed.root); root.appendChild(denied.root);
-    root.appendChild(S.node("p", "hint", "带空格的参数使用引号，不支持管道和重定向。"));
+    var rules = S.node("details", "direct-rule-disclosure");
+    rules.appendChild(S.node("summary", null, "允许与禁止的命令"));
+    rules.appendChild(S.node("p", "hint", "命令按参数前缀匹配，黑名单优先于白名单。"));
+    rules.appendChild(allowed.root); rules.appendChild(denied.root);
+    rules.appendChild(S.node("p", "hint", "带空格的参数使用引号，不支持管道和重定向。"));
+    root.appendChild(rules);
     var checker = commandChecker();
-    root.appendChild(checker.root);
+    var checking = S.node("details", "direct-rule-disclosure");
+    checking.appendChild(S.node("summary", null, "校验命令"));
+    checking.appendChild(checker.root); root.appendChild(checking);
     function save(change) {
       if (!context.value || !context.value.canSave) return;
       Object.keys(change).forEach(function (key) { pending[key] = change[key]; });
@@ -90,7 +96,6 @@
     }
     function commandChecker() {
       var section = S.node("section", "direct-rule-section direct-command-checker"), previousProjects = null;
-      section.appendChild(S.node("h4", null, "命令校验"));
       var help = S.node("p", "hint", "选择项目并输入命令，查看当前规则是否允许。校验不会执行命令；实际运行仍检查审批、目录和程序状态。");
       help.id = "direct-command-check-help";
       section.appendChild(help);

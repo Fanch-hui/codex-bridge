@@ -21,18 +21,33 @@ extension DeepSeekHarnessACPProvider {
         let raw = DeepSeekHarnessACPModelRoutes.decode(requested)?.model ?? requested
         guard catalog.contains(raw) else { throw AgentRuntimeError.modelUnavailable(requested) }
       }
-      let launch = try configuration.launchBuilder.make(
-        installation: installation,
-        projectRoot: request.projectRoot,
-        runDirectory: runDirectory,
-        persistentStateDirectory: persistentStateDirectory,
-        modelID: request.model,
-        catalogModelIDs: catalog,
-        reasoningEffort: request.effort,
-        mutationIntent: request.mutationIntent,
-        networkAllowed: request.networkAccessRequested,
-        sourceEnvironment: sourceEnvironment
-      )
+      func makeLaunch(nativeSubagentsAllowed: Bool) throws
+        -> DeepSeekHarnessACPLaunchConfiguration
+      {
+        try configuration.launchBuilder.make(
+          installation: installation,
+          projectRoot: request.projectRoot,
+          runDirectory: runDirectory,
+          persistentStateDirectory: persistentStateDirectory,
+          modelID: request.model,
+          catalogModelIDs: catalog,
+          reasoningEffort: request.effort,
+          mutationIntent: request.mutationIntent,
+          nativeSubagentsAllowed: nativeSubagentsAllowed,
+          networkAllowed: request.networkAccessRequested,
+          sourceEnvironment: sourceEnvironment
+        )
+      }
+      let prepared = try makeLaunch(nativeSubagentsAllowed: request.nativeSubagentsAllowed)
+      let launch: DeepSeekHarnessACPLaunchConfiguration
+      if !request.nativeSubagentsAllowed,
+        DeepSeekHarnessACPRuntimeLayout.isModernEntry(installation),
+        try await DeepSeekHarnessACPSubagentPolicy.verify(prepared) == false
+      {
+        launch = try makeLaunch(nativeSubagentsAllowed: true)
+      } else {
+        launch = prepared
+      }
       let connected = makeClient(transport: try configuration.transportFactory(launch))
       client = connected
       let initialization = try await connected.initialize()
@@ -87,7 +102,7 @@ extension DeepSeekHarnessACPProvider {
         client: connected,
         normalizer: normalizer,
         sessionID: session.id,
-        prompt: request.prompt,
+        prompt: request.executionPrompt,
         images: imageInputs,
         initialClientEventSequence: initialSequence,
         inactivityTimeout: configuration.inactivityTimeout,

@@ -18,8 +18,10 @@
       actions.__execution.setAttribute("role", "group");
       actions.__execution.setAttribute("aria-label", "执行控制");
       actions.__more = S.node("details", "workbench-more");
-      var trigger = S.node("summary", "button small workbench-more-toggle", "更多");
-      trigger.setAttribute("aria-label", "会话更多操作");
+      actions.__more.dataset.popup = "";
+      var trigger = S.node("summary", "button small workbench-more-toggle");
+      trigger.appendChild(S.icon("ellipsis"));
+      trigger.setAttribute("aria-label", "会话更多操作"); trigger.title = "更多操作";
       actions.__more.appendChild(trigger);
       actions.__menu = S.node("div", "workbench-more-actions");
       actions.__more.appendChild(actions.__menu);
@@ -30,8 +32,15 @@
       actions.appendChild(actions.__execution); actions.appendChild(actions.__more);
     }
     var buttons = actions.__buttons, specs = [];
-    if (detail.canInterrupt) specs.push(["interruptTask", "中断", "small danger", true]);
-    if (detail.canStop && !(detail.queuePosition && options.queueControl)) specs.push(["stopTask", "停止", "small danger", true]);
+    if (options.composerControls) {
+      // The composer's stop button interrupts; ending the whole task stays in the menu.
+      if (detail.canStop && detail.canInterrupt && !(detail.queuePosition && options.queueControl)) {
+        specs.push(["stopTask", "结束任务", "small danger"]);
+      }
+    } else {
+      if (detail.canInterrupt) specs.push(["interruptTask", "中断", "small danger", true]);
+      if (detail.canStop && !(detail.queuePosition && options.queueControl)) specs.push(["stopTask", "停止", "small danger", true]);
+    }
     specs.push(["refreshConversation", "刷新当前对话", "small"]);
     if (detail.resultSummary) specs.push(["copyResult", "复制结果", "small"]);
     if (detail.canOpenNativeSession) specs.push(["openDeepSeekHarnessSession", "打开对应会话", "small"]);

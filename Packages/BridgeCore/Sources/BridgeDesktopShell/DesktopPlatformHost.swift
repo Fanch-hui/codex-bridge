@@ -116,6 +116,24 @@
       #endif
     }
 
+    static func chooseWorkspaceDirectory(completion: @escaping @Sendable (String?) -> Void) {
+      #if os(Windows)
+        WindowsDesktopUIHostActions.chooseWorkspaceDirectory(completion: completion)
+      #else
+        LinuxDesktopHost.chooseFileIncludingCancellation(
+          title: "打开工作文件夹", directory: true, completion: completion)
+      #endif
+    }
+
+    static func chooseSkillDirectory(completion: @escaping @Sendable (String?) -> Void) {
+      #if os(Windows)
+        WindowsDesktopUIHostActions.chooseWorkspaceDirectory(completion: completion)
+      #else
+        LinuxDesktopHost.chooseFileIncludingCancellation(
+          title: "导入技能", directory: true, completion: completion)
+      #endif
+    }
+
     static func chooseConfigFile(
       title: String = "选择 Agent 配置文件",
       completion: @escaping @Sendable (String) -> Void
@@ -124,6 +142,23 @@
         WindowsDesktopUIHostActions.chooseConfigFile(title: title, completion: completion)
       #else
         LinuxDesktopHost.chooseFile(title: title, directory: false, completion: completion)
+      #endif
+    }
+
+    static func chooseImageFile(completion: @escaping @Sendable (String?) -> Void) {
+      #if os(Windows)
+        WindowsDesktopUIHostActions.chooseImageFile(completion: completion)
+      #else
+        LinuxDesktopHost.chooseFileIncludingCancellation(
+          title: "选择项目图片", directory: false, completion: completion)
+      #endif
+    }
+
+    static func chooseSaveFile(completion: @escaping @Sendable (String?) -> Void) {
+      #if os(Windows)
+        WindowsDesktopUIHostActions.chooseSaveFile(completion: completion)
+      #else
+        LinuxDesktopHost.chooseSaveFile(completion: completion)
       #endif
     }
   }

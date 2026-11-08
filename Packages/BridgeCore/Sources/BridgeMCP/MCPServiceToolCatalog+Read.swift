@@ -38,9 +38,9 @@ extension MCPServiceToolCatalog {
     name: MCPServiceToolName.listProjects.rawValue,
     title: "List projects",
     description:
-      "List user-approved projects visible to the authenticated MCP client, including default_project_id "
-      + "for the current Workbench selection. Omit project_id when submitting work unless the user "
-      + "explicitly selected a different project; Bridge resolves the current default at submission time.",
+      "List user-approved projects visible to the authenticated MCP client. default_project_id is "
+      + "Bridge's default workspace, used when submit_task or list_agent_models omits project_id. "
+      + "To work in a specific project, pass its project_id explicitly.",
     inputSchema: objectSchema(
       properties: [
         "cursor": nullableStringSchema(maximum: 2_048),

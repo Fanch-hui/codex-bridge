@@ -25,7 +25,17 @@ extension ServiceAgentAutoDiscovery {
         && candidate.securityProfileID == existing.securityProfileID
         && preservesArtifactLayout(candidate, for: existing)
     }
-    guard matches.count == 1, let candidate = matches.first else { return nil }
+    let resolvedCandidate: ServiceAgentRegistrationRequest?
+    if existing.providerID == .openCode {
+      resolvedCandidate =
+        matches.first(where: { !isLegacyOpenCodeV1PackagePath($0.executablePath) })
+        ?? matches.first
+    } else if matches.count == 1 {
+      resolvedCandidate = matches.first
+    } else {
+      resolvedCandidate = nil
+    }
+    guard let candidate = resolvedCandidate else { return nil }
     return try ServiceAgentRegistrationRequest(
       providerID: existing.providerID,
       displayName: existing.displayName,

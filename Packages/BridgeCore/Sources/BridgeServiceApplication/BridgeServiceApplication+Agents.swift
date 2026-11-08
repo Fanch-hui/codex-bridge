@@ -14,7 +14,8 @@ extension BridgeServiceApplication {
       _ = try await readableProject(projectID)
     }
     guard let agentRegistry else { return MCPAgentList(agents: []) }
-    let persistedRecords = try await agentRegistry.installations()
+    // 摘要不使用运行时工件；启用项随后由 refreshForDisplay 按完整记录校验。
+    let persistedRecords = try await agentRegistry.installations(includeRuntimeArtifacts: false)
     var records: [ServiceAgentInstallationRecord] = []
     records.reserveCapacity(persistedRecords.count)
     for record in persistedRecords {
@@ -28,13 +29,26 @@ extension BridgeServiceApplication {
           try await agentRegistry.refreshForDisplay(installationID: record.id)
         )
       } catch {
-        records.append(try await agentRegistry.installation(id: record.id) ?? record)
+        records.append(
+          try await agentRegistry.installation(id: record.id, includeRuntimeArtifacts: false)
+            ?? record)
       }
     }
     try Self.checkDeadline(deadline)
     return MCPAgentList(
       agents: records.map { Self.agentSummary($0, formatter: iso8601) }
     )
+  }
+
+  /// One installation's summary from its stored record, without the artifact revalidation that
+  /// `serviceAgents` performs for display. Used on hot paths such as workbench subagent starts;
+  /// task submission validates the installation again.
+  public func serviceAgent(installationID: String) async throws -> MCPAgentSummary? {
+    guard let agentRegistry,
+      let record = try await agentRegistry.installation(
+        id: AgentInstallationID(rawValue: installationID), includeRuntimeArtifacts: false)
+    else { return nil }
+    return Self.agentSummary(record, formatter: iso8601)
   }
 
   private static func agentSummary(

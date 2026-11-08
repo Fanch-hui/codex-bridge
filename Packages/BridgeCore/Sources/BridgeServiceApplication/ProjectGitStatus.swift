@@ -19,15 +19,16 @@ enum ProjectGitStatus {
         ],
         workingDirectory: project.root.canonicalPath,
         timeout: min(remaining, .seconds(3)),
-        environment: ["LANG": "C", "LC_ALL": "C", "GIT_TERMINAL_PROMPT": "0"]
+        environment: ["LANG": "C", "LC_ALL": "C", "GIT_TERMINAL_PROMPT": "0"],
+        separateStandardError: true
       )
       try project.root.validateCurrentIdentity()
       if result.exitCode == 0 {
         if result.output.byteCount == 0 { return "clean" }
         return hasPorcelainRecords(result) ? "dirty" : "check_failed"
       }
-      let output = result.output.head
-      return output.contains("fatal: not a git repository") ? "not_git" : "check_failed"
+      return result.diagnosticHead.contains("fatal: not a git repository")
+        ? "not_git" : "check_failed"
     } catch {
       return "check_failed"
     }

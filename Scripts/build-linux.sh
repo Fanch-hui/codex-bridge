@@ -10,6 +10,15 @@ case "$(uname -m)" in
   *) echo "Unsupported Linux architecture." >&2; exit 1 ;;
 esac
 
+mkdir -p "$output"
+output="$(cd "$output" && pwd -P)"
+runtime_temporary="$(mktemp -d "$output/.embedded-dsh.XXXXXXXX")"
+trap 'rm -rf -- "$runtime_temporary"' EXIT
+embedded_runtime="$runtime_temporary/runtime"
+node "$root/Scripts/build-embedded-dsh-runtime.mjs" \
+  --platform linux --arch "$architecture" --output "$embedded_runtime"
+node "$root/Scripts/verify-embedded-dsh-runtime.mjs" "$embedded_runtime" linux "$architecture"
+
 pkg-config --exists webkit2gtk-4.1
 arguments=(--package-path "$root/Packages/BridgeCore" --build-system swiftbuild
   -c "$configuration" -Xswiftc -DSQLITE_DISABLE_SNAPSHOT
@@ -17,5 +26,5 @@ arguments=(--package-path "$root/Packages/BridgeCore" --build-system swiftbuild
 swift build "${arguments[@]}" --product codex-bridge-service
 swift build "${arguments[@]}" --product codex-bridge-linux-app
 binary_directory="$(swift build "${arguments[@]}" --show-bin-path | tail -1)"
-"$root/Scripts/stage-linux-portable.sh" "$binary_directory" "$output" "$architecture"
+"$root/Scripts/stage-linux-portable.sh" "$binary_directory" "$output" "$architecture" "$embedded_runtime"
 "$root/Scripts/build-linux-deb.sh" "$output/$architecture" "$output" "$architecture"

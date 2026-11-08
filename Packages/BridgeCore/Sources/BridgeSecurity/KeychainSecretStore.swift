@@ -66,15 +66,24 @@ public protocol SecretStore: Sendable {
 
     private let service: String
     private let allowsUserInteraction: Bool
+    private let maximumStoredBytes: Int
 
     public init(service: String = Self.defaultService, allowsUserInteraction: Bool = true) {
       precondition(!service.isEmpty && service.utf8.count <= 255)
       self.service = service
       self.allowsUserInteraction = allowsUserInteraction
+      self.maximumStoredBytes = Self.maximumSecretBytes
+    }
+
+    init(service: String, allowsUserInteraction: Bool, maximumStoredBytes: Int) {
+      precondition(!service.isEmpty && service.utf8.count <= 255 && maximumStoredBytes > 0)
+      self.service = service
+      self.allowsUserInteraction = allowsUserInteraction
+      self.maximumStoredBytes = maximumStoredBytes
     }
 
     public func store(_ secret: Data, for reference: SecretReference) throws {
-      guard !secret.isEmpty, secret.count <= Self.maximumSecretBytes else {
+      guard !secret.isEmpty, secret.count <= maximumStoredBytes else {
         throw SecretStoreError.invalidSecret
       }
 
@@ -101,7 +110,7 @@ public protocol SecretStore: Sendable {
       var result: CFTypeRef?
       let status = SecItemCopyMatching(query as CFDictionary, &result)
       guard status == errSecSuccess else { throw map(status) }
-      guard let data = result as? Data, !data.isEmpty, data.count <= Self.maximumSecretBytes else {
+      guard let data = result as? Data, !data.isEmpty, data.count <= maximumStoredBytes else {
         throw SecretStoreError.invalidStoredValue
       }
       return data

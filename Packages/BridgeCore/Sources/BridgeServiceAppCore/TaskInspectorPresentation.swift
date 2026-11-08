@@ -44,6 +44,29 @@ public enum TaskInspectorPresentation {
     return text
   }
 
+  /// Installation capability that lets an external Agent stop its current step and continue
+  /// the same conversation with the new message.
+  public static let interruptAndContinueCapability = "lifecycle.steer_interrupt_and_continue"
+
+  /// Whether a message sent while the task runs is inserted into the conversation now. Codex
+  /// inserts it into the running turn natively; other Agents need interrupt-and-continue, so a
+  /// queue-only Agent (for example Antigravity) does not support conversation insertion.
+  public static func supportsConversationInsertion(
+    _ task: MCPServiceTaskSnapshot,
+    providers: [IPCAgentProviderSummary],
+    installations: [IPCAgentInstallationSummary]
+  ) -> Bool {
+    if task.isCodexTask { return true }
+    guard
+      providers.contains(where: { $0.providerID == task.providerIdentifier && $0.supportsSteer }),
+      let installationID = task.installationID
+    else { return false }
+    return installations.contains {
+      $0.installationID == installationID
+        && $0.effectiveCapabilities.contains(interruptAndContinueCapability)
+    }
+  }
+
   public static func canInterrupt(_ task: MCPServiceTaskSnapshot?) -> Bool {
     task?.expectedControlID != nil
   }

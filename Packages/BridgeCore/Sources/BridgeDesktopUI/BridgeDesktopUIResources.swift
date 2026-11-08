@@ -2,6 +2,8 @@ import Foundation
 
 public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case indexHTML = "index.html"
+  case startupCSS = "startup.css"
+  case startupJS = "startup.js"
   case hostContextJS = "host-context.js"
   case componentThemeCSS = "component-theme.css"
   case componentControlsCSS = "component-controls.css"
@@ -13,6 +15,7 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case settingsCSS = "settings.css"
   case markdownCSS = "markdown.css"
   case workbenchCSS = "workbench.css"
+  case workbenchPanesCSS = "workbench-panes.css"
   case dshWorkbenchCSS = "dsh-workbench.css"
   case dshWorkspaceCSS = "dsh-workspace.css"
   case responsiveCSS = "responsive.css"
@@ -20,6 +23,11 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case windowsComponentsCSS = "windows-components.css"
   case detailPagesCSS = "detail-pages.css"
   case pagesCommonJS = "pages-common.js"
+  case pagesDSHUpstreamViewJS = "pages-dsh-upstream-view.js"
+  case dshConversationUpstreamJS = "dsh-conversation-upstream.js"
+  case dshConversationUpstreamCSS = "dsh-conversation-upstream.css"
+  case dshConversationLicenses = "dsh-conversation-licenses.txt"
+  case pagesOverviewJS = "pages-overview.js"
   case pagesDetailJS = "pages-detail.js"
   case pagesNativePermissionsJS = "pages-native-permissions.js"
   case pagesWorkbenchConversationJS = "pages-workbench-conversation.js"
@@ -36,10 +44,51 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
   case pagesNativeSessionDirectoryJS = "pages-native-session-directory.js"
   case pagesWorkbenchActionsJS = "pages-workbench-actions.js"
   case pagesWorkbenchHandoffJS = "pages-workbench-handoff.js"
+  case pagesWorkbenchNewTaskJS = "pages-workbench-new-task.js"
+  case pagesWorkbenchTabsJS = "pages-workbench-tabs.js"
+  case pagesWorkbenchComposerJS = "pages-workbench-composer.js"
+  case pagesWorkbenchSessionComposerJS = "pages-workbench-session-composer.js"
   case pagesWorkbenchApprovalsJS = "pages-workbench-approvals.js"
   case pagesWorkbenchDetailsJS = "pages-workbench-details.js"
+  case pagesWorkbenchPanesJS = "pages-workbench-panes.js"
   case pagesWorkbenchJS = "pages-workbench.js"
   case pagesDSHWorkbenchJS = "pages-dsh-workbench.js"
+  case pagesEmbeddedDSHTransportJS = "pages-embedded-dsh-transport.js"
+  case pagesEmbeddedDSHOperationsJS = "pages-embedded-dsh-operations.js"
+  case pagesEmbeddedDSHValidationJS = "pages-embedded-dsh-validation.js"
+  case pagesEmbeddedDSHRecoveryJS = "pages-embedded-dsh-recovery.js"
+  case pagesEmbeddedDSHQueueJS = "pages-embedded-dsh-queue.js"
+  case pagesEmbeddedDSHWorkspaceRequestsJS = "pages-embedded-dsh-workspace-requests.js"
+  case pagesEmbeddedDSHStopJS = "pages-embedded-dsh-stop.js"
+  case pagesEmbeddedDSHSessionDirectoryJS = "pages-embedded-dsh-session-directory.js"
+  case pagesEmbeddedDSHAttachmentsJS = "pages-embedded-dsh-attachments.js"
+  case pagesEmbeddedDSHMentionsJS = "pages-embedded-dsh-mentions.js"
+  case pagesEmbeddedDSHSearchJS = "pages-embedded-dsh-search.js"
+  case pagesEmbeddedDSHProjectionJS = "pages-embedded-dsh-projection.js"
+  case embeddedDSHConversationCSS = "embedded-dsh-conversation.css"
+  case pagesEmbeddedDSHMarkdownJS = "pages-embedded-dsh-markdown.js"
+  case pagesEmbeddedDSHHistoryJS = "pages-embedded-dsh-history.js"
+  case pagesEmbeddedDSHHistoryControllerJS = "pages-embedded-dsh-history-controller.js"
+  case pagesEmbeddedDSHChildHistoryJS = "pages-embedded-dsh-child-history.js"
+  case pagesEmbeddedDSHChildViewJS = "pages-embedded-dsh-child-view.js"
+  case pagesEmbeddedDSHContentJS = "pages-embedded-dsh-content.js"
+  case pagesEmbeddedDSHContextJS = "pages-embedded-dsh-context.js"
+  case pagesEmbeddedDSHMetricsJS = "pages-embedded-dsh-metrics.js"
+  case pagesEmbeddedDSHActionsJS = "pages-embedded-dsh-actions.js"
+  case pagesEmbeddedDSHSchedulesJS = "pages-embedded-dsh-schedules.js"
+  case pagesEmbeddedDSHScheduleCreateJS = "pages-embedded-dsh-schedule-create.js"
+  case pagesEmbeddedDSHConversationJS = "pages-embedded-dsh-conversation.js"
+  case pagesEmbeddedDSHBridgeJS = "pages-embedded-dsh-bridge.js"
+  case pagesEmbeddedDSHInteractionsJS = "pages-embedded-dsh-interactions.js"
+  case pagesEmbeddedDSHActionFeedbackJS = "pages-embedded-dsh-action-feedback.js"
+  case pagesEmbeddedDSHPluginInstallJS = "pages-embedded-dsh-plugin-install.js"
+  case pagesEmbeddedDSHZCodeJS = "pages-embedded-dsh-zcode.js"
+  case pagesEmbeddedDSHWorkBuddyJS = "pages-embedded-dsh-workbuddy.js"
+  case pagesEmbeddedDSHSettingsJS = "pages-embedded-dsh-settings.js"
+  case pagesEmbeddedDSHJS = "pages-embedded-dsh.js"
+  case pagesEmbeddedDSHModelsJS = "pages-embedded-dsh-models.js"
+  case pagesEmbeddedDSHPermissionsJS = "pages-embedded-dsh-permissions.js"
+  case pagesEmbeddedDSHWelcomeJS = "pages-embedded-dsh-welcome.js"
   case pagesDSHWorkbenchLayoutJS = "pages-dsh-workbench-layout.js"
   case pagesDSHWorkbenchSelectionJS = "pages-dsh-workbench-selection.js"
   case pagesDSHConversationJS = "pages-dsh-conversation.js"
@@ -86,7 +135,11 @@ public enum BridgeDesktopUIResource: String, CaseIterable, Sendable {
 
 public enum BridgeDesktopUIResources {
   public static func url(for resource: BridgeDesktopUIResource) -> URL? {
-    Bundle.module.url(forResource: resource.rawValue, withExtension: nil)
+    let path = resource.rawValue as NSString
+    let directory = path.deletingLastPathComponent
+    return Bundle.module.url(
+      forResource: path.lastPathComponent, withExtension: nil,
+      subdirectory: directory.isEmpty ? nil : directory)
   }
 
   public static func read(_ resource: BridgeDesktopUIResource) throws -> String {

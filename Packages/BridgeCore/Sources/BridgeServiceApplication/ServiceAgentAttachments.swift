@@ -84,10 +84,7 @@ enum ServiceAgentAttachments {
     let root = try RegisteredRoot(
       capturing: URL(fileURLWithPath: project.root.canonicalPath, isDirectory: true)
     )
-    guard root.canonicalPath == project.root.canonicalPath,
-      root.identity.device == project.root.device,
-      root.identity.inode == project.root.inode
-    else {
+    guard project.root.matches(root) else {
       throw BridgeMCPQueryError.contractRejected
     }
     return root

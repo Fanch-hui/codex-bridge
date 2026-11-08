@@ -79,6 +79,16 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
       }
 
     case .plan(let entries):
+      let plan: String = entries.prefix(50).map { entry -> String in
+        let status = entry.status ?? "pending"
+        return "[\(status)] \(Self.boundedPlanStep(entry.content))"
+      }.joined(separator: "\n")
+      if !plan.isEmpty {
+        let complete = entries.allSatisfy { $0.status == "completed" }
+        await conversation.upsertAuthoritativeEntry(
+          taskID: taskID, key: "bridge:plan", kind: .toolCall, content: plan,
+          toolName: "计划", toolStatus: complete ? "completed" : "inProgress", isFinal: complete)
+      }
       let step =
         entries.first(where: { $0.status == "in_progress" })?.content
         ?? entries.first(where: { $0.status == nil || $0.status == "pending" })?.content
@@ -100,6 +110,9 @@ struct ServiceExecutionAgentEventProcessor: Sendable {
       return
 
     case .userInputRequested:
+      return
+
+    case .interactionsCancelled:
       return
 
     case .approvalAutomaticallyDenied(let itemID):

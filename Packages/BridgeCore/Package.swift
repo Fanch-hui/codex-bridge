@@ -101,9 +101,11 @@ let package = Package(
     .library(name: "BridgeOpenCodeACP", targets: ["BridgeOpenCodeACP"]),
     .library(name: "BridgeDeepSeekHarnessACP", targets: ["BridgeDeepSeekHarnessACP"]),
     .library(name: "BridgeDeepSeekHarnessDesktop", targets: ["BridgeDeepSeekHarnessDesktop"]),
+    .library(name: "BridgeEmbeddedDSH", targets: ["BridgeEmbeddedDSH"]),
     .library(name: "BridgeAntigravityCLI", targets: ["BridgeAntigravityCLI"]),
     .library(name: "BridgePiRPC", targets: ["BridgePiRPC"]),
     .library(name: "BridgeQoderSDK", targets: ["BridgeQoderSDK"]),
+    .library(name: "BridgeClaudeSDK", targets: ["BridgeClaudeSDK"]),
     .library(name: "BridgeProcess", targets: ["BridgeProcess"]),
     .library(name: "BridgeServiceApplication", targets: ["BridgeServiceApplication"]),
     .library(name: "BridgeDirectCommand", targets: ["BridgeDirectCommand"]),
@@ -240,6 +242,7 @@ let package = Package(
         "BridgeAgentCore",
         "BridgeCodexRPC",
         "BridgeDomain",
+        "BridgeProcess",
         "BridgeProjects",
         "BridgeSecurity",
         "BridgeServiceCore",
@@ -255,6 +258,13 @@ let package = Package(
       dependencies: ["BridgeProcess", "BridgeSecurity"]
     ),
     .target(
+      name: "BridgeEmbeddedDSH",
+      dependencies: [
+        "BridgeACP", "BridgeAgentCore", "BridgeProcess", "BridgeSecurity",
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
+    ),
+    .target(
       name: "BridgeOpenCodeACP",
       dependencies: [
         "BridgeACP",
@@ -263,6 +273,7 @@ let package = Package(
         "BridgeProcess",
         "BridgeSecurity",
         .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "GRDB", package: "GRDB.swift"),
       ]
     ),
     .target(
@@ -327,6 +338,13 @@ let package = Package(
       resources: [.copy("Resources/QoderHost")]
     ),
     .target(
+      name: "BridgeClaudeSDK",
+      dependencies: [
+        "BridgeACP", "BridgeAgentCore", "BridgeDomain", "BridgeProcess", "BridgeSecurity",
+      ],
+      resources: [.copy("Resources/ClaudeHost")]
+    ),
+    .target(
       name: "BridgeDirectCommand",
       dependencies: [
         "BridgeAgentCore",
@@ -353,10 +371,13 @@ let package = Package(
     .target(
       name: "BridgeServiceHost",
       dependencies: [
+        "BridgeACP",
+        "BridgeEmbeddedDSH",
         "BridgeAgentCore",
         "BridgeAntigravityCLI",
         "BridgePiRPC",
         "BridgeQoderSDK",
+        "BridgeClaudeSDK",
         "BridgeCodexRPC",
         "BridgeCodexService",
         "BridgeDirectCommand",

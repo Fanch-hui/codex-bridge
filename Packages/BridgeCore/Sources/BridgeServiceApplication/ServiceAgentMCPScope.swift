@@ -8,6 +8,7 @@ extension AgentMCPScope {
     switch self {
     case .deepSeekHarness: .deepSeekHarnessMCPServers
     case .pi: .piMCPServers
+    case .claudeCode: .claudeCodeMCPServers
     case .qoderCN: .qoderCNMCPServers
     case .qoderInternational: .qoderInternationalMCPServers
     }

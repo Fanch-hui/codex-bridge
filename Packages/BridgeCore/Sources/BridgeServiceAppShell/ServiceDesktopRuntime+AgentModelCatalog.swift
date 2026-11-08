@@ -205,6 +205,7 @@ extension BridgeServiceAppModel {
     providerID: String
   ) {
     setAgentModelOptions(resolution.response.models, providerID: providerID)
+    agentModelCatalogLoadedProviders.insert(providerID)
     setAgentModelRefreshError(nil, providerID: providerID)
     let finalDefault = correctedDefault ?? persistedDefault
     if correctedDefault != nil {

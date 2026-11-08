@@ -66,11 +66,21 @@ public struct AgentExecutionRequest: Equatable, Sendable {
   public let runtimeBinding: AgentRuntimeBinding?
   public let mutationIntent: AgentMutationIntent
   public let workspaceStrategy: AgentWorkspaceStrategy
+  public let workspaceIsolation: AgentWorkspaceIsolation?
   public let networkAccessRequested: Bool
   public let toolApprovalPolicy: AgentToolApprovalPolicy
+  public let nativeSubagentsAllowed: Bool
   public let requiredCapabilities: Set<AgentCapability>
   public let attachments: [AgentImageAttachment]
+  public let attachmentContents: [AgentImageContent]?
   public let selectedSkills: [AgentSelectedSkill]
+  /// Present when the task shares the project directory with other writers and the provider
+  /// must hold the project write lease only while a writing tool runs.
+  public let toolWriteGate: AgentToolWriteGate?
+
+  public var executionPrompt: String {
+    AgentExecutionInstructions.prompt(prompt, nativeSubagentsAllowed: nativeSubagentsAllowed)
+  }
 
   public init(
     taskID: TaskID,
@@ -84,11 +94,15 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     runtimeBinding: AgentRuntimeBinding? = nil,
     mutationIntent: AgentMutationIntent,
     workspaceStrategy: AgentWorkspaceStrategy,
+    workspaceIsolation: AgentWorkspaceIsolation? = nil,
     networkAccessRequested: Bool,
     toolApprovalPolicy: AgentToolApprovalPolicy = .providerManaged,
+    nativeSubagentsAllowed: Bool = true,
     requiredCapabilities: Set<AgentCapability> = [],
     attachments: [AgentImageAttachment] = [],
-    selectedSkills: [AgentSelectedSkill] = []
+    attachmentContents: [AgentImageContent]? = nil,
+    selectedSkills: [AgentSelectedSkill] = [],
+    toolWriteGate: AgentToolWriteGate? = nil
   ) throws {
     try AgentValidation.identifier(taskID.rawValue, field: "request.taskID", maximumBytes: 128)
     try AgentValidation.identifier(
@@ -112,12 +126,18 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     guard toolApprovalPolicy != .autoApprove || networkAccessRequested else {
       throw AgentRuntimeError.invalidRequest("request.toolApprovalPolicy")
     }
+    guard workspaceIsolation == nil || workspaceStrategy == .isolatedGitWorktree else {
+      throw AgentRuntimeError.invalidRequest("request.workspaceIsolation")
+    }
     guard attachments.count <= AgentImageAttachmentLimits.maximumCount,
       Set(attachments.map(\.relativePath)).count == attachments.count,
       attachments.reduce(Int64(0), { $0 + $1.byteCount })
         <= AgentImageAttachmentLimits.maximumTotalBytes
     else {
       throw AgentRuntimeError.invalidRequest("request.attachments")
+    }
+    if let attachmentContents, attachmentContents.map(\.attachment) != attachments {
+      throw AgentRuntimeError.invalidRequest("request.attachmentContents")
     }
     guard selectedSkills.count <= 16,
       Set(selectedSkills.map(\.name)).count == selectedSkills.count,
@@ -140,11 +160,15 @@ public struct AgentExecutionRequest: Equatable, Sendable {
     self.runtimeBinding = runtimeBinding
     self.mutationIntent = mutationIntent
     self.workspaceStrategy = workspaceStrategy
+    self.workspaceIsolation = workspaceIsolation
     self.networkAccessRequested = networkAccessRequested
     self.toolApprovalPolicy = toolApprovalPolicy
+    self.nativeSubagentsAllowed = nativeSubagentsAllowed
     self.requiredCapabilities = requiredCapabilities
     self.attachments = attachments
+    self.attachmentContents = attachmentContents
     self.selectedSkills = selectedSkills
+    self.toolWriteGate = toolWriteGate
   }
 }
 
@@ -418,6 +442,7 @@ public enum AgentEvent: Equatable, Sendable {
   case usageStatistics(AgentUsageStatistics)
   case approvalRequested(AgentApprovalRequest)
   case userInputRequested(AgentUserInputRequest)
+  case interactionsCancelled(approvalIDs: [String], userInputIDs: [String])
   case approvalAutomaticallyDenied(String)
   case completed(summary: String, stopReason: String?)
   case interrupted

@@ -9,6 +9,7 @@ extension AgentMCPScope {
     case .pi: "Pi"
     case .qoderCN: "Qoder 中国版"
     case .qoderInternational: "Qoder 国际版"
+    case .claudeCode: "Claude Code"
     }
   }
 

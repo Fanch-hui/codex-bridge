@@ -11,6 +11,9 @@ extension BridgeDesktopCommandRouter {
   ) {
     let payload = envelope.payload
     switch envelope.command {
+    case .refreshMCPClients:
+      guard connected(model) else { return }
+      Task { await model.refreshMCPClientStatus() }
     case .configureGeminiCloud, .copyGeminiCloudConfiguration, .refreshGeminiCloud:
       handleGeminiCloud(envelope, model: model)
     case .setMCPClientEnabled:
@@ -79,7 +82,8 @@ extension BridgeDesktopCommandRouter {
     case .clearTunnel:
       guard connected(model), tunnel(model)?.configured == true else { return }
       model.clearTunnel()
-    case .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .cancelAgentSetup,
+    case .beginAgentSetup, .refreshAgentSetups, .continueAgentSetup, .probeAgentSetupLogin,
+      .cancelAgentSetup,
       .openAgentSetupLogin:
       model.handleAgentSetupCommand(envelope)
     case .connectAgent:

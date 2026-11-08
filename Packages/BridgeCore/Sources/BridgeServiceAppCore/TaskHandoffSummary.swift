@@ -14,7 +14,7 @@ public enum TaskHandoffSummary {
       let names = [
         "opencode": "OpenCode", "deepseek-harness": "DSH ACP",
         "deepseek-harness-desktop": "DSH 桌面",
-        "antigravity": "Antigravity", "pi": "Pi", "qoder": "Qoder",
+        "antigravity": "Antigravity", "pi": "Pi", "qoder": "Qoder", "claude-code": "Claude Code",
       ]
       result.append(
         (installation.providerID, names[installation.providerID] ?? installation.displayName))

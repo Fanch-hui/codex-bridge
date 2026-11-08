@@ -32,10 +32,19 @@ public final class WorkbenchWorkspaceModel {
     state = WorkbenchWorkspaceState(projectID: projectID)
   }
 
+  public static let serviceUnavailableMessage = "后台服务暂时无法连接，连接恢复后会自动重新读取。"
+
   public func reject(requestID: String, message: String, errorCode: String? = nil) {
     state.lastRequestID = requestID
     state.errorMessage = message
     state.errorCode = errorCode
+  }
+
+  /// Answers a request the host could not forward because the service connection is down.
+  public func rejectUnavailable(requestID: String) {
+    reject(
+      requestID: requestID, message: Self.serviceUnavailableMessage,
+      errorCode: BridgeServiceErrorMessage.serviceUnavailableCode)
   }
 
   public func perform(_ request: IPCWorkbenchWorkspaceRequest) async {
@@ -58,11 +67,12 @@ public final class WorkbenchWorkspaceModel {
       state.errorCode = nil
     } catch {
       guard current(request, lane: lane, generation: currentGeneration) else { return }
-      state.errorMessage = BridgeServiceErrorMessage.message(error)
-      if let codec = error as? BridgeServiceIPCCodecError, case .remoteError(let remote) = codec {
-        state.errorCode = remote.code
+      if BridgeServiceErrorMessage.isServiceUnavailable(error) {
+        state.errorMessage = Self.serviceUnavailableMessage
+        state.errorCode = BridgeServiceErrorMessage.serviceUnavailableCode
       } else {
-        state.errorCode = nil
+        state.errorMessage = BridgeServiceErrorMessage.message(error)
+        state.errorCode = BridgeServiceErrorMessage.remoteFailure(error)?.code
       }
     }
     requests.removeValue(forKey: lane)

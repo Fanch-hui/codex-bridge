@@ -112,13 +112,17 @@ extension SimpleServiceStore {
     }
   }
 
-  public func agentInstallation(id: AgentInstallationID) throws
-    -> ServiceAgentInstallationRecord?
-  {
+  /// `includeRuntimeArtifacts: false` 跳过运行时工件的读取与解码（DSH 约 1500 条），返回记录的
+  /// `runtimeArtifacts` 恒为空。仅供界面展示使用，不得用于校验、回写或与完整记录比较。
+  public func agentInstallation(
+    id: AgentInstallationID,
+    includeRuntimeArtifacts: Bool = true
+  ) throws -> ServiceAgentInstallationRecord? {
     do {
       return try database.read { db in
         try Self.agentInstallationRow(id: id, in: db).map {
-          try Self.decodeAgentInstallation($0, in: db)
+          try Self.decodeAgentInstallation(
+            $0, includeRuntimeArtifacts: includeRuntimeArtifacts, in: db)
         }
       }
     } catch let error as ServiceStoreError {
@@ -128,9 +132,11 @@ extension SimpleServiceStore {
     }
   }
 
-  public func agentInstallations(providerID: AgentProviderID? = nil) throws
-    -> [ServiceAgentInstallationRecord]
-  {
+  /// `includeRuntimeArtifacts: false` 的约束同 `agentInstallation(id:includeRuntimeArtifacts:)`。
+  public func agentInstallations(
+    providerID: AgentProviderID? = nil,
+    includeRuntimeArtifacts: Bool = true
+  ) throws -> [ServiceAgentInstallationRecord] {
     do {
       return try database.read { db in
         let rows: [Row]
@@ -153,7 +159,10 @@ extension SimpleServiceStore {
               """
           )
         }
-        return try rows.map { try Self.decodeAgentInstallation($0, in: db) }
+        return try rows.map {
+          try Self.decodeAgentInstallation(
+            $0, includeRuntimeArtifacts: includeRuntimeArtifacts, in: db)
+        }
       }
     } catch let error as ServiceStoreError {
       throw error
@@ -385,9 +394,11 @@ extension SimpleServiceStore {
     )
   }
 
-  private static func decodeAgentInstallation(_ row: Row, in db: Database) throws
-    -> ServiceAgentInstallationRecord
-  {
+  private static func decodeAgentInstallation(
+    _ row: Row,
+    includeRuntimeArtifacts: Bool = true,
+    in db: Database
+  ) throws -> ServiceAgentInstallationRecord {
     guard let device = UInt64(row["executable_device"] as String),
       let inode = UInt64(row["executable_inode"] as String),
       let fileSize = UInt64(row["executable_size"] as String),
@@ -417,6 +428,8 @@ extension SimpleServiceStore {
     let lastProbedAt: Double? = row["last_probed_at"]
     let installationID = AgentInstallationID(rawValue: row["installation_id"])
     let artifacts = try agentInstallationArtifacts(for: installationID, in: db)
+    let runtimeArtifacts =
+      try includeRuntimeArtifacts ? readAgentRuntimeArtifacts(for: installationID, in: db) : []
     return try ServiceAgentInstallationRecord(
       id: installationID,
       providerID: AgentProviderID(rawValue: row["provider_id"]),
@@ -432,7 +445,7 @@ extension SimpleServiceStore {
       availability: availability,
       capabilities: capabilities,
       artifacts: artifacts,
-      runtimeArtifacts: readAgentRuntimeArtifacts(for: installationID, in: db),
+      runtimeArtifacts: runtimeArtifacts,
       lastProbeError: row["last_probe_error"],
       lastProbedAt: lastProbedAt.map(Date.init(timeIntervalSince1970:)),
       createdAt: Date(timeIntervalSince1970: row["created_at"]),

@@ -3,6 +3,20 @@ import BridgeMCP
 import BridgeServiceCore
 import Foundation
 
+private final class WorkspaceRecoveryLookup: @unchecked Sendable {
+  private let lock = NSLock()
+  private var lookup: @Sendable (ProjectID) async throws -> [String] = { _ in [] }
+
+  func set(_ value: @escaping @Sendable (ProjectID) async throws -> [String]) {
+    lock.withLock { lookup = value }
+  }
+
+  func value(for projectID: ProjectID) async throws -> [String] {
+    let current = lock.withLock { lookup }
+    return try await current(projectID)
+  }
+}
+
 public enum ServiceWorkspaceOwner: Codable, Equatable, Sendable {
   case directFileOperation(operationID: String)
   case directCommand(sessionID: String)
@@ -55,6 +69,7 @@ public struct DirectWorkspaceLease: Sendable {
 }
 
 public actor ServiceWorkspaceMutationGate {
+  private nonisolated let recoveryLookup = WorkspaceRecoveryLookup()
   private struct DirectReservation: Sendable {
     let token: String
     let owner: ServiceWorkspaceOwner
@@ -78,6 +93,16 @@ public actor ServiceWorkspaceMutationGate {
   public init(appUpdateLeaseDuration: TimeInterval = 60) {
     self.appUpdateLeaseDuration = max(1, appUpdateLeaseDuration)
     self.changes = ServiceStateChangeHub()
+  }
+
+  public nonisolated func setRecoveryLookup(
+    _ lookup: @escaping @Sendable (ProjectID) async throws -> [String]
+  ) {
+    recoveryLookup.set(lookup)
+  }
+
+  public nonisolated func workspaceRecoveryChanged() {
+    changes.publish()
   }
 
   @discardableResult
@@ -162,13 +187,18 @@ public actor ServiceWorkspaceMutationGate {
     if !(codexAdmissions[projectID] ?? []).isEmpty {
       return .codexAdmissionPending()
     }
+    if let recovery = try await recoveryLookup.value(for: projectID).first {
+      return .direct(owner: "workspace_recovery", operationID: recovery)
+    }
     return nil
   }
 
   public func acquireDirectLease(
     projectID: ProjectID,
     owner: ServiceWorkspaceOwner,
-    activeCodexWriteTask: @Sendable () async throws -> ServiceTaskRecord?
+    activeCodexWriteTask: @Sendable () async throws -> ServiceTaskRecord?,
+    activeEmbeddedDSHSession: @Sendable () async throws -> String? = { nil },
+    permittingRecoveryID: String? = nil
   ) async throws -> DirectWorkspaceLease {
     expireAppUpdateIfNeeded()
     guard appUpdateLeaseExpiresAt == nil, serviceShutdown == nil else {
@@ -184,9 +214,20 @@ public actor ServiceWorkspaceMutationGate {
     directReservations[projectID] = DirectReservation(token: token, owner: owner)
 
     do {
+      let recoveries = try await recoveryLookup.value(for: projectID)
+      if let recovery = recoveries.first,
+        permittingRecoveryID.map({ !recoveries.contains($0) }) ?? true
+      {
+        throw ProjectWorkspaceBusyError.busy(
+          .direct(owner: "workspace_recovery", operationID: recovery))
+      }
       if let task = try await activeCodexWriteTask() {
         removeDirectReservation(projectID: projectID, token: token)
         throw ProjectWorkspaceBusyError.busy(.codex(taskID: task.id.rawValue))
+      }
+      if let sessionID = try await activeEmbeddedDSHSession() {
+        removeDirectReservation(projectID: projectID, token: token)
+        throw ProjectWorkspaceBusyError.busy(.direct(owner: "embedded_dsh", operationID: sessionID))
       }
     } catch {
       removeDirectReservation(projectID: projectID, token: token)
@@ -206,6 +247,15 @@ public actor ServiceWorkspaceMutationGate {
     }
     let token = UUID().uuidString
     codexAdmissions[projectID, default: []].insert(token)
+    do {
+      if let recovery = try await recoveryLookup.value(for: projectID).first {
+        throw ProjectWorkspaceBusyError.busy(
+          .direct(owner: "workspace_recovery", operationID: recovery))
+      }
+    } catch {
+      endCodexAdmission(projectID: projectID, token: token)
+      throw error
+    }
     return token
   }
 

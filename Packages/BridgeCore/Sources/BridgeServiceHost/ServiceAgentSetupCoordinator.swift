@@ -18,6 +18,29 @@ struct ServiceAgentSetupDependencies: Sendable {
   let login:
     @Sendable (IPCAgentSetupRequest, ServiceAgentSetupRuntime) throws
       -> IPCAgentSetupLoginCommand?
+  let probeLogin: @Sendable (IPCAgentSetupRequest, ServiceAgentSetupRuntime) async throws -> Bool?
+
+  init(
+    candidates: @escaping @Sendable (IPCAgentSetupRequest) async throws -> [IPCAgentSetupCandidate],
+    configure:
+      @escaping @Sendable (IPCAgentSetupRequest, ServiceAgentSetupRuntime) async throws -> Void,
+    verify:
+      @escaping @Sendable (
+        IPCAgentSetupRequest, ServiceAgentSetupRuntime, IPCAgentSetupContinueRequest?
+      ) async throws -> ServiceAgentSetupVerification,
+    login:
+      @escaping @Sendable (IPCAgentSetupRequest, ServiceAgentSetupRuntime) throws
+      -> IPCAgentSetupLoginCommand?,
+    probeLogin:
+      @escaping @Sendable (IPCAgentSetupRequest, ServiceAgentSetupRuntime) async throws
+      -> Bool? = { _, _ in nil }
+  ) {
+    self.candidates = candidates
+    self.configure = configure
+    self.verify = verify
+    self.login = login
+    self.probeLogin = probeLogin
+  }
 }
 
 enum ServiceAgentSetupError: LocalizedError, Sendable {
@@ -204,7 +227,8 @@ actor ServiceAgentSetupCoordinator {
 
   static func validate(_ request: IPCAgentSetupRequest) throws {
     guard
-      ["opencode", "deepseek-harness", "antigravity", "pi", "qoder"].contains(request.providerID),
+      ["opencode", "deepseek-harness", "antigravity", "pi", "qoder", "claude-code"]
+        .contains(request.providerID),
       request.providerID == "qoder"
         ? request.qoderDistribution.flatMap(QoderDistribution.init(rawValue:)) != nil
         : request.qoderDistribution == nil

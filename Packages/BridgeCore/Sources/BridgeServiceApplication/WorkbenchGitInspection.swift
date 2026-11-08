@@ -24,7 +24,10 @@ public struct WorkbenchGitDiff: Equatable, Sendable {
 }
 
 enum WorkbenchGitInspection {
+  /// Presentation limit for one diff; the process capture is larger so a long diff is cut at a
+  /// character boundary here instead of falling back to a partial byte head.
   static let maximumBytes = 256 * 1_024
+  static let captureBytes = 4 * 1_024 * 1_024
 
   static func status(
     project: ServiceProjectRecord, limit: Int, deadline: ContinuousClock.Instant
@@ -37,7 +40,7 @@ enum WorkbenchGitInspection {
       ], project: project, deadline: deadline)
     guard result.exitCode == 0 else {
       return WorkbenchGitStatus(
-        state: result.output.head.contains("fatal: not a git repository")
+        state: result.diagnosticHead.contains("fatal: not a git repository")
           ? "not_git" : "check_failed",
         entries: [], truncated: false)
     }
@@ -47,20 +50,26 @@ enum WorkbenchGitInspection {
     let records = data.split(separator: 0)
     var entries: [WorkbenchGitEntry] = []
     for record in records {
-      guard record.count >= 4, let value = String(data: record, encoding: .utf8) else {
+      // `XY <path>`: two status bytes, one space, then the path as raw bytes.
+      guard record.count >= 4, record[record.startIndex + 2] == 0x20,
+        let path = String(data: record.dropFirst(3), encoding: .utf8)
+      else {
         return WorkbenchGitStatus(state: "check_failed", entries: [], truncated: false)
       }
-      let path = String(value.dropFirst(3))
       guard safePath(path, project: project) else { continue }
       entries.append(
         WorkbenchGitEntry(
           relativePath: path, originalPath: nil,
-          indexStatus: String(value.prefix(1)), worktreeStatus: String(value.dropFirst().prefix(1)))
-      )
+          indexStatus: statusLetter(record[record.startIndex]),
+          worktreeStatus: statusLetter(record[record.startIndex + 1])))
     }
     return WorkbenchGitStatus(
       state: records.isEmpty ? "clean" : "dirty", entries: Array(entries.prefix(limit)),
       truncated: entries.count > limit)
+  }
+
+  private static func statusLetter(_ byte: UInt8) -> String {
+    String(UnicodeScalar(byte))
   }
 
   static func diff(
@@ -103,20 +112,22 @@ enum WorkbenchGitInspection {
       flags + ["--", ":(literal)" + path],
       project: project, deadline: deadline)
     guard staged.exitCode == 0, working.exitCode == 0 else { throw BridgeMCPQueryError.unavailable }
-    let stagedText = text(staged)
-    let workingText = text(working)
+    guard let stagedText = text(staged), let workingText = text(working) else {
+      return WorkbenchGitDiff(relativePath: path, text: "Diff 过大，未能载入。", truncated: true)
+    }
     let combined =
       (stagedText.isEmpty ? "" : "已暂存\n" + stagedText)
       + (workingText.isEmpty ? "" : "工作区\n" + workingText)
     return WorkbenchGitDiff(
       relativePath: path,
       text: OutboundContentSecurity.redacted(combined, maximumUTF8Bytes: maximumBytes),
-      truncated: staged.completeOutput == nil || working.completeOutput == nil
-        || combined.utf8.count > maximumBytes)
+      truncated: combined.utf8.count > maximumBytes)
   }
 
-  private static func text(_ result: DirectGitResult) -> String {
-    result.completeOutput.flatMap { String(data: $0, encoding: .utf8) } ?? result.output.head
+  /// `nil` when the diff exceeded the capture buffer. Invalid UTF-8 is replaced, never shown as
+  /// escaped bytes.
+  private static func text(_ result: DirectGitResult) -> String? {
+    result.completeOutput.map { String(decoding: $0, as: UTF8.self) }
   }
 
   private static func run(
@@ -132,7 +143,7 @@ enum WorkbenchGitInspection {
       ] + arguments,
       workingDirectory: project.root.canonicalPath, timeout: min(remaining, .seconds(5)),
       environment: ["LANG": "C", "LC_ALL": "C"],
-      maximumOutputBytes: maximumBytes, restrictedEnvironment: true)
+      maximumOutputBytes: captureBytes, restrictedEnvironment: true, separateStandardError: true)
     try project.root.validateCurrentIdentity()
     return result
   }

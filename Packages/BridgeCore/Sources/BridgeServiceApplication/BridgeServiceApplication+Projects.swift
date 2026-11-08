@@ -6,6 +6,7 @@ import Foundation
 public struct ServiceManagedProjectList: Sendable {
   public let projects: [MCPProjectSummary]
   public let projectPaths: [String: String]
+  public let defaultProjectID: String?
 }
 
 extension BridgeServiceApplication {
@@ -16,9 +17,8 @@ extension BridgeServiceApplication {
   ) async throws -> MCPProjectPage {
     try Self.checkDeadline(deadline)
     guard (1...100).contains(limit) else { throw BridgeMCPQueryError.contractRejected }
-    let all = try await projects.projects()
-    let visible = Self.sortedProjects(all)
-    let defaultID = try await defaultSubmissionProjectID(in: all)
+    let defaultID = try await defaultWorkspaceProjectID()
+    let visible = Self.sortedProjects(try await projects.projects())
     let visibleDefault = visible.first { $0.id.rawValue == defaultID }?.id.rawValue
     let offset = try Self.decodeOffset(cursor, maximum: visible.count)
     let end = min(offset + limit, visible.count)
@@ -43,11 +43,13 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceManagedProjectList {
     try Self.checkDeadline(deadline)
+    let defaultProjectID = try await defaultWorkspaceProjectID()
     let registered = Self.sortedProjects(try await projects.projects())
     return ServiceManagedProjectList(
       projects: await checkedProjectSummaries(registered, deadline: deadline),
       projectPaths: Dictionary(
-        uniqueKeysWithValues: registered.map { ($0.id.rawValue, $0.root.canonicalPath) })
+        uniqueKeysWithValues: registered.map { ($0.id.rawValue, $0.root.canonicalPath) }),
+      defaultProjectID: defaultProjectID
     )
   }
 

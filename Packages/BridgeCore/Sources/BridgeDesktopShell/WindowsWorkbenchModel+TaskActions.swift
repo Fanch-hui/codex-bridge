@@ -14,8 +14,9 @@
     }
 
     public func selectTask(at index: Int) {
-      guard visibleSessions.indices.contains(index) else { return }
-      selectTask(visibleSessions[index].latestTask)
+      let sessions = allSessions
+      guard sessions.indices.contains(index) else { return }
+      selectTask(sessions[index].latestTask)
     }
 
     public func selectTask(id: String) {
@@ -28,13 +29,7 @@
         publishDisplay()
         return
       }
-      if selectedProjectID != task.projectID {
-        selectedProjectID = task.projectID
-        threads = []
-        Task {
-          try? await client.setWorkbenchProject(projectID: task.projectID)
-        }
-      }
+      alignContextProject(to: task.projectID)
       selectedTaskID = task.taskID
       selectedThreadID = task.isCodexTask ? task.threadID : nil
       selectedThreadPage = nil

@@ -13,6 +13,7 @@
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var projects: [MCPProjectSummary] = []
     private(set) var projectPaths: [String: String] = [:]
+    private(set) var defaultProjectID: String?
     private(set) var agentProviders: [IPCAgentProviderSummary] = []
     private(set) var agentInstallations: [IPCAgentInstallationSummary] = []
     var selectedProjectID: String?
@@ -102,6 +103,7 @@
         let snapshot = try await client.projectList()
         projects = snapshot.projects
         projectPaths = snapshot.projectPaths ?? [:]
+        defaultProjectID = snapshot.defaultProjectID
         connectionState = .connected
         reconcileProjectSelection()
         projectStatusText = "已加载 \(projects.count) 个项目。"
@@ -174,7 +176,8 @@
           name: project.name,
           path: projectPaths[project.projectID],
           gitState: project.gitState,
-          selected: project.projectID == selectedProjectID
+          selected: project.projectID == selectedProjectID,
+          isDefault: project.projectID == defaultProjectID
         )
       }
       let providerPresentations = agentProviders.map(ProjectAgentPresentation.provider)
@@ -223,7 +226,8 @@
         selectedIndex: selectedProjectIndex,
         detailText: selectedProject?.detailText ?? "请选择项目。",
         registerEnabled: projectActions,
-        removeEnabled: projectActions && selectedProject != nil,
+        removeEnabled: projectActions && selectedProject != nil
+          && selectedProjectID != defaultProjectID,
         statusText: projectStatusText,
         projectItems: projectItems
       )
@@ -264,13 +268,12 @@
     }
 
     private func reconcileProjectSelection() {
-      guard let selectedProjectID else {
-        self.selectedProjectID = projects.first?.projectID
+      if let selectedProjectID, projects.contains(where: { $0.projectID == selectedProjectID }) {
         return
       }
-      if !projects.contains(where: { $0.projectID == selectedProjectID }) {
-        self.selectedProjectID = projects.first?.projectID
-      }
+      selectedProjectID =
+        projects.first(where: { $0.projectID == defaultProjectID })?.projectID
+        ?? projects.first?.projectID
     }
 
     private func reconcileAgentSelection() {

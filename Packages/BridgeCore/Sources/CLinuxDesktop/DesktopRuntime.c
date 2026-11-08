@@ -98,7 +98,6 @@ static gpointer desktop_thread(gpointer raw) {
     gtk_container_add(GTK_CONTAINER(overlay), GTK_WIDGET(bridge_desktop.desktop));
     gtk_widget_set_hexpand(GTK_WIDGET(bridge_desktop.desktop), TRUE);
     gtk_widget_set_vexpand(GTK_WIDGET(bridge_desktop.desktop), TRUE);
-    bridge_desktop.browser_enabled = TRUE;
     gchar *slash = strrchr(options->page, '/');
     bridge_desktop.page_root = g_strndup(options->page, slash ? slash - options->page + 1 : 0);
     WebKitUserContentManager *content = webkit_web_view_get_user_content_manager(bridge_desktop.desktop);
@@ -120,8 +119,10 @@ static gpointer desktop_thread(gpointer raw) {
     gtk_widget_destroy(bridge_desktop.window);
     g_free(bridge_desktop.page_root);
     g_free(bridge_desktop.data_root);
-    for (guint i = 0; i < G_N_ELEMENTS(bridge_desktop.browsers); i++)
+    for (guint i = 0; i < G_N_ELEMENTS(bridge_desktop.browsers); i++) {
+      g_free(bridge_desktop.browsers[i].resume_uri);
       g_free(bridge_desktop.browsers[i].error);
+    }
   }
   g_mutex_lock(&state_lock);
   running = FALSE;

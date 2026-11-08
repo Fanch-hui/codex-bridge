@@ -89,16 +89,22 @@ public actor ServiceAgentRegistry {
     }
   }
 
-  public func installation(id: AgentInstallationID) async throws
-    -> ServiceAgentInstallationRecord?
-  {
-    try await store.agentInstallation(id: id)
+  /// `includeRuntimeArtifacts: false` 返回的记录不含运行时工件（`runtimeArtifacts` 恒为空），
+  /// 仅供只读展示；校验、Probe、替换审查与回写必须使用默认的完整记录。
+  public func installation(
+    id: AgentInstallationID,
+    includeRuntimeArtifacts: Bool = true
+  ) async throws -> ServiceAgentInstallationRecord? {
+    try await store.agentInstallation(id: id, includeRuntimeArtifacts: includeRuntimeArtifacts)
   }
 
-  public func installations(providerID: AgentProviderID? = nil) async throws
-    -> [ServiceAgentInstallationRecord]
-  {
-    try await store.agentInstallations(providerID: providerID)
+  /// `includeRuntimeArtifacts: false` 的约束同 `installation(id:includeRuntimeArtifacts:)`。
+  public func installations(
+    providerID: AgentProviderID? = nil,
+    includeRuntimeArtifacts: Bool = true
+  ) async throws -> [ServiceAgentInstallationRecord] {
+    try await store.agentInstallations(
+      providerID: providerID, includeRuntimeArtifacts: includeRuntimeArtifacts)
   }
 
   public func remove(installationID: AgentInstallationID) async throws {

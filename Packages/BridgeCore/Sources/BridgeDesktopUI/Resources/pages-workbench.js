@@ -4,6 +4,8 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var N = global.CodexBridgeDesktopNativePermissions;
   var P = global.CodexBridgeDesktopWorkbenchSubmissions;
+  function newTask() { return global.CodexBridgeDesktopWorkbenchNewTask || null; }
+  function newTaskOpen() { var panel = newTask(); return !!panel && panel.isOpen(); }
 
   function renderStable(container, signature, render, preservesButtons) {
     if (!container.__renderState) {
@@ -46,7 +48,8 @@
     var content = document.getElementById("workbench-inspector-content");
     var inputs = Object.assign({}, page, {
       browser: page.browser && page.browser.canLoadEarlierConversation,
-      development: !!development
+      development: !!development,
+      newTask: newTaskOpen() ? newTask().revision() : 0
     });
     var keys = Object.keys(inputs), previous = content.__contentInputs, revision = P.revision();
     if (previous && content.__submissionRevision === revision
@@ -82,13 +85,29 @@
   }
 
   function renderContentBody(content, page, emit) {
+    if (newTaskOpen()) {
+      Array.from(content.children).forEach(function (child) {
+        if (!newTask().owns(child)) child.remove();
+      });
+      content.__windowsDetailCard = null; content.__windowsConversationBlock = null;
+      newTask().render(content, page, emit);
+      return;
+    }
     var retained = prepareContentCard(content, page);
     if (!page.selectedTask) {
       global.CodexBridgeDesktopWorkbenchActions.reset();
       var empty = S.node("div", "workbench-empty-state");
       empty.appendChild(S.icon("sparkles", "empty-sparkle-icon"));
       empty.appendChild(S.node("h3", "empty-title", "选择 Agent 会话"));
-      empty.appendChild(S.node("p", "empty-desc", "从顶部选择已有会话，或在 ChatGPT / Qwen 中委派任务。"));
+      empty.appendChild(S.node("p", "empty-desc", "从侧栏选择会话、在聊天客户端中委派任务，或手动选择一个 Agent 开始。"));
+      if (newTask()) {
+        var start = S.button("新建 Agent 任务", null, {}, null, "small primary", false);
+        start.addEventListener("click", function () {
+          var tabs = global.CodexBridgeDesktopWorkbenchTabs;
+          if (tabs) tabs.openDraft(); else newTask().open();
+        });
+        empty.appendChild(start);
+      }
       content.appendChild(empty);
       return;
     }
@@ -109,10 +128,27 @@
     else if (content.lastChild !== card) content.appendChild(card);
   }
 
-  function renderShared(page, emit, development) {
+  // The footer only floats over the conversation while it holds a composer or hand-off entry.
+  function updateFooter(development, split) {
     var footer = document.getElementById("workbench-inspector-footer");
-    if (footer) footer.hidden = !!development;
+    if (!footer) return;
+    if (split) { footer.hidden = true; return; }
+    var controls = global.CodexBridgeDesktopWorkbenchControls;
+    footer.hidden = !!development || !(newTaskOpen() || (controls.hasForm && controls.hasForm())
+      || footer.querySelector(".workbench-handoff:not([hidden])"));
+  }
+
+  function renderShared(page, emit, development) {
+    var tabs = global.CodexBridgeDesktopWorkbenchTabs;
+    if (tabs) { if (development || !page) tabs.hide(); else tabs.render(page, emit); }
+    var panes = global.CodexBridgeDesktopWorkbenchPanes;
+    // The split view owns the inspector: each pane renders its own conversation and composer.
+    var split = !!panes && !development && panes.render(page, emit);
+    if (panes && development) panes.hide();
+    updateFooter(development);
+    if (!development && newTask()) newTask().receive(page, emit);
     P.bind(page, function (follow) {
+      if (split) { panes.render(page, emit); return; }
       renderContent(page, emit, development);
       if (!follow) return;
       var content = document.getElementById("workbench-inspector-content");
@@ -128,14 +164,21 @@
       global.CodexBridgeDesktopWorkbenchActions.reset();
       global.CodexBridgeDesktopWorkbenchHeader.reset();
       global.CodexBridgeDesktopWorkbenchControls.render(null, emit);
+      updateFooter(development);
       document.getElementById("chat-browser-slot").classList.add("browser-hidden");
       document.getElementById("browser-slot-note").textContent = "等待后台服务 提供浏览器状态";
       return;
     }
-    if (!development) global.CodexBridgeDesktopWorkbenchHeader.render(page, emit);
+    // The draft tab owns the toolbar and footer, so the selected session's actions step aside.
+    var draftPage = newTaskOpen() ? Object.assign({}, page, { selectedTask: null, draftTitle: "新建任务" }) : page;
+    if (!development) global.CodexBridgeDesktopWorkbenchHeader.render(draftPage, emit);
     global.CodexBridgeDesktopWorkbenchApprovals.render(page, emit);
+    if (split) { updateFooter(development, true); return; }
     renderContent(page, emit, development);
-    if (!development) global.CodexBridgeDesktopWorkbenchControls.render(page, emit);
+    if (!development) {
+      global.CodexBridgeDesktopWorkbenchControls.render(draftPage, emit);
+    }
+    updateFooter(development);
   }
 
   global.CodexBridgeDesktopStableRender = renderStable;

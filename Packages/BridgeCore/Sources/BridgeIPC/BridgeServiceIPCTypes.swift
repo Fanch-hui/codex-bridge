@@ -13,6 +13,9 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case updateProjectCommands = "update_project_commands"
   case setProjectCommandMode = "set_project_command_mode"
   case workbenchWorkspace = "workbench_workspace"
+  case embeddedDSH = "embedded_dsh"
+  case getWorkbenchSettings = "get_workbench_settings"
+  case setWorkbenchEnabled = "set_workbench_enabled"
   case setWorkbenchProject = "set_workbench_project"
   case setWorkbenchPermissionMode = "set_workbench_permission_mode"
   case getAgentCatalog = "get_agent_catalog"
@@ -20,6 +23,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case beginAgentSetup = "begin_agent_setup"
   case getAgentSetups = "get_agent_setups"
   case continueAgentSetup = "continue_agent_setup"
+  case probeAgentSetupLogin = "probe_agent_setup_login"
   case cancelAgentSetup = "cancel_agent_setup"
   case registerAgentInstallation = "register_agent_installation"
   case reprobeAgentInstallation = "reprobe_agent_installation"
@@ -38,6 +42,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case readThread = "read_thread"
   case listTasks = "list_tasks"
   case getTask = "get_task"
+  case localTaskHistory = "local_task_history"
   case stopTask = "stop_task"
   case steerTask = "steer_task"
   case interruptTask = "interrupt_task"
@@ -54,6 +59,8 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setDirectApprovalMode = "set_direct_approval_mode"
   case getTaskStartApprovalMode = "get_task_start_approval_mode"
   case setTaskStartApprovalMode = "set_task_start_approval_mode"
+  case getProjectWriteConcurrency = "get_project_write_concurrency"
+  case setProjectWriteConcurrency = "set_project_write_concurrency"
   case setExposureMode = "set_exposure_mode"
   case submitAgentTask = "submit_agent_task"
   case taskHandoff = "task_handoff"
@@ -208,19 +215,43 @@ public struct IPCServiceShutdownResponse: Codable, Equatable, Sendable {
   }
 }
 
+public struct IPCAppUpdateBlocker: Codable, Equatable, Sendable {
+  public let kind: String
+  public let id: String
+  public let projectID: String?
+  public let label: String
+
+  public init(kind: String, id: String, projectID: String? = nil, label: String) {
+    self.kind = kind
+    self.id = id
+    self.projectID = projectID
+    self.label = label
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case kind, id, label
+    case projectID = "project_id"
+  }
+}
+
 public struct IPCAppUpdatePreparationResponse: Codable, Equatable, Sendable {
   public let canInstall: Bool
 
   public let waitingReason: String?
+  public let blockers: [IPCAppUpdateBlocker]?
 
-  public init(canInstall: Bool, waitingReason: String? = nil) {
+  public init(
+    canInstall: Bool, waitingReason: String? = nil, blockers: [IPCAppUpdateBlocker]? = nil
+  ) {
     self.canInstall = canInstall
     self.waitingReason = waitingReason
+    self.blockers = blockers
   }
 
   private enum CodingKeys: String, CodingKey {
     case canInstall = "can_install"
     case waitingReason = "waiting_reason"
+    case blockers
   }
 }
 

@@ -30,6 +30,10 @@ extension BridgeServiceClient {
     try await call(operation: .getTask, payload: request)
   }
 
+  public func localTaskHistory(_ request: IPCTaskRequest) async throws -> MCPServiceTaskSnapshot {
+    try await call(operation: .localTaskHistory, payload: request)
+  }
+
   public func stopTask(taskID: String) async throws {
     let _: IPCMutationResponse = try await call(
       operation: .stopTask,

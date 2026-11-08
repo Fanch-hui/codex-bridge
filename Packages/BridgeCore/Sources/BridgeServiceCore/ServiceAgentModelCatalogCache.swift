@@ -14,6 +14,10 @@ struct ServiceAgentModelCatalogCacheEntry: Sendable {
 
 extension ServiceAgentRegistry {
   static let modelCatalogCacheTTL: TimeInterval = 5 * 60
+  /// An expired catalog for the same unchanged installation may still answer a lookup whose
+  /// model it lists, while a background query refreshes it. Some native catalogs (for example
+  /// `agy models`) take several seconds, which would otherwise delay every task submission.
+  static let modelCatalogStaleLifetime: TimeInterval = 24 * 60 * 60
 
   public func models(
     installationID: AgentInstallationID,
@@ -56,6 +60,18 @@ extension ServiceAgentRegistry {
         resolveInputModalities: stored.providerID == .deepSeekHarness
           && runtimeBinding?.connectionMode != .nativeDesktop)
     }
+    if !forceRefresh, let stale = staleModelCatalog(for: storedKey),
+      selectedModelID.map({ AgentModelMatcher.match($0, in: stale) != nil }) ?? true
+    {
+      revalidateModelCatalog(
+        installationID: installationID, projectRoot: projectRoot, runtimeBinding: runtimeBinding)
+      return try await resolveSelectedModel(
+        installationID: installationID, projectRoot: projectRoot,
+        selectedModelID: selectedModelID, requireSelectedModel: requireSelectedModel,
+        key: storedKey, models: stale, runtimeBinding: runtimeBinding,
+        resolveInputModalities: stored.providerID == .deepSeekHarness
+          && runtimeBinding?.connectionMode != .nativeDesktop)
+    }
 
     let record = try await validateForRuntimeBinding(
       installationID: installationID,
@@ -94,6 +110,28 @@ extension ServiceAgentRegistry {
       now().timeIntervalSince(cached.createdAt) < Self.modelCatalogCacheTTL
     else { return nil }
     return cached.models
+  }
+
+  private func staleModelCatalog(
+    for key: ServiceAgentModelCatalogCacheKey
+  ) -> [AgentModelDescriptor]? {
+    guard let cached = modelCatalogCache[key],
+      now().timeIntervalSince(cached.createdAt) < Self.modelCatalogStaleLifetime
+    else { return nil }
+    return cached.models
+  }
+
+  /// Refreshes an expired catalog without making the current caller wait; concurrent refreshes
+  /// of the same catalog share one native query.
+  private func revalidateModelCatalog(
+    installationID: AgentInstallationID, projectRoot: String?,
+    runtimeBinding: AgentRuntimeBinding?
+  ) {
+    Task {
+      _ = try? await self.models(
+        installationID: installationID, projectRoot: projectRoot, forceRefresh: true,
+        requireSelectedModel: false, runtimeBinding: runtimeBinding)
+    }
   }
 
   private func sharedModelCatalog(

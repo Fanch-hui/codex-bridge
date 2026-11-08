@@ -33,6 +33,7 @@
     var saveGenerations: [String: UInt64] = [:]
     var saveTasks: [String: Task<Void, Never>] = [:]
     var savingProviderIDs: Set<String> = []
+    /// Project context shared with the workbench; model catalogs are scoped to it.
     var workbenchProjectID: String?
     var deepSeekDesktopModelScope: String?
     var deepSeekDesktopConnectionErrorCode: String?
@@ -78,14 +79,14 @@
       }
     }
 
-    func refresh(forceModelRefresh: Bool = false) async {
+    func refresh(forceModelRefresh: Bool = false, includeModels: Bool = true) async {
       guard !busy else { return }
       busy = true
+      let previousStatus = statusText
       statusText = "正在读取 Agent 目录…"
       publishDisplay()
       do {
-        let status = try await client.status()
-        workbenchProjectID = status.workbenchProjectID
+        workbenchProjectID = contextProjectID(in: try await client.projectList())
         connectionState = .connected
         let catalog = try await client.agentCatalog()
         providers = catalog.providers
@@ -99,6 +100,11 @@
         return
       }
       busy = false
+      guard includeModels else {
+        statusText = previousStatus
+        publishDisplay()
+        return
+      }
       await refreshAllProviderModels(forceRefresh: forceModelRefresh)
       await refreshNativePermissionPolicy()
     }
@@ -127,6 +133,17 @@
     }
 
     func refreshDisplaySnapshot() { publishDisplay() }
+
+    /// Keeps the project context while it stays registered; otherwise falls back to the default workspace.
+    func contextProjectID(in list: IPCProjectListResponse) -> String? {
+      if let workbenchProjectID,
+        list.projects.contains(where: { $0.projectID == workbenchProjectID })
+      {
+        return workbenchProjectID
+      }
+      return list.projects.first(where: { $0.projectID == list.defaultProjectID })?.projectID
+        ?? list.projects.first?.projectID
+    }
 
     func availableInstallation(for providerID: String? = nil)
       -> IPCAgentInstallationSummary?

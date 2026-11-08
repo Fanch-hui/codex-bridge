@@ -16,7 +16,7 @@ enum ServiceAgentSetupLogin {
     ]
     for key in [
       "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
-      "QODER_CONFIG_DIR", "QODERCN_CONFIG_DIR", "PI_CODING_AGENT_DIR",
+      "QODER_CONFIG_DIR", "QODERCN_CONFIG_DIR", "PI_CODING_AGENT_DIR", "CLAUDE_CONFIG_DIR",
     ] {
       if let value = source[key] { environment[key] = value }
     }
@@ -39,6 +39,11 @@ enum ServiceAgentSetupLogin {
     -> (arguments: [String], instructions: String, url: String)
   {
     switch AgentProviderID(rawValue: request.providerID) {
+    case .claudeCode:
+      return (
+        ["auth", "login"], "在终端中完成 Claude Code 官方登录，然后返回验证。",
+        "https://code.claude.com/docs/en/cli-reference"
+      )
     case .openCode:
       return (
         ["auth", "login"], "在打开的终端中选择服务商，完成浏览器登录或填写 API Key，然后返回验证。",

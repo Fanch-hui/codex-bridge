@@ -20,6 +20,16 @@ public struct DSHConversationExecutionSelection: Codable, Equatable, Sendable {
       effort: selection(effort, maximumBytes: 64), permissionMode: permissionMode)
   }
 
+  /// Validates a session continuation that may switch model, effort and task mode.
+  public func validatedContinuation() throws -> Self {
+    guard permissionMode == "full" || permissionMode == "read-only" else {
+      throw DSHWorkbenchTaskSubmission.SubmissionError.permissionUnsupported
+    }
+    return try Self(
+      modelID: selection(modelID, maximumBytes: 256),
+      effort: selection(effort, maximumBytes: 64), permissionMode: permissionMode)
+  }
+
   private func selection(_ value: String?, maximumBytes: Int) throws -> String? {
     guard let value else { return nil }
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)

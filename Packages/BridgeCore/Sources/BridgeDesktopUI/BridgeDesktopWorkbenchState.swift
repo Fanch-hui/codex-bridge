@@ -172,6 +172,8 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let header: BridgeDesktopPageHeader
   public let projects: [BridgeDesktopChoice]
   public let selectedProjectID: String?
+  /// Bridge-managed default workspace; new conversations use it when no project is chosen.
+  public let defaultProjectID: String?
   public let permissionMode: String
   public let permissionOptions: [BridgeDesktopChoice]
   public let taskHistorySearch: BridgeDesktopTaskHistorySearchState?
@@ -191,12 +193,16 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
   public let isRefreshingModels: Bool?
   public let modelError: String?
   public let commandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+  public let embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]?
   public let workspace: WorkbenchWorkspaceState?
+  /// Sessions shown in the split view, each with its own live conversation; nil when unsplit.
+  public let paneTasks: [BridgeDesktopTaskDetail]?
 
   public init(
     header: BridgeDesktopPageHeader,
     projects: [BridgeDesktopChoice] = [],
     selectedProjectID: String? = nil,
+    defaultProjectID: String? = nil,
     permissionMode: String = "full",
     permissionOptions: [BridgeDesktopChoice] = [],
     tasks: [BridgeDesktopTaskRow] = [],
@@ -216,11 +222,14 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     isRefreshingModels: Bool? = nil,
     modelError: String? = nil,
     commandReceipt: BridgeDesktopWorkbenchCommandReceipt? = nil,
-    workspace: WorkbenchWorkspaceState? = nil
+    embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt]? = nil,
+    workspace: WorkbenchWorkspaceState? = nil,
+    paneTasks: [BridgeDesktopTaskDetail]? = nil
   ) {
     self.header = header
     self.projects = projects
     self.selectedProjectID = selectedProjectID
+    self.defaultProjectID = defaultProjectID
     self.permissionMode = permissionMode
     self.permissionOptions = permissionOptions
     self.tasks = tasks
@@ -240,6 +249,8 @@ public struct BridgeDesktopWorkbenchState: Codable, Equatable, Sendable {
     self.isRefreshingModels = isRefreshingModels
     self.modelError = modelError
     self.commandReceipt = commandReceipt
+    self.embeddedDSHReceipts = embeddedDSHReceipts
     self.workspace = workspace
+    self.paneTasks = paneTasks
   }
 }

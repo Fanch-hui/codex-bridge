@@ -40,6 +40,12 @@
       } catch {
         guard generation == modelCatalogGeneration else { return nil }
         modelError = BridgeServiceErrorMessage.message(error)
+        if preferences == nil, preferenceQueue.active == nil,
+          let saved = try? await client.modelPreferences(),
+          generation == modelCatalogGeneration, preferenceQueue.active == nil
+        {
+          preferences = saved
+        }
         return nil
       }
     }
@@ -52,7 +58,6 @@
       busy = true
       isRefreshingModels = true
       modelError = nil
-      statusText = "正在获取 Codex 模型…"
       publishDisplay()
       defer {
         busy = false
@@ -68,12 +73,9 @@
       else { return nil }
 
       guard let catalog = await loadModelCatalog(forceRefresh: true) else {
-        statusText = "模型刷新失败：\(modelError ?? "无法读取模型目录")"
-        feedback.postAlert(statusText)
         return nil
       }
-      statusText = "Codex 模型已刷新，共 \(catalog.models.count) 个。"
-      feedback.postToast(statusText)
+      feedback.postToast("Codex 模型已刷新，共 \(catalog.models.count) 个。")
       return catalog
     }
 
@@ -91,7 +93,7 @@
           return true
         } catch {
           modelError = BridgeServiceErrorMessage.message(error)
-          statusText = "模型刷新失败：\(modelError ?? "无法连接本机 Service")"
+          statusText = "后台服务连接失败：\(modelError ?? "无法连接本机 Service")"
           feedback.postAlert(statusText)
           return false
         }

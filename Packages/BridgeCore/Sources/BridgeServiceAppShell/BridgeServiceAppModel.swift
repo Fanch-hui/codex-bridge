@@ -91,11 +91,16 @@ struct AgentModelCatalogScope: Equatable {
 
 @MainActor
 public final class BridgeServiceAppModel: ObservableObject {
+  lazy var workbenchSettingsController = makeWorkbenchSettingsController()
   @Published var appUpdateState: BridgeDesktopAppUpdateState?
   lazy var appUpdater = makeAppUpdater()
-  @Published public var selection: BridgeServiceNavigation? = .overview {
+  @Published public var selection: BridgeServiceNavigation? = .workbench {
     didSet { updateChatBrowserVisibility() }
   }
+  @Published var preferencesNavigation: BridgeServiceNavigation = .settings
+  @Published var preferencesWindowIsKey = false
+  var preferencesWindowIsVisible = false
+  @Published var pendingNewConversationRequestID: UUID?
   @Published public internal(set) var registrationStatus: BridgeServiceRegistrationStatus
   @Published public internal(set) var connectionState: BridgeServiceConnectionState = .idle
   @Published public internal(set) var serviceStatus: IPCServiceStatusResponse?
@@ -174,7 +179,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var resolvingApprovalKeys: Set<String> = []
   @Published public internal(set) var directApprovalMode = "require"
   @Published public internal(set) var taskStartApprovalMode = "require"
+  @Published public internal(set) var projectWriteConcurrency: Int?
   @Published public internal(set) var mcpClients: [IPCMCPClientStatus] = []
+  var mcpClientStatusRefreshInFlight = false
   @Published var geminiCloudStatus: IPCGeminiCloudStatus?
   @Published public internal(set) var deepSeekHarnessMCPServers:
     [IPCDeepSeekHarnessMCPServerSummary] = []
@@ -190,22 +197,25 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var selectedThread: MCPThreadReadPage?
   @Published public internal(set) var selectedThreadID: String?
   @Published public internal(set) var selectedTaskID: String?
+  /// Project the inspector, skills and model catalogs follow; sessions of every project stay listed.
   @Published public internal(set) var selectedProjectID: String? {
     didSet {
       if oldValue != selectedProjectID {
-        clearTaskHistorySearch()
         workspaceModel.selectProject(selectedProjectID)
         synchronizeAgentModelScopes()
       }
     }
   }
+  /// Bridge-managed default workspace reported by the service; the fallback project context.
+  @Published public internal(set) var defaultProjectID: String?
   @Published public internal(set) var workbenchPermissionMode = "full"
   @Published public internal(set) var workbenchCommandReceipt: BridgeDesktopWorkbenchCommandReceipt?
+  @Published public internal(set) var embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt] = []
   @Published var desktopLogSearchText = ""
   @Published var desktopLogProjectID: String?
   @Published var desktopLogKind = "all"
   @Published var desktopSelectedLogID: String?
-  @Published var chatBrowserViewport: BridgeDesktopBrowserViewport?
+  let chatBrowserViewport = ChatBrowserViewportState()
   let chatBrowserSessions: ChatBrowserSessions
   @Published public internal(set) var chatBrowserReloadRequest: UInt64 = 0
   @Published public internal(set) var isRefreshing = false
@@ -221,7 +231,8 @@ public final class BridgeServiceAppModel: ObservableObject {
         updateChatBrowserVisibility()
       } else {
         cancelChatBrowserSleep()
-        chatBrowserViewport = nil
+        chatBrowserViewport.update(nil)
+        releaseChatWebView()
       }
     }
   }
@@ -246,22 +257,33 @@ public final class BridgeServiceAppModel: ObservableObject {
   var client: (any BridgeServiceClientProtocol)?
   var conversationPresentationCache = TaskConversationPresentationCache()
   var desktopConversationPresentationCache = BridgeDesktopConversationPresentationCache()
+  /// Split-view panes of the web workbench, each with its own live conversation.
+  lazy var paneConversations = WorkbenchPaneConversations { [weak self] in
+    self?.objectWillChange.send()
+  }
+  var panePresentationCaches: [String: BridgeDesktopConversationPresentationCache] = [:]
   var stateChangesTask: Task<Void, Never>?
   var pollingTask: Task<Void, Never>?
   var refreshInProgress = false
   var pendingRefresh = false
+  /// A task the user asked to open before it reached the local task list, such as one just
+  /// submitted while another refresh was in flight; it opens once a snapshot contains it.
+  var pendingOpenTaskID: String?
   var pendingVisibleRefresh = false
   var pendingCatalogRefresh = false
+  var pendingSettingsRefresh = false
   var pendingForceCatalogRefresh = false
   var codexModelCatalogRequests = CodexModelCatalogRequestState()
   var chatWebViewSleepTask: Task<Void, Never>?
   var toastDismissTask: Task<Void, Never>?
-  var workbenchProjectSyncTask: Task<Void, Never>?
   var workbenchPermissionModeSyncTask: Task<Void, Never>?
   var workbenchPermissionModeSyncGeneration: UInt64 = 0
   var confirmedWorkbenchPermissionMode = "full"
   var agentModelCatalogGenerations: [String: UInt64] = [:]
   var agentModelCatalogScopes: [String: AgentModelCatalogScope] = [:]
+  /// Providers whose catalog read for the current scope has completed, including an empty list.
+  /// Emptiness alone cannot tell "never loaded" from "loaded, nothing to show".
+  var agentModelCatalogLoadedProviders: Set<String> = []
   var agentModelHydrationGenerations: [String: UInt64] = [:]
   var agentModelRefreshGenerations: [String: UInt64] = [:]
   var agentModelDefaultLoadGenerations: [String: UInt64] = [:]
@@ -314,7 +336,6 @@ public final class BridgeServiceAppModel: ObservableObject {
     pollingTask?.cancel()
     chatWebViewSleepTask?.cancel()
     toastDismissTask?.cancel()
-    workbenchProjectSyncTask?.cancel()
     workbenchPermissionModeSyncTask?.cancel()
     for task in agentModelDefaultMutationTasks.values {
       task.cancel()
@@ -330,7 +351,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   }
 
   public var navigation: BridgeServiceNavigation {
-    get { selection ?? .overview }
+    get { selection ?? .workbench }
     set { selection = newValue }
   }
 

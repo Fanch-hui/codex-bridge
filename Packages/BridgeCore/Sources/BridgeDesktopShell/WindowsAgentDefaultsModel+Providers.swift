@@ -57,9 +57,9 @@
       do {
         await saveTasks[providerID]?.value
         guard modelRefreshGenerations[providerID] == generation else { return }
-        let status = try await client.status()
+        let projectList = try await client.projectList()
         guard modelRefreshGenerations[providerID] == generation else { return }
-        let projectID = status.workbenchProjectID
+        let projectID = contextProjectID(in: projectList)
         workbenchProjectID = projectID
         let cached =
           forceRefresh

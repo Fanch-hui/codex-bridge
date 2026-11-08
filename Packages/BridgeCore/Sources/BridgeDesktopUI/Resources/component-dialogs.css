@@ -21,8 +21,10 @@
 .component-dialog::backdrop { background: var(--overlay-backdrop); }
 
 .component-dialog .dialog-header {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 0;
   padding: 20px 24px 12px;
+  overflow: auto;
 }
 
 .component-dialog .dialog-header h2 {
@@ -38,6 +40,7 @@
   padding: 0 24px 20px;
   overflow: auto;
   overscroll-behavior: contain;
+  line-height: 1.5;
 }
 
 .component-dialog .dialog-body > :first-child { margin-top: 0; }
@@ -50,9 +53,9 @@
   justify-content: flex-end;
   gap: 8px;
   margin: 0;
-  padding: 12px 24px 20px;
+  padding: 12px 24px 16px;
   border-top: 1px solid var(--separator);
-  background: var(--surface-muted);
+  background: var(--surface);
 }
 
 .feedback-message {

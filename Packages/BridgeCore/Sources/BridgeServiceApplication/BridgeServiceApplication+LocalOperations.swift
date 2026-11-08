@@ -118,6 +118,7 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant
   ) async throws {
     try Self.checkDeadline(deadline)
+    try await rejectDefaultWorkspaceRemoval(projectID: projectID)
     try await projects.remove(projectID: ProjectID(rawValue: projectID))
   }
 
@@ -167,12 +168,17 @@ extension BridgeServiceApplication {
   ) async throws {
     try Self.checkDeadline(deadline)
     let id = TaskID(rawValue: taskID)
-    if let task = try await tasks.task(id: id), task.isQueued {
-      _ = try await tasks.interrupt(
-        taskID: id,
-        summary: "The queued task was cancelled before execution started."
-      )
-      return
+    if let task = try await tasks.task(id: id) {
+      if task.state.status == .unknown, try await tasks.isEmbeddedDSHTask(id) {
+        throw EmbeddedDSHRecoveryError.pendingProcessReconciliation(taskID: id)
+      }
+      if task.isQueued {
+        _ = try await tasks.interrupt(
+          taskID: id,
+          summary: "The queued task was cancelled before execution started."
+        )
+        return
+      }
     }
     await coordinator.stop(taskID: id)
   }

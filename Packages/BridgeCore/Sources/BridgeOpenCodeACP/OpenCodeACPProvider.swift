@@ -60,7 +60,7 @@ public struct OpenCodeACPProvider: AgentProvider, Sendable {
     descriptor = try AgentProviderDescriptor(
       providerID: .openCode,
       displayName: "OpenCode",
-      adapterRevision: 1
+      adapterRevision: 2
     )
   }
 }

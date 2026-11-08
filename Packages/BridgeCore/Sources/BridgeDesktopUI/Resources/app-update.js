@@ -40,6 +40,7 @@
       update.notes,
       update.progress,
       update.message,
+      JSON.stringify(update.blockers || []),
       update.isDeferred
     ].map(function (value) { return String(value === undefined ? "" : value); }).join("\u001f");
   }
@@ -125,6 +126,26 @@
     copy.appendChild(row);
   }
 
+  function appendBlockers(copy, update, emit) {
+    if (phaseOf(update) !== "waiting" || !Array.isArray(update.blockers) || !update.blockers.length) return;
+    var list = node("div", "app-update-blockers");
+    list.setAttribute("aria-label", "等待完成的任务");
+    update.blockers.forEach(function (blocker) {
+      if (!blocker || !blocker.id || !blocker.label) return;
+      if (blocker.kind !== "task" && blocker.kind !== "workbench") {
+        list.appendChild(node("span", "hint", blocker.label)); return;
+      }
+      var link = node("button", "button small", blocker.label);
+      link.type = "button";
+      link.addEventListener("click", function () {
+        if (blocker.kind === "task") emit("openTask", { taskID: blocker.id });
+        else emit("openWorkbenchSession", { sessionID: blocker.id, projectID: blocker.projectID || null });
+      });
+      list.appendChild(link);
+    });
+    copy.appendChild(list);
+  }
+
   function appendState(container, update, emit, mode) {
     var state = update || { phase: "idle", currentVersion: "" };
     var phase = phaseOf(state);
@@ -142,6 +163,7 @@
     }
     if (state.notes) copy.appendChild(node("p", "app-update-notes", String(state.notes)));
     copy.appendChild(node("p", "app-update-message", messageFor(state)));
+    appendBlockers(copy, state, emit);
     if (["available", "downloading", "verifying", "waiting", "installing"].indexOf(phase) !== -1) {
       var reminder = node("div", "app-update-plugin-reminder");
       reminder.appendChild(node("strong", null, "更新后，请刷新 ChatGPT 插件"));
@@ -221,8 +243,119 @@
     return { root: root, update: update };
   }
 
+  var sidebarDialog = null, sidebarDialogTitle = null, sidebarDialogBody = null;
+  var currentSidebarUpdate = null, currentSidebarEmit = null;
+
+  function ensureSidebarDialog() {
+    if (sidebarDialog) return;
+    sidebarDialog = node("dialog", "component-dialog app-update-dialog");
+    sidebarDialog.setAttribute("aria-label", "版本更新详情");
+    var header = node("header", "dsh-settings-header");
+    sidebarDialogTitle = node("h2", null, "发现新版本");
+    var closeBtn = node("button", "button small", "关闭");
+    closeBtn.type = "button";
+    closeBtn.addEventListener("click", function () {
+      if (sidebarDialog.open && sidebarDialog.close) sidebarDialog.close();
+      else sidebarDialog.removeAttribute("open");
+    });
+    header.appendChild(sidebarDialogTitle);
+    header.appendChild(closeBtn);
+    sidebarDialogBody = node("div", "dsh-settings-body app-update-dialog-body");
+    sidebarDialog.appendChild(header);
+    sidebarDialog.appendChild(sidebarDialogBody);
+    sidebarDialog.addEventListener("click", function (event) {
+      if (event && event.target === sidebarDialog) {
+        if (sidebarDialog.open && sidebarDialog.close) sidebarDialog.close();
+        else sidebarDialog.removeAttribute("open");
+      }
+    });
+    sidebarDialog.addEventListener("close", function () {
+      if (global.CodexBridgeDesktopPages && global.CodexBridgeDesktopPages.measureBrowserViewport && currentSidebarEmit) {
+        global.CodexBridgeDesktopPages.measureBrowserViewport(currentSidebarEmit);
+      }
+    });
+    document.body.appendChild(sidebarDialog);
+  }
+
+  function renderSidebarDialogContent() {
+    if (!sidebarDialog || !sidebarDialogBody) return;
+    var state = currentSidebarUpdate || { phase: "idle", currentVersion: "" };
+    var phase = phaseOf(state);
+    sidebarDialogTitle.textContent = titleFor(state);
+    clear(sidebarDialogBody);
+    if (state.currentVersion || state.availableVersion) {
+      var versionText = "当前版本 " + version(state.currentVersion);
+      if (state.availableVersion) versionText += " → 最新版本 " + version(state.availableVersion);
+      sidebarDialogBody.appendChild(node("p", "app-update-version", versionText));
+    }
+    var notesHeading = node("h4", "app-update-notes-heading", "更新内容");
+    sidebarDialogBody.appendChild(notesHeading);
+    var notesBox = node("div", "app-update-dialog-notes", state.notes ? String(state.notes) : messageFor(state));
+    sidebarDialogBody.appendChild(notesBox);
+    if (state.notes) {
+      sidebarDialogBody.appendChild(node("p", "app-update-message", messageFor(state)));
+    }
+    appendBlockers(sidebarDialogBody, state, currentSidebarEmit);
+    appendProgress(sidebarDialogBody, state, phase);
+    var actions = node("div", "app-update-actions");
+    var busy = isBusy(state);
+    function lockActions() {
+      Array.prototype.forEach.call(actions.children, function (btn) { btn.disabled = true; });
+    }
+    if (phase === "available") {
+      var installBtn = action("立即更新", "installAppUpdate", currentSidebarEmit, busy, lockActions);
+      installBtn.className = "button primary small";
+      actions.appendChild(installBtn);
+    } else if (["downloading", "verifying", "waiting"].indexOf(phase) !== -1) {
+      actions.appendChild(action("取消更新", "cancelAppUpdate", currentSidebarEmit, false, lockActions));
+    } else if (phase === "failed") {
+      actions.appendChild(action(
+        state.availableVersion ? "重试更新" : "重试检查",
+        state.availableVersion ? "installAppUpdate" : "checkAppUpdate",
+        currentSidebarEmit,
+        busy
+      ));
+    }
+    if (actions.children.length > 0) sidebarDialogBody.appendChild(actions);
+  }
+
+  function renderSidebar(update, emit) {
+    currentSidebarUpdate = update || null;
+    currentSidebarEmit = emit;
+    var button = document.getElementById("sidebar-update-button");
+    if (!button) return;
+    if (!button.__boundAppUpdate) {
+      button.__boundAppUpdate = true;
+      button.addEventListener("click", function () {
+        ensureSidebarDialog();
+        renderSidebarDialogContent();
+        if (sidebarDialog.showModal && !sidebarDialog.open) sidebarDialog.showModal();
+        else sidebarDialog.setAttribute("open", "");
+        if (global.CodexBridgeDesktopPages && global.CodexBridgeDesktopPages.measureBrowserViewport && currentSidebarEmit) {
+          global.CodexBridgeDesktopPages.measureBrowserViewport(currentSidebarEmit);
+        }
+      });
+    }
+    var phase = phaseOf(update);
+    var hasUpdate = !!update && (
+      ["available", "downloading", "verifying", "waiting", "cancelling", "installing"].indexOf(phase) !== -1
+      || (phase === "failed" && !!update.availableVersion)
+    );
+    button.hidden = !hasUpdate;
+    if (hasUpdate) {
+      var label = titleFor(update) + "，点击查看更新内容";
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      button.classList.toggle("is-busy", isBusy(update));
+    }
+    if (sidebarDialog && sidebarDialog.open) {
+      renderSidebarDialogContent();
+    }
+  }
+
   global.CodexBridgeDesktopAppUpdate = {
     renderOverview: renderOverview,
+    renderSidebar: renderSidebar,
     createSettings: createSettings
   };
 }(window));

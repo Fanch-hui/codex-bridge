@@ -4,13 +4,18 @@ import BridgeMCP
 import BridgeServiceAppCore
 
 extension BridgeDesktopUIStateBuilder {
-  static func workbench(from model: BridgeServiceAppModel) -> BridgeDesktopWorkbenchState {
+  /// Session rows come from `cache`; the selected task, pane conversations and engine status
+  /// follow live conversations that change without the model publishing, so they are rebuilt.
+  static func workbench(
+    from model: BridgeServiceAppModel,
+    cache: BridgeDesktopUIStateCache = BridgeDesktopUIStateCache()
+  ) -> BridgeDesktopWorkbenchState {
     let (projectStatus, projectStatusTone) = projectStatus(from: model)
-    let projectTasks = model.tasks.filter {
-      model.selectedProjectID == nil || $0.projectID == model.selectedProjectID
+    let taskRows = cache.workbenchTaskRows.value(
+      for: DesktopTaskRowsInput(model, tasksRevision: cache.tasksRevision(for: model.tasks))
+    ) {
+      cache.sessions(for: model.tasks).map { session in taskRow(session, model: model) }
     }
-    let sessions = WorkbenchSessionCatalog.sessions(tasks: projectTasks)
-      .sorted { $0.latestTask.updatedAt > $1.latestTask.updatedAt }
     return BridgeDesktopWorkbenchState(
       header: BridgeDesktopPageHeader(
         title: "工作台",
@@ -23,9 +28,10 @@ extension BridgeDesktopUIStateBuilder {
           detail: ProjectAgentPresentation.gitStateLabel($0.gitState))
       },
       selectedProjectID: model.selectedProjectID,
+      defaultProjectID: model.defaultProjectID,
       permissionMode: model.workbenchPermissionMode,
       permissionOptions: permissionOptions,
-      tasks: sessions.map { session in taskRow(session, model: model) },
+      tasks: taskRows,
       taskHistorySearch: BridgeDesktopTaskHistorySearchState(
         model.taskHistorySearch, providers: model.taskHistoryProviderChoices),
       selectedTaskID: model.selectedTaskID,
@@ -43,7 +49,9 @@ extension BridgeDesktopUIStateBuilder {
       isRefreshingModels: model.isRefreshingModels,
       modelError: model.modelCatalogError,
       commandReceipt: model.workbenchCommandReceipt,
-      workspace: model.workspaceModel.state
+      embeddedDSHReceipts: model.embeddedDSHReceipts,
+      workspace: model.workspaceModel.state,
+      paneTasks: paneTasks(from: model)
     )
   }
 
@@ -128,7 +136,8 @@ extension BridgeDesktopUIStateBuilder {
     guard let taskID,
       let installationID = model.tasks.first(where: { $0.taskID == taskID })?.installationID,
       model.agentInstallations.first(where: { $0.installationID == installationID })?
-        .effectiveCapabilities.contains("lifecycle.steer_interrupt_and_continue") == true
+        .effectiveCapabilities.contains(TaskInspectorPresentation.interruptAndContinueCapability)
+        == true
     else { return false }
     return true
   }
@@ -138,10 +147,8 @@ extension BridgeDesktopUIStateBuilder {
     model: BridgeServiceAppModel
   ) -> BridgeDesktopTaskRow {
     let task = session.latestTask
-    let providerCanSteer =
-      task.providerID.flatMap { providerID in
-        model.agentProviders.first(where: { $0.providerID == providerID })?.supportsSteer
-      } == true
+    let providerCanSteer = TaskInspectorPresentation.supportsConversationInsertion(
+      task, providers: model.agentProviders, installations: model.agentInstallations)
     return BridgeDesktopTaskRow(
       taskID: task.taskID,
       sessionID: session.sessionID,

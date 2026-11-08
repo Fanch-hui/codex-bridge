@@ -90,6 +90,12 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
 
   func handleOperation(_ request: BridgeServiceIPCRequest) async throws -> Data {
     switch request.operation {
+    case .localTaskHistory:
+      let payload = try BridgeServiceIPCCodec.payload(IPCTaskRequest.self, from: request)
+      let result = try await composition.application.serviceLocalTaskHistory(
+        taskID: payload.taskID, recentEventLimit: payload.recentEventLimit,
+        deadline: Self.deadline())
+      return try BridgeServiceIPCCodec.success(requestID: request.requestID, payload: result)
     case .getDirectConfiguration, .updateDirectConfiguration:
       return try await handleDirectConfiguration(request)
     case .checkDirectCommand:
@@ -111,13 +117,18 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleSetProjectCommandMode(request)
     case .workbenchWorkspace:
       return try await handleWorkbenchWorkspace(request)
+    case .embeddedDSH:
+      return try await handleEmbeddedDSH(request)
+    case .getWorkbenchSettings, .setWorkbenchEnabled:
+      return try await handleWorkbenchSettings(request)
     case .setWorkbenchProject:
       return try await handleSetWorkbenchProject(request)
     case .setWorkbenchPermissionMode:
       return try await handleSetWorkbenchPermissionMode(request)
     case .getAgentCatalog:
       return try await handleGetAgentCatalog(request)
-    case .beginAgentSetup, .getAgentSetups, .continueAgentSetup, .cancelAgentSetup:
+    case .beginAgentSetup, .getAgentSetups, .continueAgentSetup, .probeAgentSetupLogin,
+      .cancelAgentSetup:
       return try await handleAgentSetup(request)
     case .connectAgentInstallation:
       return try await handleConnectAgentInstallation(request)
@@ -187,6 +198,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleGetTaskStartApprovalMode(request)
     case .setTaskStartApprovalMode:
       return try await handleSetTaskStartApprovalMode(request)
+    case .getProjectWriteConcurrency:
+      return try await handleGetProjectWriteConcurrency(request)
+    case .setProjectWriteConcurrency:
+      return try await handleSetProjectWriteConcurrency(request)
     case .submitAgentTask:
       return try await handleSubmitAgentTask(request)
     case .taskHandoff:

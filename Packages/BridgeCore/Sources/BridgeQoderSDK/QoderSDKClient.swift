@@ -8,6 +8,8 @@ public enum QoderHostEvent: Sendable {
   case update(QoderJSONValue)
   case permission(ACPRequestID, QoderJSONValue)
   case userInput(ACPRequestID, QoderJSONValue)
+  /// The host asks to take or give back the project write lease for one tool call.
+  case workspaceWrite(ACPRequestID, QoderJSONValue)
 }
 
 public actor QoderSDKClient {
@@ -22,6 +24,7 @@ public actor QoderSDKClient {
   private var lastSequence: Int64 = -1
   private var pendingPermissions = Set<ACPRequestID>()
   private var pendingUserInputs = Set<ACPRequestID>()
+  private var pendingWrites = Set<ACPRequestID>()
   private var requestCount = 0
 
   public init(transport: any ACPTransport, requestTimeout: Duration = .seconds(45)) {
@@ -74,6 +77,14 @@ public actor QoderSDKClient {
     }
   }
 
+  public func resolveWorkspaceWrite(_ id: ACPRequestID, result: QoderJSONValue) async throws {
+    guard !closed, pendingWrites.remove(id) != nil else { throw ACPError.invalidMessage }
+    do { try await broker.send(ACPWireMessage(id: id, result: result)) } catch {
+      await shutdown()
+      throw error
+    }
+  }
+
   private func start() {
     guard reader == nil else { return }
     let source = transport.incoming
@@ -103,13 +114,15 @@ public actor QoderSDKClient {
       lastSequence = Int64(sequence)
       try await yield(.update(params))
     case .serverRequest(let id, let method, let params):
-      guard let params, pendingPermissions.count + pendingUserInputs.count < 32 else {
-        throw ACPError.invalidMessage
-      }
+      guard let params,
+        pendingPermissions.count + pendingUserInputs.count + pendingWrites.count < 32
+      else { throw ACPError.invalidMessage }
       if method == "qoder/permission", pendingPermissions.insert(id).inserted {
         try await yield(.permission(id, params))
       } else if method == "qoder/question", pendingUserInputs.insert(id).inserted {
         try await yield(.userInput(id, params))
+      } else if method == "qoder/workspaceWrite", pendingWrites.insert(id).inserted {
+        try await yield(.workspaceWrite(id, params))
       } else {
         throw ACPError.invalidMessage
       }
@@ -136,6 +149,7 @@ public actor QoderSDKClient {
     reader?.cancel()
     pendingPermissions.removeAll()
     pendingUserInputs.removeAll()
+    pendingWrites.removeAll()
     let task = Task { [broker] in await broker.close() }
     closing = task
     await task.value

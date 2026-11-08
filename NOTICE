@@ -15,5 +15,13 @@ Release builds may bundle OpenAI tunnel-client. Its pinned upstream LICENSE,
 NOTICE and supply manifest are copied into the application bundle under
 Contents/Resources/TunnelClient and are verified before packaging.
 
+The embedded dsh-zcode package includes zcode-api by TriDefender and
+contributors and adaptations of its proxy. Those components are licensed under
+CC BY-NC-SA 4.0, requiring attribution, noncommercial use and share-alike.
+The license and third-party notices are in EmbeddedDSH/licenses; the
+corresponding upstream and integration source is in
+EmbeddedDSH/vendor/dsh-zcode-0.2.1.tgz. On macOS, EmbeddedDSH is under the
+app's Contents/Resources directory.
+
 Complete dependency versions, source locations and license evidence are in
 docs/DEPENDENCIES.md and the generated SPDX SBOM shipped with release artifacts.

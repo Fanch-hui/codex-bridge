@@ -102,6 +102,10 @@ extension ServiceAgentAutoDiscovery {
     qoderDistributionsByExecutablePath: [String: QoderDistribution] = [:]
   ) throws -> ServiceAgentDiscoverySummary {
     switch providerID {
+    case .claudeCode:
+      return discoveredSummary(
+        from: try claudeCodeRequests(
+          existingPaths: existingInstallations.map(\.executablePath), environment: environment))
     case .qoder:
       return discoveredSummary(
         from: try qoderRequests(

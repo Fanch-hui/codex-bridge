@@ -53,6 +53,19 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
 
     await report("安装程序和依赖")
     return try await stagedInstall(in: group) { stage in
+      if providerID == .claudeCode {
+        let cli = try await installClaudeBinary(in: stage)
+        await report("准备 Node 运行时")
+        let node: String
+        if let existing = await reusableNode(near: cli.executablePath, cwd: stage) {
+          node = existing
+        } else {
+          node = try await installNode(in: stage)
+        }
+        return ServiceAgentSetupRuntime(
+          executablePath: cli.executablePath, nodeExecutablePath: node,
+          version: cli.version, installationDirectory: stage.path)
+      }
       if [.openCode, .antigravity].contains(providerID) {
         return try await installBinary(providerID: providerID, in: stage)
       }
@@ -108,7 +121,7 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
     guard let entry else { return nil }
     let isNode = ["js", "cjs", "mjs"].contains(
       URL(fileURLWithPath: entry).pathExtension.lowercased())
-    if !isNode, providerID != .qoder {
+    if !isNode, providerID != .qoder, providerID != .claudeCode {
       guard
         let output = try? await io.run(
           [entry, "--version"], cwd: group, environment: installEnvironment(in: group))
@@ -163,7 +176,7 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
     }
   }
 
-  private func normalizeExisting(
+  func normalizeExisting(
     _ path: String, providerID: AgentProviderID, distribution: QoderDistribution?
   ) -> String? {
     if providerID == .qoder {
@@ -181,6 +194,10 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
     if providerID == .pi {
       packages.append(
         ServiceAgentSetupInstallPackage(name: "@mariozechner/pi-coding-agent", command: "pi"))
+    }
+    if providerID == .claudeCode {
+      packages.append(
+        ServiceAgentSetupInstallPackage(name: "@anthropic-ai/claude-code", command: "claude"))
     }
     for _ in 0..<8 {
       for package in packages {
@@ -236,6 +253,13 @@ public struct ServiceAgentSetupInstaller: ServiceAgentSetupInstalling {
         FileManager.default.fileExists(atPath: receipt.runtime.executablePath)
       else { continue }
       let runtime = receipt.runtime
+      if providerID == .claudeCode {
+        guard let node = runtime.nodeExecutablePath,
+          let version = try? await io.run(
+            [node, "--version"], cwd: group, environment: installEnvironment(in: group, node: node)),
+          Self.nodeVersionSupported(version.trimmingCharacters(in: .whitespacesAndNewlines))
+        else { continue }
+      }
       if providerID == .deepSeekHarness, let node = runtime.nodeExecutablePath {
         guard
           let requirement = try? DeepSeekHarnessACPProfile.nodeRequirement(

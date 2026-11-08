@@ -206,6 +206,20 @@ extension BridgeServiceRequestController {
     return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
   }
 
+  func handleGetProjectWriteConcurrency(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let limit = try await composition.application.serviceProjectWriteConcurrency(
+      deadline: Self.deadline())
+    return try BridgeServiceIPCCodec.success(
+      requestID: request.requestID, payload: IPCProjectWriteConcurrency(limit: limit))
+  }
+
+  func handleSetProjectWriteConcurrency(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let payload = try BridgeServiceIPCCodec.payload(IPCProjectWriteConcurrency.self, from: request)
+    try await composition.application.serviceSetProjectWriteConcurrency(
+      payload.limit, deadline: Self.deadline())
+    return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
+  }
+
   func handleSetExposureMode(_ request: BridgeServiceIPCRequest) async throws -> Data {
     let payload = try BridgeServiceIPCCodec.payload(
       IPCExposureModeRequest.self,

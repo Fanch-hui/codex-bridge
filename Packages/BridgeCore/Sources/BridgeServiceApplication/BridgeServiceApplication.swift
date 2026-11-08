@@ -26,6 +26,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let projects: ServiceProjectService
   let tasks: ServiceTaskManager
   let settings: ServiceSettings
+  let defaultWorkspace: ServiceDefaultWorkspace?
   let agentRegistry: ServiceAgentRegistry?
   let agentCredentials: ServiceAgentCredentialEnvironment?
   let deepSeekDesktop: (any DeepSeekHarnessDesktopControlling)?
@@ -50,6 +51,8 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   let skillScanner: SkillScanner
   var taskQueueProcessor: Task<Void, Never>?
   var handoffOperations = Set<String>()
+  var unscopedWorkbenchExecutions: [String: String] = [:]
+  var workbenchMaintenanceAdmissions: [String: String] = [:]
   public let iso8601 = ISO8601DateFormatter()
 
   public init(
@@ -60,6 +63,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     coordinator: ServiceExecutionCoordinator,
     catalog: ServiceCodexCatalog,
     runtimeStatus: ServiceRuntimeStatus,
+    defaultWorkspace: ServiceDefaultWorkspace? = nil,
     agentRegistry: ServiceAgentRegistry? = nil,
     agentCredentials: ServiceAgentCredentialEnvironment? = nil,
     deepSeekDesktop: (any DeepSeekHarnessDesktopControlling)? = nil,
@@ -83,6 +87,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     self.projects = projects
     self.tasks = tasks
     self.settings = settings
+    self.defaultWorkspace = defaultWorkspace
     self.agentRegistry = agentRegistry
     self.agentCredentials = agentCredentials
     self.deepSeekDesktop = deepSeekDesktop
@@ -99,7 +104,11 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     self.mutations =
       mutations
       ?? RestrictedProjectMutationService(repository: repository)
-    self.workspaceGate = workspaceGate ?? ServiceWorkspaceMutationGate()
+    let workspaceGate = workspaceGate ?? ServiceWorkspaceMutationGate()
+    workspaceGate.setRecoveryLookup { projectID in
+      try await tasks.workspaceMergeRecoveries(projectID: projectID).map(\.workspaceID)
+    }
+    self.workspaceGate = workspaceGate
     self.directMutationOperations = DirectMutationOperationStore()
     self.appUpdatePreparationTask = nil
     self.commandPolicy = commandPolicy

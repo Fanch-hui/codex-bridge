@@ -9,6 +9,7 @@ typedef struct {
   const gchar *site;
   const gchar *home;
   const gchar *state;
+  gchar *resume_uri;
   gchar *error;
 } BridgeBrowser;
 
@@ -21,6 +22,7 @@ typedef struct {
   gchar *page_root;
   gchar *data_root;
   gboolean browser_enabled;
+  gboolean browser_presentation_visible;
   gboolean browser_visible;
   gint browser_x, browser_y, browser_width, browser_height;
 } BridgeDesktop;

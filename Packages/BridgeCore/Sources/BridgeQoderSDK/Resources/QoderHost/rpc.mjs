@@ -4,7 +4,8 @@ import { HostError, requireValue, object, identifier } from './validation.mjs';
 export class RPCPeer {
   constructor(input, output, handler, onClose = async () => {}) {
     this.input = input; this.output = output; this.handler = handler; this.onClose = onClose;
-    this.pending = new Map(); this.active = new Set(); this.closed = false;
+    this.pending = new Map(); this.active = new Set(); this.tasks = new Set(); this.closed = false;
+    this.closing = null;
     this.buffer = Buffer.alloc(0); this.maximum = 16 * 1024 * 1024;
     this.onData = bytes => this.receive(bytes);
     input.on('data', this.onData);
@@ -70,18 +71,25 @@ export class RPCPeer {
     identifier(value.method);
     requireValue(!this.active.has(value.id) && this.active.size < 64, 'duplicate_request');
     this.active.add(value.id);
-    Promise.resolve().then(() => this.handler(value.method, object(value.params ?? {})))
+    const task = Promise.resolve().then(() => this.handler(value.method, object(value.params ?? {})))
       .then(result => { if (!this.closed) this.send({ id: value.id, result: result ?? {} }); })
       .catch(error => {
         if (!this.closed) this.send({ id: value.id, error: { code: -32000,
           message: error instanceof HostError ? error.code : 'qoder_host_error' } });
-      }).finally(() => this.active.delete(value.id));
+      }).finally(() => { this.active.delete(value.id); this.tasks.delete(task); });
+    this.tasks.add(task);
   }
-  async close() {
-    if (this.closed) return;
+  close() {
+    if (this.closing) return this.closing;
     this.closed = true; this.input.off('data', this.onData); this.input.pause(); this.buffer = Buffer.alloc(0);
     for (const finish of this.pending.values()) finish(new HostError('transport_closed'));
     this.pending.clear();
-    await this.onClose();
+    this.closing = (async () => {
+      let failure;
+      try { await this.onClose(); } catch (error) { failure = error; }
+      await Promise.allSettled([...this.tasks]);
+      if (failure) throw failure;
+    })();
+    return this.closing;
   }
 }

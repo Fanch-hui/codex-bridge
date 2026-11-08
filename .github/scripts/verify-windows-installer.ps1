@@ -40,7 +40,7 @@ function Invoke-Installer([string]$Executable, [string]$Stage, [switch]$Uninstal
   $arguments = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
     "/LOG=`"$(Join-Path $verificationRoot "$Stage.log")`"")
   if (-not $Uninstall) { $arguments += @("/SP-", "/DIR=`"$installRoot`"") }
-  Invoke-Control $Executable $arguments 120
+  Invoke-Control $Executable $arguments 600
 }
 
 function Assert-InstalledPayload {
@@ -54,8 +54,13 @@ function Assert-InstalledPayload {
   if ($info.appVersion -ne $version -or $info.architecture -ne $Architecture) {
     throw "Installed version or architecture does not match the release."
   }
+  $embeddedDSHRoot = Join-Path $installRoot "EmbeddedDSH"
+  & node (Join-Path $repoRoot "Scripts\verify-embedded-dsh-runtime.mjs") $embeddedDSHRoot "windows" $Architecture
+  if ($LASTEXITCODE -ne 0) { throw "Installed embedded DSH runtime verification failed." }
+  $embeddedDSH = Get-Content -LiteralPath (Join-Path $embeddedDSHRoot "runtime.json") -Raw | ConvertFrom-Json
+  $embeddedNode = Join-Path $embeddedDSHRoot ($embeddedDSH.node -replace "/", "\")
   $expectedMachine = if ($Architecture -eq "x64") { [UInt16]0x8664 } else { [UInt16]0xAA64 }
-  foreach ($executable in @($appPath, $servicePath, (Join-Path $installRoot "tunnel-client.exe"))) {
+  foreach ($executable in @($appPath, $servicePath, $embeddedNode, (Join-Path $installRoot "tunnel-client.exe"))) {
     if ((Get-PEMachine $executable) -ne $expectedMachine) { throw "Installed executable architecture mismatch." }
   }
   foreach ($line in Get-Content -LiteralPath (Join-Path $installRoot "SHA256SUMS.txt")) {
@@ -70,8 +75,8 @@ function Assert-InstalledPayload {
   if ((Get-Sha256 (Join-Path $installRoot "tunnel-client.exe")) -cne $helperDigest) {
     throw "Installed Tunnel helper digest mismatch."
   }
-  foreach ($module in @("BridgeDesktopUI", "BridgePiRPC", "BridgeQoderSDK", "BridgeDeepSeekHarnessACP",
-      "BridgeDeepSeekHarnessDesktop")) {
+  foreach ($module in @("BridgeDesktopUI", "BridgeMCP", "BridgePiRPC", "BridgeQoderSDK",
+      "BridgeClaudeSDK", "BridgeDeepSeekHarnessACP", "BridgeDeepSeekHarnessDesktop")) {
     $resources = @(Get-ChildItem -LiteralPath $installRoot -Directory | Where-Object {
         $_.Name -in @("BridgeCore_$module.bundle", "BridgeCore_$module.resources")
       })

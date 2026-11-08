@@ -76,6 +76,11 @@ extension ExecutionSession {
         limits: approvalLimits
       )
       usedApprovalRequests.insert(requestKey)
+      if approvalLimits.isolated, prepared.request.kind != .userInput {
+        let result = try prepared.response.value(for: .deny)
+        try await client.respond(to: rpcRequest.id, result: result)
+        return
+      }
       pendingApprovals[id] = PendingApproval(
         rpcRequestID: rpcRequest.id,
         response: prepared.response,

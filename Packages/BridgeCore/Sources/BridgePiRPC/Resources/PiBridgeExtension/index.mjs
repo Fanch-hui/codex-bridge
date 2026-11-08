@@ -1,4 +1,5 @@
-import { approvalOptions, approvalPrefix, createPolicy } from "./policy.mjs";
+import { approvalOptions, approvalPrefix, createPolicy, mayWriteProject } from "./policy.mjs";
+import { acquireWriteGate } from "./write-gate.mjs";
 import { registerAskUserTool } from "./ask-user.mjs";
 import { registerPlanTool } from "./plan.mjs";
 import { registerMCPTools } from "./mcp.mjs";
@@ -18,7 +19,8 @@ export default async function registerBridge(pi) {
   }
   registerPlanTool(pi, policy.context);
   registerAskUserTool(pi);
-  const subtaskRuntime = registerSubtaskTool(pi, policy.context);
+  const subtaskRuntime = policy.context.tools.includes("bridge_subtask")
+    ? registerSubtaskTool(pi, policy.context) : null;
   const mcpRuntime = await registerMCPTools(pi, policy, policy.context);
 
   pi.on("session_start", (_event, ctx) => {
@@ -31,23 +33,30 @@ export default async function registerBridge(pi) {
     }
     ctx.ui.setStatus("codex-bridge.pi", JSON.stringify({ revision: 1,
       nonce: policy.context.nonce, tools: mcpRuntime.activeTools,
-      capabilities: ["plan", "user_input", "mcp_client", "subagents"],
+      capabilities: ["plan", "user_input", "mcp_client", ...(subtaskRuntime ? ["subagents"] : []),
+        ...(policy.context.writeGate ? ["write_gate"] : [])],
       mcp: mcpRuntime.state }));
   });
 
   pi.on("tool_call", async (event, ctx) => {
     const result = await policy.inspect(event);
-    if (result.allowed) return;
     if (result.denied) return { block: true, reason: result.reason };
-    if (!ctx.hasUI || ctx.signal?.aborted) return { block: true, reason: "Tool approval cancelled." };
-    const option = await ctx.ui.select(approvalPrefix + JSON.stringify(result.envelope), [...approvalOptions]);
-    if (ctx.signal?.aborted || !policy.decide(result.envelope, option)) {
-      return { block: true, reason: "The local user did not approve this operation." };
+    if (!result.allowed) {
+      if (!ctx.hasUI || ctx.signal?.aborted) return { block: true, reason: "Tool approval cancelled." };
+      const option = await ctx.ui.select(approvalPrefix + JSON.stringify(result.envelope), [...approvalOptions]);
+      if (ctx.signal?.aborted || !policy.decide(result.envelope, option)) {
+        return { block: true, reason: "The local user did not approve this operation." };
+      }
+    }
+    // The host holds the shared project write lease from here until this call ends.
+    if (policy.context.writeGate && mayWriteProject(event.toolName)
+        && !(await acquireWriteGate(policy.context, event, ctx))) {
+      return { block: true, reason: "Project write access was not granted for this operation." };
     }
   });
 
   pi.on("session_shutdown", async () => {
     policy.clear();
-    await Promise.all([mcpRuntime.close(), subtaskRuntime.close()]);
+    await Promise.all([mcpRuntime.close(), subtaskRuntime?.close()]);
   });
 }

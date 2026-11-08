@@ -152,6 +152,7 @@ public actor DeepSeekHarnessACPExecution {
     do {
       var nextPrompt = prompt
       var nextImages = images
+      var initialPrompt = true
       while true {
         if interruptRequested {
           await finishInterrupted()
@@ -159,8 +160,15 @@ public actor DeepSeekHarnessACPExecution {
         }
         let toolEvidenceBeforePrompt = await normalizer.toolEvidence()
         promptPhase = .running
-        let result = try await client.prompt(
-          sessionID: sessionID, text: nextPrompt, images: nextImages)
+        let result: DeepSeekHarnessACPPromptResult
+        if initialPrompt {
+          result = try await client.promptForInitialExecution(
+            sessionID: sessionID, text: nextPrompt, images: nextImages)
+          initialPrompt = false
+        } else {
+          result = try await client.prompt(
+            sessionID: sessionID, text: nextPrompt, images: nextImages)
+        }
         nextImages = []
         promptPhase = .settling
         try await waitUntilConsumed(result.eventSequenceBarrier)

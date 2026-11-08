@@ -1,6 +1,7 @@
 import BridgeAgentCore
 import BridgeCodexRPC
 import BridgeDomain
+import BridgeSecurity
 import BridgeServiceCore
 import Foundation
 
@@ -127,20 +128,72 @@ public struct ExecutionBinding: Codable, Equatable, Hashable, Sendable {
   }
 }
 
+/// A private execution root owned and validated by the service.
+public struct ServiceExecutionWorkspace: Equatable, Sendable {
+  public let root: RegisteredRoot
+  public let runtimeRoot: RegisteredRoot
+
+  public init(root: RegisteredRoot, runtimeRoot: RegisteredRoot) {
+    self.root = root
+    self.runtimeRoot = runtimeRoot
+  }
+
+  func validate(projectRoot: String) throws {
+    let paths = [projectRoot, root.canonicalPath, runtimeRoot.canonicalPath]
+    for (index, left) in paths.enumerated() {
+      for right in paths.dropFirst(index + 1) {
+        guard !AgentPathSemantics.isContained(left, in: right),
+          !AgentPathSemantics.isContained(right, in: left)
+        else { throw ExecutionServiceError.invalidRequest("isolatedWorkspace") }
+      }
+    }
+    try root.validateCurrentIdentity()
+    try runtimeRoot.validateCurrentIdentity()
+  }
+}
+
+public typealias ServiceExecutionWorkspaceResolver =
+  @Sendable (
+    ServiceTaskRecord, ServiceProjectRecord
+  ) async throws -> ServiceExecutionWorkspace?
+
 public struct ExecutionRequest: Equatable, Sendable {
   public let task: ServiceTaskRecord
   public let project: ServiceProjectRecord
+  public let isolatedWorkspace: ServiceExecutionWorkspace?
+  public let nativeSubagentsAllowed: Bool
 
-  public init(task: ServiceTaskRecord, project: ServiceProjectRecord) throws {
+  public var executionRootPath: String {
+    isolatedWorkspace?.root.canonicalPath ?? project.root.canonicalPath
+  }
+
+  public var executionPrompt: String {
+    AgentExecutionInstructions.prompt(task.prompt, nativeSubagentsAllowed: nativeSubagentsAllowed)
+  }
+
+  public init(
+    task: ServiceTaskRecord,
+    project: ServiceProjectRecord,
+    isolatedWorkspace: ServiceExecutionWorkspace? = nil,
+    nativeSubagentsAllowed: Bool = true
+  ) throws {
     guard task.projectID == project.id else {
       throw ExecutionServiceError.invalidRequest("projectID")
     }
     guard task.state.status == .starting else {
       throw ExecutionServiceError.invalidRequest("task.status")
     }
+    if let isolatedWorkspace {
+      guard task.providerID == serviceCodexProviderID, task.permissionMode == .full
+      else { throw ExecutionServiceError.invalidRequest("isolatedWorkspace") }
+      try isolatedWorkspace.validate(projectRoot: project.root.canonicalPath)
+    }
     self.task = task
     self.project = project
+    self.isolatedWorkspace = isolatedWorkspace
+    self.nativeSubagentsAllowed = nativeSubagentsAllowed
   }
+
 }
 
 public enum ExecutionCommandStatus: String, Codable, Equatable, Sendable {

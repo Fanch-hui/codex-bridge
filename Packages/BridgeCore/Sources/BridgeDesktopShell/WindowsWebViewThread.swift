@@ -33,6 +33,7 @@
     var stopping = false
     var completed = false
     var shutdownNotification: (window: HWND, message: UINT)?
+    var shutdownCompletions: [@Sendable () -> Void] = []
 
     var loaderModule: HMODULE?
     var environment: UnsafeMutableRawPointer?
@@ -168,9 +169,24 @@
       // UI pump for up to 5 seconds on teardown.
     }
 
+    func shutdown(onCompletion: @escaping @Sendable () -> Void) {
+      let target = lock.withLock { () -> DWORD? in
+        guard !completed else { return nil }
+        stopping = true
+        shutdownCompletions.append(onCompletion)
+        return threadID
+      }
+      guard let target else {
+        onCompletion()
+        return
+      }
+      if target != 0 { _ = PostThreadMessageW(target, UINT(WM_QUIT), 0, 0) }
+    }
+
     private func run() {
       let comInitialization = CoInitializeEx(nil, DWORD(0x2))
       defer {
+        if onNavigationChanged != nil { syncNavigationState() }
         releaseInterfaces()
         if let loaderModule { _ = FreeLibrary(loaderModule) }
         if comInitialization >= 0 { CoUninitialize() }
@@ -231,6 +247,7 @@
     }
 
     private func environmentCreated(errorCode: HRESULT, environment: UnsafeMutableRawPointer?) {
+      guard !lock.withLock({ stopping }) else { return }
       guard errorCode == webview2SOK, let environment else {
         updateState(.failed, "WebView2 环境初始化失败（\(hresult(errorCode))）。")
         return
@@ -253,6 +270,14 @@
     }
 
     private func controllerCreated(errorCode: HRESULT, controller: UnsafeMutableRawPointer?) {
+      if lock.withLock({ stopping }) {
+        if let controller {
+          let close: WebView2ActionFn = webView2Method(
+            controller, WebView2Slot.controllerClose, as: WebView2ActionFn.self)
+          _ = close(controller)
+        }
+        return
+      }
       guard errorCode == webview2SOK, let controller else {
         updateState(.failed, "WebView2 Controller 初始化失败（\(hresult(errorCode))）。")
         return

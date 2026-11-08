@@ -27,6 +27,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case directConfiguration = "direct.configuration"
   case directApprovalMode = "direct.approval_mode"
   case taskStartApprovalMode = "tasks.start_approval_mode"
+  case projectWriteConcurrency = "tasks.project_write_concurrency"
   case defaultExecutionModel = "models.execution.default"
   case defaultExecutionEffort = "models.execution.effort"
   case defaultSupervisorModel = "models.supervisor.default"
@@ -35,6 +36,8 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case executionAccessMode = "execution.access_mode"
   case executionFastMode = "execution.fast_mode"
   case workbenchProjectID = "workbench.project_id"
+  case defaultWorkspaceProjectID = "workspace.default_project_id"
+  case workbenchEnabled = "workbench.enabled"
   case workbenchPermissionMode = "workbench.permission_mode"
   case codexExecutablePath = "codex.executable_path"
   case openCodeDefaultModel = "agent.opencode.default_model"
@@ -58,6 +61,10 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessManagedConfigurationPath = "agent.deepseek-harness.managed_configuration_path"
   case deepSeekHarnessMCPServers = "agent.deepseek-harness.mcp.servers"
   case piMCPServers = "agent.pi.mcp.servers"
+  case claudeCodeMCPServers = "agent.claude-code.mcp.servers"
+  case claudeCodeDefaultModel = "agent.claude-code.default_model"
+  case claudeCodeDefaultPermissionMode = "agent.claude-code.default_permission_mode"
+  case claudeCodeDefaultEffort = "agent.claude-code.default_effort"
   case qoderCNMCPServers = "agent.qoder.cn.mcp.servers"
   case qoderInternationalMCPServers = "agent.qoder.international.mcp.servers"
   case antigravityDefaultModel = "agent.antigravity.default_model"
@@ -228,6 +235,38 @@ public actor ServiceSettings {
 
   public func setTaskStartApprovalMode(_ mode: ServiceTaskStartApprovalMode) async throws {
     try await set(mode.rawValue, for: .taskStartApprovalMode)
+  }
+
+  /// Full-permission Agent tasks one project may run at once; 1 keeps them exclusive.
+  public func projectWriteConcurrency() async throws -> Int {
+    guard let value = try await string(for: .projectWriteConcurrency) else {
+      return Self.defaultProjectWriteConcurrency
+    }
+    guard let limit = Int(value), Self.projectWriteConcurrencyRange.contains(limit) else {
+      throw ServiceStoreError.corruptRecord
+    }
+    return limit
+  }
+
+  public func setProjectWriteConcurrency(_ limit: Int) async throws {
+    guard Self.projectWriteConcurrencyRange.contains(limit) else {
+      throw ServiceStoreError.invalidArgument("tasks.projectWriteConcurrency")
+    }
+    try await set(String(limit), for: .projectWriteConcurrency)
+  }
+
+  public static let projectWriteConcurrencyRange = 1...4
+  /// Standalone full tasks a project runs side by side unless the user chose otherwise.
+  public static let defaultProjectWriteConcurrency = 4
+
+  public func workbenchEnabled() async throws -> Bool {
+    guard let value = try await string(for: .workbenchEnabled) else { return true }
+    guard let enabled = Bool(value) else { throw ServiceStoreError.corruptRecord }
+    return enabled
+  }
+
+  public func setWorkbenchEnabled(_ enabled: Bool) async throws {
+    try await set(String(enabled), for: .workbenchEnabled)
   }
 
   public func workbenchPermissionMode() async throws -> ServicePermissionMode {

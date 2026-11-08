@@ -35,7 +35,15 @@ function Get-WindowsBuildEnvironment {
   }
   $sdkInclude = Join-Path $kitsRoot "Include\$sdkVersion"
   $sdkLibrary = Join-Path $kitsRoot "Lib\$sdkVersion"
+  $hostBinDir = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "Hostarm64" } else { "Hostx64" }
+  $msvcBin = Join-Path $msvcRoot "bin\$hostBinDir\$Architecture"
+  if (-not (Test-Path -LiteralPath $msvcBin -PathType Container)) {
+    $msvcBin = Join-Path $msvcRoot "bin\Hostx64\$Architecture"
+  }
+  $sdkBin = Join-Path $kitsRoot "bin\$sdkVersion\$Architecture"
+  $binaryPaths = @($msvcBin, $sdkBin) | Where-Object { Test-Path -LiteralPath $_ -PathType Container }
   return [PSCustomObject]@{
+    BinaryPaths = $binaryPaths
     IncludePaths = @(
       "$msvcRoot\include", "$sdkInclude\ucrt", "$sdkInclude\um",
       "$sdkInclude\shared", "$sdkInclude\winrt"

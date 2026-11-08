@@ -43,7 +43,7 @@ extension BridgeServiceApplication {
     guard let queued = try? await tasks.queuedTasks(limit: 500) else { return }
     for task in queued {
       do {
-        guard try await tasks.activeWriteTask(projectID: task.projectID) == nil else {
+        guard try await tasks.hasProjectWriteCapacity(projectID: task.projectID) else {
           continue
         }
       } catch {

@@ -6,7 +6,7 @@ import Foundation
 enum ServiceCodexCatalogModelFetch {
   enum Outcome: Sendable {
     case models([CodexModel])
-    case refreshFailed(String)
+    case refreshFailed(String, fallbackModels: [CodexModel])
   }
 
   static func models(
@@ -25,19 +25,22 @@ enum ServiceCodexCatalogModelFetch {
       } catch let error as DecodingError {
         throw ServiceCodexModelCatalogDiagnostics.decodingFailure(error)
       }
-      // Codex can report refresh failure on stderr while returning its bundled catalog successfully.
-      // That process retains the fallback; recovery requires a fresh app-server process.
-      let diagnostics = String(decoding: await client.stderrSnapshot(), as: UTF8.self)
-      if let detail = refreshFailureDetail(diagnostics) {
-        return .refreshFailed(detail)
-      }
       models.append(contentsOf: page.data)
       guard let next = page.nextCursor, !next.isEmpty, next != cursor else {
         guard Set(models.map(\.id)).count == models.count else {
           throw BridgeMCPQueryError.codexAppServerUnavailable(
             "Codex model/list catalog validation failed (duplicate_identifier at data.id).")
         }
+        // Codex can report refresh failure on stderr while returning its cached or bundled catalog.
+        let diagnostics = String(decoding: await client.stderrSnapshot(), as: UTF8.self)
+        if let detail = refreshFailureDetail(diagnostics) {
+          return .refreshFailed(detail, fallbackModels: models)
+        }
         return .models(models)
+      }
+      let diagnostics = String(decoding: await client.stderrSnapshot(), as: UTF8.self)
+      if let detail = refreshFailureDetail(diagnostics) {
+        return .refreshFailed(detail, fallbackModels: models)
       }
       cursor = next
     }

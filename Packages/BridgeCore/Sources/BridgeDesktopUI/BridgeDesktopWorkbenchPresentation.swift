@@ -28,17 +28,14 @@ public enum BridgeDesktopWorkbenchPermissionMode: String, CaseIterable, Equatabl
 }
 
 public enum BridgeDesktopWorkbenchPresentation {
+  /// The one way a message is inserted into a running conversation: Codex inserts natively
+  /// (`queued` steer), other Agents interrupt the current step and continue with the message.
   public static func steerModes(supportsImmediateSteer: Bool) -> [BridgeDesktopChoice] {
-    var modes = [BridgeDesktopChoice(id: "queued", title: "当前任务结束后继续")]
-    if supportsImmediateSteer {
-      modes.append(
-        BridgeDesktopChoice(
-          id: "interrupt-current-then-continue",
-          title: "中断当前任务并继续"
-        )
-      )
-    }
-    return modes
+    [
+      BridgeDesktopChoice(
+        id: supportsImmediateSteer ? "interrupt-current-then-continue" : "queued",
+        title: "插入当前对话")
+    ]
   }
 
   public static func statusTone(for status: String) -> String {

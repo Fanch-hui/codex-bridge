@@ -16,16 +16,31 @@ extension BridgeServiceAppModel {
   var chatBrowserResumeURL: URL { chatBrowserSessions.resumeURL }
 
   func chatWebViewBinding(for site: ChatBrowserSite) -> Binding<WKWebView?> {
-    Binding(
-      get: { self.chatBrowserSessions.webView(for: site) },
+    let generation = chatBrowserSessions.generation
+    return Binding(
+      get: {
+        guard self.isChatBrowserEnabled, self.chatBrowserSessions.generation == generation else {
+          return nil
+        }
+        return self.chatBrowserSessions.webView(for: site)
+      },
       set: { webView in
-        guard self.isChatBrowserEnabled else { return }
+        guard self.isChatBrowserEnabled, self.chatBrowserSessions.generation == generation else {
+          if let webView, self.chatBrowserSessions.webView(for: site) !== webView {
+            ChatBrowserSessions.detach(webView)
+          }
+          return
+        }
         self.setChatWebView(webView, for: site)
       }
     )
   }
 
   private func setChatWebView(_ webView: WKWebView?, for site: ChatBrowserSite) {
+    guard isChatBrowserEnabled else {
+      if let webView { ChatBrowserSessions.detach(webView) }
+      return
+    }
     objectWillChange.send()
     chatBrowserSessions.setWebView(webView, for: site)
     if webView != nil { updateChatBrowserVisibility() }
@@ -39,8 +54,8 @@ extension BridgeServiceAppModel {
   }
 
   func updateChatBrowserVisibility() {
-    if selection != .workbench, chatBrowserViewport != nil {
-      chatBrowserViewport = nil
+    if selection != .workbench {
+      chatBrowserViewport.update(nil)
     }
     cancelChatBrowserSleep()
     guard isChatBrowserEnabled, selection != .workbench, chatBrowserSessions.hasWebViews else {

@@ -8,16 +8,25 @@ extension BridgeServiceAppModel {
     client: any BridgeServiceClientProtocol,
     includeCatalog: Bool,
     includeProjectResources: Bool,
-    forceCatalogRefresh: Bool = false
+    forceCatalogRefresh: Bool = false,
+    includeSettings: Bool = false
   ) async {
+    if workbenchSettingsController.state.enabled == nil || includeSettings {
+      await workbenchSettingsController.refresh()
+    }
     let catalogConnectionGeneration = codexModelCatalogRequests.connectionGeneration
     let managementVisible =
-      includeCatalog || includeProjectResources
-      || navigation == .settings || navigation == .connections
+      includeCatalog || includeProjectResources || includeSettings
+      || navigation == .settings || navigation == .connections || preferencesWindowIsVisible
+    if let projects = await optional({ try await client.projectList() }) {
+      applyProjectSnapshot(projects)
+    }
     let directConfigurationResult = await optional(when: managementVisible) {
       try await client.directConfiguration()
     }
-    async let projectResult = optional { try await client.projectList() }
+    async let instructionsResult = optional(when: includeSettings && !includeCatalog) {
+      try await client.customInstructions()
+    }
     let agentCatalogResult = await optional(when: managementVisible) {
       try await client.agentCatalog()
     }
@@ -30,6 +39,7 @@ extension BridgeServiceAppModel {
     let taskStartApprovalModeResult = await optional {
       try await client.taskStartApprovalMode()
     }
+    let writeConcurrencyResult = await optional { try await client.projectWriteConcurrency() }
     let mcpClientResult = await optional(when: managementVisible) { try await client.mcpClients() }
     let cloudResult = await optional(when: managementVisible) {
       try await client.geminiCloudStatus()
@@ -39,11 +49,12 @@ extension BridgeServiceAppModel {
       try await client.deepSeekHarnessMCPServers(scope: agentMCPScope)
     }
 
-    if let value = directConfigurationResult { directConfiguration = value }
-    if let value = await projectResult {
-      applyProjectSnapshot(value)
+    if let value = directConfigurationResult, directConfiguration != value {
+      directConfiguration = value
     }
-
+    if let value = await instructionsResult, customInstructions != value {
+      customInstructions = value
+    }
     if let value = agentCatalogResult {
       applyAgentCatalogSnapshot(value)
     }
@@ -78,6 +89,9 @@ extension BridgeServiceAppModel {
     if let value = taskStartApprovalModeResult, taskStartApprovalMode != value {
       taskStartApprovalMode = value
     }
+    if let value = writeConcurrencyResult, projectWriteConcurrency != value {
+      projectWriteConcurrency = value
+    }
     if let value = cloudResult, geminiCloudStatus != value { geminiCloudStatus = value }
     if let value = mcpClientResult, mcpClients != value {
       mcpClients = value
@@ -106,12 +120,15 @@ extension BridgeServiceAppModel {
     let value = snapshot.projects
     let paths = snapshot.projectPaths ?? [:]
     if projectPaths != paths { projectPaths = paths }
+    if defaultProjectID != snapshot.defaultProjectID {
+      defaultProjectID = snapshot.defaultProjectID
+    }
     guard projects != value else { return }
     projects = value
     reconcileProjectSelection()
     if selectedProjectID == nil {
       selectedProjectID =
-        value.first(where: { $0.projectID == serviceStatus?.workbenchProjectID })?.projectID
+        value.first(where: { $0.projectID == snapshot.defaultProjectID })?.projectID
         ?? value.first?.projectID
     }
   }
@@ -132,6 +149,11 @@ extension BridgeServiceAppModel {
     if tasks != value {
       tasks = value
       reconcileTaskSelection()
+      paneConversations.sync(tasks: value, client: client)
+    }
+    if let pendingOpenTaskID, value.contains(where: { $0.taskID == pendingOpenTaskID }) {
+      openTask(pendingOpenTaskID)
+      return
     }
     if let selectedTaskBeforeRefresh,
       !selectedTaskBeforeRefresh.isTerminal,
@@ -171,7 +193,7 @@ extension BridgeServiceAppModel {
   ) async {
     lastThreadCatalogRefreshAt = Date()
     let skillResult = await optional { try await client.skills(projectID: projectID) }
-    if selectedProjectID == projectID, let value = skillResult {
+    if selectedProjectID == projectID, let value = skillResult, skills != value.skills {
       skills = value.skills
     }
   }

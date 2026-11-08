@@ -2,6 +2,7 @@ import BridgeAgentCore
 import BridgeCodexService
 import BridgeDeepSeekHarnessACP
 import BridgeDomain
+import BridgeEmbeddedDSH
 import BridgeIPC
 import BridgeMCP
 import BridgeSecurity
@@ -12,6 +13,47 @@ import Foundation
 
 extension BridgeServiceRequestController {
   static func map(_ error: Error) -> BridgeServiceIPCError {
+    if let error = error as? WorkbenchAvailabilityError {
+      switch error {
+      case .busy:
+        return .init(code: "workbench_busy", message: "请先结束工作台任务和待处理操作后再关闭。", retryable: true)
+      case .disabled:
+        return .init(code: "workbench_disabled", message: "工作台已关闭，请在设置中开启。")
+      }
+    }
+    if case .invalidArgument("workbench.workspace_recovery_required") = error as? ServiceStoreError
+    {
+      return .init(
+        code: "workbench_workspace_recovery_pending",
+        message: "原会话的后台写入进程尚待核对。请在工作台恢复区检查状态，或结束所属进程。",
+        retryable: false)
+    }
+    if case .invalidArgument(let field) = error as? ServiceStoreError,
+      ["workbench.workspace_merge_recovery_required", "embedded_dsh.workspace_recovery_required"]
+        .contains(field)
+    {
+      return .init(
+        code: "workbench_workspace_merge_recovery_pending",
+        message: "项目合并尚待恢复。请在工作台恢复区继续合并或撤回本次合并。",
+        retryable: false)
+    }
+    if error is ServiceDefaultWorkspaceError {
+      return .init(code: "default_workspace_protected", message: "默认工作区不能移除。")
+    }
+    if let error = error as? WorkbenchTaskOperationNotDispatched {
+      return .init(
+        code: "workbench_preflight_failed", message: error.causeMessage, retryable: false)
+    }
+    if let error = error as? EmbeddedDSHRuntimeError {
+      return .init(
+        code: "embedded_dsh_runtime", message: error.localizedDescription,
+        retryable: error == .startupTimedOut)
+    }
+    if case EmbeddedDSHRecoveryError.pendingProcessReconciliation = error {
+      return .init(
+        code: "embedded_dsh_recovery_pending", message: "正在核对原 Agent 执行，请恢复连接后重试。",
+        retryable: true)
+    }
     if let error = error as? GeminiCloudError {
       return .init(code: "gemini_cloud_configuration", message: error.localizedDescription)
     }

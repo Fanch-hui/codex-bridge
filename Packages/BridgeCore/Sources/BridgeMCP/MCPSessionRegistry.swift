@@ -9,7 +9,7 @@ import MCP
 /// credential rotation or disablement, including while a server is starting.
 public final class MCPClientAdmissionGate: @unchecked Sendable {
   public struct Token: Equatable, Sendable {
-    fileprivate let generation: UInt64
+    package let generation: UInt64
   }
 
   private struct State {
@@ -62,6 +62,10 @@ public final class MCPClientAdmissionGate: @unchecked Sendable {
     defer { lock.unlock() }
     guard let state = states[clientID] else { return false }
     return state.enabled && state.generation == token.generation
+  }
+
+  package func isCurrent(generation: UInt64, for clientID: MCPClientID) -> Bool {
+    isCurrent(Token(generation: generation), for: clientID)
   }
 
   public func isEnabled(_ clientID: MCPClientID) -> Bool {

@@ -1,5 +1,6 @@
 import BridgeAgentCore
 import BridgeDomain
+import BridgeSecurity
 import BridgeServiceCore
 import Foundation
 
@@ -41,25 +42,6 @@ extension ServiceExecutionCoordinator {
     guard let installationID = task.installationID else {
       throw ExecutionServiceError.invalidRequest("installationID")
     }
-    let brief = AgentTaskBrief(
-      taskID: task.id,
-      providerID: AgentProviderID(rawValue: task.providerID),
-      installationID: AgentInstallationID(rawValue: installationID),
-      projectID: task.projectID,
-      projectRoot: project.root.canonicalPath,
-      prompt: task.prompt,
-      requestedSessionID: task.requestedThreadID,
-      model: task.executionModel == serviceDefaultProviderExecutionModel
-        ? nil : task.executionModel,
-      effort: task.providerID == AgentProviderID.antigravity.rawValue
-        || task.executionEffort == serviceDefaultProviderExecutionEffort
-        ? nil : task.executionEffort,
-      permissionMode: task.permissionMode,
-      runtimeBinding: try await agentRuntimeBinding(for: task),
-      networkAllowed: task.networkAllowed,
-      attachments: try await tasks.taskAttachments(taskID: task.id),
-      selectedSkills: task.selectedSkills
-    )
     let workspaceChangeTracker: ServiceWorkspaceChangeTracker?
     let handle: AgentTaskRunHandle
     do {
@@ -68,12 +50,60 @@ extension ServiceExecutionCoordinator {
       } catch {
         throw ExecutionServiceError.projectIdentityChanged(project.id)
       }
-      workspaceChangeTracker = ServiceWorkspaceChangeTracker(
-        projectRoot: project.root.canonicalPath
+      let workspace = try await executionWorkspaceResolver?(task, project)
+      try ensureStartIsActive(task.id)
+      if let workspace {
+        guard task.source == .mcpClient, task.sourceClientID.hasPrefix("embedded.dsh."),
+          task.permissionMode == .full
+        else { throw ExecutionServiceError.invalidRequest("isolatedWorkspace.owner") }
+        try workspace.validate(projectRoot: project.root.canonicalPath)
+      }
+      let attachments = try await tasks.taskAttachments(taskID: task.id)
+      let attachmentContents: [AgentImageContent]?
+      if workspace != nil, !attachments.isEmpty {
+        try project.root.validateCurrentIdentity()
+        attachmentContents = try attachments.map { attachment in
+          let image = try SecureProjectImageReader.read(
+            attachment, projectRoot: project.root.canonicalPath)
+          return try AgentImageContent(attachment: image.attachment, data: image.data)
+        }
+        try project.root.validateCurrentIdentity()
+      } else {
+        attachmentContents = nil
+      }
+      let brief = AgentTaskBrief(
+        taskID: task.id,
+        providerID: AgentProviderID(rawValue: task.providerID),
+        installationID: AgentInstallationID(rawValue: installationID),
+        projectID: task.projectID,
+        projectRoot: project.root.canonicalPath,
+        prompt: task.prompt,
+        requestedSessionID: task.requestedThreadID,
+        model: task.executionModel == serviceDefaultProviderExecutionModel
+          ? nil : task.executionModel,
+        effort: task.providerID == AgentProviderID.antigravity.rawValue
+          || task.executionEffort == serviceDefaultProviderExecutionEffort
+          ? nil : task.executionEffort,
+        permissionMode: task.permissionMode,
+        runtimeBinding: try await agentRuntimeBinding(for: task),
+        networkAllowed: task.networkAllowed,
+        attachments: attachments,
+        attachmentContents: attachmentContents,
+        selectedSkills: task.selectedSkills,
+        isolatedWorkspace: workspace,
+        nativeSubagentsAllowed: !(try await tasks.isEmbeddedDSHTask(task.id)),
+        toolWriteGate: try await toolWriteGate(for: task)
       )
-      handle = try await runner.start(brief)
+      workspaceChangeTracker = ServiceWorkspaceChangeTracker(
+        projectRoot: workspace?.root.canonicalPath ?? project.root.canonicalPath
+      )
+      handle = try await withProcessOwnership(taskID: task.id) {
+        try await runner.start(brief)
+      }
     } catch {
-      if !finishedRuns.contains(task.id), !isShuttingDown {
+      if !finishedRuns.contains(task.id), !isShuttingDown,
+        await confirmOwnedProcessesStopped(taskID: task.id)
+      {
         let conversationPersisted = await conversation.close(taskID: task.id)
         _ = try? await tasks.fail(
           taskID: task.id,
@@ -122,7 +152,9 @@ extension ServiceExecutionCoordinator {
       activeAgentRuns.removeValue(forKey: task.id)
       workspaceChangeTrackers.removeValue(forKey: task.id)
       await handle.shutdown()
-      if !finishedRuns.contains(task.id), !isShuttingDown {
+      if !finishedRuns.contains(task.id), !isShuttingDown,
+        await confirmOwnedProcessesStopped(taskID: task.id)
+      {
         let conversationPersisted = await conversation.close(taskID: task.id)
         _ = try? await tasks.fail(
           taskID: task.id,
@@ -165,6 +197,10 @@ extension ServiceExecutionCoordinator {
       case .userInputRequested(let request):
         _ = try await registerAgentUserInput(request, taskID: taskID)
 
+      case .interactionsCancelled(let approvalIDs, let userInputIDs):
+        try await cancelAgentInteractions(
+          taskID: taskID, approvalIDs: approvalIDs, userInputIDs: userInputIDs)
+
       case .completed(let summary, let stopReason):
         try await finishAgentRun(taskID: taskID) {
           try await persistWorkspaceChanges(taskID: taskID)
@@ -205,10 +241,9 @@ extension ServiceExecutionCoordinator {
       workspaceChangeTrackers.removeValue(forKey: taskID)
       pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
       clearAgentUserInputs(taskID: taskID)
-      if let run = activeAgentRuns.removeValue(forKey: taskID) {
-        await run.shutdown()
-      }
+      await closeAgentRun(taskID: taskID)
       _ = await conversation.close(taskID: taskID)
+      guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
       _ = try? await tasks.fail(
         taskID: taskID,
         failureCode: "agent_execution_failed",
@@ -225,14 +260,9 @@ extension ServiceExecutionCoordinator {
     finishedRuns.insert(taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
     clearAgentUserInputs(taskID: taskID)
-    let run = activeAgentRuns.removeValue(forKey: taskID)
-    do {
-      _ = try await transition()
-    } catch {
-      if let run { await run.shutdown() }
-      throw error
-    }
-    if let run { await run.shutdown() }
+    await closeAgentRun(taskID: taskID)
+    guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
+    _ = try await transition()
   }
 
   private func agentStreamFinished(_ taskID: TaskID, failure: (any Error)?) async {
@@ -240,9 +270,8 @@ extension ServiceExecutionCoordinator {
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
     clearAgentUserInputs(taskID: taskID)
     guard finishedRuns.remove(taskID) == nil else { return }
-    if let run = activeAgentRuns.removeValue(forKey: taskID) {
-      await run.shutdown()
-    }
+    await closeAgentRun(taskID: taskID)
+    guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
     try? await persistWorkspaceChanges(taskID: taskID)
     _ = await conversation.close(taskID: taskID)
     let summary: String

@@ -30,6 +30,8 @@ extension OpenCodeACPProvider {
       throw error
     }
     var client: OpenCodeACPClient?
+    var createdSessionID: String?
+    var supportsDeleteSession = false
     do {
       let launch = try configuration.launchBuilder.make(
         installation: installation,
@@ -42,7 +44,9 @@ extension OpenCodeACPProvider {
       client = connected
       let initialization = try await connected.initialize()
       _ = try validate(initialization)
+      supportsDeleteSession = initialization.supportsDeleteSession
       let session = try await connected.newSession(cwd: launch.process.workingDirectory)
+      createdSessionID = session.id
       if let selectedModelID {
         let model = try Self.resolveModel(selectedModelID, from: session)
         let options = try await connected.setSessionConfigOption(
@@ -54,6 +58,11 @@ extension OpenCodeACPProvider {
           from: options,
           selectedModelID: model,
           defaultModelID: Self.availableCurrentModelID(in: session)
+        )
+        await Self.cleanupTemporarySession(
+          client: connected,
+          sessionID: createdSessionID,
+          supportsDelete: supportsDeleteSession
         )
         await connected.shutdown()
         cleanup(runDirectory: launch.runDirectory, probeRoot: probeRoot)
@@ -71,6 +80,11 @@ extension OpenCodeACPProvider {
           from: session.configOptions,
           selectedModelID: nil,
           defaultModelID: currentModel
+        )
+        await Self.cleanupTemporarySession(
+          client: connected,
+          sessionID: createdSessionID,
+          supportsDelete: supportsDeleteSession
         )
         await connected.shutdown()
         cleanup(runDirectory: launch.runDirectory, probeRoot: probeRoot)
@@ -96,14 +110,35 @@ extension OpenCodeACPProvider {
           models = Self.markReasoningUnavailable(for: modelID, in: models)
         }
       }
+      await Self.cleanupTemporarySession(
+        client: connected,
+        sessionID: createdSessionID,
+        supportsDelete: supportsDeleteSession
+      )
       await connected.shutdown()
       cleanup(runDirectory: launch.runDirectory, probeRoot: probeRoot)
       return models
     } catch {
-      await client?.shutdown()
+      if let client {
+        await Self.cleanupTemporarySession(
+          client: client,
+          sessionID: createdSessionID,
+          supportsDelete: supportsDeleteSession
+        )
+        await client.shutdown()
+      }
       cleanup(runDirectory: runDirectory, probeRoot: probeRoot)
       throw Self.runtimeError(for: error)
     }
+  }
+
+  private static func cleanupTemporarySession(
+    client: OpenCodeACPClient,
+    sessionID: String?,
+    supportsDelete: Bool
+  ) async {
+    guard supportsDelete, let sessionID else { return }
+    try? await client.deleteSession(id: sessionID)
   }
 
   func capabilities(
@@ -146,13 +181,23 @@ extension OpenCodeACPProvider {
     let selected = selectedModelID ?? option.currentValue
     let defaultModel = defaultModelID ?? Self.availableDefaultModelID(in: option)
     let effort = options.first(where: { $0.id == "effort" })
+    let supportedEfforts =
+      effort?.values
+      .map(\.value)
+      .filter { $0.caseInsensitiveCompare("default") != .orderedSame } ?? []
+    let defaultEffort: String? = {
+      guard let current = effort?.currentValue,
+        current.caseInsensitiveCompare("default") != .orderedSame,
+        supportedEfforts.contains(current)
+      else { return nil }
+      return current
+    }()
     return try option.values.map { value in
       try AgentModelDescriptor(
         id: value.value,
         displayName: value.name,
-        supportedReasoningEfforts: value.value == selected
-          ? effort?.values.map(\.value) ?? [] : [],
-        defaultReasoningEffort: value.value == selected ? effort?.currentValue : nil,
+        supportedReasoningEfforts: value.value == selected ? supportedEfforts : [],
+        defaultReasoningEffort: value.value == selected ? defaultEffort : nil,
         reasoningCapabilitiesAvailable: value.value == selected,
         isDefaultModel: defaultModel.map { $0 == value.value }
       )
@@ -234,12 +279,20 @@ extension OpenCodeACPProvider {
   static func modeValue(
     for mutationIntent: AgentMutationIntent,
     readOnlyModeID: String?,
+    singleAgentModeID: String? = nil,
     in session: OpenCodeACPSession
   ) throws -> String {
-    guard let expected = mutationIntent == .readOnly ? readOnlyModeID : "build" else {
-      throw AgentRuntimeError.capabilityUnavailable(.readOnlyExecution)
+    guard let option = session.configOptions.first(where: { $0.id == "mode" }) else {
+      throw AgentRuntimeError.capabilityUnavailable(
+        mutationIntent == .readOnly ? .readOnlyExecution : .workspaceWriteInPlace
+      )
     }
-    guard let option = session.configOptions.first(where: { $0.id == "mode" }),
+    if mutationIntent != .readOnly, let singleAgentModeID,
+      option.values.contains(where: { $0.value == singleAgentModeID })
+    {
+      return singleAgentModeID
+    }
+    guard let expected = mutationIntent == .readOnly ? readOnlyModeID : "build",
       option.values.contains(where: { $0.value == expected })
     else {
       throw AgentRuntimeError.capabilityUnavailable(

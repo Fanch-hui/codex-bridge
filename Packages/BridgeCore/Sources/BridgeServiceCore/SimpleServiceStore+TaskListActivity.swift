@@ -8,6 +8,25 @@ public struct ServiceTaskListActivity: Sendable {
   public let messagesAvailable: Bool
 }
 
+extension ServiceStoreSchema {
+  /// 查询与部分索引共用同一表达式文本：SQLite 逐项比较 WHERE 子句才会选用部分索引。
+  static let nonterminalTaskPredicate = "status NOT IN ('completed', 'failed', 'interrupted')"
+
+  /// 仅含未结束任务的部分索引，让 `nonterminalTasks` 不再随历史任务数线性扫描。
+  /// 与其他纯性能索引一致，幂等创建、不改变 schema 版本，旧版本可继续打开数据库。
+  static func ensureNonterminalTaskIndex(_ database: DatabaseQueue) throws {
+    try database.write { db in
+      try db.execute(
+        sql: """
+          CREATE INDEX IF NOT EXISTS bridge_service_tasks_nonterminal
+          ON bridge_service_tasks(updated_at DESC, task_id)
+          WHERE \(nonterminalTaskPredicate)
+          """
+      )
+    }
+  }
+}
+
 extension SimpleServiceStore {
   public func nonterminalTasks() throws -> [ServiceTaskRecord] {
     do {
@@ -16,7 +35,7 @@ extension SimpleServiceStore {
           db,
           sql: """
             SELECT * FROM bridge_service_tasks
-            WHERE status NOT IN ('completed', 'failed', 'interrupted')
+            WHERE \(ServiceStoreSchema.nonterminalTaskPredicate)
             ORDER BY updated_at DESC, task_id
             """
         ).map(Self.decodeTask)

@@ -34,6 +34,9 @@ extension BridgeDesktopCommandRouter {
     case .setTaskStartApprovalMode:
       guard connected(model), let mode = approvalMode(payload.mode) else { return }
       model.setTaskStartApprovalMode(mode)
+    case .setProjectWriteConcurrency:
+      guard connected(model), let limit = payload.limit, (1...4).contains(limit) else { return }
+      model.setProjectWriteConcurrency(limit)
     case .saveSettings:
       saveSettings(payload, model: model)
     case .saveCustomInstructions:
@@ -51,6 +54,9 @@ extension BridgeDesktopCommandRouter {
     case .setKeepServiceRunning:
       guard let keep = payload.keepServiceRunningAfterExit else { return }
       model.keepServiceRunningAfterAppExit = keep
+    case .setWorkbenchEnabled:
+      guard connected(model), let enabled = payload.enabled else { return }
+      Task { await model.workbenchSettingsController.setEnabled(enabled) }
     case .updateBrowserViewport:
       updateBrowserViewport(payload.viewport, model: model)
     default:
@@ -154,9 +160,9 @@ extension BridgeDesktopCommandRouter {
       viewport.x >= 0, viewport.y >= 0, viewport.width >= 0, viewport.height >= 0,
       viewport.width <= 16_384, viewport.height <= 16_384
     else {
-      model.chatBrowserViewport = nil
+      model.chatBrowserViewport.update(nil)
       return
     }
-    model.chatBrowserViewport = viewport
+    model.chatBrowserViewport.update(viewport)
   }
 }

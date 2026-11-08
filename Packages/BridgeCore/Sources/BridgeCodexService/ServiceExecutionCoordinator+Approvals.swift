@@ -5,9 +5,12 @@ import Foundation
 
 extension ServiceExecutionCoordinator {
   public func pendingApprovals(taskID: TaskID? = nil) async -> [ExecutionApprovalRequest] {
-    let expired = purgeExpiredAgentApprovals()
-    for approval in expired {
-      await failExpiredAgentApproval(approval)
+    let now = Date()
+    let expired = pendingAgentApprovals.values.filter {
+      now.timeIntervalSince($0.createdAt) > agentApprovalLifetime
+    }.map { $0.request.approvalID }
+    for approvalID in expired {
+      await expireAgentApproval(approvalID)
     }
     let codex = await execution.pendingApprovals(taskID: taskID).filter {
       !$0.isBlocking || presentedCodexApprovals[$0.taskID]?.contains($0.id) == true
@@ -97,6 +100,15 @@ extension ServiceExecutionCoordinator {
     decision: LocalApprovalDecision
   ) async throws {
     let approval = pending.request
+    let serializesInteractions = approval.binding.providerID == .claudeCode
+    if serializesInteractions { await acquireAgentInteraction(taskID) }
+    defer { if serializesInteractions { releaseAgentInteraction(taskID) } }
+    if serializesInteractions {
+      try Task.checkCancellation()
+      guard pendingAgentApprovals[approval.approvalID] != nil else {
+        throw ExecutionServiceError.approvalUnavailable(approval.approvalID)
+      }
+    }
     guard Date().timeIntervalSince(pending.createdAt) <= agentApprovalLifetime else {
       pendingAgentApprovals.removeValue(forKey: approval.approvalID)
       await failExpiredAgentApproval(pending)
@@ -155,10 +167,9 @@ extension ServiceExecutionCoordinator {
     guard !finishedRuns.contains(taskID) else { return }
     finishedRuns.insert(taskID)
     pendingAgentApprovals = pendingAgentApprovals.filter { $0.value.request.taskID != taskID }
-    if let run = activeAgentRuns.removeValue(forKey: taskID) {
-      await run.shutdown()
-    }
+    await closeAgentRun(taskID: taskID)
     _ = await conversation.close(taskID: taskID)
+    guard await confirmOwnedProcessesStopped(taskID: taskID) else { return }
     _ = try? await tasks.fail(taskID: taskID, failureCode: code, summary: summary)
   }
   private func failExpiredAgentApproval(_ pending: PendingAgentApproval) async {
@@ -168,15 +179,17 @@ extension ServiceExecutionCoordinator {
       summary: "The agent approval expired before a local decision was made."
     )
   }
-  private func purgeExpiredAgentApprovals() -> [PendingAgentApproval] {
-    let now = Date()
-    let expired = pendingAgentApprovals.values.filter {
-      now.timeIntervalSince($0.createdAt) > agentApprovalLifetime
-    }
-    for approval in expired {
-      pendingAgentApprovals.removeValue(forKey: approval.request.approvalID)
-    }
-    return expired
+  private func expireAgentApproval(_ approvalID: String) async {
+    guard let initial = pendingAgentApprovals[approvalID] else { return }
+    let taskID = initial.request.taskID
+    let serializesInteractions = initial.request.binding.providerID == .claudeCode
+    if serializesInteractions { await acquireAgentInteraction(taskID) }
+    defer { if serializesInteractions { releaseAgentInteraction(taskID) } }
+    guard let pending = pendingAgentApprovals[approvalID],
+      Date().timeIntervalSince(pending.createdAt) > agentApprovalLifetime
+    else { return }
+    pendingAgentApprovals.removeValue(forKey: approvalID)
+    await failExpiredAgentApproval(pending)
   }
   func registerAgentApproval(
     _ approval: AgentApprovalRequest,

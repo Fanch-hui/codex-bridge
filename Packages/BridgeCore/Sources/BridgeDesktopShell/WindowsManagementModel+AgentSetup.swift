@@ -7,7 +7,9 @@
     func handleAgentSetupCommand(_ envelope: BridgeDesktopCommandEnvelope) async -> Bool {
       guard connectionState == .connected else { return false }
       let payload = envelope.payload
-      if [.beginAgentSetup, .continueAgentSetup, .cancelAgentSetup].contains(envelope.command) {
+      if [.beginAgentSetup, .continueAgentSetup, .probeAgentSetupLogin, .cancelAgentSetup].contains(
+        envelope.command)
+      {
         agentSetupRequestGeneration &+= 1
       }
       do {
@@ -45,6 +47,11 @@
             return false
           }
           return await applyAgentSetup(try await client.cancelAgentSetup(operationID: id))
+        case .probeAgentSetupLogin:
+          guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID) else {
+            return false
+          }
+          return await applyAgentSetup(try await client.probeAgentSetupLogin(operationID: id))
         case .openAgentSetupLogin:
           guard let id = BridgeDesktopCommandValue.nonEmpty(payload.operationID),
             let value = try await client.agentSetups().first(where: { $0.operationID == id }),
@@ -96,7 +103,9 @@
         agentSetupOperations.append(value)
       }
       publishDisplay()
-      guard value.state == "ready", previous?.state != "ready" else { return false }
+      // Finished setups persist in the Service, so the first sync has no local baseline and
+      // must not count as a new completion; only an observed state change refreshes models.
+      guard value.state == "ready", let previous, previous.state != "ready" else { return false }
       await refreshAgents()
       return true
     }

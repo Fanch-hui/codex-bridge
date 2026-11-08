@@ -2,7 +2,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 
 export class HostError extends Error {
-  constructor(code) { super(code); this.code = code; }
+  constructor(code, cause) { super(code, cause === undefined ? undefined : { cause }); this.code = code; }
 }
 export function requireValue(condition, code = 'invalid_request') {
   if (!condition) throw new HostError(code);

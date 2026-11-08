@@ -112,7 +112,7 @@ def verify_windows_build_script(path):
         raise ValueError("Windows build script contains a standalone script block")
     required_lines = (
         r"(?m)^  \$portableDir = Join-Path \$resolvedOutDir \$architecture$",
-        r"(?m)^  & \$stageScript @stageArguments$",
+        r"(?m)^ {2,}& \$stageScript @stageArguments$",
     )
     if any(not re.search(pattern, source) for pattern in required_lines):
         raise ValueError("Portable staging is not unconditional within the production try block")

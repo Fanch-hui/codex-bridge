@@ -26,6 +26,10 @@ enum ServiceAgentAutoDiscovery {
       existingPaths.insert(discoveredExecutablePath, at: 0)
     }
     switch providerID {
+    case .claudeCode:
+      return try claudeCodeRequests(
+        existingPaths: existingPaths, environment: environment,
+        allowInstallationSearch: discoveredExecutablePath == nil)
     case .qoder:
       return try qoderRequests(
         existingPaths: existingPaths, environment: environment,
@@ -135,14 +139,25 @@ enum ServiceAgentAutoDiscovery {
       }
     #endif
     var seen = Set<String>()
-    return try paths.compactMap { path in
+    var canonicalPaths = paths.compactMap { path -> String? in
       guard
         let canonical = canonicalExecutable(
           path, allowJavaScript: providerID == .qoder || providerID == .pi),
         isCommandLineExecutable(canonical),
         seen.insert(pathKey(canonical)).inserted
       else { return nil }
-      return try ServiceAgentRegistrationRequest(
+      return canonical
+    }
+    if allowInstallationSearch,
+      providerID == .openCode,
+      canonicalPaths.contains(where: { !isLegacyOpenCodeV1PackagePath($0) })
+    {
+      let preferred = canonicalPaths.filter { !isLegacyOpenCodeV1PackagePath($0) }
+      let legacy = canonicalPaths.filter { isLegacyOpenCodeV1PackagePath($0) }
+      canonicalPaths = preferred + legacy
+    }
+    return try canonicalPaths.map { canonical in
+      try ServiceAgentRegistrationRequest(
         providerID: providerID,
         displayName: displayName,
         executablePath: canonical,
@@ -151,6 +166,11 @@ enum ServiceAgentAutoDiscovery {
         enableOnSuccess: false
       )
     }
+  }
+
+  static func isLegacyOpenCodeV1PackagePath(_ path: String) -> Bool {
+    path.replacingOccurrences(of: "\\", with: "/").lowercased()
+      .contains("/node_modules/opencode-ai/")
   }
 
   private static func userAgentDirectories(

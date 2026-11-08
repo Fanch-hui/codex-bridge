@@ -5,7 +5,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 binary_directory="$1"
 output="$2"
 architecture="$3"
+embedded_runtime="${4:-$root/.build/embedded-dsh/linux-$architecture}"
 payload="$output/$architecture"
+node "$root/Scripts/verify-embedded-dsh-runtime.mjs" "$embedded_runtime" linux "$architecture"
 if [[ -e "$payload" ]]; then
   echo "Payload directory already exists: $payload" >&2
   exit 1
@@ -26,6 +28,8 @@ done
 shopt -u nullglob
 install -m 755 "$root/Linux/codex-bridge" "$payload/codex-bridge"
 install -m 644 "$root/LICENSE" "$root/NOTICE" "$payload/"
+cp -a "$embedded_runtime" "$payload/EmbeddedDSH"
+node "$root/Scripts/verify-embedded-dsh-runtime.mjs" "$payload/EmbeddedDSH" linux "$architecture"
 "$root/Scripts/stage-linux-tunnel-client.sh" "$architecture" "$payload"
 python3 "$root/Scripts/verify-linux-payload.py" "$payload" "$architecture"
 node "$root/Scripts/verify-agent-runtime-resources.mjs" "$payload"

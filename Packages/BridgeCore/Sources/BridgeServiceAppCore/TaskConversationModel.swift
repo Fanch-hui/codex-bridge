@@ -55,6 +55,8 @@ public final class TaskConversationModel: Identifiable {
   private var pendingPushFirstEnqueuedAt: ContinuousClock.Instant?
   var lifecycleGeneration: UInt64 = 0
   var loadGeneration: UInt64 = 0
+  var pendingSearchReveal: Int64?
+  var searchRevealGeneration: UInt64 = 0
   private var hasLoadedTerminalSnapshot = false
   private var hasRestoredPresentation = false
 
@@ -90,7 +92,13 @@ public final class TaskConversationModel: Identifiable {
   }
 
   public func start() async {
-    defer { isLoading = false }
+    defer {
+      isLoading = false
+      if let messageID = pendingSearchReveal {
+        pendingSearchReveal = nil
+        requestSearchReveal(messageID)
+      }
+    }
     if isTerminal {
       await loadPriorTasks()
       await reloadAuthoritativeSnapshot()
@@ -155,6 +163,8 @@ public final class TaskConversationModel: Identifiable {
   public func cancel() {
     lifecycleGeneration &+= 1
     loadGeneration &+= 1
+    searchRevealGeneration &+= 1
+    pendingSearchReveal = nil
     invalidateLiveSubscription()
     hasAppliedPage = false
     hasLoadedTerminalSnapshot = false

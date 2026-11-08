@@ -101,6 +101,8 @@ struct QoderRuntimeProfile {
         request?.mutationIntent == .workspaceWrite || capabilityProbe
           ? "workspace-write" : "read-only"),
       "networkAllowed": .bool(request?.networkAccessRequested == true || capabilityProbe),
+      "nativeSubagentsAllowed": .bool(request?.nativeSubagentsAllowed ?? true),
+      "writeGate": .bool(request?.toolWriteGate != nil),
       "permissionMode": .string(permissionMode),
       "skills": .array(resources.skills.map(QoderJSONValue.string)),
       "selectedSkills": .array(resources.selectedSkills.map(selectedSkillValue)),

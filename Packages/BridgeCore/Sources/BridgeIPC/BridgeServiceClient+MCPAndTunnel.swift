@@ -113,6 +113,21 @@ extension BridgeServiceClient {
     )
   }
 
+  public func projectWriteConcurrency() async throws -> Int {
+    let response: IPCProjectWriteConcurrency = try await call(
+      operation: .getProjectWriteConcurrency,
+      payload: Optional<IPCMutationResponse>.none
+    )
+    return response.limit
+  }
+
+  public func setProjectWriteConcurrency(_ limit: Int) async throws {
+    let _: IPCMutationResponse = try await call(
+      operation: .setProjectWriteConcurrency,
+      payload: IPCProjectWriteConcurrency(limit: limit)
+    )
+  }
+
   public func pendingDirectApprovals() async throws -> [IPCPendingDirectApproval] {
     let response: IPCDirectApprovalListResponse = try await call(
       operation: .listDirectApprovals,

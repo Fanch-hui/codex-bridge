@@ -16,8 +16,10 @@
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var commands: [MainWindowCommand] = []
-    nonisolated(unsafe) private static var fileRequests: [String: @Sendable (String) -> Void] = [:]
+    nonisolated(unsafe) private static var fileRequests: [String: @Sendable (String?) -> Void] = [:]
     @MainActor private(set) static var browser = BrowserSnapshot()
+    @MainActor private static var browserRequestedEnabled = false
+    @MainActor private static var browserReleasePending = false
 
     static func start() -> Bool {
       guard let resource = BridgeDesktopUI.indexURL(),
@@ -80,6 +82,8 @@
           }
         case "browser":
           receiveBrowser(String(parts[1]))
+        case "browser-closed":
+          browserDidClose()
         case "file":
           receiveFile(String(parts[1]))
         default:
@@ -106,7 +110,7 @@
       let parts = event.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
       guard parts.count == 2 else { return }
       let callback = lock.withLock { fileRequests.removeValue(forKey: String(parts[0])) }
-      if !parts[1].isEmpty { callback?(String(parts[1])) }
+      callback?(parts[1].isEmpty ? nil : String(parts[1]))
     }
 
     static func send(_ patch: BridgeDesktopUIStatePatch) {
@@ -128,8 +132,37 @@
         viewport.x, viewport.y, viewport.width, viewport.height, viewport.visible ? 1 : 0)
     }
 
+    @MainActor
     static func setBrowserEnabled(_ enabled: Bool) {
-      bridge_linux_browser_enabled(enabled ? 1 : 0)
+      browserRequestedEnabled = enabled
+      if enabled {
+        guard !browserReleasePending else { return }
+        reopenBrowser()
+      } else {
+        guard !browserReleasePending else { return }
+        browserReleasePending = true
+        bridge_linux_browser_enabled(0)
+      }
+    }
+
+    @MainActor
+    private static func browserDidClose() {
+      browserReleasePending = false
+      let preferences = ChatBrowserPreferences(defaults: .standard)
+      browser = BrowserSnapshot(
+        site: preferences.selectedSite,
+        url: preferences.resumeURL(for: preferences.selectedSite).absoluteString)
+      if browserRequestedEnabled { reopenBrowser() }
+    }
+
+    @MainActor
+    private static func reopenBrowser() {
+      selectBrowserSite(ChatBrowserPreferences(defaults: .standard).selectedSite)
+      bridge_linux_browser_enabled(1)
+    }
+
+    static func setBrowserPresentationVisible(_ visible: Bool) {
+      bridge_linux_browser_presentation_visible(visible ? 1 : 0)
     }
 
     static func browserAction(_ action: Int32) { bridge_linux_browser_action(action) }
@@ -158,10 +191,29 @@
       title: String, directory: Bool,
       completion: @escaping @Sendable (String) -> Void
     ) {
+      chooseFileIncludingCancellation(title: title, directory: directory) { path in
+        if let path { completion(path) }
+      }
+    }
+
+    static func chooseFileIncludingCancellation(
+      title: String, directory: Bool,
+      completion: @escaping @Sendable (String?) -> Void
+    ) {
       let id = UUID().uuidString
       lock.withLock { fileRequests[id] = completion }
       id.withCString { identifier in
         title.withCString { bridge_linux_choose_file(identifier, $0, directory ? 1 : 0) }
+      }
+    }
+
+    static func chooseSaveFile(completion: @escaping @Sendable (String?) -> Void) {
+      let id = UUID().uuidString
+      lock.withLock { fileRequests[id] = completion }
+      id.withCString { identifier in
+        "导出会话内容".withCString { title in
+          "会话内容.txt".withCString { bridge_linux_save_file(identifier, title, $0) }
+        }
       }
     }
   }

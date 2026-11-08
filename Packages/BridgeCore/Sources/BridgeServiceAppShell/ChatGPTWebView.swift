@@ -44,7 +44,8 @@ public struct ChatGPTWebView: NSViewRepresentable {
     )
     webView.load(request)
 
-    DispatchQueue.main.async {
+    DispatchQueue.main.async { [weak webView] in
+      guard let webView else { return }
       self.webViewReference = webView
     }
 

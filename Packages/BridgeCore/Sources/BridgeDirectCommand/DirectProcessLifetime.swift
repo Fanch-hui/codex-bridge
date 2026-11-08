@@ -62,6 +62,7 @@ public final class DirectProcessLifetime: @unchecked Sendable {
     environment: [String: String]?,
     usePTY: Bool,
     output: DirectCommandOutputCollector,
+    standardError: DirectCommandOutputCollector? = nil,
     denyNetwork: Bool = false
   ) throws {
     guard let executable = argv.first, !executable.isEmpty, argv.count <= 128, !usePTY else {
@@ -90,8 +91,9 @@ public final class DirectProcessLifetime: @unchecked Sendable {
             argv: argv,
             workingDirectory: workingDirectory,
             environment: environment,
-            mergeStandardError: true,
-            onStandardOutput: { output.append($0) }
+            mergeStandardError: standardError == nil,
+            onStandardOutput: { output.append($0) },
+            onStandardError: { standardError?.append($0) }
           )
           self.backend = .managed(managed)
           self.pid = managed.pid
@@ -117,8 +119,9 @@ public final class DirectProcessLifetime: @unchecked Sendable {
           argv: launchArgv,
           workingDirectory: workingDirectory,
           environment: environment,
-          mergeStandardError: true,
-          onStandardOutput: { output.append($0) }
+          mergeStandardError: standardError == nil,
+          onStandardOutput: { output.append($0) },
+          onStandardError: { standardError?.append($0) }
         )
       } catch let error as ManagedProcessError {
         throw Self.directError(error)

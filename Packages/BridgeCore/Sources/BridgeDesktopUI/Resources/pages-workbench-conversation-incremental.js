@@ -36,6 +36,9 @@
   }
 
   function detachBlock(block) {
+    if (block.list.__entryNodes) block.list.__entryNodes.forEach(function (item) {
+      if (item.__dshHost) global.CodexBridgeDesktopDSHConversationView.dispose(item);
+    });
     [block.heading, block.error, block.list, block.actions].forEach(function (node) {
       if (node && node.parentNode) node.parentNode.removeChild(node);
     });
@@ -58,10 +61,12 @@
       ? state.canLoadEarlier
       : page.browser && page.browser.canLoadEarlierConversation;
     var loading = !!(state && state.isLoadingEarlier);
-    var visible = !!(page.selectedTaskID && (canLoadEarlier || loading));
+    var showEarlier = !!(page.selectedTaskID && (canLoadEarlier || loading));
+    var showLatest = C.hasSearchReveal(page.selectedTaskID);
+    var visible = showEarlier || showLatest;
     if (!visible) {
       if (block.actions) block.actions.remove();
-      block.actions = block.actionButton = null;
+      block.actions = block.actionButton = block.latestButton = null;
       block.actionTaskID = null;
       return;
     }
@@ -72,10 +77,20 @@
         if (block.actionEmit) block.actionEmit("loadEarlierConversation", { taskID: block.actionTaskID });
       });
       block.actions.appendChild(block.actionButton);
+      block.latestButton = S.button("返回最新消息", null, {}, function () {}, "small", false);
+      block.latestButton.addEventListener("click", function () {
+        if (!block.actionEmit) return;
+        block.latestButton.disabled = true;
+        C.returnToLatest(block.actionTaskID, block.actionEmit);
+      });
+      block.actions.appendChild(block.latestButton);
     }
     block.actionTaskID = page.selectedTaskID;
     block.actionButton.textContent = loading ? "正在加载更早消息…" : "加载更早的消息";
+    block.actionButton.hidden = !showEarlier;
     block.actionButton.disabled = loading;
+    block.latestButton.hidden = !showLatest;
+    block.latestButton.disabled = false;
     if (loading) block.actionButton.setAttribute("aria-busy", "true");
     else if (block.actionButton.removeAttribute) block.actionButton.removeAttribute("aria-busy");
   }
@@ -87,6 +102,7 @@
     values.forEach(function (entry, index) {
       var key = entryKey(entry, index), type = entryType(entry), item = nodes.get(key);
       if (item && item.__entryType !== type) {
+        if (item.__dshHost) global.CodexBridgeDesktopDSHConversationView.dispose(item);
         item.remove(); item = null;
       }
       if (!item) {
@@ -108,7 +124,10 @@
       active.add(key); entries.push(item);
     });
     nodes.forEach(function (item, key) {
-      if (!active.has(key)) { item.remove(); nodes.delete(key); }
+      if (!active.has(key)) {
+        if (item.__dshHost) global.CodexBridgeDesktopDSHConversationView.dispose(item);
+        item.remove(); nodes.delete(key);
+      }
     });
 
     var leading = [];
@@ -161,6 +180,7 @@
       && previous.toolStatus === entry.toolStatus && previous.toolArguments === entry.toolArguments
       && previous.displayTitle === entry.displayTitle && previous.displayStatus === entry.displayStatus
       && previous.symbol === entry.symbol && previous.isFinal === entry.isFinal
+      && previous.jobDetails === entry.jobDetails
       && previous.status === entry.status && previous.markdownHTML === entry.markdownHTML
       && previous.deliveryState === entry.deliveryState && previous.deliveryMessage === entry.deliveryMessage
       && JSON.stringify(previous.childRuns || []) === JSON.stringify(entry.childRuns || []);
