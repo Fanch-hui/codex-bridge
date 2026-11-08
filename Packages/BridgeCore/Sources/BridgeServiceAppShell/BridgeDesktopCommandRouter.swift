@@ -18,6 +18,12 @@ enum BridgeDesktopCommandRouter {
       model.appUpdater.deferUpdate()
     case .cancelAppUpdate:
       model.appUpdater.cancel()
+    case .messageCenterRefresh, .messageCenterLoadMore, .messageCenterSetVisible,
+      .messageCenterMarkRead,
+      .messageCenterMarkAllRead, .messageCenterSubmitFeedback, .messageCenterReply,
+      .messageCenterSelectAttachments, .messageCenterRemoveAttachment,
+      .messageCenterPreviewAttachment, .messageCenterOpenAttachment:
+      handleMessageCenter(envelope, model: model)
     case .saveDirectConfiguration:
       model.saveDirectConfiguration(envelope.payload.value)
     case .checkDirectCommand:

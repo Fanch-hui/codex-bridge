@@ -9,6 +9,17 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case installAppUpdate
   case deferAppUpdate
   case cancelAppUpdate
+  case messageCenterRefresh
+  case messageCenterLoadMore
+  case messageCenterSetVisible
+  case messageCenterMarkRead
+  case messageCenterMarkAllRead
+  case messageCenterSubmitFeedback
+  case messageCenterReply
+  case messageCenterSelectAttachments
+  case messageCenterRemoveAttachment
+  case messageCenterPreviewAttachment
+  case messageCenterOpenAttachment
   case refreshModels
   case scanAgents
   case selectPage

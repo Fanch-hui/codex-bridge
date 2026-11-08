@@ -56,7 +56,8 @@ enum BridgeDesktopUIStateBuilder {
       logs: logsState,
       connections: connectionsState,
       settings: settingsState,
-      appUpdate: model.appUpdateState
+      appUpdate: model.appUpdateState,
+      messageCenter: model.messageCenterState
     )
     ConversationPerformanceRecorder.shared.record(
       ConversationPerformanceSample(

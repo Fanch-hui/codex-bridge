@@ -61,7 +61,7 @@
           model.displayBox.revision, management.displayBox.revision,
           auxiliary.workspace.displayBox.revision, auxiliary.agentDefaults.displayBox.revision,
           auxiliary.logs.displayBox.revision, auxiliary.settings.displayBox.revision,
-          auxiliary.connections.displayBox.revision, appUpdateRevision,
+          auxiliary.connections.displayBox.revision, appUpdateRevision, messageCenterRevision,
         ],
         page: selectedPage,
         feedback: model.feedback.current,
@@ -97,7 +97,8 @@
         browserCanGoBack: chat.canGoBack,
         browserCanGoForward: chat.canGoForward,
         feedback: model.feedback.current,
-        appUpdate: appUpdateState
+        appUpdate: appUpdateState,
+        messageCenter: messageCenterState
       )
       let preparedPatch = desktopUI.preparedPatch(
         for: state, revision: windowsDesktopRenderRevision)

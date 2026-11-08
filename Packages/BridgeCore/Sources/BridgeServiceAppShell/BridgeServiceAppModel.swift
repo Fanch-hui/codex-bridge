@@ -94,6 +94,14 @@ public final class BridgeServiceAppModel: ObservableObject {
   lazy var workbenchSettingsController = makeWorkbenchSettingsController()
   @Published var appUpdateState: BridgeDesktopAppUpdateState?
   lazy var appUpdater = makeAppUpdater()
+  @Published var messageCenterState: MessageCenterState?
+  var messageCenterVisibilityObservers: [NSObjectProtocol] = []
+  lazy var messageCenter = MessageCenterController(
+    currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+      as? String ?? "0.0.0",
+    platform: "macos",
+    onChange: { [weak self] state in self?.messageCenterState = state }
+  )
   @Published public var selection: BridgeServiceNavigation? = .workbench {
     didSet { updateChatBrowserVisibility() }
   }

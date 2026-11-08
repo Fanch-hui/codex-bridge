@@ -87,6 +87,12 @@
         appUpdater?.deferUpdate()
       case .cancelAppUpdate:
         appUpdater?.cancel()
+      case .messageCenterRefresh, .messageCenterLoadMore, .messageCenterSetVisible,
+        .messageCenterMarkRead,
+        .messageCenterMarkAllRead, .messageCenterSubmitFeedback, .messageCenterReply,
+        .messageCenterSelectAttachments, .messageCenterRemoveAttachment,
+        .messageCenterPreviewAttachment, .messageCenterOpenAttachment:
+        handleMessageCenter(envelope, feedback: model.feedback)
       case .refreshModels:
         Task { @MainActor in await auxiliary.refreshModels(model: model) }
       case .setCodexExecutable:

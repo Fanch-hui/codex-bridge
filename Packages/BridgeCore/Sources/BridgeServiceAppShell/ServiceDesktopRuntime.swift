@@ -9,6 +9,7 @@ extension BridgeServiceAppModel {
     guard !started, !stopped else { return }
     started = true
     startAppUpdateCheck()
+    startMessageCenter()
     let status = await resolveRegistrationStatus(reprobe: true)
     guard !stopped else { return }
     switch status {
@@ -29,6 +30,7 @@ extension BridgeServiceAppModel {
     guard !stopped else { return }
     stopped = true
     appUpdater.cancel()
+    stopMessageCenter()
     started = false
     pollingTask?.cancel()
     pollingTask = nil

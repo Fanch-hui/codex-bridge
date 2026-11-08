@@ -8,6 +8,7 @@
 
     static func updateWindowVisibility(_ visible: Bool, model: WindowsWorkbenchModel) {
       model.setWindowVisible(visible)
+      messageCenter?.setForegroundVisible(visible)
       guard visible != isWindowVisible else { return }
       isWindowVisible = visible
       isLongTermHidden = false

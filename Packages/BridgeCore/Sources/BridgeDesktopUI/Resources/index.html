@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="connections.css">
     <link rel="stylesheet" href="settings.css">
     <link rel="stylesheet" href="component-dialogs.css">
+    <link rel="stylesheet" href="message-center.css">
   </head>
   <body>
     <section id="startup-screen" class="startup-screen" aria-label="启动 Codex Bridge" aria-busy="true">
@@ -61,6 +62,9 @@
         <nav class="navigation navigation-secondary" id="secondary-navigation" aria-label="应用设置"></nav>
         <div class="sidebar-footer">
           <span class="connection-indicator" id="connection-indicator" role="img" aria-label="等待连接状态"></span>
+          <button class="message-center-entry icon-button" id="message-center-button" type="button" aria-label="消息信箱" title="消息信箱">
+            <span class="icon" data-symbol="envelope"></span><span class="message-center-badge" id="message-center-badge" hidden aria-hidden="true"></span>
+          </button>
           <span id="connection-label">等待连接状态</span>
           <span class="refresh-indicator" id="refresh-indicator" aria-hidden="true"></span>
           <button class="sidebar-update-button icon-button" id="sidebar-update-button" type="button" hidden aria-label="发现新版本" title="发现新版本，点击查看更新内容">
@@ -237,6 +241,8 @@
     <script src="pages-dsh-workbench.js"></script>
     <script src="pages.js"></script>
     <script src="feedback.js"></script>
+    <script src="message-center-view.js"></script>
+    <script src="message-center.js"></script>
     <script src="sidebar.js"></script>
     <script src="icons.js"></script>
     <script src="startup.js"></script>

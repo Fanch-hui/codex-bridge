@@ -11,6 +11,7 @@
     "sidebar.left": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M6 8h1M6 11h1"/>',
     "sidebar.right": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M17 8h1M17 11h1"/>',
     "arrow.clockwise": '<path d="M20 11a8 8 0 0 0-14-4L4 9"/><path d="M4 5v4h4M4 13a8 8 0 0 0 14 4l2-2"/><path d="M20 19v-4h-4"/>',
+    "envelope": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/>',
     "arrow.down.circle": '<circle cx="12" cy="12" r="9"/><path d="M12 6v9m-4-3 4 4 4-4"/>',
     "exclamationmark.triangle.fill": '<path d="m12 3 9 17H3z"/><path d="M12 8v6M12 17v.5"/>',
     "bolt.fill": '<path d="m13 2-8 11h6l-1 9 8-12h-6z"/>',

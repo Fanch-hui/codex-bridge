@@ -31,6 +31,7 @@
         }
       }
       startAppUpdateCheck(model: model)
+      startMessageCenter()
       Task { await model.startServiceAndConnect() }
       var rendering = LinuxDesktopRendering()
       while LinuxDesktopHost.isRunning {
@@ -45,6 +46,7 @@
         try? await Task.sleep(for: .milliseconds(30))
       }
       appUpdater?.cancel()
+      messageCenter?.stop()
       model.stopSchedulingForApplicationExit()
       if !auxiliary.settings.keepServiceRunningAfterExit {
         do { try await LinuxServiceControl.shutdownAndWait() } catch {
@@ -56,6 +58,7 @@
 
     static func updateWindowVisibility(_ visible: Bool, model: WindowsWorkbenchModel) {
       model.setWindowVisible(visible)
+      messageCenter?.setForegroundVisible(visible)
     }
 
     static func updateBrowserMemoryPolicy(model: WindowsWorkbenchModel) {
@@ -93,6 +96,7 @@
         auxiliary.connections.displayBox.revision, auxiliary.settings.displayBox.revision,
         auxiliary.agentDefaults.displayBox.revision,
         CodexBridgeDesktopApplication.appUpdateRevision,
+        CodexBridgeDesktopApplication.messageCenterRevision,
       ]
       let nextPage = CodexBridgeDesktopApplication.selectedPage
       let nextFeedback = model.feedback.current
@@ -119,7 +123,8 @@
           browserURL: browser.url,
           browserStatus: browser.error ?? (browser.state == "loading" ? "正在加载聊天页…" : browser.url),
           browserCanGoBack: browser.canGoBack, browserCanGoForward: browser.canGoForward,
-          feedback: feedback, appUpdate: CodexBridgeDesktopApplication.appUpdateState)
+          feedback: feedback, appUpdate: CodexBridgeDesktopApplication.appUpdateState,
+          messageCenter: CodexBridgeDesktopApplication.messageCenterState)
         state = nextState
         LinuxDesktopHost.setBrowserPresentationVisible(
           nextPage == .workbench && feedback?.kind != .alert)

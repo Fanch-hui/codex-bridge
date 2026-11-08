@@ -187,6 +187,11 @@
       url.absoluteString.withCString { bridge_linux_open_uri($0) }
     }
 
+    static func openLocalImage(_ url: URL) {
+      guard url.isFileURL else { return }
+      url.absoluteString.withCString { bridge_linux_open_uri($0) }
+    }
+
     static func chooseFile(
       title: String, directory: Bool,
       completion: @escaping @Sendable (String) -> Void

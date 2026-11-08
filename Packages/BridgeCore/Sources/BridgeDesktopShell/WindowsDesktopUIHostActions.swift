@@ -31,10 +31,12 @@
       chooseFile(title: title, filter: filter, completion: completion)
     }
 
-    static func chooseImageFile(completion: @escaping @Sendable (String?) -> Void) {
+    static func chooseImageFile(
+      title: String = "选择项目图片", completion: @escaping @Sendable (String?) -> Void
+    ) {
       let filter = "图片 (*.png;*.jpg;*.jpeg;*.webp)\0*.png;*.jpg;*.jpeg;*.webp\0"
       WindowsUIThread.shared.enqueue {
-        completion(openFileDialog(title: "选择项目图片", filter: filter))
+        completion(openFileDialog(title: title, filter: filter))
       }
     }
 

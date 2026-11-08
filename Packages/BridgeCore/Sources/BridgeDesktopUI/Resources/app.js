@@ -197,6 +197,7 @@
     document.querySelector(".refresh-button").classList.toggle("is-refreshing", !!state.isRefreshing);
     document.querySelector(".refresh-button").disabled = !!state.isRefreshing;
     renderFeedback(state.feedback);
+    if (window.CodexBridgeMessageCenter) window.CodexBridgeMessageCenter.render(state.messageCenter, emit);
     if (window.CodexBridgeDesktopAppUpdate && window.CodexBridgeDesktopAppUpdate.renderSidebar) {
       window.CodexBridgeDesktopAppUpdate.renderSidebar(state.appUpdate, emit);
     }

@@ -30,9 +30,11 @@
     nonisolated(unsafe) static var desktopUI: WindowsDesktopUIWebView?
     nonisolated(unsafe) static var window: HWND?
     nonisolated(unsafe) private static var hasRevealedWindow = false
+    nonisolated(unsafe) private static var isMinimized = false
 
     static func create() -> HWND? {
       hasRevealedWindow = false
+      isMinimized = false
       WindowsUIFoundation.initialize()
       let instance = GetModuleHandleW(nil)!
       registerWindowClass(instance)
@@ -98,7 +100,12 @@
         enqueue(.windowVisibilityChanged(wParam != 0))
         return DefWindowProcW(window, message, wParam, lParam)
       case UINT(WM_SIZE):
-        if wParam != WPARAM(SIZE_MINIMIZED) {
+        let minimized = wParam == WPARAM(SIZE_MINIMIZED)
+        if minimized != isMinimized {
+          isMinimized = minimized
+          enqueue(.windowVisibilityChanged(!minimized))
+        }
+        if !minimized {
           layout()
         }
         return 0

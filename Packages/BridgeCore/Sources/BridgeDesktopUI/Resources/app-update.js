@@ -356,6 +356,16 @@
     updateSidebarDialogActions(state, phase);
   }
 
+  function openSidebarDialog() {
+    ensureSidebarDialog();
+    renderSidebarDialogContent();
+    if (sidebarDialog.showModal && !sidebarDialog.open) sidebarDialog.showModal();
+    else sidebarDialog.setAttribute("open", "");
+    if (global.CodexBridgeDesktopPages && global.CodexBridgeDesktopPages.measureBrowserViewport && currentSidebarEmit) {
+      global.CodexBridgeDesktopPages.measureBrowserViewport(currentSidebarEmit);
+    }
+  }
+
   function renderSidebar(update, emit) {
     currentSidebarUpdate = update || null;
     currentSidebarEmit = emit;
@@ -363,15 +373,7 @@
     if (!button) return;
     if (!button.__boundAppUpdate) {
       button.__boundAppUpdate = true;
-      button.addEventListener("click", function () {
-        ensureSidebarDialog();
-        renderSidebarDialogContent();
-        if (sidebarDialog.showModal && !sidebarDialog.open) sidebarDialog.showModal();
-        else sidebarDialog.setAttribute("open", "");
-        if (global.CodexBridgeDesktopPages && global.CodexBridgeDesktopPages.measureBrowserViewport && currentSidebarEmit) {
-          global.CodexBridgeDesktopPages.measureBrowserViewport(currentSidebarEmit);
-        }
-      });
+      button.addEventListener("click", openSidebarDialog);
     }
     var phase = phaseOf(update);
     var hasUpdate = !!update && (
@@ -393,6 +395,7 @@
   global.CodexBridgeDesktopAppUpdate = {
     renderOverview: renderOverview,
     renderSidebar: renderSidebar,
+    openDialog: openSidebarDialog,
     createSettings: createSettings
   };
 }(window));

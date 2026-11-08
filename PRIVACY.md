@@ -1,12 +1,12 @@
 # Privacy
 
-Codex Bridge is a local-first application for macOS and Windows. The project does not operate a developer cloud relay, telemetry collector, analytics endpoint, account database, or billing system.
+Codex Bridge is a local-first application for macOS, Windows, and Linux. The project operates a message center on ChatGPT Sites for developer notices and user-submitted feedback.
 
 ## Local data
 
 The background service stores project registrations, configuration, task history, conversation messages, and execution evidence in the current operating-system user's application data directory. Registered projects remain in their existing locations.
 
-Connection credentials and Tunnel Runtime Keys use macOS Keychain or Windows Credential Manager. The embedded browser maintains a persistent profile for the current system user. Installation packages do not contain user databases, browser cookies, or user credentials.
+Connection credentials and Tunnel Runtime Keys use macOS Keychain, Windows Credential Manager, or Linux Secret Service. The embedded browser maintains a persistent profile for the current system user. Installation packages do not contain user databases, browser cookies, or user credentials.
 
 ## External services
 
@@ -16,6 +16,14 @@ Connection credentials and Tunnel Runtime Keys use macOS Keychain or Windows Cre
 - Configured model, search, and MCP servers receive the requests required for their enabled functions.
 
 Codex Bridge does not add an independent analytics or crash-reporting transmission path.
+
+## Messages and feedback
+
+The message center receives the app version and operating-system platform when checking developer notices. Read states and feedback drafts are saved locally.
+
+Sending feedback shares the text, app version, platform, and screenshots selected by the user with the developer. Feedback records are stored in the Site's database, and screenshots are stored in private object storage. The developer can read, reply to, and delete submitted feedback. The hosting service processes the network metadata needed to serve and rate-limit requests.
+
+Each feedback thread uses a separate access credential stored in the operating system's secret storage. The app uses it to retrieve that thread and its replies. Keep app data to retain access to feedback history. Unsubmitted screenshot uploads are eligible for cleanup after 24 hours; submitted feedback remains until the operator deletes it.
 
 ## Logs and sharing
 

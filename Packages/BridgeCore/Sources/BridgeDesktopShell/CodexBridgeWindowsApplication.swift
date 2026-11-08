@@ -42,6 +42,7 @@
           let chat = ui.chatWebView(),
           let desktopUI = ui.desktopUIWebView()
         else { return }
+        startMessageCenter()
 
         // Startup path per platform contract: launch the service when the pipe
         // is not connectable, then connect and load tasks.
@@ -70,6 +71,7 @@
           try? await Task.sleep(nanoseconds: 10_000_000)
         }
         stopActivityScheduling()
+        messageCenter?.stop()
         model.stopSchedulingForApplicationExit()
         if !auxiliary.settings.keepServiceRunningAfterExit {
           let stopped = await Task.detached { WindowsServiceLauncher.shutdownServiceAndWait() }

@@ -93,6 +93,15 @@
       #endif
     }
 
+    static func openLocalImage(_ url: URL) {
+      guard url.isFileURL else { return }
+      #if os(Windows)
+        WindowsExternalURLHost.open(url.path)
+      #else
+        LinuxDesktopHost.openLocalImage(url)
+      #endif
+    }
+
     static func chooseProjectDirectory(
       completion: @escaping @Sendable (String, String) -> Void
     ) {
@@ -145,12 +154,14 @@
       #endif
     }
 
-    static func chooseImageFile(completion: @escaping @Sendable (String?) -> Void) {
+    static func chooseImageFile(
+      title: String = "选择项目图片", completion: @escaping @Sendable (String?) -> Void
+    ) {
       #if os(Windows)
-        WindowsDesktopUIHostActions.chooseImageFile(completion: completion)
+        WindowsDesktopUIHostActions.chooseImageFile(title: title, completion: completion)
       #else
         LinuxDesktopHost.chooseFileIncludingCancellation(
-          title: "选择项目图片", directory: false, completion: completion)
+          title: title, directory: false, completion: completion)
       #endif
     }
 

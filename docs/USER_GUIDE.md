@@ -17,6 +17,7 @@ ChatGPT / Dot 使用 Secure MCP Tunnel；Qwen Studio 使用本机 HTTP MCP；Gem
 - [Pi 与 Qoder 安装、地区选择与连接](./PI_QODER_CONNECTION_GUIDE.md)
 - [OpenCode 安装与连接](./OPENCODE_CONNECTION_GUIDE.md)
 - [Antigravity 安装、连接与权限](./ANTIGRAVITY_CONNECTION_GUIDE.md)
+- [消息信箱与反馈](#13-消息信箱与反馈)
 
 ## 1. 客户端与 Agent
 
@@ -474,6 +475,7 @@ Skills 区域显示本机发现的技能，可查看内容。需要执行时，�
 | 只用 Gemini，是否需要填写 OpenAI 配置 | 不需要。跳过 ChatGPT Tunnel 配置，按第 8.1 / 8.2 节选择本地 MCP、Sites 或 ngrok；Sites 的两项 Secret 由 Bridge 生成。 |
 | Gemini 已关联，但没有调用工具 | 先在 Gemini 中输入 `@` 并选择 Codex Bridge，再要求调用 `bridge_status` 和 `list_projects`；如返回错误，按具体错误检查连接。 |
 | 任务等待且不输出 | 查看启动审批、工具审批或问题表单 |
+| v1.1.2 显示“更新文件地址无效” | 该版本只接受迁移前的旧仓库路径。任务结束并退出 App 后，从发布页下载对应架构的安装包覆盖安装一次，沿用现有数据。 |
 
 日志用于定位具体错误。分享问题时提供系统、App 版本、操作步骤和脱敏错误摘要。密钥保存在系统凭据存储中，配置 JSON 也可能含凭据，请勿公开。
 
@@ -488,3 +490,13 @@ DSH ACP 的推理选项来自当前所选模型返回的 `thought_level` / `reas
 `node --version`、`npm --version`、`swift --version`、`rg --version` 和 macOS 的 `xcodebuild -version` 只接受精确的版本查询参数。`node --check` 只接受一个项目根目录内的 `.js`、`.mjs` 或 `.cjs` 文件，不接受其他 Node 执行参数。文件路径不能逃逸项目根目录，指向项目外的符号链接也会被拒绝。`grep -R/--dereference-recursive` 和 `rg -L/--follow` 不属于允许的搜索参数。
 
 `swift build/test`、构建型 `xcodebuild`、`npm test/run` 等会执行项目代码的命令不再属于免审批内置规则。需要使用时，可显式注册为 Direct 命令并配置审批；Full 模式保持原有执行能力。黑名单仍优先于用户规则和内置规则。Windows 继续只使用符合现有信任校验的 EXE，并保留 AppContainer 网络隔离；不会将 npm 的 `.cmd` 入口当作安全 EXE 放行。
+
+## 13. 消息信箱与反馈
+
+侧栏底部的信封打开消息信箱，角标表示未读通知和开发者新回复。通知详情可阅读使用提示，或通过通知中的操作打开更新入口和指南；查看详情后标记已读，也可使用“全部已读”。
+
+在“我的反馈”点击“写反馈”，选择类型并描述问题或建议。发送时附带 App 版本和系统类型；图片通过系统文件面板选择，支持 PNG、JPEG 和 WebP，每次最多 3 张、合计 10 MiB，可在发送前预览或移除。
+
+提交成功后，原反馈保留在“我的反馈”中。开发者的回复出现在同一对话，可继续补充说明；状态区分“已收到”“处理中”和“已解决”。提交失败时保留输入和图片，重试会核对原提交结果。
+
+通知已读状态、反馈草稿和反馈访问凭据保存在当前设备，保留应用数据可继续查看原反馈。反馈文字、版本、系统类型和用户选择的图片通过 ChatGPT Sites 保存并供开发者处理；具体数据范围见[隐私说明](../PRIVACY.md#messages-and-feedback)。

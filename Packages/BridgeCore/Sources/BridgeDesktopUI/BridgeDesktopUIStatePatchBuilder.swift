@@ -139,6 +139,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.isRefreshing == new.isRefreshing
       && old.feedback == new.feedback
       && old.settings == new.settings
+      && old.messageCenter == new.messageCenter
   }
 
   private func sameWorkbenchShell(
