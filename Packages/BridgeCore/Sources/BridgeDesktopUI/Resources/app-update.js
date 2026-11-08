@@ -244,7 +244,18 @@
   }
 
   var sidebarDialog = null, sidebarDialogTitle = null, sidebarDialogBody = null;
+  var sidebarDialogVersion = null, sidebarDialogNotes = null, sidebarDialogMessage = null;
+  var sidebarDialogStatus = null, sidebarDialogActions = null;
+  var sidebarStatusSignature = null, sidebarActionSignature = null;
   var currentSidebarUpdate = null, currentSidebarEmit = null;
+
+  function emitSidebar(command, payload) {
+    if (currentSidebarEmit) currentSidebarEmit(command, payload);
+  }
+
+  function setText(element, value) {
+    if (element.textContent !== value) element.textContent = value;
+  }
 
   function ensureSidebarDialog() {
     if (sidebarDialog) return;
@@ -261,6 +272,18 @@
     header.appendChild(sidebarDialogTitle);
     header.appendChild(closeBtn);
     sidebarDialogBody = node("div", "dsh-settings-body app-update-dialog-body");
+    sidebarDialogVersion = node("p", "app-update-version");
+    sidebarDialogBody.appendChild(sidebarDialogVersion);
+    sidebarDialogBody.appendChild(node("h4", "app-update-notes-heading", "更新内容"));
+    sidebarDialogNotes = node("div", "app-update-dialog-notes");
+    sidebarDialogBody.appendChild(sidebarDialogNotes);
+    sidebarDialogMessage = node("p", "app-update-message");
+    sidebarDialogBody.appendChild(sidebarDialogMessage);
+    sidebarDialogStatus = node("div");
+    sidebarDialogStatus.style.display = "contents";
+    sidebarDialogBody.appendChild(sidebarDialogStatus);
+    sidebarDialogActions = node("div", "app-update-actions");
+    sidebarDialogBody.appendChild(sidebarDialogActions);
     sidebarDialog.appendChild(header);
     sidebarDialog.appendChild(sidebarDialogBody);
     sidebarDialog.addEventListener("click", function (event) {
@@ -277,46 +300,60 @@
     document.body.appendChild(sidebarDialog);
   }
 
+  function updateSidebarDialogStatus(state, phase) {
+    var statusSignature = "";
+    if (phase === "waiting") statusSignature = phase + JSON.stringify(state.blockers || []);
+    else if (["downloading", "installing"].indexOf(phase) !== -1) statusSignature = phase + String(progressValue(state));
+    if (sidebarStatusSignature === statusSignature) return;
+    sidebarStatusSignature = statusSignature;
+    clear(sidebarDialogStatus);
+    appendBlockers(sidebarDialogStatus, state, emitSidebar);
+    appendProgress(sidebarDialogStatus, state, phase);
+  }
+
+  function updateSidebarDialogActions(state, phase) {
+    var busy = isBusy(state);
+    var actionSignature = "";
+    if (phase === "available") actionSignature = "install";
+    else if (["downloading", "verifying", "waiting"].indexOf(phase) !== -1) actionSignature = "cancel";
+    else if (phase === "failed") actionSignature = state.availableVersion ? "retry-update" : "retry-check";
+    if (sidebarActionSignature === actionSignature) return;
+    sidebarActionSignature = actionSignature;
+    clear(sidebarDialogActions);
+    function lockActions() {
+      Array.prototype.forEach.call(sidebarDialogActions.children, function (btn) { btn.disabled = true; });
+    }
+    if (phase === "available") {
+      var installBtn = action("立即更新", "installAppUpdate", emitSidebar, busy, lockActions);
+      installBtn.className = "button primary small";
+      sidebarDialogActions.appendChild(installBtn);
+    } else if (["downloading", "verifying", "waiting"].indexOf(phase) !== -1) {
+      sidebarDialogActions.appendChild(action("取消更新", "cancelAppUpdate", emitSidebar, false, lockActions));
+    } else if (phase === "failed") {
+      sidebarDialogActions.appendChild(action(
+        state.availableVersion ? "重试更新" : "重试检查",
+        state.availableVersion ? "installAppUpdate" : "checkAppUpdate",
+        emitSidebar,
+        busy
+      ));
+    }
+    sidebarDialogActions.hidden = sidebarDialogActions.children.length === 0;
+  }
+
   function renderSidebarDialogContent() {
     if (!sidebarDialog || !sidebarDialogBody) return;
     var state = currentSidebarUpdate || { phase: "idle", currentVersion: "" };
     var phase = phaseOf(state);
-    sidebarDialogTitle.textContent = titleFor(state);
-    clear(sidebarDialogBody);
-    if (state.currentVersion || state.availableVersion) {
-      var versionText = "当前版本 " + version(state.currentVersion);
-      if (state.availableVersion) versionText += " → 最新版本 " + version(state.availableVersion);
-      sidebarDialogBody.appendChild(node("p", "app-update-version", versionText));
-    }
-    var notesHeading = node("h4", "app-update-notes-heading", "更新内容");
-    sidebarDialogBody.appendChild(notesHeading);
-    var notesBox = node("div", "app-update-dialog-notes", state.notes ? String(state.notes) : messageFor(state));
-    sidebarDialogBody.appendChild(notesBox);
-    if (state.notes) {
-      sidebarDialogBody.appendChild(node("p", "app-update-message", messageFor(state)));
-    }
-    appendBlockers(sidebarDialogBody, state, currentSidebarEmit);
-    appendProgress(sidebarDialogBody, state, phase);
-    var actions = node("div", "app-update-actions");
-    var busy = isBusy(state);
-    function lockActions() {
-      Array.prototype.forEach.call(actions.children, function (btn) { btn.disabled = true; });
-    }
-    if (phase === "available") {
-      var installBtn = action("立即更新", "installAppUpdate", currentSidebarEmit, busy, lockActions);
-      installBtn.className = "button primary small";
-      actions.appendChild(installBtn);
-    } else if (["downloading", "verifying", "waiting"].indexOf(phase) !== -1) {
-      actions.appendChild(action("取消更新", "cancelAppUpdate", currentSidebarEmit, false, lockActions));
-    } else if (phase === "failed") {
-      actions.appendChild(action(
-        state.availableVersion ? "重试更新" : "重试检查",
-        state.availableVersion ? "installAppUpdate" : "checkAppUpdate",
-        currentSidebarEmit,
-        busy
-      ));
-    }
-    if (actions.children.length > 0) sidebarDialogBody.appendChild(actions);
+    setText(sidebarDialogTitle, titleFor(state));
+    sidebarDialogVersion.hidden = !state.currentVersion && !state.availableVersion;
+    var versionText = "当前版本 " + version(state.currentVersion);
+    if (state.availableVersion) versionText += " → 最新版本 " + version(state.availableVersion);
+    setText(sidebarDialogVersion, versionText);
+    setText(sidebarDialogNotes, state.notes ? String(state.notes) : messageFor(state));
+    sidebarDialogMessage.hidden = !state.notes;
+    setText(sidebarDialogMessage, messageFor(state));
+    updateSidebarDialogStatus(state, phase);
+    updateSidebarDialogActions(state, phase);
   }
 
   function renderSidebar(update, emit) {

@@ -115,7 +115,7 @@ public struct ServiceProcessOptions: Equatable, Sendable {
 public enum ServiceProcessRunner {
   public static func run(
     arguments: [String] = Array(CommandLine.arguments.dropFirst()),
-    appVersion: String = "3.0.0"
+    appVersion: String = "3.0.1"
   ) async throws {
     applyDefaultUmask()
     #if os(Windows)

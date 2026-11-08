@@ -19,6 +19,10 @@ enum AppUpdateDownload {
     let delegate = DownloadDelegate(destination: destination, progress: progress)
     let configuration = URLSessionConfiguration.ephemeral
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+    configuration.timeoutIntervalForRequest = 300
+    configuration.timeoutIntervalForResource = 2 * 60 * 60
+    var request = request
+    request.timeoutInterval = configuration.timeoutIntervalForRequest
     let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     defer { session.finishTasksAndInvalidate() }
     return try await withTaskCancellationHandler {
