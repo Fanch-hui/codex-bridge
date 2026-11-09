@@ -1,6 +1,6 @@
 # OpenCode 连接指南
 
-本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并让 ChatGPT、Qwen Studio 或 Bridge 工作台通过 MCP 提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
+本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并让 ChatGPT、Qwen Studio、Gemini 或 Bridge 网页工作台提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
 
 ## 自动发现与连接
 
@@ -42,10 +42,10 @@ Bridge 桌面 App 中的设置边界如下：
 
 | 设置 | 作用范围 |
 | --- | --- |
-| `设置 → OpenCode 默认偏好` | 保存 OpenCode 的模型和 effort |
-| `设置 → Antigravity 默认偏好` | 保存 Antigravity 的模型和推理偏好 |
-| `设置 → Codex 执行默认偏好` | 只保存 Codex 的模型、effort、访问模式和快速模式 |
-| 项目登记、任务只读/完整、远程启动批准 | 项目登记授权目录完整访问；用户选择任务权限并审批远程启动 |
+| `连接 → OpenCode`（或 `设置 → 账户与模型 → OpenCode → 管理`） | 保存 OpenCode 的默认模型、effort 与默认任务权限 |
+| `连接 → Antigravity`（或 `设置 → 账户与模型 → Antigravity → 管理`） | 保存 Antigravity 的默认模型和默认任务权限 |
+| `连接 → Codex`（或 `设置 → 账户与模型 → Codex → 管理`） | 保存 Codex 的默认模型、effort、默认任务权限、访问模式和快速模式 |
+| 项目登记、任务只读/完整、远程启动批准 | 项目登记授权目录完整访问；未指定项目时默认使用「默认工作区」，在「网页工作台」或「动态」页审批远程启动 |
 | OpenCode/Antigravity 原生权限 | 由各自 CLI 或 ACP 处理，不因其他 Agent 的访问设置改变 |
 
 OpenCode 的授权方式取决于所选模型服务。免费模型、本地服务与已配置接口可直接使用；2.x 保存在原生数据库中的账号与 Bridge 隔离数据库分别生效。Bridge 的桌面 App 提供统一的项目、任务、模型和审批控制面。
@@ -84,12 +84,12 @@ Bridge 通过 ACP 握手判断 OpenCode 是否可用，而不是仅根据命令�
 - Agent 名称和版本字段是否正常返回；
 - `session/new`、模型配置选项和当前任务所需能力是否可用。
 
-适配器的兼容判定会随 Bridge 版本更新，本文不固定 OpenCode 的版本上限或下限。连接页显示的 Probe 结果是当前安装能否使用的依据。已启用的 OpenCode 更新后，Bridge 会自动重新 Probe；通过后恢复原连接，失败时首页“本机 Agent 引擎”会提醒前往连接页处理。
+适配器的兼容判定会随 Bridge 版本更新，本文不固定 OpenCode 的版本上限或下限。连接页显示的 Probe 结果是当前安装能否使用的依据。已启用的 OpenCode 更新后，Bridge 会自动重新 Probe；通过后恢复原连接，失败时「动态」页和「连接」页会提醒前往处理。
 
 ## 3. 在 Bridge 中发现、登记和启用
 
-1. 打开 Codex Bridge，先在“项目”页面登记要使用的本地项目。
-2. 进入“连接” → “本机 Agent 引擎连接”。
+1. 打开 Codex Bridge，可在“项目”页面登记要使用的本地项目（未指定项目时默认使用「默认工作区」）。
+2. 进入 `连接 → OpenCode`（或 `设置 → 账户与模型 → OpenCode → 管理`）。
 3. Bridge 会查找本机安装的 OpenCode。共享桌面页面显示候选后，点击 OpenCode 卡片中的“连接”；需要指定路径时，使用“按路径登记已有安装”。
 4. 如果需要选择文件，选择真实的绝对路径下的 `opencode` CLI；Windows 选择 `opencode.exe`、`opencode.cmd` 或 `opencode.bat`，不要选择 GUI 桌面程序。
 5. 快捷连接在 Probe 成功后自动启用；高级手动登记则在状态为“可用”后启用。显示“已连接”表示该安装已经可供任务提交。
@@ -98,26 +98,26 @@ Bridge 的自动发现只读取必要的安装元数据，首次连接仍由用�
 
 ## 4. 刷新模型和设置默认值
 
-在“设置” → “外部 Agent 默认偏好”中找到 OpenCode：
+在 `连接 → OpenCode`（或 `设置 → 账户与模型 → OpenCode → 管理`）中配置：
 
-1. 连接 OpenCode，并在工作台选择一个真实项目。
-2. 点击“刷新模型列表”。模型目录来自当前项目根启动的 ACP `session/new.configOptions`，不是 `opencode models` CLI 的输出。
+1. 连接 OpenCode。
+2. 点击“刷新模型列表”。模型目录来自 ACP `session/new.configOptions`，不是 `opencode models` CLI 的输出。
 3. 选择 ACP 返回的精确模型 ID。不要手动在 `opencode/...` 与其他 Provider 的名称之间改名或使用别名。
 4. 仅当当前模型通过 ACP 声明了 effort 选项时，才选择对应 effort；没有可用选项时使用 Provider 默认值。
-5. 保存 OpenCode 的默认模型和 effort。任务权限由用户在工作台选择“只读”或“完整”。
+5. 保存 OpenCode 的默认模型、effort 和默认任务权限（“只读”或“完整”）。在「网页工作台」点击顶部标签栏「+」新建本机任务时，也可在底部输入器按需选择目标项目、模型、推理强度与权限。
 
-模型和 effort 的有效值以当前 ACP 返回的能力为准。刷新失败会保留已有列表和默认设置；如果 OpenCode 删除了当前默认模型或 effort，Bridge 会清空失效的默认值，并在设置页显示错误或要求重新选择。
+模型和 effort 的有效值以当前 ACP 返回的能力为准。刷新失败会保留已有列表和默认设置；如果 OpenCode 删除了当前默认模型或 effort，Bridge 会清空失效的默认值，并在连接详情或设置页显示错误或要求重新选择。
 
 | Bridge 任务权限 | OpenCode ACP 模式 | 工具范围 |
 | --- | --- | --- |
 | 只读 | Bridge 只读 Agent | 通过独立的原生权限配置仅开放 read、glob、grep、question；不允许写入和网络工具 |
 | 完整 | `build` | 允许写入和联网，实际操作继续服从 OpenCode 原生工具审批 |
 
-ChatGPT/Qwen 新任务使用用户在工作台选择的默认任务权限。`submit_task` 不提供权限选择参数；旧客户端携带的权限字段不会改变用户的选择。
+ChatGPT/Qwen/Gemini 新任务使用配置的默认任务权限。`submit_task` 不提供权限选择参数；旧客户端携带的权限字段不会改变用户的选择。
 
-## 5. 从 ChatGPT 或 Qwen 通过 MCP 提交
+## 5. 从 ChatGPT、Qwen 或 Gemini 通过 MCP 提交
 
-先调用 `list_projects` 获取不透明的项目 ID，再调用 `list_agents` 确认 OpenCode 安装满足：
+先调用 `list_projects` 获取不透明的项目 ID（省略 `project_id` 时默认使用「默认工作区」），再调用 `list_agents` 确认 OpenCode 安装满足：
 
 ```json
 {
@@ -132,7 +132,7 @@ ChatGPT/Qwen 新任务使用用户在工作台选择的默认任务权限。`sub
 
 ```json
 {
-  "project_id": "<list_projects 返回的项目 ID>",
+  "project_id": "<list_projects 返回的项目 ID，可省略以使用默认工作区>",
   "provider_id": "opencode",
   "prompt": "检查项目结构并总结当前构建问题。"
 }
@@ -162,12 +162,12 @@ ChatGPT/Qwen 新任务使用用户在工作台选择的默认任务权限。`sub
 - `provider_id` 为 `opencode`；省略时仍走默认 Codex 路径。
 - `installation_id` 可省略，Bridge 会选择已启用且 Probe 可用的安装；有多个安装时应使用 `list_agents` 返回的精确 ID。
 - `execution_model` 和 `execution_effort` 只有在 `model_override=true` 时才覆盖本次任务。
-- 任务权限使用用户在工作台选择的默认值，AI 不选择读写或联网权限。
+- 任务权限使用用户配置的默认值，AI 不选择读写或联网权限。
 - 新建 OpenCode 会话时省略 `thread_id`；继续已有会话时，将上一任务 `get_task` 返回的 `provider_session_id` 作为 `submit_task.thread_id`。只有用户明确选择已发现的 Bridge Skill 时才携带 `skill_name`，其余字段以当前 MCP 工具 schema 为准。
 
 ## 6. 审批、查询和继续任务
 
-`submit_task` 通常先返回 `awaiting_local_approval`。本机用户在 Bridge 工作台批准后，任务才进入 `starting` 和 `running`。设置中的“自动批准远程 Agent 启动请求”默认关闭；即使开启，也不会自动批准 OpenCode 执行期 permission 或 Direct 操作。
+`submit_task` 通常先返回 `awaiting_local_approval`。本机用户在 Bridge「网页工作台」或「动态」页批准后，任务才进入 `starting` 和 `running`。设置中的“自动批准远程 Agent 启动请求”默认关闭；即使开启，也不会自动批准 OpenCode 执行期 permission 或 Direct 操作。「设置 → 执行与审批」支持配置「同一项目同时运行的 Agent」（1–4，默认 4），网页工作台续写达到并发上限时自动排队。
 
 收到任务 ID 后，可调用 `wait_task` 由 Bridge 等待结果，默认最多 300 秒；任务完成或需要审批、补充信息时立即返回。到点返回 `still_running` 和同一任务 ID，模型自行决定何时通过 `get_task` 查询。`get_task` 随时可用，返回阶段、`result_summary`、`failure_code`、`changed_files`、`recent_activity`、模型、权限和 Provider 绑定字段。
 
@@ -190,7 +190,7 @@ Bridge 会在同一个 ACP Session 中把 steer 内容排队为后续 prompt；�
 - 只读任务使用 Bridge 创建的独立只读 Agent，完整任务使用原生 Build；只读工具权限不会受已有 Agent 配置中的允许规则影响，审批不能开放写入或网络工具。
 - OpenCode 继承用户 `HOME` 和 `PATH`，使原生配置与本机工具可用；Bridge 仅隔离每次运行的 cache、state、runtime，并将会话数据库保存在 Service 私有 AgentState。
 - Bridge 不读取或回传 OpenCode auth 文件、Token、Cookie 或 Runtime Key。
-- OpenCode ACP 的权限请求由本机 Bridge 工作台处理；远程 ChatGPT/Qwen 客户端不能代替本机用户批准。
+- OpenCode ACP 的权限请求由本机 Bridge「网页工作台」或「动态」页处理；远程 ChatGPT/Qwen/Gemini 客户端不能代替本机用户批准。
 - OpenCode 的 Provider 默认值与 AGY、Codex 的默认值分开保存；修改其他 Agent 的访问设置不会改变 OpenCode 的 ACP 模式或原生权限。
 - Bridge 桌面 App 与 OpenCode Desktop 是两个应用。Bridge 只调用 OpenCode CLI 的 ACP 入口；标准 OpenCode 配置和认证数据可由 Desktop 与 CLI 共同使用，但 Desktop 独有的 UI 状态不会成为 Bridge 的会话数据。
 
@@ -201,11 +201,11 @@ Bridge 会在同一个 ACP Session 中把 steer 内容排队为后续 prompt；�
 | 没有可用安装 | 在连接页连接自动发现的候选，或重新登记绝对路径下的真实 CLI 并 Probe，确认已启用。 |
 | `needs_review` /“需复核” | 二进制身份发生变化；确认来源可信后点击“接受替换并 Probe”。 |
 | ACP 不兼容 | 查看 Probe 返回的具体协议、握手或能力缺口；升级或回退到仍能通过当前 Probe 的 OpenCode 官方版本。文档不预设固定版本范围。 |
-| 模型列表为空 | 先连接并启用 OpenCode，选择真实项目，再点击“刷新模型列表”；目录必须来自 ACP。 |
+| 模型列表为空 | 先连接并启用 OpenCode，在 `连接 → OpenCode` 点击“刷新模型列表”；目录必须来自 ACP。 |
 | 模型不可用 | 使用 ACP 返回的精确 ID，不要使用跨 Provider 别名；重新刷新当前安装的目录。 |
-| 网络工具被 Provider 拒绝 | 用户是否选择“完整”；检查 OpenCode 的 Provider 和原生权限配置。 |
-| `awaiting_local_approval` | 打开 Bridge 工作台批准任务；ChatGPT/Qwen 无法代替本机批准。 |
-| `project_busy` | 等待同一项目的其他写任务或 Direct 操作完成。 |
+| 网络工具被 Provider 拒绝 | 任务权限是否设为“完整”；检查 OpenCode 的 Provider 和原生权限配置。 |
+| `awaiting_local_approval` | 打开 Bridge「网页工作台」或「动态」页批准任务；ChatGPT/Qwen/Gemini 无法代替本机批准。 |
+| `project_busy` | 等待同一项目的并发槽位释放或 Direct 操作完成（可在「设置 → 执行与审批」调整「同一项目同时运行的 Agent」上限，网页工作台续写达到上限时会自动排队）。 |
 | `unknown` | 检查 Service/Provider 是否重启；不要自动伪造恢复或启动新任务。 |
 | 下载的 App 无法直接打开 | Finder 中对 App 使用“右键 → 打开”，或到“系统设置 → 隐私与安全性”选择“仍要打开”。发布包未配置 Developer ID，也未公证。 |
 

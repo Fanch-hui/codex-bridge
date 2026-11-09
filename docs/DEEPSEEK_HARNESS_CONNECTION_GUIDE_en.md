@@ -1,10 +1,20 @@
 # DeepSeek Harness Connection Guide
 
-This guide covers the DeepSeek Harness (DSH) ACP connection. Existing connections default to ACP. To use shared sessions in the official Desktop Host, see the [native desktop guide (Chinese)](./DSH_NATIVE_DESKTOP_GUIDE.md). Native mode reuses Desktop sign-in and tools instead of requiring the ACP API Key; it supports Full text tasks on macOS and Windows x64. Model and reasoning selections also update the Desktop default for future sessions. Linux and Windows ARM64 continue to use ACP.
+This guide covers the built-in **Workbench** and the external DeepSeek Harness (DSH) ACP connection. To use shared sessions in the official Desktop Host, see the [native desktop guide (Chinese)](./DSH_NATIVE_DESKTOP_GUIDE.md). Native mode reuses Desktop sign-in and tools instead of requiring the ACP API Key; it supports Full text tasks on macOS and Windows x64. Model and reasoning selections also update the Desktop default for future sessions. Linux and Windows ARM64 continue to use ACP.
 
 The [Chinese ACP guide](./DEEPSEEK_HARNESS_CONNECTION_GUIDE.md) contains detailed troubleshooting and task examples.
 
-Open `Workbench → DSH Workbench → Engine Settings` and click **One-click setup**. Bridge prepares official DSH and Node/npm, then prompts for the Base URL and API Key. See the [setup guide (Chinese)](./AGENT_SETUP_GUIDE.md) for installation locations and retries. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
+## Built-in Workbench
+
+Bridge ships with the built-in runtime, Node, package manager, and dependencies so you can open **Workbench** and start chatting right after installation:
+
+1. Open **Workbench** and select a target project in the bottom composer (defaults to **Default Workspace** when no project is specified).
+2. Open **Workbench Settings** to connect ChatGPT, Zhipu / Z.AI, WorkBuddy, or a custom API (Chat Completions and Responses), and manage context window & auto-compaction, skills, MCP servers, and plugins.
+3. Return to the conversation, choose permission, model, and reasoning effort in the composer, and send your first message. The right inspector provides **Files / Changes / Agent** tabs, and **Settings → Execution & Approvals** lets you configure **Concurrent Agents per Project** (1–4, default 4).
+
+## External DSH ACP connection
+
+Open `Connections → DeepSeek Harness` (or `Settings → Accounts & Models → DeepSeek Harness → Manage`) and click **One-click setup**. Bridge prepares official DSH and Node/npm, then prompts for the Base URL and API Key. See the [setup guide (Chinese)](./AGENT_SETUP_GUIDE.md) for installation locations and retries. The key is stored in the system credential store and injected only into the Harness process environment. Use an external profile and `.env` when you need an independent search endpoint, a fixed local profile, or manual registration.
 
 The provider ID is:
 
@@ -14,15 +24,19 @@ deepseek-harness
 
 Omitting `provider_id` selects Codex, not DSH.
 
-## Use the workbench
+## Use external DSH ACP in Web Workbench
 
-Register a project, then open `Workbench → DSH Workbench` and create a session. Select its model, reasoning effort, and Full permission. The session list shows task sources, searches Bridge history, and reuses conversation, approval, continuation, and result-copy controls.
+External DeepSeek Harness ACP sessions, history search, multi-tab navigation, up to 4-pane split views, task approvals, and cross-Agent handoff live in **Web Workbench**:
 
-The file pane provides directory browsing, line-numbered text editing, and Git Diff. Complete, unredacted UTF-8 files support previewed saves up to 256 KiB. Saves use Direct approval and the workspace gate, check the original SHA-256, and preserve ordinary LF/CRLF and trailing newlines. Git shows all current project changes, including existing edits.
+- Click `+` in the top tab bar to create a new Agent task locally—select DeepSeek Harness, model, reasoning effort, target project (or **Default Workspace**), and **Full** permission in the bottom composer—or select an existing session to continue.
+- Use the toolbar split-view controls (single, two-column, 1-left-2-right, or 4-grid) to work across multiple sessions simultaneously. Continuations in Web Workbench automatically queue when the project reaches the configured concurrent Agent limit (1–4, default 4).
+- The session list shows task sources, searches Bridge history, and provides conversation, approval, continuation, result-copy, and Agent handoff controls. Pending approvals also appear in **Activity**.
+
+The right inspector (**Files / Changes**) provides directory browsing, line-numbered text editing, and Git Diff. Complete, unredacted UTF-8 files support previewed saves up to 256 KiB. Saves use Direct approval and the workspace gate, check the original SHA-256, and preserve ordinary LF/CRLF and trailing newlines. Git shows all current project changes, including existing edits.
 
 New sessions accept project Skill names and project PNG/JPEG/WebP images for models that declare image input: up to eight images and 8 MiB total. Add individual images from the file tree. Bridge queries the selected model and rechecks the ACP declaration and image identity at execution. The wire content follows the official [ACP implementation](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts).
 
-ChatGPT/Qwen retain the same `deepseek-harness` provider and task tools. Both workbench views share task records and approvals.
+ChatGPT/Qwen/Gemini retain the same `deepseek-harness` provider and task tools, sharing task records and approvals with Web Workbench.
 
 ## 1. Compatibility boundary
 
@@ -90,7 +104,7 @@ Test-Path .\apps\cli\lib\bin.js
 
 ### Discover the installation in Bridge
 
-Bridge scans for local Agents on first use and saves the results. If DSH was installed later, open `Workbench → DSH Workbench → Engine Settings` and click **Scan Agents**. Once discovered, enter the Base URL and API key, then connect. App and Service restarts, page changes, and regular status refreshes reuse the saved catalog.
+Bridge scans for local Agents on first use and saves the results. If DSH was installed later, open `Connections → DeepSeek Harness` (or `Settings → Accounts & Models → DeepSeek Harness → Manage`) and click **Scan Agents**. Once discovered, enter the Base URL and API key, then connect. App and Service restarts, page changes, and regular status refreshes reuse the saved catalog.
 
 Discovery checks known launchers and standard package-manager locations before a bounded source search in local development directories. Source candidates require a built entry, the DSH package identity, and a dependency lockfile. Keep the complete source tree so Node can load its dependencies.
 
@@ -105,7 +119,7 @@ In Windows PowerShell, from the DSH source root:
 [Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
 ```
 
-Then click **Scan Agents** in DSH Engine Settings. The Windows Service reads the updated setting directly.
+Then click **Scan Agents** in `Connections → DeepSeek Harness`. The Windows Service reads the updated setting directly.
 
 For processes launched from a macOS terminal:
 
@@ -126,10 +140,10 @@ The entry point commonly uses `#!/usr/bin/env node`. Bridge resolves the real No
 Most users do not need an external profile or `.env` file. After building DSH, configure the main model connection in the app:
 
 1. Sign in to [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys), create a new API key, and copy it when it is shown.
-2. Open `Workbench → DSH Workbench → Engine Settings`.
+2. Open `Connections → DeepSeek Harness` (or `Settings → Accounts & Models → DeepSeek Harness → Manage`).
 3. Enter the main model Base URL (default `https://api.deepseek.com`) and the API key in the connection row.
 4. Click `Connect` and wait for discovery, configuration, and Probe. A successful Probe enables the installation.
-5. In Engine Settings, refresh the model catalog, and select a model returned for your account.
+5. Refresh the model catalog in the DeepSeek Harness connection details, and select the default model, reasoning effort, and default task permission returned for your account.
 
 Bridge stores the key in macOS Keychain, Windows Credential Manager or Linux Secret Service, clears the field after submission, and injects it only when starting the DSH child process. Read the advanced sections below only for manual registration, an independent Web Search endpoint, or a fixed local profile.
 
@@ -179,7 +193,7 @@ Do not rebuild or trim the template from an upstream generic example. It contain
 
 For `apps/cli/lib/bin.js`, Bridge reads and validates the external `cordis.yml`, then writes a private per-run `acp.patch.yml` and launches with `--profile acp --patch`. The user's original `cordis.yml` is not rewritten.
 
-Keep the packaged `dsh-user-approval` plugin at `policy: ask`. Bridge uses it to surface DSH `session/request_permission` calls in Workbench. Removing the approval plugin or changing the sandbox to `danger-full-access` is not a supported user configuration.
+Keep the packaged `dsh-user-approval` plugin at `policy: ask`. Bridge uses it to surface DSH `session/request_permission` calls in Web Workbench. Removing the approval plugin or changing the sandbox to `danger-full-access` is not a supported user configuration.
 
 ## 5. Advanced optional: `.env` and independent endpoints
 
@@ -217,11 +231,11 @@ Probe validates the local installation, protocol, and basic ACP session. Model r
 
 ## 7. Refresh models and defaults
 
-1. Select the task project in Workbench.
-2. Open execution defaults in DSH Engine Settings.
-3. Select the installation if more than one exists.
-4. Refresh the model list.
-5. Select an exact model ID returned by the current provider. Effort values come from the selected model's current ACP session `thought_level`/`reasoning_effort` options; the bundled profile's `off`, `low`, `high`, and `max` values are only initial examples, and the current ACP session is authoritative.
+1. Open `Connections → DeepSeek Harness` (or `Settings → Accounts & Models → DeepSeek Harness → Manage`).
+2. Select the installation if more than one exists.
+3. Refresh the model list.
+4. Select an exact model ID returned by the current provider. Effort values come from the selected model's current ACP session `thought_level`/`reasoning_effort` options; the bundled profile's `off`, `low`, `high`, and `max` values are only initial examples, and the current ACP session is authoritative.
+5. Select the default task permission (**Full** for DSH).
 
 For the modern entry, Bridge obtains the catalog in two stages:
 
@@ -235,7 +249,7 @@ The catalog endpoint needs a Bearer-authenticated OpenAI-compatible `/models` re
 
 Do not copy model IDs or effort values from Codex, OpenCode, or Antigravity. Without an explicit user override, Bridge preserves the provider/profile current value or a saved default that remains valid.
 
-Registering a project authorizes full access to that directory. ChatGPT/Qwen submissions use the default task permission selected by the user in Workbench: **Read Only** or **Full**. AI clients do not choose or override permissions.
+Registering a project authorizes full access to that directory. ChatGPT/Qwen/Gemini submissions use the default task permission configured for the Agent (**Read Only** or **Full**); AI clients do not choose or override permissions.
 
 ## Protocol and endpoints, model catalog, and search endpoints
 
@@ -257,12 +271,13 @@ Web search independently uses `DEEPSEEK_SEARCH_BASE_URL`. An explicit value wins
 
 Full tasks allow writes and network tools. Read Only tasks allow neither. The current DSH profile cannot guarantee a task-local restriction on network tools, so Bridge explicitly rejects Read Only tasks as unsupported. Select an agent that supports Read Only for that requirement.
 
+**Settings → Execution & Approvals** lets you configure **Concurrent Agents per Project** (1–4, default 4). Continuations in Web Workbench automatically queue when the project reaches the concurrency limit.
+
 For a DSH Full task:
 
-1. Register the project directory and select the project, DSH, and **Full** in Workbench.
-2. Ensure no other write task is active for the same project.
-3. Approve the remote task start unless automatic remote-start approval is enabled.
-4. Handle each runtime tool request in Workbench. DSH ACP supports `allow_once` and `reject_once`; separate tool calls may ask separately.
+1. Register the project directory (if no project is specified, Bridge uses **Default Workspace**) and set DSH task permission to **Full**.
+2. Approve the remote task start in **Web Workbench** or **Activity** unless automatic remote-start approval is enabled.
+3. Handle each runtime tool request in **Web Workbench** or **Activity**. DSH ACP supports `allow_once` and `reject_once`; separate tool calls may ask separately.
 
 Codex's full-access and auto-review settings apply only to Codex. Full task permission and automatic remote-start approval do not bypass DSH runtime approvals.
 
@@ -272,7 +287,7 @@ For Web Search, configure the external profile's adjacent `.env` and a search en
 
 Call `list_projects` and `list_agents` first. Confirm the installation is available, enabled, and accepts task submissions.
 
-With the correct Workbench project and permission selected, the minimal task is:
+When `project_id` is omitted, Bridge uses **Default Workspace**. The minimal task is:
 
 ```json
 {
@@ -281,7 +296,7 @@ With the correct Workbench project and permission selected, the minimal task is:
 }
 ```
 
-With **Full** selected by the user, a Web Search task can be submitted as:
+With **Full** configured as the default permission, a Web Search task can be submitted as:
 
 ```json
 {
@@ -290,11 +305,11 @@ With **Full** selected by the user, a Web Search task can be submitted as:
 }
 ```
 
-Only when the user explicitly requests a model override should the client add `model_override` and the exact model and effort returned by the current ACP session. Task permissions always come from the user's Workbench selection. For continuation, pass the `provider_session_id` of a completed task as `thread_id` when `lifecycle.session_continue` is available. The project and installation must match, and persistent session data must still exist. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
+Only when the user explicitly requests a model override should the client add `model_override` and the exact model and effort returned by the current ACP session. Task permissions always come from the user's configured default. For continuation, pass the `provider_session_id` of a completed task as `thread_id` when `lifecycle.session_continue` is available. The project and installation must match, and persistent session data must still exist. `skill_name` is valid only when the user explicitly selects a discovered Bridge Skill.
 
-Remote submissions normally enter `awaiting_local_approval`. Review project, provider, task permission, and prompt in Workbench before approving the start. Automatic remote-start approval is disabled by default and never approves later DSH permission requests or Direct operations.
+Remote submissions normally enter `awaiting_local_approval`. Review project, provider, task permission, and prompt in **Web Workbench** or **Activity** before approving the start. Automatic remote-start approval is disabled by default and never approves later DSH permission requests or Direct operations.
 
-When DSH requests a runtime tool, the persisted task state uses `waiting_for_codex_approval` for compatibility even though the provider remains DSH. In Workbench, inspect the approval card and choose one-shot allow or deny. There is currently no session-wide allow choice for DSH.
+When DSH requests a runtime tool, the persisted task state uses `waiting_for_codex_approval` for compatibility even though the provider remains DSH. In **Web Workbench** or **Activity**, inspect the approval card and choose one-shot allow or deny. There is currently no session-wide allow choice for DSH.
 
 Use `get_task` to inspect status and read terminal results from the same `get_task` snapshot: `result_summary`, `failure_code`, `changed_files`, activity, model/effort, and provider bindings. Terminal `next_action=read_final_report` is a hint string, not another MCP tool.
 
@@ -302,9 +317,9 @@ Queued steer sends a second prompt after the current prompt finishes. DSH also s
 
 ## 10. MCP configuration and continuation
 
-Use the DSH MCP section in Engine Settings to manage stdio and Streamable HTTP servers. Stdio commands require absolute paths; enter arguments one per line. HTTP servers are attached only to tasks with network access enabled. Environment and header values use the system credential store and are never returned to the editor. Leave a saved value blank to retain it, or remove its row to delete it. Changes apply to the next task or continuation.
+Use the MCP section in `Connections → DeepSeek Harness` (or `Settings → Accounts & Models → DeepSeek Harness → Manage`) to manage stdio and Streamable HTTP servers for external DSH ACP (separate from built-in Workbench MCP servers in **Workbench Settings**). Stdio commands require absolute paths; enter arguments one per line. HTTP servers are attached only to tasks with network access enabled. Environment and header values use the system credential store and are never returned to the editor. Leave a saved value blank to retain it, or remove its row to delete it. Changes apply to the next task or continuation.
 
-Choose Continue conversation on an ended task to retain its context after a Service restart. Resume requires the same project and installation, an ACP `resume` capability, and persistent session data. Sessions cleared by older temporary-runtime versions cannot be recovered.
+Send a follow-up message in the Web Workbench composer on an ended task to retain its context after a Service restart. Resume requires the same project and installation, an ACP `resume` capability, and persistent session data. Sessions cleared by older temporary-runtime versions cannot be recovered.
 
 ## 11. Availability and troubleshooting
 
@@ -313,17 +328,17 @@ Choose Continue conversation on an ended task to retain its context after a Serv
 | Invalid artifact | Use the official built `apps/cli/lib/bin.js`; retain the full source tree |
 | Unsupported Node | Use Node 22.19.0+ within 22.x, or Node 24+; do not use Node 23 |
 | Node not found by the app | Ensure the LaunchAgent can resolve the real interpreter, not only an interactive shell alias |
-| DSH not found after building | Click **Scan Agents**, or choose `apps/cli/lib/bin.js` under `Advanced: Register an existing installation` |
+| DSH not found after building | Click **Scan Agents** in `Connections → DeepSeek Harness`, or choose `apps/cli/lib/bin.js` under `Advanced: Register an existing installation` |
 | Manifest/lock missing | Do not copy `bin.js` away from its source tree |
 | Profile location rejected | Runtime validation requires moving `cordis.yml` and `.env` outside the DSH source; keeping them outside task projects is also recommended |
 | `templateMismatch` | Preserve the existing external `cordis.yml`; merge only the required structure from the current Bridge template, then Probe again |
 | `needs_review` | Verify expected entry point, manifest, lock, Node, adapter, or profile replacement, then accept and Probe |
 | Probe works but API auth fails | Confirm `.env` is adjacent to the registered config, the key is valid, and the main base URL is correct |
 | Main model works but search fails | Check the independent search base URL, key acceptance, and `web_search_20250305` support |
-| Model list is empty | Select the project and installation, refresh ACP config options, and use exact provider values |
-| Write denied | Check the user-selected Full permission, native tool rules, and the per-project write gate |
-| Network denied | Check the user-selected Full permission, adjacent `.env`, endpoint support, and current DSH runtime approval |
-| Start was approved but the task still waits | Open Workbench pending approvals, inspect the DSH tool request, and choose one-shot allow or deny |
+| Model list is empty | Open `Connections → DeepSeek Harness`, select the installation, refresh ACP config options, and use exact provider values |
+| Write denied | Check Full permission, native tool rules, and whether the project concurrency limit or a Direct operation is active |
+| Network denied | Check Full permission, adjacent `.env`, endpoint support, and current DSH runtime approval |
+| Start was approved but the task still waits | Open pending approvals in **Web Workbench** or **Activity**, inspect the DSH tool request, and choose one-shot allow or deny |
 | Runtime approval repeats | DSH supports only `allow_once` / `reject_once`; `full-access` does not bypass it |
 | Automatic task start still shows approvals | It skips only `awaiting_local_approval`, not DSH `session/request_permission` |
 

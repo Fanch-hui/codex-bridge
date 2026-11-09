@@ -20,15 +20,14 @@ extension BridgeServiceAppModel {
     }
   }
 
+  /// Background read that follows the selected or viewed project. It stays quiet on failure, like
+  /// the other state syncs (a just-started service may not answer yet): the next collection
+  /// refresh reads a missing detail again.
   func loadProjectDetail(projectID: String) {
     guard let client, connectionState == .connected else { return }
     Task { [weak self] in
-      do {
-        let detail = try await client.projectCommands(projectID: projectID)
-        self?.projectDetails[projectID] = detail
-      } catch {
-        self?.errorMessage = "读取项目命令配置失败。"
-      }
+      guard let detail = try? await client.projectCommands(projectID: projectID) else { return }
+      self?.projectDetails[projectID] = detail
     }
   }
 

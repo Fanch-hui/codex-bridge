@@ -6,11 +6,11 @@ Codex Bridge is a local-first application for macOS, Windows, and Linux. The pro
 
 The background service stores project registrations, configuration, task history, conversation messages, and execution evidence in the current operating-system user's application data directory. Registered projects remain in their existing locations.
 
-Connection credentials and Tunnel Runtime Keys use macOS Keychain, Windows Credential Manager, or Linux Secret Service. The embedded browser maintains a persistent profile for the current system user. Installation packages do not contain user databases, browser cookies, or user credentials.
+Connection credentials and Tunnel Runtime Keys use macOS Keychain, Windows Credential Manager, or Linux Secret Service. The embedded browser maintains separate persistent profiles for ChatGPT and Gemini under the current system user, releasing page instances when collapsed. Installation packages do not contain user databases, browser cookies, or user credentials.
 
 ## External services
 
-- ChatGPT, Codex, and other configured agents may send prompts, project content, and execution results to the services selected by the user.
+- ChatGPT, Gemini, Codex, Claude Code, and other configured agents or Workbench model connections (BigModel / Z.AI, WorkBuddy, custom APIs) send prompts, project content, and execution results to the services selected by the user.
 - Connected MCP clients receive the results of authorized tool calls. Depending on project permissions and the requested tool, these results can include file content and task output.
 - Secure MCP Tunnel carries MCP transport traffic through the packaged OpenAI tunnel helper.
 - Configured model, search, and MCP servers receive the requests required for their enabled functions.

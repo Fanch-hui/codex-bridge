@@ -31,39 +31,32 @@ Upgrades preserve application data and the embedded browser profile. Closing the
 
 Versions with the built-in updater check GitHub once at startup and show available updates on the overview page. Choose Update to download and install; installation waits for active work to finish, then restarts the app. After every update, refresh the plugin in ChatGPT to prevent stale caches (see [ChatGPT Guide](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)). On Linux, the update action opens the matching `.deb` download; install it with the system package manager and restart the app. Settings also provides a manual check. Older versions need one manual installation of an updater-enabled release.
 
-## Screenshots and task demo
+## Product screens
 
-Recorded on macOS; Windows and Linux use the same shared product UI. This 15-second demo follows ChatGPT submitting “你好” → local approval → Codex execution → the response in the workbench.
+Captured on macOS; Windows and Linux use the same shared desktop UI.
 
-<img src="./docs/assets/workbench-demo.gif" width="640" alt="Full animated demo: ChatGPT submission, local approval, and the Codex response">
+**Workbench**: Built-in model conversation workspace with main navigation and workspace-grouped sessions on the left, live conversation, performance/token/context metrics, and composer in the center, and a collapsible Files / Changes / Agents inspector on the right.
 
-<details>
-<summary>View the task approval screen</summary>
+<img src="./docs/assets/workbench.png" width="720" alt="Codex Bridge Workbench">
 
-The local approval card shows the pending operation; choosing “Allow once” continues the task.
+**Web Workbench (4-pane split view)**: View up to four agent sessions side by side (OpenCode, Codex, Antigravity, and Qoder shown here), each with its own live conversation and composer, plus top tabs, permissions, history, built-in browser, and split-view controls.
 
-<img src="./docs/assets/task-approval.jpg" width="640" alt="Task approval screen">
-
-</details>
+<img src="./docs/assets/web-workbench-split.jpg" width="720" alt="Codex Bridge Web Workbench 4-pane split view">
 
 <details>
-<summary>View the overview and settings screens</summary>
+<summary>View Connections, Workbench Settings, and Global Settings</summary>
 
-The overview shows the background service, local MCP channel, Secure Tunnel, Agent engines, and recent task status.
+**Connections**: Persistent split view for chat clients (ChatGPT, Qwen Studio, Gemini) and agents (Workbench, Codex, Antigravity CLI, Claude Code, DeepSeek Harness, DSH Desktop, OpenCode, Pi, Qoder).
 
-<img src="./docs/assets/overview.png" width="640" alt="Codex Bridge overview">
+<img src="./docs/assets/connections.png" width="720" alt="Codex Bridge Connections page">
 
-The Agent settings show models and permissions. Reasoning options depend on the model; Antigravity encodes the reasoning level in its model ID.
+**Workbench Settings**: Configure model connections (ChatGPT, BigModel / Z.AI, WorkBuddy, custom APIs), context window and auto-compaction thresholds, skills, MCP servers, and plugins.
 
-<img src="./docs/assets/agent-models.png" width="640" alt="Agent models and permissions">
+<img src="./docs/assets/workbench-settings.png" width="720" alt="Codex Bridge Workbench Settings">
 
-OpenCode model and permission settings, followed by Direct Workspace command mode, allowlist, and blocklist.
+**Settings — Accounts & Models**: Manage default models and reasoning levels across all agents, alongside General, Execution & Approvals, Clients & Instructions, Skills & Extensions, and Diagnostics & Logs.
 
-<img src="./docs/assets/direct-workspace.png" width="640" alt="Direct Workspace settings">
-
-The approvals and MCP settings page shows Direct operation and remote task launch policies, along with custom GPT/Qwen MCP instructions.
-
-<img src="./docs/assets/approvals.png" width="640" alt="Approvals and MCP settings">
+<img src="./docs/assets/settings-models.png" width="720" alt="Codex Bridge Settings — Accounts and Models">
 
 </details>
 
@@ -84,7 +77,7 @@ The approvals and MCP settings page shows Direct operation and remote task launc
 ### Local files and commands
 
 1. Open the app and confirm that the background service is connected. Approve the macOS background item if prompted.
-2. Register a local project directory to authorize full access to that directory.
+2. Bridge automatically maintains a **Default Workspace** for new conversations and MCP requests that omit `project_id`. To work with a local repository, register its folder on the **Projects** page or open it directly (`⌘O` on macOS) to authorize full access to that directory.
 3. Connect a chat client using one of the options below.
 4. In a conversation with the Codex Bridge app or plugin enabled, ask it to read or edit project files or run commands. Handle any required approvals in Bridge.
 
@@ -99,15 +92,15 @@ In Gemini, open **More → Customize → Connected apps → + Custom**, then cho
 
 **Gemini can only use added custom MCP apps in Task mode (任务模式).** This applies to local MCP, Sites, and ngrok. After linking, switch Gemini to Task mode, enable the Codex Bridge app, and send your request.
 
-Workbench **Settings → Model connections** supports ChatGPT, custom APIs, BigModel / Z.AI Coding Plan and Start Plan, and WorkBuddy CN and international accounts. Use browser sign-in for BigModel / Z.AI, or an API key for Coding Plan. WorkBuddy supports browser sign-in, API keys, desktop account import, account pool management, credits, and model filters. Select the connected provider and model in the conversation composer. The first-use screen provides a **More model connections** entry.
+**Workbench Settings → Model connections** supports ChatGPT, custom APIs, BigModel / Z.AI Coding Plan and Start Plan, and WorkBuddy CN and international accounts. Use browser sign-in for BigModel / Z.AI, or an API key for Coding Plan. WorkBuddy supports browser sign-in, API keys, desktop account import, account pool management, credits, and model filters. Select the connected provider and model in the conversation composer. The first-use screen provides a **More model connections** entry.
 
 ### Delegate agent tasks (optional)
 
-To delegate work to Codex, OpenCode, DeepSeek Harness, or another agent, complete these additional steps. The selected agent's own sign-in or API configuration is separate from the Gemini MCP connection.
+To delegate work to Codex, Claude Code, OpenCode, DeepSeek Harness, Antigravity, Pi, or Qoder, complete these additional steps. The selected agent's own sign-in or API configuration is separate from the chat client MCP connection.
 
 1. Bridge discovers existing agents on first initialization; click **Connect** on the Connections page to verify and enable them. The additional **One-click setup** action prepares missing software and dependencies, then guides you through native sign-in or API configuration. See the [setup guide (Chinese)](./docs/AGENT_SETUP_GUIDE.md). Codex uses the local Codex execution channel.
-2. Select a project, agent, and **Read Only** or **Full** in the workbench, and configure its model preferences. Full includes writes and network tools; Read Only allows neither. ChatGPT/Qwen tasks inherit the default task permission selected by the user in the workbench.
-3. Submit a task locally or call `submit_task` from the connected chat client. Follow output, tools, approvals, and structured questions in the workbench.
+2. Configure the default model, reasoning effort, and task permission (**Read Only** or **Full**) in **Connections** or **Settings → Accounts & Models**, or adjust them per task in the composer. Full includes writes and network tools; Read Only allows neither.
+3. Submit a task locally with **+** in the **Web Workbench**, delegate a subagent task from the **Workbench**, or call `submit_task` from a connected chat client. Follow output, tools, approvals, and structured questions in the Web Workbench.
 
 Existing DSH connections and one-click setup use ACP by default. To share official desktop sessions, explicitly select [native desktop mode (Chinese)](./docs/DSH_NATIVE_DESKTOP_GUIDE.md). It reuses Desktop sign-in and tools and supports Full text tasks on macOS and Windows x64. Model and reasoning selections in this mode also update the DSH Desktop default for future sessions.
 
@@ -125,40 +118,42 @@ After [connecting the ChatGPT plugin](./docs/CHATGPT_DEVELOPER_MODE.md), enable 
 
 ## Capabilities
 
+- **Workbench:** built-in model conversations (ChatGPT, BigModel / Z.AI, WorkBuddy, custom APIs), context window and auto-compaction management, skills and plugins, files/changes inspector, and external subagent delegation with isolated workspace three-way merge.
+- **Web Workbench:** external agent session tabs, up to 4-pane split view, local new agent tasks, built-in ChatGPT / Gemini browser, history search, failed-task retries, and cross-agent handoff.
 - **Codex:** Thread/Turn, streaming output, approvals, structured questions, steer, and interrupt; macOS recognizes both current and legacy bundled CLI layouts.
+- **Claude Code:** official CLI and Agent SDK integration, model and reasoning selection, native hooks enforcement, tool approvals, and session continuation.
 - **OpenCode:** ACP, model and reasoning options, permissions, and conversation continuation.
 - **DeepSeek Harness:** ACP and native desktop connections, live model catalogs, shared desktop sessions, and opening the corresponding desktop session; ACP search and MCP configuration.
 - **Antigravity:** CLI integration, model IDs that include reasoning levels, native permission policies, execution progress, and conversation continuation.
 - **Pi:** native CLI and sessions, model catalog, MCP, Skills, and task continuation.
 - **Qoder:** native CN/international CLI and SDK integration, region isolation, permission modes, tool approvals, and session continuation.
-- **Workbench:** project sessions grouped by agent, history paging, tool cards, approvals, failed-task retries, and cross-agent handoff.
 - **Direct Workspace:** controlled file access, patches, command execution, and Git operations.
-- **Skills:** local discovery, read-only inspection, and explicit actions.
+- **Skills & Message Center:** local skill discovery, import, and explicit actions; sidebar inbox for developer notices and private feedback with screenshots.
 
-Effective capabilities depend on the agent, its connection probe, the registered project directory, and user-selected task permissions. Requests without `project_id` use the workbench default project; requests without `provider_id` use Codex.
+Effective capabilities depend on the agent, its connection probe, the registered project directory, and user-selected task permissions. Requests without `project_id` use the Default Workspace; requests without `provider_id` use Codex.
 
-## Task concurrency limits
+## Task concurrency and write coordination
 
-macOS, Windows, and Linux use the same task concurrency rules:
+macOS, Windows, and Linux use the same task concurrency and write rules:
 
-| Scope | Limit |
+| Scope | Rule |
 | --- | --- |
-| Same project | One active write task, shared across all agents |
+| Same project | **Settings → Execution & Approvals** configures concurrent agents per project (default 4, range 1–4). Claude Code, Qoder, and Pi use tool-scoped write leases; Codex, OpenCode, DSH, and Antigravity use task-scoped write leases |
+| Isolated subagents | Workbench subagent tasks that support workspace isolation run in parallel working copies (up to 2 isolated write tasks per project) and merge back with three-way conflict handling |
 | Different projects | Write tasks can run concurrently, subject to the selected agent's limits |
 | Codex | Up to four concurrent execution sessions, counting read-only and write sessions together |
-| External agents | Bridge imposes no single global concurrency cap; project write slots, provider limits, and local resources still apply |
-
-Write tasks awaiting local approval, starting, running, waiting for permission approval, or in an unknown state hold the project's write slot. At capacity, a new task is rejected or fails to start and must be retried after a slot becomes available; it is not automatically queued. Stored task history does not count toward execution concurrency limits.
+| Queuing | Web Workbench continuations and queued submissions wait in line automatically when a project reaches its concurrency limit; stored task history does not count toward execution limits |
 
 ## Architecture
 
 ```text
-ChatGPT Web ── Secure MCP Tunnel ─┐
-Qwen Studio ── localhost MCP ────┼─► Codex Bridge Service
-Desktop App ── local IPC ────────┘   ├─ Project policy and approvals
-                                    ├─ Tasks, conversations, SQLite
-                                    ├─ Codex / OpenCode / DSH / AGY / Pi / Qoder
-                                    └─ Direct Workspace / Skills
+ChatGPT / Dot ─── Secure MCP Tunnel ──┐
+Gemini ────────── stdio / Cloud MCP ──┼─► Codex Bridge Service
+Qwen Studio ───── localhost MCP ──────┤   ├─ Default workspace, project policy, approvals
+Desktop App ───── local IPC ──────────┘   ├─ Workbench (embedded engine) & Message Center
+                                          ├─ Tasks, conversations, SQLite
+                                          ├─ Codex / Claude Code / OpenCode / DSH / AGY / Pi / Qoder
+                                          └─ Direct Workspace / Skills
 ```
 
 macOS uses WKWebView and XPC; Windows uses WebView2 and named pipes; Linux uses GTK 3 / WebKitGTK 4.1 and Unix domain sockets. All three use `BridgeDesktopUI` and `BridgeServiceAppCore`; Windows and Linux also share desktop state and command adapters in `BridgeDesktopShell`. Active conversations retain independent streaming subscriptions.

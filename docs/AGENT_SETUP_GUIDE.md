@@ -1,11 +1,11 @@
 # Agent 一键配置
 
-已有本机安装会自动发现，点击“连接”即可沿用原有流程。在“连接 → 本机 Agent 引擎连接”中，OpenCode、DeepSeek Harness、Antigravity、Pi 和 Qoder 均提供“一键配置”。Codex 使用独立的执行引擎连接。
+已有本机安装会自动发现，点击“连接”即可沿用原有流程。在“连接”页中，Claude Code、OpenCode、DeepSeek Harness、Antigravity、Pi 和 Qoder 均提供“一键配置”。Codex 使用独立的执行引擎连接。
 
 1. Qoder 先选择中国版或国际版，再点击“一键配置”。其他 Agent 直接点击。
 2. Bridge 检查已有安装并准备运行依赖。发现多个可用安装时，选择本次使用的安装；缺少程序时，从官方来源安装当前官方版本。
-3. OpenCode 直接检测现有可用模型；模型服务需要授权或补充配置时，按弹窗处理。Pi、Qoder 和 AGY 按提示完成原生登录，DSH 的 ACP 模式填写服务地址和 API Key。“打开登录 / 配置”会打开对应原生终端。
-4. 完成后点击“我已完成，重新检测”。连接成功后，在设置中选择模型，再提交任务。
+3. OpenCode 直接检测现有可用模型；模型服务需要授权或补充配置时，按弹窗处理。Claude Code、Pi、Qoder 和 AGY 按提示完成原生登录，DSH 的 ACP 模式填写服务地址和 API Key。“打开登录 / 配置”会打开对应原生终端。
+4. 完成后点击“我已完成，重新检测”。连接成功后，在当前连接详情或“设置 → 账户与模型”中选择默认模型与推理强度，即可提交任务。
 
 AGY 连接需要明确允许将当前用户的全局 Tool Permission 设置为 Always Proceed。该设置也影响使用同一配置的其他 AGY CLI 任务。
 

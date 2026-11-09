@@ -9,7 +9,7 @@ MCPB 客户端可使用其运行时。API key 由客户端的敏感配置管理�
 
 连接器只接受本机回环地址，通过现有 HTTP MCP 接口转发消息。工具目录、工具结果、
 客户端工具权限、项目目录授权、用户选择的任务权限与本机审批均由 Bridge 服务执行。此连接与 Qwen
-共用客户端身份和权限设置。普通用户继续从 GitHub Releases 安装 macOS 或 Windows App。
+共用客户端身份和权限设置。普通用户继续从 GitHub Releases 安装 macOS、Windows 或 Linux App。
 
 ## 发布
 

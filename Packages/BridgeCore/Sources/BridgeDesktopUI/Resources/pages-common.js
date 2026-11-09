@@ -209,7 +209,9 @@
     control.style.height = "auto";
     var border = Math.max(0, (control.offsetHeight || 0) - (control.clientHeight || 0));
     var height = Math.max((control.scrollHeight || 0) + border, 32);
-    var maxHeight = 180;
+    // A composer may cap its height in CSS (split panes use a lower limit than the default 180px).
+    var styled = global.getComputedStyle ? parseFloat(global.getComputedStyle(control).maxHeight) : NaN;
+    var maxHeight = styled > 0 ? styled : 180;
     control.style.height = Math.min(height, maxHeight) + "px";
     control.style.overflowY = height > maxHeight ? "auto" : "hidden";
   }

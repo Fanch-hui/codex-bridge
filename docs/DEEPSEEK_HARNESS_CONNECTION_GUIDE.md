@@ -1,26 +1,26 @@
 # DeepSeek Harness 接入指南
 
-本指南说明 Bridge 内置的 DSH 开发台及外部 ACP 连接。调用官方桌面的共享会话请使用[原生桌面连接指南](./DSH_NATIVE_DESKTOP_GUIDE.md)。
+本指南说明 Bridge 的内置工作台及外部 DeepSeek Harness（DSH）ACP 连接。调用官方桌面的共享会话请使用[原生桌面连接指南](./DSH_NATIVE_DESKTOP_GUIDE.md)。
 
-## 使用内置开发台
+## 使用内置工作台
 
-Bridge 随应用交付 DSH 引擎、Node、包管理器与运行依赖，安装后可直接打开开发台。
+Bridge 随应用交付内置引擎、Node、包管理器与运行依赖，安装后可直接打开「工作台」开始对话。
 
-1. 在项目页登记工作目录，进入 `工作台 → DSH 开发台`。
-2. 打开“引擎设置”，选择“使用 ChatGPT 登录”，或在“自定义 API”中填写连接。自定义接口支持 Chat Completions 和 Responses，可读取模型目录或手动填写模型 ID。
-3. 返回对话，选择模型与可用的推理强度，发送第一条消息创建会话。
+1. 打开「工作台」，可在底部输入器选择目标项目（未添加项目时默认使用「默认工作区」）。
+2. 打开「工作台设置」，选择 ChatGPT、智谱 / Z.AI、WorkBuddy 登录，或在「自定义 API」中填写连接。自定义接口支持 Chat Completions 和 Responses，可读取模型目录或手动填写模型 ID。
+3. 返回工作台对话，在底部输入器选择任务权限、模型与可用的推理强度，发送第一条消息创建会话。
 
-DSH 原生工具、技能、MCP、权限、上下文压缩及会话恢复由内置引擎处理。引擎设置提供模型连接、MCP 服务、权限与插件的安装、启停、更新和移除；模型凭据保存在系统 SecretStore。
+内置工具、技能、MCP、权限、上下文窗口与自动压缩及会话恢复由工作台处理。「工作台设置」集中管理模型连接、上下文窗口与自动压缩、技能、MCP 服务与插件的安装、启停、更新和移除；模型凭据保存在系统 SecretStore。右侧检查器提供「文件 / 变更 / Agent」标签。
 
-主智能体可以发现 Bridge 已连接的 Agent、查询模型并委派任务。每个子智能体保留独立会话和安装、项目及模型绑定，可在开发台查看过程、处理审批、追加指令或单独停止。同一根执行及其子任务共享项目目录并可并行，组外写任务继续等待。
+主智能体可以发现 Bridge 已连接的外部 Agent、查询模型并委派子任务。每个子智能体保留独立会话和安装、项目及模型绑定，可在工作台右侧检查器的「Agent」标签或对话内查看过程、处理审批、追加指令或单独停止。「设置 → 执行与审批」可配置「同一项目同时运行的 Agent」（1–4，默认 4），达到并发上限时后续任务自动排队。
 
 停止会话会停止所属活动子任务。停止后收到的结果保持待回传，用户再次发起会话或子任务后恢复处理；直接续写同一个子智能体时，先前结果会在新任务结束后回传。切换页面保留后台执行。
 
-新会话历史由 DSH 原生日志保存；已有 ACP 会话从“历史 ACP 会话”进入，沿用原执行绑定。以下章节介绍外部 ACP 的安装与配置，可从“历史 ACP 会话”中的“ACP 设置”进入。
+以下章节介绍外部 DeepSeek Harness ACP 的安装与配置。
 
 ## 外部 ACP 连接
 
-最短路径是：在 Bridge 的 `工作台 → DSH 开发台 → 引擎设置` 点击“一键配置” → Bridge 准备官方 DSH 与 Node/npm → 按弹窗填写 Base URL 和 API Key 并检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。API Key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
+最短路径是：在 Bridge 的 `连接 → DeepSeek Harness`（或 `设置 → 账户与模型 → DeepSeek Harness → 管理`）点击“一键配置” → Bridge 准备官方 DSH 与 Node/npm → 按弹窗填写 Base URL 和 API Key 并检测。安装位置和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。API Key 保存在系统凭据存储中，启动 Harness 时通过进程环境注入。外部 Profile 与 `.env` 是需要独立搜索端点、固定本机配置或手动登记时使用的高级路径。
 
 DSH 的 Provider ID 固定为：
 
@@ -30,15 +30,19 @@ deepseek-harness
 
 省略 `provider_id` 时 Bridge 使用 Codex，不会自动改用 DSH。
 
-## 历史 ACP 会话
+## 在网页工作台使用外部 DSH ACP
 
-进入 `工作台 → DSH 开发台 → 历史 ACP 会话`，选择原会话继续。模型和推理强度可按会话选择；ACP 执行使用完整权限。会话列表显示任务来源，并可搜索 Bridge 保存的历史、处理审批和复制执行结果。
+外部 DeepSeek Harness ACP 的会话、历史搜索、多标签页、四宫格分屏、任务审批和跨 Agent 交接统一归属「网页工作台」：
 
-右侧“文件 / 变更”提供目录浏览、带行号的文本预览和 Git Diff。完整且未脱敏的 UTF-8 文件支持编辑，保存前展示修改预览；确认后沿用 Direct 审批与工作区互斥，按原内容摘要检查冲突。每次保存最多 256 KiB，并保留常规 LF/CRLF 换行和尾换行。Git 区展示项目当前全部变更，包含已有修改。
+- 点击顶部标签栏「+」新建 Agent 任务，选择 DeepSeek Harness、模型、推理强度、目标项目与「完整」权限后本机直接提交，或选择已有会话继续。
+- 顶部工具栏支持单视图、左右分屏、左一右二、四宫格分屏，每格独立显示实时对话与底部输入器；续写达到同项目并发上限时自动排队。
+- 会话列表显示任务来源，支持历史搜索、处理审批、复制执行结果以及将任务交给其他 Agent。待处理审批也会在「动态」页显示。
+
+右侧检查器「文件 / 变更」提供目录浏览、带行号的文本预览和 Git Diff。完整且未脱敏的 UTF-8 文件支持编辑，保存前展示修改预览；确认后沿用 Direct 审批与工作区并发控制，按原内容摘要检查冲突。每次保存最多 256 KiB，并保留常规 LF/CRLF 换行和尾换行。Git 区展示项目当前全部变更，包含已有修改。
 
 ACP 会话可使用项目 Skill；支持图片的模型可从文件树逐张添加项目内 PNG、JPEG、WebP 图片，最多 8 张、合计 8 MiB。Bridge 按所选模型查询能力，并在执行时再次核对 ACP 的图片声明与原图片内容。协议依据官方 [ACP 内容实现](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts)，发送实际图像字节。
 
-ChatGPT/Qwen 继续使用同一个 `deepseek-harness` Provider 和既有任务工具；开发台与协作视图共享任务记录和审批。
+ChatGPT/Qwen/Gemini 使用同一个 `deepseek-harness` Provider 和既有任务工具，与网页工作台共享任务记录和审批。
 
 ## 1. 兼容边界
 
@@ -118,7 +122,7 @@ Test-Path .\apps\cli\lib\bin.js
 
 ### 在 Bridge 中发现安装
 
-首次使用 Bridge 时会自动扫描并保存本机 Agent 目录。若 DSH 是后来安装的，打开 `工作台 → DSH 开发台 → 引擎设置`，点击“扫描 Agent”；发现后填写 Base URL 与 API key，再点击“连接”。App 和后台服务重启会保留发现结果，日常状态刷新和切页使用已保存的目录。
+首次使用 Bridge 时会自动扫描并保存本机 Agent 目录。若 DSH 是后来安装的，打开 `连接 → DeepSeek Harness`（或 `设置 → 账户与模型 → DeepSeek Harness → 管理`），点击“扫描 Agent”；发现后填写 Base URL 与 API key，再点击“连接”。App 和后台服务重启会保留发现结果，日常状态刷新和切页使用已保存的目录。
 
 Bridge 优先读取已知启动入口和标准包管理器安装位置，再在本地开发目录进行有界源码索引；源码候选必须有已构建的入口、DSH 包标识和依赖锁文件。保留完整源码目录供 Node 加载依赖。
 
@@ -133,7 +137,7 @@ Windows PowerShell，在 DSH 源码根执行：
 [Environment]::SetEnvironmentVariable("DEEPSEEK_HARNESS_ROOT", (Get-Location).Path, "User")
 ```
 
-然后回到 DSH 开发台的引擎设置点击“扫描 Agent”。Windows Service 会读取新设置。
+然后回到 `连接 → DeepSeek Harness` 点击“扫描 Agent”。Windows Service 会读取新设置。
 
 macOS 终端可为从该终端启动的进程设置：
 
@@ -181,17 +185,17 @@ ACP 模式中的桌面入口使用 `ELECTRON_RUN_AS_NODE=1` 与 `--expose-intern
 - ACP initialize/session 行为与 wire protocol 1；
 - 当前入口所需的 Profile/patch 结构。
 
-因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。已启用的 DSH 更新后，Bridge 会重新解析当前运行时工件并自动 Probe；通过后沿用原连接。启动配置内容改变仍需本机确认，接口检查失败或无法确定新运行时位置时，首页“本机 Agent 引擎”会提示手动处理。
+因此不要把 `bin.js` 单独复制到其他文件夹。缺少原始 `package.json`、依赖锁文件或 `node_modules` 会使 Probe/运行失败。已启用的 DSH 更新后，Bridge 会重新解析当前运行时工件并自动 Probe；通过后沿用原连接。启动配置内容改变仍需本机确认，接口检查失败或无法确定新运行时位置时，「动态」页和「连接」页会提示手动处理。
 
 ## 推荐路径：在 App 中一键连接
 
 大多数用户不需要创建外部 Profile 或 `.env`。完成 DSH 构建后，直接在 App 中配置主模型连接：
 
 1. 登录 [DeepSeek Platform API Keys](https://platform.deepseek.com/api_keys)，创建一个新的 API key，并在页面显示时立即复制。
-2. 进入 `工作台 → DSH 开发台 → 引擎设置`。
+2. 进入 `连接 → DeepSeek Harness`（或 `设置 → 账户与模型 → DeepSeek Harness → 管理`）。
 3. 在连接行填写协议、主模型 Base URL 和 API key；官方 API 选择 DeepSeek Messages，可继续填写 `https://api.deepseek.com`，Bridge 在新版运行时归一化为 Messages 地址。
 4. 点击“连接”，等待自动发现、配置和 Probe；Probe 成功后安装会启用。
-5. 在引擎设置刷新模型目录并选择当前账号实际返回的模型。
+5. 在 DeepSeek Harness 连接详情中刷新模型目录，并选择当前账号实际返回的默认模型、推理强度和默认任务权限。
 
 Bridge 会把 API key 保存到 macOS 钥匙串或 Windows 凭据管理器，提交后清空输入框，并仅在启动 DSH 子进程时注入。只有需要手动登记已有安装、单独的 Web Search 端点或固定本机 Profile 时，才继续阅读下面的高级章节。
 
@@ -260,7 +264,7 @@ cp /Applications/CodexBridge.app/Contents/Resources/BridgeCore_BridgeDeepSeekHar
 
 普通用户不应删除插件、改写 sandbox 结构或把模板改成另一种通用 DSH 配置。模型目录、默认模型、thinking/reasoning effort 是预期的可配置内容；兼容的尾部扩展也可能通过归一化结构校验，但任何改动都应重新 Probe，结构不兼容时会触发 `templateMismatch` 或 `needs_review`。
 
-模板中的 `dsh-user-approval` 必须保持 `policy: ask`。Bridge 依靠它把 DSH 的 `session/request_permission` 带回本机工作台；删除 approval 插件、改成自动放行或把 sandbox 改成 `danger-full-access` 都不是受支持的用户配置。
+模板中的 `dsh-user-approval` 必须保持 `policy: ask`。Bridge 依靠它把 DSH 的 `session/request_permission` 带回本机网页工作台；删除 approval 插件、改成自动放行或把 sandbox 改成 `danger-full-access` 都不是受支持的用户配置。
 
 ## 7. 高级可选：创建 `.env` 并配置独立端点
 
@@ -288,7 +292,7 @@ chmod 600 /path/to/dsh-profile/.env
 
 ## 8. 推理、模型目录与搜索地址
 
-开发台引擎设置提供两种协议，并允许单独填写模型目录地址。现有官方根地址在新版 Messages 运行时自动迁移；自定义网关地址保持原输入，旧自定义连接按 OpenAI Chat Completions 继续使用。明确选择的协议与目录地址随连接保存，API key 仍保存在系统凭据存储中。
+DeepSeek Harness 连接配置提供两种协议，并允许单独填写模型目录地址。现有官方根地址在新版 Messages 运行时自动迁移；自定义网关地址保持原输入，旧自定义连接按 OpenAI Chat Completions 继续使用。明确选择的协议与目录地址随连接保存，API key 仍保存在系统凭据存储中。
 
 | 连接 | 推理 Base URL | 模型目录 Base URL | 实际请求 |
 | --- | --- | --- | --- |
@@ -312,13 +316,12 @@ Probe 验证本地安装、协议和基础 ACP Session。模型刷新还会访�
 
 ## 10. 刷新模型和设置默认值
 
-1. 先在 `工作台` 选择任务项目。
-2. 打开 `工作台 → DSH 开发台 → 引擎设置`，查看执行默认偏好。
-3. 有多个 DSH 安装时，选择目标安装实例。
-4. 点击“刷新模型列表”。
-5. 选择 DSH 当前 ACP Session 返回的精确模型 ID。
-6. 选择当前所选模型的 ACP Session 返回的 `thought_level`/`reasoning_effort` effort 能力。模型 ID 和 effort 都必须使用当前 ACP Session 返回的精确值。
-7. 在工作台选择任务权限。DSH 当前支持“完整”；ChatGPT/Qwen 新任务使用用户在工作台选择的默认权限。
+1. 打开 `连接 → DeepSeek Harness`（或 `设置 → 账户与模型 → DeepSeek Harness → 管理`）。
+2. 有多个 DSH 安装时，选择目标安装实例。
+3. 点击“刷新模型列表”。
+4. 选择 DSH 当前 ACP Session 返回的精确模型 ID。
+5. 选择当前所选模型的 ACP Session 返回的 `thought_level`/`reasoning_effort` effort 能力。模型 ID 和 effort 都必须使用当前 ACP Session 返回的精确值。
+6. 选择默认任务权限。DSH 当前支持“完整”；ChatGPT/Qwen/Gemini 新任务使用配置的默认权限，网页工作台新建任务可在底部输入器按需选择项目、模型、推理强度与权限。
 
 现代 DSH 的模型目录按以下顺序获得：
 
@@ -334,32 +337,31 @@ ACP session/new → configOptions
 
 ## 11. 任务权限、网络与审批
 
-登记项目即授权目录完整访问。用户在工作台选择“只读”或“完整”，ChatGPT/Qwen 提交任务统一使用该默认权限，AI 不选择或覆盖权限。“完整”包含写入和联网；“只读”不允许写入和工具联网。
+登记项目即授权目录完整访问。可在 `连接 → DeepSeek Harness` 配置默认任务权限（“只读”或“完整”），ChatGPT/Qwen/Gemini 提交任务统一使用该默认权限，AI 不选择或覆盖权限。“完整”包含写入和联网；“只读”不允许写入和工具联网。
 
 ### 11.1 DSH 支持范围
 
 DSH 当前的原生 Profile 不能保证任务级工具禁网，Bridge 对只读任务明确返回不支持。需要只读分析时，请使用支持只读的 Agent。
 
-DSH 完整任务使用经过验证的 `workspace-write` Profile；同一项目最多一个活动写任务，与其他 Provider 和 Direct 共用工作区互斥。任务的实际工具调用仍服从 DSH 原生权限。
+DSH 完整任务使用经过验证的 `workspace-write` Profile。「设置 → 执行与审批」支持配置「同一项目同时运行的 Agent」（1–4，默认 4），网页工作台续写达到并发上限时自动排队。任务的实际工具调用仍服从 DSH 原生权限。
 
 ### 11.2 任务启动与运行期审批
 
-远程任务启动默认需要在工作台批准。自动批准远程启动只控制启动环节。
+远程任务启动默认需要在网页工作台或「动态」页批准。自动批准远程启动只控制启动环节。
 
-随包 DSH Profile 的 `dsh-user-approval` 保持 `policy: ask`。DSH 的 `session/request_permission` 只支持 `allow_once` 和 `reject_once`；工作台审批卡片可选择“仅本次允许”或拒绝。多个独立工具调用可能分别询问。
+随包 DSH Profile 的 `dsh-user-approval` 保持 `policy: ask`。DSH 的 `session/request_permission` 只支持 `allow_once` 和 `reject_once`；网页工作台或「动态」页审批卡片可选择“仅本次允许”或拒绝。多个独立工具调用可能分别询问。
 
 Codex 的完全访问和自动审查只作用于 Codex。选择 DSH 完整任务或自动批准远程启动，不会替代 DSH 运行期审批。
 
 ### 11.3 完整任务与 Web Search
 
-1. 登记项目，在工作台选择正确项目、DSH 和“完整”。
-2. 确认同一项目没有其他活动写任务。
-3. 在工作台批准远程任务启动，处理 DSH 运行期工具请求。
-4. 使用 Web Search 时，验证外部 Profile 的 `.env`、搜索 endpoint 和账号能力。新 Provider 的搜索地址独立于推理地址；自定义 `DEEPSEEK_SEARCH_BASE_URL` 不含 `/messages`，DSH 会自行追加。
+1. 确认目标项目已登记（未指定项目时默认使用「默认工作区」），并将 DSH 任务权限设为“完整”。
+2. 在网页工作台或「动态」页批准远程任务启动，处理 DSH 运行期工具请求。
+3. 使用 Web Search 时，验证外部 Profile 的 `.env`、搜索 endpoint 和账号能力。新 Provider 的搜索地址独立于推理地址；自定义 `DEEPSEEK_SEARCH_BASE_URL` 不含 `/messages`，DSH 会自行追加。
 
 完整任务允许使用网络工具，但不会配置 API Key、搜索 endpoint 或绕过 DSH 原生审批。
 
-## 12. 从 ChatGPT/Qwen 提交 DSH 任务
+## 12. 从 ChatGPT/Qwen/Gemini 提交 DSH 任务
 
 提交前先调用：
 
@@ -379,7 +381,7 @@ list_agents
 }
 ```
 
-当 Workbench 已选择正确项目和权限时，最小任务：
+未指定 `project_id` 时默认使用「默认工作区」。最小任务：
 
 ```json
 {
@@ -388,7 +390,7 @@ list_agents
 }
 ```
 
-用户选择“完整”后，可以提交 Web Search 任务：
+默认权限设为“完整”后，可以提交 Web Search 任务：
 
 ```json
 {
@@ -421,13 +423,13 @@ list_agents
 
 ### 13.1 远程启动
 
-ChatGPT/Qwen 提交后通常先得到：
+ChatGPT/Qwen/Gemini 提交后通常先得到：
 
 ```text
 awaiting_local_approval
 ```
 
-打开 Bridge 工作台，核对项目、DSH 安装、任务权限和 prompt 后点击“批准启动”。设置中的“自动批准远程 Agent 启动请求”默认关闭；开启后也只批准启动，不批准 DSH 后续的 `session/request_permission`。
+打开 Bridge 的「网页工作台」或「动态」页，核对项目、DSH 安装、任务权限和 prompt 后点击“批准启动”。设置中的“自动批准远程 Agent 启动请求”默认关闭；开启后也只批准启动，不批准 DSH 后续的 `session/request_permission`。
 
 ### 13.2 运行期工具审批
 
@@ -437,7 +439,7 @@ awaiting_local_approval
 waiting_for_codex_approval
 ```
 
-时，进入 `工作台 → 等待本机审批`：
+时，在「网页工作台」对应会话或「动态」页查看待处理审批：
 
 1. 核对标题和 Provider 是当前 DSH 任务。
 2. 阅读卡片中的命令、请求权限、相对路径和理由。
@@ -466,19 +468,19 @@ waiting_for_codex_approval
 - 普通 `steer_task` 会把补充指令排队，在当前 prompt 完成后作为下一次 prompt 发送。
 - DSH 还支持“中断当前轮后继续”，先中断当前执行，再在同一当前 Session 中发送后续 prompt。
 - 这两者都不是 Codex 的 in-flight steer。
-- 现代入口的已结束任务可点击“继续对话”发送下一条指令；Service 重启后仍沿用原会话上下文。恢复需要同项目、同安装实例且持久会话数据仍存在。旧版临时会话已清理的数据无法补回。
+- 现代入口的已结束任务可在网页工作台底部输入器直接发送下一条指令继续对话；Service 重启后仍沿用原会话上下文。恢复需要同项目、同安装实例且持久会话数据仍存在。旧版临时会话已清理的数据无法补回。
 
 任务控制使用当前 `provider_run_id` 作为 `expected_turn_id`，避免对已经切换的运行发送过期控制命令。
 
 ### 13.5 MCP 服务
 
-在 `工作台 → DSH 开发台 → 引擎设置 → MCP 服务` 添加、编辑、停用或删除服务：
+在 `连接 → DeepSeek Harness → MCP 服务`（或 `设置 → 账户与模型 → DeepSeek Harness → 管理`）中添加、编辑、停用或删除外部 DSH ACP 的 MCP 服务：
 
 - 本地命令（stdio）：填写可执行文件的绝对路径与参数，参数逐行填写。
 - HTTP：填写 Streamable HTTP MCP 地址；任务允许网络访问时才接入。
 - 环境变量与请求头：敏感值写入系统凭据存储，保存后只显示是否已配置。编辑时留空保留原值，删除对应行移除该值。
 
-配置全局用于 App 启动的 DSH，与本机 DSH 的个人配置独立。变更在下一次新任务或续聊时生效，正在执行的任务保持当前连接。外部 MCP 工具权限由 DSH 和服务自身处理。
+配置全局用于 App 启动的外部 DSH ACP，与本机 DSH 的个人配置以及「工作台设置」中内置工作台的 MCP 服务相互独立。变更在下一次新任务或续聊时生效，正在执行的任务保持当前连接。外部 MCP 工具权限由 DSH 和服务自身处理。
 
 ## 14. `available`、`needs_review` 与 `unavailable`
 
@@ -516,7 +518,7 @@ waiting_for_codex_approval
 | 选择文件后提示 artifact 无效 | 是否选择官方构建后的 `apps/cli/lib/bin.js`；是否保留完整源码树 |
 | Node 不支持 | 使用 Node 22.19.0+ 的 22.x 或 Node 24+；不要使用 Node 23 |
 | App 找不到 Node | Node 是否只存在于交互式 shell PATH；Service 能否解析 shebang 指向的真实 Node |
-| 构建完成但未发现 DSH | 先点击“扫描 Agent”；或在“高级：按路径登记已有安装”中选择 `apps/cli/lib/bin.js` |
+| 构建完成但未发现 DSH | 先在 `连接 → DeepSeek Harness` 点击“扫描 Agent”；或在“高级：按路径登记已有安装”中选择 `apps/cli/lib/bin.js` |
 | 找不到 manifest/lock | 是否把 `bin.js` 单独复制走；源根是否仍有 `package.json` 和 `pnpm-lock.yaml` |
 | Profile 位置被拒绝 | 运行时强制把 `cordis.yml`/`.env` 移出 DSH 源码树；同时建议使用任务项目之外的专用目录 |
 | `templateMismatch` | 从当前 Bridge 随包模板重新复制，不要手工删插件或改 sandbox 结构 |
@@ -524,11 +526,11 @@ waiting_for_codex_approval
 | 主模型 404 | `DEEPSEEK_BASE_URL` 是否错误包含 `/chat/completions`，或网关是否实际支持该协议 |
 | 主模型可用但 Web Search 认证失败 | 检查独立 `DEEPSEEK_SEARCH_BASE_URL` 与该 endpoint 对当前 Key 的接受情况 |
 | 有 `/messages` 但没有搜索结果 | endpoint 是否明确支持 `web_search_20250305`，不能只看“Anthropic compatible”标签 |
-| 模型列表为空 | 选择正确 Workbench 项目和 DSH 安装后刷新；检查 ACP `configOptions` |
+| 模型列表为空 | 在 `连接 → DeepSeek Harness` 选择目标安装后刷新；检查 ACP `configOptions` |
 | 模型/effort 不可用 | 使用当前所选模型 ACP Session 返回的精确值，不要使用其他 Provider 的别名 |
-| 写入被拒绝 | 用户是否选择“完整”；DSH 原生工具规则；同项目是否已有写任务 |
-| 网络工具被拒绝 | 用户是否选择“完整”；`.env`、搜索 endpoint 和当前 DSH 工具审批是否有效 |
-| 已批准启动但任务仍等待 | 查看工作台“等待本机审批”，展开当前 DSH 命令/权限/路径后选择“仅本次允许”或拒绝 |
+| 写入被拒绝 | 任务权限是否设为“完整”；DSH 原生工具规则；是否达到同项目并发上限或存在 Direct 独占操作 |
+| 网络工具被拒绝 | 任务权限是否设为“完整”；`.env`、搜索 endpoint 和当前 DSH 工具审批是否有效 |
+| 已批准启动但任务仍等待 | 查看网页工作台或「动态」页的待处理审批，展开当前 DSH 命令/权限/路径后选择“仅本次允许”或拒绝 |
 | DSH 反复请求审批 | 当前只支持 `allow_once` / `reject_once`；多个工具请求会逐次询问，`full-access` 不会跳过 |
 | 开启自动启动仍有审批 | 自动启动只处理 `awaiting_local_approval`，不处理 DSH `session/request_permission` |
 | 修改 Profile 想关闭审批后变成 `needs_review` | 恢复当前 Bridge 随包模板；保留 `dsh-user-approval` 的 `policy: ask` |

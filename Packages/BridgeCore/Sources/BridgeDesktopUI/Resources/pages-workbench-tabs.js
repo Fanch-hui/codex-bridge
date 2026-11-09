@@ -19,6 +19,8 @@
   } catch (_) {}
 
   function newTask() { return global.CodexBridgeDesktopWorkbenchNewTask || null; }
+  // In the split view the tabs follow the focused pane and new tasks open in panes.
+  function split() { var panes = global.CodexBridgeDesktopWorkbenchPanes; return panes && panes.isSplit() ? panes : null; }
   function draftActive() { var panel = newTask(); return !!panel && panel.isOpen(); }
   function persist() {
     try { global.localStorage.setItem(storageKey, JSON.stringify(stored)); } catch (_) {}
@@ -76,8 +78,9 @@
     return row ? row.taskID : (key.indexOf("t:") === 0 ? key.slice(2) : null);
   }
   function select(key) {
-    var panel = newTask();
+    var panel = newTask(), panes = split();
     if (panel) panel.close();
+    if (panes) panes.reveal(key);
     var page = context.page || {}, taskID = taskIDFor(key);
     if (context.emit && taskID && snapshot(page).selectedKey !== key) {
       context.emit("selectTask", { taskID: taskID });
@@ -85,6 +88,8 @@
     refresh();
   }
   function openDraft() {
+    var panes = split();
+    if (panes) { panes.openDraft(); return; }
     draftTab = true;
     var panel = newTask();
     if (panel) panel.open();
@@ -94,6 +99,13 @@
     var page = context.page || {}, tabs = tabsFor(), index = tabs.indexOf(key);
     if (index < 0) return;
     tabs.splice(index, 1); setTabs(tabs);
+    // A closed tab closes its pane too, which then starts a new task.
+    var panes = split();
+    if (panes) {
+      if (snapshot(page).selectedKey === key) closedKey = key;
+      panes.closeSession(key);
+      return;
+    }
     var active = !draftActive() && snapshot(page).selectedKey === key;
     if (active) {
       closedKey = key;
@@ -134,13 +146,15 @@
 
   function draw() {
     var page = context.page || {}, model = reconcile(page), tabs = model.tabs, drafting = draftActive();
+    var panes = split(), activeKey = panes ? panes.focusedKey() : (drafting ? null : model.selectedKey);
     var rowFor = function (key) {
       var row = model.byKey.get(key);
       if (row) return row;
       var selected = page.selectedTask;
       return selected && key === "t:" + selected.taskID ? selected : {};
     };
-    var next = JSON.stringify([tabs, drafting, draftTab, model.selectedKey, tabs.map(function (key) {
+    var showDraft = draftTab && !panes;
+    var next = JSON.stringify([tabs, drafting, showDraft, activeKey, tabs.map(function (key) {
       var row = rowFor(key);
       return [row.title, row.isRunning, row.status];
     })]);
@@ -150,12 +164,12 @@
     S.clear(strip);
     tabs.forEach(function (key) {
       var row = rowFor(key), title = row.title || "Agent 会话";
-      var item = tab(title, !drafting && model.selectedKey === key,
+      var item = tab(title, activeKey === key,
         function () { select(key); }, function () { closeTask(key); }, row.isRunning ? "is-running" : "");
       if (row.provider) item.firstChild.title = title + " · " + row.provider;
       strip.appendChild(item);
     });
-    if (draftTab) strip.appendChild(tab("新建任务", drafting, openDraft, closeDraft, "is-draft"));
+    if (showDraft) strip.appendChild(tab("新建任务", drafting, openDraft, closeDraft, "is-draft"));
     var active = strip.querySelector(".workbench-tab.is-active");
     if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
@@ -188,6 +202,7 @@
     openDraft: openDraft,
     sessionKey: sessionKey,
     openKeys: function () { return tabsFor(); },
+    close: closeTask,
     // Adds a session tab without selecting it, used when a split pane shows the session.
     open: function (_page, key) {
       var tabs = tabsFor();

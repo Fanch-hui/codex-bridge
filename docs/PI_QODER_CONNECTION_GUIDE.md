@@ -1,32 +1,32 @@
 # Pi 与 Qoder 连接
 
-Pi 和 Qoder 使用本机安装与各自的原生登录态。在连接页点击“一键配置”，Bridge 会复用已有安装，或准备官方 CLI、Node/npm 和 Qoder SDK，再显示登录指引。Qoder 先选择地区。安装位置、取消和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。
+Pi 和 Qoder 使用本机安装与各自的原生登录态。在 `连接 → Pi / Qoder`（或 `设置 → 账户与模型 → Pi / Qoder → 管理`）点击“一键配置”，Bridge 会复用已有安装，或准备官方 CLI、Node/npm 和 Qoder SDK，再显示登录指引。Qoder 先选择地区。安装位置、取消和重试见[一键配置指南](./AGENT_SETUP_GUIDE.md)。
 
 以下命令用于需要自行管理安装的情况。
 
 ## Pi
 
 ```sh
-npm install -g @earendil-works/pi-coding-agent@1.4.0
+npm install -g @earendil-works/pi-coding-agent@1.5.0
 pi
 ```
 
-在 Pi 中运行 `/login` 完成所选模型服务商的登录。返回 Bridge 的“连接”页，点击“扫描 Agent”，再连接 Pi。模型目录来自 Pi 的真实可用模型；目录为空时，需要先在 Pi 完成服务商配置或登录。
+在 Pi 中运行 `/login` 完成所选模型服务商的登录。返回 Bridge 的 `连接 → Pi`（或 `设置 → 账户与模型 → Pi → 管理`），点击“扫描 Agent”，连接 Pi 并选择默认模型、推理强度和默认任务权限。模型目录来自 Pi 的真实可用模型；目录为空时，需要先在 Pi 完成服务商配置或登录。
 
 ## Qoder CN
 
 CLI 与 SDK 必须来自同一地区。以下是一组已核对的官方版本：
 
 ```sh
-npm install -g @qodercn-ai/qoderclicn@1.1.80 @qodercn-ai/qodercn-agent-sdk@1.0.56
+npm install -g @qodercn-ai/qoderclicn@1.1.83 @qodercn-ai/qodercn-agent-sdk@1.0.59
 qoderclicn login
 ```
 
-在 Bridge 的 Qoder 连接卡选择“中国版”，扫描本机安装，选择活动安装并连接。国际版使用独立的 `@qoder-ai/qodercli` 与 `@qoder-ai/qoder-agent-sdk` 包，在同一张卡中显式选择“国际版”。两版分别保存默认模型与运行配置。
+在 Bridge 的 `连接 → Qoder`（或 `设置 → 账户与模型 → Qoder → 管理`）选择“中国版”，扫描本机安装，选择活动安装并连接。国际版使用独立的 `@qoder-ai/qodercli` 与 `@qoder-ai/qoder-agent-sdk` 包，在同一张卡中显式选择“国际版”。两版分别保存默认模型与运行配置。
 
 更改地区只影响后续新任务的默认选择。继续已有会话时使用该会话原先绑定的地区与安装。
 
-在“设置 → Agent 模型与权限 → Qoder 执行权限”中，可以为选中的地区设置“请求批准”“帮我批准”或“允许完全访问”。“帮我批准”由 Qoder 自动判断操作；“允许完全访问”跳过 Qoder 的逐项权限确认。用户选择的任务权限仍然生效：只读禁止写入和网络工具，完整包含写入和联网；后两种模式需要在 Qoder 信任的目录中使用。权限设置分别保存到对应地区的 Qoder 配置。
+在 `连接 → Qoder`（或 `设置 → 账户与模型 → Qoder → 管理`）中，可以为选中的地区配置默认模型、推理强度、默认任务权限，以及在“Qoder 执行权限”中设置“请求批准”“帮我批准”或“允许完全访问”。“帮我批准”由 Qoder 自动判断操作；“允许完全访问”跳过 Qoder 的逐项权限确认。用户选择的任务权限仍然生效：只读禁止写入和网络工具，完整包含写入和联网；后两种模式需要在 Qoder 信任的目录中使用。权限设置分别保存到对应地区的 Qoder 配置。
 
 ## 安装发现与运行路径
 
@@ -43,6 +43,6 @@ Bridge 会校验 CLI、Node、SDK 与随 App 分发的宿主资源。文件更�
 - **SDK 不可用或版本不匹配**：检查 SDK 所属地区及其要求的 CLI 版本，并核对 SDK 目录。
 - **模型不可用**：先在原生 Agent 检查模型目录和服务商配置。
 
-MCP 服务按 Pi、Qoder CN、Qoder 国际版分别配置。任务权限由用户选择，只读不允许写入和网络工具，完整包含写入和联网；ChatGPT/Qwen 新任务使用工作台默认权限，AI 不选择权限。Pi/Qoder 通过应用层受控工具执行只读约束，不等同于操作系统级隔离。工具调用还服从原生规则与本机审批。
+MCP 服务按 Pi、Qoder CN、Qoder 国际版在各自连接详情中分别配置。任务权限由用户配置（只读不允许写入和网络工具，完整包含写入和联网）；ChatGPT/Qwen/Gemini 新任务使用配置的默认权限，AI 不选择权限，未指定项目时默认使用「默认工作区」。Pi/Qoder 通过应用层受控工具执行只读约束，不等同于操作系统级隔离。工具调用还服从原生规则与本机审批。
 
-工作台续写或重开 Pi/Qoder 任务时，可在 Skills 输入框填写项目 Skills 列表中的名称，多个名称用逗号分隔；留空沿用会话选择。通过 MCP 提交任务时使用 `skill_names`，单个 Skill 也兼容 `skill_name`。
+外部 Pi/Qoder 任务查看、本机新建 Agent 任务（「+」）、续写、分屏和审批位于「网页工作台」（待处理事项也会在「动态」页显示）。新建任务可在底部输入器选择目标项目，「设置 → 执行与审批」支持配置「同一项目同时运行的 Agent」（1–4，默认 4），网页工作台续写达到并发上限时自动排队。网页工作台续写或重开 Pi/Qoder 任务时，可在 Skills 输入框填写项目 Skills 列表中的名称，多个名称用逗号分隔；留空沿用会话选择。通过 MCP 提交任务时使用 `skill_names`，单个 Skill 也兼容 `skill_name`。

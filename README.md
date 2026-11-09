@@ -31,39 +31,32 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 带内置更新功能的版本会在每次启动时后台检查 GitHub 更新，发现新版后在首页提示。点击“立即更新”即可下载并安装；有任务正在执行时，等待任务结束后安装并重新启动。每次更新完成后请在 ChatGPT 中刷新一次插件以清除旧版缓存（参见 [配置指南](./docs/CHATGPT_DEVELOPER_MODE.md#8-版本更新后在-chatgpt-刷新插件防旧版缓存)）。Linux 的更新入口提供对应架构的 `.deb` 下载，下载后通过系统包管理器安装并重新启动 App。设置页可手动检查更新。旧版本需先手动安装一次带更新功能的版本。
 
-## 实际界面与任务演示
+## 实际界面
 
-以下页面为 macOS 实录，Windows 与 Linux 共用同一套产品界面。约 15 秒演示：ChatGPT 提交“你好” → 本机批准 → Codex 执行 → 工作台显示回复。
+以下画面为 macOS 实录，Windows 与 Linux 共用同一套桌面产品界面。
 
-<img src="./docs/assets/workbench-demo.gif" width="640" alt="ChatGPT 提交任务、本机批准与 Codex 执行回复的完整动态演示">
+**工作台**：应用内模型对话入口，左侧集中展示主导航与按工作区分组的会话，中央呈现对话、性能/Token/上下文统计与持久输入器，右侧为可收起的文件、变更与调用的 Agent 检查器。
 
-<details>
-<summary>查看任务批准画面</summary>
+<img src="./docs/assets/workbench.png" width="720" alt="Codex Bridge 工作台界面">
 
-本机批准卡片显示待执行操作，点击“仅本次允许”后继续执行任务。
+**网页工作台（四宫格分屏）**：支持单视图、左右两格、左一右二与四宫格分屏，每格可独立展示不同 Agent（图中为 OpenCode、Codex、Antigravity、Qoder）的实时对话与输入器，顶部工具栏提供标签页、权限、历史、内置浏览器与分屏切换。
 
-<img src="./docs/assets/task-approval.jpg" width="640" alt="任务批准画面">
-
-</details>
+<img src="./docs/assets/web-workbench-split.jpg" width="720" alt="Codex Bridge 网页工作台四宫格分屏界面">
 
 <details>
-<summary>查看概览与设置页面</summary>
+<summary>查看连接页、工作台设置与全局设置界面</summary>
 
-概览页集中显示后台服务、本地 MCP 通道、Secure Tunnel、Agent 引擎和最近任务状态。
+**连接页**：常驻分栏管理聊天客户端（ChatGPT、Qwen Studio、Gemini）与各 Agent（工作台、Codex、Antigravity CLI、Claude Code、DeepSeek Harness、DSH 桌面、OpenCode、Pi、Qoder）的连接状态与配置详情。
 
-<img src="./docs/assets/overview.png" width="640" alt="Codex Bridge 概览">
+<img src="./docs/assets/connections.png" width="720" alt="Codex Bridge 连接页">
 
-Agent 模型设置页展示各 Agent 的模型与权限；推理选项按模型能力显示，Antigravity 的强度包含在模型 ID 中。
+**工作台设置**：管理工作台模型连接（ChatGPT、智谱 / Z.AI、WorkBuddy、自定义 API）、上下文窗口与自动压缩阈值、技能、MCP 服务及插件。
 
-<img src="./docs/assets/agent-models.png" width="640" alt="Agent 模型与权限">
+<img src="./docs/assets/workbench-settings.png" width="720" alt="Codex Bridge 工作台设置">
 
-OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白名单和黑名单。
+**设置 — 账户与模型**：集中查看和管理各 Agent 的默认模型与推理强度，并提供通用、执行与审批、客户端与指令、技能与扩展、诊断与日志分类。
 
-<img src="./docs/assets/direct-workspace.png" width="640" alt="Direct Workspace 设置">
-
-审批与 MCP 设置页展示 Direct 操作和远程任务启动策略，以及 GPT/Qwen 的 MCP 自定义指令。
-
-<img src="./docs/assets/approvals.png" width="640" alt="审批与 MCP 设置">
+<img src="./docs/assets/settings-models.png" width="720" alt="Codex Bridge 设置 — 账户与模型">
 
 </details>
 
@@ -84,7 +77,7 @@ OpenCode 的模型与权限设置，以及 Direct 工作区的命令模式、白
 ### 本地文件与命令
 
 1. **启动服务**：打开 App，确认后台服务已连接。macOS 如提示后台项目需要批准，请按提示在系统设置中允许。
-2. **添加项目**：登记本地目录即授权完整访问。
+2. **添加项目**：服务自带**默认工作区**，可直接用于新对话和未指定项目的 MCP 操作；如需操作其他本地代码库，在「项目」页添加或直接打开文件夹（macOS 快捷键 `⌘O`），登记本地目录即授权完整访问。
 3. **连接聊天客户端**：按下表选择一种接入方式。
 4. **直接操作项目**：在已启用 Codex Bridge 应用或插件的对话中要求读取、修改项目文件或运行命令；需要批准时在 Bridge 中处理。
 
@@ -99,15 +92,15 @@ Gemini 的配置入口是 **更多 → 自定义 → 关联应用 → 右上角�
 
 **Gemini 只有在「任务模式」下才能使用已添加的自定义 MCP。** 本地 MCP、Sites 和 ngrok 均适用。完成关联后，在 Gemini 的任务模式中启用 Codex Bridge 应用，再发送请求。
 
-工作台的“设置 → 模型连接”支持 ChatGPT、自定义 API、智谱 / Z.AI 的 Coding Plan 与 Start Plan，以及 WorkBuddy 国内版和国际版。智谱 / Z.AI 可网页登录，Coding Plan 也可使用 API Key；WorkBuddy 提供网页登录、API Key 和导入桌面登录，并可管理账号池、积分与模型筛选。连接完成后在对话输入区选择对应来源和模型。首次使用可点击“更多模型连接”进入配置。
+「工作台设置 → 模型连接」支持 ChatGPT、自定义 API、智谱 / Z.AI 的 Coding Plan 与 Start Plan，以及 WorkBuddy 国内版和国际版。智谱 / Z.AI 可网页登录，Coding Plan 也可使用 API Key；WorkBuddy 提供网页登录、API Key 和导入桌面登录，并可管理账号池、积分与模型筛选。连接完成后在对话输入区选择对应来源和模型。首次使用可点击“更多模型连接”进入配置。
 
 ### 委派 Agent 任务（可选）
 
-需要让 Codex、OpenCode、DeepSeek Harness 等 Agent 执行任务时，再完成以下配置。Agent 自身的登录或 API 配置取决于所选引擎，与 Gemini 的 MCP 接入分别配置。
+需要让 Codex、Claude Code、OpenCode、DeepSeek Harness、Antigravity、Pi 或 Qoder 等 Agent 执行任务时，再完成以下配置。Agent 自身的登录或 API 配置取决于所选引擎，与聊天客户端的 MCP 接入分别配置。
 
-1. **连接 Agent**：首次初始化自动发现已有安装，在连接页点击“连接”完成验证和启用。需要安装或补齐环境时，可以额外点击“一键配置”，按指引完成登录或填写 API Key，详见[一键配置指南](./docs/AGENT_SETUP_GUIDE.md)。Codex 使用本机 Codex 执行通道。
-2. **选择项目和权限**：在工作台选择项目、Agent 及“只读”或“完整”，并设置模型偏好。“完整”包含写入和联网，“只读”不允许写入和工具联网；GPT/Qwen 新任务使用用户在工作台选择的默认任务权限。
-3. **执行任务**：在本机工作台提交，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在工作台显示。
+1. **连接 Agent**：首次初始化自动发现已有安装，在「连接」页点击“连接”完成验证和启用。需要安装或补齐环境时，可以点击“一键配置”，按指引完成登录或填写 API Key，详见[一键配置指南](./docs/AGENT_SETUP_GUIDE.md)。Codex 使用本机 Codex 执行通道。
+2. **配置模型与权限**：在「连接」页对应 Agent 详情或「设置 → 账户与模型」中设置默认模型、推理强度和默认任务权限（“完整权限”允许写入和联网，“只读”不允许写入和工具联网）；新建或续写任务时也可在底部输入器单独调整。
+3. **执行任务**：在「网页工作台」点击「+」直接新建 Agent 任务、在「工作台」由模型委派子任务，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在网页工作台显示。
 
 DSH 提供两个独立连接：DSH ACP 使用 API 配置，一键配置准备 ACP；[DSH 桌面](./docs/DSH_NATIVE_DESKTOP_GUIDE.md)复用官方桌面的登录、工具配置和原生会话，支持 macOS、Windows x64 的完整权限文本任务。两者可以同时连接，模型和权限分别保存，新任务选择对应 Agent，已有任务保持原绑定。DSH 桌面的模型与推理强度选择会同步到桌面默认，影响后续新建会话。
 
@@ -127,41 +120,43 @@ DSH 提供两个独立连接：DSH ACP 使用 API 配置，一键配置准备 AC
 
 | 模块 | 功能 |
 | --- | --- |
+| 工作台 | 应用内模型对话（ChatGPT、智谱 / Z.AI、WorkBuddy、自定义 API）、上下文窗口与自动压缩管理、技能与插件、文件/变更检查器、委派外部子 Agent 与独立副本三方合并 |
+| 网页工作台 | 外部 Agent 会话标签页、最多四宫格分屏、本机新建 Agent 任务、内置 ChatGPT / Gemini 浏览器、历史搜索、失败任务重试与跨 Agent 交接 |
 | Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断；macOS 同时识别新版与旧版 App 内置 CLI 路径 |
+| Claude Code | 官方 CLI 与 Agent SDK 接入、模型与推理强度选择、原生 Hooks 校验、工具审批与会话继续 |
 | OpenCode | ACP 连接、模型与推理选项、权限回传、会话继续 |
 | DeepSeek Harness | ACP 与原生桌面连接、模型目录、共享桌面会话与窗口联动；ACP 搜索及 MCP 配置 |
 | Antigravity | CLI 接入、含推理强度的模型选择、原生权限策略、执行过程与会话继续 |
 | Pi | 原生 CLI 与会话接入、模型目录、MCP、Skills 与任务续写 |
 | Qoder | CN/国际版原生 CLI 与 SDK 接入、地区隔离、权限模式、工具审批与会话续写 |
-| 工作台 | 按 Agent 分组的项目会话、历史分页、工具卡片、审批、失败任务重试与跨 Agent 交接 |
 | Direct Workspace | 受控文件读写、Patch、命令执行与 Git 操作 |
 | Gemini | 本地 MCP 命令接入；ChatGPT Sites（公开）或 ngrok 云 MCP，客户端权限独立管理 |
-| Skills | 本机技能发现、只读查看与显式 Action 调用 |
+| Skills 与消息信箱 | 本机技能发现、导入与显式 Action 调用；侧栏信箱接收开发者通知并支持提交带截图的私密反馈 |
 
-可用能力由实际 Agent、连接探测和用户选择的任务权限共同决定。远程请求省略 `project_id` 时使用工作台默认项目；省略 `provider_id` 时使用 Codex。
+可用能力由实际 Agent、连接探测和用户选择的任务权限共同决定。远程请求省略 `project_id` 时使用默认工作区；省略 `provider_id` 时使用 Codex。
 
-## 任务并发限制
+## 任务并发与写入规则
 
-macOS、Windows 与 Linux 使用相同的任务并发规则：
+macOS、Windows 与 Linux 使用相同的任务并发与写入协调规则：
 
-| 范围 | 限制 |
+| 范围 | 规则 |
 | --- | --- |
-| 同一个项目 | 最多 1 个活跃写入任务，所有 Agent 共用该名额 |
-| 不同项目 | 可以同时执行写入任务，仍受对应 Agent 的并发限制 |
+| 同一个项目 | 「设置 → 执行与审批」可调整**同一项目同时运行的 Agent** 数量（默认 4 个，范围 1–4）。Claude Code、Qoder、Pi 采用工具级写租约（仅执行写工具时持有写锁）；Codex、OpenCode、DSH、Antigravity 采用任务级写租约 |
+| 工作台隔离子任务 | 具备隔离能力的子任务可在独立工作副本中并行执行（每项目最多 2 个隔离写任务），完成后经三方合并合入主目录 |
+| 不同项目 | 可以同时执行写入任务，仍受对应 Agent 自身并发限制 |
 | Codex | 最多 4 个并发执行会话，只读与写入合计 |
-| 外部 Agent | Bridge 未设置统一的总并发上限；受项目写入名额、Provider 自身限制和本机资源约束 |
-
-待本机批准、启动中、运行中、等待权限批准及状态未知的写入任务都会占用项目写入名额。达到限制时，新任务会被拒绝或启动失败，需要在名额释放后重试；不会自动排队。任务历史记录数量不计入执行并发限制。
+| 排队与等待 | 网页工作台续写以及开启排队的提交在达到同项目并发上限时自动进入队列等待；任务历史记录数量不计入执行并发限制 |
 
 ## 架构
 
 ```text
-ChatGPT Web ── Secure MCP Tunnel ─┐
-Qwen Studio ── localhost MCP ────┼─► Codex Bridge Service
-Desktop App ── local IPC ────────┘   ├─ 项目目录授权与审批
-                                    ├─ 任务、会话与 SQLite
-                                    ├─ Codex / OpenCode / DSH / AGY / Pi / Qoder
-                                    └─ Direct Workspace / Skills
+ChatGPT / Dot ─── Secure MCP Tunnel ──┐
+Gemini ────────── stdio / Cloud MCP ──┼─► Codex Bridge Service
+Qwen Studio ───── localhost MCP ──────┤   ├─ 默认工作区、项目授权与审批
+Desktop App ───── local IPC ──────────┘   ├─ 工作台（内置引擎）与消息中心
+                                          ├─ 任务、会话与 SQLite
+                                          ├─ Codex / Claude Code / OpenCode / DSH / AGY / Pi / Qoder
+                                          └─ Direct Workspace / Skills
 ```
 
 macOS 使用 WKWebView 和 XPC；Windows 使用 WebView2 和命名管道；Linux 使用 GTK 3 / WebKitGTK 4.1 和 Unix domain socket。三平台共用 `BridgeDesktopUI` 与 `BridgeServiceAppCore`，Windows 与 Linux 还共用 `BridgeDesktopShell` 的桌面状态和命令适配。活动会话通过独立订阅接收实时输出。

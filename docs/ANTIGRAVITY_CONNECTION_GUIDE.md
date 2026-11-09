@@ -32,10 +32,10 @@ Bridge 桌面 App 中的设置边界如下：
 
 | 设置 | 作用范围 |
 | --- | --- |
-| `设置 → Antigravity 默认偏好` | 保存含推理强度的 AGY 模型 ID |
-| `设置 → OpenCode 默认偏好` | 保存 OpenCode 的模型和 effort |
-| `设置 → Codex 执行默认偏好` | 只保存 Codex 的模型、effort、访问模式和快速模式 |
-| 项目登记、任务只读/完整、远程启动批准 | 项目登记授权目录完整访问；用户选择任务权限并审批远程启动 |
+| `连接 → Antigravity`（或 `设置 → 账户与模型 → Antigravity → 管理`） | 保存含推理强度的 AGY 默认模型 ID 与默认任务权限 |
+| `连接 → OpenCode`（或 `设置 → 账户与模型 → OpenCode → 管理`） | 保存 OpenCode 的默认模型、effort 与默认任务权限 |
+| `连接 → Codex`（或 `设置 → 账户与模型 → Codex → 管理`） | 保存 Codex 的默认模型、effort、默认任务权限、访问模式和快速模式 |
+| 项目登记、任务只读/完整、远程启动批准 | 项目登记授权目录完整访问；未指定项目时默认使用「默认工作区」，在「网页工作台」或「动态」页审批远程启动 |
 | AGY `/settings`、`/config`、`/permissions` | 控制 AGY 的原生工具权限和规则；核心设置按官方行为与 Antigravity 2.0 同步 |
 
 因此，Antigravity 2.0 与 AGY CLI 会共享 AGY 自己的核心设置、权限和安全配置；OpenCode 与 AGY 不会共享彼此的 Provider 配置。Bridge 的桌面 App 只提供统一的项目、任务、模型和审批控制面，Codex 的访问模式也不会作为 AGY 的工具放行开关。
@@ -56,9 +56,9 @@ AGY CLI 原生 Sandbox + Global Permissions
 
 | 设置 | 控制什么 |
 | --- | --- |
-| `项目 → 添加项目` | 登记即授权目录完整访问 |
-| `工作台 → GPT/Qwen 新任务` | 用户选择 ChatGPT/Qwen 新任务的默认权限：只读或完整 |
-| “批准启动” | 是否启动这一次远程 Provider 任务 |
+| `项目 → 添加项目` | 登记即授权目录完整访问（未指定项目时默认使用「默认工作区」） |
+| `连接 → Antigravity`（或网页工作台新建任务底部输入器） | 配置 ChatGPT/Qwen/Gemini 新任务的默认权限或本机新建任务的权限：只读或完整（AGY 当前支持完整） |
+| “批准启动”（网页工作台 / 动态页） | 是否启动这一次远程 Provider 任务 |
 | AGY `/settings` 或 `/config` | Tool Permission 等 CLI 全局行为 |
 | AGY `/permissions` | 哪些命令、URL 和 MCP 工具可以在 headless 中直接执行 |
 
@@ -267,7 +267,7 @@ AGY 原生 Plan 用于分析和规划，但不能保证工具禁网。Bridge 的
 
 ## 6. 在 Bridge 中连接和启用
 
-1. 打开 `连接 → 本机 Agent 引擎连接`。
+1. 打开 `连接 → Antigravity`（或 `设置 → 账户与模型 → Antigravity → 管理`）。
 2. 共享桌面页面会自动查找 `agy`/`antigravity`。在 AGY 卡片中点击“连接”；如果没有自动发现，选择“按路径登记已有安装”。按路径登记时选择第 3 节命令返回的真实文件。
 3. AGY 连接前，页面会显示以下授权提示：
 
@@ -278,18 +278,17 @@ AGY 原生 Plan 用于分析和规划，但不能保证工具禁网。Bridge 的
    只有点击同意后，Service 才会连接候选、执行 Probe，并把当前用户的 AGY Global `toolPermission` 设为 `always-proceed`；取消不会修改设置。
 4. 检查版本、能力和状态。连接流程 Probe 成功时会自动启用可用安装；手动“登记 Agent”则需在状态为“可用”后打开“启用”。
 
-已启用的 AGY 更新或二进制身份变化后，Bridge 会自动重新 Probe；检查当前 CLI 实际帮助能力，通过后保留原连接，不使用固定版本范围。启动 App 和后台刷新都会触发检查；自动恢复不修改已有的 Always Proceed 授权。接口不兼容、旧路径无法明确重新发现等情况会在首页“本机 Agent 引擎”提醒，点击进入连接页查看原因并手动重连。移除登记只删除 Bridge 的连接记录，不删除 AGY CLI、登录状态或 Global 配置。
+已启用的 AGY 更新或二进制身份变化后，Bridge 会自动重新 Probe；检查当前 CLI 实际帮助能力，通过后保留原连接，不使用固定版本范围。启动 App 和后台刷新都会触发检查；自动恢复不修改已有的 Always Proceed 授权。接口不兼容、旧路径无法明确重新发现等情况会在「动态」页和「连接」页提醒，点击进入连接页查看原因并手动重连。移除登记只删除 Bridge 的连接记录，不删除 AGY CLI、登录状态或 Global 配置。
 
 ## 7. 刷新模型和默认值
 
-1. 先在 `工作台` 选择真实任务项目。
-2. 打开 `设置 → 外部 Agent 默认偏好`，找到 `Antigravity` 执行默认偏好。
-3. 有多个安装时选择目标 AGY。
-4. 点击“刷新模型列表”。Bridge 读取当前 AGY 安装实际返回的模型目录，不会补入静态或过期模型。
-5. 选择当前返回的精确模型 ID。AGY 模型 ID 已包含推理强度，Bridge 原样传给 `--model`，不另选或传入独立 effort；高强度模型也以目录返回的 ID 为准。
-6. 在工作台选择任务权限。AGY 当前支持“完整”。
+1. 打开 `连接 → Antigravity`（或 `设置 → 账户与模型 → Antigravity → 管理`）。
+2. 有多个安装时选择目标 AGY。
+3. 点击“刷新模型列表”。Bridge 读取当前 AGY 安装实际返回的模型目录，不会补入静态或过期模型。
+4. 选择当前返回的精确模型 ID。AGY 模型 ID 已包含推理强度，随模型名称直接显示，Bridge 原样传给 `--model`，不另选或传入独立 effort；高强度模型也以目录返回的 ID 为准。
+5. 选择默认任务权限（AGY 当前支持“完整”）。在「网页工作台」点击顶部标签栏「+」新建本机任务时，也可在底部输入器选择目标项目（未指定时使用「默认工作区」）、模型和权限。
 
-ChatGPT/Qwen 新任务使用用户在工作台选择的默认任务权限，AI 不选择或覆盖权限。AGY 的原生 plan 模式不能保证任务级工具禁网，因此 Bridge 对只读任务明确返回不支持；需要只读时选择支持该能力的 Agent。
+ChatGPT/Qwen/Gemini 新任务使用配置的默认任务权限，AI 不选择或覆盖权限。AGY 的原生 plan 模式不能保证任务级工具禁网，因此 Bridge 对只读任务明确返回不支持；需要只读时选择支持该能力的 Agent。
 
 连接完成后，连接详情会显示 AGY Global Tool Permission。使用 Bridge headless 任务期间应保持 `always-proceed`；需要收窄行为时优先在 AGY `/permissions` 为具体命令、域名或 MCP 工具添加 Project 规则。
 
@@ -310,10 +309,9 @@ AGY 的文件、命令、Web 和 MCP 约束由原生 Sandbox、执行模式和�
 
 ## 9. 完整任务的使用
 
-1. 登记项目目录，在工作台选择正确项目、AGY 和“完整”。
-2. 确认同一项目没有其他活动写任务。
-3. 在 AGY `/permissions` 中放行任务需要的具体命令、域名或 MCP 工具。
-4. 批准远程任务启动。
+1. 确认目标项目已登记（未指定项目时默认使用「默认工作区」），并将 AGY 任务权限设为“完整”。
+2. 在 AGY `/permissions` 中放行任务需要的具体命令、域名或 MCP 工具。
+3. 在「网页工作台」或「动态」页批准远程任务启动（或在网页工作台直接新建任务）。
 
 完整包含写入和联网，实际使用哪些工具由任务内容和 AGY 原生规则决定。
 
@@ -326,9 +324,9 @@ AGY 的文件、命令、Web 和 MCP 约束由原生 Sandbox、执行模式和�
 
 联网任务同样使用用户选择的完整权限。Web/URL 调用可能需要 `read_url(domain)`、`execute_url(domain)`；浏览器或辅助脚本也可能需要命令、MCP 或缓存写入权限。按失败的具体工具配置原生规则。
 
-Bridge 使用 `--mode accept-edits`；同一项目的完整任务进入独占工作区 gate。
+Bridge 使用 `--mode accept-edits`。「设置 → 执行与审批」支持配置「同一项目同时运行的 Agent」（1–4，默认 4），网页工作台续写达到并发上限时自动排队。
 
-## 10. 从 ChatGPT/Qwen 提交
+## 10. 从 ChatGPT/Qwen/Gemini 提交
 
 先让客户端调用：
 
@@ -343,7 +341,7 @@ list_agent_models
 - `provider_id` 为 `antigravity`；
 - 安装 `availability` 为 `available`；
 - `enabled` 与 `task_submission_enabled` 为 `true`；
-- Workbench 已选中正确项目和权限。
+- 未指定 `project_id` 时默认使用「默认工作区」。
 
 按 `list_agents` 返回的精确 `installation_id` 调用 `list_agent_models` 查询 AGY 目录。模型覆盖只在用户明确指定时设置 `model_override=true`，使用目录返回的精确模型 ID；独立 effort 会在启动前返回能力不支持错误。
 
@@ -353,7 +351,7 @@ list_agent_models
 awaiting_local_approval
 ```
 
-在 Bridge 工作台核对项目、Provider、用户选择的任务权限和 prompt 后点击“批准启动”。AGY 后续工具不会进入可交互的 App 审批卡片；权限不足时应回到 AGY `/permissions` 修正规则后重试。
+在 Bridge「网页工作台」或「动态」页核对项目、Provider、用户配置的默认任务权限和 prompt 后点击“批准启动”。AGY 后续工具不会进入可交互的 App 审批卡片；权限不足时应回到 AGY `/permissions` 修正规则后重试。
 
 ## 11. 常见故障
 

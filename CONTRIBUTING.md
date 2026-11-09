@@ -28,7 +28,7 @@ Scripts/with-xcode.sh swift test --package-path Packages/BridgeCore --build-syst
 Scripts/with-xcode.sh xcrun swift-format lint --strict --recursive Packages/BridgeCore/Sources Packages/BridgeCore/Tests App Service UITests
 ```
 
-In the development checkout, shared desktop JavaScript changes use the relevant `Scripts/test-desktop-*.cjs` tests with `node --test`. Pi and Qoder runtime changes also require their resource digest checks and affected Node protocol tests. MCP contract changes use `Scripts/verify-mcp-inspector.sh`.
+In the development checkout, shared desktop JavaScript changes use the relevant `Scripts/test-desktop-*.cjs` tests with `node --test`. Claude Code, Pi, Qoder, DSH desktop connector, and embedded Workbench runtime changes also require their resource digest checks (`node Scripts/verify-agent-runtime-resources.mjs`) and affected Node protocol tests. MCP contract changes use `Scripts/verify-mcp-inspector.sh`.
 
 macOS host changes can be built with:
 

@@ -12,11 +12,11 @@ Do not attach credentials, authentication files, browser cookies, private keys, 
 
 - Local MCP uses loopback transport and authenticated client access.
 - Desktop IPC trusts processes running as the current operating-system user; that user account is the local security boundary.
-- ChatGPT and Qwen tool exposure is saved independently for each client. The workbench task mode controls Agent execution separately, subject to project policy and approval.
+- ChatGPT, Qwen, and Gemini tool exposure is saved independently for each client. Task permission mode (`read-only` or `full`) controls Agent execution separately, subject to project policy and approval.
 - Project requests use registered project identifiers and validated paths.
 - Service policy and explicit approvals control access; model-generated text does not grant permissions.
 - Agent capabilities are checked against the installed provider and its connection probe.
-- macOS credentials use Keychain; Windows credentials use Credential Manager.
+- macOS credentials use Keychain; Windows credentials use Credential Manager; Linux credentials use Secret Service.
 - Tunnel Runtime Keys are passed to the helper through platform-specific process launch mechanisms and are excluded from task evidence.
 - Direct execution uses project command policy, structured arguments, bounded I/O, and process lifecycle controls.
 - Custom provider endpoints support local HTTP services as well as HTTPS. Endpoint owners are responsible for the transport and credential handling at their configured service.

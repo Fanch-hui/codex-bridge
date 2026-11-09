@@ -1,6 +1,6 @@
 # Linux 桌面版
 
-支持 Ubuntu 24.04 LTS 的 x64 与 ARM64。桌面使用 GTK 3 与 WebKitGTK，工作台、项目、连接、设置和日志页面与 macOS、Windows 共用。
+支持 Ubuntu 24.04 LTS 的 x64 与 ARM64。桌面使用 GTK 3 与 WebKitGTK，工作台、网页工作台、项目、动态、连接、设置与消息信箱页面与 macOS、Windows 共用。
 
 ## 安装
 

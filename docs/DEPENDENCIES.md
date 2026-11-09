@@ -13,9 +13,9 @@ The package manifests and `Package.resolved` define the Swift dependencies used 
 | WebView2 SDK | 1.0.4191.47 | Windows embedded browser loader |
 | zcode-api and proxy adaptations | `158e7653b738cbed0996243eeabd26f816638e81`, included in dsh-zcode 0.2.1 | ZCode model connection; CC BY-NC-SA 4.0 |
 
-macOS uses WKWebView and XPC. Windows uses WebView2 and named pipes. Both platforms load the shared local `BridgeDesktopUI` resources.
+macOS uses WKWebView and XPC. Windows uses WebView2 and named pipes. Linux uses GTK 3 / WebKitGTK 4.1 and Unix domain sockets. All three platforms load the shared local `BridgeDesktopUI` resources.
 
-Codex, OpenCode, DeepSeek Harness, and Antigravity run as separate agent processes. Available capabilities are determined by each installed agent's entrypoint and runtime probe. DeepSeek Harness uses a Node runtime and ACP configuration managed by the Bridge adapter.
+Codex, Claude Code, OpenCode, DeepSeek Harness, Antigravity, Pi, and Qoder run as separate agent processes, while the built-in Workbench uses the bundled `EmbeddedDSH` runtime. Available capabilities are determined by each installed agent's entrypoint and runtime probe. DeepSeek Harness uses a Node runtime and ACP configuration managed by the Bridge adapter.
 
 ## Packaging
 
