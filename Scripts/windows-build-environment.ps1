@@ -1,3 +1,21 @@
+function Get-CompatibleWindowsMSVCRoot {
+  param(
+    [Parameter(Mandatory)][string]$Directory,
+    [Parameter(Mandatory)][ValidateSet("x64", "arm64")][string]$Architecture
+  )
+
+  # Swift 6.3.3 embeds Clang 21; later MSVC STL releases can require a newer Clang.
+  Get-ChildItem -LiteralPath $Directory -Directory |
+    Where-Object { $_.Name -match '^\d+\.\d+\.\d+(\.\d+)?$' } |
+    Where-Object { [version]$_.Name -lt [version]"14.45" } |
+    Sort-Object { [version]$_.Name } -Descending |
+    Where-Object {
+      (Test-Path -LiteralPath (Join-Path $_.FullName "include\yvals_core.h") -PathType Leaf) -and
+      (Test-Path -LiteralPath (Join-Path $_.FullName "lib\$Architecture\libcmt.lib") -PathType Leaf)
+    } |
+    Select-Object -First 1 -ExpandProperty FullName
+}
+
 function Get-WindowsBuildEnvironment {
   param(
     [Parameter(Mandatory)][ValidateSet("x64", "arm64")][string]$Architecture
@@ -12,13 +30,10 @@ function Get-WindowsBuildEnvironment {
   if ($LASTEXITCODE -ne 0 -or -not $vsRoot) {
     throw "Visual Studio installation was not found."
   }
-  $msvcRoot = Get-ChildItem (Join-Path $vsRoot "VC\Tools\MSVC") -Directory |
-    Where-Object { $_.Name -match '^\d+\.\d+\.\d+(\.\d+)?$' } |
-    Sort-Object { [version]$_.Name } -Descending |
-    Where-Object { Test-Path (Join-Path $_.FullName "lib\$Architecture\libcmt.lib") } |
-    Select-Object -First 1 -ExpandProperty FullName
+  $msvcRoot = Get-CompatibleWindowsMSVCRoot -Directory (Join-Path $vsRoot "VC\Tools\MSVC") `
+    -Architecture $Architecture
   if (-not $msvcRoot) {
-    throw "Visual Studio C++ libraries for $Architecture are required."
+    throw "MSVC 14.44 or earlier C++ headers and libraries for $Architecture are required for Swift 6.3.3."
   }
 
   $kitsRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10"
