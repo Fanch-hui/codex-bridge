@@ -16,6 +16,48 @@ function Get-CompatibleWindowsMSVCRoot {
     Select-Object -First 1 -ExpandProperty FullName
 }
 
+function Get-WindowsMSVCIncludePath {
+  param(
+    [Parameter(Mandatory)][string]$IncludeDirectory,
+    [Parameter(Mandatory)][string]$SDKRoot,
+    [Parameter(Mandatory)][string]$StagingDirectory
+  )
+
+  $moduleMap = Join-Path $SDKRoot "usr\share\vcruntime.modulemap"
+  $apiNotes = Join-Path $SDKRoot "usr\share\vcruntime.apinotes"
+  foreach ($path in @($moduleMap, $apiNotes)) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+      throw "Swift SDK MSVC module support file is missing: $path"
+    }
+  }
+
+  $installedModuleMap = Join-Path $IncludeDirectory "module.modulemap"
+  $installedApiNotes = Join-Path $IncludeDirectory "vcruntime.apinotes"
+  # Swift installs these files for one MSVC toolset; the compatible toolset can be another version.
+  if ((Test-Path -LiteralPath $installedModuleMap -PathType Leaf) -and
+      (Test-Path -LiteralPath $installedApiNotes -PathType Leaf) -and
+      (Get-FileHash -LiteralPath $installedModuleMap).Hash -eq (Get-FileHash -LiteralPath $moduleMap).Hash -and
+      (Get-FileHash -LiteralPath $installedApiNotes).Hash -eq (Get-FileHash -LiteralPath $apiNotes).Hash) {
+    return $IncludeDirectory
+  }
+
+  if (Test-Path -LiteralPath $StagingDirectory) {
+    throw "MSVC include staging directory already exists: $StagingDirectory"
+  }
+  try {
+    New-Item -ItemType Directory -Path (Split-Path -Parent $StagingDirectory) -Force | Out-Null
+    Copy-Item -LiteralPath $IncludeDirectory -Destination $StagingDirectory -Recurse
+    Copy-Item -LiteralPath $moduleMap -Destination (Join-Path $StagingDirectory "module.modulemap") -Force
+    Copy-Item -LiteralPath $apiNotes -Destination (Join-Path $StagingDirectory "vcruntime.apinotes") -Force
+  } catch {
+    if (Test-Path -LiteralPath $StagingDirectory) {
+      Remove-Item -LiteralPath $StagingDirectory -Recurse -Force
+    }
+    throw
+  }
+  return $StagingDirectory
+}
+
 function Get-WindowsBuildEnvironment {
   param(
     [Parameter(Mandatory)][ValidateSet("x64", "arm64")][string]$Architecture

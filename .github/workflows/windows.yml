@@ -113,7 +113,9 @@ jobs:
           $buildEnvironment = Get-WindowsBuildEnvironment -Architecture $archDir
           $vcpkgRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet"
           $vcpkgBin = Join-Path $vcpkgRoot "bin"
-          $includePaths = @((Join-Path $vcpkgRoot "include")) + $buildEnvironment.IncludePaths
+          $msvcInclude = Get-WindowsMSVCIncludePath -IncludeDirectory $buildEnvironment.IncludePaths[0] `
+            -SDKRoot $env:SDKROOT -StagingDirectory (Join-Path $env:RUNNER_TEMP "bridge-msvc-include-$archDir")
+          $includePaths = @((Join-Path $vcpkgRoot "include"), $msvcInclude) + @($buildEnvironment.IncludePaths | Select-Object -Skip 1)
           Add-Content $env:GITHUB_ENV "INCLUDE=$($includePaths -join ';')"
           $targetLibraryPaths = (@((Join-Path $vcpkgRoot "lib")) + $buildEnvironment.LibraryPaths) -join ";"
           Add-Content $env:GITHUB_ENV "TARGET_LIBRARY_PATHS=$targetLibraryPaths"

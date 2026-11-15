@@ -100,22 +100,25 @@ foreach ($requiredPath in @($sqliteHeader, $sqliteLibrary)) {
     throw "Vcpkg SQLite development file is unavailable: $requiredPath"
   }
 }
-$env:INCLUDE = (@($vcpkgIncludeDirectory) + $buildEnvironment.IncludePaths) -join ";"
-$env:LIB = (@($vcpkgLibraryDirectory) + $buildEnvironment.LibraryPaths) -join ";"
-if ($buildEnvironment.BinaryPaths -and $buildEnvironment.BinaryPaths.Count -gt 0) {
-  $env:PATH = (@($buildEnvironment.BinaryPaths) + @($originalPath)) -join ";"
-}
-$baseBuildPath = $env:PATH
-. (Join-Path $PSScriptRoot "windows-portable-support.ps1")
-$sqliteRuntime = Join-Path $vcpkgInstalledRoot "bin\sqlite3.dll"
-$expectedMachine = if ($architecture -eq "arm64") { [UInt16]0xAA64 } else { [UInt16]0x8664 }
-if ((Get-PEMachine $sqliteRuntime) -ne $expectedMachine) {
-  throw "SQLite runtime does not match the $architecture target: $sqliteRuntime"
-}
-
-
+$msvcStagingDirectory = Join-Path $repoRoot (".build\windows-msvc-include-" + [Guid]::NewGuid().ToString("N"))
 Push-Location $packagePath
 try {
+  $msvcInclude = Get-WindowsMSVCIncludePath -IncludeDirectory $buildEnvironment.IncludePaths[0] `
+    -SDKRoot $env:SDKROOT -StagingDirectory $msvcStagingDirectory
+  $env:INCLUDE = (@($vcpkgIncludeDirectory, $msvcInclude) + @($buildEnvironment.IncludePaths | Select-Object -Skip 1)) -join ";"
+  $env:LIB = (@($vcpkgLibraryDirectory) + $buildEnvironment.LibraryPaths) -join ";"
+  if ($buildEnvironment.BinaryPaths -and $buildEnvironment.BinaryPaths.Count -gt 0) {
+    $env:PATH = (@($buildEnvironment.BinaryPaths) + @($originalPath)) -join ";"
+  }
+  $baseBuildPath = $env:PATH
+  . (Join-Path $PSScriptRoot "windows-portable-support.ps1")
+  $sqliteRuntime = Join-Path $vcpkgInstalledRoot "bin\sqlite3.dll"
+  $expectedMachine = if ($architecture -eq "arm64") { [UInt16]0xAA64 } else { [UInt16]0x8664 }
+  if ((Get-PEMachine $sqliteRuntime) -ne $expectedMachine) {
+    throw "SQLite runtime does not match the $architecture target: $sqliteRuntime"
+  }
+
+
   . (Join-Path $PSScriptRoot "windows-swift-arguments.ps1")
   $swiftArguments = @(Get-WindowsSwiftArguments `
     -VcpkgInstalledRoot $vcpkgInstalledRoot -TargetTriple $targetTriple `
@@ -194,6 +197,9 @@ try {
   }
 } finally {
   Pop-Location
+  if (Test-Path -LiteralPath $msvcStagingDirectory) {
+    Remove-Item -LiteralPath $msvcStagingDirectory -Recurse -Force
+  }
   $env:PATH = $originalPath
   $env:INCLUDE = $originalInclude
   $env:LIB = $originalLib
