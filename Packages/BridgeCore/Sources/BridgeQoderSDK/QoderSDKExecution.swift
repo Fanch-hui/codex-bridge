@@ -55,13 +55,13 @@ actor QoderSDKExecution {
           guard let self else { return }
           try await self.consume(event)
         }
-        await self?.fail()
-      } catch { await self?.fail() }
+        await self?.fail(nil)
+      } catch { await self?.fail(error) }
     }
     Task { [weak self] in
       guard let self else { return }
       do { try await self.send(self.request.executionPrompt, initial: true) } catch {
-        await self.fail()
+        await self.fail(error)
       }
     }
   }
@@ -269,9 +269,9 @@ actor QoderSDKExecution {
     guard await eventDelivery.enqueue(envelope) else { throw ACPError.transportClosed }
   }
 
-  private func fail() async {
-    await finish(
-      with: .failed(code: "qoder_transport_failed", summary: "Qoder 执行通道关闭，任务结果未确认。"))
+  /// `error` is nil when the event stream ended without a terminal event.
+  private func fail(_ error: (any Error)?) async {
+    await finish(with: AgentHostFailure(error).event(providerID: "qoder", providerName: "Qoder"))
   }
 
   private func finish(with event: AgentEvent? = nil) async {
@@ -303,6 +303,7 @@ actor QoderSDKExecution {
       ![
         "qoder_process_exit_unconfirmed", "qoder_process_tree_exit_unconfirmed",
         "qoder_windows_system_root_missing", "qoder_cleanup_failed", "qoder_transport_failed",
+        "qoder_protocol_failed", "qoder_input_rejected",
       ].contains(code)
     default: false
     }

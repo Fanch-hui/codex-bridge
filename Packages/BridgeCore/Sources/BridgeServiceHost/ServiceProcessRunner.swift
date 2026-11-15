@@ -115,7 +115,7 @@ public struct ServiceProcessOptions: Equatable, Sendable {
 public enum ServiceProcessRunner {
   public static func run(
     arguments: [String] = Array(CommandLine.arguments.dropFirst()),
-    appVersion: String = "3.0.2"
+    appVersion: String = "3.0.3"
   ) async throws {
     applyDefaultUmask()
     #if os(Windows)
@@ -158,6 +158,20 @@ public enum ServiceProcessRunner {
     )
     let logMaintenance = await ServiceLogMaintenance.start(store: composition.store)
     defer { logMaintenance.cancel() }
+    #if os(macOS)
+      let localMCPListener: MacLocalMCPListener?
+      do {
+        localMCPListener =
+          options.foreground ? nil : try MacLocalMCPListener(composition: composition)
+      } catch {
+        localMCPListener = nil
+        FileHandle.standardError.write(
+          Data(
+            "Gemini local MCP socket is unavailable; restart the service to retry. Service control remains available.\n"
+              .utf8))
+      }
+      defer { localMCPListener?.invalidate() }
+    #endif
     let listener: (any ServiceRequestListener)?
     if options.foreground {
       listener = nil
@@ -187,8 +201,14 @@ public enum ServiceProcessRunner {
       )
     }
 
+    #if os(macOS)
+      localMCPListener?.resume()
+    #endif
     await ServiceTerminationSignal.wait()
     listener?.invalidate()
+    #if os(macOS)
+      localMCPListener?.invalidate()
+    #endif
     await composition.shutdown()
   }
 

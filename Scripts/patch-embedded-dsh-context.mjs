@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 
-const compactionHash = 'eafe4adbccc2b87377e4839f1a6093ebe1a0858caadc6c3dbffef19cb1dbc54b';
-const loopHash = 'a6fa8e0c7c90191caf5f4a3bb5c624a86e9845cf3c79d020b71420d0e20ae4c1';
+const compactionHash = 'e1a3019949d01b22baa91d6eb672d9559d76b97fb5bb45e0428715a316bf11d4';
+const loopHash = 'f09f60814d4e96a880f41b9fc3832f33c56a28f954f48810d8439ce83ad6ffa8';
 const contextService = 'globalThis[Symbol.for("codex-bridge.context-policy")]';
 
 function replace(source, before, after) {

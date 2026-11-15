@@ -37,6 +37,18 @@ extension BridgeServiceRequestController {
         message: "项目合并尚待恢复。请在工作台恢复区继续合并或撤回本次合并。",
         retryable: false)
     }
+    if case .invalidArgument("embedded_dsh.workspace_reclaimed") = error as? ServiceStoreError {
+      return .init(
+        code: "workbench_workspace_reclaimed",
+        message: "该子 Agent 的隔离副本已被清理（已合并的改动都保留在项目中）。请重新委派一个新的子 Agent 继续。",
+        retryable: false)
+    }
+    if case .invalidArgument("embedded_dsh.read_only_unsupported") = error as? ServiceStoreError {
+      return .init(
+        code: "workbench_agent_read_only_unsupported",
+        message: "该 Agent 不支持只读执行。请改用支持只读的 Agent；若当前会话为完整权限，也可省略 access，让它以完整权限运行。",
+        retryable: false)
+    }
     if error is ServiceDefaultWorkspaceError {
       return .init(code: "default_workspace_protected", message: "默认工作区不能移除。")
     }

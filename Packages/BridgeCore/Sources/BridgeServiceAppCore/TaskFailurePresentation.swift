@@ -113,7 +113,7 @@ public struct TaskFailurePresentation: Equatable, Sendable {
     (
       [
         "agent_stream_ended", "execution_stream_ended", "codex_transport_failed",
-        "antigravity_transport_closed", "qoder_transport_failed",
+        "antigravity_transport_closed", "qoder_transport_failed", "claude_transport_failed",
       ],
       "执行通道在确认最终结果前断开。",
       "检查 Agent 连接并核对原生会话和文件变更；确认执行状态后再续写或重试。"
@@ -132,10 +132,14 @@ public struct TaskFailurePresentation: Equatable, Sendable {
       [
         "codex_protocol_invalid", "invalid_turn_completed", "turn_binding_mismatch",
         "duplicate_turn_completion", "invalid_turn_status", "antigravity_protocol_violation",
-        "desktop_event_invalid",
+        "desktop_event_invalid", "qoder_protocol_failed", "claude_protocol_failed",
       ],
       "Agent 返回的执行事件不符合当前协议或会话绑定。",
       "在连接页检查 Agent 版本与连接，查看诊断和原生记录后重新连接。"
+    ),
+    (
+      ["qoder_input_rejected", "claude_input_rejected"], "Agent 未接受本次输入或附件。",
+      "按诊断详情核对附件仍在项目内且提交后未被修改，调整后重新发送。"
     ),
     (
       ["codex_turn_failed", "pi_execution_failed", "desktop_run_failed"],

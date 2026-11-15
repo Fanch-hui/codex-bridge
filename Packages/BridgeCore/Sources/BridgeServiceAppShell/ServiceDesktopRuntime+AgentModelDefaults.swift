@@ -43,16 +43,20 @@ extension BridgeServiceAppModel {
     permissionMode: String?,
     effort: String?
   ) {
-    let previous = agentModelDefault(for: providerID)
+    let displayed = agentModelDefault(for: providerID)
+    // Saves queued behind a pending one share its baseline: what is displayed then is unconfirmed.
+    if agentModelConfirmedDefaults[providerID] == nil {
+      agentModelConfirmedDefaults[providerID] = displayed
+    }
     incrementAgentModelDefaultRevision(for: providerID)
     let revision = agentModelDefaultRevision(for: providerID)
     applyAgentModelDefault(
       IPCAgentModelDefaultResponse(
         providerID: providerID,
         model: model,
-        permissionMode: permissionMode ?? previous.permissionMode,
+        permissionMode: permissionMode ?? displayed.permissionMode,
         effort: effort,
-        connectionMode: previous.connectionMode
+        connectionMode: displayed.connectionMode
       ),
       providerID: providerID
     )
@@ -73,7 +77,9 @@ extension BridgeServiceAppModel {
           permissionMode: permissionMode,
           effort: effort
         )
+        self.agentModelConfirmedDefaults[providerID] = persisted
         guard self.agentModelDefaultRevision(for: providerID) == revision else { return }
+        self.agentModelConfirmedDefaults.removeValue(forKey: providerID)
         self.applyAgentModelDefault(persisted, providerID: providerID)
         self.postToast(
           "\(self.agentProviderName(providerID)) 默认设置已保存",
@@ -82,7 +88,9 @@ extension BridgeServiceAppModel {
         )
       } catch {
         guard self.agentModelDefaultRevision(for: providerID) == revision else { return }
-        self.applyAgentModelDefault(previous, providerID: providerID)
+        if let confirmed = self.agentModelConfirmedDefaults.removeValue(forKey: providerID) {
+          self.applyAgentModelDefault(confirmed, providerID: providerID)
+        }
         self.errorMessage = Self.message(error)
       }
     }

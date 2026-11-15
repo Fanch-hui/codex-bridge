@@ -24,6 +24,9 @@ struct WorkbenchWorkspaceRecord: Codable, Sendable {
   var conflicts: [String]
   var changedFilesOmitted: Int? = nil
   var conflictsOmitted: Int? = nil
+  /// Workspace paths the merge never carries over (excluded directories, secret files).
+  var excludedPaths: [String]? = nil
+  var excludedPathsOmitted: Int? = nil
   var resolutions: [WorkbenchConflictResolution]? = nil
   var resolvedInputs: [WorkbenchConflictResolution]? = nil
   var resolutionRequestID: String? = nil
@@ -40,6 +43,12 @@ struct WorkbenchWorkspaceRecord: Codable, Sendable {
     self.changedFilesOmitted = changed.omitted
     self.conflicts = conflicted.paths
     self.conflictsOmitted = conflicted.omitted
+  }
+
+  mutating func setExcludedPaths(_ paths: [String], omitted: Int) {
+    let sampled = Self.sample(paths, allowOversizedFirst: false)
+    excludedPaths = sampled.paths
+    excludedPathsOmitted = omitted + sampled.omitted
   }
 
   private static func sample(_ paths: [String], allowOversizedFirst: Bool)
@@ -187,7 +196,15 @@ extension ServiceEmbeddedDSHController {
       rootID: rootID, childID: childID, taskID: taskID,
       status: state == "completed" ? "pending" : "retained", changedFiles: [], conflicts: [])
     initial.supersededTaskIDs = lineage.isEmpty ? nil : lineage
-    try await persistWorkspaceRecordLocked(initial)
+    do {
+      try await persistWorkspaceRecordLocked(initial)
+    } catch ServiceStoreError.invalidArgument("embedded_dsh.workspace_pending_capacity") {
+      // Waiting for the queue to drain would never end the delegation. A failed record is not
+      // queued, keeps the copy, and can still be merged later with a retry.
+      initial.status = "failed"
+      initial.failureReason = Self.pendingMergeCapacityReason
+      try await persistWorkspaceRecordLocked(initial)
+    }
     return initial
   }
 
@@ -260,7 +277,9 @@ extension ServiceEmbeddedDSHController {
     -> [String: ACPJSONValue]
   {
     let id = Self.workspaceID(rootID: record.rootID, childID: record.childID)
-    guard let snapshot = try await workspaces.snapshot(id: id) else {
+    let snapshot = try await workspaces.snapshot(id: id)
+    // A merged workspace may have been reclaimed; its result stays readable without the copy.
+    if snapshot == nil, record.status != "merged" {
       throw AgentWorkspaceError.workspaceUnavailable
     }
     var result: [String: ACPJSONValue] = [
@@ -269,10 +288,13 @@ extension ServiceEmbeddedDSHController {
       "conflicts": .array(record.conflicts.map(ACPJSONValue.string)),
       "changedFilesOmitted": .integer(Int64(record.changedFilesOmitted ?? 0)),
       "conflictsOmitted": .integer(Int64(record.conflictsOmitted ?? 0)),
+      "excludedPaths": .array((record.excludedPaths ?? []).map(ACPJSONValue.string)),
+      "excludedPathsOmitted": .integer(Int64(record.excludedPathsOmitted ?? 0)),
     ]
-    if record.status != "merged" {
+    if let snapshot, record.status != "merged" {
       result["workspacePath"] = .string(snapshot.workspaceRoot.canonicalPath)
     }
+    if snapshot == nil { result["workspaceReclaimed"] = .bool(true) }
     if record.status == "conflict" {
       result["canRepairWithAgent"] = .bool(try await workspaces.canRepairConflicts(id: id))
     }
@@ -301,12 +323,18 @@ extension ServiceEmbeddedDSHController {
     guard mode == "isolated", ["completed", "failed", "interrupted"].contains(state) else {
       return .object(result)
     }
-    let record = try await ensureWorkspaceRecord(
-      rootID: rootID, childID: childID, taskID: taskID, state: state)
-    if record.status == "pending" {
-      scheduleWorkspaceMerge(rootID: rootID, childID: childID)
+    do {
+      let record = try await ensureWorkspaceRecord(
+        rootID: rootID, childID: childID, taskID: taskID, state: state)
+      if record.status == "pending" {
+        scheduleWorkspaceMerge(rootID: rootID, childID: childID)
+      }
+      result.merge(try await workspaceFields(record)) { _, new in new }
+    } catch {
+      // Reported, not repaired: nothing is deleted or re-marked, the state is only described.
+      guard let failure = Self.permanentWorkspaceFailure(error) else { throw error }
+      result.merge(failure.fields) { _, new in new }
     }
-    result.merge(try await workspaceFields(record)) { _, new in new }
     return .object(result)
   }
 

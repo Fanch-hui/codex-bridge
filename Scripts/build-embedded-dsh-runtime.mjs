@@ -67,7 +67,6 @@ try {
   ], stage);
   await patchIdentity(join(stage, 'node_modules', 'dsh-plugin-chatgpt-siwc', 'lib', 'auth', 'index.js'));
   await patchSiwc(join(stage, 'node_modules', 'dsh-plugin-chatgpt-siwc'));
-  await patchTeams(stage);
   await patchScheduleAdmission(join(stage, 'node_modules', '@deepseek-ai', 'dsh-schedule', 'lib', 'index.js'));
   await patchSessionController(join(stage, 'node_modules', '@deepseek-ai', 'dsh-api-session-controller', 'lib', 'index.js'));
   await patchSessionPersistence(join(stage, 'node_modules', '@deepseek-ai', 'dsh-session-persistence-jsonl', 'lib', 'index.js'));
@@ -132,8 +131,8 @@ try {
     await command(join(stage, nodePath), ['-e', ptyCheck], stage);
   }
   const manifest = {
-    protocolVersion: 1, dshVersion: '0.2.2-rc.1',
-    dshCommit: '66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db', node: nodePath,
+    protocolVersion: 1, dshVersion: '0.2.2-rc.3',
+    dshCommit: '38a6a5c965aa99ab525161efb7cc5cf1fe62fced', node: nodePath,
     entry: 'host/index.mjs', platform, architecture, files: [], links: []
   };
   await inventory(stage, stage, manifest);
@@ -161,24 +160,6 @@ async function patchIdentity(path) {
   const old = "url.searchParams.set('agent_name_hint', 'DSH ChatGPT SIWC');";
   if (text.split(old).length !== 2) throw new Error('SIWC identity patch does not match pinned source');
   await writeFile(path, text.replace(old, "url.searchParams.set('agent_name_hint', 'Codex Bridge');"));
-}
-async function patchTeams(stage) {
-  const modules = join(stage, 'node_modules', '@deepseek-ai');
-  const toolPath = join(modules, 'dsh-experimental-tool-agent-team', 'lib', 'index.js');
-  let tools = await readFile(toolPath, 'utf8');
-  for (const name of ['send_message', 'list_agents', 'interrupt_agent']) {
-    if (tools.split(`name: "${name}"`).length !== 2) throw new Error(`Teams tool patch does not match pinned source: ${name}`);
-    tools = tools.replaceAll(name, `team_${name}`);
-  }
-  await writeFile(toolPath, tools);
-  const profilePath = join(modules, 'dsh-experimental-agent-team-profile', 'cordis.patch.yml');
-  let profile = await readFile(profilePath, 'utf8');
-  for (const id of ['tool-subagent-control', 'tool-subagent', 'tool-subagent-fork']) {
-    const disabled = `- id: ${id}\n  disabled: true\n`;
-    if (profile.split(disabled).length !== 2) throw new Error(`Teams profile patch does not match pinned source: ${id}`);
-    profile = profile.replace(disabled, '');
-  }
-  await writeFile(profilePath, profile);
 }
 async function inventory(rootPath, dir, manifest) {
   const canonicalRoot = await realpath(rootPath);

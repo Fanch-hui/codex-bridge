@@ -24,6 +24,7 @@ import { WorkspaceRecoveryActions } from './workspace-recovery-actions.mjs';
 import { ProviderConnections } from './provider-connections.mjs';
 import { ContextPolicy, contextPolicySymbol } from './context-policy.mjs';
 import { cancelNativeSubagentInput } from './native-subagent-inputs.mjs';
+import { stopWithScopes } from './session-stop.mjs';
 
 const nativePluginWrites = new Set(['pluginManager/installBundle', 'pluginManager/setBundleEnabled',
   'pluginManager/setPluginEnabled', 'pluginManager/removeBundle', 'pluginManager/setVersionExemption']);
@@ -111,7 +112,7 @@ export class Actions {
       case 'client.stream.send': return this.client.streams.send(p);
       case 'client.stream.close': return this.client.streams.close(p);
       case 'client.stream.poll': return this.client.streams.poll(p, signal);
-      case 'status': return { ready: true, engineVersion: '0.2.2-rc.1',
+      case 'status': return { ready: true, engineVersion: '0.2.2-rc.3',
         capabilities: { durableAdmission: globalThis[Symbol.for('codex-bridge.durable-session-admission')] === true,
           boundedContentRead: typeof ctx.get('sessionPersistence')?.bridgeReadEvent === 'function', titleSearch: true } };
       case 'events': return this.events.poll(p, signal);
@@ -168,8 +169,7 @@ export class Actions {
       case 'session.cancelBinding': return this.projectBinding.cancel(p);
       case 'session.continueProject': return this.projectBinding.continue(p);
       case 'session.cancelProjectSelection': {
-        await this.sessions.stop(p.sessionId);
-        await this.scopes.cancel(p.sessionId);
+        await stopWithScopes(this.sessions, this.scopes, p.sessionId);
         return { accepted: true };
       }
       case 'session.rename': return ctx.sessionController.rename(p);
@@ -198,11 +198,7 @@ export class Actions {
         this.reconcile(p.sessionId);
         return result;
       }
-      case 'session.stop': {
-        const result = await this.sessions.stop(p.sessionId);
-        await this.scopes.cancel(p.sessionId);
-        return result;
-      }
+      case 'session.stop': return stopWithScopes(this.sessions, this.scopes, p.sessionId);
       case 'session.stopStatus': return this.sessions.stopStatus(p.sessionId);
       case 'models.list': return this.catalog.list({ refresh: p.refresh === true, priorityProvider: p.priorityProvider });
       case 'models.discover': return { models: await ctx.llm.discoverModels('llm-pi-ai', {

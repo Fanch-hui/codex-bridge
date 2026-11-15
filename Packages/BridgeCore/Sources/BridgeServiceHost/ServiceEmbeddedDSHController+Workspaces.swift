@@ -12,131 +12,119 @@ import Crypto
 import Foundation
 
 extension ServiceEmbeddedDSHController {
+  /// Settles where a subagent runs, every step inline. The staged start (`startSubagent`) is the
+  /// production route for new children; this serves continuations, which copy nothing. A new child
+  /// needs `inputGate` to be free here, because reclaiming a full store takes it.
   func prepareSubagentWorkspace(
     rootID: String, childID: String, projectID: ProjectID, providerID: String,
     installationID: String?,
     permissionMode: ServicePermissionMode, continuation: Bool
-  ) async throws -> (mode: String, synchronizedPaths: [String], repairPaths: [String]) {
-    if permissionMode == .full,
-      try await application.pendingWorkspaceMergeRecovery(projectID: projectID) != nil
-    {
+  ) async throws -> SubagentWorkspaceOutcome {
+    try await requireNoWorkspaceMergeRecovery(
+      permissionMode: permissionMode, projectID: projectID)
+    let id = Self.workspaceID(rootID: rootID, childID: childID)
+    let plan: SubagentWorkspacePlan
+    if try await store.setting(key: Self.workspaceModeKey(id)) != nil {
+      plan = .existing
+    } else {
+      plan = try await planNewSubagentWorkspace(
+        id: id, projectID: projectID, providerID: providerID, installationID: installationID,
+        permissionMode: permissionMode, continuation: continuation)
+    }
+    do {
+      return try await commitSubagentWorkspace(
+        plan, rootID: rootID, childID: childID, projectID: projectID, providerID: providerID,
+        continuation: continuation)
+    } catch {
+      await discardUnstartedWorkspace(plan)
+      throw error
+    }
+  }
+
+  func requireNoWorkspaceMergeRecovery(
+    permissionMode: ServicePermissionMode, projectID: ProjectID
+  ) async throws {
+    guard permissionMode == .full else { return }
+    if try await application.pendingWorkspaceMergeRecovery(projectID: projectID) != nil {
       throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_recovery_required")
     }
-    let id = Self.workspaceID(rootID: rootID, childID: childID)
-    let setting = try await store.setting(key: Self.workspaceModeKey(id))
-    if let setting {
-      if setting.value == "isolated" {
-        if continuation, providerID == "codex", !CodexIsolatedLaunch.supportsFileOnlyExecution {
-          try await store.setSetting(
-            ServiceSettingRecord(
-              key: Self.workspaceReasonKey(id),
-              value: "此 Codex 副本保留原变更；处理完变更后，请新建共享目录任务。", updatedAt: Date()))
-          throw AgentWorkspaceError.workspaceUnavailable
-        }
-        guard
-          providerID == "codex"
-            ? CodexIsolatedLaunch.isAvailable : WorkspaceProcessIsolation.isAvailable,
-          let snapshot = try await workspaces.snapshot(id: id)
-        else { throw AgentWorkspaceError.workspaceUnavailable }
-        let root = try await registeredProjectRoot(projectID)
-        guard snapshot.projectRoot == root else { throw AgentWorkspaceError.projectMismatch }
-        if continuation {
-          let child = try await application.embeddedDSHSubagent(
-            parentSessionID: rootID, childID: childID)
-          guard let record = try await workspaceRecord(id: id),
-            record.taskID == child?.currentTaskID?.rawValue,
-            child?.currentStatus?.isTerminal == true,
-            !["pending", "failed", "validation_required", "recovery_required"]
-              .contains(record.status)
-          else { throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_pending") }
-          if record.status != "merged",
-            record.status == "conflict"
-              || !(record.supersededTaskIDs?.isEmpty ?? true)
-          {
-            guard (record.supersededTaskIDs?.count ?? 0) < 128 else {
-              throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_lineage_capacity")
-            }
-          }
-          if record.status == "conflict" {
-            let paths = try await workspaces.prepareConflictRepair(id: id)
-            guard !paths.isEmpty else {
-              throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_conflict_missing")
-            }
-            return (setting.value, [], Self.workspaceSynchronizationSummary(paths))
-          }
-          if record.status == "merged" {
-            let paths = try await workspaces.synchronize(id: id)
-            return (setting.value, Self.workspaceSynchronizationSummary(paths), [])
-          }
-        }
-      }
-      guard ["isolated", "shared"].contains(setting.value) else {
+  }
+
+  /// A child that already has a stored mode keeps it; an isolated one must still be usable.
+  func existingSubagentWorkspace(
+    mode: String, rootID: String, childID: String, projectID: ProjectID, providerID: String,
+    continuation: Bool
+  ) async throws -> SubagentWorkspaceOutcome {
+    guard mode == "isolated" else {
+      guard mode == "shared" else {
         throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_mode")
       }
-      return (setting.value, [], [])
+      return SubagentWorkspaceOutcome(mode: mode)
     }
-    // A pre-existing native session is bound to the original project directory.
-    var mode = "shared"
-    var reason: String?
-    if continuation {
-      reason = "此会话沿用原来的项目目录。"
-    } else if providerID == "codex", !CodexIsolatedLaunch.supportsFileOnlyExecution {
-      reason = "当前 Codex 文件操作依赖命令进程，使用共享目录串行执行。"
-    } else if permissionMode == .full,
-      !(providerID == "codex"
-        ? CodexIsolatedLaunch.isAvailable : WorkspaceProcessIsolation.isAvailable)
+    let id = Self.workspaceID(rootID: rootID, childID: childID)
+    try await requireUsableIsolatedWorkspace(
+      id: id, projectID: projectID, providerID: providerID, continuation: continuation)
+    if continuation,
+      let refreshed = try await refreshedIsolatedWorkspace(id: id, rootID: rootID, childID: childID)
     {
-      reason = "当前平台的隔离检查未通过。"
+      return refreshed
     }
-    if !continuation, permissionMode == .full,
-      providerID != "codex" || CodexIsolatedLaunch.supportsFileOnlyExecution,
-      providerID == "codex"
-        ? CodexIsolatedLaunch.isAvailable : WorkspaceProcessIsolation.isAvailable
+    return SubagentWorkspaceOutcome(mode: mode)
+  }
+
+  private func requireUsableIsolatedWorkspace(
+    id: String, projectID: ProjectID, providerID: String, continuation: Bool
+  ) async throws {
+    if continuation, providerID == "codex", !CodexIsolatedLaunch.supportsFileOnlyExecution {
+      try await store.setSetting(
+        ServiceSettingRecord(
+          key: Self.workspaceReasonKey(id),
+          value: "此 Codex 副本保留原变更；处理完变更后，请新建共享目录任务。", updatedAt: Date()))
+      throw AgentWorkspaceError.workspaceUnavailable
+    }
+    let isCodex = providerID == "codex"
+    guard isCodex ? CodexIsolatedLaunch.isAvailable : WorkspaceProcessIsolation.isAvailable else {
+      throw AgentWorkspaceError.workspaceUnavailable
+    }
+    guard let snapshot = try await workspaces.snapshot(id: id) else {
+      // Merged copies are reclaimed when the managed limit is reached; the work itself is merged.
+      throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_reclaimed")
+    }
+    let root = try await registeredProjectRoot(projectID)
+    guard snapshot.projectRoot == root else { throw AgentWorkspaceError.projectMismatch }
+  }
+
+  /// Continuing an isolated child first brings its copy up to date with the project, or marks the
+  /// conflicts it has to repair. Nil means the copy is used as it is.
+  private func refreshedIsolatedWorkspace(id: String, rootID: String, childID: String)
+    async throws -> SubagentWorkspaceOutcome?
+  {
+    let child = try await application.embeddedDSHSubagent(
+      parentSessionID: rootID, childID: childID)
+    guard let record = try await workspaceRecord(id: id),
+      record.taskID == child?.currentTaskID?.rawValue,
+      child?.currentStatus?.isTerminal == true,
+      !["pending", "failed", "validation_required", "recovery_required"].contains(record.status)
+    else { throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_pending") }
+    if record.status != "merged",
+      record.status == "conflict" || !(record.supersededTaskIDs?.isEmpty ?? true)
     {
-      let root = try await registeredProjectRoot(projectID)
-      do {
-        let snapshot = try await workspaces.prepare(id: id, projectRoot: root)
-        let readiness: (ready: Bool, reason: String?)
-        if providerID == "codex" {
-          readiness = try await isolatedWorkspaceIsReady(snapshot)
-        } else if let installationID {
-          let result = try await externalWorkspaceIsReady(
-            providerID: providerID, installationID: installationID, snapshot: snapshot)
-          readiness = (result.ready, result.reason)
-        } else {
-          readiness = (false, "此 Agent 尚未提供可验证的进程隔离。")
-        }
-        if readiness.ready {
-          try await workspaces.markStarted(id: id)
-          mode = "isolated"
-          reason = readiness.reason
-        } else {
-          _ = try await workspaces.discardPrepared(id: id)
-          reason = readiness.reason
-        }
-      } catch let error as AgentWorkspaceError {
-        switch error {
-        case .unsupportedEntry:
-          mode = "shared"
-          reason = "项目包含暂不支持隔离的文件。"
-        case .resourceLimit:
-          mode = "shared"
-          reason = "项目超出独立副本的资源限额。"
-        case .gitUnavailable:
-          mode = "shared"
-          reason = "项目的独立 Git 副本暂不可用。"
-        default: throw error
-        }
+      guard (record.supersededTaskIDs?.count ?? 0) < 128 else {
+        throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_lineage_capacity")
       }
     }
-    let modeKey = Self.workspaceModeKey(id)
-    let reasonKey = Self.workspaceReasonKey(id)
-    let savedMode = mode
-    let savedReason = reason ?? ""
-    try await store.updateSettingsAtomically(keys: [modeKey, reasonKey], updatedAt: Date()) { _ in
-      [modeKey: savedMode, reasonKey: savedReason]
+    if record.status == "conflict" {
+      let paths = try await workspaces.prepareConflictRepair(id: id)
+      guard !paths.isEmpty else {
+        throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_conflict_missing")
+      }
+      return SubagentWorkspaceOutcome(
+        mode: "isolated", repairPaths: Self.workspaceSynchronizationSummary(paths))
     }
-    return (mode, [], [])
+    guard record.status == "merged" else { return nil }
+    let paths = try await workspaces.synchronize(id: id)
+    return SubagentWorkspaceOutcome(
+      mode: "isolated", synchronizedPaths: Self.workspaceSynchronizationSummary(paths))
   }
 
   private static func workspaceSynchronizationSummary(_ paths: [String]) -> [String] {
@@ -150,7 +138,7 @@ extension ServiceEmbeddedDSHController {
     return result
   }
 
-  private func registeredProjectRoot(_ projectID: ProjectID) async throws -> RegisteredRoot {
+  func registeredProjectRoot(_ projectID: ProjectID) async throws -> RegisteredRoot {
     let project = try await registeredProject(projectID.rawValue)
     let root = try RegisteredRoot(
       capturing: URL(fileURLWithPath: project.root.canonicalPath, isDirectory: true))

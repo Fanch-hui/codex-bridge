@@ -11,9 +11,15 @@ public actor AgentWorkspaceStore {
     maximumBytes: AgentWorkspaceInventory.maximumFileBytes)
   var activeIDs: Set<String> = []
   var managementRoot: RegisteredRoot?
+  /// Test seam: runs inside a copy after the files are written and before they are verified.
+  var copyCheckpoint: (@Sendable () async throws -> Void)?
 
   public init(directory: URL) {
     self.directory = directory.standardizedFileURL.resolvingSymlinksInPath()
+  }
+
+  func setCopyCheckpoint(_ checkpoint: (@Sendable () async throws -> Void)?) {
+    copyCheckpoint = checkpoint
   }
 
   public func prepare(
@@ -54,9 +60,9 @@ public actor AgentWorkspaceStore {
       let baseline = try RegisteredRoot(capturing: baselineURL)
       let workspace = try RegisteredRoot(capturing: workspaceURL)
       let runtime = try RegisteredRoot(capturing: runtimeURL)
-      let modes = try copySnapshot(
-        projectRoot: projectRoot, baseline: baseline, workspace: workspace,
-        forbiddenPatterns: forbiddenPatterns)
+      let modes = try await Self.copySnapshot(
+        writer: writer, projectRoot: projectRoot, baseline: baseline, workspace: workspace,
+        forbiddenPatterns: forbiddenPatterns, checkpoint: copyCheckpoint)
       let sourceGit = URL(fileURLWithPath: projectRoot.canonicalPath, isDirectory: true)
         .appendingPathComponent(".git")
       let hasGit = FileManager.default.fileExists(atPath: sourceGit.path)
@@ -180,10 +186,15 @@ public actor AgentWorkspaceStore {
     return root
   }
 
-  private func copySnapshot(
-    projectRoot: RegisteredRoot, baseline: RegisteredRoot, workspace: RegisteredRoot,
-    forbiddenPatterns: [ForbiddenPathPattern]
-  ) throws -> [String: Int] {
+  /// Runs off the store's executor. Copying a large project takes seconds, and every other
+  /// operation of the store (snapshots, activation, merges) would queue behind it. The `activeIDs`
+  /// entry of the caller keeps the same workspace id exclusive meanwhile.
+  @concurrent
+  private static func copySnapshot(
+    writer: SecureProjectFileWriter, projectRoot: RegisteredRoot, baseline: RegisteredRoot,
+    workspace: RegisteredRoot, forbiddenPatterns: [ForbiddenPathPattern],
+    checkpoint: (@Sendable () async throws -> Void)?
+  ) async throws -> [String: Int] {
     let policy = ProjectFilePolicy(forbiddenPatterns: forbiddenPatterns)
     let inventory = AgentWorkspaceInventory(root: projectRoot, policy: policy)
     let paths = try inventory.paths()
@@ -210,6 +221,7 @@ public actor AgentWorkspaceStore {
       modes[value] = mode
       revisions[value] = .digest(of: data)
     }
+    try await checkpoint?()
     guard try inventory.paths() == paths else { throw AgentWorkspaceError.revisionConflict("") }
     for value in paths {
       let path = try SecureRelativePath(value)

@@ -10,6 +10,13 @@ private enum ValidatedWorkspaceOutcome: Equatable {
   case completed, stale, busy
 }
 
+enum WorkspaceCandidateOutcome {
+  /// No validation command is configured, so the merge goes straight to the guarded write-back.
+  case notRequired
+  case validated(AgentWorkspaceMergeCandidate)
+  case failed
+}
+
 extension ServiceEmbeddedDSHController {
   func discardRecordedCandidate(_ record: inout WorkbenchWorkspaceRecord, workspaceID: String)
     async throws
@@ -55,6 +62,7 @@ extension ServiceEmbeddedDSHController {
       do {
         let plan = try await workspaces.planMerge(id: id)
         record.setPaths(changedFiles: plan.changedPaths, conflicts: plan.conflicts)
+        record.setExcludedPaths(plan.excludedPaths, omitted: plan.excludedPathsOmitted)
         if !plan.conflicts.isEmpty {
           record.status = "conflict"
           try await persistWorkspaceRecord(record)
@@ -64,37 +72,24 @@ extension ServiceEmbeddedDSHController {
           record.status = "merged"
           record.failureReason = nil
           try await persistWorkspaceRecord(record)
+          await discardResolvedConflictArchives(workspaceID: id)
           return
         }
         let configuration = try await workspaceValidationConfiguration(projectID: child.projectID)
-        let candidateID = UUID().uuidString.lowercased()
-        record.candidateID = candidateID
-        record.candidatePath = nil
-        try await persistWorkspaceRecord(record)
-        let candidate = try await workspaces.prepareMergeCandidate(
-          plan: plan, candidateID: candidateID)
-        record.candidatePath = candidate.root.canonicalPath
-        try await persistWorkspaceRecord(record)
-        guard !configuration.commands.isEmpty else {
-          record.status = "validation_required"
-          record.failureReason = "配置验证命令后即可继续合并。"
-          try await persistWorkspaceRecord(record)
-          return
-        }
-        do {
-          try await validateWorkspaceCandidate(
-            candidate, projectID: child.projectID, configuration: configuration, scope: scope)
-        } catch {
-          record.status = "validation_required"
-          record.failureReason = workspaceMergeFailureReason(error)
-          try await persistWorkspaceRecord(record)
-          return
+        let candidate: AgentWorkspaceMergeCandidate?
+        switch try await validatedWorkspaceCandidate(
+          &record, child: child, plan: plan, configuration: configuration, scope: scope)
+        {
+        case .notRequired: candidate = nil
+        case .validated(let verified): candidate = verified
+        case .failed: return
         }
         let outcome = try await applyValidatedWorkspaceCandidate(
           &record, child: child, plan: plan, candidate: candidate, configuration: configuration)
         if outcome == .completed {
           if record.status == "merged" {
             try await discardRecordedCandidate(&record, workspaceID: id)
+            await discardResolvedConflictArchives(workspaceID: id)
           }
           return
         }
@@ -109,9 +104,37 @@ extension ServiceEmbeddedDSHController {
     try await persistWorkspaceRecord(record)
   }
 
+  /// Builds the candidate copy and runs the configured checks on it. A failed check keeps the
+  /// candidate and marks the record `validation_required`.
+  func validatedWorkspaceCandidate(
+    _ record: inout WorkbenchWorkspaceRecord, child: EmbeddedDSHSubagentBinding,
+    plan: AgentWorkspaceMergePlan, configuration: WorkbenchValidationConfiguration,
+    scope: ManagedProcessOwnershipScope
+  ) async throws -> WorkspaceCandidateOutcome {
+    guard !configuration.commands.isEmpty else { return .notRequired }
+    let candidateID = UUID().uuidString.lowercased()
+    record.candidateID = candidateID
+    record.candidatePath = nil
+    try await persistWorkspaceRecord(record)
+    let candidate = try await workspaces.prepareMergeCandidate(
+      plan: plan, candidateID: candidateID)
+    record.candidatePath = candidate.root.canonicalPath
+    try await persistWorkspaceRecord(record)
+    do {
+      try await validateWorkspaceCandidate(
+        candidate, projectID: child.projectID, configuration: configuration, scope: scope)
+    } catch {
+      record.status = "validation_required"
+      record.failureReason = workspaceMergeFailureReason(error)
+      try await persistWorkspaceRecord(record)
+      return .failed
+    }
+    return .validated(candidate)
+  }
+
   private func applyValidatedWorkspaceCandidate(
     _ record: inout WorkbenchWorkspaceRecord, child: EmbeddedDSHSubagentBinding,
-    plan: AgentWorkspaceMergePlan, candidate: AgentWorkspaceMergeCandidate,
+    plan: AgentWorkspaceMergePlan, candidate: AgentWorkspaceMergeCandidate?,
     configuration: WorkbenchValidationConfiguration
   ) async throws -> ValidatedWorkspaceOutcome {
     let owner = "merge:" + plan.id + ":" + UUID().uuidString
@@ -147,14 +170,20 @@ extension ServiceEmbeddedDSHController {
 
   private func commitValidatedWorkspaceCandidate(
     _ record: inout WorkbenchWorkspaceRecord, child: EmbeddedDSHSubagentBinding,
-    plan: AgentWorkspaceMergePlan, candidate: AgentWorkspaceMergeCandidate
+    plan: AgentWorkspaceMergePlan, candidate: AgentWorkspaceMergeCandidate?
   ) async throws -> ValidatedWorkspaceOutcome {
     var marker = ServiceWorkspaceMergeRecovery(
       projectID: child.projectID, workspaceID: plan.id, rootID: record.rootID,
       childID: record.childID, taskID: record.taskID)
     try await store.setWorkspaceMergeRecovery(marker)
     do {
-      let applied = try await workspaces.applyMerge(plan: plan, verifiedCandidate: candidate)
+      // Both variants re-check every path against the plan's versions and journal before writing.
+      let applied =
+        if let candidate {
+          try await workspaces.applyMerge(plan: plan, verifiedCandidate: candidate)
+        } else {
+          try await workspaces.applyMerge(plan: plan)
+        }
       record.status = "merged"
       record.failureReason = nil
       record.setPaths(changedFiles: applied.changedPaths, conflicts: [])

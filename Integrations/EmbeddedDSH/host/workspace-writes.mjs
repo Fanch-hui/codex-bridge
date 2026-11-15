@@ -12,9 +12,9 @@ const nonWritingTools = new Set([
   'todo_write', 'job_output', 'job_list', 'job_kill', 'terminal_read', 'terminal_list', 'subagent', 'subagent_fork',
   'send_message', 'interrupt_agent', 'list_agents', 'list_subagent_models',
   'bridge_agents', 'bridge_agent_models', 'bridge_delegate', 'bridge_send_agent',
-  'bridge_stop_agent', 'bridge_agent_changes', 'spawn_teammate', 'team_send_message',
+  'bridge_stop_agent', 'bridge_agent_changes',
   'delegate_agent', 'list_child_agents', 'send_agent_message', 'stop_child_agent',
-  'team_list_agents', 'team_interrupt_agent', 'wait_agent', 'team_task_create',
+  'wait_agent', 'team_task_create',
   'team_task_list', 'team_task_get', 'team_task_update'
 ]);
 
@@ -402,9 +402,16 @@ export class WorkspaceWrites {
     if (exec.name === 'wait_agent' && exec.rootCallId && exec.rootCallId !== exec.callId) {
       const rootID = await this.sessions.rootID(exec.agent.id);
       const holder = this.holder(rootID, `tool:${exec.agent.id}:${exec.rootCallId}`);
-      const peers = holder?.refs > 0 ? this.ctx.agentTeams?.listMembers(exec.agent) : undefined;
-      if (peers?.some(peer => peer.id !== exec.agent.id && ['running', 'provisioning'].includes(peer.status))) {
-        throw new Error('Finish the current code step before waiting for another agent using this workspace.');
+      if (holder?.refs > 0) {
+        const peers = await this.ctx.subagents.listDescendants(rootID, exec.signal);
+        const active = id => {
+          const agent = this.ctx.agents.get(id);
+          return agent?.status === 'running' || agent?.inbox?.hasPending === true;
+        };
+        const otherActive = (rootID !== exec.agent.id && active(rootID)) ||
+          peers.some(peer => peer.id !== exec.agent.id && (peer.kind === 'diagnostic' || active(peer.id))) ||
+          this.sessions.bridgeAgents?.hasRunning(rootID);
+        if (otherActive) throw new Error('Finish the current code step before waiting for another agent using this workspace.');
       }
     }
     if (nonWritingTools.has(exec.name)) return next();

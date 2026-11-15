@@ -47,25 +47,44 @@ extension ServiceEmbeddedDSHController {
     let enriched = try await enrichWorkspaceState(
       .object(result), rootID: rootID, childID: binding.childID,
       taskID: task.taskID, state: task.status)
-    var final = enriched.objectValue ?? [:]
+    return .object(
+      Self.applyingWorkspaceLimits(
+        enriched.objectValue ?? [:], providerID: binding.providerID,
+        canSteer: canSteer, canContinue: canContinue))
+  }
+
+  /// What a child may still do once its workspace state is known: a continuation needs a copy
+  /// it can run in, so an unmerged, unavailable or reclaimed isolated workspace ends it.
+  static func applyingWorkspaceLimits(
+    _ snapshot: [String: ACPJSONValue], providerID: String, canSteer: Bool, canContinue: Bool
+  ) -> [String: ACPJSONValue] {
+    var final = snapshot
+    let isolated = final["workspaceMode"]?.stringValue == "isolated"
     let canRepair = canContinue && final["canRepairWithAgent"]?.boolValue == true
     var capabilities = final["capabilities"]?.objectValue ?? [:]
     capabilities["canRepairWithAgent"] = .bool(canRepair)
-    if final["workspaceMode"]?.stringValue == "isolated", canContinue,
+    if isolated, canContinue,
       !["merged", "retained"].contains(final["workspaceStatus"]?.stringValue ?? ""), !canRepair
     {
       capabilities["canContinue"] = .bool(false)
       capabilities["canSend"] = .bool(canSteer)
     }
-    if final["workspaceMode"]?.stringValue == "isolated",
-      binding.providerID == serviceCodexProviderID, !CodexIsolatedLaunch.supportsFileOnlyExecution
+    if isolated, providerID == serviceCodexProviderID,
+      !CodexIsolatedLaunch.supportsFileOnlyExecution
     {
       capabilities["canContinue"] = .bool(false)
       capabilities["canRepairWithAgent"] = .bool(false)
       capabilities["canSend"] = .bool(canSteer)
     }
+    if isolated, canContinue, final["workspaceReclaimed"]?.boolValue == true {
+      // Its work is merged, but the copy is gone: a continuation could only fail.
+      capabilities["canContinue"] = .bool(false)
+      capabilities["canRepairWithAgent"] = .bool(false)
+      capabilities["canSend"] = .bool(canSteer)
+      capabilities["continueUnavailableReason"] = .string(Self.reclaimedWorkspaceReason)
+    }
     final["capabilities"] = .object(capabilities)
-    return .object(final)
+    return final
   }
 
   private func subagentMessages(

@@ -80,7 +80,8 @@ export class AgentInputs {
       ...(expectedRunID && previous.runID === expectedRunID ? { previousRunID: expectedRunID } : {}),
       ...(terminal.has(previous.state) ? { requestedAfterTerminal: true } : {}),
       ...(repairConflict ? { repairConflict: true } : {}),
-      ...(attachmentPaths.length ? { attachmentPaths } : {}) };
+      ...(attachmentPaths.length ? { attachmentPaths } : {}),
+      ...(binding.access ? { access: binding.access } : {}) };
     const active = bridge.starting.get(childID)?.binding ?? [...bridge.bindings].reverse().find(row =>
       row.childID === childID && row.inputKind !== 'steer' && row.admission === 'accepted' && !terminal.has(row.state));
     let snapshot;

@@ -329,7 +329,7 @@ extension ServiceEmbeddedDSHController {
       EmbeddedDSHEvent(type: "operations.changed", payload: .object(["operationID": .string(id)])))
   }
 
-  private func operationError(_ error: any Error) -> ACPJSONValue {
+  func operationError(_ error: any Error) -> ACPJSONValue {
     let failure = BridgeServiceRequestController.map(error)
     return .object(["code": .string(failure.code), "message": .string(failure.message)])
   }

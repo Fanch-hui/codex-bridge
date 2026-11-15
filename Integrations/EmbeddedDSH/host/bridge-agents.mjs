@@ -2,34 +2,27 @@ import { createHash } from 'node:crypto';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm';
 import { registerBridgeTools, registerCollaborationTools } from './agent-collaboration-tools.mjs';
 import { AgentInputs } from './agent-inputs.mjs';
 import { AgentDependencyError, dependenciesFor, handoffPrompt, waitForDependencies, waitForPreviousRound } from './agent-handoff.mjs';
 import { ExternalWorkspaceAdmission } from './workspace-external-admission.mjs';
+import { Backoff } from './backoff.mjs';
+import { retireBindings } from './agent-retention.mjs';
+import { settleStops, stopFailure } from './agent-stop.mjs';
+import { workspaceNotice } from './workspace-notice.mjs';
+import { SkippedResults } from './agent-results.mjs';
 
 const deliveryID = result => `bridge-${createHash('sha256').update(JSON.stringify([result.rootSessionID, result.childID, result.requestID, result.taskID])).digest('hex')}`;
 const terminal = new Set(['completed', 'failed', 'interrupted', 'cancelled']);
-function workspaceNotice(result) {
-  if (result.workspaceMode !== 'isolated') return '';
-  const status = result.workspaceStatus ?? 'pending';
-  const guidance = {
-    pending: 'Changes are waiting to be merged into the project.',
-    merged: 'Changes have been merged into the project.',
-    conflict: 'Changes have conflicts and remain in the isolated workspace; use bridge_agent_changes to inspect them.',
-    retained: 'Changes remain in the isolated workspace and have not been merged.',
-    failed: 'The merge failed; changes remain in the isolated workspace.',
-    validation_required: 'Changes await successful project validation. Use the workbench recovery area to configure checks or retry validation.',
-    recovery_required: 'A partial merge needs recovery. Project writes are paused; use the workbench recovery area to finish or roll back the merge.'
-  }[status] ?? `Workspace status: ${status}.`;
-  const detail = { workspaceStatus: status,
-    ...(result.workspacePath ? { workspacePath: result.workspacePath } : {}),
-    ...(result.changedFiles ? { changedFiles: result.changedFiles } : {}),
-    ...(result.conflicts ? { conflicts: result.conflicts } : {}),
-    ...(result.failureReason ? { failureReason: result.failureReason } : {}),
-    ...(result.changedFilesOmitted === undefined ? {} : { changedFilesOmitted: result.changedFilesOmitted }),
-    ...(result.conflictsOmitted === undefined ? {} : { conflictsOmitted: result.conflictsOmitted }) };
-  return `${guidance}\n${JSON.stringify(detail)}`;
+// Binding fields refreshed from Bridge snapshots; only a change in one of them is worth rewriting the file.
+const snapshotFields = ['state', 'runID', 'capabilities', 'workspaceMode', 'workspaceReason', 'workspaceStatus',
+  'canRepairWithAgent', 'changedFiles', 'conflicts', 'failureReason', 'waitingForApproval'];
+const pollInterval = 1000;
+const pollBackoff = { initialMs: pollInterval, maxMs: 15000 };
+function logPollFailure(label, backoff, pause, error) {
+  if (backoff.shouldReport) process.stderr.write(`DSH subagent ${label} unavailable (attempt ${backoff.attempts}, retrying in ${pause} ms): ${error.message}\n`);
 }
 function stableID(...parts) {
   const bytes = createHash('sha256').update(JSON.stringify(parts)).digest().subarray(0, 16);
@@ -53,6 +46,7 @@ export class BridgeAgents {
     this.starting = new Map();
     this.inputs = new AgentInputs(this);
     this.handoffs = new Map();
+    this.skippedResults = new SkippedResults();
     this.admission = new ExternalWorkspaceAdmission(ctx, rpc, sessions, writes, () => this.persist());
   }
   async start() {
@@ -121,7 +115,8 @@ export class BridgeAgents {
     const call = { rootSessionID, childID, installationID, requestID,
       ...(request.agentOptions?.model ? { model: request.agentOptions.model } : {}),
       ...(request.agentOptions?.reasoningEffort ? { effort: request.agentOptions.reasoningEffort } : {}),
-      ...(handoff.attachmentPaths?.length ? { attachmentPaths: handoff.attachmentPaths } : {}) };
+      ...(handoff.attachmentPaths?.length ? { attachmentPaths: handoff.attachmentPaths } : {}),
+      ...(handoff.access ? { access: handoff.access } : {}) };
     const requestHash = createHash('sha256').update(JSON.stringify({ call, prompt, dependencies: handoff.dependencies ?? [] })).digest('hex');
     let binding = this.bindings.find(item => item.childID === childID && item.requestID === requestID);
     if (!binding) {
@@ -183,54 +178,66 @@ export class BridgeAgents {
     const observation = new AbortController();
     void this.observeProgress(binding, observation.signal).catch(error =>
       process.stderr.write(`DSH subagent progress failed: ${error.message}\n`));
+    const backoff = new Backoff(pollBackoff);
     try {
       for (;;) {
         const started = Date.now();
         let result;
         try { result = await this.rpc.request('bridge/subagent', { operation: 'wait', ...binding }); }
         catch (error) {
-          process.stderr.write(`DSH subagent wait unavailable: ${error.message}\n`);
-          await delay(1000);
+          const pause = backoff.next();
+          logPollFailure('wait', backoff, pause, error);
+          await delay(pause);
           continue;
         }
+        backoff.reset();
         if (result.taskID !== binding.taskID || (result.requestID && result.requestID !== binding.requestID)) {
           throw new Error('Bridge returned a result for another subagent request');
         }
-        this.rememberSnapshot(binding, result);
-        await this.persist();
+        if (this.rememberSnapshot(binding, result)) await this.persist();
         if (result.terminal === true && result.state !== 'unknown') return result;
-        const pause = Math.max(0, 1000 - (Date.now() - started));
+        const pause = Math.max(0, pollInterval - (Date.now() - started));
         if (pause) await delay(pause);
       }
     } finally { observation.abort(); }
   }
   async observeProgress(binding, signal) {
+    const backoff = new Backoff(pollBackoff);
+    let pause = pollInterval;
     try {
       while (!signal.aborted) {
-        await delay(1000, undefined, { signal });
+        await delay(pause, undefined, { signal });
         let snapshot;
         try { snapshot = await this.rpc.request('bridge/subagent', { operation: 'get', ...binding }); }
         catch (error) {
-          if (!signal.aborted) process.stderr.write(`DSH subagent progress unavailable: ${error.message}\n`);
+          pause = backoff.next();
+          if (!signal.aborted) logPollFailure('progress', backoff, pause, error);
           continue;
         }
+        backoff.reset();
+        pause = pollInterval;
         if (signal.aborted) return;
         if (snapshot.taskID !== binding.taskID || (snapshot.requestID && snapshot.requestID !== binding.requestID)) {
           throw new Error('Bridge returned progress for another subagent request');
         }
-        this.rememberSnapshot(binding, snapshot);
-        await this.persist();
+        if (this.rememberSnapshot(binding, snapshot)) await this.persist();
       }
     } catch (error) { if (!signal.aborted) throw error; }
   }
+  /** Applies a Bridge snapshot to the binding; returns whether a persisted field changed. */
   rememberSnapshot(binding, result) {
-    const fields = ['state', 'runID', 'capabilities', 'workspaceMode', 'workspaceReason', 'workspaceStatus', 'canRepairWithAgent',
-      'changedFiles', 'conflicts', 'failureReason', 'waitingForApproval'];
-    for (const key of fields) if (result[key] !== undefined) binding[key] = result[key];
+    let changed = false;
+    for (const key of snapshotFields) {
+      if (result[key] === undefined || isDeepStrictEqual(binding[key], result[key])) continue;
+      binding[key] = result[key];
+      changed = true;
+    }
+    // Updates are always announced: the page refreshes the subagent list from them even when nothing persisted changed.
     const active = this.starting.get(binding.childID)?.binding;
     if (!active || active === binding) this.events.emit(binding.parentSessionID, 'subagent.updated', { ...result,
       rootSessionID: binding.rootSessionID, parentSessionId: binding.parentSessionID,
       childID: binding.childID, requestID: binding.requestID });
+    return changed;
   }
   async delegate(args, exec) {
     if (!exec.agent) throw new Error('Delegation requires an agent');
@@ -239,16 +246,17 @@ export class BridgeAgents {
     const parent = exec.agent;
     const rootSessionID = this.rootOf(parent);
     const key = `${rootSessionID}:${parent.session.id}:${exec.callId}`;
+    if (args.access !== undefined && args.access !== 'read-only') throw new Error('access must be "read-only" when given');
     this.handoffs.set(key, { dependencies: dependenciesFor(this.bindings, rootSessionID, args.dependsOn),
-      attachmentPaths: args.attachmentPaths });
+      attachmentPaths: args.attachmentPaths, access: args.access });
     let activation;
     try {
       activation = await this.ctx.subagents.startActivation({
         provider: this.provider(args.installationID), label: args.description,
-        request: { parent, prompt: [{ type: 'text', text: handoffPrompt(args) }], agentOptions: {
+        parent, prompt: [{ type: 'text', text: handoffPrompt(args) }], agentOptions: {
           provider: exec.callId,
           ...(args.model ? { model: args.model } : {}), ...(args.effort ? { reasoningEffort: args.effort } : {})
-        } }, signal: exec.signal, delivery: 'parent'
+        }, signal: exec.signal, delivery: 'parent'
       });
     } finally { this.handoffs.delete(key); }
     const binding = this.bindings.find(item => item.childID === activation.childId);
@@ -340,7 +348,8 @@ export class BridgeAgents {
         }
       }
       if (this.sessions.stopGate.isStopped(rootSessionID)) return;
-      const { results } = await this.rpc.request('bridge/subagent', { operation: 'results', rootSessionID });
+      const { results, skipped } = await this.rpc.request('bridge/subagent', { operation: 'results', rootSessionID });
+      this.skippedResults.report(rootSessionID, skipped);
       for (const result of results) {
         if (result.state === 'unknown') continue;
         const binding = this.bindings.find(item => item.childID === result.childID && item.requestID === result.requestID && (!item.taskID || item.taskID === result.taskID));
@@ -354,7 +363,13 @@ export class BridgeAgents {
         }
         this.resumeNext(binding.childID);
       }
+      await this.retire(rootSessionID);
     } finally { this.reconciling.delete(rootSessionID); }
+  }
+  async retire(rootSessionID) {
+    const busy = row => this.starting.has(row.childID) || this.running.has(row.childID) ||
+      this.inputs.isSending(row.childID, row.requestID);
+    if (retireBindings(this.bindings, rootSessionID, { isBusy: busy })) await this.persist();
   }
   resumeQueued(binding) {
     if (this.starting.has(binding.childID) || this.running.has(binding.childID)) return;
@@ -452,16 +467,18 @@ export class BridgeAgents {
     catch (error) { if (starting?.stopRequest === request) starting.stopRequest = undefined; throw error; }
   }
   async stopRoot(rootID) {
+    const failures = [];
     const starts = [...this.starting.values()].filter(entry => entry.binding.rootSessionID === rootID);
-    await this.cancelQueued(binding => binding.rootSessionID === rootID && !starts.some(entry => entry.binding === binding));
+    try { await this.cancelQueued(binding => binding.rootSessionID === rootID && !starts.some(entry => entry.binding === binding)); }
+    catch (error) { failures.push({ error }); }
     for (const entry of starts) entry.controller.abort();
-    for (const entry of starts) {
-      if (entry.binding.taskID) await this.requestStop(entry.binding);
-    }
+    const stop = binding => this.requestStop(binding);
+    failures.push(...await settleStops(starts.filter(entry => entry.binding.taskID).map(entry => entry.binding), stop));
     const recovered = this.bindings.filter(binding => binding.rootSessionID === rootID && binding.inputKind !== 'steer' &&
       !starts.some(entry => entry.binding === binding) && !terminal.has(binding.state) &&
       ['accepted', 'dispatching', 'unknown'].includes(binding.admission));
-    for (const binding of recovered) await this.requestStop(binding);
+    failures.push(...await settleStops(recovered, stop));
+    if (failures.length) throw stopFailure(failures);
   }
   async cancelQueued(matches) {
     let changed = false;

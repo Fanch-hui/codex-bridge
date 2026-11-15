@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const sourceHash = '69efef5f84dddf947032bc1425067878fa610416c8885acde2ded9b01230c9b7';
-const queryHash = '76ce2944e561c12f48b5e240d68cafe54ce6d667b1d20722e6939ed834489939';
+const queryHash = 'cd479b998f66e04639ec3e626fca706ce4f8aad40b75e983e549043ae9d0185b';
 
 export function patchSessionPersistenceSource(source) {
   if (createHash('sha256').update(source).digest('hex') !== sourceHash) {

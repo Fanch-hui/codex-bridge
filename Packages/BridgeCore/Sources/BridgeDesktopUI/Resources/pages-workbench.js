@@ -173,7 +173,11 @@
     var draftPage = newTaskOpen() ? Object.assign({}, page, { selectedTask: null, draftTitle: "新建任务" }) : page;
     if (!development) global.CodexBridgeDesktopWorkbenchHeader.render(draftPage, emit);
     global.CodexBridgeDesktopWorkbenchApprovals.render(page, emit);
-    if (split) { updateFooter(development, true); return; }
+    if (split) {
+      global.CodexBridgeDesktopWorkbenchControls.receive(page, emit, panes.composerFor);
+      updateFooter(development, true);
+      return;
+    }
     renderContent(page, emit, development);
     if (!development) {
       global.CodexBridgeDesktopWorkbenchControls.render(draftPage, emit);

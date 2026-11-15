@@ -317,6 +317,7 @@ public actor ServiceComposition {
     await coordinator.setToolWriteGateProvider(embeddedDSH)
     try await embeddedDSH.restoreWorkspaceMergeRecoveryMarkers()
     await embeddedDSH.startNativeWriteRecovery()
+    await embeddedDSH.startExecutionRecovery()
     try await coordinator.recoverClaudeProcesses()
     await application.startTaskQueueProcessor()
     let resolvedTunnelFactory =

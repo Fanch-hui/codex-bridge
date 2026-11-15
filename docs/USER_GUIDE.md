@@ -185,14 +185,18 @@ OpenAI Runtime Key 用于 Tunnel；DSH ACP 的默认 DeepSeek API 连接另行�
 
 ### 8.1 连接 Gemini 本地 MCP
 
-本地 MCP 适用于明确提供本地 stdio 启动命令入口的同机客户端。客户端仅提供服务器 URL 输入框时，请使用下一节的云 MCP。
+本地 MCP 适用于提供本地程序启动命令入口的同机客户端。Gemini 桌面 App 的自定义关联应用中，「命令」栏就是该入口。
+
+macOS 本地连接器通过 Unix socket 获取当前服务配置，两端核对系统提供的进程身份、安装路径与代码签名，再通过本机回环 HTTP 转发 MCP。凭据保留在系统 SecretStore，不写入启动命令或配置文件。请允许 MCP 子进程访问本机网络与相关文件；更新 App 后重启后台服务，再在 Gemini 中重新连接。
+
+需要验证客户端的本机文件与回环网络权限时，可使用[本地 MCP 沙盒探针](<GEMINI_LOCAL_MCP_PROBE.md>)，它只检查合成文件和独立 HTTP 测试服务。
 
 Gemini 网页版（包括 Bridge 内置浏览器）使用下一节的 Cloud MCP。
 
 **本方式无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key。** 在 Bridge 登记项目并启用 Gemini 即可开始接入。
 
 1. 在 Bridge 的「连接 → Gemini」中启用 Gemini，并选择客户端工具权限。
-2. 在同机客户端的 MCP 配置中选择本地 stdio；使用程序启动命令入口。
+2. 在 Gemini 的自定义关联应用中选择本地 MCP，使用「命令」输入栏。
 3. 服务器名称填写 `Codex Bridge`，说明可选。
 4. 返回 Bridge，点击「复制本地启动命令」，将完整命令粘贴到客户端的「命令」栏。
 5. 保存配置并核对工具列表，在客户端启用 Codex Bridge，再调用 `bridge_status` 和 `list_projects` 检查连接。

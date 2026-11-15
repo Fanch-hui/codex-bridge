@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage, request } from "./api";
+import { createReadGeneration } from "./read-generation";
 import { displayDate, noticeStatusLabels } from "./types";
 import type { Notice, NoticeAction, NoticeStatus, Platform } from "./types";
 import { useDraft } from "./useDraft";
@@ -140,15 +141,21 @@ export default function NoticePanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [reads] = useState(createReadGeneration);
   const refresh = useCallback(async () => {
+    const isCurrent = reads.startRead();
     setLoading(true); setError("");
-    try { setNotices((await request<{ notices: Notice[] }>("/api/admin/notices")).notices); }
-    catch (problem) { setError(errorMessage(problem)); }
+    try {
+      const result = await request<{ notices: Notice[] }>("/api/admin/notices");
+      if (isCurrent()) setNotices(result.notices);
+    }
+    catch (problem) { if (isCurrent()) setError(errorMessage(problem)); }
     finally { setLoading(false); }
-  }, []);
+  }, [reads]);
   useEffect(() => { void refresh(); }, [refresh]);
   const current = useMemo(() => notices.find(notice => notice.id === selected), [notices, selected]);
   function saved(notice: Notice, message: string) {
+    reads.invalidateReads();
     setConfirmation(message);
     setNotices(items => [notice, ...items.filter(item => item.id !== notice.id)]);
     setSelected(notice.id);

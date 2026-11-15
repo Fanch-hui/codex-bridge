@@ -35,12 +35,14 @@ extension ServiceEmbeddedDSHController {
       resetNativeClient()
       runtime = nil
       recovery = nil
+      operationsRestoreStarted = false
       workspaceMergeMonitor?.cancel()
       workspaceMergeMonitor = nil
     }
     try await settings.setWorkbenchEnabled(enabled)
     if enabled {
       Task { await self.startNativeWriteRecovery() }
+      startExecutionRecovery()
     }
     return IPCWorkbenchSettings(enabled: enabled)
   }

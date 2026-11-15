@@ -17,7 +17,13 @@ extension ServiceEmbeddedDSHController {
         prompt, payload["installationID"]?.stringValue ?? "",
         payload["model"]?.stringValue ?? "", payload["effort"]?.stringValue ?? "",
       ] + (try subagentAttachmentPaths(payload))
-    return digest(try json(.array(values.map(ACPJSONValue.string))))
+    let plain = ACPJSONValue.array(values.map(ACPJSONValue.string))
+    guard let access = try requestedSubagentAccess(payload) else {
+      return digest(try json(plain))
+    }
+    // A restricted request has its own shape: fingerprints stored for earlier requests stay
+    // valid, and the access value can never be mistaken for an attachment path.
+    return digest(try json(.array([plain, .string("access"), .string(access)])))
   }
 
   func recordSubagentSubmission(

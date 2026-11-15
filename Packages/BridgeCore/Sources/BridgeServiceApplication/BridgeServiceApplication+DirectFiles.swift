@@ -177,7 +177,8 @@ extension BridgeServiceApplication {
     }
   }
 
-  private static func safeBoundedDiff(_ diff: BoundedDiff) -> MCPBoundedDiff {
+  /// The outbound form of a diff, shared by direct file receipts and mutation previews.
+  static func safeBoundedDiff(_ diff: BoundedDiff) -> MCPBoundedDiff {
     MCPBoundedDiff(
       removedLines: diff.removedLines.map {
         OutboundContentSecurity.redacted($0, maximumUTF8Bytes: 64 * 1_024)

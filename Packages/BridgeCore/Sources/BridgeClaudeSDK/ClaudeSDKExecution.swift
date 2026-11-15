@@ -59,8 +59,8 @@ actor ClaudeSDKExecution {
           guard let self else { return }
           try await self.consume(event)
         }
-        await self?.fail()
-      } catch { await self?.fail() }
+        await self?.fail(nil)
+      } catch { await self?.fail(error) }
     }
     do {
       try await send(request.executionPrompt, initial: true)
@@ -337,9 +337,9 @@ actor ClaudeSDKExecution {
     guard await eventDelivery.enqueue(envelope) else { throw ACPError.transportClosed }
   }
 
-  private func fail() async {
-    await finish(
-      with: .failed(code: "claude_transport_failed", summary: "Claude 执行通道关闭，任务结果未确认。"))
+  /// `error` is nil when the event stream ended without a terminal event.
+  private func fail(_ error: (any Error)?) async {
+    await finish(with: AgentHostFailure(error).event(providerID: "claude", providerName: "Claude"))
   }
 
   private func finish(with event: AgentEvent? = nil) async {

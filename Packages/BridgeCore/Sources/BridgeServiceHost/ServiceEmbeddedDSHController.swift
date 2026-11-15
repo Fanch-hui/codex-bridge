@@ -23,9 +23,18 @@ public actor ServiceEmbeddedDSHController {
   let externalWorkspaceReadiness:
     @Sendable (String, String, AgentWorkspaceSnapshot, String) async throws ->
       AgentWorkspaceIsolationReadiness
+  /// Why a provider can never run in an isolated copy, known without making one. Nil means the
+  /// provider needs the copy-based readiness check.
+  let externalWorkspaceSupport: @Sendable (String) -> String?
   var runtime: EmbeddedDSHRuntime?
   var sessionProjects = NativeSessionMap()
   let inputGate = AsyncMutex()
+  let subagentLanes = SubagentLanes()
+  /// Test seam that replaces the task submission of a subagent; production leaves it unset.
+  var subagentSubmitter: SubagentSubmitter?
+  /// Test seam that answers engine calls without a runtime; production leaves it unset.
+  var engineCallOverride: (@Sendable (String, ACPJSONValue) async throws -> ACPJSONValue)?
+  var stopResendDelays = ServiceEmbeddedDSHController.defaultStopResendDelays
   let workspaceRecoveryGate = AsyncMutex()
   let nativeClientGate = AsyncMutex()
   var nativeClientIndexed = false
@@ -38,6 +47,7 @@ public actor ServiceEmbeddedDSHController {
   var events: [(cursor: Int, value: ACPJSONValue, bytes: Int)] = []
   var isShuttingDown = false
   var recovery: Task<Void, Error>?
+  var operationsRestoreStarted = false
   var operationTasks: [String: Task<Void, Never>] = [:]
   var operationGates: [String: AsyncMutex] = [:]
   let operationAdmission = WorkbenchOperationAdmission()
@@ -53,6 +63,7 @@ public actor ServiceEmbeddedDSHController {
   var workspaceMergeMonitor: Task<Void, Never>?
   var workspaceMergeTasks: [String: Task<Void, Never>] = [:]
   var nativeWriteRecoveryTask: Task<Void, Never>?
+  var executionRecoveryTask: Task<Void, Never>?
   var isApplyingConfiguration = false
   var activeMutationRequests = 0
   var activeWorkbenchRequests = 0
@@ -74,6 +85,7 @@ public actor ServiceEmbeddedDSHController {
       -> AgentWorkspaceIsolationReadiness = { _, _, _, _ in
         AgentWorkspaceIsolationReadiness(ready: false, reason: "该执行器尚未启用进程写入隔离。")
       },
+    externalWorkspaceSupport: @escaping @Sendable (String) -> String? = { _ in nil },
     externalChildRecovery:
       @escaping @Sendable (EmbeddedDSHSubagentBinding) async throws -> EmbeddedDSHReconciledOutcome? =
       {
@@ -93,6 +105,7 @@ public actor ServiceEmbeddedDSHController {
         directory: dataRoot.appendingPathComponent("AgentWorkspaces", isDirectory: true))
     self.externalChildRecovery = externalChildRecovery
     self.externalWorkspaceReadiness = externalWorkspaceReadiness
+    self.externalWorkspaceSupport = externalWorkspaceSupport
   }
 
   public func call(_ request: IPCEmbeddedDSHRequest) async throws -> IPCEmbeddedDSHResponse {
@@ -252,6 +265,8 @@ public actor ServiceEmbeddedDSHController {
     workspaceMergeMonitor = nil
     nativeWriteRecoveryTask?.cancel()
     nativeWriteRecoveryTask = nil
+    executionRecoveryTask?.cancel()
+    executionRecoveryTask = nil
     let merges = Array(workspaceMergeTasks.values)
     for task in merges { task.cancel() }
     for task in merges { await task.value }
@@ -279,18 +294,10 @@ public actor ServiceEmbeddedDSHController {
     activeRuntimeInvocations += 1
     defer { activeRuntimeInvocations -= 1 }
     try await requireWorkbenchEnabled()
+    if let engineCallOverride { return try await engineCallOverride(action, payload) }
     let engine = try engine()
-    if recovery == nil {
-      recovery = Task {
-        guard await engine.recoverPreviousHost() else {
-          throw EmbeddedDSHRuntimeError.transportClosed
-        }
-        try await self.recoverExecutions()
-        try await self.loadConversationMappings()
-        Task { await self.restoreOperations() }
-      }
-    }
-    try await recovery?.value
+    try await startedRecovery(engine: engine).value
+    restoreOperationsOnce()
     try await requireWorkbenchEnabled()
     let priority = [
       "session.prompt", "session.stop", "session.cancelBinding", "approval.answer",

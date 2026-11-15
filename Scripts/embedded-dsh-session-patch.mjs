@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 
-const sourceHash = '4cf6c66e65cce865d270fa89405b96d048ffa62e493e4ffbd1a826be2207a4cd';
+const sourceHash = 'c6ce8f8014d943c8f2dceaf7a9b184a56b2de757de6097938646549d2d2a9087';
 
 // Keep prompt admission and project binding at the pinned engine's durability boundary.
 export function patchSessionControllerSource(source) {
@@ -9,6 +9,10 @@ export function patchSessionControllerSource(source) {
     throw new Error('DSH session controller does not match the pinned runtime');
   }
   const changes = [
+    [
+      '\t\t\t} catch (error) {\n\t\t\t\tif (this.hasPromptRequest(agent.session, request.requestId)) return { accepted: true };',
+      '\t\t\t} catch (error) {\n\t\t\t\tif (request.bridgeAdmission === void 0 && this.hasPromptRequest(agent.session, request.requestId)) return { accepted: true };'
+    ],
     [
       '\t\t\t\t\tif (request.mode === "steer") agent.steer(message);\n\t\t\t\t\telse agent.followup(message);\n\t\t\t\t\tbinding.commit();',
       '\t\t\t\t\tif (request.bridgeAdmission !== void 0) {\n' +
@@ -23,11 +27,6 @@ export function patchSessionControllerSource(source) {
       '\t\t\t\t\t\telse agent.followup(message);\n' +
       '\t\t\t\t\t\tbinding.commit();\n' +
       '\t\t\t\t\t}'
-    ],
-    [
-      '\t\tif (event.type !== "user/message") return false;\n\t\tconst source = event.data.source;',
-      '\t\tif (event.type === "agent/inbox/spliced") return event.data.inserted.some(matches);\n' +
-      '\t\tif (event.type !== "user/message") return false;\n\t\tconst source = event.data.source;'
     ],
     [
       '\t\t\tconst childId = brandString(`session-${randomUUID()}`);\n\t\t\tconst composition =',

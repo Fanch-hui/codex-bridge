@@ -1,5 +1,6 @@
 import { present, presentHistory, presentProjections } from './presentation.mjs';
 import { SessionStopGate } from './session-stop-gate.mjs';
+import { trackStop } from './session-stop.mjs';
 import { PromptReceipts, promptFingerprint } from './prompt-receipts.mjs';
 import { inboxEvidence } from './inbox-evidence.mjs';
 import { inspectSession } from './session-inspection.mjs';
@@ -10,6 +11,7 @@ export class Sessions {
   constructor(ctx, rpc, home) {
     this.ctx = ctx; this.rpc = rpc; this.groups = new Map(); this.stopGate = new SessionStopGate(home);
     this.receipts = new PromptReceipts(home); this.promptRequests = new Map();
+    this.stopping = new Map();
     this.titles = new Map();
     this.titleSeqs = new Map();
     ctx.on('session/created', session => { this.titles.delete(session.id); this.titleSeqs.delete(session.id); }, { global: true });
@@ -253,7 +255,7 @@ export class Sessions {
     try {
       do {
         await agent.whenIdle();
-      } while (await this.ctx.subagents.waitForChildren(agent));
+      } while (await this.ctx.subagents.waitForTreeWork(agent));
       const children = await this.ctx.subagents.listDescendants(id);
       const owners = [id, ...children.filter(c => c.kind === 'child').map(c => c.id)];
       for (const owner of owners) {
@@ -266,9 +268,16 @@ export class Sessions {
       await this.endGroup(id, group);
     } catch (error) { process.stderr.write(`DSH execution settlement failed: ${error.message}\n`); }
   }
-  async stop(id) {
+  stop(id) { return trackStop(this.stopping, id, () => this.stopNow(id)); }
+  async stopNow(id) {
     await this.stopGate.stop(id);
-    await this.bridgeAgents?.stopRoot(id);
+    // A child that cannot be stopped must not keep the root running; report it once the root is fully stopped.
+    let childStopFailure;
+    try { await this.bridgeAgents?.stopRoot(id); }
+    catch (error) {
+      childStopFailure = error;
+      process.stderr.write(`DSH subagent stop failed: ${error.message}\n`);
+    }
     const agent = await this.agent(id);
     const children = await this.ctx.subagents.listDescendants(id);
     for (const child of children.filter(c => c.kind === 'child' && c.activity === 'running')) {
@@ -283,8 +292,9 @@ export class Sessions {
       }
     }
     await agent.whenIdle();
-    while (await this.ctx.subagents.waitForChildren(agent)) await agent.whenIdle();
+    while (await this.ctx.subagents.waitForTreeWork(agent)) await agent.whenIdle();
     await this.writes?.stop(id);
+    if (childStopFailure) throw childStopFailure;
     return { accepted: true };
   }
   async stopStatus(id) {
@@ -294,8 +304,9 @@ export class Sessions {
     const jobsActive = owners.some(owner => this.ctx.jobs.list(owner)
       .some(job => job.owner === owner && ['running', 'stopping'].includes(job.status)));
     return { stopped: this.stopGate.isStopped(id) && agent.status === 'idle' && !jobsActive
-      && !children.some(child => child.kind === 'child' && child.activity === 'running')
+      && !children.some(child => child.kind === 'child' && this.ctx.agents.get(child.id)?.status === 'running')
       && !this.bridgeAgents?.hasRunning(id) && !this.writes?.hasActiveProcesses(id),
+      stopping: (this.stopping.get(id) ?? 0) > 0,
       workspaceRecoveryRequired: this.writes?.requiresRecovery(id) ?? false };
   }
   async listChildren(id, signal) {

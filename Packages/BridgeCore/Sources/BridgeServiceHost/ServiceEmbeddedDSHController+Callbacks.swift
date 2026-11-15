@@ -59,6 +59,8 @@ extension ServiceEmbeddedDSHController {
           "displayName": .string(agent.displayName),
           "available": .bool(agent.enabled && agent.taskSubmissionEnabled),
           "capabilities": .array(agent.effectiveCapabilities.map(ACPJSONValue.string)),
+          "supportsReadOnly": .bool(
+            agent.effectiveCapabilities.contains(AgentCapability.readOnlyExecution.rawValue)),
           "defaultModel": defaults?.model.map(ACPJSONValue.string) ?? .null,
           "defaultReasoningEffort": defaults?.effort.map(ACPJSONValue.string) ?? .null,
         ]))
@@ -70,6 +72,7 @@ extension ServiceEmbeddedDSHController {
         "displayName": .string("Codex"),
         "available": .bool(status.codexResolvedExecutablePath != nil),
         "capabilities": .array([.string("readOnlyExecution"), .string("steer")]),
+        "supportsReadOnly": .bool(true),
       ]), at: 0)
     return .object(["agents": .array(result)])
   }

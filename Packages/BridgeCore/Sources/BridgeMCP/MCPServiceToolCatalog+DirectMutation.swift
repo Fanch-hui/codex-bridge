@@ -24,15 +24,7 @@ extension MCPServiceToolCatalog {
         ],
         required: ["sha256", "byte_count"]
       ),
-      "bounded_diff": objectSchema(
-        properties: [
-          "removed_lines": arraySchema(stringSchema),
-          "added_lines": arraySchema(stringSchema),
-          "truncated": boolSchema,
-          "byte_count": integerSchema(minimum: 0),
-        ],
-        required: ["removed_lines", "added_lines", "truncated", "byte_count"]
-      ),
+      "bounded_diff": boundedDiffSchema,
     ],
     required: ["relative_path", "after_revision", "bounded_diff"]
   )

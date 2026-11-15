@@ -32,17 +32,27 @@ extension ServiceEmbeddedDSHController {
     try await ensureSubagentRequestAdmitted(
       ["requestID": .string(requestID)], rootID: rootID, childID: childID)
     let reservation = WorkspaceReservation(rootID: rootID, childID: childID, requestID: requestID)
-    var reservations = try await reconciledWorkspaceReservations(projectID: projectID)
+    let saved = try await savedWorkspaceReservations(projectID: projectID)
+    // A reservation granted earlier stays valid while its start has not begun and its root runs,
+    // which was just checked. Waiting engines poll here, so this answer skips walking every child
+    // and writes nothing.
+    if saved.contains(reservation),
+      try await store.embeddedDSHInput(
+        parentSessionID: rootID, childID: childID, requestID: requestID) == nil
+    {
+      return reserved
+    }
+    var reservations = try await reconciledWorkspaceReservations(saved, projectID: projectID)
     if reservations.contains(reservation) {
-      try await saveWorkspaceReservations(reservations, projectID: projectID)
+      try await saveWorkspaceReservations(reservations, replacing: saved, projectID: projectID)
       return reserved
     }
     guard reservations.count < 2 else {
-      try await saveWorkspaceReservations(reservations, projectID: projectID)
+      try await saveWorkspaceReservations(reservations, replacing: saved, projectID: projectID)
       return .object(["state": .string("waiting")])
     }
     reservations.append(reservation)
-    try await saveWorkspaceReservations(reservations, projectID: projectID)
+    try await saveWorkspaceReservations(reservations, replacing: saved, projectID: projectID)
     return reserved
   }
 
@@ -84,19 +94,29 @@ extension ServiceEmbeddedDSHController {
     return .object(["state": .string("released")])
   }
 
-  private func reconciledWorkspaceReservations(projectID: ProjectID) async throws
+  private func savedWorkspaceReservations(projectID: ProjectID) async throws
     -> [WorkspaceReservation]
   {
     let key = Self.workspaceReservationsKey(projectID)
-    let saved: [WorkspaceReservation]
-    if let setting = try await store.setting(key: key) {
-      saved = try JSONDecoder().decode([WorkspaceReservation].self, from: Data(setting.value.utf8))
-    } else {
-      saved = []
-    }
+    guard let setting = try await store.setting(key: key) else { return [] }
+    let saved = try JSONDecoder().decode(
+      [WorkspaceReservation].self, from: Data(setting.value.utf8))
     guard saved.count <= 256,
       Set(saved.map { [$0.rootID, $0.childID, $0.requestID] }).count == saved.count
     else { throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_reservations") }
+    return saved
+  }
+
+  private func reconciledWorkspaceReservations(projectID: ProjectID) async throws
+    -> [WorkspaceReservation]
+  {
+    try await reconciledWorkspaceReservations(
+      savedWorkspaceReservations(projectID: projectID), projectID: projectID)
+  }
+
+  private func reconciledWorkspaceReservations(
+    _ saved: [WorkspaceReservation], projectID: ProjectID
+  ) async throws -> [WorkspaceReservation] {
     let executions = try await application.embeddedDSHExecutions().filter {
       $0.projectID == projectID
     }
@@ -148,11 +168,13 @@ extension ServiceEmbeddedDSHController {
     return active
   }
 
+  /// Writes only a changed list: engines poll for capacity, and an unchanged answer is not worth
+  /// a database write.
   private func saveWorkspaceReservations(
-    _ reservations: [WorkspaceReservation], projectID: ProjectID
-  )
-    async throws
-  {
+    _ reservations: [WorkspaceReservation], replacing saved: [WorkspaceReservation],
+    projectID: ProjectID
+  ) async throws {
+    guard reservations != saved else { return }
     let key = Self.workspaceReservationsKey(projectID)
     try await store.setSetting(
       ServiceSettingRecord(

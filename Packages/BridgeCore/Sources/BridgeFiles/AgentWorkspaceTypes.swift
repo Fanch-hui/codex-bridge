@@ -9,7 +9,13 @@ public enum AgentWorkspaceError: Error, Equatable, Sendable {
   case workspaceUnavailable
   case workspaceBusy
   case unsupportedEntry(String)
+  /// A symbolic link blocks isolation; the payload is the relative path only.
+  case symbolicLink(String)
+  /// A file looks like it holds a credential; the payload is the relative path, never the match.
+  case suspectedSecret(String)
   case resourceLimit
+  /// The managed workspace limit is reached and no workspace could be reclaimed.
+  case workspaceCapacityReached
   case gitUnavailable
   case mergeConflict([String])
   case invalidResolution(String)
@@ -30,6 +36,9 @@ public struct AgentWorkspaceMergePlan: Sendable {
   public let revision: Int
   public let changedPaths: [String]
   public let conflicts: [String]
+  /// Paths that exist in the workspace but are never merged (excluded directories, secret files).
+  public let excludedPaths: [String]
+  public let excludedPathsOmitted: Int
   let changes: [AgentWorkspaceChange]
 }
 

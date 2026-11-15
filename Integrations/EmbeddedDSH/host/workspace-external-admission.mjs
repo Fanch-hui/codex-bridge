@@ -1,8 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { Backoff } from './backoff.mjs';
 
 const terminal = new Set(['completed', 'failed', 'interrupted', 'cancelled']);
 // 'tool': Bridge gates each writing tool call of the provider; 'task': the whole task holds the lease.
 const writeScopes = new Set(['task', 'tool']);
+// Capacity is polled quickly at first, then slows down while the project stays full.
+const capacityPoll = { initialMs: 200, maxMs: 2000 };
 
 export class ExternalWorkspaceAdmission {
   constructor(ctx, rpc, sessions, writes, persist) {
@@ -18,17 +21,21 @@ export class ExternalWorkspaceAdmission {
   async recoverBindings(bindings) {
     for (const binding of bindings) {
       if (binding.admission === 'waiting' || binding.admission === 'attached' || binding.workspaceMode === 'read-only' ||
-          binding.workspaceMode === 'isolated' || binding.writeScope === 'tool' || terminal.has(binding.state)) continue;
+          binding.access === 'read-only' || binding.workspaceMode === 'isolated' || binding.writeScope === 'tool' ||
+          terminal.has(binding.state)) continue;
       await this.writes.recover(binding.rootSessionID, this.owner(binding));
     }
   }
 
   async readOnly(binding) {
+    // A child narrowed to read-only never writes, whatever the root session may do.
+    if (binding.access === 'read-only') return true;
     const root = await this.sessions.agent(binding.rootSessionID);
     return this.ctx.sandboxPolicy.resolve({ session: root.session }).mode === 'read-only';
   }
 
   async reserve(binding, signal) {
+    const backoff = new Backoff(capacityPoll);
     for (;;) {
       signal?.throwIfAborted();
       const receipt = await this.rpc.request('bridge/subagent', { operation: 'reserve',
@@ -48,7 +55,7 @@ export class ExternalWorkspaceAdmission {
         binding.waitingReason = 'capacity';
         await this.persist();
       }
-      await delay(200, undefined, { signal });
+      await delay(backoff.next(), undefined, { signal });
     }
   }
 

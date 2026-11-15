@@ -135,6 +135,7 @@ extension BridgeServiceAppModel {
         task.cancel()
       }
       agentModelDefaultMutationTasks = [:]
+      agentModelConfirmedDefaults = [:]
       agentModelDefaults = [:]
       openCodeDefaultModel = nil
       openCodeDefaultPermissionMode = "full"

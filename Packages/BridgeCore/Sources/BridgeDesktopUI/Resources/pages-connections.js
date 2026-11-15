@@ -250,7 +250,7 @@
     context.routeChosen = !!savedRoute;
     var root = S.node("div", "connection-detail");
     var route = S.selectField("使用方式", savedRoute || "web", [
-      { id: "web", title: "网页版" }, { id: "local", title: "同机客户端" }
+      { id: "web", title: "云 MCP（网页或桌面客户端）" }, { id: "local", title: "本地 MCP（同机客户端）" }
     ], function () {
       context.routeChosen = true;
       try { if (global.localStorage) global.localStorage.setItem(routeKey, route.control.value); } catch (_) {}
@@ -269,8 +269,9 @@
     help.appendChild(S.node("summary", null, "接入帮助"));
     var steps = S.node("ol");
     [
-      "确认同机客户端提供本地程序启动入口，再启用 Gemini 连接并复制本地启动命令。",
-      "在客户端的 MCP 配置中选择本地 stdio，将服务器名称设为 Codex Bridge，粘贴启动命令。",
+      "启用 Gemini 连接并复制本地启动命令。更新 App 后请重启后台服务。",
+      "在 Gemini 中添加自定义关联应用，将名称设为 Codex Bridge，完整粘贴到「命令」栏。",
+      "允许 MCP 子进程访问本机网络及启动命令所属的文件；本地连接通过经过身份校验的本机通道获取配置。",
       "保存后启用 Codex Bridge，调用 bridge_status 和 list_projects 检查连接。",
       "使用期间保持后台服务运行；App 安装位置改变后重新复制启动命令。"
     ].forEach(function (text) { steps.appendChild(S.node("li", null, text)); });

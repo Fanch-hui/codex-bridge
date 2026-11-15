@@ -297,6 +297,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   var agentModelDefaultLoadGenerations: [String: UInt64] = [:]
   var agentModelDefaultRevisions: [String: UInt64] = [:]
   var agentModelDefaultMutationTasks: [String: Task<Void, Never>] = [:]
+  /// What the service last confirmed for a provider whose saves are still pending. The published
+  /// defaults show the pending choice meanwhile; a failed save returns to this value.
+  var agentModelConfirmedDefaults: [String: IPCAgentModelDefaultResponse] = [:]
   var agentNativePermissionGenerations: [String: UInt64] = [:]
   var resolvedTaskApprovalKeys: Set<String> = []
   var resolvedDirectApprovalKeys: Set<String> = []

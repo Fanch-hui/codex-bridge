@@ -10,20 +10,34 @@ export const handoffParameters = {
 
 const output = { schema: { type: 'string' }, render: (_args, text) => [{ type: 'text', text }] };
 
+async function childID(ctx, agent, reference, descendants, signal) {
+  const rows = await ctx.subagents.listDescendants(agent.session.id, signal);
+  const match = id => rows.find(row => row.kind === 'child' && row.id === id && (descendants || row.depth === 1));
+  const direct = match(reference);
+  if (direct) return direct.id;
+  const resolved = await ctx.subagents.resolveName(agent, reference, signal);
+  const child = match(resolved);
+  if (!child) throw new Error(descendants ? 'Subagent is not a descendant' : 'Subagent is not a direct child');
+  return child.id;
+}
+
 export function registerCollaborationTools(bridge) {
   const { ctx } = bridge;
   const register = (name, description, parameters, execute) => ctx.tools.register(defineTool({
     name, description, parameters, output, isConcurrencySafe: () => true, execute
   }));
-  register('delegate_agent', 'Start a native or connected subagent. Include task-specific context only; do not include credentials, private reasoning, or MCP operating instructions. Results arrive when the child finishes.', {
+  register('delegate_agent', 'Delegate a self-contained subtask with clear boundaries to a subagent that works independently, or ask another agent to cross-review work. Pick a connected agent by its installationID from bridge_agents; omit installationID to use a native subagent. Use dependsOn to start only after the listed connected children finished and merged their changes. For a cross-review, set access to "read-only" so the reviewing connected agent can read the project but not change it. Include task-specific context only; do not include credentials, private reasoning, or MCP operating instructions. The result is delivered automatically when the child finishes, so do not poll for it.', {
     description: { type: 'string', required: true }, prompt: { type: 'string', required: true },
-    installationID: { type: 'string', description: 'Connected agent installation ID. Omit for a native child.' },
-    model: { type: 'string' }, effort: { type: 'string' }, ...handoffParameters
+    installationID: { type: 'string', description: 'Connected agent installation ID from bridge_agents. Omit for a native child.' },
+    model: { type: 'string' }, effort: { type: 'string' },
+    access: { type: 'string', enum: ['read-only'], description: 'Connected agents only. "read-only" lets the child read the project but not change it, for reviews. It can only narrow what the current session may do and stays for later messages to this child.' },
+    ...handoffParameters
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Delegation requires an agent');
     if (args.installationID) return bridge.delegate(args, exec);
     if (args.attachmentPaths?.length) throw new Error('Native delegation does not support attachment paths');
     if (args.model || args.effort) throw new Error('Select a native child model through the native subagent tool');
+    if (args.access) throw new Error('Native children cannot be restricted to read-only; pick a connected agent by installationID');
     const rootSessionID = bridge.rootOf(exec.agent);
     const dependencies = dependenciesFor(bridge.bindings, rootSessionID, args.dependsOn);
     await waitForDependencies({ rootSessionID, dependencies }, bridge.bindings, bridge.rpc, exec.signal, async () => {});
@@ -36,41 +50,42 @@ export function registerCollaborationTools(bridge) {
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Listing subagents requires an agent');
     const id = exec.agent.session.id;
-    const rows = args.scope === 'descendants' ? await ctx.subagents.listDescendants(id, exec.signal)
-      : await ctx.subagents.listChildren(id, exec.signal);
+    const descendants = await ctx.subagents.listDescendants(id, exec.signal);
+    const rows = args.scope === 'descendants' ? descendants : descendants.filter(row => row.depth === 1);
     return JSON.stringify(rows.map(row => {
       const binding = [...bridge.bindings].reverse().find(item => item.childID === row.id && item.inputKind !== 'steer');
       return { ...row, ...(binding ? { installationID: binding.installationID, taskID: binding.taskID,
-        state: binding.state, workspaceMode: binding.workspaceMode, workspaceStatus: binding.workspaceStatus } : {}) };
+        state: binding.state, workspaceMode: binding.workspaceMode, workspaceStatus: binding.workspaceStatus,
+        ...(binding.access ? { access: binding.access } : {}) } : {}) };
     }));
   });
   register('send_agent_message', 'Message a native or connected direct child. Queue a connected continuation or steer only when supported.', {
-    childID: { type: 'string', required: true }, prompt: { type: 'string', required: true },
+    childID: { type: 'string', required: true, description: 'The direct child name or ID.' }, prompt: { type: 'string', required: true },
     delivery: { type: 'string', enum: ['queue', 'steer'] }, attachmentPaths: handoffParameters.attachmentPaths,
     repairConflict: { type: 'boolean', description: 'Explicitly ask the child to repair its conflicted workspace.' }
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Messaging a subagent requires an agent');
     const parentID = exec.agent.session.id;
-    const binding = bridge.bindings.find(row => row.childID === args.childID && row.parentSessionID === parentID);
-    if (binding) return JSON.stringify(await bridge.send(args.childID, args.prompt,
-      bridge.continuationID(bridge.rootOf(exec.agent), args.childID, exec.callId), bridge.rootOf(exec.agent),
+    const id = await childID(ctx, exec.agent, args.childID, false, exec.signal);
+    const binding = bridge.bindings.find(row => row.childID === id && row.parentSessionID === parentID);
+    if (binding) return JSON.stringify(await bridge.send(id, args.prompt,
+      bridge.continuationID(bridge.rootOf(exec.agent), id, exec.callId), bridge.rootOf(exec.agent),
       { delivery: args.delivery, attachmentPaths: args.attachmentPaths, repairConflict: args.repairConflict }));
     if (args.attachmentPaths?.length || args.delivery === 'queue' || args.repairConflict) throw new Error('This native tool does not support queued messages, attachment paths, or workspace repair');
     const native = ctx.tools.get('send_message', exec.agent);
     if (!native) throw new Error('Native subagent messaging is unavailable');
-    return JSON.stringify(await native.execute({ agent_id: args.childID, message: args.prompt }, exec));
+    return JSON.stringify(await native.execute({ agent: id, message: args.prompt }, exec));
   });
   register('stop_child_agent', 'Stop a native or connected descendant subagent.', {
-    childID: { type: 'string', required: true }
+    childID: { type: 'string', required: true, description: 'The descendant name or ID.' }
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Stopping a subagent requires an agent');
-    const descendants = await ctx.subagents.listDescendants(exec.agent.session.id, exec.signal);
-    if (!descendants.some(row => row.kind === 'child' && row.id === args.childID)) throw new Error('Subagent is not a descendant');
-    const binding = bridge.bindings.find(row => row.childID === args.childID);
-    if (binding) return JSON.stringify(await bridge.stop(args.childID, bridge.rootOf(exec.agent)));
+    const id = await childID(ctx, exec.agent, args.childID, true, exec.signal);
+    const binding = bridge.bindings.find(row => row.childID === id);
+    if (binding) return JSON.stringify(await bridge.stop(id, bridge.rootOf(exec.agent)));
     const native = ctx.tools.get('interrupt_agent', exec.agent);
     if (!native) throw new Error('Native subagent interruption is unavailable');
-    return JSON.stringify(await native.execute({ agent_id: args.childID }, exec));
+    return JSON.stringify(await native.execute({ agent: id }, exec));
   });
 }
 
@@ -81,11 +96,11 @@ export function registerBridgeTools(bridge) {
   register('bridge_agents', 'List available connected agents for delegation.', {}, async (_args, exec) => JSON.stringify(await bridge.agents(exec.agent)));
   register('bridge_agent_models', 'List models for a connected agent.', { installationID: { type: 'string', required: true } },
     async (args, exec) => JSON.stringify(await bridge.rpc.request('bridge/agentModels', { sessionID: bridge.rootOf(exec.agent), installationID: args.installationID })));
-  register('bridge_delegate', 'Start an independent connected agent. Include task-specific context only; do not include credentials, private reasoning, or MCP operating instructions. Its result and workspace status are delivered to you.', {
+  register('bridge_delegate', 'Legacy alias of delegate_agent; prefer delegate_agent. Start an independent connected agent. Include task-specific context only; do not include credentials, private reasoning, or MCP operating instructions. Its result and workspace status are delivered to you.', {
     installationID: { type: 'string', required: true }, description: { type: 'string', required: true },
     prompt: { type: 'string', required: true }, model: { type: 'string' }, effort: { type: 'string' }, ...handoffParameters
   }, (args, exec) => bridge.delegate(args, exec));
-  register('bridge_send_agent', 'Send another instruction to a running or finished connected subagent.', {
+  register('bridge_send_agent', 'Legacy alias of send_agent_message; prefer send_agent_message. Send another instruction to a running or finished connected subagent.', {
     childID: { type: 'string', required: true }, prompt: { type: 'string', required: true },
     delivery: { type: 'string', enum: ['queue', 'steer'] }, attachmentPaths: handoffParameters.attachmentPaths,
     repairConflict: { type: 'boolean', description: 'Explicitly ask the child to repair its conflicted workspace.' }
@@ -94,7 +109,7 @@ export function registerBridgeTools(bridge) {
     return JSON.stringify(await bridge.send(args.childID, args.prompt, bridge.continuationID(root, args.childID, exec.callId), root,
       { delivery: args.delivery, attachmentPaths: args.attachmentPaths, repairConflict: args.repairConflict }));
   });
-  register('bridge_stop_agent', 'Stop a connected subagent.', { childID: { type: 'string', required: true } },
+  register('bridge_stop_agent', 'Legacy alias of stop_child_agent; prefer stop_child_agent. Stop a connected subagent.', { childID: { type: 'string', required: true } },
     async (args, exec) => JSON.stringify(await bridge.stop(args.childID, bridge.rootOf(exec.agent))));
   register('bridge_agent_changes', 'Inspect a connected agent\'s proposed changes or retry their merge. After resolving a conflict in the project, submit its relative path and current SHA-256 in resolutions; use null for a deleted file.', {
     childID: { type: 'string', required: true }, retryMerge: { type: 'boolean' },

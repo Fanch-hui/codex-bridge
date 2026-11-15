@@ -230,7 +230,8 @@
   function entries(values, page) {
     var result = values.slice(), claimed = new Set();
     submissions.forEach(function (pending, requestID) {
-      if (!belongsToPage(pending, page)) return;
+      // An operation without text (retry) is tracked for its receipt only; it is not a message.
+      if (typeof pending.input !== "string" || !belongsToPage(pending, page)) return;
       var index = values.findIndex(function (entry) {
         return entry.role === "用户" && String(entry.text || "").trim() === pending.input.trim()
           && !pending.baselineIDs.has(entry.id) && !claimed.has(entry.id);

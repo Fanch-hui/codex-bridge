@@ -384,7 +384,7 @@
     var key = session ? keyOf(session) : row;
     if (cell.key !== key) {
       if (cell.blank === "draft") draftOf(cell.index).unmount();
-      cell.key = key; cell.taskID = null; cell.detail = null; cell.inputs = null; cell.following = true; cell.blank = null;
+      cell.key = key; cell.detail = null; cell.inputs = null; cell.following = true; cell.blank = null;
       S.clear(cell.body); cell.conversation = null;
       S.clear(cell.composer); cell.form = null;
     }
@@ -405,7 +405,7 @@
         cell.conversation, detail.conversation || [], view, emit, { owner: cell.body });
       if (cell.following) cell.body.scrollTop = cell.body.scrollHeight;
     }
-    if (!cell.form || cell.taskID !== detail.taskID) {
+    if (!cell.form || !cell.form.__continues(detail)) {
       S.clear(cell.composer);
       var hooks = global.CodexBridgeDesktopWorkbenchControls.paneHooks(
         function () { return panePage(context.page || {}, cell.detail); },
@@ -416,10 +416,15 @@
         if (control.id === "workbench-steer-mode") control.id = "workbench-pane-mode-" + cell.index;
       });
       cell.composer.appendChild(cell.form);
-      cell.taskID = detail.taskID;
     }
     cell.detail = detail;
     cell.form.__update(detail, view, emit);
+  }
+
+  // The pane composer of the session a submission was sent to, with that pane's page view.
+  function composerFor(pending) {
+    var cell = cells.find(function (item) { return item.form && item.detail && item.form.__continues(pending); });
+    return cell ? { form: cell.form, page: panePage(context.page || {}, cell.detail) } : null;
   }
 
   function hide() {
@@ -469,6 +474,7 @@
   global.CodexBridgeDesktopWorkbenchPanes = {
     render: render,
     hide: hide,
+    composerFor: composerFor,
     isSplit: isSplit,
     reveal: reveal,
     openDraft: openDraft,

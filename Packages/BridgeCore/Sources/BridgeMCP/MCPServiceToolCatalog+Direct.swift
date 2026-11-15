@@ -16,6 +16,17 @@ extension MCPServiceToolCatalog {
     required: ["bridge_sandbox", "sandbox_exec", "nested_sandbox", "loopback", "limitations"]
   )
 
+  /// The redacted, size-limited diff every file mutation receipt and preview carries.
+  static let boundedDiffSchema = objectSchema(
+    properties: [
+      "removed_lines": arraySchema(stringSchema),
+      "added_lines": arraySchema(stringSchema),
+      "truncated": boolSchema,
+      "byte_count": integerSchema(minimum: 0),
+    ],
+    required: ["removed_lines", "added_lines", "truncated", "byte_count"]
+  )
+
   static let directMutationOutputSchema = outputSchema(
     properties: [
       "receipt_type": receiptTypeSchema(["file_mutation"]),
@@ -25,15 +36,7 @@ extension MCPServiceToolCatalog {
       "old_sha256": stringSchema,
       "new_sha256": stringSchema,
       "byte_count": integerSchema(minimum: 0),
-      "bounded_diff": objectSchema(
-        properties: [
-          "removed_lines": arraySchema(stringSchema),
-          "added_lines": arraySchema(stringSchema),
-          "truncated": boolSchema,
-          "byte_count": integerSchema(minimum: 0),
-        ],
-        required: ["removed_lines", "added_lines", "truncated", "byte_count"]
-      ),
+      "bounded_diff": boundedDiffSchema,
     ],
     required: ["receipt_type", "relative_path", "operation", "byte_count", "bounded_diff"]
   )
@@ -46,15 +49,7 @@ extension MCPServiceToolCatalog {
       "old_sha256": stringSchema,
       "new_sha256": stringSchema,
       "byte_count": integerSchema(minimum: 0),
-      "bounded_diff": objectSchema(
-        properties: [
-          "removed_lines": arraySchema(stringSchema),
-          "added_lines": arraySchema(stringSchema),
-          "truncated": boolSchema,
-          "byte_count": integerSchema(minimum: 0),
-        ],
-        required: ["removed_lines", "added_lines", "truncated", "byte_count"]
-      ),
+      "bounded_diff": boundedDiffSchema,
     ],
     required: ["relative_path", "operation", "byte_count", "bounded_diff"]
   )

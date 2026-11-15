@@ -12,35 +12,27 @@ extension ServiceEmbeddedDSHController {
       throw ServiceStoreError.invalidArgument("embedded_dsh.subagent")
     }
     let rootID = try Self.requiredString(payload, "rootSessionID")
-    let project = try await project(for: rootID)
     let operation = try Self.requiredString(payload, "operation")
-    if operation == "results" {
-      var results: [ACPJSONValue] = []
-      for item in try await application.pendingEmbeddedDSHResults(parentSessionID: rootID) {
-        let value: ACPJSONValue = .object([
-          "childID": .string(item.childID), "requestID": .string(item.requestID),
-          "taskID": .string(item.taskID.rawValue), "state": .string(item.status.rawValue),
-          "output": item.resultSummary.map(ACPJSONValue.string) ?? .null,
-          "error": item.failureCode.map(ACPJSONValue.string) ?? .null,
-        ])
-        results.append(
-          try await enrichWorkspaceState(
-            value, rootID: rootID, childID: item.childID,
-            taskID: item.taskID.rawValue, state: item.status.rawValue))
-      }
-      return .object(["results": .array(results)])
+    let rootProject: ServiceProjectRecord
+    do {
+      rootProject = try await project(for: rootID)
+    } catch ServiceStoreError.unknownProject(let removed) {
+      guard let result = try await resultAfterProjectRemoval(operation: operation, payload: payload)
+      else { throw ServiceStoreError.unknownProject(removed) }
+      return result
     }
+    if operation == "results" { return try await subagentResults(rootID: rootID) }
     let childID = try Self.requiredString(payload, "childID")
     switch operation {
     case "reserve":
       return try await reserveSubagentWorkspace(
         rootID: rootID, childID: childID,
-        requestID: Self.requiredString(payload, "requestID"), projectID: project.id,
+        requestID: Self.requiredString(payload, "requestID"), projectID: rootProject.id,
         installationID: payload["installationID"]?.stringValue)
     case "releaseReservation":
       return try await releaseSubagentWorkspaceReservation(
         rootID: rootID, childID: childID,
-        requestID: Self.requiredString(payload, "requestID"), projectID: project.id)
+        requestID: Self.requiredString(payload, "requestID"), projectID: rootProject.id)
     case "ack":
       try await application.acknowledgeEmbeddedDSHResult(
         parentSessionID: rootID, childID: childID,
@@ -48,42 +40,14 @@ extension ServiceEmbeddedDSHController {
         taskID: TaskID(rawValue: Self.requiredString(payload, "taskID")))
       return .object([:])
     case "start":
-      // Read-only preparation (provider and model checks) runs before the input gate so that
-      // parallel starts only queue for the short submission step.
-      let preparation = await prepareSubagentStart(payload, projectID: project.id)
-      await inputGate.acquire()
-      defer { inputGate.release() }
-      try Task.checkCancellation()
-      if let result = try await previousSubagentSubmission(
-        payload, rootID: rootID, childID: childID)
-      {
-        return result
-      }
-      try await ensureSubagentRequestAdmitted(payload, rootID: rootID, childID: childID)
       return try await startSubagent(
-        payload, rootID: rootID, childID: childID, projectID: project.id,
-        preparation: preparation.get())
+        payload, rootID: rootID, childID: childID, projectID: rootProject.id,
+        preparation: await prepareSubagentStart(payload, projectID: rootProject.id))
     case "probe":
       return try await probeSubagent(payload, rootID: rootID, childID: childID)
     case "get", "wait":
-      let binding = try await child(rootID: rootID, childID: childID, allowPendingRecovery: true)
-      let taskID = try await selectedSubagentTask(payload, rootID: rootID, binding: binding)
-      let snapshot: MCPServiceTaskSnapshot
-      if payload["operation"]?.stringValue == "wait" {
-        snapshot = try await application.serviceWaitTask(
-          taskID: taskID.rawValue, timeoutSeconds: 20, recentEventLimit: 6,
-          deadline: .now.advanced(by: .seconds(25))
-        ).task
-      } else {
-        snapshot = try await application.serviceTask(
-          taskID: taskID.rawValue, recentEventLimit: 6, deadline: .now.advanced(by: .seconds(25)))
-      }
-      if let expectedRunID = payload["runID"]?.stringValue,
-        expectedRunID != (snapshot.turnID ?? snapshot.providerRunID)
-      {
-        throw ServiceStoreError.invalidArgument("embedded_dsh.child_run_mismatch")
-      }
-      return try await subagentSnapshot(payload, rootID: rootID, binding: binding, task: snapshot)
+      return try await readSubagent(
+        payload, rootID: rootID, childID: childID, waiting: operation == "wait")
     case "send":
       let value = try await sendSubagent(payload, rootID: rootID, childID: childID)
       var result = value.objectValue ?? [:]
@@ -111,112 +75,32 @@ extension ServiceEmbeddedDSHController {
     }
   }
 
-  private struct SubagentStartPreparation {
-    let providerID: String
-    let installationID: String?
-    let model: String?
-    let effort: String?
-  }
-
-  private func prepareSubagentStart(_ payload: [String: ACPJSONValue], projectID: ProjectID)
-    async -> Result<SubagentStartPreparation, any Error>
-  {
-    do {
-      let installationID = try Self.requiredString(payload, "installationID")
-      let providerID = try await subagentProviderID(installationID: installationID)
-      let submissionInstallationID = installationID == "codex" ? nil : installationID
-      let (model, effort) = try await resolveSubagentModelOverrides(
-        payload, projectID: projectID, providerID: providerID,
-        installationID: submissionInstallationID, nativeSessionID: nil,
-        deadline: .now.advanced(by: .seconds(40)))
-      return .success(
-        SubagentStartPreparation(
-          providerID: providerID, installationID: submissionInstallationID,
-          model: model, effort: effort))
-    } catch {
-      return .failure(error)
-    }
-  }
-
-  private func startSubagent(
-    _ payload: [String: ACPJSONValue], rootID: String, childID: String, projectID: ProjectID,
-    preparation: SubagentStartPreparation
+  /// One poll of a child. The engine retries errors, so only transient conditions escape here;
+  /// permanent ones are folded into the returned state (see `enrichWorkspaceState`).
+  private func readSubagent(
+    _ payload: [String: ACPJSONValue], rootID: String, childID: String, waiting: Bool
   ) async throws -> ACPJSONValue {
-    try await submitSubagent(
-      payload, rootID: rootID, childID: childID, projectID: projectID,
-      providerID: preparation.providerID, installationID: preparation.installationID,
-      nativeSessionID: nil, modelOverrides: (preparation.model, preparation.effort))
+    let binding = try await child(rootID: rootID, childID: childID, allowPendingRecovery: true)
+    let taskID = try await selectedSubagentTask(payload, rootID: rootID, binding: binding)
+    let snapshot: MCPServiceTaskSnapshot
+    if waiting {
+      snapshot = try await application.serviceWaitTask(
+        taskID: taskID.rawValue, timeoutSeconds: 20, recentEventLimit: 6,
+        deadline: .now.advanced(by: .seconds(25))
+      ).task
+    } else {
+      snapshot = try await application.serviceTask(
+        taskID: taskID.rawValue, recentEventLimit: 6, deadline: .now.advanced(by: .seconds(25)))
+    }
+    if let expectedRunID = payload["runID"]?.stringValue,
+      expectedRunID != (snapshot.turnID ?? snapshot.providerRunID)
+    {
+      throw ServiceStoreError.invalidArgument("embedded_dsh.child_run_mismatch")
+    }
+    return try await subagentSnapshot(payload, rootID: rootID, binding: binding, task: snapshot)
   }
 
-  private func submitSubagent(
-    _ payload: [String: ACPJSONValue], rootID: String, childID: String, projectID: ProjectID,
-    providerID: String, installationID: String?, nativeSessionID: String?,
-    originalFingerprint: String? = nil, modelOverrides: (model: String?, effort: String?)? = nil
-  ) async throws -> ACPJSONValue {
-    let requestID = try Self.requiredString(payload, "requestID")
-    let prompt = try Self.requiredString(payload, "prompt")
-    let attachmentPaths = try Self.subagentAttachmentPaths(payload)
-    let fingerprint = try originalFingerprint ?? Self.subagentSubmissionFingerprint(payload)
-    try await recordSubagentSubmission(
-      fingerprint: fingerprint, requestID: requestID, rootID: rootID, childID: childID)
-    guard let execution = try await application.embeddedDSHExecution(sessionID: rootID) else {
-      throw ServiceStoreError.invalidArgument("embedded_dsh.execution")
-    }
-    let deadline = ContinuousClock.now.advanced(by: .seconds(40))
-    let (requestedModel, requestedEffort) =
-      if let modelOverrides {
-        modelOverrides
-      } else {
-        try await resolveSubagentModelOverrides(
-          payload, projectID: projectID, providerID: providerID, installationID: installationID,
-          nativeSessionID: nativeSessionID, deadline: deadline)
-      }
-    let workspace = try await prepareSubagentWorkspace(
-      rootID: rootID, childID: childID, projectID: projectID, providerID: providerID,
-      installationID: installationID,
-      permissionMode: execution.permissionMode, continuation: nativeSessionID != nil)
-    var taskPrompt = prompt
-    if workspace.mode == "isolated" {
-      taskPrompt +=
-        "\n\nThis task runs in an isolated copy with controlled file tools. "
-        + "Shell commands, child processes, and external MCP tools are unavailable. "
-        + "Edit the files directly; the merge validation runs project checks and tests."
-    }
-    if !workspace.synchronizedPaths.isEmpty {
-      let paths = try Self.json(.array(workspace.synchronizedPaths.map(ACPJSONValue.string)))
-      taskPrompt +=
-        "\n\nThe isolated workspace was synchronized with the project. Changed paths include: "
-        + paths
-    }
-    if !workspace.repairPaths.isEmpty {
-      let paths = try Self.json(.array(workspace.repairPaths.map(ACPJSONValue.string)))
-      taskPrompt +=
-        "\n\nResolve and remove every BRIDGE_CONFLICT marker in the workspace. Affected paths include: "
-        + paths + ". An empty conflict version means the file was deleted."
-    }
-    let submission = MCPServiceTaskSubmission(
-      projectID: projectID.rawValue, prompt: taskPrompt, threadID: nativeSessionID,
-      providerID: providerID, installationID: installationID,
-      executionModel: requestedModel,
-      executionEffort: requestedEffort,
-      modelOverride: requestedModel != nil || requestedEffort != nil,
-      permissionMode: execution.permissionMode.rawValue, clientRequestID: requestID,
-      queueIfBusy: false, attachmentPaths: attachmentPaths)
-    let result = try await application.submitEmbeddedDSHSubagent(
-      submission, parentSessionID: rootID, childID: childID,
-      deadline: deadline)
-    var receipt: [String: ACPJSONValue] = [
-      "childID": .string(childID), "taskID": .string(result.taskID),
-      "state": .string(result.status), "waitingForApproval": .bool(result.localApprovalRequired),
-      "workspaceMode": .string(workspace.mode),
-    ]
-    if let reason = try await workspaceReason(rootID: rootID, childID: childID) {
-      receipt["workspaceReason"] = .string(reason)
-    }
-    return .object(receipt)
-  }
-
-  private func resolveSubagentModelOverrides(
+  func resolveSubagentModelOverrides(
     _ payload: [String: ACPJSONValue], projectID: ProjectID, providerID: String,
     installationID: String?, nativeSessionID: String?, deadline: ContinuousClock.Instant
   ) async throws -> (model: String?, effort: String?) {

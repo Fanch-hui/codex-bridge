@@ -1,4 +1,4 @@
-@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.1
+@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.3
 
 MIT License
 
@@ -24,7 +24,7 @@ SOFTWARE.
 
 ----------------------------------------
 
-@deepseek-ai/dsh-util-code-language@0.2.2-rc.1
+@deepseek-ai/dsh-util-code-language@0.2.2-rc.3
 
 MIT License
 

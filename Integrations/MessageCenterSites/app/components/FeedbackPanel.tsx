@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage, request } from "./api";
+import { createReadGeneration } from "./read-generation";
 import { categoryLabels, displayDate, platformLabels, statusLabels } from "./types";
 import type { Feedback, FeedbackStatus } from "./types";
 import { useDraft } from "./useDraft";
@@ -91,27 +92,35 @@ export default function FeedbackPanel() {
   const [listError, setListError] = useState("");
   const [detailError, setDetailError] = useState("");
   const [detailVersion, setDetailVersion] = useState(0);
+  const [listReads] = useState(createReadGeneration);
+  const [detailReads] = useState(createReadGeneration);
   const refresh = useCallback(async (cursor?: string) => {
+    const isCurrent = listReads.startRead();
     setLoadingList(true); setListError("");
     try {
       const result = await request<FeedbackPage>(`/api/admin/feedback${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
-      setFeedbacks(items => cursor ? [...items, ...result.feedbacks.filter(item => !items.some(previous => previous.id === item.id))] : result.feedbacks);
-      setNextCursor(result.nextCursor);
-    } catch (problem) { setListError(errorMessage(problem)); }
+      if (isCurrent()) {
+        setFeedbacks(items => cursor ? [...items, ...result.feedbacks.filter(item => !items.some(previous => previous.id === item.id))] : result.feedbacks);
+        setNextCursor(result.nextCursor);
+      }
+    } catch (problem) { if (isCurrent()) setListError(errorMessage(problem)); }
     finally { setLoadingList(false); }
-  }, []);
+  }, [listReads]);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
+    const isCurrent = detailReads.startRead(selected ?? undefined);
     if (!selected) { setCurrent(null); return; }
     const abort = new AbortController();
     setLoadingDetail(true); setDetailError("");
     request<{ feedback: Feedback }>(`/api/admin/feedback/${encodeURIComponent(selected)}`, { signal: abort.signal })
-      .then(result => setCurrent(result.feedback))
-      .catch(problem => { if (!abort.signal.aborted) setDetailError(errorMessage(problem)); })
+      .then(result => { if (isCurrent()) setCurrent(result.feedback); })
+      .catch(problem => { if (isCurrent()) setDetailError(errorMessage(problem)); })
       .finally(() => { if (!abort.signal.aborted) setLoadingDetail(false); });
     return () => abort.abort();
-  }, [selected, detailVersion]);
+  }, [selected, detailVersion, detailReads]);
   function updated(feedback: Feedback) {
+    listReads.invalidateReads();
+    detailReads.invalidateReads(feedback.id);
     setCurrent(feedback);
     setFeedbacks(items => [feedback, ...items.filter(item => item.id !== feedback.id)]);
   }

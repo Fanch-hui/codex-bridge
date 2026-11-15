@@ -8,22 +8,22 @@ Codex Bridge 是面向个人自托管场景的桌面 App 与后台服务，将 C
 
 macOS、Windows 与 Linux 共用 Swift 核心和桌面界面。项目目录授权、任务记录与配置保存在本机；调用 ChatGPT 或模型服务时，请求会发送给你选择的服务。
 
-当前版本为 [v3.0.2](./docs/RELEASE_NOTES_v3.0.2.md)。
+当前版本为 [v3.0.3](./docs/RELEASE_NOTES_v3.0.3.md)。
 
 ## 下载与安装
 
 从 [GitHub Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 下载最新版本。
 
-| 平台 | v3.0.2 安装包 | 安装方式 |
+| 平台 | v3.0.3 安装包 | 安装方式 |
 | --- | --- | --- |
-| macOS 14+，Apple Silicon | `CodexBridge-3.0.2-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| macOS 14+，Intel | `CodexBridge-3.0.2-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
-| Windows x64 | `CodexBridge-Windows-x64-3.0.2-Setup.exe` | 运行安装器，选择安装位置 |
-| Windows ARM64 | `CodexBridge-Windows-arm64-3.0.2-Setup.exe` | 运行安装器，选择安装位置 |
+| macOS 14+，Apple Silicon | `CodexBridge-3.0.3-macos-arm64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| macOS 14+，Intel | `CodexBridge-3.0.3-macos-x86_64.dmg` | 打开 DMG，将 App 拖入 Applications |
+| Windows x64 | `CodexBridge-Windows-x64-3.0.3-Setup.exe` | 运行安装器，选择安装位置 |
+| Windows ARM64 | `CodexBridge-Windows-arm64-3.0.3-Setup.exe` | 运行安装器，选择安装位置 |
 | Windows x64 / ARM64，便携运行 | `codex-bridge-windows-x64.zip` / `codex-bridge-windows-arm64.zip` | 完整解压后运行 `codex-bridge-windows-app.exe` |
-| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-3.0.2.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-3.0.2.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
-| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-3.0.2.tar.gz` / `codex-bridge-linux-arm64-3.0.2.tar.gz` | 完整解压后运行 `./codex-bridge` |
+| Ubuntu 24.04 LTS x64 | `CodexBridge-Linux-x64-3.0.3.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS ARM64 | `CodexBridge-Linux-arm64-3.0.3.deb` | 使用 APT 安装，详见 [Linux 指南](./docs/LINUX.md) |
+| Ubuntu 24.04 LTS x64 / ARM64，便携运行 | `codex-bridge-linux-x64-3.0.3.tar.gz` / `codex-bridge-linux-arm64-3.0.3.tar.gz` | 完整解压后运行 `./codex-bridge` |
 
 macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻止打开，请在系统设置的“隐私与安全性”中允许此次打开。Windows 需要 WebView2 Runtime；App 会在运行环境缺失时给出提示。
 
@@ -85,7 +85,7 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 | --- | --- |
 | ChatGPT / Dot | 按 [Tunnel 配置指南](./docs/CHATGPT_DEVELOPER_MODE.md)配置 OpenAI Secure MCP Tunnel，在 ChatGPT「插件 → 添加 → 创建自定义 MCP 服务器」添加 Codex Bridge。需要 Plus 及以上订阅或团队订阅。 |
 | Qwen Studio | 使用本机回环 HTTP MCP，从 Bridge 连接页复制 Qwen JSON 配置。 |
-| Gemini 桌面 App | 本地 MCP 用于与 Bridge 位于同一台电脑、能启动本机程序的 Gemini 桌面 App，复制[本地 MCP 启动命令](./docs/USER_GUIDE.md#81-连接-gemini-本地-mcp)进行配置。 |
+| Gemini 桌面 App | 在自定义关联应用的「命令」栏填写[本地 MCP 启动命令](./docs/USER_GUIDE.md#81-连接-gemini-本地-mcp)，允许本机网络与文件访问。macOS 通过双向身份校验的 Unix socket 获取服务配置。 |
 | Gemini 网页版（含 Bridge 内置浏览器） | **必须使用 Cloud MCP**，选择 [ChatGPT Sites（公开）或 ngrok](./docs/USER_GUIDE.md#82-连接-gemini-云-mcp)，填写 Bridge 生成的完整专用链接。 |
 
 Gemini 的配置入口是 **更多 → 自定义 → 关联应用 → 右上角「＋自定义」**，然后选择本地 MCP 或 Cloud MCP。**Gemini 的三种接入方式都无需配置 OpenAI Platform、Tunnel ID 或 OpenAI Runtime API Key，也无需启用 ChatGPT 的 Tunnel 连接。** 选择 Sites 时需要可使用 ChatGPT Sites 的账号；站点的两项 Secret 由 Bridge 生成。选择本地 MCP 或 ngrok 时，无需使用 ChatGPT Sites。

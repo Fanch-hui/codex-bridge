@@ -11,7 +11,9 @@ extension AgentWorkspaceStore {
       let url = directory.appendingPathComponent(name)
       let metadata = try FileSystemEntryMetadata(at: url)
       if metadata.isDirectory || metadata.isSymbolicLink { count += 1 }
-      guard count < Self.maximumManagedWorkspaces else { throw AgentWorkspaceError.resourceLimit }
+      guard count < Self.maximumManagedWorkspaces else {
+        throw AgentWorkspaceError.workspaceCapacityReached
+      }
     }
   }
 
@@ -69,24 +71,9 @@ extension AgentWorkspaceStore {
     }
     let baseline = try baselineRoot(manifest)
     let policy = ProjectFilePolicy(forbiddenPatterns: manifest.forbiddenPatterns)
-    let paths: [String]
-    do {
-      paths = try AgentWorkspaceInventory(root: baseline, policy: policy).paths()
-    } catch AgentWorkspaceError.unsupportedEntry(_) {
-      return false
-    } catch AgentWorkspaceError.resourceLimit {
-      return false
-    }
-    let workspacePaths: [String]
-    do {
-      workspacePaths = try AgentWorkspaceInventory(root: snapshot.workspaceRoot, policy: policy)
-        .paths()
-    } catch AgentWorkspaceError.unsupportedEntry(_) {
-      return false
-    } catch AgentWorkspaceError.resourceLimit {
-      return false
-    }
-    guard paths == workspacePaths,
+    guard let paths = try preparedInventory(root: baseline, policy: policy),
+      let workspacePaths = try preparedInventory(root: snapshot.workspaceRoot, policy: policy),
+      paths == workspacePaths,
       try containsOnlyPreparedEntries(
         paths: paths, baseline: baseline, workspace: baseline, privateGit: false),
       try containsOnlyPreparedEntries(
@@ -111,6 +98,21 @@ extension AgentWorkspaceStore {
     else { return false }
     try FileManager.default.removeItem(at: workspaceDirectory(id))
     return true
+  }
+
+  /// Nil means the tree cannot be inventoried, so it is not an untouched copy.
+  private func preparedInventory(root: RegisteredRoot, policy: ProjectFilePolicy) throws
+    -> [String]?
+  {
+    do {
+      return try AgentWorkspaceInventory(root: root, policy: policy).paths()
+    } catch AgentWorkspaceError.unsupportedEntry(_) {
+      return nil
+    } catch AgentWorkspaceError.symbolicLink(_) {
+      return nil
+    } catch AgentWorkspaceError.resourceLimit {
+      return nil
+    }
   }
 
   private func hasOnlyPreparedStorage(id: String, privateGit: Bool) throws -> Bool {

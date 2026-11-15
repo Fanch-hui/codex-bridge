@@ -255,7 +255,7 @@ let package = Package(
     ),
     .target(
       name: "BridgeACP",
-      dependencies: ["BridgeProcess", "BridgeSecurity"]
+      dependencies: ["BridgeAgentCore", "BridgeProcess", "BridgeSecurity"]
     ),
     .target(
       name: "BridgeEmbeddedDSH",
@@ -363,7 +363,7 @@ let package = Package(
     .target(
       name: "BridgeLocalMCP",
       dependencies: [
-        "BridgeIPC",
+        "BridgeIPC", "BridgeSecurity",
         .product(name: "MCP", package: "swift-sdk"),
         .product(name: "Logging", package: "swift-log"),
       ]

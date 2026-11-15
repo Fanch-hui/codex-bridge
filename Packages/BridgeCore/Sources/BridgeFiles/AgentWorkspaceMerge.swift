@@ -127,6 +127,8 @@ extension AgentWorkspaceStore {
           path: value, before: current, after: merged.value, baseline: original,
           workspace: child, workspaceMode: mode, beforeMode: beforeMode))
     }
+    let excluded = try AgentWorkspaceInventory(root: snapshot.workspaceRoot, policy: policy)
+      .excludedEntries(limit: AgentWorkspaceInventory.maximumReportedExcludedPaths)
     if conflictsChanged {
       manifest.pendingConflicts = pending
       manifest.revision += 1
@@ -134,7 +136,8 @@ extension AgentWorkspaceStore {
     }
     return AgentWorkspaceMergePlan(
       id: id, revision: manifest.revision, changedPaths: changes.map(\.path),
-      conflicts: Set(pending.keys).union(unresolvedRepairs).sorted(), changes: changes)
+      conflicts: Set(pending.keys).union(unresolvedRepairs).sorted(),
+      excludedPaths: excluded.paths, excludedPathsOmitted: excluded.omitted, changes: changes)
   }
 
   func baselineRoot(_ manifest: AgentWorkspaceManifest) throws -> RegisteredRoot {

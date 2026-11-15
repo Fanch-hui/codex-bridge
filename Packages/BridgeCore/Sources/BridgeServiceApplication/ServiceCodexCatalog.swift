@@ -32,15 +32,17 @@ public actor ServiceCodexCatalog {
     let fetchedAt: ContinuousClock.Instant
   }
 
-  private struct InFlightModels {
-    let generation: UInt64
-    let task: Task<MCPModelList, any Error>
+  private struct ModelsFetch {
+    let task: Task<Void, Never>
+    var waiters: [UUID: CheckedContinuation<MCPModelList, any Error>] = [:]
   }
 
   private let configuration: ServiceCodexCatalogConfiguration
   private let clock = ContinuousClock()
   private var modelCache: ModelCacheEntry?
-  private var inFlightModels: InFlightModels?
+  /// Fetches by generation. Callers join the one of the current generation; a fetch that was
+  /// invalidated meanwhile stays until it has answered the callers it already has.
+  private var modelFetches: [UInt64: ModelsFetch] = [:]
   private var modelsFetchGeneration: UInt64 = 0
 
   public init(configuration: ServiceCodexCatalogConfiguration) {
@@ -179,35 +181,57 @@ public actor ServiceCodexCatalog {
     if let cache = modelCache, clock.now < cache.fetchedAt + configuration.modelsCacheTTL {
       return cache.models
     }
-    // Single flight: concurrent callers share one app-server spawn instead of
-    // starting one cold process per request.
-    let inFlight: InFlightModels
-    if let existing = inFlightModels {
-      inFlight = existing
-    } else {
-      modelsFetchGeneration += 1
-      let created = InFlightModels(
-        generation: modelsFetchGeneration,
-        task: makeModelsFetchTask()
-      )
-      inFlightModels = created
-      inFlight = created
+    let generation = joinModelsFetch()
+    let waiterID = UUID()
+    // A caller leaves at its own deadline. The fetch is bounded by the request timeout, so it
+    // may still finish and fill the cache for the next caller.
+    let expiry = Task { [clock] in
+      guard (try? await clock.sleep(until: deadline)) != nil else { return }
+      self.takeModelsWaiter(waiterID, generation: generation)?
+        .resume(throwing: BridgeMCPQueryError.timeout)
     }
-    let result = await inFlight.task.result
-    if inFlightModels?.generation == inFlight.generation {
-      inFlightModels = nil
-    }
-    switch result {
-    case .success(let models):
-      if inFlight.generation == modelsFetchGeneration {
-        modelCache = ModelCacheEntry(models: models, fetchedAt: clock.now)
+    defer { expiry.cancel() }
+    return try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation { continuation in
+        modelFetches[generation]?.waiters[waiterID] = continuation
       }
-      try Self.checkDeadline(deadline)
-      return models
-    case .failure(let error):
-      try Self.checkDeadline(deadline)
-      throw error
+    } onCancel: {
+      Task { await self.cancelModelsWaiter(waiterID, generation: generation) }
     }
+  }
+
+  /// Single flight: concurrent callers share one app-server spawn instead of starting one cold
+  /// process per request. Returns the generation of the fetch to wait for.
+  private func joinModelsFetch() -> UInt64 {
+    if modelFetches[modelsFetchGeneration] == nil {
+      modelsFetchGeneration += 1
+      modelFetches[modelsFetchGeneration] = ModelsFetch(
+        task: makeModelsFetchTask(generation: modelsFetchGeneration))
+    }
+    return modelsFetchGeneration
+  }
+
+  private func finishModelsFetch(generation: UInt64, result: Result<MCPModelList, any Error>) {
+    guard let fetch = modelFetches.removeValue(forKey: generation) else { return }
+    if case .success(let models) = result, generation == modelsFetchGeneration {
+      modelCache = ModelCacheEntry(models: models, fetchedAt: clock.now)
+    }
+    for waiter in fetch.waiters.values { waiter.resume(with: result) }
+  }
+
+  private func takeModelsWaiter(_ waiterID: UUID, generation: UInt64)
+    -> CheckedContinuation<MCPModelList, any Error>?
+  {
+    modelFetches[generation]?.waiters.removeValue(forKey: waiterID)
+  }
+
+  /// A cancelled caller that was the last one waiting takes the fetch and its process down with it.
+  private func cancelModelsWaiter(_ waiterID: UUID, generation: UInt64) {
+    guard let waiter = takeModelsWaiter(waiterID, generation: generation) else { return }
+    if modelFetches[generation]?.waiters.isEmpty == true {
+      modelFetches.removeValue(forKey: generation)?.task.cancel()
+    }
+    waiter.resume(throwing: CancellationError())
   }
 
   public func refreshModels(deadline: ContinuousClock.Instant) async throws -> MCPModelList {
@@ -219,17 +243,23 @@ public actor ServiceCodexCatalog {
   /// app-server configuration.
   public func invalidateModelCache() {
     modelCache = nil
-    inFlightModels = nil
     modelsFetchGeneration += 1
   }
 
-  private func makeModelsFetchTask() -> Task<MCPModelList, any Error> {
+  private func makeModelsFetchTask(generation: UInt64) -> Task<Void, Never> {
     let configuration = self.configuration
     let fetchDeadline =
       clock.now
       .advanced(by: .nanoseconds(Int64(clamping: configuration.requestTimeoutNanoseconds)))
     return Task {
-      try await Self.fetchModels(configuration: configuration, deadline: fetchDeadline)
+      let result: Result<MCPModelList, any Error>
+      do {
+        result = .success(
+          try await Self.fetchModels(configuration: configuration, deadline: fetchDeadline))
+      } catch {
+        result = .failure(error)
+      }
+      self.finishModelsFetch(generation: generation, result: result)
     }
   }
 

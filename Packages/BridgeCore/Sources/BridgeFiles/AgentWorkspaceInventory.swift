@@ -53,7 +53,7 @@ struct AgentWorkspaceInventory {
         guard policy.allows(path) else { continue }
         let child = base.appendingPathComponent(relative)
         let metadata = try FileSystemEntryMetadata(at: child)
-        if metadata.isSymbolicLink { throw AgentWorkspaceError.unsupportedEntry(relative) }
+        if metadata.isSymbolicLink { throw AgentWorkspaceError.symbolicLink(relative) }
         if metadata.isDirectory {
           if !Self.ignoredDirectories.contains(name.lowercased()) {
             guard path.components.count <= 64 else { throw AgentWorkspaceError.resourceLimit }
@@ -96,7 +96,7 @@ struct AgentWorkspaceInventory {
   static func validateContent(_ data: Data?, path: String) throws {
     guard let data, let text = String(data: data, encoding: .utf8) else { return }
     if ProjectSecretRedactor.containsSensitiveContent(text) {
-      throw AgentWorkspaceError.unsupportedEntry(path)
+      throw AgentWorkspaceError.suspectedSecret(path)
     }
   }
 

@@ -180,7 +180,7 @@ extension BridgeServiceApplication {
         relativePath: change.relativePath,
         beforeRevision: revision(change.beforeRevision),
         afterRevision: revision(change.afterRevision),
-        boundedDiff: safeMutationDiff(change.boundedDiff)
+        boundedDiff: safeBoundedDiff(change.boundedDiff)
       )
     }
   }
@@ -205,19 +205,6 @@ extension BridgeServiceApplication {
 
   private static func revision(_ value: FileRevision) -> MCPDirectMutationRevision {
     MCPDirectMutationRevision(sha256: value.sha256, byteCount: value.byteCount)
-  }
-
-  private static func safeMutationDiff(_ diff: BoundedDiff) -> MCPBoundedDiff {
-    MCPBoundedDiff(
-      removedLines: diff.removedLines.map {
-        OutboundContentSecurity.redacted($0, maximumUTF8Bytes: 64 * 1_024)
-      },
-      addedLines: diff.addedLines.map {
-        OutboundContentSecurity.redacted($0, maximumUTF8Bytes: 64 * 1_024)
-      },
-      truncated: diff.truncated,
-      byteCount: diff.byteCount
-    )
   }
 
   private static func mutationTimestamp(_ date: Date) -> String {

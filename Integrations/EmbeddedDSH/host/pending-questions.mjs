@@ -12,6 +12,10 @@ export class PendingQuestions {
     this.revisions = new Map();
     this.queued = new Set();
     this.active = 0;
+    // After a failed save memory is ahead of the file, so the next refresh must save and notify again
+    // even when the projection is unchanged. Saves run in order and each writes the latest rows, so the
+    // outcome of the most recent save is the file's state.
+    this.saveFailed = false;
     this.persistQueue = Promise.resolve();
     this.closed = false;
     this.abort = new AbortController();
@@ -77,7 +81,7 @@ export class PendingQuestions {
     const items = (projection?.values?.userQuestions?.active ?? []).filter(question => question.state === 'continued')
       .map(question => ({ sessionID, callId: question.callId, questions: question.questions }));
     const before = [...this.rows.values()].filter(row => row.sessionID === sessionID);
-    if (JSON.stringify(before) === JSON.stringify(items)) return;
+    if (!this.saveFailed && JSON.stringify(before) === JSON.stringify(items)) return;
     for (const row of before) this.rows.delete(this.key(sessionID, row.callId));
     for (const row of items) this.rows.set(this.key(sessionID, row.callId), row);
     await this.persist();
@@ -89,7 +93,10 @@ export class PendingQuestions {
       await writeFile(temporary, `${JSON.stringify([...this.rows.values()])}\n`, { mode: 0o600 });
       await rename(temporary, this.path);
     });
-    this.persistQueue = task.catch(error => process.stderr.write(`Pending question index could not be saved: ${error.message}\n`));
+    this.persistQueue = task.then(() => { this.saveFailed = false; }, error => {
+      this.saveFailed = true;
+      process.stderr.write(`Pending question index could not be saved: ${error.message}\n`);
+    });
     return task;
   }
   async dispose() {

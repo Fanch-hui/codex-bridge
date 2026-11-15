@@ -21,6 +21,7 @@ export async function startEngine(home) {
     { id: 'fs-observation-policy', disabled: false },
     { id: 'session-query-sqlite', config: { path: ':memory:', openAt: 'first-search', persistedReadConcurrency: 2 } },
     { id: 'skill-filesystem', config: { agentsHome: join(home, 'agents') } },
+    { id: 'tool-subagent-control', config: { interrupt: true } },
     { insert: [
       { id: 'bridge-credentials', name: pathToFileURL(join(hostDirectory, 'credentials.mjs')).href },
       { id: 'workspace', name: '@deepseek-ai/dsh-workspace' },

@@ -25,7 +25,7 @@
   }
 
   function create(detail, emit, hooks) {
-    var draft = hooks.draftFor(detail.taskID), state = { detail: detail, page: null, emit: emit, stopping: false };
+    var draft = hooks.draftFor(detail), state = { detail: detail, page: null, emit: emit, stopping: false };
     var view = C().create({
       className: "workbench-session-composer", inputID: "workbench-task-input", label: "消息",
       value: draft.input, placeholder: "",
@@ -34,12 +34,10 @@
       onModel: function (value) { draft.modelID = value; draft.effort = ""; refresh(); },
       onEffort: function (value) { draft.effort = value; refresh(); }
     });
-    view.input.dataset.taskID = detail.taskID;
     var mode = C().choice("发送方式", function (value) {
-      draft.mode = value; hooks.persistDraft(detail.taskID, draft); refresh();
+      draft.mode = value; hooks.persistDraft(state.detail, draft); refresh();
     }, "workbench-composer-mode");
     mode.control.id = "workbench-steer-mode";
-    mode.control.dataset.taskID = detail.taskID;
     view.trailing.insertBefore(mode.wrapper, view.trailing.firstChild);
     var retry = S.button("重试", null, {}, null, "small workbench-composer-retry", false);
     retry.title = "用原始指令重新开始任务";
@@ -50,18 +48,32 @@
     queue.appendChild(queueLabel); queue.appendChild(queueItems); view.leading.appendChild(queue);
     view.input.addEventListener("input", function () {
       draft.input = view.input.value; draft.error = "";
-      hooks.persistDraft(detail.taskID, draft); S.autoGrowTextArea(view.input); validate();
+      hooks.persistDraft(state.detail, draft); S.autoGrowTextArea(view.input); validate();
     });
     S.autoGrowTextArea(view.input);
+
+    // The composer stays with its session: a follow-up creates a new task, and the session ID
+    // of a first task arrives while it runs. Either way the draft moves along with it.
+    function bindTask(next) {
+      hooks.rekeyDraft(state.detail, next, draft);
+      state.detail = next;
+      view.input.dataset.taskID = next.taskID;
+      mode.control.dataset.taskID = next.taskID;
+    }
+    function setInput(value) {
+      draft.input = value;
+      hooks.persistDraft(state.detail, draft);
+      view.input.value = value; S.autoGrowTextArea(view.input);
+    }
 
     function modes() {
       var options = S.safeArray(state.page && state.page.steerModes).filter(function (item) { return item.enabled !== false; });
       return options.length ? options : [{ id: "queued", title: "插入当前对话" }];
     }
     function selection() {
-      var agent = C().agentFor(detail.providerID, detail.installationID);
-      return C().setModels(view, agent, draft.modelID, draft.effort || clean(detail.executionEffort),
-        clean(detail.executionModel));
+      var current = state.detail, agent = C().agentFor(current.providerID, current.installationID);
+      return C().setModels(view, agent, draft.modelID, draft.effort || clean(current.executionEffort),
+        clean(current.executionModel));
     }
     function updateQueue() {
       var items = P.queued(state.page);
@@ -138,7 +150,7 @@
         if (selected) payload.executionSelection = selected;
       }
       var saved = P.sendOperation(pending, payload, function (result) { hooks.apply(result, state.emit); });
-      if (pending.visible && saved && pending.state !== "failed") hooks.updateDraft(current.taskID, "", view.input);
+      if (pending.visible && saved && pending.state !== "failed") setInput("");
       updateQueue(); validate();
     }
     function restart() {
@@ -159,12 +171,18 @@
     }
 
     var form = view.root;
-    form.__taskID = detail.taskID;
     form.__inputControl = view.input;
+    form.__draft = draft;
+    form.__setInput = setInput;
     form.__validate = validate;
     form.__updateQueue = updateQueue;
+    // Whether a task detail or a submission belongs to the session shown here.
+    form.__continues = function (owner) {
+      return owner.taskID === state.detail.taskID || hooks.draftKey(owner) === hooks.draftKey(state.detail);
+    };
+    bindTask(detail);
     form.__update = function (nextDetail, page, nextEmit) {
-      state.detail = nextDetail; state.page = page; state.emit = nextEmit;
+      bindTask(nextDetail); state.page = page; state.emit = nextEmit;
       if (nextDetail.isTerminal === true || !isRunning(nextDetail)) state.stopping = false;
       refresh();
     };

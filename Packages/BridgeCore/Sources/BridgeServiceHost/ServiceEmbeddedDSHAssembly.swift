@@ -58,7 +58,7 @@ enum ServiceEmbeddedDSHAssembly {
             as? any AgentWorkspaceIsolationProviding
         else {
           return AgentWorkspaceIsolationReadiness(
-            ready: false, reason: "该执行器尚未启用进程写入隔离。")
+            ready: false, reason: ServiceEmbeddedDSHController.isolationUnsupportedReason)
         }
         let record = try await registry.reprobe(
           installationID: AgentInstallationID(rawValue: installationID),
@@ -71,6 +71,13 @@ enum ServiceEmbeddedDSHAssembly {
           installation: try record.agentInstallation(),
           workspaceRoot: snapshot.workspaceRoot.canonicalPath,
           runtimeDirectory: runtimeDirectory)
+      },
+      externalWorkspaceSupport: { providerID in
+        let id = AgentProviderID(rawValue: providerID)
+        let isolatable =
+          providers.first(where: { $0.descriptor.providerID == id })
+          is any AgentWorkspaceIsolationProviding
+        return isolatable ? nil : ServiceEmbeddedDSHController.isolationUnsupportedReason
       },
       externalChildRecovery: { child in
         guard child.providerID == AgentProviderID.deepSeekHarnessDesktop.rawValue,
