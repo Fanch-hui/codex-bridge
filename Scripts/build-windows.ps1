@@ -105,7 +105,7 @@ $msvcStagingDirectory = Join-Path $repoRoot (".build\windows-msvc-include-" + [G
 Push-Location $packagePath
 try {
   $msvcInclude = Get-WindowsMSVCIncludePath -IncludeDirectory $buildEnvironment.IncludePaths[0] `
-    -SDKRoot $env:SDKROOT -StagingDirectory $msvcStagingDirectory
+    -SDKRoot $env:SDKROOT -StagingDirectory (Join-Path $msvcStagingDirectory "include")
   $env:INCLUDE = (@($vcpkgIncludeDirectory, $msvcInclude) + @($buildEnvironment.IncludePaths | Select-Object -Skip 1)) -join ";"
   $env:LIB = (@($vcpkgLibraryDirectory) + $buildEnvironment.LibraryPaths) -join ";"
   if ($buildEnvironment.BinaryPaths -and $buildEnvironment.BinaryPaths.Count -gt 0) {

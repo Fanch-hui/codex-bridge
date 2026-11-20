@@ -114,7 +114,7 @@ jobs:
           $vcpkgRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet"
           $vcpkgBin = Join-Path $vcpkgRoot "bin"
           $msvcInclude = Get-WindowsMSVCIncludePath -IncludeDirectory $buildEnvironment.IncludePaths[0] `
-            -SDKRoot $env:SDKROOT -StagingDirectory (Join-Path $env:RUNNER_TEMP "bridge-msvc-include-$archDir")
+            -SDKRoot $env:SDKROOT -StagingDirectory (Join-Path $env:RUNNER_TEMP "bridge-msvc-$archDir/include")
           $includePaths = @((Join-Path $vcpkgRoot "include"), $msvcInclude) + @($buildEnvironment.IncludePaths | Select-Object -Skip 1)
           Add-Content $env:GITHUB_ENV "INCLUDE=$($includePaths -join ';')"
           $targetLibraryPaths = (@((Join-Path $vcpkgRoot "lib")) + $buildEnvironment.LibraryPaths) -join ";"
@@ -142,6 +142,10 @@ jobs:
         with:
           path: .build/ci-cache/vcpkg
           key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+      - name: Verify Windows compiler header selection
+        timeout-minutes: 5
+        shell: pwsh
+        run: '& "$env:GITHUB_WORKSPACE\.github\scripts\verify-windows-compiler.ps1" -Architecture "${{ matrix.architecture }}"'
       - name: Compile Windows application resources
         shell: pwsh
         run: |
