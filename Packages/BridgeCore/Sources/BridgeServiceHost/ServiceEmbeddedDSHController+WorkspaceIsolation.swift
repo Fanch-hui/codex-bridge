@@ -54,9 +54,6 @@ extension ServiceEmbeddedDSHController {
   ) -> SubagentWorkspacePlan? {
     let isCodex = providerID == "codex"
     if continuation { return .shared(reason: "此会话沿用原来的项目目录。") }
-    if isCodex, !CodexIsolatedLaunch.supportsFileOnlyExecution {
-      return .shared(reason: "当前 Codex 文件操作依赖命令进程，使用共享目录串行执行。")
-    }
     guard permissionMode == .full else { return .shared(reason: nil) }
     guard isCodex ? CodexIsolatedLaunch.isAvailable : WorkspaceProcessIsolation.isAvailable else {
       return .shared(reason: "当前平台的隔离检查未通过。")

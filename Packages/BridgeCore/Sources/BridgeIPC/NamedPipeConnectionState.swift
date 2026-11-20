@@ -13,6 +13,7 @@
     private let writeLock = NSLock()
     private var closed = false
     private var handleClosed = false
+    private var hasReceivedFrame = false
 
     init(handle: HANDLE, io: NamedPipeOverlappedIO) {
       self.handle = handle
@@ -24,6 +25,12 @@
       lifecycleLock.lock()
       defer { lifecycleLock.unlock() }
       return closed
+    }
+
+    var receivedAnyFrame: Bool {
+      lifecycleLock.lock()
+      defer { lifecycleLock.unlock() }
+      return hasReceivedFrame
     }
 
     func start(reader: @escaping @Sendable () -> Void) {
@@ -78,8 +85,11 @@
       let length = header.withUnsafeBytes { raw in
         raw.loadUnaligned(fromByteOffset: 1, as: UInt32.self).littleEndian
       }
-      guard length <= BridgeServiceIPC.maximumMessageBytes else { return nil }
+      guard Int(length) <= ServiceFrameKind.maximumPayloadBytes(for: kind) else { return nil }
       guard let payload = readFullyWhileTracked(length) else { return nil }
+      lifecycleLock.lock()
+      hasReceivedFrame = true
+      lifecycleLock.unlock()
       return (kind, payload)
     }
 

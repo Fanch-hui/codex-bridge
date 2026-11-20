@@ -132,10 +132,19 @@
         settings: pageCache.settings(
           key: WindowsDesktopSettingsCacheKey(
             settings: settings,
-            agentDefaults: agentDefaults
+            agentDefaults: agentDefaults,
+            applicationMode: workbench.applicationMode,
+            applicationModeTransition: workbench.applicationModeTransition,
+            applicationModeError: workbench.applicationModeError
           )
         ) {
-          settingsPage(settings: settings, agentDefaults: agentDefaults)
+          settingsPage(
+            settings: settings,
+            agentDefaults: agentDefaults,
+            applicationMode: workbench.applicationMode,
+            applicationModeTransition: workbench.applicationModeTransition,
+            applicationModeError: workbench.applicationModeError
+          )
         },
         appUpdate: appUpdate,
         messageCenter: messageCenter

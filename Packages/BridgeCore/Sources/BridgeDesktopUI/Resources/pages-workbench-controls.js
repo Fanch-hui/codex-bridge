@@ -56,11 +56,6 @@
     }
     var form = controls.__activeForm;
     if (continuesSession(form, detail)) form.__update(detail, page, emit);
-    if (global.CodexBridgeDesktopWorkbenchHandoff) {
-      global.CodexBridgeDesktopWorkbenchHandoff.render(
-        detail, emit, page && page.commandReceipt
-      );
-    }
   }
 
   function continuesSession(form, owner) { return !!form && !!owner && form.__continues(owner); }

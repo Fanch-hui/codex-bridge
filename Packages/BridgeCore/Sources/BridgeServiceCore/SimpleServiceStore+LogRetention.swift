@@ -12,7 +12,11 @@ extension SimpleServiceStore {
           sql: "DELETE FROM bridge_service_task_events WHERE created_at < ?",
           arguments: [cutoff.timeIntervalSince1970]
         )
-        return db.changesCount
+        let removed = db.changesCount
+        try db.execute(
+          sql: "DELETE FROM bridge_service_gateway_activity WHERE recorded_at < ?",
+          arguments: [cutoff.timeIntervalSince1970])
+        return removed
       }
     } catch {
       throw ServiceStoreError.storageFailure

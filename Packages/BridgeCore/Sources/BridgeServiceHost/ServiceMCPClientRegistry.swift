@@ -24,6 +24,9 @@ public struct ServiceMCPClientProfile: Equatable, Sendable {
 public enum ServiceMCPClientRegistryError: Error, Equatable, Sendable {
   case unsupportedClient
   case clientDisabled
+  case externalStoreUnavailable
+  case invalidExternalClient
+  case externalClientLimit
 }
 
 public actor ServiceMCPClientRegistry {
@@ -32,29 +35,35 @@ public actor ServiceMCPClientRegistry {
 
   private static let localClients: [MCPClientID] = [.qwenStudio, .gemini]
   private let settings: ServiceSettings
-  private let secrets: ServiceMCPSecretProvider
-  private let mutationGate = AsyncMutex()
+  let secrets: ServiceMCPSecretProvider
+  let mutationGate = AsyncMutex()
+  let store: SimpleServiceStore?
 
   /// Defers credential-store access until the local listener is prepared.
   public static func makeDeferred(
     settings: ServiceSettings,
-    secrets: ServiceMCPSecretProvider
+    secrets: ServiceMCPSecretProvider,
+    store: SimpleServiceStore? = nil
   ) throws -> ServiceMCPClientRegistry {
-    ServiceMCPClientRegistry(settings: settings, secrets: secrets)
+    ServiceMCPClientRegistry(settings: settings, secrets: secrets, store: store)
   }
 
   public static func make(
     settings: ServiceSettings,
-    secrets: ServiceMCPSecretProvider
+    secrets: ServiceMCPSecretProvider,
+    store: SimpleServiceStore? = nil
   ) async throws -> ServiceMCPClientRegistry {
-    let registry = try makeDeferred(settings: settings, secrets: secrets)
+    let registry = try makeDeferred(settings: settings, secrets: secrets, store: store)
     try await registry.prepareForLocalMCP()
     return registry
   }
 
-  private init(settings: ServiceSettings, secrets: ServiceMCPSecretProvider) {
+  private init(
+    settings: ServiceSettings, secrets: ServiceMCPSecretProvider, store: SimpleServiceStore?
+  ) {
     self.settings = settings
     self.secrets = secrets
+    self.store = store
     authenticator = MCPClientCredentialAuthenticator()
     admission = MCPClientAdmissionGate(initiallyEnabled: [])
   }
@@ -87,7 +96,9 @@ public actor ServiceMCPClientRegistry {
       case .chatGPT: return Self.mcpMode(try await settings.exposureMode())
       case .qwenStudio: return Self.mcpMode(try await settings.qwenStudioExposureMode())
       case .gemini: return Self.mcpMode(try await settings.geminiExposureMode())
-      default: return .readOnly
+      default:
+        return try await externalClients().contains { $0.id == clientID.rawValue && $0.enabled }
+          ? .full : .readOnly
       }
     } catch {
       return .readOnly
@@ -142,10 +153,15 @@ public actor ServiceMCPClientRegistry {
   }
 
   public func credential(for clientID: MCPClientID) async throws -> String {
-    try requireLocalClient(clientID)
     await mutationGate.acquire()
     defer { mutationGate.release() }
-    guard try await isConfiguredEnabled(clientID), admission.isEnabled(clientID) else {
+    let enabled: Bool
+    if Self.localClients.contains(clientID) {
+      enabled = try await isConfiguredEnabled(clientID)
+    } else {
+      enabled = try await externalClients().contains { $0.id == clientID.rawValue && $0.enabled }
+    }
+    guard enabled, admission.isEnabled(clientID) else {
       throw ServiceMCPClientRegistryError.clientDisabled
     }
     return try await secrets.secret(for: clientID)
@@ -183,9 +199,13 @@ public actor ServiceMCPClientRegistry {
         admission.revoke(clientID)
       }
     }
+    for client in try await externalClients() {
+      let clientID = MCPClientID(rawValue: client.id)
+      if client.enabled { admission.allow(clientID) } else { admission.revoke(clientID) }
+    }
   }
 
-  private func installCredentials(excluding excluded: MCPClientID? = nil) async throws {
+  func installCredentials(excluding excluded: MCPClientID? = nil) async throws {
     var credentials = [
       try MCPClientCredential(clientID: .chatGPT, value: try await secrets.secret(for: .chatGPT))
     ]
@@ -195,6 +215,14 @@ public actor ServiceMCPClientRegistry {
           try MCPClientCredential(
             clientID: clientID, value: try await secrets.secret(for: clientID))
         )
+      }
+    }
+    for client in try await externalClients() where client.enabled {
+      let clientID = MCPClientID(rawValue: client.id)
+      if clientID != excluded {
+        credentials.append(
+          try MCPClientCredential(
+            clientID: clientID, value: try await secrets.secret(for: clientID)))
       }
     }
     try authenticator.replaceCredentials(credentials)

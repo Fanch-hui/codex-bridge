@@ -4,10 +4,11 @@
 
   /// Named pipe transport for the Windows desktop shell.
   ///
-  /// Frame layout on the pipe: one kind byte (0 request, 1 response, 2 stream
-  /// push), a UInt32 little-endian payload length, then the payload. Responses
-  /// are matched to requests in FIFO order; the server preserves per-connection
-  /// response ordering.
+  /// Frame layout on the pipe: one kind byte (0 legacy request, 1 legacy response,
+  /// 2 stream push, 3 multiplexed request, 4 multiplexed response), a UInt32
+  /// little-endian payload length, then the payload. Multiplexed frames prefix
+  /// the payload with an 8-byte little-endian request tag so concurrent requests
+  /// (such as long-polls and interactive RPCs) do not head-of-line block each other.
   final class NamedPipeServiceTransport: ServiceRequestTransport, @unchecked Sendable {
     private struct PendingResponse {
       let state: NamedPipeConnectionState
@@ -15,10 +16,15 @@
     }
 
     private let pipeName: String
+    private let expectedServerImage: [WCHAR]?
     private let lock = NSLock()
     private var currentState: NamedPipeConnectionState?
     private var retiringStates: [NamedPipeConnectionState] = []
-    private var pending: [PendingResponse] = []
+    private var pendingFIFO: [PendingResponse] = []
+    private var pendingTagged: [UInt64: PendingResponse] = [:]
+    private var nextTag: UInt64 = 1
+    private var multiplexingEnabled: Bool
+    private var multiplexedConfirmed = false
     private var streamHandlerStore: (@Sendable (Data) -> Void)?
     private var invalidated = false
 
@@ -35,8 +41,13 @@
       }
     }
 
-    init(pipeName: String) {
+    init(
+      pipeName: String, multiplexed: Bool = true,
+      expectedServerImage: [WCHAR]? = WindowsPipeServerIdentity.expectedServiceImage()
+    ) {
       self.pipeName = pipeName
+      self.expectedServerImage = expectedServerImage
+      self.multiplexingEnabled = multiplexed
     }
 
     deinit {
@@ -44,6 +55,18 @@
     }
 
     func perform(_ data: Data) async throws -> Data {
+      let useMultiplexed = lock.withLock { multiplexingEnabled }
+      do {
+        return try await performOnce(data, multiplexed: useMultiplexed)
+      } catch BridgeServiceClientError.unavailable
+        where useMultiplexed && lock.withLock({ !multiplexingEnabled && !multiplexedConfirmed })
+        && ServiceMultiplexedFrame.allowsLegacyFallback(for: data)
+      {
+        return try await performOnce(data, multiplexed: false)
+      }
+    }
+
+    private func performOnce(_ data: Data, multiplexed: Bool) async throws -> Data {
       try await withCheckedThrowingContinuation { continuation in
         let state: NamedPipeConnectionState
         do {
@@ -54,13 +77,36 @@
         }
 
         var registered = false
+        let frameKind: UInt8
+        let wirePayload: Data
+        let allocatedTag: UInt64
+        if multiplexed {
+          allocatedTag = lock.withLock {
+            let tag = nextTag
+            nextTag &+= 1
+            if nextTag == 0 { nextTag = 1 }
+            return tag
+          }
+          frameKind = ServiceFrameKind.multiplexedRequest
+          wirePayload = ServiceMultiplexedFrame.encode(tag: allocatedTag, payload: data)
+        } else {
+          allocatedTag = 0
+          frameKind = ServiceFrameKind.legacyRequest
+          wirePayload = data
+        }
+
         do {
-          try state.writeFrame(kind: 0, payload: data) { [weak self] in
+          try state.writeFrame(kind: frameKind, payload: wirePayload) { [weak self] in
             guard let self else { return false }
             lock.lock()
             defer { lock.unlock() }
             guard !invalidated, currentState === state else { return false }
-            pending.append(PendingResponse(state: state, continuation: continuation))
+            let entry = PendingResponse(state: state, continuation: continuation)
+            if multiplexed {
+              pendingTagged[allocatedTag] = entry
+            } else {
+              pendingFIFO.append(entry)
+            }
             registered = true
             return true
           }
@@ -85,8 +131,9 @@
       currentState = nil
       let retiring = retiringStates
       retiringStates.removeAll(keepingCapacity: false)
-      let failed = pending
-      pending.removeAll()
+      let failed = pendingFIFO + Array(pendingTagged.values)
+      pendingFIFO.removeAll()
+      pendingTagged.removeAll()
       lock.unlock()
 
       state?.cancelAndClose(waitForReader: true)
@@ -155,7 +202,9 @@
       guard opened != INVALID_HANDLE_VALUE else {
         throw BridgeServiceClientError.unavailable
       }
-      guard let io = NamedPipeOverlappedIO() else {
+      guard WindowsPipeServerIdentity.accepts(pipe: opened, expectedImage: expectedServerImage),
+        let io = NamedPipeOverlappedIO()
+      else {
         _ = CloseHandle(opened)
         throw BridgeServiceClientError.unavailable
       }
@@ -193,13 +242,29 @@
       from state: NamedPipeConnectionState
     ) {
       switch frame.kind {
-      case 1:
+      case ServiceFrameKind.legacyResponse:
         lock.lock()
-        let index = pending.firstIndex { $0.state === state && currentState === state }
-        let response = index.map { pending.remove(at: $0) }
+        let index = pendingFIFO.firstIndex { $0.state === state && currentState === state }
+        let response = index.map { pendingFIFO.remove(at: $0) }
         lock.unlock()
         response?.continuation.resume(returning: frame.payload)
-      case 2:
+      case ServiceFrameKind.multiplexedResponse:
+        guard let (tag, body) = ServiceMultiplexedFrame.decode(frame.payload) else {
+          state.cancelAndClose(waitForReader: false)
+          retire(state, waitForReader: false)
+          return
+        }
+        lock.lock()
+        multiplexedConfirmed = true
+        let response: PendingResponse?
+        if currentState === state, let entry = pendingTagged[tag], entry.state === state {
+          response = pendingTagged.removeValue(forKey: tag)
+        } else {
+          response = nil
+        }
+        lock.unlock()
+        response?.continuation.resume(returning: body)
+      case ServiceFrameKind.streamPush:
         let handler: (@Sendable (Data) -> Void)? = lock.withLock {
           guard currentState === state, !invalidated else { return nil }
           return streamHandlerStore
@@ -221,12 +286,22 @@
       } else if !retiringStates.contains(where: { $0 === state }) {
         retiringStates.append(state)
       }
-      let failed = pending.filter { $0.state === state }
-      pending.removeAll { $0.state === state }
+      let failedFIFO = pendingFIFO.filter { $0.state === state }
+      pendingFIFO.removeAll { $0.state === state }
+      var failedTagged: [PendingResponse] = []
+      for (tag, entry) in pendingTagged where entry.state === state {
+        failedTagged.append(entry)
+        pendingTagged.removeValue(forKey: tag)
+      }
+      if multiplexingEnabled && !multiplexedConfirmed && !state.receivedAnyFrame
+        && !failedTagged.isEmpty
+      {
+        multiplexingEnabled = false
+      }
       lock.unlock()
 
       state.cancelAndClose(waitForReader: waitForReader)
-      for response in failed {
+      for response in failedFIFO + failedTagged {
         response.continuation.resume(throwing: BridgeServiceClientError.unavailable)
       }
     }

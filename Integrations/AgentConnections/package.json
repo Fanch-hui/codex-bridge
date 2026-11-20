@@ -1,0 +1,13 @@
+{
+  "name": "codex-bridge-agent-connections",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "dependencies": {
+    "@decimalturn/toml-patch": "3.3.3",
+    "jsonc-parser": "3.3.1"
+  }
+}

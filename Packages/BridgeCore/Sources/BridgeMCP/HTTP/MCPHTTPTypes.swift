@@ -174,7 +174,7 @@ public final class MCPClientCredentialAuthenticator: @unchecked Sendable {
   }
 
   private static func isValid(_ credentials: [MCPClientCredential]) -> Bool {
-    guard (1...8).contains(credentials.count) else { return false }
+    guard (1...35).contains(credentials.count) else { return false }
     return Set(credentials.map(\.clientID)).count == credentials.count
       && Set(credentials.map(\.secret)).count == credentials.count
   }

@@ -28,7 +28,7 @@
     input.wrapper.querySelector("label").hidden = true;
     var send = S.button("", null, {}, null, "small primary message-composer-send dsh-composer-send");
     send.setAttribute("aria-label", "发送消息"); send.title = "发送消息（Enter）";
-    var sendSymbol = S.node("span", null, "↑"); sendSymbol.setAttribute("aria-hidden", "true"); send.appendChild(sendSymbol);
+    var sendSymbol = S.icon("arrow.up", "composer-send-icon"); send.appendChild(sendSymbol);
     row.appendChild(input.wrapper); surface.appendChild(row);
     var toolbar = S.node("div", "message-composer-toolbar");
     var leading = S.node("div", "message-composer-tools dsh-composer-leading");
@@ -70,7 +70,8 @@
     if (options && options.detachedFeedback) {
       feedback = S.node("div", "dsh-composer-feedback"); feedback.hidden = true;
       feedback.appendChild(recovery); feedback.appendChild(hint);
-      detailButton = S.button("⋯", null, {}, null, "small dsh-composer-feedback-detail");
+      detailButton = S.button("", null, {}, null, "small dsh-composer-feedback-detail");
+      detailButton.appendChild(S.icon("ellipsis"));
       detailButton.title = "查看完整状态"; detailButton.setAttribute("aria-label", "查看完整状态");
       detailButton.hidden = true; feedback.appendChild(detailButton);
       detailDialog = S.node("dialog", "component-dialog dsh-composer-feedback-dialog");

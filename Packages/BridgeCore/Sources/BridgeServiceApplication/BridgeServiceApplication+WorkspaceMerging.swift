@@ -5,7 +5,7 @@ import BridgeServiceCore
 import Foundation
 
 extension BridgeServiceApplication {
-  /// The caller must hold the root session's workspace write lease for the entire merge.
+  /// The caller holds the shared project write lease, excluding every root and its children.
   public func acquireEmbeddedDSHWorkspaceMergeLease(
     sessionID: String, projectID: ProjectID, operationID: String,
     permittingRecoveryID: String? = nil
@@ -19,15 +19,12 @@ extension BridgeServiceApplication {
       projectID: projectID,
       owner: .directFileOperation(operationID: operationID),
       activeCodexWriteTask: {
-        if try await tasks.activeEmbeddedDSHSession(projectID: projectID) == sessionID {
+        if try await tasks.activeEmbeddedDSHSession(projectID: projectID) != nil {
           return nil
         }
         return try await tasks.activeWriteTask(projectID: projectID)
       },
-      activeEmbeddedDSHSession: {
-        let active = try await tasks.activeEmbeddedDSHSession(projectID: projectID)
-        return active == sessionID ? nil : active
-      },
+      activeEmbeddedDSHSession: { nil },
       permittingRecoveryID: permittingRecoveryID
     )
   }

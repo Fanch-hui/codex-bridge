@@ -2,6 +2,7 @@
   "use strict";
 
   var timer = null;
+  var leaveTimer = null;
   var renderedID = null;
 
   function node(tag, className, text) {
@@ -11,15 +12,41 @@
     return element;
   }
 
+  function iconNode(symbol, className) {
+    var element = node("span", "icon" + (className ? " " + className : ""));
+    element.dataset.symbol = symbol;
+    var icons = global.CodexBridgeDesktopIcons;
+    if (icons) {
+      element.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+        + (icons[symbol] || icons["info.circle"] || "") + "</svg>";
+    }
+    return element;
+  }
+
   function toneClass(tone) {
     return tone || "neutral";
   }
 
-  function clear() {
+  function symbolForTone(tone) {
+    if (tone === "success") return "checkmark.circle.fill";
+    if (tone === "warning") return "exclamationmark.triangle.fill";
+    if (tone === "error") return "xmark.circle.fill";
+    return "info.circle.fill";
+  }
+
+  function clearTimers() {
     if (timer !== null) {
       global.clearTimeout(timer);
       timer = null;
     }
+    if (leaveTimer !== null) {
+      global.clearTimeout(leaveTimer);
+      leaveTimer = null;
+    }
+  }
+
+  function clear() {
+    clearTimers();
     var layer = document.getElementById("feedback-layer");
     var dialog = layer.querySelector("dialog");
     if (dialog && dialog.open) dialog.close();
@@ -27,7 +54,20 @@
     layer.hidden = true;
   }
 
-  function dismiss(feedback, emit) {
+  function dismiss(feedback, emit, animate) {
+    clearTimers();
+    var layer = document.getElementById("feedback-layer");
+    var toast = animate && layer ? layer.querySelector(".feedback-toast") : null;
+    var reduced = global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (toast && !reduced) {
+      toast.setAttribute("data-leaving", "true");
+      leaveTimer = global.setTimeout(function () {
+        leaveTimer = null;
+        clear();
+        emit("dismissFeedback", { feedbackID: feedback.id });
+      }, 170);
+      return;
+    }
     clear();
     emit("dismissFeedback", { feedbackID: feedback.id });
   }
@@ -55,34 +95,53 @@
     var close = node("button", "button primary", "好");
     close.type = "button";
     close.autofocus = true;
-    close.addEventListener("click", function () { dismiss(feedback, emit); });
+    close.addEventListener("click", function () { dismiss(feedback, emit, false); });
     footer.appendChild(close);
     dialog.appendChild(footer);
     dialog.addEventListener("cancel", function (event) {
       event.preventDefault();
-      dismiss(feedback, emit);
+      dismiss(feedback, emit, false);
     });
     layer.appendChild(dialog);
     dialog.showModal();
   }
 
   function renderToast(layer, feedback, emit) {
+    var kind = toneClass(feedback.tone);
     layer.className = "feedback-layer is-toast";
-    var toast = node("section", "feedback-toast tone-" + toneClass(feedback.tone));
-    toast.setAttribute("role", "status");
+    var toast = node("section", "feedback-toast tone-" + kind);
+    toast.setAttribute("role", kind === "error" ? "alert" : "status");
 
-    var copy = document.createElement("div");
-    copy.appendChild(node("strong", null, feedback.title));
-    copy.appendChild(node("span", null, feedback.message));
+    toast.appendChild(iconNode(symbolForTone(kind), "feedback-toast-icon"));
+
+    var copy = node("div", "feedback-toast-copy");
+    if (feedback.title) copy.appendChild(node("strong", null, feedback.title));
+    if (feedback.message) copy.appendChild(node("span", null, feedback.message));
     toast.appendChild(copy);
 
-    var close = node("button", "feedback-dismiss", "×");
+    var close = node("button", "feedback-dismiss");
     close.type = "button";
     close.setAttribute("aria-label", "关闭提示");
-    close.addEventListener("click", function () { dismiss(feedback, emit); });
+    close.appendChild(iconNode("xmark"));
+    close.addEventListener("click", function () { dismiss(feedback, emit, true); });
     toast.appendChild(close);
+
+    var baseDuration = kind === "warning" ? 10000 : kind === "error" ? 5200 : 3400;
+    function scheduleDismiss(delay) {
+      if (timer !== null) global.clearTimeout(timer);
+      timer = global.setTimeout(function () { dismiss(feedback, emit, true); }, delay);
+    }
+    toast.addEventListener("mouseenter", function () {
+      if (timer !== null) {
+        global.clearTimeout(timer);
+        timer = null;
+      }
+    });
+    toast.addEventListener("mouseleave", function () {
+      scheduleDismiss(kind === "warning" ? 4500 : 2200);
+    });
     layer.appendChild(toast);
-    timer = global.setTimeout(function () { dismiss(feedback, emit); }, feedback.tone === "warning" ? 10000 : 3200);
+    scheduleDismiss(baseDuration);
   }
 
   function render(feedback, emit) {

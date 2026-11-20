@@ -89,6 +89,9 @@
     public var embeddedDSHReceipts: [BridgeDesktopEmbeddedDSHReceipt] = []
     public var workspace: WorkbenchWorkspaceState? = nil
     public var paneTasks: [BridgeDesktopTaskDetail]? = nil
+    public var applicationMode: String? = nil
+    public var applicationModeTransition: String? = nil
+    public var applicationModeError: String? = nil
   }
 
   /// Lock-guarded bridge between main-actor model updates and the
@@ -171,6 +174,13 @@
     }
     var workbenchDisplayCache = WindowsWorkbenchPresentationCache()
     var serviceStatus: IPCServiceStatusResponse?
+    var isLightweightMode: Bool?
+    var applicationModeTransition: String?
+    var applicationModeError: String?
+    var isModelGatewayEnabled: Bool?
+    var applicationMode: String? {
+      isLightweightMode.map { $0 ? "lite" : "full" }
+    }
     var projects: [MCPProjectSummary] = [] {
       didSet { workbenchDisplayCache.projectsDidChange() }
     }

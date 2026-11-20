@@ -62,7 +62,7 @@
         var selected = project.projectID === page.selectedProjectID;
         var row = S.node("button", "project-library-row" + (selected ? " selected" : "")); row.type = "button";
         row.setAttribute("aria-current", selected ? "true" : "false");
-        row.appendChild(S.icon("folder.fill", "project-library-icon"));
+        row.appendChild(S.icon(selected ? "folder.fill" : "folder", "project-library-icon"));
         var copy = S.node("span", "row-main"); copy.appendChild(S.node("span", "row-title", project.name));
         var path = S.node("span", "row-detail", compactPath(project.path || project.detail || project.projectID));
         path.title = project.path || ""; copy.appendChild(path); row.appendChild(copy);
@@ -97,6 +97,7 @@
     });
     remove.addEventListener("click", function () {
       if (remove.disabled || !global.confirm("从 Codex Bridge 移除项目“" + current.project.name + "”？\n本地磁盘文件会保留。")) return;
+      S.setButtonPending(remove, true, "移除中…", "移除项目…");
       context.emit("removeProject", { projectID: projectID });
     });
     actions.appendChild(more); header.appendChild(actions); root.appendChild(header);
@@ -153,6 +154,7 @@
         description.textContent = page.selectedProjectDetail || ""; description.hidden = !page.selectedProjectDetail;
         // The default workspace is managed by Bridge itself and cannot be removed.
         more.hidden = !!project.isDefault;
+        S.setButtonPending(remove, false, null, "移除项目…");
         remove.disabled = !page.canRemove || !!project.isDefault; start.disabled = !page.canRegister;
         tabs.sessions.textContent = "会话 " + S.safeArray(page.sessions).length;
         tabs.skills.textContent = "技能 " + S.safeArray(page.skills).length;

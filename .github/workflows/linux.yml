@@ -41,6 +41,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.11.1
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+          cache-dependency-path: Integrations/ModelProtocol/go.sum
       - name: Restore SwiftPM dependency repositories
         id: dependencies-cache
         uses: actions/cache/restore@v6

@@ -15,6 +15,9 @@
     var model = S.selectField("默认模型", item.model || "", S.choices(item.model || "", modelOptions(item)), function () {}, "");
     var effort = S.selectField("推理强度", item.effort || "", S.choices(item.effort || "", [{ id: "", title: "Agent 默认" }].concat(S.safeArray(item.effortOptions))), function () {}, "");
     var permission = S.selectField("任务权限", item.permissionMode, permissionChoices(item), function () {}, "");
+    var modelSaved = S.trackFieldSave(model.wrapper);
+    var effortSaved = S.trackFieldSave(effort.wrapper);
+    var permissionSaved = S.trackFieldSave(permission.wrapper);
     var permissionHint = S.node("p", "hint");
     var desktopDefaultHint = S.node("p", "hint", "此选择会同步到 DSH 桌面默认，影响后续新建会话。");
     [model, effort, permission].forEach(function (field) { grid.appendChild(field.wrapper); });
@@ -66,10 +69,17 @@
     }
     model.control.addEventListener("change", function () {
       updateEfforts(context.item, true);
+      modelSaved.markPending(model.control.value);
       persistSelection();
     });
-    effort.control.addEventListener("change", persistSelection);
-    permission.control.addEventListener("change", persistSelection);
+    effort.control.addEventListener("change", function () {
+      effortSaved.markPending(effort.control.value);
+      persistSelection();
+    });
+    permission.control.addEventListener("change", function () {
+      permissionSaved.markPending(permission.control.value);
+      persistSelection();
+    });
     refresh.addEventListener("click", function () {
       if (!refresh.disabled) context.emit("refreshAgentModels", { providerID: context.item.providerID, installationID: context.item.installationID });
     });
@@ -90,6 +100,9 @@
       var sameModel = model.control.value === (next.model || "");
       if (sameModel) D.selectOptions(effort.control, S.choices(next.effort || "", [{ id: "", title: "Agent 默认" }].concat(S.safeArray(next.effortOptions))));
       draft.update({ model: next.model || "", effort: sameModel ? next.effort || "" : effort.control.value, permission: next.providerID === "deepseek-harness-desktop" ? "full" : next.permissionMode });
+      modelSaved.confirm(next.model || "", !!next.errorMessage);
+      effortSaved.confirm(next.effort || "", !!next.errorMessage);
+      permissionSaved.confirm(next.providerID === "deepseek-harness-desktop" ? "full" : next.permissionMode, !!next.errorMessage);
       sameModel = model.control.value === (next.model || "");
       updateEfforts(next, false);
       permission.control.disabled = !next.canSave || next.isRefreshingModels || next.supportsWorkspaceWrite === false;
@@ -101,6 +114,7 @@
       model.control.disabled = !next.canSave || next.isRefreshingModels || next.canSelectModel === false;
       refresh.hidden = !next.canRefreshModels;
       refresh.disabled = !!next.isRefreshingModels;
+      refresh.setAttribute("aria-busy", String(!!next.isRefreshingModels));
       refresh.textContent = next.isRefreshingModels ? "刷新中…" : "刷新模型列表";
 
     }

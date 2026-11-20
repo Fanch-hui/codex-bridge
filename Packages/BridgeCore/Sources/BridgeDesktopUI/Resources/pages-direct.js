@@ -8,7 +8,11 @@
     var pending = Object.create(null);
     var mode = S.selectField("命令模式", "safe", [
       { id: "denied", title: "关闭命令执行" }, { id: "safe", title: "安全模式" }, { id: "full", title: "完整模式" }
-    ], function (value) { save({ commandMode: value }); }, "");
+    ], function (value) {
+      modeSaved.markPending(value);
+      save({ commandMode: value });
+    }, "");
+    var modeSaved = S.trackFieldSave(mode.wrapper);
     root.appendChild(mode.wrapper);
     var allowed = list("白名单", "allowedCommands", "例如：git status"), denied = list("黑名单", "deniedCommands", "例如：git push");
     var rules = S.node("details", "direct-rule-disclosure");
@@ -125,8 +129,9 @@
       checkButton.addEventListener("click", function () {
         if (checkButton.disabled || !context.emit) return;
         result.hidden = false;
+        result.className = "page-message";
         result.textContent = "正在校验命令…";
-        checkButton.disabled = true;
+        S.setButtonPending(checkButton, true, "校验中…", "校验命令");
         context.emit("checkDirectCommand", {
           projectID: project.control.value,
           input: command.control.value.trim(),
@@ -142,9 +147,11 @@
       function renderResult() {
         var state = context.value && context.value.check;
         var available = state && state.canCheck && S.safeArray(state.projects).length > 0;
+        var checkingNow = !!(state && state.isChecking);
         project.control.disabled = !available;
-        checkButton.disabled = !available || state.isChecking || !command.control.value.trim();
-        section.setAttribute("aria-busy", state && state.isChecking ? "true" : "false");
+        S.setButtonPending(checkButton, checkingNow, "校验中…", "校验命令");
+        checkButton.disabled = !available || checkingNow || !command.control.value.trim();
+        section.setAttribute("aria-busy", checkingNow ? "true" : "false");
         result.hidden = false;
         result.className = "page-message";
         if (!available) {
@@ -199,6 +206,7 @@
       if (!value) return;
       var effective = effectiveValue(value);
       mode.control.value = effective.commandMode; mode.control.disabled = !effective.canSave;
+      modeSaved.confirm(value.commandMode);
       allowed.update(value); denied.update(value);
       checker.update(value.check);
     }};

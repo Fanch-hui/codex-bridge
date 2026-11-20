@@ -18,6 +18,10 @@
     case selectPage(index: Int)
     case windowVisibilityChanged(Bool)
     case refreshAll
+    case switchApplicationMode
+    case toggleModelGateway
+    case openApprovals
+    case quitCompletely
     case registerProject(name: String, path: String)
     case registerAgentFromDesktop(
       providerID: String,

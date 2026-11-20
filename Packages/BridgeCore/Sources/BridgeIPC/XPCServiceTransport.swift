@@ -93,6 +93,23 @@
     static func responseTimeout(for data: Data) -> TimeInterval {
       guard let request = try? BridgeServiceIPCCodec.decodeRequest(data) else { return 120 }
       if request.operation == .status { return 3 }
+      if request.operation == .providerGateway,
+        let payload = try? BridgeServiceIPCCodec.payload(
+          IPCProviderGatewayRequest.self, from: request)
+      {
+        switch payload.action {
+        case "plugins.install", "plugins.update":
+          // Installation can prepare Bun and install a package sequentially.
+          return 2100
+        case let action where action.hasPrefix("plugins."):
+          return 1800
+        case "provider.call", "models.refresh":
+          // A cold supplier host validates its bundled runtime before starting.
+          return 600
+        default:
+          break
+        }
+      }
       guard request.operation == .manageDeepSeekHarnessDesktop,
         let payload = try? BridgeServiceIPCCodec.payload(
           DeepSeekHarnessDesktopRequest.self, from: request),

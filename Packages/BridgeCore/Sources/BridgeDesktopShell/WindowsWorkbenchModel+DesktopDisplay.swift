@@ -24,6 +24,7 @@
         projectID: task.projectID,
         projectName: projectName,
         source: task.sourceDisplayName,
+        sourceKinds: session.sourceKinds,
         provider: task.providerDisplayName,
         providerID: task.providerIdentifier,
         status: desktopStatusLabel(
@@ -90,6 +91,7 @@
         ),
         projectName: projectName,
         source: task.sourceDisplayName,
+        sourceKind: task.workbenchSourceKind.rawValue,
         status: desktopStatusLabel(
           task, canContinue: canResume, pendingUserInput: pendingUserInput
         ),

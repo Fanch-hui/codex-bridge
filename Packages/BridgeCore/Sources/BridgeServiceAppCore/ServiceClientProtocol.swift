@@ -37,6 +37,8 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     -> MCPProjectDetail
   func workbenchWorkspace(_ request: IPCWorkbenchWorkspaceRequest) async throws
     -> IPCWorkbenchWorkspaceResponse
+  func providerGateway(_ request: IPCProviderGatewayRequest) async throws
+    -> IPCProviderGatewayResponse
   func embeddedDSH(_ request: IPCEmbeddedDSHRequest) async throws -> IPCEmbeddedDSHResponse
   func workbenchSettings() async throws -> IPCWorkbenchSettings
   func setWorkbenchEnabled(_ enabled: Bool) async throws -> IPCWorkbenchSettings
@@ -215,6 +217,8 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func connectTunnel() async throws -> IPCTunnelStatus
   func disconnectTunnel() async throws
   func clearTunnel() async throws
+  func messageCenterSecret(_ request: IPCMessageCenterSecretRequest) async throws
+    -> IPCMessageCenterSecretResponse
   func close() async
 }
 
@@ -225,6 +229,11 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func messageCenterSecret(_ request: IPCMessageCenterSecretRequest) async throws
+    -> IPCMessageCenterSecretResponse
+  {
+    throw BridgeServiceClientError.serviceRestartRequired
+  }
   public func workbenchSettings() async throws -> IPCWorkbenchSettings {
     throw BridgeServiceClientError.serviceRestartRequired
   }

@@ -10,6 +10,9 @@
     static var selectedPage = WindowsMainPage.workbench
     /// Opening Connections loads model catalogs once; later visits keep them until refreshed.
     static var connectionModelsLoaded = false
+    static var completeExitInProgress = false
+    static var completeExitServicePrepared = false
+    static var completedServiceExit = false
 
     #if os(Windows)
       public static func main() async {
@@ -27,11 +30,12 @@
           guard !model.isShuttingDown else { return }
           Task(priority: .utility) {
             await auxiliary.connections.refresh()
-            guard !model.isShuttingDown else { return }
+            guard !model.isShuttingDown, model.isLightweightMode == false else { return }
             await management.refreshAgents()
             guard !model.isShuttingDown else { return }
             await auxiliary.agentDefaults.refresh()
           }
+          guard model.isLightweightMode == false else { return }
           if selectedPage != .overview {
             refresh(page: selectedPage, model: model, management: management, auxiliary: auxiliary)
           }
@@ -73,7 +77,7 @@
         stopActivityScheduling()
         messageCenter?.stop()
         model.stopSchedulingForApplicationExit()
-        if !auxiliary.settings.keepServiceRunningAfterExit {
+        if !completedServiceExit && !auxiliary.settings.keepServiceRunningAfterExit {
           let stopped = await Task.detached { WindowsServiceLauncher.shutdownServiceAndWait() }
             .value
           if !stopped {
@@ -102,6 +106,21 @@
         selectPage(page, model: model, management: management, auxiliary: auxiliary)
       case .refreshAll:
         refreshAll(model: model, management: management, auxiliary: auxiliary)
+      case .switchApplicationMode:
+        Task { await model.toggleApplicationModeFromTray() }
+      case .toggleModelGateway:
+        Task { await model.toggleModelGatewayFromTray() }
+      case .quitCompletely:
+        beginCompleteExit(model: model)
+      case .openApprovals:
+        selectPage(.overview, model: model, management: management, auxiliary: auxiliary)
+        #if os(Windows)
+          if model.isLightweightMode == true {
+            WindowsUIThread.shared.desktopUIWebView()?.openLightweightActivity()
+          }
+        #elseif os(Linux)
+          if model.isLightweightMode == true { LinuxDesktopHost.openLightweightActivity() }
+        #endif
       case .registerProject(let name, let path):
         Task {
           await registerWorkFolder(
@@ -138,15 +157,21 @@
       auxiliary: WindowsAuxiliaryRuntime,
       forceModelRefresh: Bool = false
     ) {
+      let fullMode = model.isLightweightMode == false
       switch page {
       case .overview:
         Task {
           await model.refreshServiceStatus()
-          await model.refreshTasks()
-          await management.refresh()
+          if fullMode {
+            await model.refreshTasks()
+            await management.refresh()
+          } else {
+            await management.refreshProjects()
+          }
           await auxiliary.connections.refresh()
         }
       case .workbench:
+        guard fullMode else { return }
         Task { await model.refreshSelectedTask() }
       case .projects:
         Task { await management.refreshProjects() }
@@ -154,10 +179,11 @@
       case .logs:
         Task { await auxiliary.logs.refresh() }
       case .connections:
-        let includeModels = forceModelRefresh || !connectionModelsLoaded
-        connectionModelsLoaded = true
+        let includeModels = fullMode && (forceModelRefresh || !connectionModelsLoaded)
+        if fullMode { connectionModelsLoaded = true }
         Task {
           await auxiliary.connections.refresh()
+          guard fullMode else { return }
           await management.refreshAgents()
           if includeModels {
             await auxiliary.settings.refreshConnectionPreferences(
@@ -180,8 +206,13 @@
     ) {
       Task {
         await model.connectAndRefresh()
-        await management.refresh()
-        await auxiliary.refreshAll()
+        let lightweight = model.isLightweightMode != false
+        if lightweight {
+          await management.refreshProjects()
+        } else {
+          await management.refresh()
+        }
+        await auxiliary.refreshAll(lightweight: lightweight)
       }
     }
 

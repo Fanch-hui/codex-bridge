@@ -1,3 +1,4 @@
+import BridgeProcess
 import Foundation
 
 #if canImport(Darwin)
@@ -207,20 +208,8 @@ struct TunnelChildExit: Equatable, Sendable {
 
     private func writeAndClose(_ data: Data, to pipe: TunnelDescriptorPipe) throws {
       let descriptor = pipe.writeDescriptor
-      #if canImport(Darwin)
-        _ = fcntl(descriptor, F_SETNOSIGPIPE, 1)
-      #else
-        var blocked = sigset_t()
-        var previous = sigset_t()
-        sigemptyset(&blocked)
-        sigaddset(&blocked, SIGPIPE)
-        pthread_sigmask(SIG_BLOCK, &blocked, &previous)
-        defer {
-          var timeout = timespec(tv_sec: 0, tv_nsec: 0)
-          _ = sigtimedwait(&blocked, nil, &timeout)
-          pthread_sigmask(SIG_SETMASK, &previous, nil)
-        }
-      #endif
+      var signals = try PipeWriteSignalGuard(descriptor: descriptor)
+      defer { signals.restore() }
       try data.withUnsafeBytes { bytes in
         guard let baseAddress = bytes.baseAddress else { return }
         var written = 0

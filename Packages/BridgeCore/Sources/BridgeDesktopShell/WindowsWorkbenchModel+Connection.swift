@@ -74,6 +74,21 @@
         guard isCurrentConnection(requestGeneration) else { return false }
         didHandshake = true
         serviceStatus = status
+        applyServiceStatusMode(status)
+        var gatewayFailure: String?
+        if isLightweightMode == nil {
+          do {
+            try await refreshProviderGatewayModeStatus()
+          } catch {
+            isLightweightMode = nil
+            applicationModeTransition = nil
+            applicationModeError = nil
+            isModelGatewayEnabled = nil
+            lightweightModeDidChange()
+            gatewayFailure = "读取运行模式失败：\(BridgeServiceErrorMessage.message(error))"
+          }
+        }
+        connectionState = .connected
         do {
           let snapshot = try await client.projectList()
           guard isCurrentConnection(requestGeneration) else { return didHandshake }
@@ -92,7 +107,7 @@
         {
           workbenchPermissionMode = mode
         }
-        errorMessage = nil
+        errorMessage = gatewayFailure
         await refreshTasks()
         guard isCurrentConnection(requestGeneration), connectionState == .connected else {
           return didHandshake
@@ -115,7 +130,7 @@
       guard !taskRefreshInProgress else { return }
       taskRefreshInProgress = true
       defer { taskRefreshInProgress = false }
-      await loadTasks()
+      if isLightweightMode == false { await loadTasks() }
       guard connectionState == .connected else { return }
       await refreshApprovals()
     }
@@ -173,7 +188,10 @@
     }
 
     private func pollingInterval() -> Duration {
-      if tasks.contains(where: { $0.isActive }) || !approvals.isEmpty || !directApprovals.isEmpty {
+      if (isLightweightMode == false
+        && (tasks.contains(where: { $0.isActive }) || !approvals.isEmpty))
+        || !directApprovals.isEmpty
+      {
         return .seconds(2)
       }
       return isWindowVisible ? .seconds(5) : .seconds(20)
@@ -218,7 +236,7 @@
       }
     }
 
-    private func scheduleDeferredConnectionWork(
+    func scheduleDeferredConnectionWork(
       generation: UInt64,
       notifyOnConnect: Bool
     ) {
@@ -236,6 +254,7 @@
     }
 
     private func loadDeferredCatalogs(generation: UInt64) async {
+      guard isLightweightMode == false else { return }
       do {
         let catalog = try await client.agentCatalog()
         guard isCurrentConnection(generation) else { return }
@@ -304,6 +323,20 @@
         guard !isShuttingDown, connectionState == .connected else { return }
         var changed = serviceStatus != status
         serviceStatus = status
+        if applyServiceStatusMode(status) { changed = true }
+        if isLightweightMode == nil {
+          do {
+            try await refreshProviderGatewayModeStatus()
+            changed = true
+          } catch {
+            let failure = "读取运行模式失败：\(BridgeServiceErrorMessage.message(error))"
+            if errorMessage != failure {
+              errorMessage = failure
+              publishDisplay()
+            }
+            return
+          }
+        }
         if let mode = status.workbenchPermissionMode,
           BridgeDesktopWorkbenchPermissionMode(rawValue: mode) != nil,
           workbenchPermissionMode != mode

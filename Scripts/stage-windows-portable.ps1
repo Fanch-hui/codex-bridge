@@ -165,6 +165,11 @@ try {
   if ((Get-PEMachine $embeddedNode) -ne $expectedMachine) {
     throw "Embedded DSH Node has the wrong architecture."
   }
+  $protocolHelper = Join-Path $embeddedDSHSource "provider\model-protocol.exe"
+  Assert-RegularFile $protocolHelper | Out-Null
+  if ((Get-PEMachine $protocolHelper) -ne $expectedMachine) {
+    throw "Provider protocol helper has the wrong architecture."
+  }
   $embeddedDSHDestination = Join-Path $outFull "EmbeddedDSH"
   & robocopy $embeddedDSHSource $embeddedDSHDestination /E /COPY:DAT /DCOPY:DAT /R:1 /W:1 /NJH /NJS /NP
   if ($LASTEXITCODE -gt 7) { throw "Could not stage embedded DSH runtime." }

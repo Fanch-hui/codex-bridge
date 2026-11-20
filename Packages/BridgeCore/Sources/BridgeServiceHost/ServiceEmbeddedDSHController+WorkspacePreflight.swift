@@ -69,7 +69,7 @@ extension ServiceEmbeddedDSHController {
       guard stopped else { throw WorkspacePreflightFailure.processNotStopped }
       return (
         ready,
-        ready ? "独立副本仅使用文件工具，构建与测试由合并验证执行。" : "该会话启用了外部工具，使用共享目录执行。"
+        ready ? "独立副本支持文件与命令工具；进程树写入受沙箱限制。" : "该会话启用了外部工具，使用共享目录执行。"
       )
     } catch is CancellationError {
       guard try await finishWorkspacePreflight(client, directory: temporary) else {

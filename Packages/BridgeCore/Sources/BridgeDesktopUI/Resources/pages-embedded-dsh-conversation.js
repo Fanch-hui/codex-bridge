@@ -49,6 +49,8 @@
   }
   function create(configuration) {
     configuration = configuration || {};
+    // Cards for tasks the user handed straight to an Agent (see pages-embedded-dsh-agent-cards.js).
+    var cards = configuration.agentCards || null;
     var root = S.node("section", "dsh-embedded-conversation dsh-bridge-conversation");
     var viewport = S.node("div", "dsh-bridge-conversation-scroll");
     viewport.setAttribute("role", "log"); viewport.setAttribute("aria-label", "工作台对话");
@@ -62,6 +64,9 @@
     var contentReader = global.CodexBridgeDesktopEmbeddedDSHContent && global.CodexBridgeDesktopEmbeddedDSHContent.create();
     if (contentReader) root.appendChild(contentReader.root);
     var windowStart = null, lastEntries = [], lastDisplayEntries = [], lastProjectTitle = "", windowSize = 200;
+    var unsubscribeCards = cards && cards.subscribe ? cards.subscribe(function () {
+      nodes.forEach(function (item) { if (item.__agentCard) cards.render(item.__agentCard.entry, item); });
+    }) : null;
     function updateMetricsGeometry() {
       var area = root.getBoundingClientRect(), footer = metrics.root.getBoundingClientRect();
       root.style.setProperty("--bridge-metrics-height", Math.ceil(footer.height) + "px");
@@ -181,7 +186,7 @@
         turn = [];
       }
       entries.forEach(function (entry) {
-        if (entry.kind === "message" && entry.role === "用户") {
+        if (entry.kind === "message" && entry.role === "用户" || entry.kind === "agent-dispatch") {
           flushTurn(true);
           result.push(entry);
         } else {
@@ -218,7 +223,7 @@
       var visibleEntries = displayEntries.slice(windowStart, windowStart + windowSize);
       var used = new Set(), position = list.firstElementChild;
       visibleEntries.forEach(function (entry) {
-        var key = entry.kind + ":" + entry.id, item = nodes.get(key);
+        var key = entry.kind + ":" + (entry.kind === "agent-dispatch" ? entry.childID : entry.id), item = nodes.get(key);
         var upstream = global.CodexBridgeDesktopDSHConversationView;
         function openContent(ref) { if (contentReader) contentReader.open(id, ref); }
         if (entry.kind === "status") {
@@ -230,6 +235,11 @@
             if (!item) { item = S.node("div", "dsh-bridge-conversation-status"); item.setAttribute("role", "status"); nodes.set(key, item); }
             if (item.textContent !== entry.text) item.textContent = entry.text;
           }
+        } else if (entry.kind === "agent-dispatch") {
+          if (!cards) return;
+          item = cards.render(entry, item); nodes.set(key, item);
+        } else if (entry.kind === "workbench-import") {
+          item = global.CodexBridgeDesktopWorkbenchImport.renderSource(entry, item); nodes.set(key, item);
         } else if (entry.kind === "process") {
           var processValues = entry.rawEntries.map(function (subEntry) {
             var subValue = entryValue(subEntry, subEntry.kind + ":" + subEntry.id);
@@ -288,6 +298,35 @@
       else if (previousFirst && list.firstElementChild !== previousFirst) viewport.scrollTop = oldTop + viewport.scrollHeight - oldHeight;
     }
 
+    function revealEntry(index) {
+      if (index < 0) return false;
+      following = false; pendingPosition = null;
+      windowStart = Math.max(0, Math.min(index - 20, Math.max(0, lastDisplayEntries.length - windowSize)));
+      render(sessionID, lastProjectTitle, lastEntries);
+      var entry = lastDisplayEntries[index];
+      var key = entry.kind + ":" + (entry.kind === "agent-dispatch" ? entry.childID : entry.id);
+      var item = nodes.get(key);
+      if (item && entry.kind === "process") {
+        if (item.__dshHost) global.CodexBridgeDesktopDSHConversationView.reveal(item);
+        else item.open = true;
+      }
+      if (item && item.scrollIntoView) item.scrollIntoView({ block: "center" });
+      if (item) {
+        item.setAttribute("tabindex", "-1");
+        item.focus({ preventScroll: true });
+      }
+      return !!item;
+    }
+    function entryHasChild(entry, childID) {
+      if (entry.kind === "agent-dispatch") return entry.childID === childID;
+      if (entry.kind === "process") return entry.rawEntries.some(function (part) { return entryHasChild(part, childID); });
+      if (entry.kind !== "tool" || !entry.output) return false;
+      try {
+        var result = JSON.parse(entry.output);
+        return !!result && (result.childID === childID || result.childId === childID);
+      } catch (_) { return false; }
+    }
+
     return {
       root: root, update: update,
       updateBridge: function (id, messages, nextOptions) {
@@ -312,21 +351,15 @@
             return containsSequence(subEntry);
           });
         });
-        if (index < 0) return false;
-        following = false; pendingPosition = null;
-        windowStart = Math.max(0, Math.min(index - 20, Math.max(0, lastDisplayEntries.length - windowSize)));
-        render(sessionID, lastProjectTitle, lastEntries);
-        var entry = lastDisplayEntries[index], item = nodes.get(entry.kind + ":" + entry.id);
-        if (item && entry.kind === "process") {
-          if (item.__dshHost) global.CodexBridgeDesktopDSHConversationView.reveal(item);
-          else item.open = true;
-        }
-        if (item && item.scrollIntoView) item.scrollIntoView({ block: "center" });
-        return !!item;
+        return revealEntry(index);
+      },
+      revealAgent: function (childID) {
+        return revealEntry(lastDisplayEntries.findIndex(function (entry) { return entryHasChild(entry, childID); }));
       },
       dispose: function () {
         nodes.forEach(function (item) { if (item.__dshHost) global.CodexBridgeDesktopDSHConversationView.dispose(item); });
         nodes.clear();
+        if (unsubscribeCards) unsubscribeCards();
         if (metricsObserver) metricsObserver.disconnect(); metrics.dispose(); if (contentReader) contentReader.dispose();
       }
     };

@@ -30,7 +30,7 @@
 
     static func updateBrowserMemoryPolicy(model: WindowsWorkbenchModel) {
       guard let browser = WindowsUIThread.shared.chatWebView() else { return }
-      browser.setEnabled(model.isChatBrowserEnabled)
+      browser.setEnabled(model.isChatBrowserEnabled && model.isLightweightMode == false)
       browser.setLowMemoryUsage(isLongTermHidden)
     }
 

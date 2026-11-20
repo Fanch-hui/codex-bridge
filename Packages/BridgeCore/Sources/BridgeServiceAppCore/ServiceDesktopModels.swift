@@ -3,6 +3,10 @@ import BridgeMCP
 import Crypto
 import Foundation
 
+public enum WorkbenchTaskSourceKind: String, Codable, Sendable {
+  case chatgpt, qwen, gemini, local, embedded, unknown
+}
+
 extension MCPServiceTaskSnapshot {
   public var isQueued: Bool {
     status == "queued"
@@ -89,6 +93,17 @@ extension MCPServiceTaskSnapshot {
     if let code = failureCode, !code.isEmpty { lines.append("失败代码：\(code)") }
     if let diagnostic = failure.diagnostic { lines.append("诊断详情：\(diagnostic)") }
     return lines.joined(separator: "\n")
+  }
+
+  public var workbenchSourceKind: WorkbenchTaskSourceKind {
+    if sourceClientID == "embedded.dsh" || sourceClientID?.hasPrefix("embedded.dsh.") == true {
+      return .embedded
+    }
+    if sourceClientID == MCPClientID.chatGPT.rawValue || source == "chatgpt.mcp" { return .chatgpt }
+    if sourceClientID == MCPClientID.qwenStudio.rawValue { return .qwen }
+    if sourceClientID == MCPClientID.gemini.rawValue { return .gemini }
+    if source == "macos.app" || source == "legacy.import" || source == nil { return .local }
+    return .unknown
   }
 
   public var sourceDisplayName: String {

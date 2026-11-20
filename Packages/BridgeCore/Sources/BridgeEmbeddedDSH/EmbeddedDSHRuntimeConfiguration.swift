@@ -5,15 +5,21 @@ public struct EmbeddedDSHRuntimeConfiguration: Sendable {
   public let resourceRoot: URL?
   public let dataRoot: URL
   public let requestTimeout: Duration
+  public let providersOnly: Bool
+  public let sharedProviders: Bool
 
   public init(
     resourceRoot: URL? = nil,
     dataRoot: URL,
-    requestTimeout: Duration = .seconds(45)
+    requestTimeout: Duration = .seconds(45),
+    providersOnly: Bool = false,
+    sharedProviders: Bool = false
   ) {
     self.resourceRoot = resourceRoot
     self.dataRoot = dataRoot
     self.requestTimeout = requestTimeout
+    self.providersOnly = providersOnly
+    self.sharedProviders = sharedProviders
   }
 
   func validatedDataRoot() throws -> URL {
@@ -25,7 +31,12 @@ public struct EmbeddedDSHRuntimeConfiguration: Sendable {
     return dataRoot.standardizedFileURL
   }
 
-  func resolveResourceRoot() throws -> URL {
+  func recordRoot() throws -> URL {
+    let root = try validatedDataRoot()
+    return providersOnly ? root.appendingPathComponent(".provider-host", isDirectory: true) : root
+  }
+
+  public func resolveResourceRoot() throws -> URL {
     if let resourceRoot {
       guard resourceRoot.isFileURL, AgentPathSemantics.isAbsolute(resourceRoot.path) else {
         throw EmbeddedDSHRuntimeError.invalidConfiguration

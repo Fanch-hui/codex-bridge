@@ -78,11 +78,13 @@
       if (operation.userAction === "select_installation") payload.installationID = candidate.control.value;
       context.emit("continueAgentSetup", payload);
       key.control.value = "";
-      proceed.disabled = true;
+      if (S.setButtonPending) S.setButtonPending(proceed, true, "正在检测…");
+      else proceed.disabled = true;
     });
     cancel.addEventListener("click", function () {
       if (operation) context.emit("cancelAgentSetup", { operationID: operation.operationID });
-      cancel.disabled = true;
+      if (S.setButtonPending) S.setButtonPending(cancel, true, "取消中…", "取消配置");
+      else cancel.disabled = true;
     });
     function valid() {
       if (!operation) return false;
@@ -129,6 +131,10 @@
       login.hidden = !needs || !value.canOpenLogin;
       docs.hidden = !value.documentationURL;
       login.disabled = !context.canConnect;
+      if (S.setButtonPending) {
+        S.setButtonPending(proceed, false);
+        S.setButtonPending(cancel, false, null, "取消配置");
+      }
       proceed.hidden = !needs;
       proceed.textContent = value.userAction === "credentials" ? "保存并检测"
         : value.userAction === "permission" ? "允许并继续"

@@ -19,6 +19,10 @@
       static let openMainWindow = 10_002
       static let refresh = 10_003
       static let exit = 10_004
+      static let switchMode = 10_005
+      static let toggleGateway = 10_006
+      static let approvals = 10_007
+      static let quitCompletely = 10_008
     }
 
     nonisolated(unsafe) private static var trayData: NOTIFYICONDATAW?
@@ -52,6 +56,15 @@
         activate(window)
       case MenuCommand.refresh:
         WindowsMainWindow.enqueue(.refreshAll)
+      case MenuCommand.switchMode:
+        WindowsMainWindow.enqueue(.switchApplicationMode)
+      case MenuCommand.toggleGateway:
+        WindowsMainWindow.enqueue(.toggleModelGateway)
+      case MenuCommand.approvals:
+        WindowsMainWindow.enqueue(.openApprovals)
+        activate(window)
+      case MenuCommand.quitCompletely:
+        WindowsMainWindow.enqueue(.quitCompletely)
       case MenuCommand.exit:
         _ = PostMessageW(window, UINT(WM_CLOSE), WindowsApplicationIdentity.explicitCloseRequest, 0)
       default:
@@ -102,11 +115,14 @@
       guard let window, let menu = CreatePopupMenu() else { return }
       defer { _ = DestroyMenu(menu) }
 
-      appendMenuItem(menu, id: MenuCommand.openWorkbench, title: "打开工作台")
-      appendMenuItem(menu, id: MenuCommand.openMainWindow, title: "打开主窗口")
+      appendMenuItem(menu, id: MenuCommand.openMainWindow, title: "打开管理")
+      appendMenuItem(menu, id: MenuCommand.approvals, title: "待处理审批")
+      appendMenuItem(menu, id: MenuCommand.toggleGateway, title: "暂停或恢复模型网关")
+      appendMenuItem(menu, id: MenuCommand.switchMode, title: "切换轻量 / 完整模式")
       appendMenuItem(menu, id: MenuCommand.refresh, title: "立即刷新状态")
       _ = AppendMenuW(menu, UINT(MF_SEPARATOR), 0, nil)
       appendMenuItem(menu, id: MenuCommand.exit, title: "退出应用程序")
+      appendMenuItem(menu, id: MenuCommand.quitCompletely, title: "彻底退出并停止后台服务")
 
       var position = POINT()
       guard GetCursorPos(&position) else { return }

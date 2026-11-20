@@ -77,7 +77,10 @@ extension BridgeDesktopUIStateBuilder {
             projects: model.projects.map { BridgeDesktopChoice(id: $0.projectID, title: $0.name) },
             canCheck: model.connectionState == .connected && !model.isSavingDirectConfiguration,
             status: model.directCommandChecker.state))
-      }
+      },
+      applicationMode: model.applicationMode,
+      applicationModeTransition: model.applicationModeTransition,
+      applicationModeError: model.applicationModeError
     )
   }
 

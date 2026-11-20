@@ -20,6 +20,8 @@
     @MainActor private(set) static var browser = BrowserSnapshot()
     @MainActor private static var browserRequestedEnabled = false
     @MainActor private static var browserReleasePending = false
+    @MainActor private static var desktopReady = false
+    @MainActor private static var activityPending = false
 
     static func start() -> Bool {
       guard let resource = BridgeDesktopUI.indexURL(),
@@ -49,6 +51,9 @@
 
     static var isRunning: Bool { bridge_linux_running() != 0 }
 
+    static func show() { bridge_linux_show() }
+    static func stop() { bridge_linux_stop() }
+
     static func enqueueCommand(_ command: MainWindowCommand) {
       lock.withLock { commands.append(command) }
     }
@@ -77,8 +82,22 @@
           else { continue }
           if envelope.command == .ready || envelope.command == .requestStateResync {
             needsFullState = true
+            desktopReady = true
+            if activityPending { openLightweightActivity() }
           } else if let command = WindowsDesktopUICommandRouter.command(for: envelope) {
             enqueueCommand(command)
+          }
+        case "tray":
+          switch parts[1] {
+          case "hidden":
+            desktopReady = false
+            enqueueCommand(.windowVisibilityChanged(false))
+          case "visible": enqueueCommand(.windowVisibilityChanged(true))
+          case "approvals": enqueueCommand(.openApprovals)
+          case "mode": enqueueCommand(.switchApplicationMode)
+          case "gateway": enqueueCommand(.toggleModelGateway)
+          case "quit-completely": enqueueCommand(.quitCompletely)
+          default: break
           }
         case "browser":
           receiveBrowser(String(parts[1]))
@@ -120,6 +139,17 @@
       let script =
         "window.CodexBridgeDesktopUI && window.CodexBridgeDesktopUI.applyStatePatch(\(json));"
       script.withCString { bridge_linux_script($0) }
+    }
+
+    @MainActor
+    static func openLightweightActivity() {
+      guard desktopReady else {
+        activityPending = true
+        return
+      }
+      activityPending = false
+      "window.CodexBridgeDesktopLightweight && window.CodexBridgeDesktopLightweight.select('activity');"
+        .withCString { bridge_linux_script($0) }
     }
 
     static func applyBrowserViewport(_ viewport: BridgeDesktopBrowserViewport) {

@@ -211,6 +211,9 @@ struct DesktopSettingsInput: Equatable {
   let deepSeekDesktopStates: [String: BridgeDesktopDeepSeekHarnessDesktopState]
   let agentModels: AgentModels
   let nativePermissions: NativePermissions
+  let applicationMode: String?
+  let applicationModeTransition: String?
+  let applicationModeError: String?
 
   @MainActor
   init(_ model: BridgeServiceAppModel) {
@@ -236,5 +239,8 @@ struct DesktopSettingsInput: Equatable {
     deepSeekDesktopStates = model.deepSeekDesktopStates
     agentModels = AgentModels(model)
     nativePermissions = NativePermissions(model)
+    applicationMode = model.applicationMode
+    applicationModeTransition = model.applicationModeTransition
+    applicationModeError = model.applicationModeError
   }
 }

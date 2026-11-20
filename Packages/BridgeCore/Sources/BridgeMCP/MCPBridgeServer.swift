@@ -79,7 +79,10 @@ public actor MCPBridgeServer {
     exposureMode: @escaping @Sendable (MCPClientID) async -> MCPServiceExposureMode,
     httpConfiguration: MCPHTTPConfiguration,
     sessionLimits: MCPSessionRegistry.Limits = .init(),
-    clientAdmission: MCPClientAdmissionGate? = nil
+    clientAdmission: MCPClientAdmissionGate? = nil,
+    clientAccess: @escaping @Sendable (MCPClientID) async -> MCPClientAccess = { _ in .unrestricted
+    },
+    delegationEnabled: @escaping @Sendable () async -> Bool = { true }
   ) {
     precondition(!appVersion.isEmpty)
     let activity = MCPClientCallActivity(
@@ -92,7 +95,9 @@ public actor MCPBridgeServer {
         service: service,
         exposureMode: mode,
         clientID: clientID,
-        activity: activity
+        activity: activity,
+        clientAccess: clientAccess,
+        delegationEnabled: delegationEnabled
       ).makeServer()
     }
     discoveryInstructions = { clientID in

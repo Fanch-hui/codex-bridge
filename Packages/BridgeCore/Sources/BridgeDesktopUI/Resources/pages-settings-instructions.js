@@ -24,10 +24,14 @@
       counter.hidden = valid && bytes < 24576;
       save.disabled = !context.page.canSaveInstructions || !valid;
     }
+    var submittedValue = null;
     text.addEventListener("input", validate);
     text.addEventListener("compositionend", validate);
     save.addEventListener("click", function () {
-      if (!save.disabled) context.emit("saveCustomInstructions", { value: text.value });
+      if (save.disabled) return;
+      submittedValue = text.value;
+      S.setButtonPending(save, true, "保存中…", "保存指令");
+      context.emit("saveCustomInstructions", { value: text.value });
     });
     actions.appendChild(save);
     card.appendChild(actions);
@@ -35,6 +39,15 @@
       context.page = next;
       context.emit = nextEmit;
       draft.update({ text: next.customInstructions || "" });
+      if (submittedValue !== null) {
+        if ((next.customInstructions || "") === submittedValue) {
+          submittedValue = null;
+          S.flashButtonSuccess(save, "已保存");
+        } else {
+          submittedValue = null;
+          S.setButtonPending(save, false);
+        }
+      }
       validate();
     }
     update(page, emit);

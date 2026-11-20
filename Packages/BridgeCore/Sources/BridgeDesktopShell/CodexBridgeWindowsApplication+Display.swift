@@ -80,6 +80,7 @@
       let chatSlotEnabled =
         chat.state == .active
         && display.browserEnabled
+        && display.applicationMode == "full"
         && model.feedback.current?.kind != .alert
       let state = WindowsDesktopUIStateBuilder.build(
         workbench: display,

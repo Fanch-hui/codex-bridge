@@ -2,6 +2,8 @@ import Foundation
 
 #if os(macOS)
   import Darwin
+#elseif os(Linux)
+  import Glibc
 #endif
 
 public enum WorkspaceProcessIsolationError: Error, Equatable, Sendable {
@@ -30,7 +32,7 @@ public enum WorkspaceProcessIsolation {
     runtimeDirectory: URL,
     denyProcessFork: Bool = false
   ) throws -> WorkspaceIsolatedProcessConfiguration {
-    #if os(macOS)
+    #if os(macOS) || os(Linux)
       guard isAvailable else { throw WorkspaceProcessIsolationError.unavailable }
       guard executableURL.isFileURL, executableURL.path.hasPrefix("/"),
         !executableURL.path.contains("\0")
@@ -57,12 +59,9 @@ public enum WorkspaceProcessIsolation {
       privateEnvironment["XDG_STATE_HOME"] = state.path
       return WorkspaceIsolatedProcessConfiguration(
         executableURL: sandboxExecutable,
-        arguments: [
-          "-p",
-          try profile(workspace: workspace, runtime: runtime, denyProcessFork: denyProcessFork),
-          executableURL.path,
-        ]
-          + arguments,
+        arguments: try launchArguments(
+          workspace: workspace, runtime: runtime,
+          command: [executableURL.path] + arguments, denyProcessFork: denyProcessFork),
         environment: privateEnvironment,
         currentDirectoryURL: workspace)
     #else
@@ -70,9 +69,35 @@ public enum WorkspaceProcessIsolation {
     #endif
   }
 
-  #if os(macOS)
-    private static let sandboxExecutable = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
+  #if os(macOS) || os(Linux)
+    #if os(macOS)
+      private static let sandboxExecutable = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
+    #else
+      private static let sandboxExecutable = URL(fileURLWithPath: "/usr/bin/bwrap")
+    #endif
     private static let availability = probe()
+
+    private static func launchArguments(
+      workspace: URL, runtime: URL, command: [String], denyProcessFork: Bool = false
+    ) throws -> [String] {
+      #if os(macOS)
+        return [
+          "-p",
+          try profile(
+            workspace: workspace, runtime: runtime,
+            denyProcessFork: denyProcessFork),
+        ] + command
+      #else
+        guard !denyProcessFork else { throw WorkspaceProcessIsolationError.unavailable }
+        return [
+          "--ro-bind", "/", "/", "--unshare-user", "--unshare-pid", "--unshare-ipc",
+          "--new-session",
+          "--die-with-parent", "--proc", "/proc", "--dev", "/dev",
+          "--bind", workspace.path, workspace.path,
+          "--bind", runtime.path, runtime.path, "--chdir", workspace.path, "--",
+        ] + command
+      #endif
+    }
 
     private static func existingDirectory(_ url: URL) throws -> URL {
       guard url.isFileURL, url.path.hasPrefix("/"), !url.path.contains("\0"),
@@ -106,8 +131,13 @@ public enum WorkspaceProcessIsolation {
     }
 
     private static func contains(_ directory: String, _ path: String) -> Bool {
-      let root = directory.precomposedStringWithCanonicalMapping.lowercased()
-      let item = path.precomposedStringWithCanonicalMapping.lowercased()
+      #if os(macOS)
+        let root = directory.precomposedStringWithCanonicalMapping.lowercased()
+        let item = path.precomposedStringWithCanonicalMapping.lowercased()
+      #else
+        let root = directory
+        let item = path
+      #endif
       return item == root || item.hasPrefix(root == "/" ? "/" : root + "/")
     }
 
@@ -165,10 +195,9 @@ public enum WorkspaceProcessIsolation {
           """#
         let process = Process()
         process.executableURL = sandboxExecutable
-        process.arguments = [
-          "-p", try profile(workspace: workspace, runtime: runtime),
-          "/bin/sh", "-c", command, "sh", workspace.path, runtime.path, protected.path,
-        ]
+        process.arguments = try launchArguments(
+          workspace: workspace, runtime: runtime,
+          command: ["/bin/sh", "-c", command, "sh", workspace.path, runtime.path, protected.path])
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()

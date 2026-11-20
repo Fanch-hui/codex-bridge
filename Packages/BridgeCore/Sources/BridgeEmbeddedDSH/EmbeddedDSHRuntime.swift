@@ -7,6 +7,7 @@ public actor EmbeddedDSHRuntime {
   public typealias EventHandler = @Sendable (EmbeddedDSHEvent) async -> Void
 
   private let configuration: EmbeddedDSHRuntimeConfiguration
+  private let prepareDependencies: @Sendable () async throws -> Void
   private let handler: Handler
   private let onEvent: EventHandler
   private var client: EmbeddedDSHClient?
@@ -20,10 +21,12 @@ public actor EmbeddedDSHRuntime {
 
   public init(
     configuration: EmbeddedDSHRuntimeConfiguration,
+    prepareDependencies: @escaping @Sendable () async throws -> Void = {},
     handler: @escaping Handler,
     onEvent: @escaping EventHandler
   ) {
     self.configuration = configuration
+    self.prepareDependencies = prepareDependencies
     self.handler = handler
     self.onEvent = onEvent
   }
@@ -37,10 +40,12 @@ public actor EmbeddedDSHRuntime {
   }
 
   /// Reads a running host without starting one solely for an availability check.
-  public func callIfRunning(action: String) async throws -> ACPJSONValue? {
+  public func callIfRunning(action: String, payload: ACPJSONValue = .object([:])) async throws
+    -> ACPJSONValue?
+  {
     guard let client else { return nil }
     return try await client.request(
-      action: action, payload: .object([:]), timeout: configuration.requestTimeout)
+      action: action, payload: payload, timeout: configuration.requestTimeout)
   }
 
   /// A failed host is restarted only on an explicit request, avoiding replay of unknown actions.
@@ -69,7 +74,7 @@ public actor EmbeddedDSHRuntime {
       return confirmed && client == nil && opening == nil
     }
     guard client == nil, opening == nil,
-      let dataRoot = try? configuration.validatedDataRoot()
+      let dataRoot = try? configuration.recordRoot()
     else { return false }
     let tracked = trackedClients
     let task = Task {
@@ -108,8 +113,12 @@ public actor EmbeddedDSHRuntime {
     let configuration = configuration
     let handler = handler
     let onEvent = onEvent
+    let prepareDependencies = prepareDependencies
     let task = Task { [weak self] in
-      try await Self.launch(
+      // The shared workbench requests its provider snapshot during the readiness handshake.
+      try await prepareDependencies()
+      try Task.checkCancellation()
+      return try await Self.launch(
         configuration: configuration, handler: handler, onEvent: onEvent,
         onCreated: { [weak self] client in await self?.track(client, generation: attempt) },
         onFailure: { [weak self] error in await self?.didFail(error, generation: attempt) }
@@ -186,6 +195,7 @@ public actor EmbeddedDSHRuntime {
     onFailure: @escaping EmbeddedDSHClient.FailureHandler
   ) async throws -> EmbeddedDSHClient {
     let dataRoot = try configuration.validatedDataRoot()
+    let recordRoot = try configuration.recordRoot()
     let root = try configuration.resolveResourceRoot()
     let resources = try await Task.detached(priority: .utility) {
       try EmbeddedDSHRuntimeResources.load(root: root)
@@ -193,12 +203,13 @@ public actor EmbeddedDSHRuntime {
     try Task.checkCancellation()
     do {
       try FileManager.default.createDirectory(at: dataRoot, withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(at: recordRoot, withIntermediateDirectories: true)
     } catch { throw EmbeddedDSHRuntimeError.invalidConfiguration }
-    guard await EmbeddedDSHHostRecord.recover(in: dataRoot) else {
+    guard await EmbeddedDSHHostRecord.recover(in: recordRoot) else {
       throw EmbeddedDSHRuntimeError.processTreeStillRunning
     }
     let record = EmbeddedDSHHostRecord()
-    try record.save(in: dataRoot)
+    try record.save(in: recordRoot)
     let environment = EmbeddedDSHRuntimeEnvironment.make(
       nodePath: resources.node.canonicalPath, dataRoot: dataRoot)
     let transport: ACPProcessTransport
@@ -207,7 +218,8 @@ public actor EmbeddedDSHRuntime {
         configuration: ACPProcessTransportConfiguration(
           argv: [
             resources.node.canonicalPath, resources.entry.canonicalPath, "--home", dataRoot.path,
-          ],
+          ] + (configuration.providersOnly ? ["--providers-only"] : [])
+            + (configuration.sharedProviders ? ["--shared-providers"] : []),
           workingDirectory: dataRoot.path,
           environment: environment,
           maximumFrameBytes: 32 * 1_024 * 1_024,
@@ -224,7 +236,7 @@ public actor EmbeddedDSHRuntime {
       guard let identity = transport.processIdentity else {
         throw EmbeddedDSHRuntimeError.launchFailed
       }
-      try record.running(identity: identity).save(in: dataRoot)
+      try record.running(identity: identity).save(in: recordRoot)
       try resources.validateEntrypoints()
       await client.start()
       let status = try await client.request(

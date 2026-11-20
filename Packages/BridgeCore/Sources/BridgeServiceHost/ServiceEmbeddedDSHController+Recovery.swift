@@ -16,7 +16,9 @@ extension ServiceEmbeddedDSHController {
   func validateWorkspaceWriteRecovery(projectID: ProjectID) async throws {
     let writers = try persistedWorkspaceWriters()
     for rootID in Set(writers.filter { $0.ownerID.hasPrefix("tool:") }.map(\.rootID)) {
-      if try await storedProjectID(for: rootID) == projectID.rawValue {
+      if !liveExecutionRoots.contains(rootID),
+        try await storedProjectID(for: rootID) == projectID.rawValue
+      {
         throw ServiceStoreError.invalidArgument("workbench.workspace_recovery_required")
       }
     }

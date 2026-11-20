@@ -10,6 +10,13 @@ extension BridgeServiceAppModel {
     started = true
     startAppUpdateCheck()
     startMessageCenter()
+    do {
+      try await registration.resumeTemporaryStopIfNeeded()
+    } catch {
+      connectionState = .unavailable
+      errorMessage = Self.message(error)
+      return
+    }
     let status = await resolveRegistrationStatus(reprobe: true)
     guard !stopped else { return }
     switch status {
@@ -43,7 +50,7 @@ extension BridgeServiceAppModel {
 
   @discardableResult
   public func shutdownForApplicationTermination() async -> Bool {
-    if !keepServiceRunningAfterAppExit {
+    if !completeExitPrepared && !keepServiceRunningAfterAppExit {
       let processIDs: [Int32]
       do {
         processIDs = try await registration.processIDsForShutdown()
@@ -210,10 +217,19 @@ extension BridgeServiceAppModel {
     do {
       let refreshedStatus = try await client.status()
       if serviceStatus != refreshedStatus { serviceStatus = refreshedStatus }
+      applyServiceStatusMode(refreshedStatus)
       applyWorkbenchPermissionMode(refreshedStatus.workbenchPermissionMode)
       if connectionState != .connected { connectionState = .connected }
       if !silent { lastRefreshAt = Date() }
-      if !silent, errorMessage != nil { errorMessage = nil }
+      if isLightweightMode == nil {
+        do {
+          try await refreshProviderGatewayModeStatus(using: client)
+        } catch {
+          if !silent { errorMessage = "读取运行模式失败：\(Self.message(error))" }
+        }
+      } else if !silent, errorMessage != nil {
+        errorMessage = nil
+      }
       await refreshCollections(
         client: client,
         includeCatalog: includeCatalog,
@@ -334,7 +350,11 @@ extension BridgeServiceAppModel {
       exposureMode: mode,
       tunnel: serviceStatus.tunnel,
       workbenchProjectID: serviceStatus.workbenchProjectID,
-      workbenchPermissionMode: serviceStatus.workbenchPermissionMode
+      workbenchPermissionMode: serviceStatus.workbenchPermissionMode,
+      applicationMode: serviceStatus.applicationMode,
+      applicationModeTransition: serviceStatus.applicationModeTransition,
+      applicationModeError: serviceStatus.applicationModeError,
+      modelGatewayRunning: serviceStatus.modelGatewayRunning
     )
   }
 
@@ -346,7 +366,11 @@ extension BridgeServiceAppModel {
       exposureMode: serviceStatus.exposureMode,
       tunnel: serviceStatus.tunnel,
       workbenchProjectID: serviceStatus.workbenchProjectID,
-      workbenchPermissionMode: mode
+      workbenchPermissionMode: mode,
+      applicationMode: serviceStatus.applicationMode,
+      applicationModeTransition: serviceStatus.applicationModeTransition,
+      applicationModeError: serviceStatus.applicationModeError,
+      modelGatewayRunning: serviceStatus.modelGatewayRunning
     )
   }
 
@@ -392,7 +416,8 @@ extension BridgeServiceAppModel {
 
   func nextPollingDelay(base: Duration) -> Duration {
     let needsLiveUpdates =
-      connectionState != .connected || tasks.contains(where: \.isActive) || !approvals.isEmpty
+      connectionState != .connected
+      || (isLightweightMode == false && (tasks.contains(where: \.isActive) || !approvals.isEmpty))
       || !directApprovals.isEmpty
       || !resolvingApprovalKeys.isEmpty
       || (serviceStatus?.tunnel.enabled == true && serviceStatus?.tunnel.lifecycle != "ready")

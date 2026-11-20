@@ -43,37 +43,19 @@ extension ServiceEmbeddedDSHController {
     }
   }
 
-  /// Results the engine has not acknowledged yet. A child that cannot be described this round is
-  /// reported in `skipped` and comes back next round, so it never holds back the others.
-  func subagentResults(rootID: String) async throws -> ACPJSONValue {
-    var results: [ACPJSONValue] = []
-    var skipped: [ACPJSONValue] = []
-    for item in try await application.pendingEmbeddedDSHResults(parentSessionID: rootID) {
-      let value: ACPJSONValue = .object([
-        "childID": .string(item.childID), "requestID": .string(item.requestID),
-        "taskID": .string(item.taskID.rawValue), "state": .string(item.status.rawValue),
-        "output": item.resultSummary.map(ACPJSONValue.string) ?? .null,
-        "error": item.failureCode.map(ACPJSONValue.string) ?? .null,
-      ])
-      do {
-        results.append(
-          try await enrichWorkspaceState(
-            value, rootID: rootID, childID: item.childID,
-            taskID: item.taskID.rawValue, state: item.status.rawValue))
-      } catch is CancellationError {
-        throw CancellationError()
-      } catch {
-        let mapped = BridgeServiceRequestController.map(error)
-        skipped.append(
-          .object([
-            "childID": .string(item.childID), "requestID": .string(item.requestID),
-            "error": .string("\(mapped.code): \(mapped.message)"),
-          ]))
-      }
+  /// A chat-only root has no project, so it never delegated to a connected agent: the questions the
+  /// engine asks of every root (stopping, waiting for results) have empty answers. Nil means the
+  /// operation needs a project.
+  static func resultForRootWithoutProject(operation: String, rootID: String) -> ACPJSONValue? {
+    switch operation {
+    case "round.stopRoot": return .object(["accepted": .bool(true)])
+    case "round.hasRunning": return .object(["running": .bool(false)])
+    case "round.pending": return SubagentRoundJSON.pending(SubagentPendingBatch())
+    case "round.list":
+      return SubagentRoundJSON.list(
+        SubagentRoundList(rounds: [], children: [], hasUnfinished: false), rootID: rootID)
+    default: return nil
     }
-    var response: [String: ACPJSONValue] = ["results": .array(results)]
-    if !skipped.isEmpty { response["skipped"] = .array(skipped) }
-    return .object(response)
   }
 
   /// Removing a project deletes its tasks, so nothing is left to wait for or to acknowledge.
@@ -82,9 +64,10 @@ extension ServiceEmbeddedDSHController {
     -> ACPJSONValue?
   {
     switch operation {
-    case "results": return .object(["results": .array([])])
-    case "ack": return .object([:])
-    case "get", "wait":
+    case "round.ack", "round.stopRoot": return .object([:])
+    case "round.pending": return .object(["results": .array([])])
+    case "round.hasRunning": return .object(["running": .bool(false)])
+    case "get":
       guard let taskID = payload["taskID"]?.stringValue,
         let childID = payload["childID"]?.stringValue
       else { return nil }

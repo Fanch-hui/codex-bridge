@@ -9,19 +9,37 @@ import Foundation
 
 extension ServiceEmbeddedDSHController {
   func performPrompt(_ input: [String: ACPJSONValue]) async throws -> ACPJSONValue {
+    let admission: String
     let prepared: [String: ACPJSONValue]
+    let id: String
     do {
-      let id = try Self.requiredString(input, "sessionId")
+      id = try Self.requiredString(input, "sessionId")
+      let logicalID = nativeLogicalIDs[id] ?? id
+      admission = try await application.beginWorkbenchPromptAdmission(sessionIDs: [id, logicalID])
+    } catch {
+      throw WorkbenchTaskOperationNotDispatched(cause: error)
+    }
+    do {
       try await authorizeSession(id, requiresProject: false)
       prepared = try await preparePrompt(input, sessionID: id)
       try await synchronizeSessionScope(id)
     } catch {
+      await application.endWorkbenchPromptAdmission(admission)
       throw WorkbenchTaskOperationNotDispatched(cause: error)
     }
-    return try await invoke(action: "session.prompt", payload: .object(prepared))
+    do {
+      let result = try await invoke(action: "session.prompt", payload: .object(prepared))
+      await application.endWorkbenchPromptAdmission(admission)
+      return result
+    } catch {
+      await application.endWorkbenchPromptAdmission(admission)
+      throw error
+    }
   }
 
-  func createSession(_ input: [String: ACPJSONValue]) async throws -> ACPJSONValue {
+  func createSession(
+    _ input: [String: ACPJSONValue], engineAction: String = "session.create"
+  ) async throws -> ACPJSONValue {
     let projectID = input["projectID"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
     let sessionID = input["sessionId"]?.stringValue ?? UUID().uuidString
     if let existing = try await store.workbenchConversation(logicalSessionID: sessionID),
@@ -51,7 +69,7 @@ extension ServiceEmbeddedDSHController {
       nativeSessionID: sessionID, projectID: projectID)
     noteConversationWrite()
     nativeLogicalIDs[sessionID] = sessionID
-    let result = try await invoke(action: "session.create", payload: .object(payload))
+    let result = try await invoke(action: engineAction, payload: .object(payload))
     guard result["sessionId"]?.stringValue == sessionID else {
       throw ServiceStoreError.invalidArgument("embedded_dsh.session_response")
     }

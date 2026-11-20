@@ -32,6 +32,12 @@
       }
     }
 
+    func setWorkbenchPaneDescriptors(_ panes: [WorkbenchPaneDescriptor]) {
+      if paneConversations.setPanes(descriptors: panes, tasks: tasks, client: client) {
+        publishDisplay()
+      }
+    }
+
     func setWorkbenchPanes(_ taskIDs: [String]) {
       if paneConversations.setPanes(taskIDs, tasks: tasks, client: client) { publishDisplay() }
     }

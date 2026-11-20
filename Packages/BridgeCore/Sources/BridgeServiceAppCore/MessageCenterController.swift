@@ -1,5 +1,63 @@
+import BridgeIPC
 import BridgeSecurity
 import Foundation
+
+public protocol MessageCenterSecretStorage: Sendable {
+  func store(_ secret: Data, for reference: SecretReference) async throws
+  func load(_ reference: SecretReference) async throws -> Data
+  func remove(_ reference: SecretReference) async throws
+}
+
+public struct DirectMessageCenterSecretStorage: MessageCenterSecretStorage {
+  private let store: any SecretStore
+
+  public init(_ store: any SecretStore = SecretStoreFactory.defaultStore()) {
+    self.store = store
+  }
+
+  public func store(_ secret: Data, for reference: SecretReference) async throws {
+    try store.store(secret, for: reference)
+  }
+
+  public func load(_ reference: SecretReference) async throws -> Data {
+    try store.load(reference)
+  }
+
+  public func remove(_ reference: SecretReference) async throws {
+    try store.remove(reference)
+  }
+}
+
+public struct ServiceIPCMessageCenterSecretStorage: MessageCenterSecretStorage {
+  private let clientProvider: @Sendable () async -> (any BridgeServiceClientProtocol)?
+
+  public init(clientProvider: @escaping @Sendable () async -> (any BridgeServiceClientProtocol)?) {
+    self.clientProvider = clientProvider
+  }
+
+  public func store(_ secret: Data, for reference: SecretReference) async throws {
+    guard let value = String(data: secret, encoding: .utf8), !value.isEmpty else {
+      throw SecretStoreError.invalidSecret
+    }
+    guard let client = await clientProvider() else { throw SecretStoreError.accessDenied }
+    _ = try await client.messageCenterSecret(
+      IPCMessageCenterSecretRequest(action: "store", reference: reference.rawValue, value: value))
+  }
+
+  public func load(_ reference: SecretReference) async throws -> Data {
+    guard let client = await clientProvider() else { throw SecretStoreError.accessDenied }
+    let response = try await client.messageCenterSecret(
+      IPCMessageCenterSecretRequest(action: "load", reference: reference.rawValue))
+    guard let value = response.value, !value.isEmpty else { throw SecretStoreError.notFound }
+    return Data(value.utf8)
+  }
+
+  public func remove(_ reference: SecretReference) async throws {
+    guard let client = await clientProvider() else { throw SecretStoreError.accessDenied }
+    _ = try await client.messageCenterSecret(
+      IPCMessageCenterSecretRequest(action: "remove", reference: reference.rawValue))
+  }
+}
 
 @MainActor
 public final class MessageCenterController {
@@ -10,7 +68,7 @@ public final class MessageCenterController {
   private let version: String
   private let platform: String
   private let client: MessageCenterClient
-  private let secrets: any SecretStore
+  private let secrets: any MessageCenterSecretStorage
   private let onChange: @MainActor @Sendable (MessageCenterState) -> Void
   private var storage: MessageCenterStorage?
   private var saved = MessageCenterSavedState()
@@ -26,22 +84,34 @@ public final class MessageCenterController {
 
   public convenience init(
     currentVersion: String, platform: String,
+    secretStorage: (any MessageCenterSecretStorage)? = nil,
     onChange: @escaping @MainActor @Sendable (MessageCenterState) -> Void
   ) {
     self.init(
       currentVersion: currentVersion, platform: platform, client: MessageCenterClient(),
-      secrets: SecretStoreFactory.defaultStore(), root: nil, onChange: onChange)
+      secretStorage: secretStorage ?? DirectMessageCenterSecretStorage(), root: nil,
+      onChange: onChange)
+  }
+
+  convenience init(
+    currentVersion: String, platform: String, client: MessageCenterClient,
+    secrets: any SecretStore, root: URL?,
+    onChange: @escaping @MainActor @Sendable (MessageCenterState) -> Void
+  ) {
+    self.init(
+      currentVersion: currentVersion, platform: platform, client: client,
+      secretStorage: DirectMessageCenterSecretStorage(secrets), root: root, onChange: onChange)
   }
 
   init(
     currentVersion: String, platform: String, client: MessageCenterClient,
-    secrets: any SecretStore, root: URL?,
+    secretStorage: any MessageCenterSecretStorage, root: URL?,
     onChange: @escaping @MainActor @Sendable (MessageCenterState) -> Void
   ) {
     version = currentVersion
     self.platform = platform
     self.client = client
-    self.secrets = secrets
+    self.secrets = secretStorage
     self.onChange = onChange
     state.appVersion = currentVersion
     state.platform = platform
@@ -141,7 +211,7 @@ public final class MessageCenterController {
             for entry in batch {
               group.addTask {
                 do {
-                  let token = try Self.loadToken(entry.secretReference, secrets: secrets)
+                  let token = try await Self.loadToken(entry.secretReference, secrets: secrets)
                   let feedback = try await client.feedback(id: entry.feedback.id, token: token)
                   guard feedback.id == entry.feedback.id else { return (entry.feedback.id, nil) }
                   return (entry.feedback.id, feedback)
@@ -321,7 +391,7 @@ public final class MessageCenterController {
             .first(where: { $0.id == id }),
           let storage
         else { throw MessageCenterStorageError.missingFeedback }
-        let token = try loadToken(entry.secretReference)
+        let token = try await loadToken(entry.secretReference)
         let (bytes, contentType) = try await client.download(id: id, token: token)
         try Task.checkCancellation()
         guard bytes.count == attachment.size,
@@ -368,14 +438,14 @@ public final class MessageCenterController {
     }
   }
 
-  private func loadToken(_ value: String) throws -> String {
-    try Self.loadToken(value, secrets: secrets)
+  private func loadToken(_ value: String) async throws -> String {
+    try await Self.loadToken(value, secrets: secrets)
   }
 
-  private nonisolated static func loadToken(_ value: String, secrets: any SecretStore) throws
-    -> String
-  {
-    let bytes = try secrets.load(SecretReference(validating: value))
+  private nonisolated static func loadToken(
+    _ value: String, secrets: any MessageCenterSecretStorage
+  ) async throws -> String {
+    let bytes = try await secrets.load(SecretReference(validating: value))
     guard let token = String(data: bytes, encoding: .utf8), token.count == 64,
       token.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
     else { throw MessageCenterStorageError.missingFeedback }
@@ -448,7 +518,7 @@ extension MessageCenterController {
           try finalize(pending, result: result, keeping: keep)
           attachments = try copyReusedAttachments(attachments, previous: pending)
         }
-        let pending = try begin(
+        let pending = try await begin(
           feedbackID: feedbackID, category: category, body: body, attachments: attachments)
         let result = try await execute(pending)
         try Task.checkCancellation()
@@ -506,7 +576,7 @@ extension MessageCenterController {
 
   private func begin(
     feedbackID: String?, category: String, body: String, attachments: [MessageCenterDraftAttachment]
-  ) throws -> MessageCenterPendingSubmission {
+  ) async throws -> MessageCenterPendingSubmission {
     let reference: String
     if let feedbackID {
       guard let entry = saved.feedbacks.first(where: { $0.feedback.id == feedbackID }) else {
@@ -519,7 +589,7 @@ extension MessageCenterController {
       let token = (0..<32).map { _ in
         String(format: "%02x", UInt8.random(in: 0...255, using: &generator))
       }.joined()
-      try secrets.store(Data(token.utf8), for: secretReference)
+      try await secrets.store(Data(token.utf8), for: secretReference)
       reference = secretReference.rawValue
     }
     let pending = MessageCenterPendingSubmission(
@@ -529,7 +599,7 @@ extension MessageCenterController {
     saved.pending[scope] = pending
     guard persist() else {
       saved.pending.removeValue(forKey: scope)
-      if feedbackID == nil { try? secrets.remove(SecretReference(validating: reference)) }
+      if feedbackID == nil { try? await secrets.remove(SecretReference(validating: reference)) }
       throw MessageCenterStorageError.storageUnavailable
     }
     return pending
@@ -539,7 +609,7 @@ extension MessageCenterController {
     -> MessageCenterFeedbackRecord
   {
     guard let storage else { throw MessageCenterStorageError.storageUnavailable }
-    let token = try loadToken(pending.secretReference)
+    let token = try await loadToken(pending.secretReference)
     for attachment in pending.attachments {
       let bytes = try Data(contentsOf: storage.draftURL(id: attachment.id), options: .mappedIfSafe)
       guard bytes.count == attachment.size,

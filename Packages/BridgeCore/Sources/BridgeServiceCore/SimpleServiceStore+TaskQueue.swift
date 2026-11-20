@@ -104,6 +104,31 @@ extension SimpleServiceStore {
     }
   }
 
+  func finishTaskBeforeStart(
+    id: TaskID, expectedQueued: Bool, event: ServiceTaskEventDraft,
+    state: @Sendable (ServiceTaskRecord) throws -> ServiceTaskState
+  ) throws -> Bool {
+    do {
+      return try database.write { db in
+        guard let row = try Self.taskRow(id: id, in: db) else { return false }
+        let existing = try Self.decodeTask(row)
+        guard existing.isQueued == expectedQueued, existing.state.status == .awaitingLocalApproval
+        else { return false }
+        guard event.createdAt >= existing.updatedAt else {
+          throw ServiceStoreError.invalidArgument("task.updatedAt")
+        }
+        let updated = try existing.replacingState(state(existing), updatedAt: event.createdAt)
+        try updateTaskRow(updated, in: db)
+        try Self.insert(event, taskID: id, in: db)
+        return true
+      }
+    } catch let error as ServiceStoreError {
+      throw error
+    } catch {
+      throw ServiceStoreError.storageFailure
+    }
+  }
+
   func promoteQueuedTask(
     id: TaskID,
     at date: Date,

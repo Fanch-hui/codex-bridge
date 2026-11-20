@@ -5,11 +5,17 @@ import ServiceManagement
 
 public enum BridgeServiceRegistrationError: Error, LocalizedError, Sendable {
   case executableNotFound
+  case temporaryStopFailed
+  case temporaryRestoreFailed
 
   public var errorDescription: String? {
     switch self {
     case .executableNotFound:
       "App Bundle 中没有找到 Codex Bridge 后台 Service 可执行文件。"
+    case .temporaryStopFailed:
+      "无法临时停止后台服务，请检查服务状态后重试。"
+    case .temporaryRestoreFailed:
+      "无法恢复之前临时停止的后台服务，请检查服务状态后重试。"
     }
   }
 }
@@ -23,6 +29,8 @@ public protocol BridgeServiceRegistrationManaging: AnyObject {
 
   func register() throws
   func unregister() async throws
+  func stopTemporarily() async throws
+  func resumeTemporaryStopIfNeeded() async throws
   func processIDsForShutdown() async throws -> [Int32]
   func waitForShutdown(processIDs: [Int32]) async throws
   func openSystemSettings()
@@ -33,6 +41,10 @@ extension BridgeServiceRegistrationManaging {
   public func probeStatus() async -> BridgeServiceRegistrationStatus { status }
   public var supportsAutomaticRecovery: Bool { false }
   public func recoverUnavailableService() async throws -> Bool { false }
+  public func stopTemporarily() async throws {
+    throw BridgeServiceRegistrationError.temporaryStopFailed
+  }
+  public func resumeTemporaryStopIfNeeded() async throws {}
   public func processIDsForShutdown() async throws -> [Int32] { [] }
   public func waitForShutdown(processIDs: [Int32]) async throws {}
 }
@@ -42,6 +54,7 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
   public var supportsAutomaticRecovery: Bool { true }
 
   private let service: SMAppService
+  private let temporaryStopKey = "bridge.service.temporarilyStopped"
   private let plistName: String
   private let machServiceName: String
 
@@ -116,6 +129,61 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
     unregisterUserLaunchAgent()
   }
 
+  public func stopTemporarily() async throws {
+    let processIDs = try await processIDsForShutdown()
+    let legacy =
+      FileManager.default.fileExists(atPath: userLaunchAgentPlistURL.path)
+      && service.status != .enabled
+    UserDefaults.standard.set(legacy ? "legacy" : "managed", forKey: temporaryStopKey)
+    let label = machServiceName
+    let active = await Task.detached {
+      Self.isLaunchAgentActive(label: label)
+    }.value
+    if active {
+      let stopped = await Task.detached {
+        Self.runLaunchctl(["bootout", "gui/\(getuid())/\(label)"])
+      }.value
+      guard stopped else {
+        UserDefaults.standard.removeObject(forKey: temporaryStopKey)
+        throw BridgeServiceRegistrationError.temporaryStopFailed
+      }
+    }
+    try await waitForShutdown(processIDs: processIDs)
+  }
+
+  public func resumeTemporaryStopIfNeeded() async throws {
+    guard let original = UserDefaults.standard.string(forKey: temporaryStopKey) else { return }
+    let label = machServiceName
+    let active = await Task.detached { Self.isLaunchAgentActive(label: label) }.value
+    if active {
+      UserDefaults.standard.removeObject(forKey: temporaryStopKey)
+      return
+    }
+    let plist: URL
+    if original == "legacy" {
+      guard FileManager.default.fileExists(atPath: userLaunchAgentPlistURL.path) else {
+        UserDefaults.standard.removeObject(forKey: temporaryStopKey)
+        return
+      }
+      plist = userLaunchAgentPlistURL
+    } else {
+      guard service.status == .enabled else {
+        UserDefaults.standard.removeObject(forKey: temporaryStopKey)
+        return
+      }
+      guard let executable = locateServiceExecutable() else {
+        throw BridgeServiceRegistrationError.executableNotFound
+      }
+      plist = try makeTemporaryBootstrapPlist(executable: executable)
+    }
+    defer { if original != "legacy" { try? FileManager.default.removeItem(at: plist) } }
+    let success = await Task.detached {
+      Self.runLaunchctl(["bootstrap", "gui/\(getuid())", plist.path])
+    }.value
+    guard success else { throw BridgeServiceRegistrationError.temporaryRestoreFailed }
+    UserDefaults.standard.removeObject(forKey: temporaryStopKey)
+  }
+
   public func processIDsForShutdown() async throws -> [Int32] {
     guard
       let executable = locateServiceExecutable()
@@ -166,6 +234,41 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
       }
     }
     return nil
+  }
+
+  private func makeTemporaryBootstrapPlist(executable: URL) throws -> URL {
+    let value: [String: Any] = [
+      "Label": machServiceName,
+      "ProgramArguments": [executable.path],
+      "MachServices": [machServiceName: true],
+      "RunAtLoad": true,
+      "KeepAlive": ["SuccessfulExit": false],
+      "ProcessType": "Interactive",
+    ]
+    let data = try PropertyListSerialization.data(fromPropertyList: value, format: .xml, options: 0)
+    let path = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "codex-bridge-bootstrap-\(UUID().uuidString).plist")
+    try data.write(to: path, options: .atomic)
+    return path
+  }
+
+  private nonisolated static func runLaunchctl(_ arguments: [String]) -> Bool {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+    process.arguments = arguments
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    do {
+      try process.run()
+      process.waitUntilExit()
+      return process.terminationStatus == 0
+    } catch {
+      return false
+    }
+  }
+
+  private nonisolated static func isLaunchAgentActive(label: String) -> Bool {
+    runLaunchctl(["print", "gui/\(getuid())/\(label)"])
   }
 
   private nonisolated static func isUserLaunchAgentActive(

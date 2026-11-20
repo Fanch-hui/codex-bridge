@@ -42,7 +42,8 @@
   }
 
   function helpTooltip(label, description) {
-    var wrapper = node("span", "help-tooltip"), trigger = node("button", "help-tooltip-trigger", "ⓘ");
+    var wrapper = node("span", "help-tooltip"), trigger = node("button", "help-tooltip-trigger");
+    trigger.appendChild(icon("info.circle"));
     var tooltip = node("span", "help-tooltip-content", description);
     var nativePopover = typeof tooltip.showPopover === "function", opened = false;
     var triggerHovered = false, tooltipHovered = false, focused = false, closeTimer = null, dialog = null;
@@ -150,10 +151,204 @@
     var element = node("button", "button " + (className || ""), title);
     element.type = "button";
     element.disabled = !!disabled;
+    element.__restoreTitle = title || "";
     if (command) {
       element.addEventListener("click", function () { emit(command, payload || {}); });
     }
     return element;
+  }
+
+  function syncButtonLabel(element, title) {
+    if (!element) return;
+    element.__restoreTitle = title;
+    if (!element.__flashTimer && element.dataset.pending !== "true" && element.textContent !== title) {
+      element.textContent = title;
+    }
+  }
+
+  function setButtonPending(element, pending, pendingLabel, restoreLabel) {
+    if (!element) return;
+    if (restoreLabel !== undefined) element.__restoreTitle = restoreLabel;
+    else if (element.__restoreTitle === undefined && element.dataset.pending !== "true" && !element.__flashTimer) {
+      element.__restoreTitle = element.textContent || "";
+    }
+    if (!pending) {
+      var wasPending = element.dataset.pending === "true";
+      delete element.dataset.pending;
+      element.setAttribute("aria-busy", "false");
+      if (wasPending && !element.__flashTimer && element.__restoreTitle !== undefined) {
+        element.textContent = element.__restoreTitle;
+      }
+      return;
+    }
+    if (element.__flashTimer) {
+      global.clearTimeout(element.__flashTimer);
+      element.__flashTimer = null;
+      element.classList.remove("is-feedback-success");
+    }
+    element.dataset.pending = "true";
+    element.setAttribute("aria-busy", "true");
+    element.disabled = true;
+    if (pendingLabel) element.textContent = pendingLabel;
+  }
+
+  function flashButtonSuccess(element, doneLabel, durationMs) {
+    if (!element) return;
+    if (element.__restoreTitle === undefined && !element.__flashTimer && element.dataset.pending !== "true") {
+      element.__restoreTitle = element.textContent || "";
+    }
+    delete element.dataset.pending;
+    element.setAttribute("aria-busy", "false");
+    if (element.__flashTimer) global.clearTimeout(element.__flashTimer);
+    element.classList.add("is-feedback-success");
+    clear(element);
+    element.appendChild(icon("check"));
+    element.appendChild(node("span", null, doneLabel || "已复制"));
+    element.__flashTimer = global.setTimeout(function () {
+      element.__flashTimer = null;
+      element.classList.remove("is-feedback-success");
+      element.textContent = element.__restoreTitle !== undefined ? element.__restoreTitle : "";
+    }, durationMs || 1600);
+  }
+
+  function trackFieldSave(fieldWrapper, labelText) {
+    if (!fieldWrapper) return { markPending: function () {}, confirm: function () {} };
+    var caption = fieldWrapper.querySelector("label"), statusBadge = node("span", "field-saved-badge");
+    statusBadge.setAttribute("role", "status"); statusBadge.setAttribute("aria-live", "polite");
+    statusBadge.appendChild(icon("check")); statusBadge.appendChild(node("span", null, labelText || "已保存"));
+    if (caption && caption.parentNode === fieldWrapper) {
+      var row = node("div", "field-label-row");
+      fieldWrapper.insertBefore(row, caption); row.appendChild(caption); row.appendChild(statusBadge);
+    } else {
+      fieldWrapper.insertBefore(statusBadge, fieldWrapper.firstChild);
+    }
+    var pendingValue = null, hideTimer = null;
+    return {
+      markPending: function (value) { pendingValue = String(value == null ? "" : value); },
+      confirm: function (serverValue, hasError) {
+        if (pendingValue === null) return;
+        if (hasError) { pendingValue = null; return; }
+        if (String(serverValue == null ? "" : serverValue) !== pendingValue) return;
+        pendingValue = null;
+        if (hideTimer) global.clearTimeout(hideTimer);
+        statusBadge.classList.add("is-visible");
+        hideTimer = global.setTimeout(function () {
+          hideTimer = null; statusBadge.classList.remove("is-visible");
+        }, 1800);
+      }
+    };
+  }
+
+  function runButtonAction(element, pendingLabel, actionFn, successLabel) {
+    if (!element || element.disabled) return Promise.resolve(false);
+    var restore = element.__restoreTitle !== undefined ? element.__restoreTitle : (element.textContent || "");
+    setButtonPending(element, true, pendingLabel || "处理中…", restore);
+    var result;
+    try { result = actionFn(); }
+    catch (failure) { setButtonPending(element, false, null, restore); element.disabled = false; return Promise.reject(failure); }
+    return Promise.resolve(result).then(function (value) {
+      setButtonPending(element, false, null, restore);
+      element.disabled = false;
+      if (value !== false && successLabel) flashButtonSuccess(element, successLabel);
+      return value;
+    }, function (failure) {
+      setButtonPending(element, false, null, restore);
+      element.disabled = false;
+      throw failure;
+    });
+  }
+
+  function openModalShell(title, className) {
+    var dialog = node("dialog", "component-dialog " + (className || ""));
+    dialog.setAttribute("aria-modal", "true");
+    var header = node("header", "dialog-header");
+    header.appendChild(node("h2", null, title));
+    var body = node("div", "dialog-body prompt-dialog-body");
+    var footer = node("footer", "dialog-footer");
+    dialog.appendChild(header); dialog.appendChild(body); dialog.appendChild(footer);
+    return { dialog: dialog, body: body, footer: footer };
+  }
+
+  function confirmDialog(options) {
+    options = typeof options === "string" ? { message: options } : (options || {});
+    var fallback = options.fallbackText || [options.title, options.message].filter(Boolean).join("\n");
+    var doc = global.document || (typeof document !== "undefined" ? document : null);
+    if (!doc || !doc.body) {
+      return Promise.resolve(typeof global.confirm === "function" ? !!global.confirm(fallback) : true);
+    }
+    var probe = doc.createElement("dialog");
+    if (!probe || typeof probe.showModal !== "function") {
+      return Promise.resolve(typeof global.confirm === "function" ? !!global.confirm(fallback) : true);
+    }
+    return new Promise(function (resolve) {
+      var settled = false, shell = openModalShell(options.title || "确认操作", "confirm-dialog");
+      if (options.message) shell.body.appendChild(node("p", "feedback-message", options.message));
+      if (Array.isArray(options.details) && options.details.length) {
+        var meta = node("dl", "confirm-dialog-meta");
+        options.details.forEach(function (pair) {
+          if (!pair || !pair[1]) return;
+          meta.appendChild(node("dt", null, pair[0]));
+          meta.appendChild(node("dd", null, pair[1]));
+        });
+        if (meta.firstChild) shell.body.appendChild(meta);
+      }
+      if (options.note) shell.body.appendChild(node("p", "confirm-dialog-note", options.note));
+      var cancelBtn = button(options.cancelTitle || "取消", null, {}, null, "small", false);
+      var submitClass = "small " + (options.danger ? "danger" : "primary");
+      var submitBtn = button(options.confirmTitle || "确认", null, {}, null, submitClass, false);
+      function finish(result) {
+        if (settled) return;
+        settled = true;
+        if (shell.dialog.open && typeof shell.dialog.close === "function") shell.dialog.close();
+        shell.dialog.remove(); resolve(result);
+      }
+      cancelBtn.addEventListener("click", function () { finish(false); });
+      submitBtn.addEventListener("click", function () { finish(true); });
+      shell.dialog.addEventListener("cancel", function (event) { event.preventDefault(); finish(false); });
+      shell.dialog.addEventListener("click", function (event) { if (event.target === shell.dialog) finish(false); });
+      shell.footer.appendChild(cancelBtn); shell.footer.appendChild(submitBtn);
+      doc.body.appendChild(shell.dialog);
+      shell.dialog.showModal();
+      submitBtn.focus();
+    });
+  }
+
+  function promptDialog(options) {
+    options = options || {};
+    var doc = global.document || (typeof document !== "undefined" ? document : null);
+    if (!doc || !doc.body) return Promise.resolve(null);
+    return new Promise(function (resolve) {
+      var settled = false, shell = openModalShell(options.title || "输入内容", "prompt-dialog");
+      if (options.message) shell.body.appendChild(node("p", "feedback-message", options.message));
+      var inputField = (options.multiline ? textAreaField : textField)(
+        options.label || options.title || "内容", options.initialValue || "", options.placeholder || "");
+      shell.body.appendChild(inputField.wrapper);
+      var cancelBtn = button(options.cancelTitle || "取消", null, {}, null, "small", false);
+      var submitBtn = button(options.submitTitle || "确定", null, {}, null, "small primary", false);
+      function updateSubmit() { submitBtn.disabled = !inputField.control.value.trim(); }
+      function finish(result) {
+        if (settled) return;
+        settled = true;
+        if (shell.dialog.open && typeof shell.dialog.close === "function") shell.dialog.close();
+        shell.dialog.remove(); resolve(result);
+      }
+      inputField.control.addEventListener("input", updateSubmit);
+      inputField.control.addEventListener("keydown", function (event) {
+        if (!options.multiline && event.key === "Enter" && !isIMEKeyEvent(event)) {
+          event.preventDefault();
+          if (!submitBtn.disabled) finish(inputField.control.value.trim());
+        }
+      });
+      cancelBtn.addEventListener("click", function () { finish(null); });
+      submitBtn.addEventListener("click", function () { if (!submitBtn.disabled) finish(inputField.control.value.trim()); });
+      shell.dialog.addEventListener("cancel", function (event) { event.preventDefault(); finish(null); });
+      shell.dialog.addEventListener("click", function (event) { if (event.target === shell.dialog) finish(null); });
+      shell.footer.appendChild(cancelBtn); shell.footer.appendChild(submitBtn);
+      doc.body.appendChild(shell.dialog); updateSubmit();
+      if (typeof shell.dialog.showModal === "function") shell.dialog.showModal(); else shell.dialog.setAttribute("open", "");
+      inputField.control.focus();
+      if (typeof inputField.control.select === "function" && options.initialValue) inputField.control.select();
+    });
   }
 
   function field(label, control, className) {
@@ -423,6 +618,13 @@
     updateStatus: updateStatus,
     gitStateBadge: gitStateBadge,
     button: button,
+    syncButtonLabel: syncButtonLabel,
+    setButtonPending: setButtonPending,
+    flashButtonSuccess: flashButtonSuccess,
+    runButtonAction: runButtonAction,
+    trackFieldSave: trackFieldSave,
+    confirmDialog: confirmDialog,
+    promptDialog: promptDialog,
     selectField: selectField,
     textField: textField,
     pageHeader: pageHeader,

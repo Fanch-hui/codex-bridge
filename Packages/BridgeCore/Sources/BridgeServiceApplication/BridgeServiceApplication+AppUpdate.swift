@@ -84,10 +84,12 @@ extension BridgeServiceApplication {
     }
   }
 
-  public func prepareIdleServiceShutdown() async throws -> Bool {
+  public func prepareIdleServiceShutdown(
+    additionalCheck: @Sendable () async throws -> Bool = { true }
+  ) async throws -> Bool {
     guard await workspaceGate.beginIdleServiceShutdown() else { return false }
     do {
-      guard try await appUpdateIsIdle() else {
+      guard try await appUpdateIsIdle(), try await additionalCheck() else {
         await workspaceGate.cancelIdleServiceShutdown()
         return false
       }

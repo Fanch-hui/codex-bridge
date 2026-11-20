@@ -5,8 +5,8 @@ const categories = ['models', 'mcp', 'plugins'];
 const initial = () => ({ desiredRevision: 0, appliedRevision: 0, status: 'applied', restartRequired: false });
 
 export class ConfigurationActivation {
-  constructor(home, notify) {
-    this.path = join(home, 'bridge-configuration-activation.json');
+  constructor(home, notify, filename = 'bridge-configuration-activation.json') {
+    this.path = join(home, filename);
     this.notify = notify;
     this.categories = Object.fromEntries(categories.map(name => [name, initial()]));
     this.queue = Promise.resolve();

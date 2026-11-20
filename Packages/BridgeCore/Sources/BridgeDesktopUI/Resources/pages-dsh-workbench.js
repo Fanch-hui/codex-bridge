@@ -3,10 +3,10 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var Selection = global.CodexBridgeDesktopDSHWorkbenchSelection;
   var storageKey = "codexbridge.dsh.workbench.v1";
-  var preferences = Selection.preferences(), view, context, settingsOpen = false, settingsPurpose = null, settingsCategory = null, restoreRequested = null, restoreProjectID = null, navigationTaskID = null, pendingNewConversation = null, pendingEmbeddedSessionID = null;
+  var preferences = Selection.preferences(), view, context, settingsOpen = false, settingsPurpose = null, settingsCategory = null, restoreRequested = null, restoreProjectID = null, navigationTaskID = null, pendingNewConversation = null, pendingEmbeddedSessionID = null, pendingExternalTaskID = null;
   var followedProject = "";
-  var settingsIntent = null, navigationTaskRequest = null, sessionOpenRevision = 0, pendingSessionResolution = null;
-  var savedOperationsPaused = false;
+  var settingsIntent = null, navigationTaskRequest = null, navigationWebOnly = false, sessionOpenRevision = 0, pendingSessionResolution = null;
+  var savedOperationsPaused = false, lastContinueReceiptID = null, lastWebTasks = [];
   try {
     var stored = JSON.parse(global.localStorage.getItem(storageKey) || "null");
     preferences = Selection.preferences(stored);
@@ -35,6 +35,56 @@
       embedded.pauseSavedOperations(); savedOperationsPaused = true;
     }
   }
+  function taskRow(taskID, page) {
+    if (!taskID || !page) return null;
+    var listed = S.safeArray(page.tasks).find(function (task) { return task.taskID === taskID; });
+    if (listed) return listed;
+    if (page.selectedTask && page.selectedTask.taskID === taskID) return page.selectedTask;
+    return null;
+  }
+  function isWebTask(taskID, page) {
+    var sources = global.CodexBridgeDesktopWorkbenchSources;
+    if (!sources || !sources.isWebRow || !taskID || !page) return false;
+    var listed = S.safeArray(page.tasks).find(function (task) { return task.taskID === taskID; });
+    if (listed && sources.isWebRow(listed)) return true;
+    var selected = page.selectedTask && page.selectedTask.taskID === taskID ? page.selectedTask : null;
+    if (selected && sources.isWebRow(selected)) return true;
+    if (selected && selected.sessionID) {
+      var bySession = S.safeArray(page.tasks).find(function (task) {
+        return task.sessionID === selected.sessionID && task.providerID === selected.providerID;
+      });
+      if (bySession && sources.isWebRow(bySession)) return true;
+    }
+    return false;
+  }
+  function stableWebTasks(next) {
+    if (next.length === lastWebTasks.length && next.every(function (task, index) { return task === lastWebTasks[index]; })) {
+      return lastWebTasks;
+    }
+    lastWebTasks = next;
+    return lastWebTasks;
+  }
+  function externalAgentTasks(page) {
+    var sources = global.CodexBridgeDesktopWorkbenchSources;
+    return S.safeArray(page && page.tasks).filter(function (row) {
+      if (!row || !row.taskID) return false;
+      if (!sources || !sources.sourceKinds) return true;
+      var kinds = sources.sourceKinds(row).filter(function (kind) { return kind !== "embedded"; });
+      return kinds.length > 0;
+    });
+  }
+  function openWorkbenchExternalTask(taskID) {
+    if (!context || !taskID) return false;
+    sessionOpenRevision++; pendingEmbeddedSessionID = null; pendingSessionResolution = null;
+    preferences.mode = "dsh"; settingsOpen = false; settingsPurpose = null;
+    restoreRequested = null; navigationTaskID = null; navigationWebOnly = false; navigationTaskRequest = null;
+    pendingExternalTaskID = taskID; persist();
+    global.dispatchEvent(new CustomEvent("codex-bridge-workbench-mode-changed"));
+    global.CodexBridgeDesktopWorkbenchHeader.reset();
+    if (context.emit) context.emit("selectPage", { navigation: "workbench" });
+    refresh();
+    return true;
+  }
   function receiveNavigation(event) {
     var envelope = event.detail || {}, taskID = envelope.payload && envelope.payload.taskID;
     if (envelope.command === "openWorkbenchSession" && document.documentElement.dataset.surface !== "preferences") {
@@ -42,15 +92,26 @@
     }
     if (envelope.command === "selectPage" && envelope.payload && envelope.payload.navigation !== "workbench") {
       sessionOpenRevision++; pendingEmbeddedSessionID = null; pendingSessionResolution = null;
+      pendingExternalTaskID = null; navigationWebOnly = false;
     }
     var outsideWorkbench = context && context.state && context.state.selectedNavigation !== "workbench";
-    if (taskID && (envelope.command === "openTask" || envelope.command === "selectTask" && outsideWorkbench)) navigationTaskID = taskID;
+    if (taskID && (envelope.command === "openTask" || envelope.command === "selectTaskHistory"
+      || envelope.command === "selectTask" && outsideWorkbench)) {
+      navigationTaskID = taskID;
+      // Generic links from Activity and Projects follow the task's source once the host selects it.
+      navigationWebOnly = envelope.command === "openTask";
+      navigationTaskRequest = null;
+      if (envelope.command === "selectTaskHistory" && envelope.requestID) {
+        navigationTaskRequest = { taskID: taskID, requestID: envelope.requestID };
+      }
+    }
   }
   function receiveEmbeddedSession(event) {
     var detail = event.detail || {};
     if (!detail.sessionID) return;
     var revision = ++sessionOpenRevision;
-    preferences.mode = "dsh"; settingsOpen = false; persist();
+    preferences.mode = "dsh"; settingsOpen = false;
+    pendingExternalTaskID = null; navigationWebOnly = false; persist();
     global.dispatchEvent(new CustomEvent("codex-bridge-workbench-mode-changed"));
     if (context && context.emit) context.emit("selectPage", { navigation: "workbench" });
     if (context && context.state && context.state.selectedNavigation === "workbench") refresh();
@@ -74,10 +135,20 @@
     });
   }
   function applyNavigation(page) {
-    if (!navigationTaskID || !page || !page.selectedTask || page.selectedTaskID !== navigationTaskID) return;
-    preferences.mode = "collaboration";
-    settingsOpen = false; restoreRequested = navigationTaskID = pendingNewConversation = null;
-    navigationTaskRequest = null;
+    if (!navigationTaskID || !page || !page.selectedTask || page.selectedTaskID !== navigationTaskID
+      || page.selectedTask.taskID !== navigationTaskID) return;
+    var targetID = navigationTaskID, openInWeb = navigationWebOnly && isWebTask(targetID, page);
+    settingsOpen = false; settingsPurpose = null;
+    restoreRequested = navigationTaskID = pendingNewConversation = null;
+    navigationTaskRequest = null; navigationWebOnly = false;
+    if (openInWeb) {
+      preferences.mode = "collaboration";
+      preferences.tasks.collaboration = targetID;
+      pendingExternalTaskID = null;
+    } else {
+      preferences.mode = "dsh";
+      pendingExternalTaskID = targetID;
+    }
     persist(); global.CodexBridgeDesktopWorkbenchHeader.reset();
     global.dispatchEvent(new CustomEvent("codex-bridge-workbench-mode-changed"));
   }
@@ -89,32 +160,40 @@
   function remember(page) {
     if (!page || !page.selectedTask) return;
     if (restoreRequested && page.selectedTask.taskID !== restoreRequested) return;
-    if (preferences.mode !== "collaboration") return;
+    if (preferences.mode !== "collaboration" || !isWebTask(page.selectedTask.taskID, page)) return;
     preferences.tasks.collaboration = page.selectedTask.taskID;
     persist();
   }
   function setMode(mode, taskID) {
     if (!context) return;
     sessionOpenRevision++; pendingEmbeddedSessionID = null; pendingSessionResolution = null;
+    pendingExternalTaskID = null;
     remember(context.page);
     preferences.mode = mode; settingsOpen = false; settingsPurpose = null;
     global.dispatchEvent(new CustomEvent("codex-bridge-workbench-mode-changed"));
-    restoreRequested = null; navigationTaskID = null; navigationTaskRequest = null; persist();
+    restoreRequested = null; navigationTaskID = null; navigationWebOnly = false; navigationTaskRequest = null; persist();
     global.CodexBridgeDesktopWorkbenchHeader.reset();
-    var tasks = S.safeArray(context.page && context.page.tasks), target;
+    var allTasks = S.safeArray(context.page && context.page.tasks);
+    var allWeb = global.CodexBridgeDesktopWorkbenchSources
+      ? global.CodexBridgeDesktopWorkbenchSources.visibleRows(allTasks, "all") : allTasks;
+    var filteredWeb = view && view.webSources ? view.webSources.filterRows(allTasks) : allWeb;
+    var target;
     if (mode === "collaboration") {
       var wanted = taskID || preferences.tasks.collaboration;
-      target = tasks.find(function (task) { return task.taskID === wanted; });
-      if (!target && !taskID) target = tasks[0];
-      if (taskID) navigationTaskID = taskID;
+      target = (taskID ? allWeb : filteredWeb).find(function (task) { return task.taskID === wanted; });
+      if (!target && !taskID) target = filteredWeb[0] || null;
       if (target) { preferences.tasks.collaboration = target.taskID; persist(); }
     }
-    if (target && target.taskID !== context.page.selectedTaskID) {
+    if (target && target.taskID !== (context.page && context.page.selectedTaskID)) {
       restoreRequested = target.taskID;
       context.emit("selectTask", { taskID: target.taskID });
     } else if (taskID && !target) {
       restoreRequested = taskID;
       context.emit("selectTask", { taskID: taskID });
+    }
+    if (mode === "collaboration" && taskID) {
+      navigationTaskID = taskID;
+      navigationWebOnly = true;
     }
     refresh();
   }
@@ -126,7 +205,7 @@
   function openEmbeddedSettings(purpose) {
     if (!context || !workbenchAvailable(context.state)) return;
     if (purpose === "models" || purpose === "mcp") { settingsCategory = purpose; purpose = null; }
-    settingsIntent = purpose && view.embedded ? view.embedded.navigationIdentity() : null;
+    settingsIntent = purpose && focusedEmbedded() ? focusedEmbedded().navigationIdentity() : null;
     settingsPurpose = purpose === "chatgpt-add" ? "chatgpt" : purpose || null;
     settingsOpen = true; persist(); refresh();
     if (purpose === "chatgpt" && view.embeddedSettings) view.embeddedSettings.beginLogin();
@@ -134,29 +213,31 @@
   }
   function connectionReady(kind, providerID) {
     if (!settingsOpen || settingsPurpose !== kind) return;
-    if (settingsIntent && view.embedded && settingsIntent !== view.embedded.navigationIdentity()) return;
-    if (view.embedded) view.embedded.selectProvider(providerID);
+    if (settingsIntent && focusedEmbedded() && settingsIntent !== focusedEmbedded().navigationIdentity()) return;
+    if (focusedEmbedded()) focusedEmbedded().selectProvider(providerID);
     settingsOpen = false; settingsPurpose = null; settingsIntent = null; refresh();
-    if (view.embedded) view.embedded.focus();
+    if (focusedEmbedded()) focusedEmbedded().focus();
   }
   function openExternalSearchResult(item) {
     if (!context || !context.emit) return;
     sessionOpenRevision++; pendingEmbeddedSessionID = null; pendingSessionResolution = null;
-    preferences.mode = "collaboration"; settingsOpen = false; settingsPurpose = null;
-    restoreRequested = null; persist();
+    preferences.mode = "dsh"; settingsOpen = false; settingsPurpose = null;
+    restoreRequested = null; navigationWebOnly = false; persist();
     global.dispatchEvent(new CustomEvent("codex-bridge-workbench-mode-changed"));
-    if (item.source === "agent" && item.projectID && item.projectID !== context.page.selectedProjectID) {
+    if (item.source === "agent" && item.projectID && item.projectID !== (context.page && context.page.selectedProjectID)) {
       context.emit("selectProject", { projectID: item.projectID });
     }
     if (item.source === "bridge" && item.taskID) {
-      navigationTaskID = item.taskID;
-      navigationTaskRequest = { taskID: item.taskID, requestID: global.CodexBridgeDesktopEmbeddedDSHTransport.requestID() };
       var anchor = item.matchAnchor || {}, messageID = anchor.messageID;
       if (global.CodexBridgeDesktopWorkbenchConversation && global.CodexBridgeDesktopWorkbenchConversation.reveal) {
         global.CodexBridgeDesktopWorkbenchConversation.reveal(item.taskID, anchor.messageKey);
       }
+      var requestID = global.CodexBridgeDesktopEmbeddedDSHTransport.requestID();
+      navigationTaskID = item.taskID;
+      navigationTaskRequest = { taskID: item.taskID, requestID: requestID };
+      pendingExternalTaskID = item.taskID;
       context.emit("selectTaskHistory", { taskID: item.taskID,
-        messageKey: anchor.messageKey || undefined, value: messageID == null ? undefined : String(messageID) }, navigationTaskRequest.requestID);
+        messageKey: anchor.messageKey || undefined, value: messageID == null ? undefined : String(messageID) }, requestID);
     } else if (item.source === "agent" && global.CodexBridgeDesktopTaskHistorySearch) {
       global.CodexBridgeDesktopTaskHistorySearch.openNative({ projectID: item.projectID,
         installationID: item.installationID, nativeSessionID: item.nativeSessionID, matchAnchor: item.matchAnchor }, context.emit);
@@ -164,8 +245,13 @@
     refresh();
   }
   function restoreSelection(page, emit) {
-    if (!page || restoreRequested || navigationTaskID || page.selectedTask) return;
-    var tasks = S.safeArray(page.tasks);
+    if (!page || restoreRequested || navigationTaskID) return;
+    if (page.selectedTask && isWebTask(page.selectedTask.taskID, page)) return;
+    var tasks = view && view.webSources
+      ? view.webSources.filterRows(S.safeArray(page.tasks))
+      : (global.CodexBridgeDesktopWorkbenchSources
+        ? global.CodexBridgeDesktopWorkbenchSources.visibleRows(S.safeArray(page.tasks), "all")
+        : S.safeArray(page.tasks));
     var target = tasks.find(function (task) {
       return task.taskID === preferences.tasks.collaboration;
     }) || tasks.find(function (task) { return task.projectID === page.selectedProjectID; }) || tasks[0];
@@ -191,12 +277,13 @@
       return button;
     }
     view.searchSessions = headingButton("搜索会话", "magnifyingglass", function () { if (view.embedded) view.embedded.toggleSearch(); });
-    view.newCollaborationTask = headingButton("新建 Agent 任务", "plus", function () {
-      if (global.CodexBridgeDesktopWorkbenchNewTask) global.CodexBridgeDesktopWorkbenchNewTask.open();
-    });
     headingButton("选择工作文件夹", "folder.badge.plus", function () { context.emit("registerProject", {}); });
     sessionsHeading.appendChild(headingActions);
     sidebar.appendChild(sessionsHeading);
+    if (global.CodexBridgeDesktopWorkbenchSources) {
+      view.webSources = global.CodexBridgeDesktopWorkbenchSources.create({ onFilterChange: refresh });
+      sidebar.appendChild(view.webSources.root);
+    }
     view.collaborationSessions = S.node("nav", "dsh-session-list collaboration-session-list");
     view.collaborationSessions.setAttribute("aria-label", "网页工作台会话");
     sidebar.appendChild(view.collaborationSessions);
@@ -216,12 +303,25 @@
     if (global.CodexBridgeDesktopEmbeddedDSH) {
       view.embedded = global.CodexBridgeDesktopEmbeddedDSH.create(function () {
         sessionOpenRevision++; pendingEmbeddedSessionID = null; pendingSessionResolution = null;
+        pendingExternalTaskID = null;
         settingsOpen = false; pendingNewConversation = null; persist(); refresh();
       }, openEmbeddedSettings, openExternalSearchResult, refresh);
-      view.center.appendChild(view.embedded.root);
+      if (global.CodexBridgeDesktopEmbeddedDSHPanes) {
+        view.panes = global.CodexBridgeDesktopEmbeddedDSHPanes.create(view.embedded, {
+          openSettings: openEmbeddedSettings, onFocus: refresh, onCreate: observeComposerHeight,
+          onMenuChange: function () { global.CodexBridgeDesktopPages.measureBrowserViewport(context.emit); },
+          openExternalResult: openExternalSearchResult, onProjectChange: refresh,
+          onEvent: function (item, controller) {
+            if (view.workspace && controller === focusedEmbedded() && item.sessionID === controller.currentSessionID()) view.workspace.receive(item);
+          }
+        });
+        view.center.appendChild(view.panes.tabs); view.center.appendChild(view.panes.root);
+        toolbarActions.appendChild(view.panes.control);
+      } else view.center.appendChild(view.embedded.root);
       if (view.embedded.setEventListener) view.embedded.setEventListener(function (item) {
-        if (view.embeddedSettings) view.embeddedSettings.receive(item);
-        else if (item && (item.type === "auth.changed" || item.type === "models.changed")) {
+        if (view.embeddedSettings && item && item.type !== "community.models.changed") view.embeddedSettings.receive(item);
+        if (item && (item.type === "community.models.changed"
+            || !view.embeddedSettings && (item.type === "auth.changed" || item.type === "models.changed"))) {
           if (!view.modelRefreshQueued) {
             view.modelRefreshQueued = true;
             Promise.resolve().then(function () {
@@ -230,31 +330,29 @@
             }).catch(view.embedded.showError);
           }
         }
-        if (view.workspace && item && item.sessionID === view.embedded.currentSessionID()) view.workspace.receive(item);
+        if (view.workspace && focusedEmbedded() === view.embedded && item && item.sessionID === view.embedded.currentSessionID()) view.workspace.receive(item);
       });
       if (view.embedded.searchRoot) sidebar.appendChild(view.embedded.searchRoot);
       sidebar.appendChild(view.embedded.sidebar);
+      view.externalSessionsSection = S.node("details", "dsh-external-sessions-section");
+      view.externalSessionsSection.open = false;
+      view.externalSessionsSection.hidden = true;
+      view.externalSessionsSummary = S.node("summary", "dsh-external-sessions-summary", "外部 Agent 会话 (0)");
+      view.externalSessions = S.node("nav", "dsh-session-list dsh-external-session-list");
+      view.externalSessions.setAttribute("aria-label", "外部 Agent 会话");
+      view.externalSessionsSection.appendChild(view.externalSessionsSummary);
+      view.externalSessionsSection.appendChild(view.externalSessions);
+      sidebar.appendChild(view.externalSessionsSection);
       toolbarContext.appendChild(view.embedded.toolbarContext);
       toolbarActions.appendChild(view.embedded.toolbarActions);
     }
     view.root.appendChild(view.center);
     if (global.CodexBridgeDesktopDSHWorkspace) {
       view.workspace = global.CodexBridgeDesktopDSHWorkspace.create(function (projectID, path) {
-        return !!view.embedded && view.embedded.addAttachment(projectID, path);
+        return !!focusedEmbedded() && focusedEmbedded().addAttachment(projectID, path);
       });
       if (view.embedded && view.embedded.subagents && view.workspace.mountSubagents) {
         view.workspace.mountSubagents(view.embedded.subagents);
-      }
-      if (view.embedded && view.embedded.setSubagentsListener) {
-        view.embedded.setSubagentsListener(function (count, added) {
-          if (view.workspace && view.workspace.syncSubagents) view.workspace.syncSubagents();
-          if (added && view.workspace && view.workspace.selectTab) {
-            view.workspace.selectTab("agents");
-            if (preferences.panels && preferences.panels.workspaceCollapsed) {
-              preferences.panels.workspaceCollapsed = false; persist(); refresh();
-            }
-          }
-        });
       }
       view.workspace.root.id = "dsh-workspace-pane"; view.root.appendChild(view.workspace.root);
     }
@@ -269,6 +367,9 @@
     view.settings.addEventListener("close", function () {
       if (settingsOpen) { settingsOpen = false; settingsPurpose = null; refresh(); }
     });
+    if (global.CodexBridgeDesktopTaskHistorySearch) {
+      view.historySearch = global.CodexBridgeDesktopTaskHistorySearch.createDialog(toolbarActions);
+    }
     view.settingsButton = localButton("", function () {
       settingsPurpose = null; settingsOpen = true; refresh();
     }, "dsh-pane-toggle");
@@ -276,32 +377,54 @@
     view.settingsButton.setAttribute("aria-label", view.settingsButton.title); toolbarActions.appendChild(view.settingsButton);
     document.getElementById("workbench-page").appendChild(view.root);
     view.layout = global.CodexBridgeDesktopDSHWorkbenchLayout.create(view, toolbarActions, preferences.panels, function () { persist(); refresh(); });
-    observeComposerHeight();
+    if (view.embedded) observeComposerHeight(view.embedded);
   }
-  function observeComposerHeight() {
+  function observeComposerHeight(controller) {
     if (typeof global.ResizeObserver !== "function") return;
-    var embeddedComposer = view.embedded && view.embedded.root.querySelector(".dsh-native-composer");
-    var conversationViewport = view.embedded && view.embedded.root.querySelector(".dsh-bridge-conversation");
-    if (!embeddedComposer) return;
-    view.composerObserver = new global.ResizeObserver(function () {
-      var bounds = embeddedComposer.getBoundingClientRect();
+    var composer = controller.root.querySelector(".dsh-native-composer");
+    var conversation = controller.root.querySelector(".dsh-bridge-conversation");
+    if (!composer || !conversation) return;
+    var observer = new global.ResizeObserver(function () {
+      var bounds = composer.getBoundingClientRect();
       if (bounds.height <= 0) return;
-      var height = Math.ceil(bounds.height);
-      view.root.style.setProperty("--dsh-composer-height", height + "px");
-      if (conversationViewport) {
-        var overlap = conversationViewport.getBoundingClientRect().bottom - bounds.top;
-        view.embedded.setBottomInset(Math.max(0, Math.ceil(overlap + 12)));
-      }
+      controller.root.style.setProperty("--dsh-composer-height", Math.ceil(bounds.height) + "px");
+      controller.setBottomInset(Math.max(0, Math.ceil(conversation.getBoundingClientRect().bottom - bounds.top + 12)));
     });
-    view.composerObserver.observe(embeddedComposer);
-    if (conversationViewport) view.composerObserver.observe(conversationViewport);
+    observer.observe(composer); observer.observe(conversation);
+  }
+  function focusedEmbedded() {
+    return view && view.panes ? view.panes.currentView() : view && view.embedded;
+  }
+  function syncFocusedView(visible) {
+    var focused = focusedEmbedded();
+    if (!focused) return;
+    if (view.focused !== focused) {
+      if (view.focused) {
+        view.focused.toolbarContext.hidden = true; view.focused.toolbarActions.hidden = true;
+        view.focused.setSubagentsListener(null);
+      }
+      view.focused = focused;
+      document.getElementById("workspace-toolbar-context").appendChild(focused.toolbarContext);
+      document.getElementById("workspace-toolbar-actions").appendChild(focused.toolbarActions);
+      if (view.workspace) view.workspace.mountSubagents(focused.subagents);
+      focused.setSubagentsListener(function (_count, added) {
+        if (view.workspace) view.workspace.syncSubagents();
+        if (added && view.workspace) {
+          view.workspace.selectTab("agents");
+          if (preferences.panels.workspaceCollapsed) { preferences.panels.workspaceCollapsed = false; persist(); refresh(); }
+        }
+      });
+    }
+    var externalFocused = !!(visible && view.panes && view.panes.isExternalFocused && view.panes.isExternalFocused());
+    focused.toolbarContext.hidden = !visible || externalFocused;
+    focused.toolbarActions.hidden = !visible || externalFocused;
   }
   function closeSettings() {
     settingsOpen = false; settingsPurpose = null; refresh();
-    if (view.embedded) view.embedded.focus();
+    if (focusedEmbedded()) focusedEmbedded().focus();
   }
   function updateCollaborationSessions(page, emit) {
-    var tasks = S.safeArray(page.tasks), projects = S.safeArray(page.projects), defaultID = S.defaultProjectID(page);
+    var tasks = view.webSources ? view.webSources.filterRows(S.safeArray(page.tasks)) : S.safeArray(page.tasks), projects = S.safeArray(page.projects), defaultID = S.defaultProjectID(page);
     var signature = JSON.stringify([page.selectedTaskID, tasks, projects, defaultID]);
     global.CodexBridgeDesktopStableRender(view.collaborationSessions, signature, function () {
       S.clear(view.collaborationSessions);
@@ -320,31 +443,82 @@
         meta.appendChild(S.node("span", "dsh-session-source", task.provider || task.providerID || "Agent"));
         var status = task.status && task.status !== "已创建" ? task.status : "";
         if (status) meta.appendChild(S.node("span", "dsh-session-status", status));
+        if (view.webSources) view.webSources.decorateRow(meta, task);
         button.appendChild(meta); target.appendChild(button);
       }
       if (!projects.length) { tasks.forEach(function (task) { row(task, view.collaborationSessions); }); return; }
       S.groupByProject(tasks, projects, defaultID, function (task) { return task.projectID; },
         function (task) { return task.projectName; }).forEach(function (group) {
-        var rendered = S.projectGroup(group, { scope: "agent", newLabel: "新建 Agent 任务", onNew: function (projectID) {
-          if (global.CodexBridgeDesktopWorkbenchNewTask) global.CodexBridgeDesktopWorkbenchNewTask.open({ projectID: projectID });
-        } });
+        var rendered = S.projectGroup(group, { scope: "agent" });
         group.rows.forEach(function (task) { row(task, rendered.body); });
         view.collaborationSessions.appendChild(rendered.root);
+      });
+    });
+  }
+  function updateExternalSessions(page, embedded) {
+    if (!view || !view.externalSessionsSection) return;
+    var tasks = embedded ? externalAgentTasks(page) : [];
+    view.externalSessionsSection.hidden = !embedded || !tasks.length;
+    if (view.externalSessionsSection.hidden) return;
+    view.externalSessionsSummary.textContent = "外部 Agent 会话 (" + tasks.length + ")";
+    var projects = S.safeArray(page && page.projects), defaultID = S.defaultProjectID(page);
+    var activeTaskID = view.panes && view.panes.focusedTaskID ? view.panes.focusedTaskID() : null;
+    var signature = JSON.stringify([activeTaskID, tasks, projects, defaultID]);
+    global.CodexBridgeDesktopStableRender(view.externalSessions, signature, function () {
+      S.clear(view.externalSessions);
+      function row(task, target) {
+        var title = task.title || "Agent 会话", selected = !!activeTaskID && task.taskID === activeTaskID;
+        var button = localButton("", function () {
+          settingsOpen = false; settingsPurpose = null;
+          if (view.panes && view.panes.openExternalTask) {
+            view.panes.openExternalTask(task.taskID, task);
+          }
+          refresh();
+        }, "dsh-session-button" + (selected ? " is-active" : ""));
+        button.title = title; button.setAttribute("aria-current", selected ? "true" : "false");
+        button.appendChild(S.node("span", "dsh-session-title", title));
+        var meta = S.node("span", "dsh-session-metadata");
+        meta.appendChild(S.node("span", "dsh-session-source", task.provider || task.providerID || "Agent"));
+        var status = task.status && task.status !== "已创建" ? task.status : "";
+        if (status) meta.appendChild(S.node("span", "dsh-session-status", status));
+        if (view.webSources && global.CodexBridgeDesktopWorkbenchSources
+          && global.CodexBridgeDesktopWorkbenchSources.isWebRow(task)) {
+          view.webSources.decorateRow(meta, task);
+        }
+        button.appendChild(meta); target.appendChild(button);
+      }
+      if (projects.length <= 1) {
+        tasks.forEach(function (task) { row(task, view.externalSessions); });
+        return;
+      }
+      S.groupByProject(tasks, projects, defaultID, function (task) { return task.projectID; },
+        function (task) { return task.projectName; }).forEach(function (group) {
+        var rendered = S.projectGroup(group, { scope: "dsh-external-agent" });
+        group.rows.forEach(function (task) { row(task, rendered.body); });
+        view.externalSessions.appendChild(rendered.root);
       });
     });
   }
   function updateSharedVisibility(development) {
     var header = document.getElementById("workbench-inspector-header"), headerModel = header.__inspectorHeader;
     header.hidden = development || !headerModel || headerModel.queue.hidden;
-    document.getElementById("workbench-native-sessions").hidden = development;
+    var nativeSessions = document.getElementById("workbench-native-sessions");
+    if (nativeSessions) nativeSessions.hidden = !development;
   }
   function updateSettings() {
     if (view.embedded && global.CodexBridgeDesktopEmbeddedDSHSettings) {
       if (!view.embeddedSettings) {
-        view.embeddedSettings = global.CodexBridgeDesktopEmbeddedDSHSettings.create(view.embedded.refreshModels, view.embedded.restart, connectionReady);
+        view.embeddedSettings = global.CodexBridgeDesktopEmbeddedDSHSettings.create(
+          function (provider, force, fromEvent) {
+            if (fromEvent) return view.embedded.refreshModels(provider, force);
+            return global.CodexBridgeDesktopProviderGatewayTransport.call("models.refresh", {})
+              .then(function () { return view.embedded.refreshModels(provider, force); });
+          }, view.embedded.restart, connectionReady,
+          { transport: global.CodexBridgeDesktopProviderGatewayTransport.supplierTransport(
+            global.CodexBridgeDesktopEmbeddedDSHTransport) });
         view.settings.appendChild(view.embeddedSettings.root);
       }
-      view.embeddedSettings.setSession(view.embedded.currentSessionID());
+      view.embeddedSettings.setSession(focusedEmbedded().currentSessionID());
       view.embeddedSettings.setSetupMode(settingsPurpose);
       if (settingsCategory) { view.embeddedSettings.selectCategory(settingsCategory); settingsCategory = null; }
       view.embeddedSettings.root.hidden = false; view.embeddedSettings.setActive(settingsOpen);
@@ -354,7 +528,9 @@
   // screen, so the viewing project follows it. One request per (conversation, viewing project)
   // pair keeps a host that declines the change from being asked on every render.
   function followViewedProject(page, emit) {
-    var wanted = view.embedded.currentProjectID();
+    var focused = focusedEmbedded();
+    var wanted = view && view.panes && view.panes.focusedProjectID
+      ? view.panes.focusedProjectID() : (focused && focused.currentProjectID());
     var key = wanted + "\u001f" + (page && page.selectedProjectID || "");
     if (!wanted || !page || wanted === page.selectedProjectID || followedProject === key) return;
     followedProject = key; emit("selectProject", { projectID: wanted });
@@ -362,6 +538,9 @@
   function render(page, emit, state, shared) {
     context = { page: page, emit: emit, state: state, shared: shared };
     setTransportAvailability(state);
+    if (global.CodexBridgeDesktopWorkbenchComposer && global.CodexBridgeDesktopWorkbenchComposer.setSettings) {
+      global.CodexBridgeDesktopWorkbenchComposer.setSettings(state && state.settings);
+    }
     if (global.CodexBridgeDesktopWorkbenchNewTask) {
       global.CodexBridgeDesktopWorkbenchNewTask.setSettings(state && state.settings);
       global.CodexBridgeDesktopWorkbenchNewTask.setOnChange(function () {
@@ -369,12 +548,20 @@
       });
     }
     mount();
+    if (view.webSources) view.webSources.update(state && state.connections, emit);
     var receipt = page && page.commandReceipt;
     if (navigationTaskRequest && receipt && receipt.command === "selectTaskHistory"
       && receipt.requestID === navigationTaskRequest.requestID && receipt.taskID === navigationTaskRequest.taskID
       && receipt.accepted === false) {
-      if (navigationTaskID === navigationTaskRequest.taskID) navigationTaskID = null;
+      if (navigationTaskID === navigationTaskRequest.taskID) {
+        navigationTaskID = null; navigationWebOnly = false;
+      }
       navigationTaskRequest = null;
+    }
+    if (receipt && receipt.command === "continueNativeAgentSession" && receipt.accepted === true
+      && receipt.resultingTaskID && receipt.receiptID && receipt.receiptID !== lastContinueReceiptID) {
+      lastContinueReceiptID = receipt.receiptID;
+      if (preferences.mode === "dsh") pendingExternalTaskID = receipt.resultingTaskID;
     }
     applyNavigation(page);
     var projectID = page && page.selectedProjectID;
@@ -390,9 +577,9 @@
       : status.changing ? (status.enabled ? "正在关闭工作台…" : "正在开启工作台…") : "工作台已关闭";
     view.unavailableSettings.hidden = !status.loaded || status.changing;
     view.searchSessions.hidden = !embedded;
-    view.newCollaborationTask.hidden = development;
     document.getElementById("collaboration-workbench").hidden = development;
     view.root.hidden = !development;
+    if (view.webSources) view.webSources.root.hidden = development;
     view.collaborationSessions.hidden = development;
     if (view.embedded) {
       view.embedded.sidebar.hidden = !embedded;
@@ -400,32 +587,59 @@
       view.embedded.toolbarContext.hidden = !embedded;
       view.embedded.toolbarActions.hidden = !embedded;
     }
+    if (view.historySearch) {
+      view.historySearch.trigger.hidden = !embedded;
+      if (embedded && page) global.CodexBridgeDesktopTaskHistorySearch.update(view.historySearch, page, emit);
+    }
     view.settingsButton.hidden = !embedded;
     var workspaceActive = view.layout.update(embedded);
     updateSharedVisibility(development);
     global.CodexBridgeDesktopWorkbenchHeader.setVisible(!development);
     if (!development) restoreSelection(page, emit);
     if (view.embedded) {
-      view.embedded.root.hidden = !embedded;
       view.embedded.setNavigationActive(embedded);
-      view.embedded.update(page, emit, embedded, available && !!(state && state.serviceConnected),
-        status.loaded && !status.enabled);
+      var connected = available && !!(state && state.serviceConnected), disabled = status.loaded && !status.enabled;
+      if (view.panes) view.panes.update(page, emit, embedded, connected, disabled, state && state.connections);
+      else view.embedded.update(page, emit, embedded, connected, disabled, state && state.connections);
       if (embedded) resolvePendingSession();
       if (embedded && pendingEmbeddedSessionID) {
         var requestedSession = pendingEmbeddedSessionID; pendingEmbeddedSessionID = null;
-        view.embedded.openSession(requestedSession).catch(view.embedded.showError);
+        if (!view.panes || !view.panes.openSession(requestedSession)) view.embedded.openSession(requestedSession).catch(view.embedded.showError);
+      }
+      if (embedded && pendingExternalTaskID && view.panes && view.panes.openExternalTask) {
+        var requestedTask = pendingExternalTaskID; pendingExternalTaskID = null;
+        if (view.panes.openExternalTask(requestedTask, taskRow(requestedTask, page)) === false) {
+          if (!pendingExternalTaskID) pendingExternalTaskID = requestedTask;
+        }
       }
       if (embedded && pendingNewConversation) {
         var request = pendingNewConversation; pendingNewConversation = null;
-        view.embedded.newSession(request.projectID);
+        if (!view.panes || !view.panes.newDraft(request)) {
+          if (request.agentDraft) Promise.resolve(focusedEmbedded().newAgentDraft(request)).catch(view.embedded.showError);
+          else focusedEmbedded().newSession(request.projectID);
+        }
       }
-      if (embedded) followViewedProject(page, emit);
+      if (embedded && view.panes && view.panes.composerFor && global.CodexBridgeDesktopWorkbenchControls
+        && global.CodexBridgeDesktopWorkbenchControls.receive) {
+        global.CodexBridgeDesktopWorkbenchControls.receive(page, emit, view.panes.composerFor);
+      }
     }
+    updateExternalSessions(page, embedded);
+    syncFocusedView(embedded);
+    if (embedded) followViewedProject(page, emit);
     if (!embedded && global.CodexBridgeDesktopStartup) global.CodexBridgeDesktopStartup.update({ status: "ready" });
     if (!development) {
       if (view.embeddedSettings) view.embeddedSettings.setActive(false);
       if (view.workspace) view.workspace.setActive(false, emit);
-      var collaboration = Selection.project(page, navigationTaskID || restoreRequested);
+      var filteredTasks = stableWebTasks(view.webSources
+        ? view.webSources.filterRows(S.safeArray(page && page.tasks)) : S.safeArray(page && page.tasks));
+      var selectedIsWeb = !!(page && page.selectedTask && isWebTask(page.selectedTask.taskID, page));
+      var webPage = page ? Object.assign({}, page, {
+        tasks: filteredTasks,
+        selectedTask: selectedIsWeb ? page.selectedTask : null,
+        selectedTaskID: selectedIsWeb ? page.selectedTaskID : null
+      }) : page;
+      var collaboration = Selection.project(webPage, navigationTaskID || restoreRequested);
       updateCollaborationSessions(collaboration, emit);
       if (view.settings.open) view.settings.close();
       remember(collaboration); shared(collaboration, emit); return;
@@ -438,7 +652,7 @@
       return;
     }
     if (view.workspace) {
-      if (view.embedded && view.workspace.setSession) view.workspace.setSession(view.embedded.currentSessionID());
+      if (view.embedded && view.workspace.setSession) view.workspace.setSession(focusedEmbedded().currentSessionID());
       view.workspace.update(page, emit, !(state && state.serviceConnected === false));
       view.workspace.setActive(workspaceActive, emit);
     }
@@ -465,19 +679,52 @@
     },
     render: render, mode: function () { return preferences.mode; }, filteredPage: Selection.project,
     setActive: function (active, emit) {
+      if (!active && global.CodexBridgeDesktopWorkbenchImport) global.CodexBridgeDesktopWorkbenchImport.setActive(false);
       if (!active && view && view.settings && view.settings.open) {
         settingsOpen = false; settingsPurpose = null; view.settings.close();
       }
       if (!active && view && view.embeddedSettings) view.embeddedSettings.setActive(false);
-      if (!active && view && view.embedded) {
-        var status = availability(context && context.state);
-        view.embedded.update(context && context.page, emit, false,
-          workbenchAvailable(context && context.state) && !!(context && context.state && context.state.serviceConnected),
-          status.loaded && !status.enabled);
-      }
       if (!active && view && view.workspace) view.workspace.setActive(false, emit);
+      if (!active && view && view.embedded) {
+        var state = context && context.state, status = availability(state);
+        var page = context && context.page, connected = workbenchAvailable(state) && !!(state && state.serviceConnected);
+        var disabled = status.loaded && !status.enabled, connections = state && state.connections;
+        if (view.panes) view.panes.update(page, emit, false, connected, disabled, connections);
+        else view.embedded.update(page, emit, false, connected, disabled, connections);
+      }
     },
-    openTask: function (taskID) { setMode("collaboration", taskID); },
+    openTask: function (taskID) {
+      if (!context || !taskID) return;
+      var row = taskRow(taskID, context.page);
+      if (row) {
+        if (isWebTask(taskID, context.page)) {
+          setMode("collaboration", taskID);
+          if (context.state && context.state.selectedNavigation !== "workbench" && context.emit) {
+            context.emit("selectPage", { navigation: "workbench" });
+          }
+          return;
+        }
+        openWorkbenchExternalTask(taskID);
+        return;
+      }
+      if (context.emit) {
+        if (context.state && context.state.selectedNavigation !== "workbench") {
+          context.emit("selectPage", { navigation: "workbench" });
+        }
+        context.emit("selectTask", { taskID: taskID });
+      }
+      navigationTaskID = taskID;
+      navigationWebOnly = true;
+      navigationTaskRequest = null;
+      restoreRequested = taskID;
+    },
+    openCollaborationTask: function (taskID) {
+      if (!context || !taskID) return;
+      setMode("collaboration", taskID);
+      if (context.state && context.state.selectedNavigation !== "workbench" && context.emit) {
+        context.emit("selectPage", { navigation: "workbench" });
+      }
+    },
     showDevelopment: function () {
       if (!context || !context.page || !context.emit) return false;
       if (preferences.mode !== "dsh") setMode("dsh");
@@ -494,15 +741,25 @@
       if (!context || !context.page || !context.emit) return false;
       preferences.mode = "dsh"; settingsOpen = false; settingsPurpose = null;
       global.dispatchEvent(new CustomEvent("codex-bridge-workbench-mode-changed"));
-      navigationTaskID = restoreRequested = null;
+      navigationTaskID = restoreRequested = pendingExternalTaskID = null; navigationWebOnly = false;
       pendingNewConversation = { projectID: projectID || null }; persist();
+      global.CodexBridgeDesktopWorkbenchHeader.reset();
+      context.emit("selectPage", { navigation: "workbench" }); refresh();
+      return true;
+    },
+    openAgentDraft: function (options) {
+      if (!context || !context.page || !context.emit) return false;
+      preferences.mode = "dsh"; settingsOpen = false; settingsPurpose = null;
+      global.dispatchEvent(new CustomEvent("codex-bridge-workbench-mode-changed"));
+      navigationTaskID = restoreRequested = pendingExternalTaskID = null; navigationWebOnly = false;
+      pendingNewConversation = Object.assign({}, options, { agentDraft: true }); persist();
       global.CodexBridgeDesktopWorkbenchHeader.reset();
       context.emit("selectPage", { navigation: "workbench" }); refresh();
       return true;
     },
     openSettings: function (category) {
       if (!context || !context.page || !context.emit) return false;
-      navigationTaskID = null;
+      navigationTaskID = pendingExternalTaskID = null; navigationWebOnly = false;
       preferences.mode = "dsh";
       settingsPurpose = null; settingsCategory = category || "models";
       settingsOpen = workbenchAvailable(context.state); persist();

@@ -17,6 +17,7 @@ struct BridgeDesktopWindowDestination {
     case connectionDetail
     case settingsDetail
     case workbenchSession
+    case lightweightActivity
   }
 
   let id = UUID()
@@ -34,6 +35,9 @@ struct BridgeDesktopWindowDestination {
       return "Boolean(window.CodexBridgeDesktopConnectionsPage?.openDetail(\(argument)))"
     case .settingsDetail:
       return "Boolean(window.CodexBridgeDesktopSettingsPage?.openDetail(\(argument)))"
+    case .lightweightActivity:
+      return
+        "Boolean(window.CodexBridgeDesktopLightweight && (window.CodexBridgeDesktopLightweight.select('activity'), true))"
     case .workbenchSession:
       return
         "window.dispatchEvent(new CustomEvent('codex-bridge-open-workbench-session',{detail:{sessionID:\(argument)}}))"

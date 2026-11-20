@@ -6,7 +6,17 @@
     box-shadow: none;
   }
   :root[data-platform="windows"] .new-conversation-button .icon { color: ButtonText; }
-  :root[data-platform="windows"] :is(.button.primary, .nav-item.is-selected, .list-row.selected, .project-row.selected, .log-row.selected) {
+  :root[data-platform="windows"] :is(
+    .button.primary,
+    .nav-item.is-selected,
+    .list-row.selected,
+    .project-row.selected,
+    .project-library-row.selected,
+    .log-row.selected,
+    .connection-list-item[aria-current="page"],
+    .settings-sidebar-item[aria-current="page"],
+    .message-center-tab.is-selected
+  ) {
     color: HighlightText;
     border-color: Highlight;
     background: Highlight;

@@ -9,6 +9,13 @@ extension BridgeServiceAppModel {
     if changed { objectWillChange.send() }
   }
 
+  func setWorkbenchPaneDescriptors(_ panes: [WorkbenchPaneDescriptor]) {
+    let changed = paneConversations.setPanes(descriptors: panes, tasks: tasks, client: client)
+    let active = Set(paneConversations.paneTaskIDs)
+    panePresentationCaches = panePresentationCaches.filter { active.contains($0.key) }
+    if changed { objectWillChange.send() }
+  }
+
   func closeWorkbenchPanes() {
     paneConversations.removeAll()
     panePresentationCaches = [:]

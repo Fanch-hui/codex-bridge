@@ -161,10 +161,13 @@
       control.addEventListener("compositionend", validate);
     });
     transport.control.addEventListener("change", updateTransport);
+    var pendingSaveName = null;
     save.addEventListener("click", function () {
       if (save.disabled) return;
       var values = draft.values();
       saveDraft();
+      pendingSaveName = values.name.trim();
+      S.setButtonPending(save, true, "保存中…", "保存 MCP");
       context.emit("saveDeepSeekHarnessMCPServer", {
         mcpServerID: editingID,
         mcpServerScope: editingScope,
@@ -183,6 +186,8 @@
       headers.clearValues();
     });
     cancel.addEventListener("click", function () {
+      pendingSaveName = null;
+      S.setButtonPending(save, false, null, "保存 MCP");
       saveDraft();
       environment.clearValues();
       headers.clearValues();
@@ -194,6 +199,16 @@
       root: root,
       setCanManage: function (value) {
         canManage = !!value;
+        if (pendingSaveName === null) validate();
+      },
+      acknowledgeServers: function (servers) {
+        if (pendingSaveName === null) return;
+        var matched = S.safeArray(servers).some(function (server) {
+          return server && (server.id === editingID || server.name === pendingSaveName);
+        });
+        pendingSaveName = null;
+        if (matched) S.flashButtonSuccess(save, "已保存 MCP");
+        else S.setButtonPending(save, false, null, "保存 MCP");
         validate();
       },
       setVisibilityChange: function (handler) {

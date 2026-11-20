@@ -21,9 +21,12 @@ public struct BridgeDesktopEmbeddedDSHReceipt: Codable, Equatable, Sendable {
 
   public init(requestID: String, error: any Error) {
     let failure = BridgeServiceErrorMessage.remoteFailure(error)
+    let code =
+      BridgeServiceErrorMessage.isUnconfirmedResponse(error)
+      ? BridgeServiceErrorMessage.serviceUnavailableCode : failure?.code
     self.init(
       requestID: requestID, errorMessage: BridgeServiceErrorMessage.message(error),
-      errorCode: failure?.code, retryable: failure?.retryable)
+      errorCode: code, retryable: failure?.retryable)
   }
 }
 

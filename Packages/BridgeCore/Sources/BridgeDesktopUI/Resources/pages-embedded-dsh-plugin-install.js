@@ -20,12 +20,28 @@
         return false;
       }
     }
+    function setBusy(control, busy, busyLabel, idleLabel) {
+      if (!control) return;
+      if (control.dataset) {
+        if (busy) control.dataset.pending = "true";
+        else delete control.dataset.pending;
+      }
+      if (typeof control.setAttribute === "function") control.setAttribute("aria-busy", String(!!busy));
+      if (busy && busyLabel) control.textContent = busyLabel;
+      else if (!busy && idleLabel) control.textContent = idleLabel;
+    }
     function render() {
       var status = current && current.status, pending = pendingStates.indexOf(status) !== -1;
       options.root.hidden = !current;
+      if (options.root.dataset) {
+        options.root.dataset.state = !current ? "" : pending ? "pending"
+          : status === "completed" ? "success" : status === "failed" ? "error" : "uncertain";
+      }
       options.message.textContent = current && current.error || labels[status] || "";
       options.installButton.disabled = pending;
+      setBusy(options.installButton, pending, "安装中…", "安装插件");
       options.cancelButton.hidden = !pending || status === "cancelling";
+      setBusy(options.cancelButton, status === "cancelling", "取消中…", "取消安装");
       options.dismissButton.hidden = pending;
       if (options.onPending) options.onPending(pending);
     }

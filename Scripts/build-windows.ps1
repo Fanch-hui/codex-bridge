@@ -64,6 +64,7 @@ $vcpkgRootValue = if ($resolvedVcpkgRoot) {
 $originalPath = $env:PATH
 $originalInclude = $env:INCLUDE
 $originalLib = $env:LIB
+$originalSdkRoot = $env:SDKROOT
 $originalWindowsResource = $env:CODEX_BRIDGE_WINDOWS_RESOURCE
 
 $resourceOutput = Join-Path $resolvedOutDir "CodexBridgeWindowsApp.res"
@@ -203,6 +204,11 @@ try {
   $env:PATH = $originalPath
   $env:INCLUDE = $originalInclude
   $env:LIB = $originalLib
+  if ([string]::IsNullOrWhiteSpace($originalSdkRoot)) {
+    Remove-Item Env:SDKROOT -ErrorAction SilentlyContinue
+  } else {
+    $env:SDKROOT = $originalSdkRoot
+  }
   if ($null -eq $originalWindowsResource) {
     Remove-Item Env:CODEX_BRIDGE_WINDOWS_RESOURCE -ErrorAction SilentlyContinue
   } else {

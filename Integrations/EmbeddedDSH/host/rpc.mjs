@@ -13,10 +13,19 @@ export class Rpc {
 
   send(message) { this.output.write(`${JSON.stringify(message)}\n`); }
   notify(method, params) { this.send({ jsonrpc: '2.0', method, params }); }
-  request(method, params) {
+  request(method, params, signal) {
+    if (signal?.aborted) return Promise.reject(signal.reason);
     const id = `node:${++this.nextID}`;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const abort = () => {
+        this.pending.delete(id);
+        this.notify('$/cancelRequest', { id });
+        reject(signal.reason);
+      };
+      const finish = fn => value => { signal?.removeEventListener('abort', abort); fn(value); };
+      this.pending.set(id, { resolve: finish(resolve), reject: finish(reject) });
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) { abort(); return; }
       this.send({ jsonrpc: '2.0', id, method, params });
     });
   }

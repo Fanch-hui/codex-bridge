@@ -13,6 +13,9 @@ public struct MCPServiceServerFactory: Sendable {
     exposureMode: MCPServiceExposureMode,
     clientID: MCPClientID = .chatGPT,
     activity: MCPClientCallActivity? = nil,
+    clientAccess: @escaping @Sendable (MCPClientID) async -> MCPClientAccess = { _ in .unrestricted
+    },
+    delegationEnabled: @escaping @Sendable () async -> Bool = { true },
     logger: Logger = Logger(label: "CodexBridge.BridgeMCP.LightweightServer")
   ) {
     precondition(!appVersion.isEmpty)
@@ -23,6 +26,8 @@ public struct MCPServiceServerFactory: Sendable {
       service: service,
       exposureMode: exposureMode,
       clientID: clientID,
+      clientAccess: clientAccess,
+      delegationEnabled: delegationEnabled,
       logger: logger
     )
   }
@@ -45,7 +50,15 @@ public struct MCPServiceServerFactory: Sendable {
       guard parameters.cursor == nil || parameters.cursor?.isEmpty == true else {
         throw MCPError.invalidParams("The tool catalog does not use cursors.")
       }
-      return ListTools.Result(tools: definitions)
+      let access = await dispatcher.clientAccess(dispatcher.clientID)
+      let delegation = await dispatcher.delegationEnabled()
+      return ListTools.Result(
+        tools: definitions.filter { tool in
+          guard access.allowsTool(tool.name),
+            let contract = MCPServiceToolCatalog.contract(named: tool.name)
+          else { return false }
+          return delegation || contract.route != .task
+        })
     }
     await server.withMethodHandler(CallTool.self) { parameters in
       let sessionID =

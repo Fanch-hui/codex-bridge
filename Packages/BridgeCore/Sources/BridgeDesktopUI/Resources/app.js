@@ -58,29 +58,57 @@
 
   function navigate(destination) {
     var workbench = window.CodexBridgeDesktopDSHWorkbench;
+    var lightweight = window.CodexBridgeDesktopLightweight;
+    if (destination.indexOf("lite-") === 0 && lightweight) {
+      lightweight.select(destination.slice(5)); return;
+    }
+    var wasOverlay = !!(lightweight && lightweight.isOverlay(state));
+    if (lightweight) lightweight.leave();
+    var targetPage = null;
     if (destination === "development" && workbench && workbench.showDevelopment) {
+      targetPage = "workbench";
       if (workbench.showDevelopment() === false) emit("selectPage", { navigation: "workbench" });
     } else if (destination === "collaboration" && workbench && workbench.openCollaboration) {
+      targetPage = "workbench";
       if (workbench.openCollaboration() === false) emit("selectPage", { navigation: "workbench" });
     } else if (destination === "settings") {
       emit("openSettings");
     } else {
+      targetPage = destination;
       emit("selectPage", { navigation: destination });
     }
-    refreshNavigation();
+    var hasTarget = !!(state && targetPage && targetPage !== "settings" && targetPage !== "logs"
+      && (state.navigation || []).some(function (item) { return item.navigation === targetPage; }));
+    if (hasTarget && (state.selectedNavigation !== targetPage || wasOverlay)) {
+      state = Object.assign({}, state, { selectedNavigation: targetPage });
+      renderActivePage();
+    } else {
+      refreshNavigation();
+    }
   }
 
   function renderNavigation(items, selected) {
     var primary = document.getElementById("navigation");
     var secondary = document.getElementById("secondary-navigation");
     var itemByID = new Map((items || []).map(function (item) { return [item.navigation, item]; }));
-    var entries = [
-      { key: "development", page: "workbench", title: "工作台", symbol: "sparkles" },
-      { key: "collaboration", page: "workbench", title: "网页工作台", symbol: "person.2" },
-      { key: "projects", page: "projects", title: "项目", symbol: "folder.fill" },
-      { key: "overview", page: "overview", title: "动态", symbol: "list.bullet.rectangle" },
+    var lightweight = window.CodexBridgeDesktopLightweight;
+    var liteMode = lightweight && lightweight.mode() === "lite";
+    var overlay = lightweight && lightweight.isOverlay(state);
+    var entries = liteMode ? [
+      { key: "lite-service", page: "overview", title: "服务", symbol: "network", selectedSymbol: "network.fill" },
+      { key: "lite-suppliers", page: "overview", title: "供应商", symbol: "cpu", selectedSymbol: "cpu.fill" },
+      { key: "lite-clients", page: "overview", title: "接入应用", symbol: "terminal", selectedSymbol: "terminal.fill" },
+      { key: "lite-activity", page: "overview", title: "活动", symbol: "list.bullet.rectangle", selectedSymbol: "list.bullet.rectangle.fill" },
+      { key: "settings", page: "settings", title: "设置", symbol: "gearshape", selectedSymbol: "gearshape.fill", secondary: true }
+    ] : [
+      { key: "development", page: "workbench", title: "工作台", symbol: "sparkles", selectedSymbol: "sparkles.fill" },
+      { key: "collaboration", page: "workbench", title: "网页工作台", symbol: "person.2", selectedSymbol: "person.2.fill" },
+      { key: "projects", page: "projects", title: "项目", symbol: "folder", selectedSymbol: "folder.fill" },
+      { key: "overview", page: "overview", title: "动态", symbol: "list.bullet.rectangle", selectedSymbol: "list.bullet.rectangle.fill" },
+      { key: "lite-suppliers", page: "overview", title: "供应商", symbol: "cpu", selectedSymbol: "cpu.fill", secondary: true },
+      { key: "lite-clients", page: "overview", title: "接入应用", symbol: "square.grid.2x2", selectedSymbol: "square.grid.2x2.fill", secondary: true },
       { key: "connections", page: "connections", title: "连接", symbol: "link", secondary: true },
-      { key: "settings", page: "settings", title: "设置", symbol: "gearshape", secondary: true }
+      { key: "settings", page: "settings", title: "设置", symbol: "gearshape", selectedSymbol: "gearshape.fill", secondary: true }
     ];
     var active = new Set();
     var positions = { primary: 0, secondary: 0 };
@@ -108,17 +136,29 @@
         navigationNodes.set(entry.key, navNode);
         setIcons(button);
       }
-      var badgeValue = entry.key === "development" ? null : source.badge;
+      var badgeValue = entry.key === "development" || entry.key.indexOf("lite-") === 0 ? null : source.badge;
+      if (entry.key === "lite-activity") {
+        var approvals = state.workbench && state.workbench.approvals || [];
+        var pending = approvals.filter(function (item) { return item.isDirect; }).length;
+        badgeValue = pending || null;
+      }
       button.title = entry.title;
       button.setAttribute("aria-label", entry.title + (badgeValue == null ? "" : "，" + badgeValue));
-      var isSelected = selected === entry.page;
+      var isSelected = entry.key.indexOf("lite-") === 0
+        ? overlay && lightweight.tab() === entry.key.slice(5) : !overlay && selected === entry.page;
       if (entry.page === "workbench") {
         isSelected = isSelected && (entry.key === "development" ? workbenchMode() === "dsh" : workbenchMode() !== "dsh");
-      } else if (entry.key === "settings" && selected === "logs") {
+      } else if (!overlay && entry.key === "settings" && selected === "logs") {
         isSelected = true;
       }
       button.className = "nav-item" + (isSelected ? " is-selected" : "");
       button.setAttribute("aria-current", isSelected ? "page" : "false");
+      var navIcon = button.querySelector(".icon");
+      var targetSymbol = isSelected && entry.selectedSymbol ? entry.selectedSymbol : entry.symbol;
+      if (navIcon && navIcon.dataset.symbol !== targetSymbol) {
+        navIcon.dataset.symbol = targetSymbol;
+        navIcon.innerHTML = iconMarkup(targetSymbol);
+      }
       var badge = button.querySelector(".nav-badge");
       badge.hidden = badgeValue == null; badge.textContent = badgeValue == null ? "" : badgeValue;
       if (container && container.children[index] !== navNode) container.insertBefore(navNode, container.children[index] || null);
@@ -132,18 +172,53 @@
     if (!state) return;
     renderNavigation(state.navigation, state.selectedNavigation);
     var pageTitle = document.getElementById("page-title");
-    if (state.selectedNavigation === "workbench") {
+    var lightweight = window.CodexBridgeDesktopLightweight;
+    var overlay = lightweight && lightweight.isOverlay(state);
+    if (overlay) {
+      pageTitle.textContent = lightweight.title(); pageTitle.title = pageTitle.textContent;
+    } else if (state.selectedNavigation === "workbench") {
       pageTitle.textContent = workbenchMode() === "dsh" ? "工作台" : "网页工作台";
       pageTitle.title = pageTitle.textContent;
       var workbenchPage = document.getElementById("workbench-page");
       if (workbenchPage) workbenchPage.setAttribute("aria-label", pageTitle.textContent);
     }
-    var outsideWorkbench = state.selectedNavigation !== "workbench";
+    var outsideWorkbench = overlay || state.selectedNavigation !== "workbench";
     ["workspace-navigator", "workspace-toolbar-context", "workspace-toolbar-actions"].forEach(function (id) {
       var node = document.getElementById(id);
       if (node) node.hidden = outsideWorkbench;
     });
     document.getElementById("app-shell").dataset.workbenchMode = workbenchMode();
+    var primaryAction = document.querySelector(".sidebar-primary-action");
+    if (primaryAction) primaryAction.hidden = lightweight && lightweight.mode() === "lite";
+  }
+
+  function updatePageTitle() {
+    if (!state) return;
+    var selectedItem = (state.navigation || []).find(function (item) { return item.navigation === state.selectedNavigation; }) || {};
+    var pageState = state[state.selectedNavigation];
+    var pageTitle = document.getElementById("page-title");
+    if (!pageTitle) return;
+    pageTitle.textContent = state.selectedNavigation === "overview"
+      ? "动态" : pageState && pageState.header ? pageState.header.title : selectedItem.title || "Codex Bridge";
+    pageTitle.title = pageTitle.textContent;
+  }
+
+  function renderActivePage() {
+    if (!state) return;
+    updatePageTitle();
+    var overlay = window.CodexBridgeDesktopLightweight && window.CodexBridgeDesktopLightweight.isOverlay(state);
+    if (state.selectedNavigation === "overview" && window.CodexBridgeDesktopOverviewPage && !overlay) {
+      window.CodexBridgeDesktopOverviewPage.render(state.overview, state.appUpdate, emit);
+    }
+    globalPages(state, emit);
+    refreshNavigation();
+    if ((state.selectedNavigation !== "workbench" || overlay) && window.CodexBridgeDesktopStartup) {
+      window.CodexBridgeDesktopStartup.update({ status: "ready" });
+    }
+  }
+
+  function refreshLightweight() {
+    renderActivePage();
   }
 
   function iconElement(symbol, className) {
@@ -171,6 +246,7 @@
     var newConvButton = document.querySelector(".new-conversation-button");
     if (newConvButton) newConvButton.disabled = !state;
     shell.dataset.state = state ? "ready" : "loading";
+    if (window.CodexBridgeDesktopLightweight) window.CodexBridgeDesktopLightweight.configure(state, emit, refreshLightweight);
     if (!state) {
       ["workspace-navigator", "workspace-toolbar-context", "workspace-toolbar-actions"].forEach(function (id) {
         var node = document.getElementById(id);
@@ -180,19 +256,17 @@
       globalPages(null, emit);
       return;
     }
-    var selectedItem = (state.navigation || []).find(function (item) { return item.navigation === state.selectedNavigation; }) || {};
-    var pageState = state[state.selectedNavigation];
-    var pageTitle = document.getElementById("page-title");
-    pageTitle.textContent = state.selectedNavigation === "overview"
-      ? "动态" : pageState && pageState.header ? pageState.header.title : selectedItem.title || "Codex Bridge";
-    pageTitle.title = pageTitle.textContent;
     var indicator = document.getElementById("connection-indicator");
-    indicator.className = "connection-indicator " + toneClass(state.connectionTone);
-    indicator.title = state.connectionLabel;
-    indicator.setAttribute("aria-label", state.connectionLabel);
+    if (indicator) {
+      indicator.className = "connection-indicator " + toneClass(state.connectionTone);
+      indicator.title = state.connectionLabel;
+      indicator.setAttribute("aria-label", state.connectionLabel);
+    }
     var connectionLabel = document.getElementById("connection-label");
-    connectionLabel.textContent = state.connectionLabel;
-    connectionLabel.hidden = toneClass(state.connectionTone) === "success";
+    if (connectionLabel) {
+      connectionLabel.textContent = state.connectionLabel;
+      connectionLabel.hidden = toneClass(state.connectionTone) === "success";
+    }
     document.getElementById("refresh-indicator").classList.toggle("is-visible", !!state.isRefreshing);
     document.querySelector(".refresh-button").classList.toggle("is-refreshing", !!state.isRefreshing);
     document.querySelector(".refresh-button").disabled = !!state.isRefreshing;
@@ -201,14 +275,7 @@
     if (window.CodexBridgeDesktopAppUpdate && window.CodexBridgeDesktopAppUpdate.renderSidebar) {
       window.CodexBridgeDesktopAppUpdate.renderSidebar(state.appUpdate, emit);
     }
-    if (state.selectedNavigation === "overview" && window.CodexBridgeDesktopOverviewPage) {
-      window.CodexBridgeDesktopOverviewPage.render(state.overview, state.appUpdate, emit);
-    }
-    globalPages(state, emit);
-    refreshNavigation();
-    if (state.selectedNavigation !== "workbench" && window.CodexBridgeDesktopStartup) {
-      window.CodexBridgeDesktopStartup.update({ status: "ready" });
-    }
+    renderActivePage();
   }
 
   function isStatePatch(value) {
@@ -274,7 +341,9 @@
     var valid = true;
     (Array.isArray(changes) ? changes : []).forEach(function (change) {
       if (!change || !change.kind) { valid = false; return; }
-      if (change.kind === "overview") {
+      if (change.kind === "selectedNavigation" && change.selectedNavigation) {
+        next.selectedNavigation = change.selectedNavigation;
+      } else if (change.kind === "overview") {
         next.overview = change.overview || null;
       } else if (change.kind === "connection") {
         next.connections = change.connections || null;
@@ -383,7 +452,12 @@
     var action = event.target.closest("[data-action]");
     if (!action) return;
     if (action.dataset.action === "new-conversation") window.CodexBridgeDesktopDSHWorkbench.openConversation();
-    if (action.dataset.action === "refresh") emit("refresh");
+    if (action.dataset.action === "refresh") {
+      if (window.CodexBridgeDesktopLightweight && window.CodexBridgeDesktopLightweight.isOverlay(state)) {
+        void window.CodexBridgeDesktopLightweight.refresh();
+        if (window.CodexBridgeDesktopLightweight.tab() === "clients") emit("refreshMCPClients");
+      } else emit("refresh");
+    }
     if (action.dataset.action === "select-page") emit("selectPage", { navigation: action.dataset.page });
   });
   document.addEventListener("contextmenu", function (event) {
@@ -399,6 +473,7 @@
       || document.querySelector("dialog[open]")) return;
     var key = event.key.toLowerCase();
     if (key === "n") {
+      if (window.CodexBridgeDesktopLightweight && window.CodexBridgeDesktopLightweight.mode() === "lite") return;
       event.preventDefault(); window.CodexBridgeDesktopDSHWorkbench.openConversation();
     } else if (key === "o") {
       event.preventDefault(); emit("registerProject");
@@ -447,6 +522,9 @@
     window.chrome.webview.addEventListener("message", function (event) {
       var incoming = event.data;
       if (typeof incoming === "string") { try { incoming = JSON.parse(incoming); } catch (_) { return; } }
+      if (incoming && incoming.type === "open-lightweight-activity" && window.CodexBridgeDesktopLightweight) {
+        window.CodexBridgeDesktopLightweight.select("activity"); return;
+      }
       if (incoming && typeof incoming === "object") receiveState(incoming);
     });
   }

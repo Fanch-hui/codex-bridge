@@ -71,6 +71,7 @@
       }
       WindowsMainWindow.chat = activeChat
       activeDesktopUI.attach(to: window)
+      activeChat.setEnabled(false)
       activeChat.attach(to: window)
       activeChat.setVisible(false)
       // The pre-attach layout was a no-op for both surfaces, so push the real client

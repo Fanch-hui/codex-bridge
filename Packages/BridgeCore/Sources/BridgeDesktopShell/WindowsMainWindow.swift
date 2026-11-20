@@ -31,6 +31,9 @@
     nonisolated(unsafe) static var window: HWND?
     nonisolated(unsafe) private static var hasRevealedWindow = false
     nonisolated(unsafe) private static var isMinimized = false
+    nonisolated(unsafe) private static var desktopSuspending = false
+    nonisolated(unsafe) private static var desktopResumeRequested = false
+    private static let desktopSuspendedMessage = UINT(WM_APP + 42)
 
     static func create() -> HWND? {
       hasRevealedWindow = false
@@ -97,6 +100,7 @@
         if WindowsMainWindowChrome.handleCommand(wParam, window: window) { return 0 }
         return 0
       case UINT(WM_SHOWWINDOW):
+        if wParam != 0 { resumeDesktop(window) }
         enqueue(.windowVisibilityChanged(wParam != 0))
         return DefWindowProcW(window, message, wParam, lParam)
       case UINT(WM_SIZE):
@@ -144,7 +148,16 @@
         if wParam == WindowsApplicationIdentity.explicitCloseRequest {
           WindowsMainWindowLifecycle.requestExit(window)
         } else {
+          suspendDesktop(window)
           _ = ShowWindow(window, SW_HIDE)
+        }
+        return 0
+      case desktopSuspendedMessage:
+        desktopUI?.shutdown()
+        desktopSuspending = false
+        if desktopResumeRequested {
+          desktopResumeRequested = false
+          resumeDesktop(window)
         }
         return 0
       case WindowsMainWindowLifecycle.chatStoppedMessage:
@@ -160,6 +173,8 @@
         WindowsUIFoundation.shutdown()
         WindowsMainWindowLifecycle.reset()
         hasRevealedWindow = false
+        desktopSuspending = false
+        desktopResumeRequested = false
         desktopUI = nil
         Self.window = nil
         PostQuitMessage(0)
@@ -167,6 +182,23 @@
       default:
         return DefWindowProcW(window, message, wParam, lParam)
       }
+    }
+
+    private static func suspendDesktop(_ window: HWND?) {
+      desktopResumeRequested = false
+      guard let window, !desktopSuspending else { return }
+      desktopSuspending =
+        desktopUI?.beginShutdown(notifying: window, message: desktopSuspendedMessage) == true
+      if !desktopSuspending { desktopUI?.shutdown() }
+    }
+
+    private static func resumeDesktop(_ window: HWND?) {
+      if desktopSuspending {
+        desktopResumeRequested = true
+        return
+      }
+      desktopUI?.attach(to: window)
+      layout()
     }
 
     /// Surfaces the desktop UI once it is live and reports a clear reason when the

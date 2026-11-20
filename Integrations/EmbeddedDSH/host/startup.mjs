@@ -22,6 +22,7 @@ export function startActions(actions) {
     await actions.mcp.start();
     await actions.bridgeAgents.start();
     await actions.activity.start();
+    actions.runtimeAdmission.start();
     await actions.verifyRestartedPlugins();
     return actions;
   });

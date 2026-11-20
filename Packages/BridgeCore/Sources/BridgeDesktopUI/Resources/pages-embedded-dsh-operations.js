@@ -44,7 +44,7 @@
     }
     function inspect(job, result) {
       var operation = snapshot(result, job.requestId), status = outcome(operation);
-      if (status === "accepted") { clear(job.requestId); options.onAccepted(job); return true; }
+      if (status === "accepted") { clear(job.requestId); options.onAccepted(job, operation); return true; }
       if (status === "failed" || status === "cancelled") {
         clear(job.requestId); options.onFailed(job, operation); return true;
       }

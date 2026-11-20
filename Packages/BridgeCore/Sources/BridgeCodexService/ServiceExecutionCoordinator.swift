@@ -122,7 +122,9 @@ public actor ServiceExecutionCoordinator {
       throw ServiceStoreError.unknownTask(taskID)
     }
     guard let project = try await projects.project(id: task.projectID) else {
-      throw ExecutionServiceError.projectUnavailable(task.projectID)
+      try await rejectBeforeLaunch(
+        task, error: .projectUnavailable(task.projectID),
+        failureCode: "execution_project_unavailable")
     }
     guard task.providerID == serviceCodexProviderID else {
       try await startAgentTask(task, project: project)
@@ -395,6 +397,23 @@ public actor ServiceExecutionCoordinator {
     guard !isShuttingDown, startingTasks.contains(taskID), !finishedRuns.contains(taskID) else {
       throw CancellationError()
     }
+  }
+
+  /// Only for preflight checks inside the reserved start, before any provider launch.
+  func rejectBeforeLaunch(
+    _ task: ServiceTaskRecord, error: ExecutionServiceError, failureCode: String
+  ) async throws -> Never {
+    try ensureStartIsActive(task.id)
+    guard task.state.status == .starting else { throw error }
+    do {
+      try await tasks.fail(
+        taskID: task.id, failureCode: failureCode,
+        summary: ExecutionStartFailurePresentation.summary(error, provider: task.providerID),
+        expectedStatus: .starting)
+    } catch ServiceStoreError.invalidTaskTransition {
+      // A concurrent stop or process reconciliation already changed the persisted state.
+    }
+    throw error
   }
 
   func closeConversation(taskID: TaskID) async throws {

@@ -7,6 +7,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
   public let title: String
   public let projectName: String
   public let source: String?
+  public let sourceKind: String?
   public let isTerminal: Bool?
   public let status: String
   public let provider: String
@@ -49,6 +50,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     title: String,
     projectName: String,
     source: String? = nil,
+    sourceKind: String? = nil,
     status: String,
     isTerminal: Bool? = nil,
     provider: String,
@@ -90,6 +92,7 @@ public struct BridgeDesktopTaskDetail: Codable, Equatable, Sendable {
     self.title = title
     self.projectName = projectName
     self.source = source
+    self.sourceKind = sourceKind
     self.status = status
     self.isTerminal = isTerminal
     self.provider = provider

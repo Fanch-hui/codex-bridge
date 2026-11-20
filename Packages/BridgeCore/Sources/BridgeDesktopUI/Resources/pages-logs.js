@@ -13,8 +13,10 @@
     S.clear(container);
     var context = { emit: emit };
     var header = S.node("div");
-    var back = S.button("返回设置", "selectPage", { navigation: "settings" }, emit, "small");
-    container.appendChild(back);
+    var topbar = S.node("div", "detail-header");
+    var back = S.button("返回设置", "selectPage", { navigation: "settings" }, emit, "small detail-back");
+    topbar.appendChild(back);
+    container.appendChild(topbar);
     var filters = createFilterBar(emit);
     var list = S.node("div", "log-list");
     var entries = new Map();
@@ -26,13 +28,20 @@
     container.appendChild(unavailable);
     var actions = S.node("div", "form-actions");
     var refresh = S.button("刷新日志", null, {}, null, "small", true);
-    refresh.addEventListener("click", function () { context.emit("refresh", {}); });
+    refresh.addEventListener("click", function () {
+      if (refresh.disabled) return;
+      S.setButtonPending(refresh, true, "刷新中…", "刷新日志");
+      context.emit("refresh", {});
+    });
     actions.appendChild(refresh); container.appendChild(actions);
 
     return {
       update: function (page, nextEmit, state) {
         if (nextEmit) context.emit = nextEmit;
-        if (state) refresh.disabled = !!state.isRefreshing;
+        if (state) {
+          S.setButtonPending(refresh, !!state.isRefreshing, "刷新中…", "刷新日志");
+          refresh.disabled = !!state.isRefreshing;
+        }
         if (!page) {
           S.pageHeader(header, {
             title: "日志",
@@ -104,13 +113,9 @@
     var actions = S.node("div", "filter-actions");
     var copy = S.button("复制日志", null, {}, null, "small", true);
     copy.addEventListener("click", function () {
+      if (copy.disabled) return;
+      S.flashButtonSuccess(copy, "已复制");
       context.emit("copyLogs", {});
-      copy.textContent = "已复制";
-      copy.__copied = true;
-      global.setTimeout(function () {
-        copy.__copied = false;
-        copy.textContent = "复制日志";
-      }, 1500);
     });
     actions.appendChild(copy);
     bar.appendChild(actions);

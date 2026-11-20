@@ -5,6 +5,7 @@ const referencePattern = /^WORKBUDDY_MANAGER_BRIDGE_[A-F0-9]{32}$/;
 const fileID = file => `workbuddy-${createHash('sha256').update(file).digest('hex').slice(0, 32)}.json`;
 const accountActions = new Set(['accountDisabled', 'accountDelete', 'accountRefresh', 'accountCheckin']);
 const modelActions = new Set(['authDesktop', 'authKey', 'accountDisabled', 'accountDelete', 'accountRefresh', 'gatewayOptions', 'sync']);
+const reasoningLevels = new Set(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 
 function loginURL(value) {
   const url = new URL(value);
@@ -37,6 +38,12 @@ function mergeModels(previous, discovered) {
     const old = existing.get(model.id);
     return old ? { ...model, ...old } : model;
   });
+}
+
+function reasoningEfforts(model) {
+  const levels = (model.efforts ?? []).filter(level => reasoningLevels.has(level));
+  if (!levels.length) return undefined;
+  return Object.fromEntries(levels.map(level => [level, level]));
 }
 
 export class WorkBuddyConnection {
@@ -141,13 +148,16 @@ export class WorkBuddyConnection {
     if (!referencePattern.test(bridge.ref) || !bridge.models?.length) {
       throw new Error('WorkBuddy 本机模型连接无效。');
     }
+    const capabilities = new Map((await this.service.gateway.discoverModels()).map(model => [model.id, reasoningEfforts(model)]));
+    const withCapabilities = model => ({ ...model,
+      ...(capabilities.get(model.id) ? { reasoningEfforts: capabilities.get(model.id) } : {}) });
     const baseURL = gatewayURL(bridge.url);
-    await this.saveModels(baseURL, bridge.ref, bridge.models);
+    await this.saveModels(baseURL, bridge.ref, bridge.models.map(withCapabilities));
     onBindingReady();
     const discovered = await this.ctx.llm.discoverModels('llm-pi-ai', {
       provider: workbuddyProvider, baseURL, api: 'openai-completions'
     });
-    const models = discovered.filter(model => typeof model.id === 'string' && model.id).map(model => ({
+    const models = discovered.filter(model => typeof model.id === 'string' && model.id).map(model => withCapabilities({
       id: model.id, ...(model.name ? { name: model.name } : {}),
       ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
       ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),

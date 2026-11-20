@@ -18,7 +18,6 @@
     });
     S.autoFitSelect(model.permission);
     actions.appendChild(model.permission);
-    model.historySearch = global.CodexBridgeDesktopTaskHistorySearch.createDialog(actions);
     model.toggle = S.button("浏览器", null, {}, null, "small workbench-browser-toggle");
     model.toggle.setAttribute("role", "switch");
     model.toggle.setAttribute("aria-label", "内置浏览器");
@@ -27,6 +26,7 @@
       if (!model.toggle.disabled && model.emit) model.emit("setBrowserEnabled", { enabled: !browser.enabled });
     });
     actions.appendChild(model.toggle);
+    model.importSlot = S.node("div", "workbench-import-control"); actions.appendChild(model.importSlot);
     model.taskActions = S.node("div", "workbench-task-actions");
     actions.appendChild(model.taskActions);
     return actions;
@@ -102,6 +102,7 @@
       model.queueText.title = queueTask.queueRequestedAt ? new Date(queueTask.queueRequestedAt).toLocaleString() : "";
       model.queueText.textContent = queueText;
     }
+    if (global.CodexBridgeDesktopWorkbenchImport) global.CodexBridgeDesktopWorkbenchImport.attach(model.importSlot, page.selectedTask);
     model.taskActions.hidden = !page.selectedTask;
     if (page.selectedTask) {
       var row = S.safeArray(page.tasks).find(function (task) {
@@ -130,7 +131,6 @@
     var header = JSON.stringify([
       page.browser && page.browser.enabled, page.browser && page.browser.canToggle,
       page.projects, page.selectedProjectID, page.selectedTaskID, page.permissionMode, page.permissionOptions, page.draftTitle,
-      (page.nativeSessions || {}).installations,
       page.projectStatus, page.projectStatusTone, detail.provider, detail.status, detail.permissionMode, detail.canOpenNativeSession, detail.canInterrupt, detail.canStop, detail.resultSummary, detail.taskID, detail.sessionID, detail.queuePosition, detail.queueOccupantTaskID, detail.queueRequestedAt,
       S.safeArray(page.tasks).map(function (t) {
         return [t.taskID, t.providerID, t.provider, t.title, t.status, t.selected, t.canInterrupt, t.canDelete, t.isRunning];
@@ -150,13 +150,12 @@
       }
       headerSignature = header;
     }
-    var model = document.getElementById("workbench-inspector-header").__inspectorHeader;
-    if (model) global.CodexBridgeDesktopTaskHistorySearch.update(model.historySearch, page, emit);
   }
 
   global.CodexBridgeDesktopWorkbenchHeader = {
     render: render,
     setVisible: function (visible) {
+      if (global.CodexBridgeDesktopWorkbenchImport) global.CodexBridgeDesktopWorkbenchImport.setActive(visible);
       var header = document.getElementById("workbench-inspector-header"), model = header && header.__inspectorHeader;
       if (model) { model.context.hidden = !visible; model.actions.hidden = !visible; }
     },

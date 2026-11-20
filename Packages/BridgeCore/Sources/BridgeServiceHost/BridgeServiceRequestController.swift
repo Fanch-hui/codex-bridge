@@ -1,4 +1,6 @@
 import BridgeIPC
+import BridgeSecurity
+import BridgeServiceCore
 import Foundation
 
 /// Transport-neutral request controller for the background service. Both the
@@ -7,6 +9,7 @@ import Foundation
 public final class BridgeServiceRequestController: @unchecked Sendable {
   let composition: ServiceComposition
   let admission: XPCRequestAdmission
+  let longPollAdmission: XPCRequestAdmission?
   let streamSink: (any ServiceStreamSink)?
   let streams = StreamRegistry()
   let conversationStreamGate = AsyncMutex()
@@ -24,6 +27,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
     self.admission = XPCRequestAdmission(
       maximumConcurrent: maximumConcurrentRequests
     )
+    // Keep 20-second long-polls off the regular request pool unless the caller
+    // explicitly constrained the controller to a single concurrent request.
+    self.longPollAdmission =
+      maximumConcurrentRequests > 1 ? XPCRequestAdmission(maximumConcurrent: 8) : nil
   }
 
   public func stopStreaming() {
@@ -61,7 +68,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
         message: "The XPC request is invalid."
       )
     }
-    guard admission.acquire() else {
+    let longPoll = Self.isLongPoll(decoded)
+    let gate = longPoll ? (longPollAdmission ?? admission) : admission
+    let background = longPoll ? false : Self.isBackground(decoded)
+    guard await gate.acquire(background: background) else {
       return Self.fallbackFailure(
         requestID: decoded.requestID,
         code: "busy",
@@ -69,8 +79,36 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
         retryable: true
       )
     }
-    defer { admission.release() }
+    defer { gate.release() }
+    if Task.isCancelled {
+      return Self.fallbackFailure(
+        requestID: decoded.requestID, code: "busy",
+        message: "The service request was cancelled.", retryable: true)
+    }
     return await handle(decoded)
+  }
+
+  private static func isLongPoll(_ request: BridgeServiceIPCRequest) -> Bool {
+    guard request.operation == .embeddedDSH,
+      let payload = try? BridgeServiceIPCCodec.payload(
+        IPCEmbeddedDSHRequest.self, from: request)
+    else { return false }
+    return ["events", "client.stream.poll"].contains(payload.action)
+  }
+
+  private static func isBackground(_ request: BridgeServiceIPCRequest) -> Bool {
+    switch request.operation {
+    case .listModels, .getModelCatalog, .listAgentModels, .getAgentModelDefault:
+      return true
+    case .providerGateway:
+      guard
+        let payload = try? BridgeServiceIPCCodec.payload(
+          IPCProviderGatewayRequest.self, from: request)
+      else { return false }
+      return ["plugins.catalog", "plugins.checkUpdate"].contains(payload.action)
+    default:
+      return false
+    }
   }
 
   private func handle(_ request: BridgeServiceIPCRequest) async -> Data {
@@ -117,6 +155,10 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleSetProjectCommandMode(request)
     case .workbenchWorkspace:
       return try await handleWorkbenchWorkspace(request)
+    case .providerGateway:
+      let payload = try BridgeServiceIPCCodec.payload(IPCProviderGatewayRequest.self, from: request)
+      let result = try await composition.providerGatewayRequest(payload)
+      return try BridgeServiceIPCCodec.success(requestID: request.requestID, payload: result)
     case .embeddedDSH:
       return try await handleEmbeddedDSH(request)
     case .getWorkbenchSettings, .setWorkbenchEnabled:
@@ -264,6 +306,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handlePrepareAppUpdate(request)
     case .cancelAppUpdate:
       return try await handleCancelAppUpdate(request)
+    case .messageCenterSecret:
+      return try handleMessageCenterSecret(request)
     case .shutdownServiceIfIdle:
       #if os(Linux)
         return try await handleShutdownServiceIfIdle(request)
@@ -288,6 +332,42 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
           )
         )
       #endif
+    }
+  }
+
+  private func handleMessageCenterSecret(_ request: BridgeServiceIPCRequest) throws -> Data {
+    let payload = try BridgeServiceIPCCodec.payload(
+      IPCMessageCenterSecretRequest.self, from: request)
+    guard payload.reference.hasPrefix("message-center-feedback.") else {
+      throw ServiceStoreError.invalidArgument("message_center.secret_reference")
+    }
+    let reference = try SecretReference(validating: payload.reference)
+    switch payload.action {
+    case "load":
+      do {
+        let data = try composition.secretStore.load(reference)
+        guard let value = String(data: data, encoding: .utf8), !value.isEmpty else {
+          throw SecretStoreError.invalidStoredValue
+        }
+        return try BridgeServiceIPCCodec.success(
+          requestID: request.requestID, payload: IPCMessageCenterSecretResponse(value: value))
+      } catch SecretStoreError.notFound {
+        return try BridgeServiceIPCCodec.success(
+          requestID: request.requestID, payload: IPCMessageCenterSecretResponse(value: nil))
+      }
+    case "store":
+      guard let value = payload.value, !value.isEmpty, value.utf8.count <= 1_024 else {
+        throw ServiceStoreError.invalidArgument("message_center.secret_value")
+      }
+      try composition.secretStore.store(Data(value.utf8), for: reference)
+      return try BridgeServiceIPCCodec.success(
+        requestID: request.requestID, payload: IPCMessageCenterSecretResponse(value: nil))
+    case "remove":
+      do { try composition.secretStore.remove(reference) } catch SecretStoreError.notFound {}
+      return try BridgeServiceIPCCodec.success(
+        requestID: request.requestID, payload: IPCMessageCenterSecretResponse(value: nil))
+    default:
+      throw ServiceStoreError.invalidArgument("message_center.secret_action")
     }
   }
 

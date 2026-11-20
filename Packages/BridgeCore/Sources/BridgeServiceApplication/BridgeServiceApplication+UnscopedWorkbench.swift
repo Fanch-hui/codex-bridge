@@ -3,7 +3,7 @@ import Foundation
 extension BridgeServiceApplication {
   public func beginUnscopedWorkbenchExecution(sessionID: String) async throws -> String {
     if let token = unscopedWorkbenchExecutions[sessionID] { return token }
-    let token = try await workspaceGate.beginTaskAdmission()
+    let token = try await workspaceGate.beginTaskAdmission(workbenchSessionID: sessionID)
     if let existing = unscopedWorkbenchExecutions[sessionID] {
       await workspaceGate.endTaskAdmission(token: token)
       return existing

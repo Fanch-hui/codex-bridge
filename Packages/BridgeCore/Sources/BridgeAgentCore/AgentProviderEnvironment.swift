@@ -117,7 +117,7 @@ public enum AgentProviderEnvironment {
     }
   }
 
-  private static func environmentValue(
+  public static func environmentValue(
     _ name: String,
     source: [String: String]
   ) -> String? {

@@ -14,11 +14,13 @@
       publishDisplay()
 
       var errors: [String] = []
-      do {
-        let refreshed = try await client.approvals(taskID: nil)
-        if approvals != refreshed { approvals = refreshed }
-      } catch {
-        errors.append("安全审批读取失败：\(BridgeServiceErrorMessage.message(error))")
+      if isLightweightMode == false {
+        do {
+          let refreshed = try await client.approvals(taskID: nil)
+          if approvals != refreshed { approvals = refreshed }
+        } catch {
+          errors.append("安全审批读取失败：\(BridgeServiceErrorMessage.message(error))")
+        }
       }
       do {
         let refreshed = try await client.pendingDirectApprovals()

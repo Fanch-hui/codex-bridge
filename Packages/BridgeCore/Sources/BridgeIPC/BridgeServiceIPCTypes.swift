@@ -14,6 +14,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setProjectCommandMode = "set_project_command_mode"
   case workbenchWorkspace = "workbench_workspace"
   case embeddedDSH = "embedded_dsh"
+  case providerGateway = "provider_gateway"
   case getWorkbenchSettings = "get_workbench_settings"
   case setWorkbenchEnabled = "set_workbench_enabled"
   case setWorkbenchProject = "set_workbench_project"
@@ -94,6 +95,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case clearTunnel = "clear_tunnel"
   case prepareAppUpdate = "prepare_app_update"
   case cancelAppUpdate = "cancel_app_update"
+  case messageCenterSecret = "message_center_secret"
   case shutdownService = "shutdown_service"
   case shutdownServiceIfIdle = "shutdown_service_if_idle"
 }

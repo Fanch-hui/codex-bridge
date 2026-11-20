@@ -100,6 +100,9 @@ public final class BridgeServiceAppModel: ObservableObject {
     currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
       as? String ?? "0.0.0",
     platform: "macos",
+    secretStorage: ServiceIPCMessageCenterSecretStorage { [weak self] in
+      await MainActor.run { self?.client }
+    },
     onChange: { [weak self] state in self?.messageCenterState = state }
   )
   @Published public var selection: BridgeServiceNavigation? = .workbench {
@@ -111,6 +114,10 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published var pendingNewConversationRequestID: UUID?
   @Published public internal(set) var registrationStatus: BridgeServiceRegistrationStatus
   @Published public internal(set) var connectionState: BridgeServiceConnectionState = .idle
+  @Published public internal(set) var isLightweightMode: Bool?
+  @Published public internal(set) var applicationModeTransition: String?
+  @Published public internal(set) var applicationModeError: String?
+  @Published public internal(set) var isModelGatewayEnabled: Bool?
   @Published public internal(set) var serviceStatus: IPCServiceStatusResponse?
   @Published public internal(set) var projects: [MCPProjectSummary] = []
   @Published public internal(set) var projectPaths: [String: String] = [:]
@@ -306,6 +313,9 @@ public final class BridgeServiceAppModel: ObservableObject {
   var lastThreadCatalogRefreshAt: Date?
   var started = false
   var stopped = false
+  var completeExitPrepared = false
+  var completeExitServicePrepared = false
+  var completeExitInProgress = false
 
   private static let keepServiceRunningAfterAppExitKey =
     "keepServiceRunningAfterAppExit"
@@ -399,6 +409,10 @@ public final class BridgeServiceAppModel: ObservableObject {
 
   public var exposureMode: MCPServiceExposureMode {
     serviceStatus?.exposureMode ?? .readOnly
+  }
+
+  var applicationMode: String? {
+    isLightweightMode.map { $0 ? "lite" : "full" }
   }
 
   public var safeLocalMCPDescription: String? {

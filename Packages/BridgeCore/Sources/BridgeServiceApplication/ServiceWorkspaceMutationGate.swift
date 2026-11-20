@@ -81,6 +81,11 @@ public actor ServiceWorkspaceMutationGate {
   private var directReservations: [ProjectID: DirectReservation] = [:]
   private var codexAdmissions: [ProjectID: Set<String>] = [:]
   private var taskAdmissions: Set<String> = []
+  private var workbenchPromptAdmissions: [String: [String]] = [:]
+  private enum TaskModeAdmission {
+    case full, transitioning, sealed, lite
+  }
+  private var taskModeAdmission = TaskModeAdmission.full
   private var appUpdateLeaseExpiresAt: Date?
   private enum ServiceShutdownState {
     case checking, committed
@@ -105,12 +110,28 @@ public actor ServiceWorkspaceMutationGate {
     changes.publish()
   }
 
-  @discardableResult
-  public func beginTaskAdmission() throws -> String {
+  public func requireTaskAdmission(allowDuringModeTransition: Bool = false) throws {
+    switch taskModeAdmission {
+    case .full: break
+    case .transitioning where allowDuringModeTransition: break
+    case .transitioning, .sealed, .lite: throw BridgeMCPQueryError.busy
+    }
     expireAppUpdateIfNeeded()
     guard appUpdateLeaseExpiresAt == nil, serviceShutdown == nil else {
       throw BridgeMCPQueryError.busy
     }
+  }
+
+  @discardableResult
+  public func beginTaskAdmission(
+    allowDuringModeTransition: Bool = false, workbenchSessionID: String? = nil
+  ) throws -> String {
+    let admittedPrompt =
+      workbenchSessionID.map { sessionID in
+        workbenchPromptAdmissions.values.contains { $0.contains(sessionID) }
+      } ?? false
+    try requireTaskAdmission(
+      allowDuringModeTransition: allowDuringModeTransition || admittedPrompt)
     let token = UUID().uuidString
     taskAdmissions.insert(token)
     return token
@@ -118,6 +139,40 @@ public actor ServiceWorkspaceMutationGate {
 
   public func endTaskAdmission(token: String) {
     taskAdmissions.remove(token)
+  }
+
+  public func beginWorkbenchPromptAdmission(sessionIDs: [String]) throws -> String {
+    let token = try beginTaskAdmission()
+    workbenchPromptAdmissions[token] = sessionIDs
+    return token
+  }
+
+  public func endWorkbenchPromptAdmission(token: String) {
+    workbenchPromptAdmissions.removeValue(forKey: token)
+    endTaskAdmission(token: token)
+  }
+
+  public func setLightweightMode(_ enabled: Bool) {
+    taskModeAdmission = enabled ? .lite : .full
+    changes.publish()
+  }
+
+  public func beginLightweightTransition() {
+    taskModeAdmission = .transitioning
+    changes.publish()
+  }
+
+  /// Sealing closes the last child admission race before checking persistent work.
+  public func sealLightweightTransition() -> Bool {
+    guard case .transitioning = taskModeAdmission, taskAdmissions.isEmpty else { return false }
+    taskModeAdmission = .sealed
+    return true
+  }
+
+  public func resumeLightweightTransition() {
+    guard case .sealed = taskModeAdmission else { return }
+    taskModeAdmission = .transitioning
+    changes.publish()
   }
 
   @discardableResult
@@ -297,6 +352,7 @@ public actor ServiceWorkspaceMutationGate {
     directReservations = [:]
     codexAdmissions = [:]
     taskAdmissions = []
+    workbenchPromptAdmissions = [:]
     serviceShutdown = nil
     appUpdateLeaseExpiresAt = nil
     changes.publish()

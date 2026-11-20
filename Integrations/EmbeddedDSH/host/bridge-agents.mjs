@@ -1,30 +1,16 @@
-import { createHash } from 'node:crypto';
-import { readFile, rename, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { isDeepStrictEqual } from 'node:util';
-import { createUserMessage, freezeMessage } from '@deepseek-ai/dsh-llm';
 import { registerBridgeTools, registerCollaborationTools } from './agent-collaboration-tools.mjs';
-import { AgentInputs } from './agent-inputs.mjs';
-import { AgentDependencyError, dependenciesFor, handoffPrompt, waitForDependencies, waitForPreviousRound } from './agent-handoff.mjs';
-import { ExternalWorkspaceAdmission } from './workspace-external-admission.mjs';
-import { Backoff } from './backoff.mjs';
-import { retireBindings } from './agent-retention.mjs';
-import { settleStops, stopFailure } from './agent-stop.mjs';
-import { workspaceNotice } from './workspace-notice.mjs';
-import { SkippedResults } from './agent-results.mjs';
+import { ResultDelivery, activationResult } from './agent-delivery.mjs';
+import { dispatchRequest, recordDispatch } from './agent-dispatch.mjs';
+import { attachNotices } from './agent-notices.mjs';
+import { handoffPrompt } from './agent-handoff.mjs';
+import { migrateLegacyBindings } from './agent-migration.mjs';
 
-const deliveryID = result => `bridge-${createHash('sha256').update(JSON.stringify([result.rootSessionID, result.childID, result.requestID, result.taskID])).digest('hex')}`;
-const terminal = new Set(['completed', 'failed', 'interrupted', 'cancelled']);
-// Binding fields refreshed from Bridge snapshots; only a change in one of them is worth rewriting the file.
-const snapshotFields = ['state', 'runID', 'capabilities', 'workspaceMode', 'workspaceReason', 'workspaceStatus',
-  'canRepairWithAgent', 'changedFiles', 'conflicts', 'failureReason', 'waitingForApproval'];
-const pollInterval = 1000;
-const pollBackoff = { initialMs: pollInterval, maxMs: 15000 };
-function logPollFailure(label, backoff, pause, error) {
-  if (backoff.shouldReport) process.stderr.write(`DSH subagent ${label} unavailable (attempt ${backoff.attempts}, retrying in ${pause} ms): ${error.message}\n`);
-}
-function stableID(...parts) {
+// How long a torn-down activation waits for the Service to report what became of its child.
+const disposeWait = 30000;
+
+export function stableID(...parts) {
   const bytes = createHash('sha256').update(JSON.stringify(parts)).digest().subarray(0, 16);
   bytes[6] = (bytes[6] & 15) | 80;
   bytes[8] = (bytes[8] & 63) | 128;
@@ -32,46 +18,35 @@ function stableID(...parts) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/**
+ * The engine's side of connected-agent delegation. The Service owns the rounds (queueing, dispatch,
+ * capacity, workspaces, recovery, results; see `round.*` in `bridge/subagent`); this adapter turns the
+ * delegation tools and the page's subagent actions into those calls and writes finished results into
+ * the parent session.
+ */
 export class BridgeAgents {
-  constructor(ctx, rpc, home, events, sessions, writes) {
+  constructor(ctx, rpc, home, sessions, { pollInterval } = {}) {
     this.ctx = ctx;
     this.rpc = rpc;
-    this.events = events;
+    this.home = home;
     this.sessions = sessions;
-    this.path = join(home, 'bridge-subagents.json');
-    this.bindings = [];
     this.providers = new Set();
-    this.queue = Promise.resolve();
-    this.running = new Map();
-    this.starting = new Map();
-    this.inputs = new AgentInputs(this);
     this.handoffs = new Map();
-    this.skippedResults = new SkippedResults();
-    this.admission = new ExternalWorkspaceAdmission(ctx, rpc, sessions, writes, () => this.persist());
+    this.round = (operation, rootSessionID, fields = {}) =>
+      rpc.request('bridge/subagent', { operation: `round.${operation}`, rootSessionID, ...fields });
+    this.delivery = new ResultDelivery({ ctx, sessions, round: this.round, interval: pollInterval });
   }
+  /** Moves the earlier orchestrator's records into the Service, then offers the tools. A failed move is retried at the next start. */
   async start() {
-    try { this.bindings = JSON.parse(await readFile(this.path, 'utf8')); }
-    catch (error) { if (error.code !== 'ENOENT') throw error; }
-    await this.admission.recoverBindings(this.bindings);
-    this.registerTools();
-    for (const rootSessionID of new Set(this.bindings.map(b => b.rootSessionID))) {
-      void this.reconcile(rootSessionID).catch(error => process.stderr.write(`DSH subagent recovery failed: ${error.message}\n`));
+    this.removeNoticeHook = this.ctx.on('agent/pre-step', attachNotices, { global: true });
+    try {
+      const tally = await migrateLegacyBindings(this.rpc, this.home);
+      if (tally?.skipped) process.stderr.write(`DSH subagent migration skipped ${tally.skipped} record(s): ${JSON.stringify(tally.reasons)}\n`);
+    } catch (error) {
+      process.stderr.write(`DSH subagent migration will be retried at the next start: ${error.message}\n`);
     }
-    const timer = setInterval(() => {
-      for (const root of new Set(this.bindings.map(binding => binding.rootSessionID))) {
-        void this.reconcile(root).catch(error => process.stderr.write(`DSH subagent recovery failed: ${error.message}\n`));
-      }
-    }, 5000);
-    timer.unref();
-  }
-  async persist() {
-    const task = this.queue.then(async () => {
-      const temp = `${this.path}.tmp`;
-      await writeFile(temp, `${JSON.stringify(this.bindings, null, 2)}\n`, { mode: 0o600 });
-      await rename(temp, this.path);
-    });
-    this.queue = task.catch(() => {});
-    await task;
+    registerCollaborationTools(this);
+    registerBridgeTools(this);
   }
   rootOf(agent) {
     let session = agent.session;
@@ -84,12 +59,9 @@ export class BridgeAgents {
     }
     return session.id;
   }
-  async agents(agent) {
-    return this.rpc.request('bridge/agents', { sessionID: this.rootOf(agent) });
-  }
-  continuationID(rootSessionID, childID, callID) {
-    return stableID('continue', rootSessionID, childID, callID);
-  }
+  agents(agent) { return this.agentsFor(this.rootOf(agent)); }
+  agentsFor(rootSessionID) { return this.rpc.request('bridge/agents', { sessionID: rootSessionID }); }
+  continuationID(rootSessionID, childID, callID) { return stableID('continue', rootSessionID, childID, callID); }
   provider(installationID) {
     const name = `bridge-${createHash('sha256').update(installationID).digest('hex').slice(0, 20)}`;
     if (!this.providers.has(name)) {
@@ -102,6 +74,7 @@ export class BridgeAgents {
     }
     return name;
   }
+  /** Records the child's first round and returns the activation that settles with its first result. */
   async startExternal(installationID, request) {
     const parent = request.parent;
     const rootSessionID = this.rootOf(parent);
@@ -112,143 +85,37 @@ export class BridgeAgents {
     if (request.prompt.some(part => part.type !== 'text')) throw new Error('This subagent cannot receive non-text content directly; provide supported attachment paths');
     const prompt = request.prompt.filter(part => part.type === 'text').map(part => part.text).join('\n');
     const handoff = this.handoffs.get(`${rootSessionID}:${parent.session.id}:${toolCallID}`) ?? {};
-    const call = { rootSessionID, childID, installationID, requestID,
-      ...(request.agentOptions?.model ? { model: request.agentOptions.model } : {}),
-      ...(request.agentOptions?.reasoningEffort ? { effort: request.agentOptions.reasoningEffort } : {}),
-      ...(handoff.attachmentPaths?.length ? { attachmentPaths: handoff.attachmentPaths } : {}),
-      ...(handoff.access ? { access: handoff.access } : {}) };
-    const requestHash = createHash('sha256').update(JSON.stringify({ call, prompt, dependencies: handoff.dependencies ?? [] })).digest('hex');
-    let binding = this.bindings.find(item => item.childID === childID && item.requestID === requestID);
-    if (!binding) {
-      binding = { ...call, parentSessionID: parent.session.id, state: 'created', initialRequestID: requestID,
-        admission: 'waiting', label: request.label, createdAt: Date.now(), requestHash,
-        dependencies: handoff.dependencies ?? [], deliveryRequired: true, pendingOperation: 'start', pendingPrompt: prompt };
-      this.bindings.push(binding);
-      await this.persist();
-    } else if (binding.admission !== 'waiting' || binding.pendingPrompt !== prompt ||
-        (binding.requestHash && binding.requestHash !== requestHash)) {
-      throw new Error('Subagent request was already admitted');
-    }
-    if (this.starting.has(childID)) throw new Error('Subagent request is already queued');
-    const controller = new AbortController();
-    const abort = () => controller.abort(request.signal?.reason);
-    request.signal?.addEventListener('abort', abort, { once: true });
-    if (request.signal?.aborted) abort();
-    let finished = false;
-    const launch = async () => {
-      try { await this.waitForDependencies(binding, controller.signal); }
-      catch (error) {
-        if (controller.signal.aborted) await this.cancelQueued(row => row === binding);
-        else if (error instanceof AgentDependencyError) await this.failQueued(binding, error);
-        throw error;
-      }
-      await this.admission.begin(binding, async () => {
-        const value = await this.rpc.request('bridge/subagent', { operation: 'start', ...call, prompt });
-        if (value.childID !== childID) throw new Error('Bridge returned an invalid subagent receipt');
-        return value;
-      }, controller.signal);
-      this.events.emit(parent.session.id, 'subagent.started', { ...binding, rootSessionID, parentSessionId: parent.session.id });
-      if (controller.signal.aborted) await this.requestStop(binding);
-      const value = await this.wait(binding);
-      await this.admission.release(binding);
-      return value;
-    };
-    let starting;
-    const result = launch().then(value => {
-      finished = true;
-      const output = [value.output, workspaceNotice(value)].filter(Boolean).map(text => ({ type: 'text', text }));
-      return { output,
-        stopReason: value.state === 'completed' ? 'completed' : value.state === 'interrupted' ? 'aborted' : 'error',
-        ...(value.error ? { diagnostic: String(value.error).slice(0, 4096) } : {}) };
-    }).finally(() => {
-      finished = true;
-      if (this.starting.get(childID) === starting) this.starting.delete(childID);
-      this.resumeNext(childID);
-    });
-    starting = { controller, result, binding };
-    this.starting.set(childID, starting);
-    request.signal?.removeEventListener('abort', abort);
+    const waiter = this.delivery.waitFor(rootSessionID, childID, requestID);
+    try {
+      await this.round('start', rootSessionID, { childID, requestID, installationID, prompt,
+        parentSessionID: parent.session.id, ...(request.label ? { label: request.label } : {}),
+        ...(request.agentOptions?.model ? { model: request.agentOptions.model } : {}),
+        ...(request.agentOptions?.reasoningEffort ? { effort: request.agentOptions.reasoningEffort } : {}),
+        ...(handoff.attachmentPaths?.length ? { attachmentPaths: handoff.attachmentPaths } : {}),
+        ...(handoff.access ? { access: handoff.access } : {}),
+        ...(handoff.dependsOn?.length ? { dependsOn: handoff.dependsOn } : {}) });
+    } catch (error) { this.delivery.forget(waiter); throw error; }
+    const result = waiter.promise.then(activationResult);
+    this.delivery.kick(rootSessionID);
     return { id: childID, result, dispose: async () => {
-      controller.abort();
-      if (!finished && binding.taskID) await this.requestStop(binding);
+      if (!waiter.settled) {
+        // Nobody wants the child any more: cancel it and give the Service a bounded time to report how it ended.
+        const { state } = await this.cancelInput(rootSessionID, childID, requestID);
+        if (['cancelled', 'notFound', 'settled'].includes(state)) waiter.reject(new Error('The subagent request was cancelled'));
+        else void delay(disposeWait, undefined, { ref: false }).then(() => waiter.reject(new Error('The subagent outcome is still being checked')));
+      }
       await result.catch(() => {});
     } };
-  }
-  async wait(binding) {
-    const observation = new AbortController();
-    void this.observeProgress(binding, observation.signal).catch(error =>
-      process.stderr.write(`DSH subagent progress failed: ${error.message}\n`));
-    const backoff = new Backoff(pollBackoff);
-    try {
-      for (;;) {
-        const started = Date.now();
-        let result;
-        try { result = await this.rpc.request('bridge/subagent', { operation: 'wait', ...binding }); }
-        catch (error) {
-          const pause = backoff.next();
-          logPollFailure('wait', backoff, pause, error);
-          await delay(pause);
-          continue;
-        }
-        backoff.reset();
-        if (result.taskID !== binding.taskID || (result.requestID && result.requestID !== binding.requestID)) {
-          throw new Error('Bridge returned a result for another subagent request');
-        }
-        if (this.rememberSnapshot(binding, result)) await this.persist();
-        if (result.terminal === true && result.state !== 'unknown') return result;
-        const pause = Math.max(0, pollInterval - (Date.now() - started));
-        if (pause) await delay(pause);
-      }
-    } finally { observation.abort(); }
-  }
-  async observeProgress(binding, signal) {
-    const backoff = new Backoff(pollBackoff);
-    let pause = pollInterval;
-    try {
-      while (!signal.aborted) {
-        await delay(pause, undefined, { signal });
-        let snapshot;
-        try { snapshot = await this.rpc.request('bridge/subagent', { operation: 'get', ...binding }); }
-        catch (error) {
-          pause = backoff.next();
-          if (!signal.aborted) logPollFailure('progress', backoff, pause, error);
-          continue;
-        }
-        backoff.reset();
-        pause = pollInterval;
-        if (signal.aborted) return;
-        if (snapshot.taskID !== binding.taskID || (snapshot.requestID && snapshot.requestID !== binding.requestID)) {
-          throw new Error('Bridge returned progress for another subagent request');
-        }
-        if (this.rememberSnapshot(binding, snapshot)) await this.persist();
-      }
-    } catch (error) { if (!signal.aborted) throw error; }
-  }
-  /** Applies a Bridge snapshot to the binding; returns whether a persisted field changed. */
-  rememberSnapshot(binding, result) {
-    let changed = false;
-    for (const key of snapshotFields) {
-      if (result[key] === undefined || isDeepStrictEqual(binding[key], result[key])) continue;
-      binding[key] = result[key];
-      changed = true;
-    }
-    // Updates are always announced: the page refreshes the subagent list from them even when nothing persisted changed.
-    const active = this.starting.get(binding.childID)?.binding;
-    if (!active || active === binding) this.events.emit(binding.parentSessionID, 'subagent.updated', { ...result,
-      rootSessionID: binding.rootSessionID, parentSessionId: binding.parentSessionID,
-      childID: binding.childID, requestID: binding.requestID });
-    return changed;
   }
   async delegate(args, exec) {
     if (!exec.agent) throw new Error('Delegation requires an agent');
     const agents = await this.agents(exec.agent);
     if (!agents.agents.some(agent => agent.installationID === args.installationID && agent.available)) throw new Error('Agent is not available');
+    if (args.access !== undefined && args.access !== 'read-only') throw new Error('access must be "read-only" when given');
     const parent = exec.agent;
     const rootSessionID = this.rootOf(parent);
     const key = `${rootSessionID}:${parent.session.id}:${exec.callId}`;
-    if (args.access !== undefined && args.access !== 'read-only') throw new Error('access must be "read-only" when given');
-    this.handoffs.set(key, { dependencies: dependenciesFor(this.bindings, rootSessionID, args.dependsOn),
-      attachmentPaths: args.attachmentPaths, access: args.access });
+    this.handoffs.set(key, { dependsOn: args.dependsOn, attachmentPaths: args.attachmentPaths, access: args.access });
     let activation;
     try {
       activation = await this.ctx.subagents.startActivation({
@@ -259,353 +126,66 @@ export class BridgeAgents {
         }, signal: exec.signal, delivery: 'parent'
       });
     } finally { this.handoffs.delete(key); }
-    const binding = this.bindings.find(item => item.childID === activation.childId);
-    this.running.set(activation.childId, activation);
-    void activation.result.then(async () => {
-      if (this.sessions.stopGate.isStopped(rootSessionID)) return;
-      const recorded = parent.session.snapshotEvents().some(event => JSON.stringify(event.data).includes(`\"senderSessionId\":\"${binding.childID}\"`));
-      if (!recorded || !await this.ctx.sessions.flush(parent.session)) throw new Error('Subagent result is not yet persisted');
-      if (this.sessions.stopGate.isStopped(rootSessionID)) return;
-      if (binding.taskID && terminal.has(binding.state)) {
-        await this.ack(binding);
-        binding.resultDelivered = true;
-        await this.persist();
-      }
-    }).finally(() => {
-      if (this.running.get(activation.childId) === activation) this.running.delete(activation.childId);
-      this.resumeNext(activation.childId);
-    }).catch(error => process.stderr.write(`DSH subagent delivery failed: ${error.message}\n`));
-    return JSON.stringify({ childID: activation.childId, taskID: binding.taskID,
-      state: binding.admission === 'waiting' ? 'waiting-for-workspace' : binding.state });
+    const waiter = this.delivery.waiterOf(rootSessionID, activation.childId);
+    void activation.result.then(() => this.delivery.delivered(parent, rootSessionID, waiter.result))
+      .catch(error => process.stderr.write(`DSH subagent delivery failed: ${error.message}\n`))
+      .finally(() => this.delivery.forget(waiter));
+    return JSON.stringify({ childID: activation.childId, state: 'waiting-for-workspace' });
   }
-  async ack(binding) {
-    await this.rpc.request('bridge/subagent', { operation: 'ack', rootSessionID: binding.rootSessionID,
-      childID: binding.childID, requestID: binding.requestID, taskID: binding.taskID });
-  }
-  async waitForDependencies(binding, signal) {
-    await waitForDependencies(binding, this.bindings, this.rpc, signal, async pending => {
-      await this.persist();
-      this.events.emit(binding.parentSessionID, 'subagent.dependencies', { childID: binding.childID,
-        requestID: binding.requestID, dependencies: pending });
-    });
-  }
-  async reconcile(rootSessionID) {
-    if (this.reconciling?.has(rootSessionID)) return;
-    this.reconciling ??= new Set();
-    this.reconciling.add(rootSessionID);
-    try {
-      for (const binding of this.bindings.filter(row => row.rootSessionID === rootSessionID)) {
-        if (this.inputs.isSending(binding.childID, binding.requestID)) continue;
-        if (binding.admission === 'delivery_unknown') continue;
-        if (binding.admission === 'waiting' && binding.pendingOperation && typeof binding.pendingPrompt === 'string') {
-          this.resumeNext(binding.childID);
-          continue;
-        }
-        if (this.starting.get(binding.childID)?.binding === binding && binding.admission !== 'unknown') continue;
-        const state = await this.admission.reconcile(binding);
-        if (state?.state === 'delivery_unknown' && binding.inputKind === 'steer') {
-          if (binding.taskID && state.taskID && binding.taskID !== state.taskID) throw new Error('Invalid recovered task identity');
-          if (state.taskID) binding.taskID = state.taskID;
-          binding.admission = 'delivery_unknown';
-          await this.persist();
-          this.events.emit(binding.parentSessionID, 'subagent.input-unknown', { childID: binding.childID,
-            requestID: binding.requestID, ...(binding.taskID ? { taskID: binding.taskID } : {}) });
-        } else if (state?.state === 'absent' && ['dispatching', 'unknown'].includes(binding.admission)) {
-          const reason = binding.dispatchError;
-          Object.assign(binding, { admission: 'cancelled', state: 'failed', ...(reason ? { failureReason: reason } : {}) });
-          delete binding.pendingPrompt;
-          delete binding.pendingOperation;
-          delete binding.dispatchError;
-          await this.persist();
-          if (!this.sessions.stopGate.isStopped(rootSessionID)) {
-            await this.deliver(binding, { state: 'failed', error: reason
-              ? `Bridge rejected the subagent request: ${reason}`
-              : 'The subagent request was not dispatched; delegate again if still needed.' });
-          }
-          this.resumeNext(binding.childID);
-        } else if (state?.state === 'active' || state?.state === 'terminal') {
-          if (['dispatching', 'unknown'].includes(binding.admission)) {
-            try {
-              const snapshot = await this.rpc.request('bridge/subagent', { operation: 'get',
-                rootSessionID, childID: binding.childID, requestID: binding.requestID });
-              if (!snapshot.taskID || (binding.taskID && binding.taskID !== snapshot.taskID)) throw new Error('Invalid recovered task identity');
-              binding.taskID = snapshot.taskID;
-              binding.admission = binding.inputKind === 'steer' ? 'attached' : 'accepted';
-              delete binding.dispatchError;
-              this.rememberSnapshot(binding, snapshot);
-            } catch (error) {
-              process.stderr.write(`DSH subagent receipt recovery failed: ${error.message}\n`);
-              continue;
-            }
-          }
-          delete binding.pendingPrompt;
-          delete binding.pendingOperation;
-          if (this.sessions.stopGate.isStopped(rootSessionID)) {
-            if (state.state === 'active') await this.requestStop(binding);
-            else Object.assign(binding, { admission: 'settled', state: 'interrupted' });
-          }
-          await this.persist();
-        }
-      }
-      if (this.sessions.stopGate.isStopped(rootSessionID)) return;
-      const { results, skipped } = await this.rpc.request('bridge/subagent', { operation: 'results', rootSessionID });
-      this.skippedResults.report(rootSessionID, skipped);
-      for (const result of results) {
-        if (result.state === 'unknown') continue;
-        const binding = this.bindings.find(item => item.childID === result.childID && item.requestID === result.requestID && (!item.taskID || item.taskID === result.taskID));
-        if (!binding || this.running.has(binding.childID)) continue;
-        binding.taskID = result.taskID;
-        binding.state = result.state;
-        await this.persist();
-        if (await this.deliver(binding, result) !== false) {
-          binding.resultDelivered = true;
-          await this.persist();
-        }
-        this.resumeNext(binding.childID);
-      }
-      await this.retire(rootSessionID);
-    } finally { this.reconciling.delete(rootSessionID); }
-  }
-  async retire(rootSessionID) {
-    const busy = row => this.starting.has(row.childID) || this.running.has(row.childID) ||
-      this.inputs.isSending(row.childID, row.requestID);
-    if (retireBindings(this.bindings, rootSessionID, { isBusy: busy })) await this.persist();
-  }
-  resumeQueued(binding) {
-    if (this.starting.has(binding.childID) || this.running.has(binding.childID)) return;
-    const controller = new AbortController();
-    let starting, running;
-    const task = this.runQueued(binding, controller.signal).finally(() => {
-      if (this.starting.get(binding.childID) === starting) this.starting.delete(binding.childID);
-      if (this.running.get(binding.childID) === running) this.running.delete(binding.childID);
-      const retryLater = binding.retryAfterReconcile;
-      delete binding.retryAfterReconcile;
-      if (!retryLater || binding.admission === 'cancelled') this.resumeNext(binding.childID);
-    });
-    starting = { controller, result: task, binding, recovered: true };
-    running = { result: task };
-    this.starting.set(binding.childID, starting);
-    this.running.set(binding.childID, running);
-    void task.catch(error => process.stderr.write(`DSH subagent recovery failed: ${error.message}\n`));
-  }
-  resumeNext(childID) {
-    if (this.starting.has(childID) || this.running.has(childID)) return;
-    if (this.bindings.some(binding => binding.childID === childID && binding.inputKind !== 'steer' &&
-      (['dispatching', 'unknown'].includes(binding.admission) ||
-       (binding.admission === 'accepted' && !terminal.has(binding.state))))) return;
-    if (this.bindings.some(binding => binding.childID === childID && binding.inputKind !== 'steer' &&
-      binding.admission === 'accepted' && binding.deliveryRequired && !binding.resultDelivered)) return;
-    const waiting = this.bindings.filter(binding => binding.childID === childID && binding.admission === 'waiting' && binding.pendingOperation);
-    const next = waiting.some(binding => binding.waitingReason === 'conflict')
-      ? waiting.find(binding => binding.repairConflict) ?? waiting[0] : waiting[0];
-    if (next) this.resumeQueued(next);
-  }
-  async runQueued(binding, signal) {
-    if (this.sessions.stopGate.isStopped(binding.rootSessionID)) {
-      binding.admission = 'cancelled';
-      binding.state = 'cancelled';
-      delete binding.pendingPrompt;
-      delete binding.pendingOperation;
-      await this.persist();
-      await this.admission.release(binding);
-      return;
+  /**
+   * The user hands a message straight to a connected agent as a subtask of this root session, without the
+   * model: the Service records the first round (`origin: 'user'`), and the session gets the child and a
+   * notice that does not wake the model. Repeating the call changes nothing: the round is recorded once
+   * and the notice is recognised.
+   */
+  async dispatch(p, revision) {
+    const request = dispatchRequest(p);
+    const { rootSessionID, childID, requestID, installationID } = request;
+    const root = await this.sessions.agent(rootSessionID);
+    if (root.session.header.origin === 'subagent') throw new Error('仅根会话可直派子任务');
+    if (this.sessions.scopes.isChatOnly(rootSessionID)) throw new Error('请先为会话选择项目文件夹');
+    const existing = await this.receipt(rootSessionID, childID, requestID);
+    const readOnly = this.ctx.sandboxPolicy.resolve({ session: root.session }).mode === 'read-only';
+    let target, saved;
+    if (existing.state === 'notFound') {
+      target = (await this.agentsFor(rootSessionID)).agents.find(agent => agent.installationID === installationID);
+      if (!target?.available) throw new Error('该 Agent 未连接或不可用');
+      if (readOnly && target.supportsReadOnly !== true) throw new Error('该 Agent 不支持只读任务');
+    } else {
+      saved = (await this.list(rootSessionID)).rounds.find(round => round.childID === childID && round.requestID === requestID);
     }
-    let rootAgent, group, generation;
-    let completed = false;
-    try {
-      rootAgent = await this.sessions.agent(binding.rootSessionID);
-      ({ group, generation } = await this.sessions.begin(binding.rootSessionID, rootAgent));
-      await this.waitForDependencies(binding, signal);
-      const ready = await waitForPreviousRound(binding, this.bindings, this.rpc, signal, async status => {
-        if (binding.waitingReason !== status) {
-          binding.waitingReason = status;
-          await this.persist();
-          this.events.emit(binding.parentSessionID, 'subagent.waiting', { childID: binding.childID,
-            requestID: binding.requestID, workspaceStatus: status });
-        }
-        return status === 'conflict' && this.bindings.some(row => row.childID === binding.childID &&
-          row !== binding && row.admission === 'waiting' && row.repairConflict === true);
-      });
-      if (ready === false) { completed = true; return; }
-      delete binding.waitingReason;
-      await this.admission.begin(binding, async () => {
-        const { pendingOperation: operation, pendingPrompt: prompt, ...call } = binding;
-        const receipt = await this.rpc.request('bridge/subagent', { operation, ...call, prompt });
-        if (operation === 'start' && receipt.childID !== binding.childID) throw new Error('Bridge returned an invalid subagent receipt');
-        return receipt;
-      }, signal);
-      this.events.emit(binding.parentSessionID, 'subagent.started', { ...binding, parentSessionId: binding.parentSessionID });
-      if (signal.aborted || this.sessions.stopGate.isStopped(binding.rootSessionID)) await this.requestStop(binding);
-      const result = await this.wait(binding);
-      await this.admission.release(binding);
-      if (await this.deliver(binding, result) !== false) {
-        binding.resultDelivered = true;
-        await this.persist();
-      }
-      completed = true;
-    } catch (error) {
-      if (signal.aborted) await this.cancelQueued(row => row === binding);
-      else if (error instanceof AgentDependencyError && binding.admission === 'waiting') await this.failQueued(binding, error);
-      if (!['waiting', 'cancelled'].includes(binding.admission) && !this.sessions.stopGate.isStopped(binding.rootSessionID)) {
-        await this.deliver(binding, { state: 'unknown', error: 'The subagent delivery outcome is being checked.' });
-      }
-      if (error instanceof AgentDependencyError && !signal.aborted) {
-        await this.deliver(binding, { state: 'failed', error: error.message });
-      }
-      throw error;
-    } finally {
-      if (group) void this.sessions.settle(binding.rootSessionID, rootAgent, group, generation);
-      if (!completed) binding.retryAfterReconcile = true;
-    }
+    await this.sessions.stopGate.resume(rootSessionID, revision);
+    const catalog = root.session.snapshotEvents().find(event => event.type === 'subagent/catalog' && event.data.childId === childID);
+    const name = catalog?.data.label ?? saved?.label ?? request.label ?? target?.displayName ?? installationID;
+    await this.round('start', rootSessionID, { childID, requestID, installationID, prompt: request.text, parentSessionID: rootSessionID,
+      label: name, origin: 'user', ...(request.model ? { model: request.model } : {}), ...(request.effort ? { effort: request.effort } : {}),
+      ...(request.attachmentPaths ? { attachmentPaths: request.attachmentPaths } : {}), ...(readOnly ? { access: 'read-only' } : {}) });
+    const { state } = await this.receipt(rootSessionID, childID, requestID);
+    if (state === 'cancelled') return { accepted: false, childID, requestID, state };
+    recordDispatch(root, { ...request, name });
+    if (!await this.ctx.sessions.flush(root.session)) throw new Error('The session could not be persisted');
+    void this.delivery.kick(rootSessionID);
+    return { accepted: true, childID, requestID, state };
   }
-  async requestStop(binding) {
-    const starting = this.starting.get(binding.childID);
-    if (starting?.stopRequest) return starting.stopRequest;
-    const request = this.rpc.request('bridge/subagent', { operation: 'stop', ...binding });
-    if (starting) starting.stopRequest = request;
-    try { await request; }
-    catch (error) { if (starting?.stopRequest === request) starting.stopRequest = undefined; throw error; }
+  send(childID, prompt, requestID = randomUUID(), rootSessionID, { delivery, attachmentPaths, repairConflict, expectedTaskID, expectedRunID } = {}) {
+    return this.round('send', rootSessionID, { childID, requestID, prompt,
+      ...(delivery ? { delivery } : {}), ...(attachmentPaths ? { attachmentPaths } : {}),
+      ...(repairConflict === undefined ? {} : { repairConflict }),
+      ...(expectedTaskID ? { taskID: expectedTaskID } : {}), ...(expectedRunID ? { runID: expectedRunID } : {}) })
+      .finally(() => this.delivery.kick(rootSessionID));
   }
-  async stopRoot(rootID) {
-    const failures = [];
-    const starts = [...this.starting.values()].filter(entry => entry.binding.rootSessionID === rootID);
-    try { await this.cancelQueued(binding => binding.rootSessionID === rootID && !starts.some(entry => entry.binding === binding)); }
-    catch (error) { failures.push({ error }); }
-    for (const entry of starts) entry.controller.abort();
-    const stop = binding => this.requestStop(binding);
-    failures.push(...await settleStops(starts.filter(entry => entry.binding.taskID).map(entry => entry.binding), stop));
-    const recovered = this.bindings.filter(binding => binding.rootSessionID === rootID && binding.inputKind !== 'steer' &&
-      !starts.some(entry => entry.binding === binding) && !terminal.has(binding.state) &&
-      ['accepted', 'dispatching', 'unknown'].includes(binding.admission));
-    failures.push(...await settleStops(recovered, stop));
-    if (failures.length) throw stopFailure(failures);
+  receipt(rootSessionID, childID, requestID) { return this.round('receipt', rootSessionID, { childID, requestID }); }
+  cancelInput(rootSessionID, childID, requestID) { return this.round('cancelInput', rootSessionID, { childID, requestID }); }
+  stop(childID, rootSessionID, { expectedTaskID, expectedRunID } = {}) {
+    return this.round('stopChild', rootSessionID, { childID,
+      ...(expectedTaskID ? { taskID: expectedTaskID } : {}), ...(expectedRunID ? { runID: expectedRunID } : {}) });
   }
-  async cancelQueued(matches) {
-    let changed = false;
-    for (const binding of this.bindings) {
-      if (!matches(binding) || binding.admission !== 'waiting') continue;
-      Object.assign(binding, { admission: 'cancelled', state: 'cancelled' });
-      delete binding.pendingPrompt;
-      delete binding.pendingOperation;
-      changed = true;
-    }
-    if (changed) await this.persist();
+  stopRoot(rootSessionID) { return this.round('stopRoot', rootSessionID); }
+  async hasRunning(rootSessionID) { return (await this.round('hasRunning', rootSessionID)).running === true; }
+  list(rootSessionID) { return this.round('list', rootSessionID); }
+  dependencies(rootSessionID, dependsOn, dependencies) {
+    return this.round('dependencies', rootSessionID, { dependsOn, ...(dependencies ? { dependencies } : {}) });
   }
-  async failQueued(binding, error) {
-    Object.assign(binding, { admission: 'cancelled', state: 'failed', failureReason: error.message });
-    delete binding.pendingPrompt;
-    delete binding.pendingOperation;
-    await this.persist();
-  }
-  hasRunning(rootID) {
-    return [...this.starting.values()].some(entry => entry.binding.rootSessionID === rootID) ||
-      this.bindings.some(binding => binding.rootSessionID === rootID && !terminal.has(binding.state) &&
-        ['accepted', 'dispatching', 'unknown'].includes(binding.admission));
-  }
-  async deliver(binding, result) {
-    if (this.sessions.stopGate.isStopped(binding.rootSessionID)) return false;
-    const found = await this.ctx.sessionController.resolveAgent(binding.parentSessionID);
-    if (found.error) throw found.error;
-    const parent = found.agent;
-    const rootAgent = binding.rootSessionID === binding.parentSessionID ? parent : await this.sessions.agent(binding.rootSessionID);
-    let group, generation;
-    try { ({ group, generation } = await this.sessions.begin(binding.rootSessionID, rootAgent)); }
-    catch (error) { if (this.sessions.stopGate.isStopped(binding.rootSessionID)) return false; throw error; }
-    const id = deliveryID({ ...result, rootSessionID: binding.rootSessionID, childID: binding.childID,
-      requestID: binding.requestID, taskID: binding.taskID });
-    const events = parent.session.snapshotEvents();
-    const already = events.some(event => JSON.stringify(event.data).includes(id));
-    const nativeFirst = binding.requestID === binding.initialRequestID && events.some(event =>
-      JSON.stringify(event.data).includes(`"senderSessionId":"${binding.childID}"`));
-    try {
-      if (this.sessions.stopGate.isStopped(binding.rootSessionID)) return false;
-      if (!events.some(event => event.type === 'subagent/catalog' && event.data.childId === binding.childID)) {
-        parent.session.append('subagent/catalog', { version: 2, childId: binding.childID,
-          childCreatedAt: binding.createdAt ?? Date.now(), mode: 'external', ...(binding.label ? { label: binding.label } : {}) });
-      }
-      if (!already && !nativeFirst) {
-        const summary = result.state === 'unknown'
-          ? `Bridge subagent ${binding.childID}, request ${binding.requestID}, delivery is being checked.`
-          : `Bridge subagent ${binding.childID}, request ${binding.requestID}, finished (${result.state}).`;
-        const detail = [result.output ?? result.error ?? '', workspaceNotice(result)].filter(Boolean).join('\n');
-        const message = createUserMessage({ content: [{ type: 'text', text: `${summary}\n${detail}` }],
-          source: { kind: 'subagent-settled', form: 'notice', summary, senderSessionId: binding.childID } });
-        parent.steer(freezeMessage({ ...message, id }));
-      }
-      if (!await this.ctx.sessions.flush(parent.session)) throw new Error('Parent session could not be persisted');
-      if (this.sessions.stopGate.isStopped(binding.rootSessionID)) return false;
-      if (binding.taskID && result.state !== 'unknown') await this.ack(binding);
-      return true;
-    } finally { setImmediate(() => void this.sessions.settle(binding.rootSessionID, rootAgent, group, generation)); }
-  }
-  currentRun(childID) {
-    const running = this.starting.get(childID)?.binding;
-    if (running?.taskID) return running;
-    return [...this.bindings].reverse().find(row => row.childID === childID && row.taskID && row.inputKind !== 'steer');
-  }
-  assertCurrent(childID, expectedTaskID, expectedRunID) {
-    if (!expectedTaskID && !expectedRunID) return;
-    const binding = this.currentRun(childID);
-    if (!binding || (expectedTaskID && binding.taskID !== expectedTaskID) ||
-        (expectedRunID && binding.runID !== expectedRunID)) {
-      throw new Error('The subagent has moved to a different task or run');
-    }
-  }
-  send(...args) { return this.inputs.send(...args); }
-  receipt(...args) { return this.inputs.receipt(...args); }
-  async cancelInput(rootSessionID, childID, requestID) {
-    const binding = this.bindings.find(row => row.rootSessionID === rootSessionID &&
-      row.childID === childID && row.requestID === requestID);
-    if (!binding) return { state: this.inputs.isSending(childID, requestID) ? 'unknown' : 'notFound' };
-    if (binding.inputKind === 'steer') {
-      return { state: ['unknown', 'dispatching'].includes(binding.admission) ? 'unknown' : 'settled' };
-    }
-    const starting = this.starting.get(childID);
-    if (binding.admission === 'waiting') {
-      if (starting?.binding === binding) starting.controller.abort();
-      await this.cancelQueued(row => row === binding);
-      return { state: 'cancelled' };
-    }
-    if (binding.admission === 'cancelled' || terminal.has(binding.state)) return { state: 'settled' };
-    if (starting?.binding === binding && !binding.taskID) {
-      starting.controller.abort();
-      return { state: 'unknown' };
-    }
-    const current = this.currentRun(childID);
-    if (!binding.taskID || current?.taskID !== binding.taskID || (binding.runID && current?.runID !== binding.runID)) {
-      return { state: 'unknown' };
-    }
-    await this.requestStop(binding);
-    return { state: 'stopping' };
-  }
-  async stop(childID, rootSessionID, { expectedTaskID, expectedRunID } = {}) {
-    this.assertCurrent(childID, expectedTaskID, expectedRunID);
-    const rows = this.bindings.filter(item => item.childID === childID && item.inputKind !== 'steer');
-    const binding = this.starting.get(childID)?.binding ?? [...rows].reverse().find(item =>
-      ['dispatching', 'unknown', 'accepted'].includes(item.admission) && !terminal.has(item.state)) ?? rows.at(-1);
-    if (!binding) throw new Error('Bridge subagent not found');
-    if (binding.rootSessionID !== rootSessionID) throw new Error('Subagent belongs to another session');
-    const starting = this.starting.get(childID);
-    await this.cancelQueued(row => row.rootSessionID === rootSessionID && row.childID === childID && row !== starting?.binding);
-    this.assertCurrent(childID, expectedTaskID, expectedRunID);
-    if (starting && !starting.binding.taskID) {
-      starting.controller.abort();
-      if (starting.binding.admission === 'waiting' || starting.binding.admission === 'cancelled') {
-        await starting.result.catch(() => {});
-        return { accepted: true };
-      }
-      await starting.result.catch(() => {});
-      if (starting.binding.admission === 'unknown') throw new Error('The subagent outcome is still being checked');
-      return { accepted: true };
-    }
-    if (starting?.binding.taskID) await this.requestStop(starting.binding);
-    else if ((binding.taskID || ['dispatching', 'unknown'].includes(binding.admission)) && !terminal.has(binding.state)) {
-      await this.requestStop(binding);
-    }
-    return { accepted: true };
-  }
-  registerTools() {
-    registerCollaborationTools(this);
-    registerBridgeTools(this);
-  }
+  /** Checks the root for results to deliver now. */
+  reconcile(rootSessionID) { return this.delivery.kick(rootSessionID); }
 }

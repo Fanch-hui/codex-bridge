@@ -36,41 +36,57 @@
 
   function create(options) {
     var T = options.transport, active = false, busy = false, status = null, timer = null, readSequence = 0;
-    var root = S.node("details", "agent-details"), body = S.node("div", "dsh-provider-content");
-    var heading = S.node("summary", null, "智谱 / Z.AI");
+    var activeControl = null;
+    var root = S.node("details", "agent-details provider-disclosure"), body = S.node("div", "dsh-provider-content");
+    var heading = S.node("summary", "provider-disclosure-summary");
+    heading.appendChild(S.node("span", "provider-summary-title", "智谱 / Z.AI"));
     heading.appendChild(S.helpTooltip("智谱 / Z.AI接入说明", "此渠道涉及反代可能封禁账号，请合理使用"));
+    var summaryBadge = S.badge("未连接", "neutral");
+    summaryBadge.classList.add("provider-summary-badge");
+    heading.appendChild(summaryBadge);
     root.appendChild(heading); root.appendChild(body);
+    var grid = S.node("div", "form-grid");
     var platform = S.selectField("平台", "bigmodel", [
       { id: "bigmodel", title: "智谱" }, { id: "zai", title: "Z.AI" }
     ], function () { key.control.value = ""; render(); });
     var plan = S.selectField("套餐", "coding-plan", [
       { id: "coding-plan", title: "Coding Plan" }, { id: "start-plan", title: "Start Plan" }
     ], function () { render(); });
-    body.appendChild(platform.wrapper); body.appendChild(plan.wrapper);
+    grid.appendChild(platform.wrapper); grid.appendChild(plan.wrapper);
+    body.appendChild(grid);
+    var statusRow = S.node("div", "provider-status-bar");
     var accountStatus = S.node("p", "hint"), quotaStatus = S.node("p", "hint");
-    accountStatus.setAttribute("role", "status"); body.appendChild(accountStatus); body.appendChild(quotaStatus);
+    accountStatus.setAttribute("role", "status");
+    statusRow.appendChild(accountStatus); statusRow.appendChild(quotaStatus);
+    body.appendChild(statusRow);
     var actions = S.node("div", "form-actions"); body.appendChild(actions);
-    var login = button("网页登录", beginLogin), openLogin = button("打开登录页面", openAuthorization);
-    var cancel = button("取消登录", function () { return perform("cancelLogin"); });
-    var disconnect = button("断开连接", function () { return perform("disconnect"); });
-    var refreshModels = button("刷新模型", function () { return perform("refreshModels"); });
-    var refreshQuota = button("刷新额度", function () { return perform("refreshQuota"); });
-    [login, openLogin, cancel, disconnect, refreshModels, refreshQuota].forEach(function (item) { actions.appendChild(item); });
-    var keyDetails = S.node("details", "agent-details"), keyBody = S.node("div", "dsh-provider-content");
+    var login = button("网页登录", function () { return beginLogin(); }, "primary"), openLogin = button("打开登录页面", openAuthorization, "primary");
+    var cancel = button("取消登录", function () { return perform("cancelLogin", null, cancel, "取消中…"); });
+    var disconnect = button("断开连接", function () { return perform("disconnect", null, disconnect, "断开中…"); }, "danger");
+    var refreshModels = button("刷新模型", function () { return perform("refreshModels", null, refreshModels, "刷新中…", "已刷新"); });
+    var refreshQuota = button("刷新额度", function () { return perform("refreshQuota", null, refreshQuota, "读取中…", "已更新"); });
+    [login, openLogin, cancel, refreshModels, refreshQuota, disconnect].forEach(function (item) { actions.appendChild(item); });
+    var keyDetails = S.node("details", "agent-details provider-subdisclosure"), keyBody = S.node("div", "dsh-provider-content");
     keyDetails.appendChild(S.node("summary", null, "使用 API Key")); keyDetails.appendChild(keyBody); body.appendChild(keyDetails);
     var key = S.textField("Coding Plan API Key", "", "填写 API Key"); key.control.type = "password";
-    var saveKey = button("连接", useKey); keyBody.appendChild(key.wrapper); keyBody.appendChild(saveKey);
+    var keyActions = S.node("div", "form-actions");
+    var saveKey = button("连接", useKey, "primary");
+    keyActions.appendChild(saveKey);
+    keyBody.appendChild(key.wrapper); keyBody.appendChild(keyActions);
     keyDetails.addEventListener("toggle", function () { if (!keyDetails.open) key.control.value = ""; });
     root.addEventListener("toggle", function () { if (!root.open) key.control.value = ""; });
-    var feedback = S.node("p", "hint"); feedback.setAttribute("role", "status"); body.appendChild(feedback);
+    var feedback = S.node("p", "page-message provider-inline-feedback"); feedback.setAttribute("role", "status"); body.appendChild(feedback);
     render();
 
-    function button(label, action) {
-      var control = S.button(label, null, {}, null, "small");
+    function button(label, action, extraClass) {
+      var control = S.button(label, null, {}, null, "small" + (extraClass ? " " + extraClass : ""));
       control.addEventListener("click", function () { if (!control.disabled) void action(); });
       return control;
     }
-    function show(message) { feedback.textContent = message || ""; feedback.hidden = !message; }
+    function show(message, tone) {
+      feedback.className = "page-message provider-inline-feedback" + (tone ? " " + tone : "");
+      feedback.textContent = message || ""; feedback.hidden = !message;
+    }
     function account() {
       return status && S.safeArray(status.accounts).find(function (item) {
         return item.platform === platform.control.value && (item.plan || "coding-plan") === plan.control.value;
@@ -81,7 +97,13 @@
     }
     function render() {
       var row = account(), waiting = row && row.state === "authorizing", ready = row && row.state !== "signed_out";
-      accountStatus.textContent = accountText(row) + (row && row.accountLabel ? " · " + row.accountLabel : "");
+      var labelText = accountText(row);
+      accountStatus.textContent = labelText + (row && row.accountLabel ? " · " + row.accountLabel : "");
+      var anyReady = status && S.safeArray(status.accounts).some(function (item) { return item.state === "ready"; });
+      var summaryTone = waiting ? "warning" : row && row.state === "ready" || anyReady ? "success"
+        : row && (row.state === "error" || row.state === "reauth_required") ? "error" : "neutral";
+      summaryBadge.textContent = waiting ? "等待授权" : anyReady ? "已连接" : labelText;
+      summaryBadge.className = "status-badge provider-summary-badge " + summaryTone;
       var quota = status && S.safeArray(status.quotas).find(function (item) {
         return item.platform === platform.control.value && (item.plan || "coding-plan") === plan.control.value;
       });
@@ -89,7 +111,9 @@
       login.hidden = !!waiting; openLogin.hidden = !waiting || !row.login; cancel.hidden = !waiting; disconnect.hidden = !ready || !!waiting;
       keyDetails.hidden = plan.control.value !== "coding-plan";
       if (keyDetails.hidden) key.control.value = "";
-      [login, openLogin, cancel, disconnect, refreshModels, refreshQuota, saveKey].forEach(function (item) { item.disabled = busy; });
+      [login, openLogin, cancel, disconnect, refreshModels, refreshQuota, saveKey].forEach(function (item) {
+        item.disabled = busy || item === activeControl;
+      });
       platform.control.disabled = busy; plan.control.disabled = busy; key.control.disabled = busy;
       schedule();
     }
@@ -113,30 +137,35 @@
       return T.call("connections.zcode", { method: "status", platform: platform.control.value }).then(function (next) {
         if (sequence === readSequence) update(next);
       }).catch(function (error) {
-        if (active && sequence === readSequence) { show(error.message || "读取连接状态失败。"); schedule(); }
+        if (active && sequence === readSequence) { show(error.message || "读取连接状态失败。", "error"); schedule(); }
       });
     }
-    function perform(method, extra) {
+    function perform(method, extra, triggerButton, pendingLabel, doneLabel) {
       if (busy) return Promise.resolve(false);
-      busy = true; readSequence++; show(""); render();
+      busy = true; activeControl = triggerButton || null; readSequence++; show("");
+      var restore = triggerButton ? (triggerButton.__restoreTitle || triggerButton.textContent) : "";
+      if (triggerButton && S.setButtonPending) S.setButtonPending(triggerButton, true, pendingLabel || "处理中…", restore);
+      render();
       var payload = { method: method, platform: platform.control.value, plan: plan.control.value };
       Object.assign(payload, extra || {});
       return T.call("connections.zcode", payload).then(function (next) {
         update(next);
         if (["disconnect", "useApiKey", "refreshModels"].includes(method)) options.modelsChanged();
+        if (triggerButton && doneLabel && S.flashButtonSuccess) S.flashButtonSuccess(triggerButton, doneLabel);
         return next;
-      }).catch(function (error) { show(error.message || "操作失败，请重试。"); return false; }).finally(function () {
-        busy = false; render();
+      }).catch(function (error) { show(error.message || "操作失败，请重试。", "error"); return false; }).finally(function () {
+        if (triggerButton && S.setButtonPending && !triggerButton.__flashTimer) S.setButtonPending(triggerButton, false, null, restore);
+        activeControl = null; busy = false; render();
       });
     }
     function beginLogin() {
       var chosen = platform.control.value;
-      return perform("beginLogin").then(function (next) {
+      return perform("beginLogin", null, login, "打开中…").then(function (next) {
         if (!next) return false;
         var item = S.safeArray(next.accounts).find(function (value) { return value.platform === chosen && value.login; });
-        if (!item) { show("获取登录地址失败，请重试。"); return false; }
+        if (!item) { show("获取登录地址失败，请重试。", "error"); return false; }
         try { T.openExternalURL(item.login.authorizeUrl); show("请在浏览器中完成授权。"); }
-        catch (error) { show(error.message || "无法打开登录地址。"); }
+        catch (error) { show(error.message || "无法打开登录地址。", "error"); }
         return true;
       });
     }
@@ -144,12 +173,12 @@
       var row = account();
       if (!row || !row.login) return;
       try { T.openExternalURL(row.login.authorizeUrl); show("请在浏览器中完成授权。"); }
-      catch (error) { show(error.message || "无法打开登录地址。"); }
+      catch (error) { show(error.message || "无法打开登录地址。", "error"); }
     }
     function useKey() {
       var value = key.control.value.trim(); key.control.value = "";
-      if (!value) { show("请填写 API Key。"); return Promise.resolve(false); }
-      return perform("useApiKey", { key: value });
+      if (!value) { show("请填写 API Key。", "warning"); return Promise.resolve(false); }
+      return perform("useApiKey", { key: value }, saveKey, "连接中…");
     }
     function setActive(value) {
       active = !!value;

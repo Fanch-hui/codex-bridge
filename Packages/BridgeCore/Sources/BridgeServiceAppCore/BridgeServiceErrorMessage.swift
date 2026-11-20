@@ -18,6 +18,13 @@ public enum BridgeServiceErrorMessage {
     (error as? BridgeServiceClientError) == .unavailable
   }
 
+  public static func isUnconfirmedResponse(_ error: any Error) -> Bool {
+    switch error as? BridgeServiceClientError {
+    case .unavailable, .invalidRemoteProxy, .responseFailed: true
+    default: false
+    }
+  }
+
   /// Renders a user-facing message for IPC transport and remote errors.
   public static func message(_ error: any Error) -> String {
     if let codec = error as? BridgeServiceIPCCodecError {

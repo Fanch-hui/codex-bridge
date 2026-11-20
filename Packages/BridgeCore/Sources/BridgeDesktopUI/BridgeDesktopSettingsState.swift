@@ -229,6 +229,9 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
   public let canRefreshModels: Bool?
   public let isRefreshingModels: Bool?
   public let modelError: String?
+  public let applicationMode: String?
+  public let applicationModeTransition: String?
+  public let applicationModeError: String?
 
   public init(
     header: BridgeDesktopPageHeader,
@@ -269,7 +272,10 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     canRefreshModels: Bool? = nil,
     isRefreshingModels: Bool? = nil,
     modelError: String? = nil,
-    direct: BridgeDesktopDirectState? = nil
+    direct: BridgeDesktopDirectState? = nil,
+    applicationMode: String? = nil,
+    applicationModeTransition: String? = nil,
+    applicationModeError: String? = nil
   ) {
     self.header = header
     self.models = models
@@ -310,5 +316,8 @@ public struct BridgeDesktopSettingsState: Codable, Equatable, Sendable {
     self.canRefreshModels = canRefreshModels
     self.isRefreshingModels = isRefreshingModels
     self.modelError = modelError
+    self.applicationMode = applicationMode
+    self.applicationModeTransition = applicationModeTransition
+    self.applicationModeError = applicationModeError
   }
 }

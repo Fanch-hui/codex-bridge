@@ -65,7 +65,13 @@ extension MCPServiceToolDispatcher {
     let page = try await withToolDeadline(until: deadline) {
       try await service.serviceProjects(cursor: cursor, limit: limit, deadline: deadline)
     }
-    return try resultEncoder.encode(ListProjectsOutput(page: page))
+    let access = await clientAccess(clientID)
+    let visible = MCPProjectPage(
+      projects: page.projects.filter { access.allowsProject($0.projectID) },
+      nextCursor: page.nextCursor,
+      defaultProjectID: page.defaultProjectID.flatMap { access.allowsProject($0) ? $0 : nil }
+    )
+    return try resultEncoder.encode(ListProjectsOutput(page: visible))
 
   }
 

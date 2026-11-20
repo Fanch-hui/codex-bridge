@@ -217,7 +217,8 @@
       if (!active || !context.connected || editing || deleting || loadingEdit) return;
       var ticket = generation, revision = ++readRevision;
       historyRevision++; history = null; render();
-      notice.textContent = "正在读取任务与提醒…"; refreshButton.disabled = true;
+      notice.textContent = "正在读取任务与提醒…";
+      S.setButtonPending(refreshButton, true, "刷新中…", "刷新");
       return rpc("schedule/catalog", {}).then(function (rows) {
         if (!active || ticket !== generation || revision !== readRevision) return;
         if (!Array.isArray(rows)) throw new Error("任务与提醒数据不可用。");
@@ -248,7 +249,10 @@
       }).catch(function (error) {
         if (active && ticket === generation && revision === readRevision) showError(error);
       }).finally(function () {
-        if (active && ticket === generation && revision === readRevision) refreshButton.disabled = !!editing || !!deleting || loadingEdit || writing;
+        if (active && ticket === generation && revision === readRevision) {
+          S.setButtonPending(refreshButton, false, null, "刷新");
+          refreshButton.disabled = !!editing || !!deleting || loadingEdit || writing;
+        }
       });
     }
     function rule(item) {

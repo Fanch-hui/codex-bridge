@@ -42,6 +42,8 @@ public struct MCPServiceToolDispatcher: Sendable {
   let resultEncoder: MCPToolResultEncoder
   let admission: MCPToolAdmission
   let deadlines: MCPServiceToolDeadlines
+  let clientAccess: @Sendable (MCPClientID) async -> MCPClientAccess
+  let delegationEnabled: @Sendable () async -> Bool
   let logger: Logger
   let clock = ContinuousClock()
 
@@ -52,6 +54,9 @@ public struct MCPServiceToolDispatcher: Sendable {
     resultEncoder: MCPToolResultEncoder = .init(),
     admission: MCPToolAdmission = .init(),
     deadlines: MCPServiceToolDeadlines = .production,
+    clientAccess: @escaping @Sendable (MCPClientID) async -> MCPClientAccess = { _ in .unrestricted
+    },
+    delegationEnabled: @escaping @Sendable () async -> Bool = { true },
     logger: Logger = Logger(label: "CodexBridge.BridgeMCP.ServiceTools")
   ) {
     self.service = service
@@ -60,6 +65,8 @@ public struct MCPServiceToolDispatcher: Sendable {
     self.resultEncoder = resultEncoder
     self.admission = admission
     self.deadlines = deadlines
+    self.clientAccess = clientAccess
+    self.delegationEnabled = delegationEnabled
     self.logger = logger
   }
 
@@ -69,6 +76,15 @@ public struct MCPServiceToolDispatcher: Sendable {
   ) async throws -> CallTool.Result {
     guard let contract = MCPServiceToolCatalog.contract(named: parameters.name) else {
       throw MCPError.invalidParams("Unknown tool name.")
+    }
+    if contract.route == .task, !(await delegationEnabled()) {
+      return try resultEncoder.encode(
+        MCPToolErrorOutput(
+          error: .init(
+            code: "capability_not_enabled", category: .policyDenied,
+            message: "Agent delegation is not enabled in the current mode.", retryable: false,
+            nextAction: "enable_workbench"
+          )), isError: true)
     }
     guard contract.isExposed(in: exposureMode) else {
       return try resultEncoder.encode(
@@ -87,6 +103,15 @@ public struct MCPServiceToolDispatcher: Sendable {
     defer { Task { await admission.release(sessionID: key) } }
 
     do {
+      guard try await authorized(contract.name, arguments: parameters.arguments) else {
+        return try resultEncoder.encode(
+          MCPToolErrorOutput(
+            error: .init(
+              code: "client_permission_denied", category: .policyDenied,
+              message: "This client is not authorized for this tool or project.", retryable: false,
+              nextAction: "request_access_from_local_user"
+            )), isError: true)
+      }
       return try await callAdmitted(
         contract,
         arguments: parameters.arguments,
@@ -112,6 +137,29 @@ public struct MCPServiceToolDispatcher: Sendable {
         metadata: ["correlation_id": .string(correlationID)]
       )
       return try encodeQueryError(.internalFailure(correlationID: correlationID))
+    }
+  }
+
+  private func authorized(_ name: MCPServiceToolName, arguments: [String: Value]?) async throws
+    -> Bool
+  {
+    let access = await clientAccess(clientID)
+    guard access.allowsTool(name.rawValue) else { return false }
+    guard case .restricted(let projectIDs, _) = access else { return true }
+    switch name {
+    case .directReadCommand, .directWriteStdin, .directInterruptCommand:
+      guard case .string(let sessionID)? = arguments?["session_id"] else { return false }
+      let deadline = clock.now.advanced(by: deadlines.read)
+      for projectID in projectIDs {
+        let page = try await withToolDeadline(until: deadline) {
+          try await service.serviceListDirectCommands(
+            projectID: projectID, limit: 100, deadline: deadline)
+        }
+        if page.commands.contains(where: { $0.sessionID == sessionID }) { return true }
+      }
+      return false
+    default:
+      return access.permits(name, arguments: arguments)
     }
   }
 

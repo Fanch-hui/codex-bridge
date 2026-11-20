@@ -1,7 +1,7 @@
 .dsh-workspace-pane { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); padding: calc(10px + var(--app-toolbar-height, 52px)) 12px 12px; border-left: 1px solid var(--separator); }
 .dsh-workspace-pane[hidden] { display: none; }
-.dsh-workspace-heading { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-block: 8px; }
-.dsh-workspace-heading h3 { margin: 0; font-size: 13px; font-weight: 500; text-wrap: balance; }
+.dsh-workspace-heading { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-block: 8px 6px; }
+.dsh-workspace-heading h3 { margin: 0; font-size: var(--font-size-caption); font-weight: 600; color: var(--text-secondary); text-wrap: balance; }
 .dsh-workspace-heading ~ .dsh-workspace-heading { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--separator); }
 .dsh-workspace-error-details { margin-block: 8px 12px; font-size: 12px; color: var(--text-secondary); }
 .dsh-workspace-error-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
@@ -9,8 +9,9 @@
 .dsh-file-entry { display: flex; flex: 0 0 auto; align-items: center; min-width: 0; }
 .dsh-file-entry .dsh-file-row { flex: 1; min-width: 0; }
 .dsh-file-add-image { flex: 0 0 auto; }
-.button.dsh-file-row { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-width: 0; min-height: 32px; padding: 4px 8px; border: 0; border-inline-start: 2px solid transparent; background: transparent; text-align: left; font-weight: 400; }
-.button.dsh-file-row.is-active { border-inline-start-color: var(--accent); background: var(--selection); font-weight: 600; }
+.button.dsh-file-row { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-width: 0; min-height: 30px; padding: 4px 8px; border: 0; border-radius: var(--control-radius); background: transparent; box-shadow: none; text-align: left; font-weight: 400; }
+.button.dsh-file-row:hover { background: var(--surface-hover); }
+.button.dsh-file-row.is-active { background: var(--selection); color: var(--accent); font-weight: 600; }
 .dsh-file-icon { flex: 0 0 auto; order: -1; }
 .dsh-file-name { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-git-status { flex: 0 0 auto; margin-left: auto; font-family: var(--font-mono, monospace); white-space: pre; font-variant-numeric: tabular-nums; }
@@ -48,24 +49,24 @@
 .dsh-workspace-pane .button.dsh-embedded-agent-item { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; min-height: 38px; padding: 8px 12px; border: 1px solid var(--separator); border-radius: 8px; background: var(--surface); box-shadow: none; color: var(--text); text-align: left; font-size: 12px; font-weight: 500; cursor: pointer; }
 .dsh-workspace-pane .button.dsh-embedded-agent-item:hover { background: var(--surface-muted); }
 .dsh-workspace-pane .dsh-embedded-agent-title { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-workspace-pane .dsh-embedded-agent-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; }
 .dsh-workspace-pane .dsh-embedded-agent-chevron { flex: 0 0 auto; color: var(--text-secondary); font-size: 14px; line-height: 1; }
 .dsh-workspace-pane .dsh-embedded-agent-detail,
 .dsh-workspace-pane .dsh-embedded-agent-session { display: flex; flex: 1 1 0; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
-.dsh-workspace-pane .dsh-embedded-agent-header { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--separator); }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-header { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--separator); }
 .dsh-workspace-pane .button.dsh-embedded-agent-back { flex: 0 0 auto; padding-inline: 8px; }
-.dsh-workspace-pane .dsh-embedded-agent-detail-title { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
-.dsh-workspace-pane .dsh-embedded-agent-body { display: flex; flex: 1 1 0; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; padding-block: 6px; overflow: hidden; }
-.dsh-workspace-pane .dsh-embedded-agent-hint, .dsh-workspace-pane .dsh-embedded-agent-feedback { margin: 0; font-size: 11px; }
-.dsh-workspace-pane .dsh-embedded-agent-changes { flex: 0 1 auto; max-height: 160px; min-height: 0; overflow: auto; font-size: 11px; }
-.dsh-workspace-pane .dsh-embedded-agent-changes pre { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.dsh-workspace-pane .dsh-embedded-agent-session > .button { align-self: flex-start; margin-top: 6px; }
-.dsh-workspace-pane .dsh-embedded-agent-compose { display: flex; flex: 0 0 auto; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--separator); }
-.dsh-workspace-pane .dsh-embedded-agent-compose .field { margin: 0; }
-.dsh-workspace-pane .dsh-embedded-agent-compose input { min-height: 28px; font-size: 12px; }
-.dsh-workspace-pane .dsh-embedded-agent-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 0; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-detail-title { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-body { display: flex; flex: 1 1 0; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; padding-block: 6px; overflow: hidden; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) :is(.dsh-embedded-agent-hint, .dsh-embedded-agent-feedback) { margin: 0; font-size: 11px; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-changes { flex: 0 1 auto; max-height: 160px; min-height: 0; overflow: auto; font-size: 11px; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-changes pre { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-session > .button { align-self: flex-start; margin-top: 6px; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-compose { display: flex; flex: 0 0 auto; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--separator); }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-compose .field { margin: 0; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-compose input { min-height: 28px; font-size: 12px; }
+:is(.dsh-workspace-pane, .dsh-collaboration-pane-body) .dsh-embedded-agent-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 0; }
 
 @media (forced-colors: active) {
-  .button.dsh-file-row.is-active { border-inline-start-color: Highlight; }
+  .button.dsh-file-row.is-active { color: HighlightText; background: Highlight; }
   .dsh-source-body:focus-within { outline-color: Highlight; }
 }

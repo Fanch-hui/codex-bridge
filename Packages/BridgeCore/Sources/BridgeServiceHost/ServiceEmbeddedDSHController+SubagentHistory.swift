@@ -11,11 +11,13 @@ import Foundation
 extension ServiceEmbeddedDSHController {
   func subagentSnapshot(
     _ payload: [String: ACPJSONValue], rootID: String,
-    binding: EmbeddedDSHSubagentBinding, task: MCPServiceTaskSnapshot
+    binding: EmbeddedDSHSubagentBinding, task: MCPServiceTaskSnapshot,
+    includingMessages: Bool = true
   ) async throws -> ACPJSONValue {
     var result = try Self.childState(task, childID: binding.childID).objectValue ?? [:]
     let isCurrent = binding.currentTaskID?.rawValue == task.taskID
     result["providerID"] = .string(binding.providerID)
+    if let model = task.executionModel { result["model"] = .string(model) }
     result["installationID"] = binding.installationID.map(ACPJSONValue.string) ?? .null
     result["requestID"] = .string(
       payload["requestID"]?.stringValue ?? binding.currentRequestID)
@@ -41,9 +43,11 @@ extension ServiceEmbeddedDSHController {
       "canAnswer": .bool(!pending.isEmpty),
     ])
     result["waitingForApproval"] = .bool(!pending.isEmpty)
-    let history = try await subagentMessages(
-      payload, rootID: rootID, binding: binding, task: task)
-    result.merge(history) { _, new in new }
+    if includingMessages {
+      let history = try await subagentMessages(
+        payload, rootID: rootID, binding: binding, task: task)
+      result.merge(history) { _, new in new }
+    }
     let enriched = try await enrichWorkspaceState(
       .object(result), rootID: rootID, childID: binding.childID,
       taskID: task.taskID, state: task.status)
@@ -67,13 +71,6 @@ extension ServiceEmbeddedDSHController {
       !["merged", "retained"].contains(final["workspaceStatus"]?.stringValue ?? ""), !canRepair
     {
       capabilities["canContinue"] = .bool(false)
-      capabilities["canSend"] = .bool(canSteer)
-    }
-    if isolated, providerID == serviceCodexProviderID,
-      !CodexIsolatedLaunch.supportsFileOnlyExecution
-    {
-      capabilities["canContinue"] = .bool(false)
-      capabilities["canRepairWithAgent"] = .bool(false)
       capabilities["canSend"] = .bool(canSteer)
     }
     if isolated, canContinue, final["workspaceReclaimed"]?.boolValue == true {

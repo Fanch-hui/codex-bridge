@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { lstat, readFile, readdir, readlink, realpath } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -53,7 +55,7 @@ async function contents(root) {
   return entries;
 }
 
-export async function verifyEmbeddedDSH(rootArgument, platform, architecture) {
+export async function verifyEmbeddedDSH(rootArgument, platform, architecture, { execute = false } = {}) {
   if (!["darwin", "windows", "linux"].includes(platform) ||
       !["x64", "arm64"].includes(architecture)) {
     throw new Error("Invalid embedded DSH platform or architecture.");
@@ -107,6 +109,22 @@ export async function verifyEmbeddedDSH(rootArgument, platform, architecture) {
     ...bundledPlugins.flatMap(plugin => ["package.json", ...plugin.files].map(file => `node_modules/${plugin.name}/${file}`))]) {
     if (expected.get(component) !== "file") throw new Error(`Embedded DSH component is missing: ${component}`);
   }
+  const providerComponents = [
+    `provider/model-protocol${platform === "windows" ? ".exe" : ""}`,
+    "provider/MODEL_PROTOCOL_LICENSE", "provider/community/host.js",
+    "provider/community/bridge-secret.js", "provider/community/LICENSE",
+    "provider/community/catalog.json", "provider/community/cli.mjs",
+    "provider/community/install.mjs", "provider/community/provision-bun.mjs",
+    "provider/agent-connections/index.mjs", "provider/agent-connections/connections.mjs",
+    "provider/agent-connections/editor.mjs", "provider/agent-connections/package.json",
+    "provider/agent-connections/package-lock.json",
+    "provider/agent-connections/node_modules/@decimalturn/toml-patch/LICENSE",
+    "provider/agent-connections/node_modules/jsonc-parser/LICENSE.md",
+    ...["@decimalturn/toml-patch", "jsonc-parser"].map(name => `provider/agent-connections/node_modules/${name}/package.json`)
+  ];
+  for (const component of providerComponents) {
+    if (expected.get(component) !== "file") throw new Error(`Provider runtime component is missing: ${component}`);
+  }
   const actual = await contents(root);
   if (actual.size !== expected.size) throw new Error("Embedded DSH resource inventory differs from its manifest.");
   for (const [name, kind] of expected) {
@@ -125,6 +143,12 @@ export async function verifyEmbeddedDSH(rootArgument, platform, architecture) {
       throw new Error(`Embedded DSH plugin identity does not match: ${plugin.name}`);
     }
   }
+  for (const [name, version] of [["@decimalturn/toml-patch", "3.3.3"], ["jsonc-parser", "3.3.1"]]) {
+    const installed = JSON.parse(await readFile(path.join(root, "provider/agent-connections/node_modules", name, "package.json"), "utf8"));
+    if (installed.name !== name || installed.version !== version) {
+      throw new Error(`Agent connection dependency identity does not match: ${name}`);
+    }
+  }
   const realRoot = await realpath(root);
   for (const item of manifest.links) {
     const absolute = path.join(root, ...item.path.split("/"));
@@ -134,13 +158,32 @@ export async function verifyEmbeddedDSH(rootArgument, platform, architecture) {
       throw new Error(`Embedded DSH link leaves the runtime: ${item.path}`);
     }
   }
+  if (execute) {
+    const nativePlatform = process.platform === "win32" ? "windows" : process.platform;
+    if (nativePlatform !== platform) throw new Error("Protocol execution requires the target OS.");
+    const executable = path.join(root, "provider", platform === "windows" ? "model-protocol.exe" : "model-protocol");
+    const request = JSON.stringify({ id: 1, method: "cancel", params: { requestId: "verification" } });
+    const result = spawnSync(executable, ["--state-dir", tmpdir()], {
+      input: `${request}\n`, encoding: "utf8", timeout: 10000, windowsHide: true,
+    });
+    if (result.error || result.status !== 0) {
+      throw new Error("Provider protocol executable failed to start.", { cause: result.error });
+    }
+    let reply;
+    try { reply = JSON.parse(result.stdout); }
+    catch { throw new Error("Provider protocol executable returned an invalid response."); }
+    if (reply.id !== 1 || reply.result?.cancelled !== false) {
+      throw new Error("Provider protocol executable returned an unexpected response.");
+    }
+  }
   return { files: manifest.files.length, links: manifest.links.length, node };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  if (process.argv.length !== 5) {
-    throw new Error("Usage: node verify-embedded-dsh-runtime.mjs RUNTIME_ROOT PLATFORM ARCHITECTURE");
+  if (process.argv.length !== 5 && !(process.argv.length === 6 && process.argv[5] === "--execute")) {
+    throw new Error("Usage: node verify-embedded-dsh-runtime.mjs RUNTIME_ROOT PLATFORM ARCHITECTURE [--execute]");
   }
-  const result = await verifyEmbeddedDSH(process.argv[2], process.argv[3], process.argv[4]);
-  console.log(`Verified embedded DSH: ${result.files} files and ${result.links} links.`);
+  const execute = process.argv[5] === "--execute";
+  const result = await verifyEmbeddedDSH(process.argv[2], process.argv[3], process.argv[4], { execute });
+  console.log(`Verified embedded DSH: ${result.files} files and ${result.links} links${execute ? "; protocol executed" : ""}.`);
 }

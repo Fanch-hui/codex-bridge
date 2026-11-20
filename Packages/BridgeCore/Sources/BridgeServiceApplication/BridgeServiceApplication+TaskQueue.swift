@@ -34,7 +34,7 @@ extension BridgeServiceApplication {
     Task { [weak self] in await self?.drainQueuedTasks() }
   }
 
-  func stopTaskQueueProcessor() {
+  public func stopTaskQueueProcessor() {
     taskQueueProcessor?.cancel()
     taskQueueProcessor = nil
   }
@@ -72,8 +72,9 @@ extension BridgeServiceApplication {
           )
         }
       } catch {
-        _ = try? await tasks.fail(
-          taskID: admitted.id,
+        // Once approval hands the task to the executor, only it can confirm process exit.
+        _ = try? await tasks.failBeforeStart(
+          taskID: admitted.id, expectedQueued: false,
           failureCode: "queued_start_failed",
           summary: "The queued task could not start after admission."
         )
@@ -92,16 +93,16 @@ extension BridgeServiceApplication {
 
   private func recheckQueuedTask(_ task: ServiceTaskRecord) async -> Bool {
     guard let project = try? await projects.project(id: task.projectID) else {
-      _ = try? await tasks.fail(
-        taskID: task.id,
+      _ = try? await tasks.failBeforeStart(
+        taskID: task.id, expectedQueued: true,
         failureCode: "queued_project_missing",
         summary: "The project no longer exists, so the queued task was cancelled."
       )
       return false
     }
     guard (try? project.root.validateCurrentIdentity()) != nil else {
-      _ = try? await tasks.fail(
-        taskID: task.id,
+      _ = try? await tasks.failBeforeStart(
+        taskID: task.id, expectedQueued: true,
         failureCode: "queued_project_unavailable",
         summary: "The registered project directory is no longer available."
       )
@@ -113,8 +114,8 @@ extension BridgeServiceApplication {
     case .unavailable:
       return false
     case .invalid:
-      _ = try? await tasks.fail(
-        taskID: task.id,
+      _ = try? await tasks.failBeforeStart(
+        taskID: task.id, expectedQueued: true,
         failureCode: "queued_model_unavailable",
         summary: "The selected model is no longer available for this queued task."
       )
@@ -122,8 +123,8 @@ extension BridgeServiceApplication {
     }
     guard task.providerID != serviceCodexProviderID else { return true }
     guard let installationID = task.installationID, let registry = agentRegistry else {
-      _ = try? await tasks.fail(
-        taskID: task.id,
+      _ = try? await tasks.failBeforeStart(
+        taskID: task.id, expectedQueued: true,
         failureCode: "queued_agent_unavailable",
         summary: "The queued Agent installation is no longer available."
       )
@@ -136,8 +137,8 @@ extension BridgeServiceApplication {
       guard installation.providerID.rawValue == task.providerID else { throw CancellationError() }
       return true
     } catch {
-      _ = try? await tasks.fail(
-        taskID: task.id,
+      _ = try? await tasks.failBeforeStart(
+        taskID: task.id, expectedQueued: true,
         failureCode: "queued_agent_unavailable",
         summary: "The queued Agent installation is no longer available."
       )

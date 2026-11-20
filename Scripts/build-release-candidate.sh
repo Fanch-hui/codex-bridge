@@ -119,6 +119,7 @@ for architecture in "${architectures[@]}"; do
   bundled_helper="${archived_app}/Contents/Helpers/tunnel-client"
   bundled_digest="${archived_app}/Contents/Resources/TunnelClient/tunnel-client.sha256"
   embedded_dsh="${archived_app}/Contents/Resources/EmbeddedDSH"
+  protocol_helper="${embedded_dsh}/provider/model-protocol"
   deepseek_bundle="${archived_app}/Contents/Resources/BridgeCore_BridgeDeepSeekHarnessACP.bundle"
   deepseek_template="${deepseek_bundle}/Contents/Resources/cordis.yml"
   [[ -d "${deepseek_bundle}" && ! -L "${deepseek_bundle}" && \
@@ -126,7 +127,7 @@ for architecture in "${architectures[@]}"; do
     print -u2 "Archive did not contain the DeepSeek Harness resource bundle."
     exit 66
   }
-  for binary in "${app_binary}" "${service_binary}" "${bundled_helper}"; do
+  for binary in "${app_binary}" "${service_binary}" "${bundled_helper}" "${protocol_helper}"; do
     /usr/bin/lipo "${binary}" -verify_arch "${architecture}"
     [[ "$(/usr/bin/lipo -archs "${binary}")" == "${architecture}" ]] || {
       print -u2 "Release component contains an unexpected architecture: ${binary}"
@@ -151,7 +152,7 @@ for architecture in "${architectures[@]}"; do
   /usr/bin/python3 "${script_directory}/sign-embedded-dsh-runtime.py" \
     "${embedded_dsh}" - "${node_entitlements}" --hardened
   node "${script_directory}/verify-embedded-dsh-runtime.mjs" \
-    "${embedded_dsh}" darwin "${runtime_architecture}"
+    "${embedded_dsh}" darwin "${runtime_architecture}" --execute
   /usr/bin/codesign --force --sign - \
     --entitlements "${repository_root}/App/CodexBridge.entitlements" "${archived_app}"
   /usr/bin/codesign --verify --deep --strict --verbose=2 "${archived_app}"

@@ -6,8 +6,7 @@
     button.__pendingCommand = command;
     button.__pendingLabel = label;
     button.__pendingStatusMessage = context.statusMessage || "";
-    button.disabled = true;
-    button.textContent = "请求中…";
+    S.setButtonPending(button, true, "请求中…", label);
     context.emit(command, {});
     if (command === "connectTunnel" && global.CodexBridgeDesktopConnectionsPage) {
       global.CodexBridgeDesktopConnectionsPage.watchClients();
@@ -21,8 +20,8 @@
       if (!command) return;
       if (!message) { button.__pendingStatusMessage = ""; return; }
       if (message === button.__pendingStatusMessage) return;
+      S.setButtonPending(button, false, null, button.__pendingLabel);
       button.disabled = !allowed[command];
-      button.textContent = button.__pendingLabel;
       button.__pendingCommand = null;
     });
   }
@@ -39,6 +38,7 @@
     if (page.canCopyLocalMCPURL) {
       var copy = S.button("复制本机地址", null, {}, null, "small", false);
       copy.addEventListener("click", function () {
+        S.flashButtonSuccess(copy, "已复制");
         context.emit("copyLocalMCPEndpoint", {});
       });
       state.appendChild(copy);
@@ -102,7 +102,7 @@
         var details = global.CodexBridgeDesktopWorkbenchDetails;
         if (!details || !details.copyResult) { copy.textContent = "复制暂不可用"; return; }
         details.copyResult(actions.__tunnelDiagnostic).then(function () {
-          copy.textContent = "已复制";
+          S.flashButtonSuccess(copy, "已复制");
         }, function () { copy.textContent = "复制失败，请重试"; });
       });
       maintenance.appendChild(copy);

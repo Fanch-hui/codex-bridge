@@ -1,5 +1,5 @@
 import { defineTool } from '@deepseek-ai/dsh-tools';
-import { dependenciesFor, handoffPrompt, waitForDependencies } from './agent-handoff.mjs';
+import { handoffPrompt, waitForDependencies } from './agent-handoff.mjs';
 
 export const handoffParameters = {
   context: { type: 'string', description: 'Task-specific context needed by the child.' },
@@ -10,15 +10,13 @@ export const handoffParameters = {
 
 const output = { schema: { type: 'string' }, render: (_args, text) => [{ type: 'text', text }] };
 
-async function childID(ctx, agent, reference, descendants, signal) {
+/** The child's listing row (its ID and whether a connected agent runs it). */
+async function childRow(ctx, agent, reference, descendants, signal) {
   const rows = await ctx.subagents.listDescendants(agent.session.id, signal);
   const match = id => rows.find(row => row.kind === 'child' && row.id === id && (descendants || row.depth === 1));
-  const direct = match(reference);
-  if (direct) return direct.id;
-  const resolved = await ctx.subagents.resolveName(agent, reference, signal);
-  const child = match(resolved);
+  const child = match(reference) ?? match(await ctx.subagents.resolveName(agent, reference, signal));
   if (!child) throw new Error(descendants ? 'Subagent is not a descendant' : 'Subagent is not a direct child');
-  return child.id;
+  return child;
 }
 
 export function registerCollaborationTools(bridge) {
@@ -38,9 +36,7 @@ export function registerCollaborationTools(bridge) {
     if (args.attachmentPaths?.length) throw new Error('Native delegation does not support attachment paths');
     if (args.model || args.effort) throw new Error('Select a native child model through the native subagent tool');
     if (args.access) throw new Error('Native children cannot be restricted to read-only; pick a connected agent by installationID');
-    const rootSessionID = bridge.rootOf(exec.agent);
-    const dependencies = dependenciesFor(bridge.bindings, rootSessionID, args.dependsOn);
-    await waitForDependencies({ rootSessionID, dependencies }, bridge.bindings, bridge.rpc, exec.signal, async () => {});
+    await waitForDependencies(bridge, bridge.rootOf(exec.agent), args.dependsOn, exec.signal);
     const native = ctx.tools.get('subagent', exec.agent);
     if (!native) throw new Error('Native subagent tool is unavailable');
     return JSON.stringify(await native.execute({ description: args.description, prompt: handoffPrompt(args) }, exec));
@@ -49,14 +45,15 @@ export function registerCollaborationTools(bridge) {
     scope: { type: 'string', enum: ['children', 'descendants'] }
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Listing subagents requires an agent');
-    const id = exec.agent.session.id;
-    const descendants = await ctx.subagents.listDescendants(id, exec.signal);
+    const descendants = await ctx.subagents.listDescendants(exec.agent.session.id, exec.signal);
     const rows = args.scope === 'descendants' ? descendants : descendants.filter(row => row.depth === 1);
+    const connected = rows.some(row => row.mode === 'external')
+      ? new Map((await bridge.list(bridge.rootOf(exec.agent))).children.map(child => [child.childID, child])) : new Map();
     return JSON.stringify(rows.map(row => {
-      const binding = [...bridge.bindings].reverse().find(item => item.childID === row.id && item.inputKind !== 'steer');
-      return { ...row, ...(binding ? { installationID: binding.installationID, taskID: binding.taskID,
-        state: binding.state, workspaceMode: binding.workspaceMode, workspaceStatus: binding.workspaceStatus,
-        ...(binding.access ? { access: binding.access } : {}) } : {}) };
+      const child = connected.get(row.id);
+      return { ...row, ...(child ? { installationID: child.installationID, taskID: child.taskID,
+        state: child.state, workspaceMode: child.workspaceMode, workspaceStatus: child.workspaceStatus,
+        ...(child.access ? { access: child.access } : {}) } : {}) };
     }));
   });
   register('send_agent_message', 'Message a native or connected direct child. Queue a connected continuation or steer only when supported.', {
@@ -65,10 +62,8 @@ export function registerCollaborationTools(bridge) {
     repairConflict: { type: 'boolean', description: 'Explicitly ask the child to repair its conflicted workspace.' }
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Messaging a subagent requires an agent');
-    const parentID = exec.agent.session.id;
-    const id = await childID(ctx, exec.agent, args.childID, false, exec.signal);
-    const binding = bridge.bindings.find(row => row.childID === id && row.parentSessionID === parentID);
-    if (binding) return JSON.stringify(await bridge.send(id, args.prompt,
+    const { id, mode } = await childRow(ctx, exec.agent, args.childID, false, exec.signal);
+    if (mode === 'external') return JSON.stringify(await bridge.send(id, args.prompt,
       bridge.continuationID(bridge.rootOf(exec.agent), id, exec.callId), bridge.rootOf(exec.agent),
       { delivery: args.delivery, attachmentPaths: args.attachmentPaths, repairConflict: args.repairConflict }));
     if (args.attachmentPaths?.length || args.delivery === 'queue' || args.repairConflict) throw new Error('This native tool does not support queued messages, attachment paths, or workspace repair');
@@ -80,9 +75,8 @@ export function registerCollaborationTools(bridge) {
     childID: { type: 'string', required: true, description: 'The descendant name or ID.' }
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Stopping a subagent requires an agent');
-    const id = await childID(ctx, exec.agent, args.childID, true, exec.signal);
-    const binding = bridge.bindings.find(row => row.childID === id);
-    if (binding) return JSON.stringify(await bridge.stop(id, bridge.rootOf(exec.agent)));
+    const { id, mode } = await childRow(ctx, exec.agent, args.childID, true, exec.signal);
+    if (mode === 'external') return JSON.stringify(await bridge.stop(id, bridge.rootOf(exec.agent)));
     const native = ctx.tools.get('interrupt_agent', exec.agent);
     if (!native) throw new Error('Native subagent interruption is unavailable');
     return JSON.stringify(await native.execute({ agent: id }, exec));
@@ -119,11 +113,11 @@ export function registerBridgeTools(bridge) {
     } } }
   }, async (args, exec) => {
     const rootSessionID = bridge.rootOf(exec.agent);
-    if (!bridge.bindings.some(row => row.rootSessionID === rootSessionID && row.childID === args.childID)) {
+    if (!(await bridge.list(rootSessionID)).children.some(child => child.childID === args.childID)) {
       throw new Error('Bridge subagent not found');
     }
-    return JSON.stringify(await bridge.rpc.request('bridge/subagent', { operation: 'changes', rootSessionID,
-      childID: args.childID, ...(args.retryMerge === undefined ? {} : { retryMerge: args.retryMerge }),
+    return JSON.stringify(await bridge.rpc.request('bridge/subagent', { operation: 'changes',
+      rootSessionID, childID: args.childID, ...(args.retryMerge === undefined ? {} : { retryMerge: args.retryMerge }),
       ...(args.resolutions === undefined ? {} : { resolutions: args.resolutions }) }));
   });
 }

@@ -1,9 +1,10 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
+  var sharedIcons = global.CodexBridgeDesktopIcons || {};
   var symbols = {
-    activity: '<path d="M4 14a8 8 0 1 1 16 0"/><path d="m12 12 4-4"/><path d="M5.5 17h13"/>',
-    usage: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/>',
+    activity: sharedIcons["gauge.with.needle"] || '<path d="M4.2 15a8.2 8.2 0 1 1 15.6 0"/><path d="M12 12.5 15.6 8.4"/><path d="M6.5 18h11"/>',
+    usage: '<ellipse cx="12" cy="5.2" rx="7.8" ry="2.8"/><path d="M4.2 5.2v6.8c0 1.55 3.5 2.8 7.8 2.8s7.8-1.25 7.8-2.8V5.2M4.2 12v6.8c0 1.55 3.5 2.8 7.8 2.8s7.8-1.25 7.8-2.8V12"/>',
     context: '<circle cx="12" cy="12" r="8" opacity=".25"/>'
   };
 

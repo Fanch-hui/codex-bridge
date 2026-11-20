@@ -1,17 +1,26 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport, T = global.CodexBridgeDesktopEmbeddedDSHTransport;
+  var questionDraftKey = "codexbridge.workbench.question-drafts.v1", questionDrafts = null;
+  var childDraftKey = "codexbridge.workbench.child-drafts.v1", childDrafts = null;
 
-  function create(interaction, subagents, showError, onSubagentsChange, openWorkspaceRecovery) {
-    var requests = new Map(), deferred = new Map(), agentNodes = new Map(), sessionID = null, listGeneration = 0;
-    var selectedAgentID = null;
+  function readDrafts(key) {
+    try { return JSON.parse(global.localStorage.getItem(key) || "{}") || {}; } catch (_) { return {}; }
+  }
+
+  // `agentsFeed` (optional) receives the session's Agent list after every refresh, for the cards in the conversation.
+  function create(interaction, subagents, showError, onSubagentsChange, openWorkspaceRecovery, agentsFeed, collaborationOptions) {
+    var requests = new Map(), deferred = new Map(), agentNodes = new Map(), sessionID = null, listGeneration = 0, listedAgents = [];
+    var selectedAgentID = null, paneHosts = new Map();
     var listContainer = S.node("div", "dsh-embedded-agent-list");
     var detailContainer = S.node("div", "dsh-embedded-agent-detail"); detailContainer.hidden = true;
+    var collaboration = global.CodexBridgeDesktopEmbeddedDSHCollaboration.create(
+      Object.assign({}, collaborationOptions, { openChild: showChild }));
+    subagents.appendChild(collaboration.summary);
     subagents.appendChild(listContainer); subagents.appendChild(detailContainer);
-    var questionDraftKey = "codexbridge.workbench.question-drafts.v1", questionDrafts = {};
-    try { questionDrafts = JSON.parse(global.localStorage.getItem(questionDraftKey) || "{}") || {}; } catch (_) {}
-    var childDraftKey = "codexbridge.workbench.child-drafts.v1", childDrafts = {}, childTimers = new Map();
-    try { childDrafts = JSON.parse(global.localStorage.getItem(childDraftKey) || "{}") || {}; } catch (_) {}
+    if (!questionDrafts) questionDrafts = readDrafts(questionDraftKey);
+    if (!childDrafts) childDrafts = readDrafts(childDraftKey);
+    var childTimers = new Map();
     var active = false, timer = null, activeGeneration = 0;
     var bridge = global.CodexBridgeDesktopEmbeddedDSHBridge.create(interaction, function (id) {
       var row = agentNodes.get(id); return row ? row.label.textContent : id;
@@ -216,11 +225,13 @@
     function syncViewMode() {
       var selected = selectedAgentID && agentNodes.get(selectedAgentID) || null;
       if (!selected) selectedAgentID = null;
-      listContainer.hidden = !!selected;
-      detailContainer.hidden = !selected;
+      subagents.classList.toggle("has-agent-detail", !!selected);
+      detailContainer.hidden = !selected || paneHosts.has(selectedAgentID);
       agentNodes.forEach(function (row, id) {
-        row.detail.hidden = id !== selectedAgentID;
+        row.detail.hidden = id !== selectedAgentID && !paneHosts.has(id);
         row.item.classList.toggle("is-active", id === selectedAgentID);
+        row.item.setAttribute("aria-expanded", String(id === selectedAgentID));
+        if (row.collaborationItem) row.collaborationItem.classList.toggle("is-active", id === selectedAgentID);
       });
     }
     function openAgent(id) {
@@ -228,6 +239,7 @@
       if (!row) return;
       selectedAgentID = id;
       syncViewMode();
+      collaboration.focus(row);
       loadAgent(row);
     }
     function closeAgent() {
@@ -237,12 +249,13 @@
     function setSession(id) {
       if (id === sessionID) return;
       childTimers.forEach(function (timer) { global.clearTimeout(timer); }); childTimers.clear();
-      sessionID = id; selectedAgentID = null; listGeneration++; clearRequests();
+      sessionID = id; selectedAgentID = null; listGeneration++; clearRequests(); paneHosts.clear();
+      listedAgents = []; if (agentsFeed) agentsFeed.reset();
       agentNodes.forEach(function (row) {
         if (row.childHistory) row.childHistory.dispose();
-        row.history.dispose(); row.item.remove(); row.detail.remove();
+        row.history.dispose(); row.collaborationItem.remove(); row.detail.remove();
       });
-      agentNodes.clear(); S.clear(listContainer); S.clear(detailContainer);
+      agentNodes.clear(); S.clear(listContainer); S.clear(detailContainer); collaboration.reset();
       syncViewMode();
       subagents.hidden = true;
       if (onSubagentsChange) onSubagentsChange(0, false);
@@ -302,12 +315,12 @@
     function display(item) {
       if (item.type === "approval") approval(item.payload || {}, item.sessionID);
       if (item.type === "question") question(item.payload || {}, item.sessionID);
-      if (/subagent/.test(item.type || "") || item.sessionID === sessionID && ["tool/call", "tool/result", "user/message", "turn/end", "status"].includes(item.type)) {
+      if (/subagent/.test(item.type || "") || item.sessionID === sessionID && ["tool/call", "tool/result", "user/message", "turn/end", "status", "agent/inbox/spliced"].includes(item.type)) {
         refresh();
       }
       if (item.sessionID !== sessionID) {
         var child = Array.from(agentNodes.values()).find(function (row) { return row.sessionID === item.sessionID; });
-        if (child && selectedAgentID === child.id) {
+        if (child && (selectedAgentID === child.id || paneHosts.has(child.id))) {
           if (child.mode !== "external" && child.childHistory) child.childHistory.receive(item);
           else if (item.type !== "assistant-stream" || item.payload && item.payload.type === "end") loadAgent(child);
         }
@@ -354,8 +367,29 @@
         refresh().finally(function () { schedule(token); });
       }, delay);
     }
+    function emitAgents() {
+      if (!agentsFeed) return;
+      agentsFeed.update(listedAgents, function (id) { return !!childState(sessionID, id).stopID; });
+    }
+    // Opens the child's detail in the Agents list and has the page show that list.
+    function showChild(id) {
+      if (!agentNodes.has(id)) return false;
+      if (paneHosts.has(id) && collaborationOptions && collaborationOptions.focusPane) collaborationOptions.focusPane(id);
+      else openAgent(id);
+      if (onSubagentsChange) onSubagentsChange(agentNodes.size, true);
+      return true;
+    }
+    function stopChild(id) {
+      if (!sessionID || !agentNodes.has(id)) return;
+      submitChild(sessionID, id, "stop", ""); emitAgents();
+    }
     function renderAgents(items) {
       var visible = new Set(), added = false, wasActive = hasActiveAgents();
+      var focused = listContainer.contains(document.activeElement) ? document.activeElement : null;
+      listedAgents = items;
+      items = collaboration.sort(items);
+      collaboration.updateSummary(items);
+      var position = listContainer.firstElementChild;
       var statusLabels = {
         running: "运行中",
         starting: "启动中",
@@ -380,10 +414,13 @@
         if (!row) {
           row = createAgent(id);
           agentNodes.set(id, row);
-          listContainer.appendChild(row.item);
           detailContainer.appendChild(row.detail);
           added = true;
         }
+        collaboration.decorate(row, item, items);
+        var container = row.collaborationItem;
+        if (container === position) position = position.nextElementSibling;
+        else listContainer.insertBefore(container, position);
         var titleText = item.label || item.name || item.title || item.provider || id;
         row.label.textContent = titleText;
         row.detailLabel.textContent = titleText;
@@ -400,11 +437,13 @@
         var statusText = statusLabels[item.status] !== undefined
           ? statusLabels[item.status]
           : ((item.status === "idle" ? "" : item.status) || (item.running ? "运行中" : ""));
+        if (item.waitingForApproval) statusText = "等待批准";
+        else if (S.safeArray(item.waitingFor).length) statusText = "等待依赖";
         var mode = item.admission === "waiting" || item.status === "waiting-for-workspace" ? "等待写入"
           : item.workspaceMode === "isolated" ? "独立副本执行"
           : item.workspaceMode === "shared" || item.mode === "native" ? "共享目录执行" : "";
         var summary = [statusText, mode === statusText ? "" : mode, workspaceStatus(item.workspaceStatus)].filter(Boolean).join(" · ");
-        row.status.textContent = summary;
+        row.status.textContent = statusText;
         row.detailStatus.textContent = summary;
         row.workspaceReason.textContent = item.workspaceReason || item.failureReason || "";
         row.workspaceReason.hidden = !row.workspaceReason.textContent;
@@ -419,25 +458,28 @@
           saveChildren();
         }
         if (state.stopID) {
-          row.status.textContent = ["正在停止…", mode, workspaceStatus(item.workspaceStatus)].filter(Boolean).join(" · ");
-          row.detailStatus.textContent = row.status.textContent;
+          row.status.textContent = "正在停止…";
+          row.detailStatus.textContent = ["正在停止…", mode, workspaceStatus(item.workspaceStatus)].filter(Boolean).join(" · ");
         }
         row.status.title = row.status.textContent; row.detailStatus.title = row.detailStatus.textContent;
         row.syncControls();
         deferred.forEach(function (pending) { if (pending.sessionID === row.sessionID) display(pending); });
-        if (selectedAgentID === id && (bindingChanged || previousStatus !== row.rawStatus || isNonTerminalStatus(row.rawStatus))) loadAgent(row);
+        if ((selectedAgentID === id || paneHosts.has(id)) && (bindingChanged || previousStatus !== row.rawStatus || isNonTerminalStatus(row.rawStatus))) loadAgent(row);
       });
       agentNodes.forEach(function (row, id) {
         if (!visible.has(id)) {
           if (row.childHistory) row.childHistory.dispose();
           row.history.dispose();
-          row.item.remove();
+          row.collaborationItem.remove();
           row.detail.remove();
           agentNodes.delete(id);
         }
       });
       syncViewMode();
+      if (focused && listContainer.contains(focused) && document.activeElement !== focused) focused.focus({ preventScroll: true });
       if (bridge.syncSources) bridge.syncSources();
+      emitAgents();
+      if (collaborationOptions && collaborationOptions.childrenChanged) collaborationOptions.childrenChanged(sessionID, listedAgents);
       subagents.hidden = !visible.size;
       if (active && wasActive !== hasActiveAgents()) schedule(activeGeneration);
       if (onSubagentsChange) onSubagentsChange(visible.size, added);
@@ -525,7 +567,26 @@
       }
       return row.childHistory.load();
     }
-    return { setSession: setSession, setActive: setActive, receive: receive, replacePending: replacePending, refresh: refresh };
+    function mountChild(id, host) {
+      var row = agentNodes.get(id);
+      if (!row) return false;
+      if (paneHosts.get(id) !== host) {
+        paneHosts.set(id, host); host.appendChild(row.detail); row.setPaneMode(true); row.detail.hidden = false;
+        syncViewMode(); loadAgent(row);
+      }
+      return true;
+    }
+    function releaseChild(id) {
+      var row = agentNodes.get(id);
+      if (!paneHosts.has(id)) return;
+      paneHosts.delete(id);
+      if (row) { row.setPaneMode(false); detailContainer.appendChild(row.detail); }
+      syncViewMode();
+    }
+    return { setSession: setSession, setActive: setActive, receive: receive, replacePending: replacePending, refresh: refresh,
+      showChild: showChild, stopChild: stopChild, mountChild: mountChild, releaseChild: releaseChild,
+      children: function () { return listedAgents.slice(); } };
+
   }
   global.CodexBridgeDesktopEmbeddedDSHInteractions = { create: create };
 }(window));

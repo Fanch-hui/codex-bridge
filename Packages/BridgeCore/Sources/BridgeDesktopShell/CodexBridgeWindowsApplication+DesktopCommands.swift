@@ -135,7 +135,12 @@
         }
       case .updateBrowserViewport:
         guard let viewport = payload.viewport else { return true }
-        DesktopPlatformHost.applyBrowserViewport(viewport)
+        if model.isLightweightMode == false, model.isChatBrowserEnabled {
+          DesktopPlatformHost.applyBrowserViewport(viewport)
+        } else {
+          DesktopPlatformHost.applyBrowserViewport(
+            BridgeDesktopBrowserViewport(x: 0, y: 0, width: 0, height: 0, visible: false))
+        }
       case .dismissFeedback:
         guard let feedbackID = BridgeDesktopCommandValue.nonEmpty(payload.feedbackID) else {
           return true

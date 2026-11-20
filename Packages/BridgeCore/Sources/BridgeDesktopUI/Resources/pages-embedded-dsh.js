@@ -4,10 +4,12 @@
   var T = global.CodexBridgeDesktopEmbeddedDSHTransport, P = global.CodexBridgeDesktopEmbeddedDSHProjection;
   var M = global.CodexBridgeDesktopEmbeddedDSHModels;
   var O = global.CodexBridgeDesktopEmbeddedDSHOperations;
+  var AgentMentions = global.CodexBridgeDesktopEmbeddedDSHAgentMentions, Dispatch = global.CodexBridgeDesktopEmbeddedDSHDispatch;
+  var AgentCards = global.CodexBridgeDesktopEmbeddedDSHAgentCards, noDispatch = { active: false, blocked: false };
   var key = "codexbridge.dsh.embedded.v1";
   var startupSequence = 0;
-  function readState() {
-    try { return JSON.parse(global.localStorage.getItem(key) || "null") || {}; } catch (_) { return {}; }
+  function readState(storageKey) {
+    try { return JSON.parse(global.localStorage.getItem(storageKey || key) || "null") || {}; } catch (_) { return {}; }
   }
   function requireManualRecovery(job) {
     if (!job || typeof job.requestId !== "string" || !job.requestId) return false;
@@ -25,23 +27,26 @@
       try { global.localStorage.setItem(key, JSON.stringify(saved)); } catch (_) {}
     }
   }
-  function create(onSelect, openSettings, openExternalResult, onProjectChange) {
+  function create(onSelect, openSettings, openExternalResult, onProjectChange, configuration) {
+    configuration = configuration || {};
+    var storageKey = configuration.storageKey || key;
     var startupScope = ++startupSequence;
-    var saved = readState(), page = {}, emit = null, active = false, serviceConnected = false, connected = false, engineFailed = false;
+    var saved = readState(storageKey), page = {}, emit = null, active = false, serviceConnected = false, connected = false, engineFailed = false;
     var serviceGeneration = 0;
     var lastModel = M.cachedSelection(saved);
     var models = M.cachedGroups(lastModel), catalogFailures = [], selected = saved.selected || {}, drafts = saved.drafts || {};
     var modelsLoaded = false, modelRequest = 0, modelRefresh = null, catalogDefault = null, defaultRevision = 0;
     var auth = { authenticated: false, signingIn: false }, authRevision = 0, authKnown = false;
     var sessionID = null, projectID = null, pending = null, running = false, projectInitialized = false;
-    var draftChoice = null;
+    var draftChoice = null, draftSlot = "new";
     var jobs = O.create(saved), inFlight = new Set();
     var workspaceRequests = global.CodexBridgeDesktopEmbeddedDSHWorkspaceRequests.create(saved.workspaceBindIDs, T.requestID, persist);
     var bindingSessions = new Set();
     var restoredPending = jobs.list().length > 0;
     var cursor = 0, generation = 0, loading = false, started = false, pollingGeneration = -1;
     var pollTimer = null;
-    var eventListener = null, subagentsListener = null, sessionNavigation = 0, pendingOpenSession = null;
+    var eventListener = null, subagentsListener = null, paneObserver = null, sessionChoiceHandler = null, newSessionChoiceHandler = null, sidebarSessionID = undefined;
+    var sessionNavigation = 0, pendingOpenSession = null;
     var deferredHistorySession = null;
     var startupFinished = false, loadFailures = {}, loadComplete = {}, loadingReads = {};
     var restarting = false, chatModelRefresh = null, commandPreparing = false;
@@ -54,13 +59,20 @@
     var directory = global.CodexBridgeDesktopEmbeddedDSHSessionDirectory.create(P.navigationIndex(saved.sessions, selected), {
       generation: function () { return generation; }, connected: function () { return connected; },
       active: function () { return active; }, pending: function () { return jobs.list(); },
-      onSelect: function (id) { select(id); if (onSelect) onSelect(); },
-      onNew: function (id) { newSession(id); if (onSelect) onSelect(); },
+      onSelect: function (id) {
+        if (sessionChoiceHandler && sessionChoiceHandler(id)) return;
+        select(id); if (onSelect) onSelect();
+      },
+      onNew: function (id) {
+        if (newSessionChoiceHandler && newSessionChoiceHandler(id)) return;
+        newSession(id); if (onSelect) onSelect();
+      },
       onChange: function () {
         delete loadFailures.sessions;
         var selectedSession = directory.get(sessionID);
         if (selectedSession) running = !!selectedSession.running;
         persist(); render();
+        if (paneObserver && paneObserver.directoryChanged) paneObserver.directoryChanged(directory.items());
       },
       onError: function (error) { loadFailure("sessions", error); showError(error); }
     });
@@ -97,11 +109,20 @@
       retryModels: refreshChatModels
     });
     root.appendChild(welcome.root);
-    var conversation = global.CodexBridgeDesktopEmbeddedDSHConversation.create();
+    // Agents the user can hand a task to directly, and the conversation cards that follow those tasks.
+    var agentDirectory = AgentMentions ? AgentMentions.createDirectory() : null;
+    var agentCards = AgentCards && AgentCards.create({
+      open: function (id) { return !!interactions.showChild && interactions.showChild(id); },
+      stop: function (id) { if (interactions.stopChild) interactions.stopChild(id); },
+      openPane: function (id) { if (paneObserver && paneObserver.openChild) paneObserver.openChild(sessionID, id); },
+      agentName: function (id) { return agentDirectory ? agentDirectory.name(id) : ""; }
+    });
+    var conversation = global.CodexBridgeDesktopEmbeddedDSHConversation.create({ agentCards: agentCards });
     var search = global.CodexBridgeDesktopEmbeddedDSHSearch && global.CodexBridgeDesktopEmbeddedDSHSearch.create(function (item) {
       if (!item.source || item.source === "workbench") {
         var seq = item.matchAnchor && item.matchAnchor.seq != null ? item.matchAnchor.seq : item.seq;
-        openSessionAt(item.sessionId, seq); return;
+        if (!sessionChoiceHandler || !sessionChoiceHandler(item.sessionId, seq)) openSessionAt(item.sessionId, seq);
+        return;
       }
       if (openExternalResult) openExternalResult(item);
     });
@@ -119,7 +140,10 @@
     var workspaceRecovery = global.CodexBridgeDesktopEmbeddedDSHRecovery.create(interaction, openSession);
     var interactions = global.CodexBridgeDesktopEmbeddedDSHInteractions.create(interaction, subagents, showError, function (count, added) {
       if (subagentsListener) subagentsListener(count, added);
-    }, function () { workspaceRecovery.reveal(); });
+    }, function () { workspaceRecovery.reveal(); }, agentCards && agentCards.feed, { locateConversation: locateAgent,
+      agentName: function (id) { return agentDirectory ? agentDirectory.name(id) : ""; },
+      childrenChanged: function (id, items) { if (paneObserver && paneObserver.childrenChanged) paneObserver.childrenChanged(id, items); },
+      focusPane: function (id) { if (paneObserver && paneObserver.focusChild) paneObserver.focusChild(sessionID, id); } });
     var workspacePrompt = S.node("section", "dsh-embedded-request dsh-workspace-request");
     var workspacePromptText = S.node("span", null, "选择工作文件夹以继续。");
     var workspaceButton = S.button("选择文件夹", null, {}, null, "small");
@@ -130,13 +154,19 @@
     var queue = global.CodexBridgeDesktopEmbeddedDSHQueue.create(); view.queueSlot.appendChild(queue.root);
     var mentions = global.CodexBridgeDesktopEmbeddedDSHMentions && global.CodexBridgeDesktopEmbeddedDSHMentions.create(
       view.input, root, function () { return { sessionID: sessionID, projectID: projectID, connected: connected }; },
-      function () { saveDraft(); S.autoGrowTextArea(view.input); validate(); });
+      function () { saveDraft(); S.autoGrowTextArea(view.input); validate(); }, agentDirectory);
+    var dispatcher = Dispatch && agentDirectory ? Dispatch.create({
+      directory: agentDirectory, ensureSession: function () { return ensureCommandSession(true); }, setMessage: showMessage,
+      context: function () { return { sessionID: sessionID, projectID: projectID }; },
+      capture: captureDispatch, attempt: dispatchAttempt, finish: finishDispatch
+    }) : null;
+    if (agentDirectory) agentDirectory.subscribe(validate);
     var slashCommands = actions.bindComposer && actions.bindComposer(view.input, root, function (row) {
       saveDraft(); S.autoGrowTextArea(view.input);
       if (row && (row.description || row.input && row.input.hint)) message = row.description || row.input.hint;
       validate();
     });
-    view.input.id = "dsh-embedded-session-input";
+    view.input.id = "dsh-embedded-session-input" + (configuration.inputSuffix || "");
     view.input.parentNode.querySelector("label").htmlFor = view.input.id;
     view.modeWrapper.hidden = true; view.effortWrapper.hidden = true;
     var permissionState = { selected: "", draftPreset: "", choices: [], ready: false, loading: false, writing: false, error: "" };
@@ -174,11 +204,11 @@
     function persist() {
       if (persistTimer !== null) { global.clearTimeout(persistTimer); persistTimer = null; }
       var snapshot = { selected: selected, drafts: drafts, pendingJobs: jobs.list(),
-        activeSessionID: sessionID, activeProjectID: projectID, lastModel: lastModel,
+        activeSessionID: sessionID, activeProjectID: projectID, activeDraftSlot: sessionID ? null : draftSlot, lastModel: lastModel,
         sessions: P.navigationIndex(directory.items()), workspaceBindIDs: workspaceRequests.savedIDs() };
       var legacy = jobs.list().find(function (job) { return job.legacyPending; });
       if (legacy) snapshot.pending = legacy;
-      try { global.localStorage.setItem(key, JSON.stringify(snapshot)); } catch (_) {}
+      try { global.localStorage.setItem(storageKey, JSON.stringify(snapshot)); } catch (_) {}
     }
     // Draft edits stay live in memory; the storage write waits for a quiet moment and is
     // flushed on submit, session or page switches, blur and when the page is hidden.
@@ -217,11 +247,13 @@
       loading = !!pending && inFlight.has(pending.requestId);
       restoredPending = !!pending && !loading && !pending.error;
     }
-    function currentDraftKey() { return JSON.stringify([projectID, sessionID || "new"]); }
+    function currentDraftKey() { return JSON.stringify([projectID, sessionID || draftSlot]); }
     function saveDraft(debounce) {
       var draft = { text: view.input.value, model: chosenModel, effort: chosenEffort,
         attachmentPaths: attachmentPaths.slice(), attachmentRefs: attachmentRefs.slice(),
         attachmentItems: attachmentItems.slice(), attachmentError: attachmentError, selectionEdited: draftSelectionEdited };
+      var previous = drafts[currentDraftKey()];
+      if (previous && previous.dispatchAttempts) draft.dispatchAttempts = previous.dispatchAttempts;
       if (!sessionID && permissionState.draftPreset) draft.permissionPreset = permissionState.draftPreset;
       if (!sessionID && !M.retainsDraft(draft)) delete drafts[currentDraftKey()];
       else drafts[currentDraftKey()] = draft;
@@ -305,7 +337,7 @@
     function updateStartup() {
       if (!active || !projectInitialized || startupFinished) return;
       startupFinished = true;
-      if (global.CodexBridgeDesktopStartup) global.CodexBridgeDesktopStartup.update({ status: "ready" });
+      if (!configuration.storageKey && global.CodexBridgeDesktopStartup) global.CodexBridgeDesktopStartup.update({ status: "ready" });
     }
     function updateModels() {
       if (!modelsLoaded && !models.length && !chosenModel) return;
@@ -364,13 +396,15 @@
       var offerChat = modelPending && (!auth.authenticated || !auth.planEnabled || model.provider === "chatgpt-siwc");
       var isSlashCommand = !running && !attachmentPaths.length && !attachmentRefs.length
         && actions.isCommand && actions.isCommand(view.input.value);
-      view.send.disabled = blocked || loading || commandPreparing || restoringSelection || loadingAuth || !connected || !history.ready() || !permissionState.ready
+      var dispatch = dispatcher ? dispatcher.inspect(view.input.value, attachmentRefs.length) : noDispatch;
+      view.send.disabled = blocked || loading || commandPreparing || !dispatch.active && (restoringSelection || loadingAuth)
+        || !connected || !history.ready() || !permissionState.ready
         || !!sessionID && !directory.ready() || !sessionID && !projectID
         || permissionState.loading || permissionState.writing || !!permissionState.error || !!attachmentError
         || !!(attachmentDraft && attachmentDraft.attachmentBusy)
-        || !isSlashCommand && (!view.model.value || !!(model && model.pending))
-        || (!view.input.value.trim() && !attachmentPaths.length && !attachmentRefs.length) || invalid;
-      view.input.readOnly = false; view.model.disabled = blocked || running; view.effort.disabled = blocked || running;
+        || !isSlashCommand && !dispatch.active && (!view.model.value || !!(model && model.pending))
+        || (!view.input.value.trim() && !attachmentPaths.length && !attachmentRefs.length) || invalid || dispatch.blocked;
+      view.input.readOnly = !!dispatcher && dispatcher.busy(); view.model.disabled = blocked || running; view.effort.disabled = blocked || running;
       view.project.disabled = blocked || running;
       view.permission.disabled = !connected || blocked || running || permissionState.loading || permissionState.writing
         || !permissionState.choices.length || !!sessionID && !directory.get(sessionID);
@@ -388,17 +422,19 @@
       view.edit.disabled = !recoverable;
       var hint = message;
       if (!hint && recoverable) hint = pending.error || "上一次提交尚未确认。";
+      var invalidHint = "消息不能包含 NUL，且不能超过 32768 字节。";
       if (!hint && !connected) hint = "正在连接工作台…";
       else if (!hint && !history.ready()) hint = "正在载入对话…";
       else if (!hint && !sessionID && !projectID) hint = "正在读取默认工作区…";
       else if (!hint && permissionState.error) hint = permissionState.error;
       else if (!hint && attachmentError) hint = attachmentError;
       else if (!hint && permissionState.loading) hint = "正在载入权限…";
+      else if (!hint && dispatch.active) hint = invalid ? invalidHint : dispatch.hint || "";
       else if (!hint && !modelsLoaded) hint = "正在载入模型…";
       else if (!hint && loadingAuth) hint = "正在读取账号状态…";
       else if (!hint && !view.model.value) hint = "请连接模型。";
       else if (!hint && model && model.pending) hint = "所选模型暂不可用，请重新连接或选择其他模型。";
-      else if (!hint && invalid) hint = "消息不能包含 NUL，且不能超过 32768 字节。";
+      else if (!hint && invalid) hint = invalidHint;
       view.setHint(hint); view.feedback.hidden = view.root.hidden;
       stop.hidden = !sessionID || !running;
       stop.disabled = !connected || stopManager.has(sessionID);
@@ -425,7 +461,7 @@
     function render() {
       if (renderFrame) { global.cancelAnimationFrame(renderFrame); renderFrame = 0; }
       workspaceRecovery.setContext(projectID, sessionID, active && serviceConnected);
-      directory.render({ projectID: projectID, sessionID: sessionID, navigationActive: navigationActive,
+      directory.render({ projectID: projectID, sessionID: sidebarSessionID === undefined ? sessionID : sidebarSessionID, navigationActive: navigationActive,
         connected: connected, engineFailed: engineFailed, projects: page.projects, defaultProjectID: S.defaultProjectID(page) });
       updateProjectPicker();
       queue.setSession(sessionID, active && connected && !creatingSession() && history.ready() && directory.ready());
@@ -486,17 +522,14 @@
       return awaitCurrent(request, modelRefresh);
     }
     function loadPending() {
-      var requestGeneration = generation;
-      return T.read("pending.list", function () {
-        var revision = workspaceRequests.version();
-        return T.call("pending.list", {}).then(function (value) {
-          if (requestGeneration !== generation || !connected) return;
-          var items = S.safeArray(value && value.items);
-          interactions.replacePending(items.filter(function (item) { return item.type !== "workspace"; }));
-          var workspaces = value && Array.isArray(value.workspaceRequests) ? value.workspaceRequests
-            : items.filter(function (item) { return item.type === "workspace"; });
-          if (workspaceRequests.replace(workspaces, revision)) render();
-        });
+      var requestGeneration = generation, revision = workspaceRequests.version();
+      return T.read("pending.list", function () { return T.call("pending.list", {}); }).then(function (value) {
+        if (requestGeneration !== generation || !connected) return;
+        var items = S.safeArray(value && value.items);
+        interactions.replacePending(items.filter(function (item) { return item.type !== "workspace"; }));
+        var workspaces = value && Array.isArray(value.workspaceRequests) ? value.workspaceRequests
+          : items.filter(function (item) { return item.type === "workspace"; });
+        if (workspaceRequests.replace(workspaces, revision)) render();
       });
     }
     function loadAuthentication() {
@@ -530,15 +563,16 @@
       return history.load(recoveryAttempt);
     }
     function loadEarlier() { return history.loadEarlier(); }
-    function select(id, nextDraftProjectID) {
+    function select(id, nextDraftProjectID, nextDraftSlot) {
       var target = directory.get(id);
       if (!id) draftChoice = nextDraftProjectID || null;
       var nextProject = id ? target && target.projectID || null : draftProject();
-      if (id === sessionID && nextProject === projectID) return Promise.resolve();
+      var slot = id ? "new" : nextDraftSlot || "new";
+      if (id === sessionID && nextProject === projectID && (id || slot === draftSlot)) return Promise.resolve();
       navigationRevision++; sessionNavigation++;
       if (mentions) mentions.hide();
       if (slashCommands) slashCommands.hide();
-      saveDraft(); sessionID = id || null; projectID = nextProject; refreshPending(); history.setSession(sessionID);
+      saveDraft(); sessionID = id || null; projectID = nextProject; draftSlot = slot; refreshPending(); history.setSession(sessionID);
       delete loadFailures.history;
       running = !!(directory.get(sessionID) || {}).running;
       interactions.setSession(creatingSession() ? null : sessionID);
@@ -546,6 +580,7 @@
       message = "";
       if (pending && pending.projectID === projectID && pending.sessionId === sessionID && pending.error) message = pending.error;
       selected[projectKey(projectID)] = sessionID; persist(); loadDraft(); render();
+      if (paneObserver && paneObserver.sessionChanged) paneObserver.sessionChanged(sessionID);
       if (sessionID) return loadHistory().catch(showError);
       return Promise.resolve();
     }
@@ -564,26 +599,58 @@
         if (ticket === sessionNavigation) showError(error);
       });
     }
+    function locateInConversation(id, reveal, missing) {
+      function locate(attempt) {
+        if (id !== sessionID) return;
+        if (reveal()) return;
+        if (attempt >= 10 || !history.snapshot().hasMore) {
+          message = missing; render(); return;
+        }
+        var before = history.snapshot().beforeSeq;
+        return loadEarlier().then(function () {
+          if (history.snapshot().beforeSeq === before) return;
+          return locate(attempt + 1);
+        });
+      }
+      return locate(0);
+    }
     function openSessionAt(id, seq) {
       return openSession(id).then(function () {
-        function locate(attempt) {
-          if (id !== sessionID) return;
-          if (conversation.revealSequence && conversation.revealSequence(seq)) return;
-          if (attempt >= 10 || !history.snapshot().hasMore) {
-            message = "请继续加载更早的消息以查看匹配位置。"; render(); return;
-          }
-          var before = history.snapshot().beforeSeq;
-          return loadEarlier().then(function () {
-            if (history.snapshot().beforeSeq === before) return;
-            return locate(attempt + 1);
-          });
-        }
-        return locate(0);
+        return locateInConversation(id, function () { return conversation.revealSequence(seq); },
+          "请继续加载更早的消息以查看匹配位置。");
       });
     }
-    function newSession(nextProjectID) {
-      select(null, nextProjectID || null);
+    function locateAgent(id) {
+      return locateInConversation(sessionID, function () { return conversation.revealAgent(id); },
+        "当前历史中未找到该 Agent 的派发记录，请加载更早的消息。");
+    }
+    function newSession(nextProjectID, slot) {
+      select(null, nextProjectID || null, slot);
       message = ""; render(); view.input.focus();
+    }
+    function newAgentDraft(options) {
+      options = options || {};
+      var project = options.projectID || S.defaultProjectID(page);
+      var incoming = typeof options.input === "string" ? options.input : "";
+      var available = agentDirectory && agentDirectory.list({ sessionID: null, projectID: project }) || [];
+      var target = AgentMentions && AgentMentions.labels(available).find(function (entry) {
+        return options.installationID ? entry.agent.installationID === options.installationID
+          : options.providerID && entry.agent.providerID === options.providerID;
+      });
+      var requested = options.installationID || options.providerID || "";
+      var fallback = String(options.providerID || options.installationID || "").replace(/[\]\n\r]/g, " ").trim();
+      var token = target ? AgentMentions.tokenOf(target) : requested && fallback ? "@[" + fallback + "]" : "";
+      var text = [token, incoming].filter(Boolean).join(" ");
+      var current = drafts[JSON.stringify([project, "new"])];
+      if (!sessionID && projectID === project && draftSlot === "new") {
+        saveDraft(); current = drafts[JSON.stringify([project, "new"])];
+      }
+      var slot = current && M.retainsDraft(current) ? "agent:" + T.requestID() : "new";
+      newSession(project, slot);
+      view.input.value = text;
+      if (options.permissionMode === "read-only" || options.permissionMode === "full") permissions.choose(options.permissionMode);
+      if (requested && !target) message = "该 Agent 当前不可用，请在 @ 列表中重新选择。";
+      saveDraft(); S.autoGrowTextArea(view.input); validate(); view.input.focus();
     }
     function selectProvider(providerID) {
       if (running || pending) return false;
@@ -594,31 +661,60 @@
       return true;
     }
     function showError(error) { message = error && error.message || "工作台操作失败。"; render(); }
+    function showMessage(text) { message = text; render(); }
+    function captureDispatch() {
+      saveDraft();
+      return { projectID: projectID, paths: attachmentPaths.slice() };
+    }
+    function dispatchAttempt(project, id, attemptKey, label) {
+      var key = JSON.stringify([project, id]), draft = drafts[key] || {};
+      var attempts = draft.dispatchAttempts || (draft.dispatchAttempts = {}), attempt = attempts[attemptKey];
+      if (!attempt) {
+        attempt = { operationID: T.requestID(), childID: T.requestID(), label: label };
+        attempts[attemptKey] = attempt; drafts[key] = draft; persist();
+      }
+      return attempt;
+    }
+    // After a message to Agents: what remains of the draft (nothing, when every Agent took it).
+    function finishDispatch(remaining, clearAttachments, settled) {
+      var draft = drafts[currentDraftKey()];
+      if (draft && draft.dispatchAttempts) {
+        settled.forEach(function (key) { delete draft.dispatchAttempts[key]; });
+        if (!Object.keys(draft.dispatchAttempts).length) delete draft.dispatchAttempts;
+      }
+      view.input.value = remaining;
+      if (clearAttachments) { attachmentPaths = []; attachmentRefs = []; attachmentItems = []; attachmentError = ""; draftSelectionEdited = false; }
+      saveDraft(); S.autoGrowTextArea(view.input); updateAttachments(); validate();
+    }
     function modelSelection() {
       try { var values = JSON.parse(view.model.value); return { provider: values[0], model: values[1], reasoningEffort: view.effort.value || undefined }; }
       catch (_) { return null; }
     }
-    async function ensureCommandSession() {
+    async function ensureCommandSession(skipModel) {
       if (sessionID) return sessionID;
       if (!connected || commandPreparing || pending) throw new Error("会话正在准备中，请稍后重试。");
       if (!projectID) throw new Error("默认工作区尚未就绪，请稍后重试。");
-      var id = T.requestID(), project = projectID, revision = navigationRevision;
+      var id = T.requestID(), project = projectID, revision = navigationRevision, slot = draftSlot;
       var preset = permissionState.selected, selection = modelSelection();
       commandPreparing = true; message = "正在准备会话…"; render();
       try {
         var created = await T.call("session.create", { sessionId: id, projectID: project });
         if (!created || created.sessionId !== id) throw new Error("会话身份未能确认，请重试。");
         if (preset) await permissions.apply(id, preset);
-        if (selection) await T.call("session.selectModel", Object.assign({ sessionId: id }, selection));
+        if (selection && !skipModel) await T.call("session.selectModel", Object.assign({ sessionId: id }, selection));
         directory.upsert(id, project);
-        if (revision === navigationRevision && project === projectID && !sessionID) {
-          saveDraft(); var oldKey = currentDraftKey(); sessionID = id;
-          if (drafts[oldKey]) { drafts[currentDraftKey()] = drafts[oldKey]; delete drafts[oldKey]; }
+        var followsDraft = revision === navigationRevision && project === projectID && !sessionID;
+        if (followsDraft) saveDraft();
+        var oldKey = JSON.stringify([project, slot]), newKey = JSON.stringify([project, id]);
+        if (drafts[oldKey]) { drafts[newKey] = drafts[oldKey]; delete drafts[oldKey]; }
+        if (followsDraft) {
+          sessionID = id;
+          if (paneObserver && paneObserver.sessionChanged) paneObserver.sessionChanged(sessionID);
           selected[projectKey(projectID)] = id; history.setSession(id, true);
           interactions.setSession(id); permissions.open(id, null, connected); refreshPending();
           message = ""; persist(); render();
         }
-        listSessions().catch(showError); return id;
+        persist(); listSessions().catch(showError); return id;
       } finally { commandPreparing = false; render(); }
     }
     function ownsPendingView(job, origin) {
@@ -627,6 +723,7 @@
     function followPendingSession(job, origin) {
       if (!ownsPendingView(job, origin) || sessionID === job.sessionId) return;
       sessionID = job.sessionId; history.setSession(sessionID, true); selected[projectKey(projectID)] = sessionID;
+      if (paneObserver && paneObserver.sessionChanged) paneObserver.sessionChanged(sessionID);
       interactions.setSession(creatingSession() ? null : sessionID);
       refreshPending();
       permissions.open(sessionID, null, job.phase !== "permission" && job.phase !== "create" && connected); persist();
@@ -716,6 +813,7 @@
     function submit() {
       if (view.send.disabled || pending) return;
       var text = view.input.value;
+      if (dispatcher && dispatcher.submit(text, attachmentRefs.length)) return;
       if (!running && !attachmentPaths.length && !attachmentRefs.length && actions.isCommand && actions.isCommand(text)) {
         view.input.value = ""; saveDraft(); S.autoGrowTextArea(view.input); validate();
         if (!actions.executeCommand(text)) {
@@ -773,9 +871,11 @@
           updateModels();
           if (item.payload && item.payload.error) message = item.payload.error;
           else message = "";
-          if (!eventListener) refreshModels = true;
+          if (!eventListener || configuration.storageKey) refreshModels = true;
         }
-        if (item.type === "models.changed" && !eventListener) refreshModels = true;
+        if ((item.type === "models.changed" || item.type === "community.models.changed")
+            && (!eventListener || configuration.storageKey)) refreshModels = true;
+        if (item.type === "models.refreshFailed" && item.payload && item.payload.message) message = item.payload.message;
         if (item.type === "session/title" || item.type === "session/created" || item.type === "status") refreshSessions = true;
         if (!item.sessionID || item.sessionID === sessionID) {
           var change = history.receive(item);
@@ -819,7 +919,9 @@
     function poll(token, retries) {
       if (!active || token !== generation) return;
       retries = retries || 0;
-      T.call("events", { after: cursor, timeoutMs: 20000 }, { timeoutMs: 30000 }).then(function (value) {
+      var request = paneObserver ? paneObserver.pollEvents(cursor)
+        : T.call("events", { after: cursor, timeoutMs: 20000 }, { timeoutMs: 30000 });
+      request.then(function (value) {
         if (!active || token !== generation) return;
         applyEvents(value, retries > 0); poll(token);
       }).catch(function (error) {
@@ -877,8 +979,9 @@
         failEngine(error);
       });
     }
-    function update(nextPage, nextEmit, enabled, nextServiceConnected, workbenchDisabled) {
+    function update(nextPage, nextEmit, enabled, nextServiceConnected, workbenchDisabled, connections) {
       page = nextPage || {}; emit = nextEmit; T.configure(emit);
+      if (agentDirectory) agentDirectory.setDraft(connections);
       if (workbenchDisabled) {
         var changed = false;
         jobs.list().forEach(function (job) {
@@ -899,7 +1002,7 @@
       var nextProject = draftProject();
       if (projectInitialized && !sessionID && nextProject !== projectID) {
         if (composing) {
-          deferredUpdate = [nextPage, nextEmit, enabled, nextServiceConnected, workbenchDisabled];
+          deferredUpdate = [nextPage, nextEmit, enabled, nextServiceConnected, workbenchDisabled, connections];
           if (!activeChanged) return;
         } else {
           moveDraftToProject(nextProject);
@@ -907,7 +1010,7 @@
       } else if (!projectInitialized) {
         navigationRevision++; sessionNavigation++;
         projectID = nextProject;
-        sessionID = null;
+        sessionID = null; draftSlot = typeof saved.activeDraftSlot === "string" ? saved.activeDraftSlot : "new";
         projectInitialized = true; refreshPending();
         message = "";
         running = false;
@@ -967,7 +1070,7 @@
     view.input.addEventListener("compositionstart", function () { composing = true; });
     view.input.addEventListener("compositionend", function () {
       composing = false; saveDraft();
-      if (deferredUpdate) { var next = deferredUpdate; deferredUpdate = null; update(next[0], next[1], next[2], next[3], next[4]); }
+      if (deferredUpdate) { var next = deferredUpdate; deferredUpdate = null; update(next[0], next[1], next[2], next[3], next[4], next[5]); }
     });
     view.input.addEventListener("keydown", function (event) {
       if (mentions && mentions.keydown(event)) return;
@@ -1066,7 +1169,7 @@
     restart.addEventListener("click", function () { restartEngine().catch(function () {}); });
     updateAttachments();
     return { root: root, sidebar: sidebar, toolbarContext: toolbarContext, toolbarActions: toolbarActions, searchRoot: search && search.root,
-      update: update, newSession: newSession,
+      update: update, newSession: newSession, newAgentDraft: newAgentDraft,
       addAttachment: addAttachment, refreshModels: listModels, refreshSessions: listSessions,
       currentSessionID: function () { return sessionID; }, showError: showError,
       navigationIdentity: function () { return JSON.stringify([sessionID, projectID, navigationRevision]); },
@@ -1080,6 +1183,31 @@
       restart: restartEngine,
       setEventListener: function (listener) { eventListener = listener; },
       setSubagentsListener: function (listener) { subagentsListener = listener; },
+      setPaneObserver: function (observer) { paneObserver = observer; },
+      setSessionChoiceHandler: function (handler) { sessionChoiceHandler = handler; },
+      setNewSessionChoiceHandler: function (handler) { newSessionChoiceHandler = handler; },
+      savedSessionID: function () { return saved.activeSessionID; },
+      sessionDirectoryReady: directory.ready,
+      selectPaneSession: function (item) {
+        pendingOpenSession = null;
+        directory.seed(item);
+        return select(item.sessionId);
+      },
+      revealPaneSequence: openSessionAt,
+      showPaneDraft: function () {
+        pendingOpenSession = null; sessionNavigation++;
+        if (sessionID) select(null);
+      },
+      resetPaneDraft: function () {
+        select(null, null, draftSlot);
+        delete drafts[currentDraftKey()];
+        loadDraft(); persist(); render(); view.input.focus();
+      },
+      setSidebarSession: function (id) { if (sidebarSessionID !== id) { sidebarSessionID = id; render(); } },
+      sessionItems: function () { return directory.items(); },
+      childItems: function () { return interactions.children ? interactions.children() : []; },
+      mountChildPane: function (id, host) { return interactions.mountChild && interactions.mountChild(id, host); },
+      releaseChildPane: function (id) { if (interactions.releaseChild) interactions.releaseChild(id); },
       interaction: interaction, subagents: subagents };
   }
   global.CodexBridgeDesktopEmbeddedDSH = { create: create, pauseSavedOperations: pauseSavedOperations };

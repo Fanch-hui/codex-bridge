@@ -55,6 +55,7 @@ extension BridgeDesktopUIStateBuilder {
       } ?? task.workbenchTitle,
       projectName: model.projectName(for: task.projectID),
       source: task.sourceDisplayName,
+      sourceKind: task.workbenchSourceKind.rawValue,
       status: BridgeDesktopUIStateBuilder.displayStatus(task, model: model),
       isTerminal: task.isTerminal,
       provider: task.providerDisplayName,

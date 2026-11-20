@@ -1,0 +1,11 @@
+.workbench-sources { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 8px 8px; border-bottom: 1px solid var(--separator); }
+.workbench-sources[hidden] { display: none; }
+.workbench-client-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.button.workbench-client-status-item { display: inline-flex; align-items: center; gap: 4px; min-width: 26px; min-height: 26px; padding: 3px 5px; border-color: transparent; background: transparent; box-shadow: none; color: var(--text-secondary); }
+.button.workbench-client-status-item.has-problem { color: var(--warning); }
+.button.workbench-client-status-item .icon { width: 14px; height: 14px; }
+.workbench-client-symbol, .workbench-source-badge { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; background: var(--surface-muted); font-size: 10px; font-weight: 600; }
+.workbench-client-problem { font-size: 11px; }
+.workbench-source-filter { max-width: 120px; min-height: 26px; font-size: 11px; }
+.workbench-source-badges { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 3px; color: var(--text-secondary); }
+.workbench-source-label { font-size: 10px; white-space: nowrap; }

@@ -24,47 +24,49 @@ extension SimpleServiceStore {
         guard try Self.projectRow(id: projectID, in: db) != nil else {
           throw ServiceStoreError.unknownProject(projectID)
         }
-        if let row = try Self.executionGroup(projectID: projectID, in: db) {
-          guard row["root_session_id"] as String? == sessionID else {
-            throw ServiceStoreError.activeWriteTaskExists(projectID)
+        let existingGroup = try Self.executionGroup(projectID: projectID, in: db)
+        let groupID: String = existingGroup?["group_id"] ?? "dsh:" + UUID().uuidString.lowercased()
+        if existingGroup != nil, try !Self.hasExecutionRoots(groupID, in: db) {
+          throw ServiceStoreError.activeWriteTaskExists(projectID)
+        }
+        if let root = try Self.executionRoot(sessionID: sessionID, in: db) {
+          guard root["group_id"] as String == groupID else {
+            throw ServiceStoreError.invalidArgument("dsh.executionOwner")
           }
-          guard row["root_closing"] as Int == 0 else {
+          guard root["root_closing"] as Int == 0 else {
             throw ServiceStoreError.invalidArgument("dsh.executionClosing")
           }
-          if permissionMode == .readOnly {
-            let activeWriteChild = try Int.fetchOne(
-              db,
-              sql: """
-                SELECT 1 FROM bridge_service_tasks
-                WHERE execution_group_id = ? AND permission_mode = 'workspace-write'
-                  AND queue_state = 'active' AND status IN (
-                    'awaiting_local_approval', 'starting', 'running',
-                    'waiting_for_codex_approval', 'unknown') LIMIT 1
-                """,
-              arguments: [row["group_id"] as String]
-            )
-            guard activeWriteChild == nil else {
-              throw ServiceStoreError.invalidArgument("dsh.permissionModeBusy")
-            }
+        }
+        if permissionMode == .readOnly {
+          let writer = try Int.fetchOne(
+            db,
+            sql: """
+              SELECT 1 FROM bridge_service_tasks t
+              JOIN bridge_service_embedded_dsh_inputs i ON i.task_id = t.task_id
+              WHERE i.parent_session_id = ? AND t.permission_mode = 'workspace-write'
+                AND t.queue_state = 'active' AND t.status IN
+                  ('awaiting_local_approval', 'starting', 'running', 'waiting_for_codex_approval', 'unknown')
+              LIMIT 1
+              """, arguments: [sessionID])
+          guard writer == nil else {
+            throw ServiceStoreError.invalidArgument("dsh.permissionModeBusy")
           }
+        }
+        if existingGroup == nil {
           try db.execute(
             sql: """
-              UPDATE bridge_service_execution_groups SET root_active = 1, root_permission_mode = ?
-              WHERE project_id = ?
-              """,
-            arguments: [permissionMode.rawValue, projectID.rawValue]
-          )
-          return row["group_id"]
+              INSERT INTO bridge_service_execution_groups
+                (project_id, group_id, root_active, root_closing) VALUES (?, ?, 0, 0)
+              """, arguments: [projectID.rawValue, groupID])
         }
-        let groupID = "dsh:" + UUID().uuidString.lowercased()
         try db.execute(
           sql: """
-            INSERT INTO bridge_service_execution_groups
-              (project_id, group_id, root_session_id, root_active, root_closing, root_permission_mode)
-            VALUES (?, ?, ?, 1, 0, ?)
-            """,
-          arguments: [projectID.rawValue, groupID, sessionID, permissionMode.rawValue]
-        )
+            INSERT INTO bridge_service_execution_roots
+              (group_id, root_session_id, root_active, root_closing, root_permission_mode)
+            VALUES (?, ?, 1, 0, ?)
+            ON CONFLICT(root_session_id) DO UPDATE SET root_active = 1,
+              root_permission_mode = excluded.root_permission_mode
+            """, arguments: [groupID, sessionID, permissionMode.rawValue])
         return groupID
       }
     } catch let error as ServiceStoreError {
@@ -79,12 +81,14 @@ extension SimpleServiceStore {
     do {
       try database.write { db in
         guard let group = try Self.executionGroup(projectID: projectID, in: db) else { return }
-        guard group["root_session_id"] as String? == sessionID else {
+        guard let root = try Self.executionRoot(sessionID: sessionID, in: db) else { return }
+        guard root["group_id"] as String == group["group_id"] as String else {
           throw ServiceStoreError.invalidArgument("dsh.executionOwner")
         }
         try db.execute(
-          sql: "UPDATE bridge_service_execution_groups SET root_closing = 1 WHERE project_id = ?",
-          arguments: [projectID.rawValue]
+          sql:
+            "UPDATE bridge_service_execution_roots SET root_closing = 1 WHERE root_session_id = ?",
+          arguments: [sessionID]
         )
       }
     } catch let error as ServiceStoreError {
@@ -99,13 +103,15 @@ extension SimpleServiceStore {
     do {
       try database.write { db in
         guard let group = try Self.executionGroup(projectID: projectID, in: db) else { return }
-        guard group["root_session_id"] as String? == sessionID else {
+        guard let root = try Self.executionRoot(sessionID: sessionID, in: db) else { return }
+        guard root["group_id"] as String == group["group_id"] as String else {
           throw ServiceStoreError.invalidArgument("dsh.executionOwner")
         }
         let groupID: String = group["group_id"]
         try db.execute(
-          sql: "UPDATE bridge_service_execution_groups SET root_active = 0 WHERE project_id = ?",
-          arguments: [projectID.rawValue]
+          sql:
+            "UPDATE bridge_service_execution_roots SET root_active = 0 WHERE root_session_id = ?",
+          arguments: [sessionID]
         )
         try Self.releaseInactiveExecutionGroup(groupID, in: db)
       }
@@ -120,7 +126,11 @@ extension SimpleServiceStore {
     do {
       return try database.read { db in
         guard let row = try Self.executionGroup(projectID: projectID, in: db) else { return nil }
-        return row["root_session_id"] as String?
+        return try String.fetchOne(
+          db,
+          sql:
+            "SELECT root_session_id FROM bridge_service_execution_roots WHERE group_id = ? ORDER BY root_session_id LIMIT 1",
+          arguments: [row["group_id"] as String])
       }
     } catch {
       throw ServiceStoreError.storageFailure
@@ -133,7 +143,7 @@ extension SimpleServiceStore {
         try Int.fetchOne(
           db,
           sql:
-            "SELECT COUNT(*) FROM bridge_service_execution_groups WHERE root_session_id IS NOT NULL"
+            "SELECT COUNT(*) FROM bridge_service_execution_roots"
         ) ?? 0
       }
     } catch {
@@ -147,9 +157,9 @@ extension SimpleServiceStore {
         let rows = try Row.fetchAll(
           db,
           sql: """
-            SELECT project_id, group_id, root_session_id, root_active, root_closing, root_permission_mode
-            FROM bridge_service_execution_groups WHERE root_session_id IS NOT NULL
-            ORDER BY project_id
+            SELECT g.project_id, r.* FROM bridge_service_execution_roots r
+            JOIN bridge_service_execution_groups g USING (group_id)
+            ORDER BY g.project_id, r.root_session_id
             """
         )
         return try rows.map(Self.decodeEmbeddedDSHExecution)
@@ -167,7 +177,8 @@ extension SimpleServiceStore {
       return try database.read { db in
         try Row.fetchOne(
           db,
-          sql: "SELECT * FROM bridge_service_execution_groups WHERE root_session_id = ?",
+          sql:
+            "SELECT g.project_id, r.* FROM bridge_service_execution_roots r JOIN bridge_service_execution_groups g USING (group_id) WHERE r.root_session_id = ?",
           arguments: [sessionID]
         ).map(Self.decodeEmbeddedDSHExecution)
       }
@@ -240,11 +251,36 @@ extension SimpleServiceStore {
     )
   }
 
+  static func executionRoot(sessionID: String, in db: Database) throws -> Row? {
+    try Row.fetchOne(
+      db, sql: "SELECT * FROM bridge_service_execution_roots WHERE root_session_id = ?",
+      arguments: [sessionID])
+  }
+
+  static func hasExecutionRoots(_ groupID: String, in db: Database) throws -> Bool {
+    try Int.fetchOne(
+      db, sql: "SELECT 1 FROM bridge_service_execution_roots WHERE group_id = ? LIMIT 1",
+      arguments: [groupID]) != nil
+  }
+
   static func releaseInactiveExecutionGroup(_ groupID: String, in db: Database) throws {
     try db.execute(
       sql: """
-        DELETE FROM bridge_service_execution_groups
+        DELETE FROM bridge_service_execution_roots
         WHERE group_id = ? AND root_active = 0 AND NOT EXISTS (
+          SELECT 1 FROM bridge_service_tasks t
+          JOIN bridge_service_embedded_dsh_inputs i ON i.task_id = t.task_id
+          WHERE i.parent_session_id = bridge_service_execution_roots.root_session_id
+            AND t.queue_state = 'active' AND t.status IN
+              ('awaiting_local_approval', 'starting', 'running', 'waiting_for_codex_approval', 'unknown')
+        )
+        """, arguments: [groupID])
+    try db.execute(
+      sql: """
+        DELETE FROM bridge_service_execution_groups
+        WHERE group_id = ? AND NOT EXISTS (
+          SELECT 1 FROM bridge_service_execution_roots r WHERE r.group_id = bridge_service_execution_groups.group_id
+        ) AND NOT EXISTS (
           SELECT 1 FROM bridge_service_tasks
           WHERE execution_group_id = ? AND queue_state = 'active'
             AND status IN ('awaiting_local_approval', 'starting', 'running',

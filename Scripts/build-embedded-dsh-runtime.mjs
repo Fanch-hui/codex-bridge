@@ -12,7 +12,9 @@ import { patchScheduleAdmission } from './embedded-dsh-schedule-patch.mjs';
 import { patchSessionController } from './embedded-dsh-session-patch.mjs';
 import { patchSessionPersistence, patchSessionQuery } from './embedded-dsh-persistence-patch.mjs';
 import { patchSiwc } from './embedded-dsh-siwc-patch.mjs';
+import { patchGatewayPiAi, patchGatewaySiwc, patchGatewayZcode } from './embedded-dsh-gateway-patch.mjs';
 import { patchContextCompaction, patchContextAgentLoop } from './patch-embedded-dsh-context.mjs';
+import { buildProviderRuntime } from './build-provider-runtime.mjs';
 
 const version = '24.11.1';
 const hashes = {
@@ -61,12 +63,16 @@ try {
     ...String(process.env.PATH ?? '').split(delimiter).map(path => join(path, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'))
   ].find(existsSync);
   if (!npmCLI) throw new Error('Node npm-cli.js was not found');
+  await buildProviderRuntime({ root, stage, platform, architecture, node: process.execPath, npmCLI, npmConfig, globalNpmConfig });
   await command(process.execPath, [npmCLI,
     'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--userconfig', npmConfig,
     '--globalconfig', globalNpmConfig, '--os', platform === 'windows' ? 'win32' : platform, '--cpu', architecture
   ], stage);
   await patchIdentity(join(stage, 'node_modules', 'dsh-plugin-chatgpt-siwc', 'lib', 'auth', 'index.js'));
   await patchSiwc(join(stage, 'node_modules', 'dsh-plugin-chatgpt-siwc'));
+  await patchGatewaySiwc(join(stage, 'node_modules', 'dsh-plugin-chatgpt-siwc', 'lib', 'provider', 'request.js'));
+  await patchGatewayPiAi(join(stage, 'node_modules', '@deepseek-ai', 'dsh-llm-pi-ai', 'lib', 'index.js'));
+  await patchGatewayZcode(join(stage, 'node_modules', 'dsh-zcode', 'lib', 'provider', 'adapter.js'));
   await patchScheduleAdmission(join(stage, 'node_modules', '@deepseek-ai', 'dsh-schedule', 'lib', 'index.js'));
   await patchSessionController(join(stage, 'node_modules', '@deepseek-ai', 'dsh-api-session-controller', 'lib', 'index.js'));
   await patchSessionPersistence(join(stage, 'node_modules', '@deepseek-ai', 'dsh-session-persistence-jsonl', 'lib', 'index.js'));
@@ -90,11 +96,16 @@ try {
   await cp(join(nodeSource, 'LICENSE'), join(stage, 'licenses', 'node', 'LICENSE'));
   await cp(join(stage, 'node_modules', 'pnpm', 'LICENSE'), join(stage, 'licenses', 'pnpm', 'LICENSE'));
   if (platform === 'windows') {
-    const modules = join(stage, 'node_modules');
-    const flattened = join(temporary, 'flat-modules');
-    await cp(modules, flattened, { recursive: true, dereference: true });
-    await rm(modules, { recursive: true });
-    await rename(flattened, modules);
+    for (const modules of [
+      join(stage, 'node_modules'),
+      join(stage, 'provider', 'agent-connections', 'node_modules')
+    ]) {
+      if (!existsSync(modules)) continue;
+      const flattened = join(temporary, `flat-${basename(dirname(modules))}-modules`);
+      await cp(modules, flattened, { recursive: true, dereference: true });
+      await rm(modules, { recursive: true });
+      await rename(flattened, modules);
+    }
   }
   const buildPlatform = process.platform === 'win32' ? 'windows' : process.platform;
   if (platform === buildPlatform && architecture === process.arch) {

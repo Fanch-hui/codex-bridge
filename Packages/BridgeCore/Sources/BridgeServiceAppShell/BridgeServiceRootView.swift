@@ -76,21 +76,39 @@ public struct BridgeServiceMenuBarView: View {
           .foregroundStyle(.green)
       }
 
-      if model.approvals.count > 0 {
-        Label("等待处理 \(model.approvals.count) 项安全审批", systemImage: "exclamationmark.shield.fill")
-          .font(.caption)
-          .foregroundStyle(.orange)
+      if model.approvals.count + model.directApprovals.count > 0 {
+        Label(
+          "等待处理 \(model.approvals.count + model.directApprovals.count) 项安全审批",
+          systemImage: "exclamationmark.shield.fill"
+        )
+        .font(.caption)
+        .foregroundStyle(.orange)
       }
 
       Divider()
 
-      Button("打开工作台") {
-        model.selection = .workbench
+      Button("打开管理") {
         showMainWindow()
       }
 
-      Button("打开主窗口") {
-        showMainWindow()
+      Button("待处理审批") {
+        model.selection = .overview
+        if model.isLightweightMode == true {
+          let coordinator = BridgeDesktopWindowCoordinator.shared
+          let open = coordinator.showMainWindow()
+          coordinator.openMain(destination: .init(kind: .lightweightActivity, value: ""))
+          if !open { openWindow(id: mainWindowID) }
+        } else {
+          showMainWindow()
+        }
+      }
+
+      Button(model.isModelGatewayEnabled == true ? "暂停模型网关" : "启动模型网关") {
+        model.toggleModelGatewayFromTray()
+      }
+
+      Button(model.isLightweightMode == true ? "切换到完整模式" : "切换到轻量模式") {
+        model.toggleApplicationModeFromTray()
       }
 
       Button("立即刷新状态") {
@@ -101,6 +119,11 @@ public struct BridgeServiceMenuBarView: View {
 
       Button("退出应用程序") {
         NSApp.terminate(nil)
+      }
+
+      Button("彻底退出并停止后台服务") {
+        showMainWindow()
+        model.quitCompletely()
       }
     }
     .padding(10)

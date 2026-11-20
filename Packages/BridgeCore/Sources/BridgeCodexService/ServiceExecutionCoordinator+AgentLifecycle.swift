@@ -37,10 +37,12 @@ extension ServiceExecutionCoordinator {
     project: ServiceProjectRecord
   ) async throws {
     guard let runner = agentRunner else {
-      throw ExecutionServiceError.processUnavailable
+      try await rejectBeforeLaunch(
+        task, error: .processUnavailable, failureCode: "agent_runner_unavailable")
     }
     guard let installationID = task.installationID else {
-      throw ExecutionServiceError.invalidRequest("installationID")
+      try await rejectBeforeLaunch(
+        task, error: .invalidRequest("installationID"), failureCode: "agent_installation_missing")
     }
     let workspaceChangeTracker: ServiceWorkspaceChangeTracker?
     let handle: AgentTaskRunHandle

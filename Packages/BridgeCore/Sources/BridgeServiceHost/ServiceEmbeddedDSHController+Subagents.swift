@@ -13,6 +13,8 @@ extension ServiceEmbeddedDSHController {
     }
     let rootID = try Self.requiredString(payload, "rootSessionID")
     let operation = try Self.requiredString(payload, "operation")
+    // The import places each record's project itself, so a root without one is not an error.
+    if operation == "round.import" { return try await subagentRoundImport(payload, rootID: rootID) }
     let rootProject: ServiceProjectRecord
     do {
       rootProject = try await project(for: rootID)
@@ -20,78 +22,48 @@ extension ServiceEmbeddedDSHController {
       guard let result = try await resultAfterProjectRemoval(operation: operation, payload: payload)
       else { throw ServiceStoreError.unknownProject(removed) }
       return result
+    } catch ServiceStoreError.invalidArgument("embedded_dsh.session") {
+      guard let result = Self.resultForRootWithoutProject(operation: operation, rootID: rootID)
+      else { throw ServiceStoreError.invalidArgument("embedded_dsh.session") }
+      return result
     }
-    if operation == "results" { return try await subagentResults(rootID: rootID) }
+    if operation.hasPrefix("round.") {
+      return try await subagentRoundOperation(
+        operation, payload: payload, rootID: rootID, projectID: rootProject.id)
+    }
     let childID = try Self.requiredString(payload, "childID")
     switch operation {
-    case "reserve":
-      return try await reserveSubagentWorkspace(
-        rootID: rootID, childID: childID,
-        requestID: Self.requiredString(payload, "requestID"), projectID: rootProject.id,
-        installationID: payload["installationID"]?.stringValue)
-    case "releaseReservation":
-      return try await releaseSubagentWorkspaceReservation(
-        rootID: rootID, childID: childID,
-        requestID: Self.requiredString(payload, "requestID"), projectID: rootProject.id)
-    case "ack":
-      try await application.acknowledgeEmbeddedDSHResult(
-        parentSessionID: rootID, childID: childID,
-        requestID: Self.requiredString(payload, "requestID"),
-        taskID: TaskID(rawValue: Self.requiredString(payload, "taskID")))
-      return .object([:])
-    case "start":
-      return try await startSubagent(
-        payload, rootID: rootID, childID: childID, projectID: rootProject.id,
-        preparation: await prepareSubagentStart(payload, projectID: rootProject.id))
-    case "probe":
-      return try await probeSubagent(payload, rootID: rootID, childID: childID)
-    case "get", "wait":
-      return try await readSubagent(
-        payload, rootID: rootID, childID: childID, waiting: operation == "wait")
-    case "send":
-      let value = try await sendSubagent(payload, rootID: rootID, childID: childID)
-      var result = value.objectValue ?? [:]
-      result["workspaceMode"] = .string(try await workspaceMode(rootID: rootID, childID: childID))
-      if let reason = try await workspaceReason(rootID: rootID, childID: childID) {
-        result["workspaceReason"] = .string(reason)
-      }
-      return .object(result)
+    case "get":
+      return try await readSubagent(payload, rootID: rootID, childID: childID)
     case "changes":
       return try await workspaceChanges(
         rootID: rootID, childID: childID, retry: payload["retryMerge"]?.boolValue == true,
         resolutions: payload["resolutions"])
-    case "stop":
-      let binding = try await child(rootID: rootID, childID: childID)
-      if let taskID = binding.currentTaskID {
-        let task = try await application.serviceTask(
-          taskID: taskID.rawValue, recentEventLimit: 1, deadline: .now.advanced(by: .seconds(40)))
-        try validateCurrentSubagentTask(
-          payload, binding: binding, taskID: task.taskID, runID: task.turnID ?? task.providerRunID)
-        try await application.serviceStopTask(
-          taskID: taskID.rawValue, deadline: .now.advanced(by: .seconds(40)))
-      }
-      return .object(["state": .string("interrupted")])
     default: throw ServiceStoreError.invalidArgument("embedded_dsh.subagent_operation")
     }
   }
 
-  /// One poll of a child. The engine retries errors, so only transient conditions escape here;
-  /// permanent ones are folded into the returned state (see `enrichWorkspaceState`).
+  /// A send with the workspace mode and reason of the child added to the receipt.
+  func sendSubagentReceipt(
+    _ payload: [String: ACPJSONValue], rootID: String, childID: String
+  ) async throws -> ACPJSONValue {
+    let value = try await sendSubagent(payload, rootID: rootID, childID: childID)
+    var result = value.objectValue ?? [:]
+    result["workspaceMode"] = .string(try await workspaceMode(rootID: rootID, childID: childID))
+    if let reason = try await workspaceReason(rootID: rootID, childID: childID) {
+      result["workspaceReason"] = .string(reason)
+    }
+    return .object(result)
+  }
+
+  /// Reads a child's selected task and history, retaining its workspace failure projection.
   private func readSubagent(
-    _ payload: [String: ACPJSONValue], rootID: String, childID: String, waiting: Bool
+    _ payload: [String: ACPJSONValue], rootID: String, childID: String
   ) async throws -> ACPJSONValue {
     let binding = try await child(rootID: rootID, childID: childID, allowPendingRecovery: true)
     let taskID = try await selectedSubagentTask(payload, rootID: rootID, binding: binding)
-    let snapshot: MCPServiceTaskSnapshot
-    if waiting {
-      snapshot = try await application.serviceWaitTask(
-        taskID: taskID.rawValue, timeoutSeconds: 20, recentEventLimit: 6,
-        deadline: .now.advanced(by: .seconds(25))
-      ).task
-    } else {
-      snapshot = try await application.serviceTask(
-        taskID: taskID.rawValue, recentEventLimit: 6, deadline: .now.advanced(by: .seconds(25)))
-    }
+    let snapshot = try await application.serviceTask(
+      taskID: taskID.rawValue, recentEventLimit: 6, deadline: .now.advanced(by: .seconds(25)))
     if let expectedRunID = payload["runID"]?.stringValue,
       expectedRunID != (snapshot.turnID ?? snapshot.providerRunID)
     {
@@ -136,7 +108,7 @@ extension ServiceEmbeddedDSHController {
     return (requestedModel, effort)
   }
 
-  private func child(rootID: String, childID: String, allowPendingRecovery: Bool = false)
+  func child(rootID: String, childID: String, allowPendingRecovery: Bool = false)
     async throws
     -> EmbeddedDSHSubagentBinding
   {

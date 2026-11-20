@@ -50,6 +50,8 @@ extension BridgeServiceRequestController {
     let endpoint = await composition.endpoint()?.localURL.absoluteString
     let exposureMode = try await composition.application.serviceExposureMode()
     let tunnel = await composition.tunnelStatus()
+    let modeStatus = try? await composition.applicationMode.status()
+    let gatewayRunning = await composition.providerGateway.isGatewayRunning()
     return IPCServiceStatusResponse(
       status: status,
       localMCPURL: endpoint,
@@ -60,7 +62,11 @@ extension BridgeServiceRequestController {
       ),
       workbenchPermissionMode: try await composition.application.serviceWorkbenchPermissionMode(
         deadline: Self.deadline()
-      ).rawValue
+      ).rawValue,
+      applicationMode: modeStatus?.mode.rawValue,
+      applicationModeTransition: modeStatus?.transition,
+      applicationModeError: modeStatus?.error,
+      modelGatewayRunning: gatewayRunning
     )
   }
 

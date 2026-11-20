@@ -210,7 +210,7 @@ extension ServiceEmbeddedDSHController {
     guard let dispatch = frozen["dispatch"]?.objectValue,
       let sessionID = record.draft.sessionID, let childID = dispatch["childId"]?.stringValue
     else { throw ServiceStoreError.invalidArgument("workbench.operation_input") }
-    guard dispatch["operation"]?.stringValue == "send" else { return }
+    guard ["send", "dispatch"].contains(dispatch["operation"]?.stringValue) else { return }
     let generation = try await store.workbenchGeneration(sessionID: sessionID)
     guard !generation.closed, generation.generation == record.generation else { return }
     let stopID = Self.cancellationStopID(record.draft.operationID)

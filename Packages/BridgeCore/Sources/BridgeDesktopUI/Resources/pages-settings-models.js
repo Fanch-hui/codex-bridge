@@ -62,6 +62,9 @@
     var access = S.selectField(
       "访问模式", page.accessMode,
       S.choices(page.accessMode, page.accessOptions), function () {}, "");
+    var modelSaved = S.trackFieldSave(model.wrapper);
+    var effortSaved = S.trackFieldSave(effort.wrapper);
+    var accessSaved = S.trackFieldSave(access.wrapper);
     var controls = {
       model: model.control,
       effort: effort.control,
@@ -103,14 +106,17 @@
 
     model.control.addEventListener("change", function () {
       updateDependent();
+      modelSaved.markPending(model.control.value);
       context.emit("setExecutionModel", { modelID: model.control.value });
     });
     effort.control.addEventListener("change", function () {
       if (!effort.control.disabled) {
+        effortSaved.markPending(effort.control.value);
         context.emit("setExecutionEffort", { effort: effort.control.value });
       }
     });
     access.control.addEventListener("change", function () {
+      accessSaved.markPending(access.control.value);
       context.emit("setAccessMode", { accessMode: access.control.value });
     });
     toggle.control.addEventListener("change", function () {
@@ -130,12 +136,16 @@
         access: next.accessMode,
         enabled: next.fastModeEnabled
       });
+      modelSaved.confirm(next.executionModel, !!next.modelError);
+      effortSaved.confirm(next.executionEffort, !!next.modelError);
+      accessSaved.confirm(next.accessMode, !!next.modelError);
       model.control.disabled = !next.canSavePreferences;
       access.control.disabled = !next.canSavePreferences;
       modelStatus.textContent = modelRefreshStatus(next);
       modelStatus.hidden = !next.isRefreshingModels && !next.modelError;
       var count = modelCount(next);
       refreshModels.textContent = next.isRefreshingModels ? "获取中…" : count > 0 ? "刷新模型" : "获取模型";
+      refreshModels.setAttribute("aria-busy", String(!!next.isRefreshingModels));
       refreshModels.disabled = next.isRefreshingModels === true || next.canRefreshModels === false;
       updateDependent();
     }

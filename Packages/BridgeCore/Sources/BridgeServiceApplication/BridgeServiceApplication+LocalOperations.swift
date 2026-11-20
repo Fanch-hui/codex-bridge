@@ -168,17 +168,15 @@ extension BridgeServiceApplication {
   ) async throws {
     try Self.checkDeadline(deadline)
     let id = TaskID(rawValue: taskID)
-    if let task = try await tasks.task(id: id) {
-      if task.state.status == .unknown, try await tasks.isEmbeddedDSHTask(id) {
-        throw EmbeddedDSHRecoveryError.pendingProcessReconciliation(taskID: id)
-      }
-      if task.isQueued {
-        _ = try await tasks.interrupt(
-          taskID: id,
-          summary: "The queued task was cancelled before execution started."
-        )
-        return
-      }
+    if try await tasks.interruptIfQueued(
+      taskID: id, summary: "The queued task was cancelled before execution started.")
+    {
+      return
+    }
+    if try await tasks.task(id: id)?.state.status == .unknown,
+      try await tasks.isEmbeddedDSHTask(id)
+    {
+      throw EmbeddedDSHRecoveryError.pendingProcessReconciliation(taskID: id)
     }
     await coordinator.stop(taskID: id)
   }

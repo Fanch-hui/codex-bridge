@@ -9,6 +9,13 @@
     private var closed = false
     private var transfers = 0
     private var descriptorClosed = false
+    private var hasReceivedFrame = false
+
+    public var receivedAnyFrame: Bool {
+      condition.lock()
+      defer { condition.unlock() }
+      return hasReceivedFrame
+    }
 
     public init(descriptor: Int32) {
       self.descriptor = descriptor
@@ -58,7 +65,7 @@
     public func writeFrame(
       kind: UInt8, payload: Data, register: () throws -> Void = {}
     ) throws {
-      guard payload.count <= BridgeServiceIPC.maximumMessageBytes else {
+      guard payload.count <= ServiceFrameKind.maximumPayloadBytes(for: kind) else {
         throw LinuxSocketError.invalidFrame
       }
       writeLock.lock()
@@ -85,13 +92,18 @@
 
     public func readFrame() throws -> (kind: UInt8, payload: Data) {
       let header = try readFully(5)
+      let kind = header[0]
       let length = header.withUnsafeBytes {
         $0.loadUnaligned(fromByteOffset: 1, as: UInt32.self).littleEndian
       }
-      guard length <= BridgeServiceIPC.maximumMessageBytes else {
+      guard Int(length) <= ServiceFrameKind.maximumPayloadBytes(for: kind) else {
         throw LinuxSocketError.invalidFrame
       }
-      return (header[0], try readFully(Int(length)))
+      let payload = try readFully(Int(length))
+      condition.lock()
+      hasReceivedFrame = true
+      condition.unlock()
+      return (kind, payload)
     }
 
     private func readFully(_ count: Int) throws -> Data {

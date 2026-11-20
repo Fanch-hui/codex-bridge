@@ -1,12 +1,8 @@
 (function (global) {
   "use strict";
-  // Lets the user pick a connected Agent and start a task by hand from the web workbench.
-  // The greeting sits in the conversation area and the composer in the shared footer,
-  // matching the workbench layout. Submission progress shows as the user's message.
-  // Every draft is its own instance: the single view keeps one behind the draft tab, and each
-  // blank split pane owns another, so several new tasks can be written and sent side by side.
+  // Keeps older drafts and receipts available while directing new Agent work to the workbench.
   var S = global.CodexBridgeDesktopPageSupport;
-  var receiptTimeoutMs = 30000, revision = 0, settingsSignature = "", onChange = null;
+  var revision = 0, settingsSignature = "", onChange = null;
 
   // Composer and form helpers load after this script, so they are resolved when used.
   function C() { return global.CodexBridgeDesktopWorkbenchComposer; }
@@ -23,7 +19,7 @@
     // A blank split pane can host the draft instead of the inspector: { body, composer }.
     var mount = null;
     var context = { page: null, emit: null, onAccepted: config.onAccepted || null };
-    var pending = null, message = "", receiptTimer = null;
+    var pending = null, message = "";
     var draft = { agentKey: "", input: "", modelID: "", effort: "" };
     // The project picked for this draft; empty means the default workspace. Not stored with the draft.
     var projectChoice = "";
@@ -34,17 +30,25 @@
           if (typeof saved[key] === "string") draft[key] = saved[key];
         });
         if (saved.pending && typeof saved.pending.requestID === "string") {
-          pending = saved.pending; message = "上次发送未确认，再次发送会沿用同一请求。"; pending.uncertain = true;
+          pending = saved.pending; message = "上次发送未确认，请先在会话列表核对。"; pending.uncertain = true;
         }
       }
     } catch (_) {}
+    var legacyDraft = !!draft.input || !!pending;
 
     function persist() {
       try { global.localStorage.setItem(storageKey, JSON.stringify(Object.assign({ pending: pending }, draft))); } catch (_) {}
     }
     function selectedAgent() {
       var list = C().agents();
-      return list.find(function (agent) { return agent.key === draft.agentKey; }) || list[0] || null;
+      return list.find(function (agent) { return agent.key === draft.agentKey; }) || (!draft.agentKey && list[0]) || null;
+    }
+    function savedAgent() {
+      var agent = selectedAgent();
+      if (agent || !draft.agentKey) return agent;
+      if (draft.agentKey === "codex") return { providerID: "codex", installationID: null };
+      var separator = draft.agentKey.indexOf(":");
+      return separator < 0 ? null : { providerID: draft.agentKey.slice(0, separator), installationID: draft.agentKey.slice(separator + 1) };
     }
     // A task's permission starts from the default for remote clients and can be changed per task.
     function permissionMode() {
@@ -68,6 +72,11 @@
       var greeting = S.node("div", "workbench-new-task-greeting");
       greeting.appendChild(S.node("h3", "dsh-chat-empty-title"));
       hero.appendChild(greeting);
+      var launch = S.button("在工作台开始", null, {}, null, "small primary workbench-new-task-open");
+      launch.addEventListener("click", function () {
+        if (!openWorkbench()) { message = "工作台暂不可用，请稍后重试。"; if (view) update(); }
+      });
+      hero.appendChild(launch);
       var thread = S.node("div", "dsh-chat-conversation workbench-new-task-thread"); thread.hidden = true;
       hero.appendChild(thread);
 
@@ -92,7 +101,7 @@
         persist(); S.autoGrowTextArea(composer.input); validate();
       });
       composer.root.hidden = true;
-      return { hero: hero, title: greeting.firstChild, greeting: greeting, thread: thread, composer: composer,
+      return { hero: hero, title: greeting.firstChild, greeting: greeting, launch: launch, thread: thread, composer: composer,
         agent: agent.control, project: project.control, projectWrapper: project.wrapper };
     }
 
@@ -100,13 +109,14 @@
       if (!view) view = build();
       var host = mount ? mount.composer : (config.inline ? null : document.getElementById("workbench-inspector-footer"));
       if (host && view.composer.root.parentNode !== host) host.appendChild(view.composer.root);
-      view.composer.root.hidden = !open && !mount;
+      view.composer.root.hidden = !legacyDraft || !open && !mount;
       return view;
     }
 
     function update() {
       if (!view) return;
       var list = C().agents(), agent = selectedAgent(), composer = view.composer;
+      composer.root.hidden = !legacyDraft || !open && !mount;
       forms().selectOptions(view.agent, list.length ? list.map(function (item) { return { id: item.key, title: item.title }; })
         : [{ id: "", title: "暂无可用 Agent" }], false);
       view.agent.value = agent ? agent.key : "";
@@ -118,13 +128,15 @@
       C().setPermission(composer, permissionMode(), !agent || agent.readOnly);
       if (composer.input.value !== draft.input && document.activeElement !== composer.input) composer.input.value = draft.input;
       var project = projectTitle();
-      view.title.textContent = project ? "想让 Agent 在 " + project + " 中完成什么？" : "想让 Agent 完成什么？";
+      view.title.textContent = legacyDraft ? (project ? "想让 Agent 在 " + project + " 中完成什么？" : "想让 Agent 完成什么？")
+        : "前往工作台开始新任务";
+      view.launch.hidden = legacyDraft;
       updateThread();
       S.autoGrowTextArea(composer.input);
       validate();
     }
 
-    // While the task is being created the user's message is already shown, like a native chat.
+    // An earlier pending submission retains its visible message until its receipt arrives.
     function updateThread() {
       var sending = !!pending && !pending.uncertain && pending.payload;
       view.greeting.hidden = !!sending; view.thread.hidden = !sending;
@@ -143,8 +155,8 @@
     function blocker() {
       var agent = selectedAgent(), text = view.composer.input.value;
       if (!targetProject()) return "还没有可用的项目，请先添加工作文件夹。";
-      if (!agent) return "暂无可用 Agent，请先在连接页启用并连接。";
-      if (permissionMode() === "read-only" && !agent.readOnly) return agent.title + " 仅支持完整权限。";
+      if (!agent && !draft.agentKey) return "暂无可用 Agent，请先在连接页启用并连接。";
+      if (agent && permissionMode() === "read-only" && !agent.readOnly) return agent.title + " 仅支持完整权限。";
       if (text.indexOf("\u0000") >= 0 || new TextEncoder().encode(text).length > 32768) return "指令不能包含 NUL，且不能超过 32 KB。";
       return "";
     }
@@ -159,27 +171,33 @@
       C().setHint(composer, message || (typed ? reason : "") || (selectedAgent() && selectedAgent().errorMessage) || "");
     }
 
+    function openWorkbench(options) {
+      var destination = global.CodexBridgeDesktopDSHWorkbench;
+      if (!destination || !destination.openAgentDraft) return false;
+      options = options || {};
+      var agent = null;
+      if (options.installationID || options.providerID) agent = options;
+      else if (draft.agentKey) agent = savedAgent();
+      else if (draft.input) agent = selectedAgent();
+      return destination.openAgentDraft({
+        projectID: options.projectID || targetProject(),
+        installationID: agent && agent.installationID || null,
+        providerID: agent && agent.providerID || null,
+        input: options.input === undefined ? draft.input : options.input,
+        modelID: options.modelID || draft.modelID || null,
+        effort: options.effort || draft.effort || null,
+        permissionMode: options.permissionMode || permissionMode()
+      });
+    }
     function submit() {
       if (!view || view.composer.action.disabled) return;
-      var agent = selectedAgent(), composer = view.composer;
-      var payload = { projectID: targetProject(), providerID: agent.providerID, input: composer.input.value,
-        modelID: composer.model.value || null, effort: composer.effort.value || null, permissionMode: permissionMode() };
-      if (agent.installationID) payload.installationID = agent.installationID;
-      // An unconfirmed request is resent with its original ID so the service can deduplicate it.
-      var reuse = pending && pending.uncertain && JSON.stringify(pending.payload) === JSON.stringify(payload);
-      pending = { requestID: reuse ? pending.requestID : global.CodexBridgeDesktopWorkbenchSubmissions.newRequestID(),
-        payload: payload };
-      message = ""; persist();
-      composer.input.value = ""; S.autoGrowTextArea(composer.input);
-      updateThread(); validate();
-      if (receiptTimer) global.clearTimeout(receiptTimer);
-      receiptTimer = global.setTimeout(function () {
-        if (!pending) return;
-        pending.uncertain = true; persist();
-        message = "发送未确认，请先在会话列表核对；再次发送会沿用同一请求。";
-        restoreInput(); updateThread(); validate();
-      }, receiptTimeoutMs);
-      context.emit("submitAgentTask", payload, pending.requestID);
+      draft.input = view.composer.input.value; persist();
+      var agent = savedAgent();
+      if (!openWorkbench({ projectID: targetProject(), installationID: agent && agent.installationID,
+        providerID: agent && agent.providerID, input: draft.input, modelID: view.composer.model.value,
+        effort: view.composer.effort.value, permissionMode: permissionMode() })) {
+        message = "工作台暂不可用，请稍后重试。"; validate();
+      }
     }
     function restoreInput() {
       if (view && !view.composer.input.value) { view.composer.input.value = draft.input; S.autoGrowTextArea(view.composer.input); }
@@ -188,10 +206,10 @@
     function acknowledge(page) {
       var receipt = page && page.commandReceipt;
       if (!pending || !receipt || receipt.command !== "submitAgentTask" || receipt.requestID !== pending.requestID) return;
-      if (receiptTimer) { global.clearTimeout(receiptTimer); receiptTimer = null; }
       if (receipt.accepted === true) {
         var taskID = receipt.resultingTaskID;
         pending = null; message = ""; draft.input = ""; delete draft.permissionMode; projectChoice = ""; persist();
+        legacyDraft = false;
         if (view) { view.composer.input.value = ""; updateThread(); }
         if (context.onAccepted) context.onAccepted(taskID || null);
         api.close();
@@ -208,7 +226,7 @@
 
     function clear(full) {
       if (pending) return;
-      draft.input = ""; delete draft.permissionMode; message = ""; projectChoice = "";
+      draft.input = ""; legacyDraft = false; delete draft.permissionMode; message = ""; projectChoice = "";
       if (full) { draft.agentKey = ""; draft.modelID = ""; draft.effort = ""; }
       persist();
       if (view) { view.composer.input.value = ""; changed(); }
@@ -220,13 +238,14 @@
       // `options.projectID` starts the draft in that project, otherwise the current choice stays;
       // `options.focus === false` keeps the keyboard focus where the user just clicked.
       open: function (options) {
-        if (options && options.projectID) { projectChoice = options.projectID; changed(); if (view && (open || mount)) update(); }
+        if (!options || !options.inPlace) return openWorkbench(options);
+        if (options.projectID) { projectChoice = options.projectID; changed(); if (view && (open || mount)) update(); }
         if (!open) { open = true; changed(); notify(); }
-        if (options && options.focus === false) return;
-        api.focus();
+        if (options.focus !== false) api.focus();
+        return true;
       },
       focus: function () {
-        global.setTimeout(function () { if (view && (open || mount)) view.composer.input.focus(); }, 0);
+        global.setTimeout(function () { if (view && (open || mount)) (legacyDraft ? view.composer.input : view.launch).focus(); }, 0);
       },
       close: function () {
         if (!open) return;
@@ -267,14 +286,8 @@
     return api;
   }
 
-  // The single view's draft. In the split view new tasks open in a pane instead.
+  // The single view retains any draft and receipt from earlier versions.
   var single = createDraft({ storageKey: "codexbridge.workbench.new-task.v1" });
-  var singleOpen = single.open;
-  single.open = function (options) {
-    var panes = global.CodexBridgeDesktopWorkbenchPanes;
-    if (panes && panes.isSplit()) { panes.openDraft(options); return; }
-    singleOpen(options);
-  };
   single.create = createDraft;
   single.revision = function () { return revision; };
   single.setOnChange = function (handler) { onChange = handler; };

@@ -1,3 +1,4 @@
+import { WorkspaceWriteDomains } from './workspace-write-domains.mjs';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFile, rename, writeFile } from 'node:fs/promises';
@@ -33,6 +34,8 @@ export class WorkspaceWrites {
     this.scopes = new WorkspaceProcessScopes(home);
     this.recovery = new WorkspaceWriteRecovery(this);
     this.pools = new Map();
+    this.domains = new WorkspaceWriteDomains(this);
+    this.nextWaiter = 0;
     this.processContext = new AsyncLocalStorage();
     this.terminalRuntime = { release: async agent => {
       const terminals = this.ctx.get?.('terminals');
@@ -47,7 +50,7 @@ export class WorkspaceWrites {
   pool(rootID) {
     let pool = this.pools.get(rootID);
     if (!pool) {
-      pool = { holders: new Map(), waiters: [], revoked: new Set(), processes: new Set(), settlements: new Set() };
+      pool = { holders: new Map(), waiters: [], revoked: new Set(), processes: new Set(), settlements: new Set(), quiescence: [] };
       this.pools.set(rootID, pool);
     }
     return pool;
@@ -61,6 +64,7 @@ export class WorkspaceWrites {
         throw new Error('Invalid workspace write lease index');
       }
       for (const row of rows) {
+        if (row.workspaceID) this.domains.bind(row.rootID, row.workspaceID);
         const pool = this.pool(row.rootID);
         if (pool.holders.has(row.ownerID)) throw new Error('Duplicate workspace write lease');
         pool.holders.set(row.ownerID, { ...row, persistent: true, refs: 1, workflows: 0,
@@ -124,7 +128,7 @@ export class WorkspaceWrites {
     const task = this.persistQueue.then(async () => {
       const rows = [];
       for (const [rootID, pool] of this.pools) for (const holder of pool.holders.values()) {
-        if (holder.persistent) rows.push({ rootID, ownerID: holder.ownerID, token: holder.token,
+        if (holder.persistent) rows.push({ rootID, workspaceID: this.domains.key(rootID), ownerID: holder.ownerID, token: holder.token,
           ...(holder.scopeID ? { scopeID: holder.scopeID } : {}) });
       }
       const temporary = `${this.path}.tmp`;
@@ -151,14 +155,29 @@ export class WorkspaceWrites {
     if (!validID(rootID) || !validID(ownerID)) throw new Error('A session and write owner are required');
   }
 
-  async acquire(rootID, ownerID, { signal, persistent = false, reentrant = false, retainedAgent, retainedRuntime,
+  async acquire(rootID, ownerID, options = {}) {
+    let token;
+    const acquire = async () => { token = await this.acquireLease(rootID, ownerID, options); return token; };
+    try {
+      if (!this.runtimeAdmission) return await acquire();
+      const hold = JSON.stringify([rootID, ownerID]);
+      return options.runtimeSlot
+        ? await this.runtimeAdmission.suspendExternal({ ...options.runtimeSlot, signal: options.signal }, acquire, { hold })
+        : await this.runtimeAdmission.suspend(acquire, { hold });
+    } catch (error) {
+      if (token && this.holder(rootID, ownerID)?.token === token) await this.release(rootID, ownerID, token);
+      throw error;
+    }
+  }
+
+  async acquireLease(rootID, ownerID, { signal, persistent = false, reentrant = false, retainedAgent, retainedRuntime,
     allowWorkflowWait = false } = {}) {
     this.validate(rootID, ownerID);
     if (this.disposed) throw new Error('Workspace write coordinator is closed');
     signal?.throwIfAborted();
     const pool = this.pool(rootID);
     if (pool.revoked.has(ownerID)) throw new Error('Workspace write owner was cancelled');
-    if (this.requiresRecovery(rootID)) throw recoveryRequired();
+    if (this.domains.roots(rootID).some(id => this.requiresRecovery(id))) throw recoveryRequired();
     const owned = pool.holders.get(ownerID);
     if (owned && (owned.refs > 0 || !owned.retained)) {
       if (owned.ready) await owned.ready;
@@ -186,6 +205,7 @@ export class WorkspaceWrites {
             throw error;
           } finally { holder.ready = undefined; }
         }
+        this.runtimeAdmission?.unpin(JSON.stringify([rootID, previousOwner]));
         return holder.token;
       }
     }
@@ -193,10 +213,11 @@ export class WorkspaceWrites {
       throw workflowBusy();
     }
     return new Promise((resolve, reject) => {
-      const waiter = { ownerID, persistent, signal, resolve, reject, allowWorkflowWait };
+      const waiter = { ownerID, persistent, signal, resolve, reject, allowWorkflowWait, order: ++this.nextWaiter };
       waiter.abort = () => {
         const index = pool.waiters.indexOf(waiter);
         if (index >= 0) pool.waiters.splice(index, 1);
+        this.settleQuiescence(rootID);
         reject(signal.reason ?? new Error('Workspace write request cancelled'));
       };
       signal?.addEventListener('abort', waiter.abort, { once: true });
@@ -205,9 +226,11 @@ export class WorkspaceWrites {
     });
   }
 
-  drain(rootID) {
+  drain(rootID) { this.domains.drain(rootID); }
+
+  drainRoot(rootID) {
     const pool = this.pool(rootID);
-    if (this.disposed || pool.clearing || (!pool.waiters.length && !pool.notifyWhenFree)) return;
+    if (this.disposed || pool.clearing || (!pool.waiters.length && !pool.notifyWhenFree && !pool.quiescence.length)) return;
     if (pool.holders.size) {
       if (pool.holders.size !== 1) return;
       const holder = [...pool.holders.values()][0];
@@ -219,9 +242,11 @@ export class WorkspaceWrites {
         try { await this.release(rootID, holder.ownerID, holder.token); }
         catch (error) { holder.retained = retained; throw error; }
         pool.clearing = false;
+        this.settleQuiescence(rootID);
         this.drain(rootID);
       }).catch(error => {
         pool.clearing = false;
+        for (const waiter of pool.quiescence.splice(0)) waiter.reject(error);
         for (const waiter of pool.waiters.splice(0)) {
           waiter.signal?.removeEventListener('abort', waiter.abort);
           waiter.reject(error);
@@ -230,6 +255,7 @@ export class WorkspaceWrites {
       return;
     }
     if (!pool.waiters.length) {
+      this.settleQuiescence(rootID);
       pool.notifyWhenFree = false;
       this.onAvailable(rootID);
       return;
@@ -270,11 +296,13 @@ export class WorkspaceWrites {
       try { await this.persist(); } catch (error) { holder.persistent = true; throw error; }
     }
     pool.holders.delete(ownerID);
+    this.runtimeAdmission?.unpin(JSON.stringify([rootID, ownerID]));
     if (holder.scopeRecord) holder.scopeRecord.active = false;
     if (holder.scopeID) {
       try { this.scopes.remove(holder.scopeID); }
       catch (error) { process.stderr.write(`Workspace process metadata cleanup failed: ${error.message}\n`); }
     }
+    this.settleQuiescence(rootID);
     this.drain(rootID);
   }
 
@@ -296,9 +324,18 @@ export class WorkspaceWrites {
   }
 
   async quiesce(rootID) {
-    const ownerID = `settle:${randomUUID()}`;
-    const token = await this.acquire(rootID, ownerID, { allowWorkflowWait: true });
-    await this.release(rootID, ownerID, token);
+    const pool = this.pool(rootID);
+    if (!pool.holders.size && !pool.waiters.length && !pool.clearing) return;
+    await new Promise((resolve, reject) => {
+      pool.quiescence.push({ resolve, reject });
+      this.drain(rootID);
+    });
+  }
+
+  settleQuiescence(rootID) {
+    const pool = this.pool(rootID);
+    if (pool.holders.size || pool.waiters.length || pool.clearing) return;
+    for (const waiter of pool.quiescence.splice(0)) waiter.resolve();
   }
 
   enterWorkflow(rootID, holder) {
@@ -312,24 +349,24 @@ export class WorkspaceWrites {
     }
   }
 
-  async acquireForSession({ sessionId, ownerId, wait }, signal) {
+  async acquireForSession({ sessionId, ownerId, wait, runtimeAdmission }, signal) {
     const rootID = await this.sessions.rootID(sessionId);
     if (rootID !== sessionId) throw new Error('The workspace owner must be a root session');
     this.validate(rootID, ownerId);
     const pool = this.pool(rootID);
     if (pool.revoked.has(ownerId)) throw new Error('Workspace write owner was cancelled');
-    if (this.requiresRecovery(rootID)) {
+    if (this.domains.roots(rootID).some(id => this.requiresRecovery(id))) {
       if (wait === false) return { acquired: false, reason: 'recovery-required' };
       throw recoveryRequired();
     }
     const existing = pool.holders.get(ownerId);
     if (existing?.refs > 0) return { acquired: true, token: existing.token };
-    if (wait === false && (pool.holders.size || pool.waiters.length || pool.clearing)) {
+    if (wait === false && this.domains.busy(rootID)) {
       pool.notifyWhenFree = true;
       this.drain(rootID);
       return { acquired: false };
     }
-    return { acquired: true, token: await this.acquire(rootID, ownerId, { signal }) };
+    return { acquired: true, token: await this.acquire(rootID, ownerId, { signal, runtimeSlot: runtimeAdmission }) };
   }
 
   async releaseForSession({ sessionId, ownerId, token }) {
@@ -367,7 +404,7 @@ export class WorkspaceWrites {
     }
     const holder = pool.holders.get(ownerId);
     if (holder) await this.release(rootID, ownerId, holder.token);
-    else this.drain(rootID);
+    else { this.settleQuiescence(rootID); this.drain(rootID); }
     return { accepted: true };
   }
 
@@ -410,7 +447,7 @@ export class WorkspaceWrites {
         };
         const otherActive = (rootID !== exec.agent.id && active(rootID)) ||
           peers.some(peer => peer.id !== exec.agent.id && (peer.kind === 'diagnostic' || active(peer.id))) ||
-          this.sessions.bridgeAgents?.hasRunning(rootID);
+          await this.sessions.bridgeAgents?.hasRunning(rootID);
         if (otherActive) throw new Error('Finish the current code step before waiting for another agent using this workspace.');
       }
     }
@@ -490,9 +527,11 @@ export class WorkspaceWrites {
     this.removeExecute?.();
     this.removeSpawn?.();
     this.removeTerminal?.();
-    for (const pool of this.pools.values()) for (const waiter of pool.waiters.splice(0)) {
-      waiter.signal?.removeEventListener('abort', waiter.abort);
-      waiter.reject(new Error('Workspace write coordinator is closed'));
+    for (const pool of this.pools.values()) {
+      for (const waiter of [...pool.waiters.splice(0), ...pool.quiescence.splice(0)]) {
+        waiter.signal?.removeEventListener('abort', waiter.abort);
+        waiter.reject(new Error('Workspace write coordinator is closed'));
+      }
     }
   }
 }

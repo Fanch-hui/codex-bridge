@@ -27,13 +27,13 @@
       if (save.disabled) return;
       var values = draft.values();
       if (!values.tunnelID || !values.runtimeKey) return;
+      S.setButtonPending(save, true, "连接中…", "保存并启动连接");
       context.emit("configureTunnel", {
         tunnelID: values.tunnelID,
         runtimeKey: values.runtimeKey
       });
       key.control.value = "";
       draft.update({ tunnelID: id.control.value, runtimeKey: "" });
-      validate();
     });
     return {
       root: form,
@@ -45,6 +45,7 @@
       update: function (tunnel, nextEmit) {
         context.canConfigure = !!tunnel.canConfigure;
         context.emit = nextEmit;
+        S.setButtonPending(save, false, null, "保存并启动连接");
         draft.update({ tunnelID: tunnel.tunnelID || "", runtimeKey: "" });
         validate();
       }
@@ -68,9 +69,12 @@
     }
     proxy.control.addEventListener("input", validate);
     proxy.control.addEventListener("compositionend", validate);
+    var pendingProxy = null;
     save.addEventListener("click", function () {
       if (!save.disabled) {
-        context.emit("setTunnelHTTPProxy", { httpProxy: draft.values().httpProxy.trim() || null });
+        pendingProxy = draft.values().httpProxy.trim() || "";
+        S.setButtonPending(save, true, "保存中…", "保存代理");
+        context.emit("setTunnelHTTPProxy", { httpProxy: pendingProxy || null });
       }
     });
     return { root: form, update: function (tunnel, nextEmit) {
@@ -78,6 +82,11 @@
       context.canSetHTTPProxy = tunnel.canSetHTTPProxy === true;
       context.httpProxy = tunnel.httpProxy || "";
       draft.update({ httpProxy: context.httpProxy });
+      if (pendingProxy !== null) {
+        if (context.httpProxy === pendingProxy) S.flashButtonSuccess(save, "已保存");
+        else S.setButtonPending(save, false, null, "保存代理");
+        pendingProxy = null;
+      }
       proxy.control.disabled = !context.canSetHTTPProxy;
       validate();
     } };
@@ -183,6 +192,7 @@
         return;
       }
       var selected = getProvider(values.providerID);
+      S.setButtonPending(register, true, "登记中…", "按上方路径登记");
       context.emit("registerAgent", {
         providerID: values.providerID,
         displayName: values.displayName,
@@ -200,6 +210,7 @@
         context.providers = S.safeArray(providers);
         context.enabled = !!enabled;
         context.emit = nextEmit;
+        S.setButtonPending(register, false, null, "按上方路径登记");
         D.selectOptions(provider.control, context.providers.map(function (item) {
           return { id: item.providerID, title: item.displayName, detail: item.detail };
         }));

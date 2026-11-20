@@ -28,6 +28,12 @@ extension BridgeServiceClient {
     }
   }
 
+  public func messageCenterSecret(_ request: IPCMessageCenterSecretRequest) async throws
+    -> IPCMessageCenterSecretResponse
+  {
+    try await call(operation: .messageCenterSecret, payload: request)
+  }
+
   private static func mapAppUpdateCompatibilityError(_ error: Error) -> Error {
     guard let codecError = error as? BridgeServiceIPCCodecError else { return error }
     switch codecError {

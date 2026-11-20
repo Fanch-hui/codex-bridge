@@ -24,6 +24,53 @@
     return !source || !source.kind || source.kind === "user" || source.kind === "user-rpc";
   }
 
+  // Notices the engine writes into the parent session for an Agent the user handed a task to directly.
+  // A result notice is its summary line followed by the result.
+  function noticeText(message, summary) {
+    var text = textOf(message.content || message).trim();
+    if (typeof summary === "string" && summary && text.indexOf(summary) === 0) text = text.slice(summary.length).trim();
+    return text.slice(0, 32768);
+  }
+
+  // A dispatch notice reads "<summary>：<instruction>\n（Bridge 子 Agent <child>，请求 …）": the instruction is between.
+  function dispatchText(message, source, childID) {
+    var text = textOf(message.content || message).trim(), summary = String(source.summary || "");
+    if (summary && text.indexOf(summary) === 0) text = text.slice(summary.length).replace(/^[：:]\s*/, "");
+    var tail = text.lastIndexOf("\n（Bridge 子 Agent " + childID);
+    return (tail >= 0 ? text.slice(0, tail) : text).trim().slice(0, 32768);
+  }
+
+  function noticeState(summary) {
+    var found = /finished \((\w+)\)/.exec(typeof summary === "string" ? summary : "");
+    return found ? found[1] : "";
+  }
+
+  // Plugin records and their later user messages refer to the same notice; older sessions can also contain inbox notices.
+  function agentNotice(message, id, entries, dispatches, results, seenNotices) {
+    var source = message && message.source;
+    if (!source || !["subagent-dispatch", "subagent-settled", "workbench-import"].includes(source.kind)) return false;
+    if (message.id && seenNotices.has(message.id)) return true;
+    if (message.id) seenNotices.add(message.id);
+    if (source.kind === "workbench-import") {
+      entries.push({ id: id, kind: "workbench-import", taskID: source.taskID, title: source.summary || "来自网页工作台",
+        text: textOf(message.content || message) });
+      return true;
+    }
+    var childID = typeof source.senderSessionId === "string" ? source.senderSessionId : "";
+    if (!childID) return true;
+    if (source.kind === "subagent-settled") {
+      results.set(childID, { state: noticeState(source.summary), text: noticeText(message, source.summary) });
+      return true;
+    }
+    if (dispatches.has(childID)) return true;
+    var text = dispatchText(message, source, childID);
+    var entry = { id: id, kind: "agent-dispatch", childID: childID, installationID: String(source.installationID || ""),
+      requestID: String(source.requestId || ""), label: String(source.summary || "").replace(/^用户直接交给 /, ""),
+      text: text || String(source.summary || "") };
+    dispatches.set(childID, entry); entries.push(entry);
+    return true;
+  }
+
   function projectJob(jobs, entries, id, event, data) {
     var jobID = data.jobId == null ? "event:" + id : String(data.jobId);
     var job = jobs.get(jobID);
@@ -57,7 +104,7 @@
   }
 
   function project(records) {
-    var entries = [], tools = new Map(), jobs = new Map();
+    var entries = [], tools = new Map(), jobs = new Map(), dispatches = new Map(), results = new Map(), seenNotices = new Set();
     (records || []).forEach(function (record) {
       var event = record && (record.event || record), data = event && event.data || {};
       if (!event || !event.type) return;
@@ -69,6 +116,7 @@
       }
       if (event.type === "user/message" || event.type === "assistant/message") {
         var message = data.message || data;
+        if (event.type === "user/message" && agentNotice(message, id, entries, dispatches, results, seenNotices)) return;
         if (event.type === "user/message" && !isUserInput(message)) return;
         var blocks = message.content || message;
         if (event.type === "assistant/message" && Array.isArray(blocks)) {
@@ -81,6 +129,12 @@
         if (!content && event.type === "assistant/message") content = stream({ activeAttempt: { stream: data.stream } }).text;
         if (content) entries.push({ id: id, kind: "message", role: event.type.indexOf("user/") === 0 ? "用户" : "助手", text: content,
           contentRef: contentReference("message.text") });
+      } else if (event.type === "plugin:codex-bridge/subagent-notice") {
+        agentNotice(data.message, id, entries, dispatches, results, seenNotices);
+      } else if (event.type === "agent/inbox/spliced") {
+        (Array.isArray(data.inserted) ? data.inserted : []).forEach(function (queued) {
+          agentNotice(queued, id, entries, dispatches, results, seenNotices);
+        });
       } else if (event.type === "tool/call") {
         var callID = String(data.callId || data.toolCallId || id);
         var tool = { id: id, callID: callID, kind: "tool", name: data.name || "工具", input: data.arguments || data.input || "", output: "", status: "运行中",
@@ -106,6 +160,10 @@
       } else if (event.type === "turn/end" && data.reason && (data.reason.kind || data.reason) !== "completed") {
         entries.push({ id: id, kind: "status", text: data.message || data.reason.kind || data.reason });
       }
+    });
+    results.forEach(function (result, childID) {
+      var dispatch = dispatches.get(childID);
+      if (dispatch) dispatch.result = result;
     });
     return bounded(attachJobs(entries, tools));
   }

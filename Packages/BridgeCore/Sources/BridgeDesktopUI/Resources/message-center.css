@@ -1,23 +1,24 @@
 .message-center-entry { position: relative; flex: 0 0 auto; width: 28px; height: 28px; padding: 5px; }
-.message-center-entry .icon { width: 17px; height: 17px; }
+.message-center-entry .icon { width: 16px; height: 16px; }
 .message-center-badge {
-  position: absolute; top: -2px; right: -5px; min-width: 15px; height: 15px; padding: 0 3px;
-  border-radius: 8px; color: var(--on-primary); background: var(--error); font-size: 10px;
+  position: absolute; top: -1px; right: -4px; min-width: 15px; height: 15px; padding: 0 3.5px;
+  border-radius: var(--radius-pill); color: #ffffff; background: var(--error); font-size: 10px;
   font-weight: 600; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 1.5px var(--sidebar);
 }
 .message-center-dialog { width: min(780px, calc(100vw - 40px)); height: min(620px, calc(100dvh - 40px)); }
 .component-dialog .message-center-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; }
 .message-center-toolbar { display: flex; align-items: center; gap: 8px; padding: 0 24px 12px; border-bottom: 1px solid var(--separator); }
 .message-center-tabs { display: flex; flex: 1 1 auto; align-items: center; gap: 4px; min-width: 0; }
-.message-center-tab { padding: 5px 10px; border: 0; border-radius: 6px; color: var(--text-secondary); background: transparent; font: inherit; cursor: pointer; }
-.message-center-tab:hover { background: var(--surface-muted); color: var(--text); }
-.message-center-tab.is-selected { color: var(--text); background: var(--surface-pressed); font-weight: 600; }
+.message-center-tab { padding: 5px 10px; border: 0; border-radius: var(--control-radius); color: var(--text-secondary); background: transparent; font: inherit; font-weight: 500; cursor: pointer; transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out); }
+.message-center-tab:hover { background: var(--surface-hover); color: var(--text); }
+.message-center-tab.is-selected { color: var(--text); background: var(--sidebar-selection); font-weight: 600; }
 .message-center-tab:focus-visible, .message-center-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .message-center-status { margin: 0; padding: 8px 24px; color: var(--text-secondary); font-size: var(--font-size-caption); border-bottom: 1px solid var(--separator); }
 .message-center-layout { display: grid; flex: 1 1 auto; grid-template-columns: minmax(180px, 32%) minmax(0, 1fr); min-height: 0; }
-.message-center-list { min-width: 0; min-height: 0; overflow-y: auto; border-right: 1px solid var(--separator); }
-.message-center-row { display: grid; position: relative; width: 100%; gap: 3px; padding: 11px 24px 11px 16px; border: 0; border-bottom: 1px solid var(--separator); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.message-center-row:hover { background: var(--surface-muted); }
+.message-center-list { min-width: 0; min-height: 0; overflow-y: auto; border-right: 1px solid var(--separator); background: var(--surface-subtle); }
+.message-center-row { display: grid; position: relative; width: 100%; gap: 3px; padding: 11px 24px 11px 16px; border: 0; border-bottom: 1px solid var(--separator); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color var(--duration-fast) var(--ease-out); }
+.message-center-row:hover { background: var(--surface-hover); }
 .message-center-row.is-selected { background: var(--accent-soft); }
 .message-center-row-title { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .message-center-row-meta, .message-center-meta { color: var(--text-secondary); font-size: var(--font-size-caption); }
@@ -31,9 +32,10 @@
 .message-center-notice-action { margin-top: 16px; }
 .message-center-feedback-detail { display: flex; flex: 1 1 auto; flex-direction: column; }
 .message-center-conversation { flex: 1 1 auto; min-height: 80px; overflow-y: auto; overscroll-behavior: contain; }
-.message-center-conversation-item { padding: 0 0 16px; }
-.message-center-conversation-meta { margin-bottom: 5px; color: var(--text-secondary); font-size: var(--font-size-caption); }
-.message-center-conversation-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.message-center-conversation-item { padding: 10px 12px; border: 1px solid var(--separator); border-radius: var(--control-radius); background: var(--surface-subtle); }
+.message-center-conversation-item + .message-center-conversation-item { margin-top: 10px; }
+.message-center-conversation-meta { margin-bottom: 4px; color: var(--text-secondary); font-size: var(--font-size-2xs); font-weight: 500; }
+.message-center-conversation-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
 .message-center-form { display: grid; align-content: start; gap: 12px; }
 .message-center-feedback-detail > .message-center-form { flex: 0 0 auto; padding-top: 12px; border-top: 1px solid var(--separator); }
 .message-center-field textarea { min-height: 80px; max-height: 220px; resize: vertical; }

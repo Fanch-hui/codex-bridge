@@ -16,9 +16,6 @@ public enum CodexIsolatedLaunch {
   /// Cached after a probe verifies writes, child-process inheritance and symlink handling.
   public static var isAvailable: Bool { availability }
 
-  /// Codex currently accesses project files through command processes.
-  public static var supportsFileOnlyExecution: Bool { false }
-
   public static func prepare(
     configuration: AppServerConfiguration,
     workspaceRoot: URL,
@@ -231,7 +228,7 @@ public enum CodexIsolatedLaunch {
         .replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }
 
-    private static func profile(workspace: URL, runtime: URL, allowsSubprocesses: Bool = false)
+    private static func profile(workspace: URL, runtime: URL)
       throws -> String
     {
       let home = runtime.appendingPathComponent("home", isDirectory: true)
@@ -242,7 +239,6 @@ public enum CodexIsolatedLaunch {
         + "(deny file-write* (literal \(try quotedPath(home.path)))"
         + " (literal \(try quotedPath(home.appendingPathComponent("config.toml").path)))"
         + " (regex #\"/[.]codex(/.*)?$\"))"
-        + (allowsSubprocesses ? "" : "(deny process-fork)")
     }
 
     private static func probe() -> Bool {
@@ -282,7 +278,7 @@ public enum CodexIsolatedLaunch {
         let process = Process()
         process.executableURL = sandboxExecutable
         process.arguments = [
-          "-p", try profile(workspace: workspace, runtime: runtime, allowsSubprocesses: true),
+          "-p", try profile(workspace: workspace, runtime: runtime),
           "/bin/sh", "-c", command, "sh", workspace.path, runtime.path, protected.path,
         ]
         process.standardOutput = FileHandle.nullDevice

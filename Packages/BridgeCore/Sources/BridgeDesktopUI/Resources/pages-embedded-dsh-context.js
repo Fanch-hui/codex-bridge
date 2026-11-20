@@ -10,8 +10,9 @@
     var source = S.node("p", "hint dsh-context-source"), limit = S.node("p", "hint dsh-context-limit");
     var contextWindow = S.textField("上下文窗口（tokens）", "", ""), threshold = S.textField("自动压缩阈值（tokens）", "", "");
     var actions = S.node("div", "form-actions"), feedback = S.node("p", "hint dsh-context-feedback");
-    var save = S.button("保存", null, null, null, "small"), reset = S.button(isSession ? "跟随全局" : "恢复默认", null, null, null, "small");
+    var save = S.button("保存", null, null, null, "small primary"), reset = S.button(isSession ? "跟随全局" : "恢复默认", null, null, null, "small");
     var retry = S.button("重试", null, null, null, "small");
+    var activeAction = null;
     feedback.setAttribute("role", "status");
     [contextWindow, threshold].forEach(function (field) {
       field.control.inputMode = "numeric";
@@ -25,10 +26,14 @@
     save.addEventListener("click", function () {
       var policy;
       try { policy = readInputs(); } catch (error) { showFeedback(error.message); return; }
-      void setPolicy(policy);
+      void setPolicy(policy, save, "保存中…", "保存");
     });
-    reset.addEventListener("click", function () { void setPolicy(null); });
-    retry.addEventListener("click", function () { void refresh(); });
+    reset.addEventListener("click", function () {
+      void setPolicy(null, reset, "恢复中…", isSession ? "跟随全局" : "恢复默认");
+    });
+    retry.addEventListener("click", function () {
+      S.runButtonAction(retry, "读取中…", refresh);
+    });
     syncControls();
 
     function readInputs() {
@@ -85,10 +90,12 @@
         stale = true; showFeedback(error && error.message || "读取上下文设置失败，请重试。"); syncControls();
       });
     }
-    function setPolicy(policy) {
+    function setPolicy(policy, triggerButton, pendingLabel, idleLabel) {
       if (busy || !state || isSession && !sessionID) return Promise.resolve();
       var current = revision;
-      ++request; busy = true; refreshPending = false; showFeedback(""); syncControls();
+      ++request; busy = true; activeAction = triggerButton || null; refreshPending = false; showFeedback("");
+      if (activeAction && S.setButtonPending) S.setButtonPending(activeAction, true, pendingLabel, idleLabel);
+      syncControls();
       return T.call("context.set", payload(policy)).then(function (result) {
         if (current !== revision) return;
         dirty = false; display(result, true); showFeedback("已保存。");
@@ -97,7 +104,8 @@
         showFeedback(error && error.message || "保存失败，请重试。");
       }).finally(function () {
         if (current !== revision) return;
-        busy = false; syncControls();
+        if (activeAction && S.setButtonPending) S.setButtonPending(activeAction, false, null, idleLabel);
+        activeAction = null; busy = false; syncControls();
         if (refreshPending) { refreshPending = false; void refresh(); }
       });
     }

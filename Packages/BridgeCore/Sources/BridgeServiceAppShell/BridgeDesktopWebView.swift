@@ -127,6 +127,11 @@ struct BridgeDesktopWebView: NSViewRepresentable {
       updateThrottle.schedule { [weak self] in self?.refreshFromModel() }
     }
 
+    private func flushUpdate() {
+      updateThrottle.cancel()
+      refreshFromModel()
+    }
+
     private func refreshFromModel() {
       guard let model, let webView else { return }
       if surface == .preferences, !model.preferencesWindowIsVisible, latestState != nil {
@@ -292,6 +297,13 @@ struct BridgeDesktopWebView: NSViewRepresentable {
       Task { @MainActor [weak self, weak model] in
         guard let self, let model else { return }
         self.route(envelope, model: model)
+        switch envelope.command {
+        case .selectPage, .openWorkbench, .openProjects, .openConnections, .openSettings,
+          .openLogs, .openTask, .openWorkbenchSession:
+          self.flushUpdate()
+        default:
+          break
+        }
       }
     }
 

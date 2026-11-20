@@ -21,6 +21,8 @@ extension BridgeServiceRequestController {
         return .init(code: "workbench_disabled", message: "工作台已关闭，请在设置中开启。")
       }
     }
+    if let mapped = mapSubagentRoundError(error) { return mapped }
+    if let mapped = mapCommunityProviderError(error) { return mapped }
     if case .invalidArgument("workbench.workspace_recovery_required") = error as? ServiceStoreError
     {
       return .init(
@@ -57,6 +59,10 @@ extension BridgeServiceRequestController {
         code: "workbench_preflight_failed", message: error.causeMessage, retryable: false)
     }
     if let error = error as? EmbeddedDSHRuntimeError {
+      if case .remote(_, let message) = error, message.hasPrefix("project_capacity_reached:") {
+        return .init(
+          code: "project_capacity_reached", message: "项目已达到同时运行的 Agent 上限。", retryable: true)
+      }
       return .init(
         code: "embedded_dsh_runtime", message: error.localizedDescription,
         retryable: error == .startupTimedOut)
@@ -119,6 +125,28 @@ extension BridgeServiceRequestController {
     }
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
+    }
+    if let error = error as? ExternalAgentConnectionError {
+      switch error {
+      case .configurationChanged, .conflictingFields:
+        return .init(
+          code: "external_configuration_conflict",
+          message: "目标应用配置已发生变化，请检查配置后重新预览。")
+      case .editorFailed("owned_name_in_use"):
+        return .init(
+          code: "external_configuration_conflict",
+          message: "目标应用已有同名供应商配置，请检查后再试。")
+      case .invalidPreview:
+        return .init(
+          code: "external_configuration_changed",
+          message: "配置预览已失效，请重新查看配置变更。")
+      case .invalidConfiguration, .editorFailed:
+        return .init(
+          code: "external_configuration_invalid", message: "无法读取或编辑目标应用的配置文件。")
+      case .editorUnavailable, .editorProcessStillRunning:
+        return .init(
+          code: "external_configuration_unavailable", message: "目标应用配置编辑器暂不可用。")
+      }
     }
     if let error = error as? SecretStoreError {
       return mapSecretStoreError(error)
@@ -212,6 +240,15 @@ extension BridgeServiceRequestController {
       return .init(code: "invalid_client", message: "The MCP client is unsupported.")
     case .clientDisabled:
       return .init(code: "client_disabled", message: "The MCP client is disabled.")
+    case .externalStoreUnavailable:
+      return .init(
+        code: "mcp_client_store_unavailable", message: "The MCP client store is unavailable.")
+    case .invalidExternalClient:
+      return .init(
+        code: "invalid_client", message: "The external MCP client configuration is invalid.")
+    case .externalClientLimit:
+      return .init(
+        code: "mcp_client_limit", message: "The external MCP client limit has been reached.")
     }
   }
 

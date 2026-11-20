@@ -8,6 +8,7 @@ import SwiftUI
 @MainActor
 final class ChatBrowserViewportState: ObservableObject {
   @Published private(set) var viewport: BridgeDesktopBrowserViewport?
+  var loadError: String?
 
   func update(_ viewport: BridgeDesktopBrowserViewport?) {
     guard self.viewport != viewport else { return }
@@ -22,16 +23,27 @@ struct ChatBrowserOverlay: View {
   var body: some View {
     if let viewport = viewportState.viewport,
       viewport.visible,
+      viewport.width > 0,
+      viewport.height > 0,
       model.navigation == .workbench,
-      model.isChatBrowserEnabled
+      model.isChatBrowserActive
     {
+      let site = model.chatBrowserSite
+      let generation = model.chatBrowserSessions.generation
       ChatGPTWebView(
-        site: model.chatBrowserSite,
+        site: site,
         initialURL: model.chatBrowserResumeURL,
         reloadRequest: model.chatBrowserReloadRequest,
-        webViewReference: model.chatWebViewBinding(for: model.chatBrowserSite)
+        viewportSize: CGSize(width: viewport.width, height: viewport.height),
+        webViewReference: model.chatWebViewBinding(for: site),
+        onLoadError: { [weak model] message in
+          model?.setChatBrowserLoadError(message, for: site, generation: generation)
+        },
+        onNavigationChange: { [weak model] in
+          model?.notifyChatBrowserNavigationChanged(for: site, generation: generation)
+        }
       )
-      .id("\(model.chatBrowserSite.rawValue):\(model.chatBrowserSessions.generation)")
+      .id("\(site.rawValue):\(generation)")
       .frame(width: viewport.width, height: viewport.height)
       .offset(x: viewport.x, y: viewport.y)
     }

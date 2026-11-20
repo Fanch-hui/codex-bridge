@@ -1,19 +1,20 @@
 (function (global) {
   "use strict";
 
+  function create(configuration) {
   var pending = new Map(), callQueue = [], activeCalls = 0, drainingCalls = false, sequence = 0, sender = null;
   var enabled = true;
   var reads = new Map(), readQueue = [], activeReads = 0, retryDelays = [100, 250, 500];
 
   function requestID() {
-    if (global.crypto && global.crypto.randomUUID) return global.crypto.randomUUID();
-    return "dsh-" + Date.now().toString(36) + "-" + (++sequence).toString(36);
+    if (global.crypto && global.crypto.randomUUID) return configuration.prefix + global.crypto.randomUUID();
+    return (configuration.prefix || "dsh-") + Date.now().toString(36) + "-" + (++sequence).toString(36);
   }
 
   function configure(emit) { sender = emit; }
 
   function unavailable() {
-    var error = new Error("工作台当前不可用。");
+    var error = new Error(configuration.unavailable);
     error.code = "workbench_disabled";
     return error;
   }
@@ -28,13 +29,25 @@
     });
   }
 
-  function openExternalURL(value) {
+  function openExternalURL(value, localLoginPath) {
     if (!sender) throw new Error("后台 Service 未连接。");
     var url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password || url.port) {
+    var publicHTTPS = url.protocol === "https:" && !url.port;
+    var localLogin = localLoginPath && url.protocol === "http:" && url.hostname === "127.0.0.1"
+      && Number(url.port) >= 1024 && !url.search && !url.hash && localLoginPath.test(url.pathname);
+    if ((!publicHTTPS && !localLogin) || url.username || url.password) {
       throw new Error("登录地址无效，请重试。");
     }
     sender("openExternalURL", { value: url.href });
+  }
+
+  function timeoutFor(action, requested) {
+    if (configuration.command !== "providerGateway") return requested || 60000;
+    var minimum = 0;
+    if (/^plugins\.(install|update)$/.test(action)) minimum = 2160000;
+    else if (/^plugins\./.test(action)) minimum = 1860000;
+    else if (action === "provider.call" || action === "models.refresh") minimum = 660000;
+    return Math.max(requested || 60000, minimum);
   }
 
   function call(action, payload, options) {
@@ -47,7 +60,12 @@
     try { input = JSON.stringify(payload || {}); } catch (error) { return Promise.reject(error); }
     var resolveRequest, rejectRequest;
     var promise = new Promise(function (resolve, reject) { resolveRequest = resolve; rejectRequest = reject; });
-    var entry = { id: id, action: action, input: input, sender: sender, timeoutMs: options.timeoutMs || 60000,
+    var readOnly = action === "status" || ["plugins.usage", "plugins.authMethods", "plugins.catalog"].indexOf(action) !== -1 || action === "provider.call" && payload
+      && ["status", "auth.status", "models.list", "settings.get", "connections.status",
+        "configuration.status"].indexOf(payload.action) !== -1;
+    var entry = { id: id, action: action, input: input, sender: sender, command: options.command || configuration.command,
+      readOnly: readOnly,
+      timeoutMs: timeoutFor(action, options.timeoutMs),
       promise: promise, resolve: resolveRequest, reject: rejectRequest, sent: false, timer: null };
     pending.set(id, entry); callQueue.push(entry); drainCalls();
     return promise;
@@ -63,13 +81,15 @@
         entry.sent = true; activeCalls++;
         entry.timer = global.setTimeout(function (current) {
           return function () {
-            var error = new Error("请求未确认，请重试。");
+            var message = current.readOnly ? "读取供应商状态超时，请稍后刷新。"
+              : "请求未收到确认，请查看当前状态后再操作。";
+            var error = new Error(message);
             error.code = "embedded_dsh_transport_timeout";
             finishCall(current, true, error);
           };
         }(entry), entry.timeoutMs);
         if (entry.timer && entry.timer.unref) entry.timer.unref();
-        try { entry.sender("embeddedDSH", { action: entry.action, input: entry.input }, entry.id); }
+        try { entry.sender(entry.command, { action: entry.action, input: entry.input }, entry.id); }
         catch (error) { finishCall(entry, true, error); }
       }
     } finally { drainingCalls = false; }
@@ -136,7 +156,7 @@
 
   function canRetryRead(entry, error) {
     if (!error) return false;
-    if (error.code === "busy" && error.retryable === true) return true;
+    if ((error.code === "busy" || error.code === "community_provider_busy") && error.retryable === true) return true;
     if (!/^startup\.(status|graph)(:|$)/.test(entry.key)) return false;
     return error.code === "embedded_dsh_transport_timeout"
       || error.code === "embedded_dsh_runtime" && error.retryable === true;
@@ -157,11 +177,44 @@
       }
       var result;
       try { result = JSON.parse(receipt.resultJSON); }
-      catch (_) { finishCall(current, true, new Error("工作台引擎返回了无效结果。")); return; }
+      catch (_) { finishCall(current, true, new Error("后台服务返回了无效结果。")); return; }
       finishCall(current, false, result);
     });
   }
 
-  global.CodexBridgeDesktopEmbeddedDSHTransport = { configure: configure, setEnabled: setEnabled, call: call, read: read,
+  return { configure: configure, setEnabled: setEnabled, call: call, read: read,
     receive: receive, requestID: requestID, openExternalURL: openExternalURL };
+  }
+  global.CodexBridgeDesktopEmbeddedDSHTransport = create({ command: "embeddedDSH", prefix: "",
+    unavailable: "工作台当前不可用。" });
+  var gateway = create({ command: "providerGateway", prefix: "provider-",
+    unavailable: "供应商服务当前不可用。" });
+  gateway.openPluginLogin = function (value, plugin, provider) {
+    var localPath;
+    if (plugin && plugin.package === "magpie-providers-hub" && plugin.version === "0.13.2"
+        && (provider === "hub-astudio" || provider === "hub-loomy"
+          || provider === "hub-magicrew" || provider === "hub-magicrew-intl"
+          || provider === "hub-monkeycode" || provider === "hub-monkeycode-intl")) localPath = /^\/login$/;
+    if (plugin && plugin.package === "magpie-plugin-codar" && plugin.version === "0.3.0"
+        && provider === "codar") localPath = /^\/s\/[0-9a-f]{32}\/$/;
+    gateway.openExternalURL(value, localPath);
+  };
+  gateway.supplierTransport = function (fallback) {
+    return {
+      call: function (action, payload, options) {
+        if (fallback && (action === "configuration.status" || action === "runtime.applyWhenIdle")) {
+          return fallback.call(action, payload, options);
+        }
+        if (/^(auth|settings|models|connections)\./.test(action)
+          || action === "configuration.status" || action === "runtime.applyWhenIdle") {
+          return gateway.call("provider.call", { action: action, payload: payload || {} }, options);
+        }
+        if (fallback) return fallback.call(action, payload, options);
+        return Promise.reject(new Error("当前页面不支持此操作。"));
+      },
+      read: gateway.read,
+      openExternalURL: gateway.openExternalURL
+    };
+  };
+  global.CodexBridgeDesktopProviderGatewayTransport = gateway;
 }(window));

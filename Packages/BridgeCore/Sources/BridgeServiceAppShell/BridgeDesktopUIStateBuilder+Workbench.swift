@@ -159,6 +159,7 @@ extension BridgeDesktopUIStateBuilder {
       projectID: task.projectID,
       projectName: model.projectName(for: task.projectID),
       source: task.sourceDisplayName,
+      sourceKinds: session.sourceKinds,
       provider: task.providerDisplayName,
       providerID: task.providerIdentifier,
       status: displayStatus(task, model: model),
@@ -307,17 +308,13 @@ extension BridgeDesktopUIStateBuilder {
   private static func browserSlot(
     from model: BridgeServiceAppModel
   ) -> BridgeDesktopBrowserSlot {
-    let visible = model.navigation == .workbench && model.isChatBrowserEnabled
-    let status =
-      model.isChatBrowserEnabled
-      ? (model.chatWebView?.url?.absoluteString ?? "由宿主加载 \(model.chatBrowserSite.displayName) 工作区")
-      : "内置浏览器已关闭"
+    let visible = model.navigation == .workbench && model.isChatBrowserActive
     return BridgeDesktopBrowserSlot(
       site: model.chatBrowserSite,
       visible: visible,
       enabled: model.isChatBrowserEnabled,
       url: model.chatWebView?.url?.absoluteString ?? model.chatBrowserResumeURL.absoluteString,
-      status: status,
+      status: browserStatus(from: model),
       canToggle: true,
       canOpenExternally: true,
       canGoBack: model.chatWebView?.canGoBack == true,
@@ -325,5 +322,21 @@ extension BridgeDesktopUIStateBuilder {
       canReload: model.isChatBrowserEnabled,
       canLoadEarlierConversation: model.conversation?.canLoadEarlier == true
     )
+  }
+
+  private static func browserStatus(from model: BridgeServiceAppModel) -> String {
+    guard model.isChatBrowserEnabled else {
+      return "内置浏览器已关闭"
+    }
+    if model.isLightweightMode == true {
+      return "轻量模式下已关闭内置浏览器"
+    }
+    if model.isLightweightMode == nil {
+      return "正在等待后台服务就绪…"
+    }
+    if let loadError = model.chatBrowserLoadError {
+      return loadError
+    }
+    return "正在加载 \(model.chatBrowserSite.displayName)…"
   }
 }

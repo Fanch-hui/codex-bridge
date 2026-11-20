@@ -58,7 +58,10 @@ export function contentForEvent(event, field) {
 }
 
 export function presentEvent(event) {
-  const projected = present(event);
+  const message = event.data?.message ?? event.data;
+  const importNotice = ['plugin:codex-bridge/subagent-notice', 'user/message'].includes(event.type) &&
+    message?.source?.kind === 'workbench-import';
+  const projected = present(event, 65536, importNotice ? 60 * 1024 : 16384);
   const truncatedFields = readableFields.filter(field => {
     const original = contentForEvent(event, field);
     return original !== null && (original.length > 32768 || original !== contentForEvent(projected, field));
@@ -66,13 +69,13 @@ export function presentEvent(event) {
   return truncatedFields.length ? { ...projected, truncatedFields } : projected;
 }
 
-export function present(value, limit = 65536) {
+export function present(value, limit = 65536, stringLimit = 16384) {
   let remaining = limit;
   function visit(input, depth) {
     if (input === null || typeof input === 'boolean' || typeof input === 'number') { remaining -= 16; return input; }
     if (typeof input === 'string') {
       const bytes = Buffer.from(input);
-      const take = Math.max(0, Math.min(bytes.length, 16384, remaining));
+      const take = Math.max(0, Math.min(bytes.length, stringLimit, remaining));
       remaining -= take;
       return take === bytes.length ? input : `${bytes.subarray(0, take).toString('utf8')}…`;
     }

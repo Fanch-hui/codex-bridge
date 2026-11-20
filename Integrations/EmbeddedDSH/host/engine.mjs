@@ -8,7 +8,7 @@ import { clientRoster } from './client-roster.mjs';
 
 const hostDirectory = dirname(fileURLToPath(import.meta.url));
 
-export async function startEngine(home) {
+export async function startEngine(home, { sharedProviders = false } = {}) {
   process.env.DSH_HOME = home;
   process.env.DSH_TELEMETRY_DISABLED = '1';
   const profile = join(home, 'profiles', 'bridge');
@@ -33,12 +33,15 @@ export async function startEngine(home) {
       { id: 'session-skills', name: pathToFileURL(join(hostDirectory, 'skill-catalog.mjs')).href },
       { id: 'settings-controller', name: '@deepseek-ai/dsh-api-settings-controller' },
       { id: 'cordis-host-runner', name: '@deepseek-ai/dsh-cordis-host-runner' },
-      { id: 'chatgpt-siwc', name: pathToFileURL(join(hostDirectory, '..', 'node_modules', 'dsh-plugin-chatgpt-siwc', 'lib', 'index.js')).href },
-      { id: 'llm-zcode', name: pathToFileURL(join(hostDirectory, '..', 'node_modules', 'dsh-zcode', 'lib', 'index.js')).href },
-      { id: 'workbuddy-manager', name: pathToFileURL(join(hostDirectory, '..', 'node_modules', 'dsh-workbuddy-manager', 'lib', 'index.js')).href },
+      ...sharedProviders ? [] : [
+        { id: 'chatgpt-siwc', name: pathToFileURL(join(hostDirectory, '..', 'node_modules', 'dsh-plugin-chatgpt-siwc', 'lib', 'index.js')).href },
+        { id: 'llm-zcode', name: pathToFileURL(join(hostDirectory, '..', 'node_modules', 'dsh-zcode', 'lib', 'index.js')).href },
+        { id: 'workbuddy-manager', name: pathToFileURL(join(hostDirectory, '..', 'node_modules', 'dsh-workbuddy-manager', 'lib', 'index.js')).href }
+      ],
       ...clientRoster()
     ] }
   ];
+  if (sharedProviders) rows.push(...['llm-pi-ai', 'llm-deepseek', 'llm-deepseek-account', 'deepseek-account'].map(id => ({ id, disabled: true })));
   writeFileSync(overlay, JSON.stringify(rows));
   const pnpm = join(hostDirectory, '..', 'node_modules', 'pnpm', 'bin', 'pnpm.cjs');
   if (!existsSync(pnpm)) throw new Error('Bundled pnpm is unavailable');

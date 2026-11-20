@@ -38,6 +38,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case workbenchProjectID = "workbench.project_id"
   case defaultWorkspaceProjectID = "workspace.default_project_id"
   case workbenchEnabled = "workbench.enabled"
+  case applicationMode = "application.mode"
   case workbenchPermissionMode = "workbench.permission_mode"
   case codexExecutablePath = "codex.executable_path"
   case openCodeDefaultModel = "agent.opencode.default_model"
@@ -239,13 +240,19 @@ public actor ServiceSettings {
 
   /// Full-permission Agent tasks one project may run at once; 1 keeps them exclusive.
   public func projectWriteConcurrency() async throws -> Int {
-    guard let value = try await string(for: .projectWriteConcurrency) else {
-      return Self.defaultProjectWriteConcurrency
+    try await projectWriteConcurrencySnapshot().limit
+  }
+
+  public func projectWriteConcurrencySnapshot() async throws -> (limit: Int, revision: Double) {
+    guard
+      let record = try await store.setting(key: ServiceSettingKey.projectWriteConcurrency.rawValue)
+    else {
+      return (Self.defaultProjectWriteConcurrency, 0)
     }
-    guard let limit = Int(value), Self.projectWriteConcurrencyRange.contains(limit) else {
+    guard let limit = Int(record.value), Self.projectWriteConcurrencyRange.contains(limit) else {
       throw ServiceStoreError.corruptRecord
     }
-    return limit
+    return (limit, record.updatedAt.timeIntervalSince1970)
   }
 
   public func setProjectWriteConcurrency(_ limit: Int) async throws {

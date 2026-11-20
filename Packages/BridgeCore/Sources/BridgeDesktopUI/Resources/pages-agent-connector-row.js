@@ -76,11 +76,13 @@
     var installDirectory = S.textField("安装目录（可选）", "", "留空时使用应用管理的安装目录");
     installOptions.appendChild(installDirectory.wrapper);
 
-    function beginSetup() {
+    function beginSetup(event) {
+      var trigger = event && event.currentTarget || null;
       context.emit("beginAgentSetup", { providerID: currentProvider.providerID,
         qoderDistribution: currentProvider.providerID === "qoder" ? qoderSettings.distribution() : null,
         installationID: currentProvider.providerID === "qoder" ? qoderSettings.installationID() : null,
         installDirectory: installDirectory.control.value.trim() || null });
+      if (trigger && S.setButtonPending) S.setButtonPending(trigger, true, "正在启动…");
       setupAction.disabled = true;
       setupPrimary.disabled = true;
       setupHelp.disabled = true;
@@ -172,6 +174,9 @@
 
     function updateSetupActions(operation, noCandidate, connected) {
       var running = global.CodexBridgeDesktopAgentSetup.running(operation);
+      if (S.setButtonPending) {
+        [setupPrimary, setupHelp, setupAction].forEach(function (btn) { S.setButtonPending(btn, false); });
+      }
       setupAction.disabled = !context.canConnect || context.busy || running;
       setupPrimary.hidden = !noCandidate;
       setupPrimary.disabled = !context.canConnect || context.busy || running;
@@ -231,11 +236,12 @@
         actionBar.hidden = false;
         action.hidden = false;
         setupPrimary.hidden = setupProgress.hidden = setupHelp.hidden = true;
-        action.textContent = "处理中…";
-        action.disabled = true;
+        if (S.setButtonPending) S.setButtonPending(action, true, "处理中…");
+        else { action.textContent = "处理中…"; action.disabled = true; }
         actionHint.textContent = "正在更新本机连接状态";
         return;
       }
+      if (S.setButtonPending) S.setButtonPending(action, false);
       if (needsSetup) {
         action.hidden = setupPrimary.hidden = setupHelp.hidden = true;
         actionHint.textContent = "";

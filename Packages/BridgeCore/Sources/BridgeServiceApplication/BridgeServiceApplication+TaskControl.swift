@@ -104,25 +104,23 @@ extension BridgeServiceApplication {
   ) async throws -> MCPServiceTaskMutationReceipt {
     try Self.checkDeadline(deadline)
     let id = TaskID(rawValue: taskID)
-    guard let task = try await tasks.task(id: id) else {
-      throw BridgeMCPQueryError.taskNotFound
-    }
-    if task.isQueued {
-      do {
-        let cancelled = try await tasks.interrupt(
-          taskID: id,
-          summary: "The queued task was cancelled before provider execution started."
-        )
+    do {
+      if try await tasks.interruptIfQueued(
+        taskID: id, summary: "The queued task was cancelled before provider execution started.")
+      {
         return MCPServiceTaskMutationReceipt(
           taskID: taskID,
-          status: cancelled.state.status.rawValue,
+          status: ServiceTaskStatus.interrupted.rawValue,
           accepted: true
         )
-      } catch let storeError as ServiceStoreError {
-        throw Self.publicStoreError(storeError)
-      } catch {
-        throw Self.publicExecutionError(error)
       }
+    } catch let storeError as ServiceStoreError {
+      throw Self.publicStoreError(storeError)
+    } catch {
+      throw Self.publicExecutionError(error)
+    }
+    guard let task = try await tasks.task(id: id) else {
+      throw BridgeMCPQueryError.taskNotFound
     }
     guard
       task.state.status == .running

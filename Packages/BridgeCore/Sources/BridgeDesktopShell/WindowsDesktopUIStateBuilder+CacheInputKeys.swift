@@ -53,5 +53,8 @@
   struct WindowsDesktopSettingsCacheKey: Equatable {
     let settings: WindowsSettingsDisplay?
     let agentDefaults: WindowsAgentDefaultsDisplay?
+    var applicationMode: String? = nil
+    var applicationModeTransition: String? = nil
+    var applicationModeError: String? = nil
   }
 #endif

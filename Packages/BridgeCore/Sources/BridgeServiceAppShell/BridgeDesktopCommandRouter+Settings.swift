@@ -154,7 +154,8 @@ extension BridgeDesktopCommandRouter {
     _ viewport: BridgeDesktopBrowserViewport?,
     model: BridgeServiceAppModel
   ) {
-    guard model.navigation == .workbench, model.isChatBrowserEnabled, let viewport,
+    guard model.navigation == .workbench, model.isChatBrowserEnabled,
+      model.isLightweightMode != true, let viewport,
       viewport.x.isFinite, viewport.y.isFinite, viewport.width.isFinite,
       viewport.height.isFinite,
       viewport.x >= 0, viewport.y >= 0, viewport.width >= 0, viewport.height >= 0,

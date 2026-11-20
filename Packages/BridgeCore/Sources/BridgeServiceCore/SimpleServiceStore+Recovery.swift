@@ -25,15 +25,13 @@ extension SimpleServiceStore {
           if task.isQueued {
             continue
           }
-          if task.state.status == .awaitingLocalApproval,
-            task.requiresLocalStartApproval
-          {
+          let embeddedDSH = try Self.isEmbeddedDSHTask(task.id, in: db)
+          let wasNotStarted = task.state.status == .awaitingLocalApproval
+          if wasNotStarted, task.requiresLocalStartApproval, !embeddedDSH {
             continue
           }
-          let embeddedDSH = try Self.isEmbeddedDSHTask(task.id, in: db)
           let ownedProcess = embeddedDSH || task.providerID == AgentProviderID.claudeCode.rawValue
           if ownedProcess, task.state.status == .unknown { continue }
-          let wasNotStarted = task.state.status == .awaitingLocalApproval
           let recoveredStatus: ServiceTaskStatus =
             ownedProcess && !wasNotStarted ? .unknown : .interrupted
           let recoverySummary: String

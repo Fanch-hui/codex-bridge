@@ -219,6 +219,10 @@ public struct IPCServiceStatusResponse: Codable, Equatable, Sendable {
   public let tunnel: IPCTunnelStatus
   public let workbenchProjectID: String?
   public let workbenchPermissionMode: String?
+  public let applicationMode: String?
+  public let applicationModeTransition: String?
+  public let applicationModeError: String?
+  public let modelGatewayRunning: Bool?
 
   public init(
     status: BridgeStatusSnapshot,
@@ -226,7 +230,11 @@ public struct IPCServiceStatusResponse: Codable, Equatable, Sendable {
     exposureMode: MCPServiceExposureMode,
     tunnel: IPCTunnelStatus = .unconfigured,
     workbenchProjectID: String? = nil,
-    workbenchPermissionMode: String? = nil
+    workbenchPermissionMode: String? = nil,
+    applicationMode: String? = nil,
+    applicationModeTransition: String? = nil,
+    applicationModeError: String? = nil,
+    modelGatewayRunning: Bool? = nil
   ) {
     self.status = status
     self.localMCPURL = localMCPURL
@@ -234,6 +242,10 @@ public struct IPCServiceStatusResponse: Codable, Equatable, Sendable {
     self.tunnel = tunnel
     self.workbenchProjectID = workbenchProjectID
     self.workbenchPermissionMode = workbenchPermissionMode
+    self.applicationMode = applicationMode
+    self.applicationModeTransition = applicationModeTransition
+    self.applicationModeError = applicationModeError
+    self.modelGatewayRunning = modelGatewayRunning
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -243,6 +255,10 @@ public struct IPCServiceStatusResponse: Codable, Equatable, Sendable {
     case tunnel
     case workbenchProjectID = "workbench_project_id"
     case workbenchPermissionMode = "workbench_permission_mode"
+    case applicationMode = "application_mode"
+    case applicationModeTransition = "application_mode_transition"
+    case applicationModeError = "application_mode_error"
+    case modelGatewayRunning = "model_gateway_running"
   }
 
   public init(from decoder: Decoder) throws {
@@ -258,6 +274,13 @@ public struct IPCServiceStatusResponse: Codable, Equatable, Sendable {
       String.self,
       forKey: .workbenchPermissionMode
     )
+    applicationMode = try values.decodeIfPresent(String.self, forKey: .applicationMode)
+    applicationModeTransition = try values.decodeIfPresent(
+      String.self,
+      forKey: .applicationModeTransition
+    )
+    applicationModeError = try values.decodeIfPresent(String.self, forKey: .applicationModeError)
+    modelGatewayRunning = try values.decodeIfPresent(Bool.self, forKey: .modelGatewayRunning)
   }
 }
 

@@ -47,6 +47,8 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case submitDSHTask
   case submitAgentTask
   case embeddedDSH
+  case providerGateway
+  case providerGatewayCopyConnection
   case workbenchWorkspace
   case searchTaskHistory
   case selectTaskHistory
@@ -219,6 +221,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let viewport: BridgeDesktopBrowserViewport?
   /// Split view: the latest task of each session shown in a pane.
   public let taskIDs: [String]?
+  public let panes: [WorkbenchPaneDescriptor]?
 
   public init(
     navigation: BridgeDesktopNavigation? = nil,
@@ -294,7 +297,8 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     nodeExecutablePath: String? = nil,
     sdkRoot: String? = nil,
     viewport: BridgeDesktopBrowserViewport? = nil,
-    taskIDs: [String]? = nil
+    taskIDs: [String]? = nil,
+    panes: [WorkbenchPaneDescriptor]? = nil
   ) {
     self.navigation = navigation
     self.taskID = taskID
@@ -370,6 +374,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.sdkRoot = sdkRoot
     self.viewport = viewport
     self.taskIDs = taskIDs
+    self.panes = panes
   }
 }
 

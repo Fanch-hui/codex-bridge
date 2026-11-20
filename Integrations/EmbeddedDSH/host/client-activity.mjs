@@ -104,7 +104,7 @@ export class ClientActivity {
         this.reportAdmission(rootID, ids, 'stopped');
         throw error;
       }
-      if (!/^(busy|project_busy): /.test(error?.message ?? '')) throw error;
+      if (!/^(busy|project_busy|project_capacity_reached): /.test(error?.message ?? '')) throw error;
       this.reportAdmission(rootID, ids, 'waiting');
       const retry = new Error('Project is busy');
       retry.code = 'BRIDGE_SCHEDULE_BUSY';

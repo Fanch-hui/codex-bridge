@@ -242,6 +242,10 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     defer { inputLock.unlock() }
     guard !inputClosed else { throw ManagedProcessError.stdinUnavailable }
     do {
+      #if !os(Windows)
+        var signals = try PipeWriteSignalGuard(descriptor: standardInputHandle.fileDescriptor)
+        defer { signals.restore() }
+      #endif
       try standardInputHandle.write(contentsOf: data)
     } catch {
       throw ManagedProcessError.stdinUnavailable
@@ -275,6 +279,8 @@ public final class ManagedStdioProcess: @unchecked Sendable {
       if writeFailed { throw ManagedProcessError.stdinUnavailable }
     #else
       let descriptor = standardInputHandle.fileDescriptor
+      var signals = try PipeWriteSignalGuard(descriptor: descriptor)
+      defer { signals.restore() }
       let previousFlags = fcntl(descriptor, F_GETFL)
       guard previousFlags >= 0,
         fcntl(descriptor, F_SETFL, previousFlags | O_NONBLOCK) == 0

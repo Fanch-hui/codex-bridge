@@ -21,6 +21,9 @@
         if (!id || find(id)) return;
         items.unshift({ sessionId: id, projectID: projectID || null }); revision++;
       },
+      seed: function (item) {
+        if (!find(item.sessionId)) items.unshift(Object.assign({}, item));
+      },
       setProject: function (id, projectID) {
         var index = items.findIndex(function (item) { return item.sessionId === id; });
         if (index >= 0) { items[index] = Object.assign({}, items[index], { projectID: projectID || null }); revision++; }
@@ -245,20 +248,18 @@
     }
     function list() {
       var generation = options.generation();
-      return T.read("session.list", function () {
-        var ticket = store.begin();
-        return T.call("session.list", {}).then(function (value) {
-          if (generation !== options.generation() || !options.connected()) return store.items();
-          if (store.commit(ticket, value && value.items, options.pending())) options.onChange();
-          return store.items();
-        });
+      var ticket = store.begin();
+      return T.read("session.list", function () { return T.call("session.list", {}); }).then(function (value) {
+        if (generation === options.generation() && options.connected() &&
+            store.commit(ticket, value && value.items, options.pending())) options.onChange();
+        return store.items();
       }).catch(function (error) {
         if (options.active() && generation === options.generation()) options.onError(error);
         throw error;
       });
     }
     return { root: sidebar, list: list, render: render, ready: store.ready, get: store.get, items: store.items,
-      upsert: store.upsert, setProject: store.setProject, invalidate: store.invalidate, invalidateRead: store.invalidateRead,
+      upsert: store.upsert, seed: store.seed, setProject: store.setProject, invalidate: store.invalidate, invalidateRead: store.invalidateRead,
       label: function (id) { var item = store.get(id); return item ? label(item) : ""; } };
   }
   var api = { create: create, createStore: createStore, label: label };

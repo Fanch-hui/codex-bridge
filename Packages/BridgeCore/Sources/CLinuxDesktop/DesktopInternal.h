@@ -16,6 +16,9 @@ typedef struct {
 typedef struct {
   GtkWidget *window;
   GtkWidget *layout;
+  GtkWidget *overlay;
+  GtkStatusIcon *tray;
+  gchar *page_uri;
   WebKitWebView *desktop;
   BridgeBrowser browsers[2];
   BridgeBrowser *browser;

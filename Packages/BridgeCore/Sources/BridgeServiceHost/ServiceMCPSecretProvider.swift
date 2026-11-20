@@ -64,12 +64,20 @@ public actor ServiceMCPSecretProvider {
     return value
   }
 
+  public func remove(clientID: MCPClientID) throws {
+    try store.remove(Self.reference(for: clientID))
+  }
+
   private static func reference(for clientID: MCPClientID) throws -> SecretReference {
     switch clientID {
-    case .chatGPT: reference
-    case .qwenStudio: qwenStudioReference
-    case .gemini: geminiReference
-    default: throw ServiceMCPSecretError.unsupportedClient
+    case .chatGPT: return reference
+    case .qwenStudio: return qwenStudioReference
+    case .gemini: return geminiReference
+    default:
+      guard ServiceExternalMCPClient.isValidID(clientID.rawValue) else {
+        throw ServiceMCPSecretError.unsupportedClient
+      }
+      return SecretReference(rawValue: "service.mcp.client.\(clientID.rawValue)")
     }
   }
 

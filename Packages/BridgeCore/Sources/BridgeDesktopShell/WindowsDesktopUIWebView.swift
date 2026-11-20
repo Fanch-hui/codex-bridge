@@ -15,6 +15,7 @@
     private var latestStateRevision: UInt64?
     private var patchBuilder = BridgeDesktopUIStatePatchBuilder()
     private var isPageReady = false
+    private var pendingLightweightActivity = false
     private var readyDeadline: UInt64 = 0
 
     /// Loading the local page needs the WebView2 runtime, the environment, the
@@ -64,6 +65,8 @@
         lock.withLock({
           guard worker == nil else { return false }
           worker = next
+          snapshot = Snapshot(state: .loading, errorDetail: nil)
+          isPageReady = false
           readyDeadline = DispatchTime.now().uptimeNanoseconds + Self.readyGraceNanoseconds
           return true
         })
@@ -125,10 +128,25 @@
 
     func shutdown() {
       let active = lock.withLock { () -> WindowsWebViewThread? in
-        defer { worker = nil }
+        defer {
+          worker = nil
+          isPageReady = false
+          readyDeadline = 0
+        }
         return worker
       }
       active?.shutdown()
+    }
+
+    func openLightweightActivity() {
+      let active = lock.withLock { () -> WindowsWebViewThread? in
+        pendingLightweightActivity = true
+        guard isPageReady, let worker else { return nil }
+        pendingLightweightActivity = false
+        return worker
+      }
+      active?.postWebMessageAsJSON(
+        "{\"type\":\"open-lightweight-activity\"}", replacesPendingMessages: false)
     }
 
     private func sendFullSnapshot() {
@@ -155,6 +173,8 @@
       if envelope.command == .ready || envelope.command == .requestStateResync {
         lock.withLock { isPageReady = true }
         sendFullSnapshot()
+        let pending = lock.withLock { pendingLightweightActivity }
+        if pending { openLightweightActivity() }
         return
       }
       commandHandler(envelope)

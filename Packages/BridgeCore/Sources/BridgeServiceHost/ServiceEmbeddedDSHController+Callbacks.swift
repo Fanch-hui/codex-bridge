@@ -173,20 +173,37 @@ extension ServiceEmbeddedDSHController {
       throw ServiceStoreError.invalidArgument("embedded_dsh.session")
     }
     switch try Self.requiredString(payload, "operation") {
+    case "capacity":
+      guard !generation.closed,
+        let execution = try await application.embeddedDSHExecution(sessionID: sessionID),
+        execution.rootActive, !execution.closing
+      else { throw CancellationError() }
+      let capacity = try await settings.projectWriteConcurrencySnapshot()
+      return .object([
+        "limit": .integer(Int64(capacity.limit)), "revision": .number(capacity.revision),
+      ])
     case "begin":
       let project = try await project(for: sessionID)
       try await validateWorkspaceWriteRecovery(projectID: project.id)
       let mode: ServicePermissionMode =
         payload["permissionMode"]?.stringValue == "read-only" ? .readOnly : .full
+      let capacity = try await settings.projectWriteConcurrencySnapshot()
+      let runtimeOwners = try await projectRuntimeOwners(project.id)
       let groupID = try await application.beginEmbeddedDSHExecution(
         sessionID: sessionID, projectID: project.id, permissionMode: mode)
+      liveExecutionRoots.insert(sessionID)
       return .object([
-        "groupID": .string(groupID), "executionGeneration": .integer(generation.generation),
+        "groupID": .string(groupID), "workspaceID": .string(project.id.rawValue),
+        "runtimeLimit": .integer(Int64(capacity.limit)),
+        "runtimeLimitRevision": .number(capacity.revision),
+        "runtimeOwners": .array(runtimeOwners.map(ACPJSONValue.string)),
+        "executionGeneration": .integer(generation.generation),
       ])
     case "end":
       try await validateWorkspaceWriteRecovery(projectID: ProjectID(rawValue: projectID))
       try await application.finishEmbeddedDSHExecution(
         sessionID: sessionID, projectID: ProjectID(rawValue: projectID))
+      liveExecutionRoots.remove(sessionID)
       return .object([:])
     default: throw ServiceStoreError.invalidArgument("embedded_dsh.execution_operation")
     }

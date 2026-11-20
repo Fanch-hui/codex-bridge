@@ -108,6 +108,7 @@
         toggle: toggle, edit: edit, remove: remove, confirmation: confirmation };
       toggle.addEventListener("click", function () {
         if (toggle.disabled) return;
+        S.setButtonPending(toggle, true, row.enabled ? "停用中…" : "启用中…", row.enabled ? "停用" : "启用");
         context.emit("setDeepSeekHarnessMCPServerEnabled", {
           mcpServerID: row.server.id,
           mcpServerScope: row.scope,
@@ -121,6 +122,7 @@
       cancel.addEventListener("click", function () { confirmation.hidden = true; });
       confirm.addEventListener("click", function () {
         if (!context.canManage) return;
+        S.setButtonPending(remove, true, "删除中…", "删除");
         context.emit("deleteDeepSeekHarnessMCPServer", {
           mcpServerID: row.server.id,
           mcpServerScope: row.scope
@@ -143,7 +145,9 @@
       row.detail.textContent = server.transport + " · " + detail
         + (configured ? " · " + (server.transport === "http" ? "请求头 " : "环境变量 ")
           + configured + " 项" : "");
+      S.setButtonPending(row.toggle, false, null, row.enabled ? "停用" : "启用");
       row.toggle.textContent = row.enabled ? "停用" : "启用";
+      S.setButtonPending(row.remove, false, null, "删除");
       row.toggle.disabled = !context.canManage || server.canToggle === false;
       row.edit.disabled = !context.canManage || server.canEdit === false;
       row.remove.disabled = !context.canManage || server.canDelete === false;
@@ -173,6 +177,7 @@
       load.disabled = !context.canLoad || editor.isOpen();
       add.disabled = !context.canManage || editor.isOpen();
       editor.setCanManage(context.canManage);
+      if (editor.acknowledgeServers && matching) editor.acknowledgeServers(page.deepSeekHarnessMCPServers);
       var visible = new Set();
       var position = 0;
       (matching ? S.safeArray(page.deepSeekHarnessMCPServers) : []).forEach(function (server) {

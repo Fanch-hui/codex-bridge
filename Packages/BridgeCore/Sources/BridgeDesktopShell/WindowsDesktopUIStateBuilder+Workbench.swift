@@ -152,16 +152,28 @@
       canGoForward: Bool
     ) -> BridgeDesktopBrowserSlot {
       let enabled = display.browserEnabled
+      let fullMode = display.applicationMode == "full"
+      let active = enabled && fullMode
+      let resolvedStatus: String
+      if !enabled {
+        resolvedStatus = "内置浏览器已关闭"
+      } else if display.applicationMode == "lite" {
+        resolvedStatus = "轻量模式下已关闭内置浏览器"
+      } else if display.applicationMode == nil {
+        resolvedStatus = "正在等待后台服务就绪…"
+      } else {
+        resolvedStatus = status ?? (available ? "正在加载 \(site.displayName)…" : "内置浏览器不可用")
+      }
       return BridgeDesktopBrowserSlot(
         site: site,
-        visible: true,
+        visible: active,
         enabled: enabled,
         url: url,
-        status: status ?? (available ? "正在加载 \(site.displayName)…" : "内置浏览器不可用"),
+        status: resolvedStatus,
         canToggle: true,
         canOpenExternally: true,
-        canGoBack: enabled && canGoBack,
-        canGoForward: enabled && canGoForward,
+        canGoBack: active && canGoBack,
+        canGoForward: active && canGoForward,
         canReload: enabled,
         canLoadEarlierConversation: display.canLoadEarlierConversation
       )

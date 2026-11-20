@@ -16,6 +16,8 @@
     <link rel="stylesheet" href="component-surfaces.css">
     <link rel="stylesheet" href="workbench.css">
     <link rel="stylesheet" href="workbench-panes.css">
+    <link rel="stylesheet" href="workbench-import.css">
+    <link rel="stylesheet" href="workbench-sources.css">
     <link rel="stylesheet" href="responsive.css">
     <link rel="stylesheet" href="windows-theme.css">
     <link rel="stylesheet" href="windows-components.css">
@@ -23,10 +25,13 @@
     <link rel="stylesheet" href="dsh-workbench.css">
     <link rel="stylesheet" href="embedded-dsh-conversation.css">
     <link rel="stylesheet" href="dsh-workspace.css">
+    <link rel="stylesheet" href="dsh-collaboration.css">
+    <link rel="stylesheet" href="dsh-collaboration-panes.css">
     <link rel="stylesheet" href="connections.css">
     <link rel="stylesheet" href="settings.css">
     <link rel="stylesheet" href="component-dialogs.css">
     <link rel="stylesheet" href="message-center.css">
+    <link rel="stylesheet" href="lightweight.css">
   </head>
   <body>
     <section id="startup-screen" class="startup-screen" aria-label="启动 Codex Bridge" aria-busy="true">
@@ -61,15 +66,26 @@
         <div class="workspace-navigator" id="workspace-navigator" hidden></div>
         <nav class="navigation navigation-secondary" id="secondary-navigation" aria-label="应用设置"></nav>
         <div class="sidebar-footer">
-          <span class="connection-indicator" id="connection-indicator" role="img" aria-label="等待连接状态"></span>
-          <button class="message-center-entry icon-button" id="message-center-button" type="button" aria-label="消息信箱" title="消息信箱">
-            <span class="icon" data-symbol="envelope"></span><span class="message-center-badge" id="message-center-badge" hidden aria-hidden="true"></span>
-          </button>
-          <span id="connection-label">等待连接状态</span>
-          <span class="refresh-indicator" id="refresh-indicator" aria-hidden="true"></span>
-          <button class="sidebar-update-button icon-button" id="sidebar-update-button" type="button" hidden aria-label="发现新版本" title="发现新版本，点击查看更新内容">
-            <span class="icon" data-symbol="arrow.down.circle"></span>
-          </button>
+          <div class="sidebar-lightweight-control" id="sidebar-lightweight-control">
+            <button class="sidebar-lightweight-toggle" id="sidebar-lightweight-toggle" type="button" role="switch" aria-checked="false" aria-describedby="sidebar-lightweight-tooltip" disabled>
+              <span class="sidebar-lightweight-track" aria-hidden="true"><span class="sidebar-lightweight-thumb"></span></span>
+              <span class="sidebar-lightweight-label">轻量模式</span>
+            </button>
+            <div class="sidebar-lightweight-tooltip" id="sidebar-lightweight-tooltip" role="tooltip">
+              <strong>轻量模式（纯网关）</strong>
+              <span>关闭工作台与内置浏览器以节省资源，仅保留模型网关、插件与外部 Agent 接入；随时可关闭切回完整模式。</span>
+            </div>
+          </div>
+          <span id="connection-label" hidden>等待连接状态</span>
+          <div class="sidebar-footer-actions">
+            <span class="refresh-indicator" id="refresh-indicator" aria-hidden="true"></span>
+            <button class="sidebar-update-button icon-button" id="sidebar-update-button" type="button" hidden aria-label="发现新版本" title="发现新版本，点击查看更新内容">
+              <span class="icon" data-symbol="arrow.down.circle"></span>
+            </button>
+            <button class="message-center-entry icon-button" id="message-center-button" type="button" aria-label="消息通知" title="消息通知">
+              <span class="icon" data-symbol="bell"></span><span class="message-center-badge" id="message-center-badge" hidden aria-hidden="true"></span>
+            </button>
+          </div>
         </div>
         <div class="sidebar-divider" role="separator" aria-label="调整侧边栏宽度" aria-orientation="vertical"
           aria-controls="main-sidebar" aria-valuemin="220" aria-valuemax="340" aria-valuenow="252" tabindex="0"></div>
@@ -88,6 +104,10 @@
         <div class="content-scroll">
           <section class="overview-page" id="overview-page" aria-labelledby="page-title">
             <div id="overview-content"></div>
+          </section>
+
+          <section class="page lightweight-page" id="lightweight-page" hidden aria-labelledby="page-title">
+            <div id="lightweight-content"></div>
           </section>
 
           <section class="workbench-page" id="workbench-page" hidden aria-label="工作台">
@@ -142,19 +162,17 @@
       </main>
     </div>
     <div class="feedback-layer" id="feedback-layer" hidden></div>
+    <script src="icons.js"></script>
     <script src="pages-common.js"></script>
     <script src="pages-dsh-upstream-view.js"></script>
     <script src="pages-detail.js"></script>
     <script src="pages-overview.js"></script>
     <script src="app-update.js"></script>
     <script src="pages-native-permissions.js"></script>
-    <script src="pages-workbench-attachments.js"></script>
-    <script src="pages-workbench-skills.js"></script>
     <script src="pages-workbench-submissions.js"></script>
     <script src="pages-workbench-composer.js"></script>
     <script src="pages-workbench-session-composer.js"></script>
     <script src="pages-workbench-controls.js"></script>
-    <script src="pages-workbench-handoff.js"></script>
     <script src="pages-workbench-new-task.js"></script>
     <script src="pages-workbench-tabs.js"></script>
     <script src="pages-workbench-conversation.js"></script>
@@ -200,13 +218,16 @@
     <script src="pages-settings.js"></script>
     <script src="pages-embedded-dsh-transport.js"></script>
     <script src="pages-embedded-dsh-operations.js"></script>
+    <script src="pages-workbench-import.js"></script>
     <script src="pages-embedded-dsh-queue.js"></script>
     <script src="pages-embedded-dsh-workspace-requests.js"></script>
     <script src="pages-embedded-dsh-stop.js"></script>
     <script src="pages-embedded-dsh-session-directory.js"></script>
     <script src="pages-embedded-dsh-projection.js"></script>
     <script src="pages-embedded-dsh-attachments.js"></script>
+    <script src="pages-embedded-dsh-agent-mentions.js"></script>
     <script src="pages-embedded-dsh-mentions.js"></script>
+    <script src="pages-embedded-dsh-dispatch.js"></script>
     <script src="pages-embedded-dsh-search.js"></script>
     <script src="pages-dsh-composer-view.js"></script>
     <script src="pages-embedded-dsh-markdown.js"></script>
@@ -215,6 +236,7 @@
     <script src="pages-embedded-dsh-content.js"></script>
     <script src="pages-embedded-dsh-context.js"></script>
     <script src="pages-embedded-dsh-metrics.js"></script>
+    <script src="pages-embedded-dsh-agent-cards.js"></script>
     <script src="pages-embedded-dsh-conversation.js"></script>
     <script src="pages-embedded-dsh-child-history.js"></script>
     <script src="pages-embedded-dsh-child-view.js"></script>
@@ -222,6 +244,7 @@
     <script src="pages-embedded-dsh-schedule-create.js"></script>
     <script src="pages-embedded-dsh-actions.js"></script>
     <script src="pages-embedded-dsh-bridge.js"></script>
+    <script src="pages-embedded-dsh-collaboration.js"></script>
     <script src="pages-embedded-dsh-interactions.js"></script>
     <script src="pages-embedded-dsh-validation.js"></script>
     <script src="pages-embedded-dsh-recovery.js"></script>
@@ -230,21 +253,27 @@
     <script src="pages-embedded-dsh-zcode.js"></script>
     <script src="pages-embedded-dsh-workbuddy.js"></script>
     <script src="pages-embedded-dsh-settings.js"></script>
+    <script src="pages-lightweight-clients.js"></script>
+    <script src="pages-lightweight-plugins-auth.js"></script>
+    <script src="pages-lightweight-plugins.js"></script>
+    <script src="pages-lightweight.js"></script>
     <script src="pages-embedded-dsh-welcome.js"></script>
     <script src="pages-embedded-dsh-models.js"></script>
     <script src="pages-embedded-dsh-permissions.js"></script>
     <script src="pages-embedded-dsh.js"></script>
+    <script src="pages-dsh-external-agent-pane.js"></script>
+    <script src="pages-embedded-dsh-panes.js"></script>
     <script src="pages-dsh-workspace-editor.js"></script>
     <script src="pages-dsh-workspace.js"></script>
     <script src="pages-dsh-workbench-layout.js"></script>
     <script src="pages-dsh-workbench-selection.js"></script>
+    <script src="pages-workbench-sources.js"></script>
     <script src="pages-dsh-workbench.js"></script>
     <script src="pages.js"></script>
     <script src="feedback.js"></script>
     <script src="message-center-view.js"></script>
     <script src="message-center.js"></script>
     <script src="sidebar.js"></script>
-    <script src="icons.js"></script>
     <script src="startup.js"></script>
     <script src="app.js"></script>
   </body>

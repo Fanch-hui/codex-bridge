@@ -26,10 +26,19 @@ public actor ServiceEmbeddedDSHController {
   /// Why a provider can never run in an isolated copy, known without making one. Nil means the
   /// provider needs the copy-based readiness check.
   let externalWorkspaceSupport: @Sendable (String) -> String?
+  var liveExecutionRoots: Set<String> = []
   var runtime: EmbeddedDSHRuntime?
+  var sharedProviders: ServiceExistingProviders?
+  weak var communityGateway: ServiceProviderGateway?
+  var pendingCommunityProviderRefresh = false
+  var runtimeStarted = false
+  var pendingCommunityRefreshTask: Task<Void, Never>?
+  var pendingCommunityRefreshGeneration: UInt64 = 0
   var sessionProjects = NativeSessionMap()
   let inputGate = AsyncMutex()
   let subagentLanes = SubagentLanes()
+  /// Drives subagent rounds from the ledger; created on first use and once rounds are open.
+  var subagentScheduler: SubagentRoundScheduler?
   /// Test seam that replaces the task submission of a subagent; production leaves it unset.
   var subagentSubmitter: SubagentSubmitter?
   /// Test seam that answers engine calls without a runtime; production leaves it unset.
@@ -259,6 +268,7 @@ public actor ServiceEmbeddedDSHController {
   public func shutdown() async throws {
     guard !isShuttingDown else { return }
     isShuttingDown = true
+    resetPendingCommunityProviderRefresh()
     eventSignal.notify()
     idleApplyTask?.cancel()
     workspaceMergeMonitor?.cancel()
@@ -267,6 +277,8 @@ public actor ServiceEmbeddedDSHController {
     nativeWriteRecoveryTask = nil
     executionRecoveryTask?.cancel()
     executionRecoveryTask = nil
+    await subagentScheduler?.shutdown()
+    subagentScheduler = nil
     let merges = Array(workspaceMergeTasks.values)
     for task in merges { task.cancel() }
     for task in merges { await task.value }
@@ -282,6 +294,8 @@ public actor ServiceEmbeddedDSHController {
       await application.finishAllUnscopedWorkbenchExecutions()
       await finishAllPluginMaintenance()
       self.runtime = nil
+      await communityGateway?.closeWorkbenchGateway()
+      liveExecutionRoots.removeAll()
     }
   }
 
@@ -304,6 +318,7 @@ public actor ServiceEmbeddedDSHController {
       "question.answer", "commands.execute", "session.selectModel", "permissions.set",
       "session.scope", "session.bindingSnapshot", "session.receipt", "session.stopStatus",
       "context.get", "context.set", "workspace.release", "workspace.cancel",
+      "subagent.lease", "subagent.root", "subagent.deliveries",
     ].contains(action)
     if !waitsForWriter { await runtimeAdmission.acquire(priority: priority) }
     defer { if !waitsForWriter { runtimeAdmission.release(priority: priority) } }
@@ -312,7 +327,9 @@ public actor ServiceEmbeddedDSHController {
     let timeout: Duration? =
       waitsForWriter || ["plugins.install", "plugins.update"].contains(action)
       ? .seconds(315_360_000) : nil
-    return try await engine.call(action: action, payload: payload, timeout: timeout)
+    let result = try await engine.call(action: action, payload: payload, timeout: timeout)
+    noteRuntimeRunning(engine)
+    return result
   }
 
   private func finishPreviousExecutions() async throws {
@@ -327,11 +344,13 @@ public actor ServiceEmbeddedDSHController {
   func restartEngine() async throws -> ACPJSONValue {
     resetNativeClient()
     let engine = try engine()
+    await subagentScheduler?.adapterStopped()
     let executions = try await application.embeddedDSHExecutions()
     for execution in executions {
       try await application.closeEmbeddedDSHExecutionAdmission(
         sessionID: execution.sessionID, projectID: execution.projectID)
     }
+    resetPendingCommunityProviderRefresh()
     await engine.shutdown()
     await toolWriteLeases.closeAll()
     guard await engine.confirmedStopped(), await engine.recoverPreviousHost() else {
@@ -343,10 +362,14 @@ public actor ServiceEmbeddedDSHController {
         sessionID: execution.sessionID, projectID: execution.projectID)
     }
     try await engine.restart()
+    noteRuntimeRunning(engine)
     await application.finishAllUnscopedWorkbenchExecutions()
     await finishAllPluginMaintenance()
     recovery = Task {}
-    return try await engine.call(action: "status", payload: .object([:]))
+    await subagentScheduler?.adapterStarted()
+    let status = try await engine.call(action: "status", payload: .object([:]))
+    noteRuntimeRunning(engine)
+    return status
   }
 
   func engine() throws -> EmbeddedDSHRuntime {
@@ -354,15 +377,20 @@ public actor ServiceEmbeddedDSHController {
     if let runtime { return runtime }
     let runtime = EmbeddedDSHRuntime(
       configuration: EmbeddedDSHRuntimeConfiguration(
-        resourceRoot: resourceRoot, dataRoot: dataRoot),
+        resourceRoot: resourceRoot, dataRoot: dataRoot, sharedProviders: sharedProviders != nil),
+      prepareDependencies: { [sharedProviders] in
+        if let sharedProviders { _ = try await sharedProviders.call("status") }
+      },
       handler: { [weak self] method, payload in
         guard let self else { throw CancellationError() }
         return try await self.callback(method: method, payload: payload)
       },
       onEvent: { [weak self] event in
-        await self?.receive(event)
+        await self?.receiveRuntimeEvent(event)
       }
     )
+    liveExecutionRoots.removeAll()
+    resetPendingCommunityProviderRefresh()
     self.runtime = runtime
     return runtime
   }
@@ -370,6 +398,19 @@ public actor ServiceEmbeddedDSHController {
   func callback(method: String, payload: ACPJSONValue) async throws -> ACPJSONValue {
     do {
       switch method {
+      case "bridge/provider":
+        guard let sharedProviders else { throw EmbeddedDSHRuntimeError.invalidConfiguration }
+        let action = payload["action"]?.stringValue
+        if action == "provider.snapshot" {
+          let snapshot = try await sharedProviders.workbenchCall(payload)
+          guard let communityGateway else { return snapshot }
+          return try await communityGateway.workbenchSnapshot(snapshot)
+        }
+        if action == "community.gateway.endpoint" {
+          guard let communityGateway else { throw EmbeddedDSHRuntimeError.invalidConfiguration }
+          return try await communityGateway.workbenchEndpoint()
+        }
+        return try await sharedProviders.workbenchCall(payload)
       case "bridge/secret": return try secret(payload)
       case "bridge/agents": return try await agents(payload)
       case "bridge/agentModels": return try await agentModels(payload)
@@ -398,8 +439,9 @@ public actor ServiceEmbeddedDSHController {
       "auth.switchAccount", "auth.removeAccount", "models.list", "models.discover", "plugins.list",
       "connections.status", "connections.zcode", "connections.workbuddy",
       "plugins.install", "plugins.enable", "plugins.remove", "plugins.update",
-      "approval.answer", "question.answer", "subagents.list", "subagents.control",
-      "skills.list", "skills.import", "mcp.list", "mcp.save", "mcp.remove", "mcp.setEnabled",
+      "approval.answer", "question.answer", "subagents.list", "subagents.agents",
+      "subagents.control", "skills.list", "skills.import", "mcp.list", "mcp.save", "mcp.remove",
+      "mcp.setEnabled",
       "permissions.get", "permissions.set",
       "session.receipt", "session.resumePending", "session.content",
       "session.cancelProjectSelection", "configuration.status",
@@ -420,7 +462,7 @@ public actor ServiceEmbeddedDSHController {
       "context.get",
       "session.list",
       "session.history", "session.search", "session.content", "pending.list",
-      "subagents.list",
+      "subagents.list", "subagents.agents",
       "subagents.history", "configuration.status", "plugins.list", "plugins.installStatus",
       "mcp.list", "skills.list", "operations.read", "operations.reconcile", "attachments.read",
       "commands.list", "session.queue", "session.receipt", "session.bindingSnapshot",

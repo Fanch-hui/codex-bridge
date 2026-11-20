@@ -39,18 +39,21 @@ extension ServiceEmbeddedDSHController: ServiceToolWriteGateProviding {
     else { return nil }
     return await toolWriteLeases.makeGate(
       taskID: task.id, rootID: identity.parentSessionID, childID: identity.childID,
-      engine: toolWriteEngine())
+      engine: toolWriteEngine(task: task, identity: identity))
   }
 
   public func releaseToolWriteLeases(taskID: TaskID) async {
     await toolWriteLeases.releaseAll(taskID: taskID)
   }
 
-  private func toolWriteEngine() -> EmbeddedDSHToolWriteEngine {
+  private func toolWriteEngine(task: ServiceTaskRecord, identity: EmbeddedDSHSubagentIdentity)
+    -> EmbeddedDSHToolWriteEngine
+  {
     EmbeddedDSHToolWriteEngine(
       acquire: { [weak self] rootID, owner in
         guard let self else { throw CancellationError() }
-        return try await self.acquireToolWriteLease(rootID: rootID, owner: owner)
+        return try await self.acquireToolWriteLease(
+          rootID: rootID, owner: owner, task: task, identity: identity)
       },
       release: { [weak self] rootID, owner, token in
         try await self?.runToolWriteLeaseAction(
@@ -63,11 +66,23 @@ extension ServiceEmbeddedDSHController: ServiceToolWriteGateProviding {
 
   /// Waits for the lease without taking a runtime admission slot or timing out. The engine does
   /// not hear about a cancelled wait, so the caller revokes the owner afterwards.
-  private func acquireToolWriteLease(rootID: String, owner: String) async throws -> String {
+  private func acquireToolWriteLease(
+    rootID: String, owner: String, task: ServiceTaskRecord, identity: EmbeddedDSHSubagentIdentity
+  ) async throws -> String {
+    guard let requestID = task.clientRequestID else {
+      throw ServiceStoreError.invalidArgument("embedded_dsh.request")
+    }
+    let key = SubagentRoundKey(rootID: rootID, childID: identity.childID, requestID: requestID)
+    let capacity = try await settings.projectWriteConcurrencySnapshot()
     let lease = try await invoke(
       action: "workspace.acquire",
       payload: .object([
         "sessionId": .string(rootID), "ownerId": .string(owner), "wait": .bool(true),
+        "runtimeAdmission": .object([
+          "projectID": .string(task.projectID.rawValue),
+          "owner": .string(Self.roundExecutionOwner(key)),
+          "limit": .integer(Int64(capacity.limit)), "revision": .number(capacity.revision),
+        ]),
       ]), waitsForWriter: true)
     guard lease["acquired"]?.boolValue == true, let token = lease["token"]?.stringValue else {
       throw ServiceStoreError.invalidArgument("embedded_dsh.workspace_lease")

@@ -21,22 +21,22 @@
 .dsh-bridge-conversation-status { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 .dsh-bridge-conversation-metrics { position: absolute; z-index: 2; inset: auto max(var(--dsh-content-inset, 24px), calc((100% - var(--dsh-content-width, 760px)) / 2)) var(--bridge-conversation-current-inset, 0px); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 4px; color: var(--text-secondary); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; }
 .dsh-bridge-metric { position: relative; min-width: 0; }
-.dsh-bridge-metric-summary { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; box-sizing: border-box; padding: 1px 8px; border-radius: 6px; cursor: pointer; list-style: none; white-space: nowrap; }
+.dsh-bridge-metric-summary { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; box-sizing: border-box; padding: 2px 8px; border-radius: var(--control-radius-small); cursor: pointer; list-style: none; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out); }
 .dsh-bridge-metric-icon { width: 14px; height: 14px; flex: none; }
 .dsh-bridge-metric-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dsh-bridge-metric-summary::-webkit-details-marker { display: none; }
-.dsh-bridge-metric-summary:hover, .dsh-bridge-metric[open] > .dsh-bridge-metric-summary { color: var(--text); background: var(--surface-muted); }
+.dsh-bridge-metric-summary:hover, .dsh-bridge-metric[open] > .dsh-bridge-metric-summary { color: var(--text); background: var(--surface-hover); }
 .dsh-bridge-metric-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.dsh-bridge-metric-panel { position: absolute; z-index: 3; bottom: calc(100% + 6px); left: 0; box-sizing: border-box; width: 300px; max-height: max(0px, min(300px, calc(var(--bridge-metrics-top, 200px) - var(--app-toolbar-height, 52px) - 12px))); overflow-y: auto; padding: 16px; border: 1px solid var(--separator); border-radius: 10px; color: var(--text); background: var(--surface); box-shadow: var(--shadow-overlay); }
+.dsh-bridge-metric-panel { position: absolute; z-index: 3; bottom: calc(100% + 8px); left: 0; box-sizing: border-box; width: 304px; max-height: max(0px, min(300px, calc(var(--bridge-metrics-top, 200px) - var(--app-toolbar-height, 52px) - 12px))); overflow-y: auto; padding: 14px 16px; border: 1px solid var(--separator); border-radius: var(--radius); color: var(--text); background: var(--surface-elevated); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: var(--shadow-popover); transform-origin: bottom left; }
 .dsh-bridge-metric-context .dsh-bridge-metric-panel { max-height: max(0px, min(480px, calc(var(--bridge-metrics-top, 200px) - var(--app-toolbar-height, 52px) - 12px))); }
-.dsh-bridge-metric-context .dsh-context-editor { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--separator); }
-.dsh-bridge-metric-title { margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--separator); font-size: 12px; font-weight: 500; }
-.dsh-bridge-metric-bar { display: flex; gap: 1px; height: 4px; margin: 10px 0 12px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
+.dsh-bridge-metric-context .dsh-context-editor { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--separator); }
+.dsh-bridge-metric-title { margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--separator); font-size: 12px; font-weight: 600; letter-spacing: -.01em; }
+.dsh-bridge-metric-bar { display: flex; gap: 1.5px; height: 5px; margin: 10px 0 12px; overflow: hidden; border-radius: var(--radius-pill); background: var(--surface-muted); }
 .dsh-bridge-metric-segment { flex: none; min-width: 1px; height: 100%; background: var(--text-secondary); }
-.dsh-bridge-metric-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2px; }
-.dsh-bridge-metric-segment-system { background: #8c95a5; }
-.dsh-bridge-metric-segment-tools { background: #a78bfa; }
-.dsh-bridge-metric-segment-messages { background: #438df5; }
+.dsh-bridge-metric-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2.5px; }
+.dsh-bridge-metric-segment-system { background: var(--chart-system); }
+.dsh-bridge-metric-segment-tools { background: var(--chart-tools); }
+.dsh-bridge-metric-segment-messages { background: var(--chart-messages); }
 .dsh-bridge-metric-rows { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; margin: 0; }
 .dsh-bridge-metric-rows dt { color: var(--text-secondary); }
 .dsh-bridge-metric-rows dd { margin: 0; text-align: right; }
@@ -101,27 +101,27 @@
   --dsw-alias-markdown-code-block: var(--surface-muted);
   --dsw-alias-markdown-code-block-banner: var(--surface-muted);
   --dsw-specific-bubble: var(--surface-muted);
-  --dsw-radius-xs: 4px;
-  --dsw-radius-sm: 6px;
-  --dsw-radius-md: 8px;
-  --dsw-radius-lg: 10px;
-  --dsw-radius-xl: 16px;
+  --dsw-radius-xs: var(--radius-xs);
+  --dsw-radius-sm: var(--control-radius-small);
+  --dsw-radius-md: var(--control-radius);
+  --dsw-radius-lg: var(--radius);
+  --dsw-radius-xl: var(--radius-lg);
   --dsw-focus-ring-color: var(--focus-ring);
   --dsw-font-family: var(--font-ui);
   --ds-font-family-code: var(--font-mono);
-  --dsw-font-markdown-base: 400 14px/24px var(--font-ui);
-  --dsw-font-markdown-base-strong: 600 14px/24px var(--font-ui);
-  --dsw-font-markdown-h1: 600 25px/1.3 var(--font-ui);
-  --dsw-font-markdown-h2: 600 21px/1.3 var(--font-ui);
-  --dsw-font-markdown-h3: 600 18px/1.4 var(--font-ui);
-  --dsw-font-markdown-h4: 600 16px/1.4 var(--font-ui);
+  --dsw-font-markdown-base: 400 14px/23px var(--font-ui);
+  --dsw-font-markdown-base-strong: 600 14px/23px var(--font-ui);
+  --dsw-font-markdown-h1: 600 20px/1.32 var(--font-display);
+  --dsw-font-markdown-h2: 600 17px/1.36 var(--font-display);
+  --dsw-font-markdown-h3: 600 15px/1.4 var(--font-ui);
+  --dsw-font-markdown-h4: 600 14px/1.44 var(--font-ui);
   --dsw-font-markdown-code: 12px/1.5 var(--font-mono);
-  --dsw-font-markdown-code-block: 12px/1.5 var(--font-mono);
+  --dsw-font-markdown-code-block: 12px/1.55 var(--font-mono);
   --dsw-font-markdown-code-font-family: var(--font-mono);
   --dsw-font-markdown-table: 13px/1.5 var(--font-ui);
   --dsw-font-markdown-table-head: 600 13px/1.5 var(--font-ui);
-  --ds-transition-duration: 100ms;
-  --ds-ease-in-out: ease;
+  --ds-transition-duration: var(--duration-fast);
+  --ds-ease-in-out: var(--ease-out);
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
@@ -130,6 +130,19 @@
 .dsh-chat-conversation > .dsh-upstream-entry.entry-user,
 .dsh-upstream-entry.entry-user { justify-self: stretch; width: 100%; max-width: 100%; padding: 0; background: none; }
 .dsh-upstream-host, .dsh-upstream-assistant { min-width: 0; }
+/* A task the user handed straight to an Agent: a user-side card that follows that Agent's state. */
+.dsh-chat-conversation > .dsh-agent-dispatch { justify-self: end; display: grid; gap: 6px; box-sizing: border-box; width: fit-content; min-width: min(260px, 100%); max-width: min(82%, 525px); padding: 10px 16px; border-radius: 16px; background: var(--surface-muted); color: var(--text); font-size: 14px; line-height: 22px; }
+.dsh-chat-conversation > .dsh-agent-dispatch:not(:first-child) { margin-top: 20px; }
+.dsh-agent-dispatch-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; font-size: 12px; line-height: 20px; }
+.dsh-agent-dispatch-target { min-width: 0; overflow: hidden; color: var(--text-secondary); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-agent-dispatch-status { flex: none; color: var(--text-secondary); }
+.dsh-agent-dispatch[data-state="running"] .dsh-agent-dispatch-status { color: var(--running); }
+.dsh-agent-dispatch[data-state="done"] .dsh-agent-dispatch-status { color: var(--success); }
+.dsh-agent-dispatch[data-state="failed"] .dsh-agent-dispatch-status { color: var(--error); }
+.dsh-agent-dispatch-text, .dsh-agent-dispatch-result { display: -webkit-box; margin: 0; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 8; }
+.dsh-agent-dispatch-result { padding-top: 6px; border-top: 1px solid var(--separator); color: var(--text-secondary); font-size: 13px; line-height: 20px; -webkit-line-clamp: 6; }
+.dsh-agent-dispatch-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.dsh-agent-dispatch-actions .button { color: var(--text-secondary); }
 .dsh-upstream-user-row { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .dsh-upstream-user-row > :first-child { max-width: min(82%, 525px); box-sizing: border-box; }
 .dsh-upstream-assistant { display: flex; flex-direction: column; color: var(--text); font-size: 14px; line-height: 24px; }

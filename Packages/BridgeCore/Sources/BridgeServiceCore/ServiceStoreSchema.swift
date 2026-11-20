@@ -27,7 +27,7 @@ private struct LegacyWorkspaceCommand: Codable {
 }
 
 enum ServiceStoreSchema {
-  static let version: Int64 = 26
+  static let version: Int64 = 29
   static let migrationPrefix = "BridgeServiceCore."
   static let migrationV1 = "BridgeServiceCore.v1"
   static let migrationV2 = "BridgeServiceCore.v2"
@@ -55,6 +55,8 @@ enum ServiceStoreSchema {
   static let migrationV24 = "BridgeServiceCore.v24"
   static let migrationV25 = "BridgeServiceCore.v25"
   static let migrationV26 = "BridgeServiceCore.v26"
+  static let migrationV27 = "BridgeServiceCore.v27"
+  static let migrationV28 = "BridgeServiceCore.v28"
   static let knownMigrations = Set((1...version).map { "\(migrationPrefix)v\($0)" })
 
   static func prepare(_ database: DatabaseQueue) throws {
@@ -317,6 +319,15 @@ enum ServiceStoreSchema {
     }
     migrator.registerMigration(migrationV26) { db in
       try createVersionTwentySix(in: db)
+    }
+    migrator.registerMigration(migrationV27) { db in
+      try createVersionTwentySeven(in: db)
+    }
+    migrator.registerMigration(migrationV28) { db in
+      try createVersionTwentyEight(in: db)
+    }
+    migrator.registerMigration("BridgeServiceCore.v29") { db in
+      try createGatewayActivity(in: db)
     }
     return migrator
   }
@@ -1198,6 +1209,7 @@ enum ServiceStoreSchema {
 
       let requiredColumns: [String: Set<String>] = [
         "bridge_service_meta": ["singleton", "schema_version"],
+        "bridge_service_gateway_activity": ["byte_offset", "recorded_at", "entry"],
         "bridge_service_projects": [
           "project_id", "name", "canonical_path", "root_device", "root_inode", "root_volume_uuid",
           "read_permission", "write_permission", "network_permission", "created_at", "updated_at",
@@ -1211,6 +1223,9 @@ enum ServiceStoreSchema {
         "bridge_service_dsh_native_sessions": [
           "installation_id", "profile_id", "project_id", "session_id",
         ],
+        "bridge_service_execution_roots": [
+          "group_id", "root_session_id", "root_active", "root_closing", "root_permission_mode",
+        ],
         "bridge_service_execution_groups": [
           "project_id", "group_id", "root_session_id", "root_active", "root_closing",
           "root_permission_mode",
@@ -1221,6 +1236,15 @@ enum ServiceStoreSchema {
         ],
         "bridge_service_embedded_dsh_inputs": [
           "parent_session_id", "child_id", "request_id", "task_id", "result_delivered",
+        ],
+        "bridge_service_subagent_rounds": [
+          "root_id", "child_id", "request_id", "project_id", "ordinal", "parent_session_id",
+          "installation_id", "kind", "phase", "fingerprint", "prompt", "options_json", "access",
+          "repair_conflict", "dependencies_json", "previous_request_id", "previous_task_id",
+          "previous_run_id", "requested_after_terminal", "task_id", "waiting_reason",
+          "failure_reason", "failure_origin", "dispatch_error", "delivery_required", "delivered",
+          "workspace_mode", "write_scope", "reservation_held", "lease_held", "child_created_at",
+          "created_at", "updated_at", "settled_at",
         ],
         "bridge_service_workbench_operations": [
           "operation_id", "kind", "session_id", "child_id", "project_id", "target_id",
@@ -1290,6 +1314,14 @@ enum ServiceStoreSchema {
         guard Set(try db.columns(in: table).map(\.name)) == expected else {
           throw ServiceStoreError.corruptSchema
         }
+      }
+      let roundForeignKeys = try Row.fetchAll(
+        db, sql: "PRAGMA foreign_key_list(bridge_service_subagent_rounds)")
+      guard roundForeignKeys.count == 1,
+        roundForeignKeys[0]["table"] as String == "bridge_service_projects",
+        roundForeignKeys[0]["on_delete"] as String == "CASCADE"
+      else {
+        throw ServiceStoreError.corruptSchema
       }
       let artifactForeignKeys = try Row.fetchAll(
         db,

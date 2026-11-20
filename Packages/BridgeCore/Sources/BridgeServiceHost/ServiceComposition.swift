@@ -20,6 +20,7 @@ import Foundation
 public actor ServiceComposition {
   public let paths: ServiceDataPaths
   public let store: SimpleServiceStore
+  public let secretStore: any SecretStore
   public let projects: ServiceProjectService
   public let tasks: ServiceTaskManager
   public let settings: ServiceSettings
@@ -34,6 +35,8 @@ public actor ServiceComposition {
   public let runtimeStatus: ServiceRuntimeStatus
   public let application: BridgeServiceApplication
   public let embeddedDSH: ServiceEmbeddedDSHController
+  let providerGateway: ServiceProviderGateway
+  let applicationMode: ServiceApplicationModeController
   public let tunnel: ServiceTunnelController
   public let mcpClients: ServiceMCPClientRegistry
   let geminiCloud: ServiceGeminiCloudController
@@ -48,6 +51,9 @@ public actor ServiceComposition {
   private var startupAgentRefreshTask: Task<Void, Never>?
   private var tunnelBootstrapped = false
   private var isShutdown = false
+  var completeExitTask: Task<Void, Never>?
+  var completeExitState = "idle"
+  var completeExitMessage: String?
 
   public static func make(
     configuration: ServiceCompositionConfiguration,
@@ -69,7 +75,16 @@ public actor ServiceComposition {
     tunnelFactory: (any ServiceTunnelManagerBuilding)? = nil
   ) async throws -> ServiceComposition {
     let paths = try ServiceDataPaths.prepare(at: configuration.dataRootURL)
+    let freshInstall =
+      !FileManager.default.fileExists(atPath: paths.databaseURL.path)
+      && configuration.legacyDataRootURL == nil
     let store = try SimpleServiceStore(path: paths.databaseURL.path)
+    if freshInstall {
+      try await store.setSetting(
+        ServiceSettingRecord(
+          key: "application.onboarding", value: "true", updatedAt: Date()))
+    }
+    let providerSecrets = ChunkedSecretStore(base: secretStore)
     let legacyImport = await Self.importLegacyConfiguration(
       from: configuration.legacyDataRootURL,
       into: store
@@ -311,15 +326,26 @@ public actor ServiceComposition {
       application: application, projects: projects, tasks: tasks, store: store, settings: settings,
       registry: agentRegistry, providers: agentProviders,
       desktop: deepSeekDesktopProvider.controller,
-      secretStore: secretStore,
-      dataRoot: embeddedDSHRoot, workspaces: workspaces
+      secretStore: providerSecrets,
+      dataRoot: embeddedDSHRoot, resourceRoot: configuration.providerResourceRoot,
+      workspaces: workspaces
     )
+    let existingProviders = ServiceExistingProviders(
+      workbench: embeddedDSH, dataRoot: embeddedDSHRoot,
+      resourceRoot: configuration.providerResourceRoot)
+    await embeddedDSH.attachProviders(existingProviders)
+    let applicationMode = ServiceApplicationModeController(
+      settings: settings, application: application, embeddedDSH: embeddedDSH)
+    try await applicationMode.initialize()
     await coordinator.setToolWriteGateProvider(embeddedDSH)
     try await embeddedDSH.restoreWorkspaceMergeRecoveryMarkers()
-    await embeddedDSH.startNativeWriteRecovery()
-    await embeddedDSH.startExecutionRecovery()
+    if await applicationMode.delegationEnabled() {
+      await embeddedDSH.startNativeWriteRecovery()
+      await embeddedDSH.startExecutionRecovery()
+      await embeddedDSH.startSubagentScheduler()
+    }
     try await coordinator.recoverClaudeProcesses()
-    await application.startTaskQueueProcessor()
+    if await applicationMode.delegationEnabled() { await application.startTaskQueueProcessor() }
     let resolvedTunnelFactory =
       tunnelFactory
       ?? BundledServiceTunnelManagerFactory(
@@ -339,8 +365,16 @@ public actor ServiceComposition {
     )
     let mcpClients = try ServiceMCPClientRegistry.makeDeferred(
       settings: settings,
-      secrets: secretProvider
+      secrets: secretProvider, store: store
     )
+    let providerGateway = ServiceProviderGateway(
+      store: store, existing: existingProviders,
+      dataRoot: paths.rootURL.appendingPathComponent("ProviderGateway", isDirectory: true),
+      resourceRoot: configuration.providerResourceRoot)
+    try await ServiceProviderGatewayAssembly.configure(
+      gateway: providerGateway, mode: applicationMode, store: store,
+      secrets: providerSecrets, clients: mcpClients, projects: projects,
+      configuration: configuration)
     return ServiceComposition(
       configuration: configuration,
       executionAppServer: executionAppServer,
@@ -348,6 +382,7 @@ public actor ServiceComposition {
       deepSeekDesktop: deepSeekDesktopProvider.controller,
       paths: paths,
       store: store,
+      secretStore: secretStore,
       projects: projects,
       tasks: tasks,
       settings: settings,
@@ -361,6 +396,7 @@ public actor ServiceComposition {
       runtimeStatus: runtimeStatus,
       application: application,
       embeddedDSH: embeddedDSH,
+      providerGateway: providerGateway, applicationMode: applicationMode,
       setupRuntimeBindings: setupRuntimeBindings,
       tunnel: tunnel,
       mcpClients: mcpClients,
@@ -373,6 +409,7 @@ public actor ServiceComposition {
     let registry = agentRegistry
     let runtimeStatus = runtimeStatus
     startupAgentRefreshTask = Task {
+      guard await applicationMode.delegationEnabled() else { return }
       do {
         _ = try await registry.refreshInstallationStates()
       } catch is CancellationError {
@@ -402,6 +439,7 @@ public actor ServiceComposition {
     deepSeekDesktop: DeepSeekHarnessDesktopController,
     paths: ServiceDataPaths,
     store: SimpleServiceStore,
+    secretStore: any SecretStore,
     projects: ServiceProjectService,
     tasks: ServiceTaskManager,
     settings: ServiceSettings,
@@ -415,6 +453,7 @@ public actor ServiceComposition {
     runtimeStatus: ServiceRuntimeStatus,
     application: BridgeServiceApplication,
     embeddedDSH: ServiceEmbeddedDSHController,
+    providerGateway: ServiceProviderGateway, applicationMode: ServiceApplicationModeController,
     setupRuntimeBindings: ServiceAgentSetupRuntimeBindings,
     tunnel: ServiceTunnelController,
     mcpClients: ServiceMCPClientRegistry,
@@ -426,6 +465,7 @@ public actor ServiceComposition {
     self.deepSeekDesktop = deepSeekDesktop
     self.paths = paths
     self.store = store
+    self.secretStore = secretStore
     self.projects = projects
     self.tasks = tasks
     self.settings = settings
@@ -447,6 +487,8 @@ public actor ServiceComposition {
     self.runtimeStatus = runtimeStatus
     self.application = application
     self.embeddedDSH = embeddedDSH
+    self.providerGateway = providerGateway
+    self.applicationMode = applicationMode
     self.tunnel = tunnel
     self.mcpClients = mcpClients
     geminiCloud = ServiceGeminiCloudController(settings: settings, clients: mcpClients)
@@ -478,7 +520,9 @@ public actor ServiceComposition {
           geminiCloudAccessGate: geminiCloud.accessGate,
           port: requestedPort
         ),
-        clientAdmission: mcpClients.admission
+        clientAdmission: mcpClients.admission,
+        clientAccess: { [mcpClients] in await mcpClients.access(for: $0) },
+        delegationEnabled: { [applicationMode] in await applicationMode.delegationEnabled() }
       )
       server = activeServer
       attemptedServerStart = true
@@ -634,6 +678,8 @@ public actor ServiceComposition {
   public func shutdown() async {
     guard !isShutdown else { return }
     isShutdown = true
+    await providerGateway.stopAccepting()
+    await applicationMode.shutdown()
     await agentSetup.shutdown()
     let refreshTask = startupAgentRefreshTask
     startupAgentRefreshTask = nil
@@ -645,6 +691,7 @@ public actor ServiceComposition {
     await application.shutdownTaskQueueProcessor()
     do {
       try await embeddedDSH.shutdown()
+      try await providerGateway.shutdown()
     } catch {
       let current = await runtimeStatus.current()
       await runtimeStatus.update(

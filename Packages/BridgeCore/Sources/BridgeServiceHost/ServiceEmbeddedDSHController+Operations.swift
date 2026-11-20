@@ -5,7 +5,7 @@ import Foundation
 
 extension ServiceEmbeddedDSHController {
   static let durableActions: Set<String> = [
-    "session.prompt", "session.stop", "subagents.control",
+    "session.prompt", "session.stop", "subagents.control", "workbench.importTask",
     "plugins.install", "plugins.update",
   ]
   static let webOperationKinds: Set<String> = [
@@ -66,9 +66,14 @@ extension ServiceEmbeddedDSHController {
       return try await store.registerWorkbenchOperation(
         previous.draft, generation: previous.generation)
     }
+    if ["session.prompt", "workbench.resume", "handoff.submit"].contains(kind) {
+      try await application.requireNewWorkbenchTaskAdmission()
+    }
     let sessionID =
-      payload["sessionID"]?.stringValue ?? request["sessionId"]?.stringValue
-      ?? request["taskID"]?.stringValue
+      kind == "workbench.importTask"
+      ? nil
+      : payload["sessionID"]?.stringValue ?? request["sessionId"]?.stringValue
+        ?? request["taskID"]?.stringValue
     if ["session.prompt", "session.stop", "subagents.control"].contains(kind),
       sessionID?.isEmpty != false
     {
@@ -84,7 +89,12 @@ extension ServiceEmbeddedDSHController {
     }
     let inputJSON: String
     let projectID: String?
-    if Self.webOperationKinds.contains(kind) {
+    if kind == "workbench.importTask" {
+      let prepared = try await prepareTaskImport(request, operationID: id)
+      inputJSON = Self.canonicalJSON(
+        .object(["request": .object(request), "dispatch": .object(prepared)]))
+      projectID = prepared["projectID"]?.stringValue
+    } else if Self.webOperationKinds.contains(kind) {
       inputJSON = try await application.prepareWorkbenchTaskOperation(
         kind: kind,
         inputJSON: Self.json(.object(request)))
@@ -116,7 +126,18 @@ extension ServiceEmbeddedDSHController {
       childID: payload["childID"]?.stringValue, projectID: projectID,
       targetID: payload["targetID"]?.stringValue ?? request["taskID"]?.stringValue,
       requestID: payload["requestID"]?.stringValue ?? id, inputJSON: inputJSON)
-    let registration = try await store.registerWorkbenchOperation(draft, generation: generation)
+    let registration: ServiceWorkbenchOperationRegistration
+    do {
+      registration = try await store.registerWorkbenchOperation(draft, generation: generation)
+    } catch ServiceStoreError.invalidArgument("operation.idempotencyConflict")
+      where kind == "workbench.importTask"
+    {
+      guard let previous = try await store.workbenchOperation(id: id), previous.draft.kind == kind,
+        try Self.decodeObject(previous.draft.inputJSON)["request"] == .object(request)
+      else { throw ServiceStoreError.invalidArgument("operation.idempotencyConflict") }
+      registration = try await store.registerWorkbenchOperation(
+        previous.draft, generation: previous.generation)
+    }
     if kind == "session.stop", let sessionID { bindingTasks[sessionID]?.cancel() }
     if registration.created, payload["legacyPending"]?.boolValue == true {
       var imported = try await store.transitionWorkbenchOperation(
@@ -221,6 +242,9 @@ extension ServiceEmbeddedDSHController {
   }
 
   func dispatchOperation(_ record: ServiceWorkbenchOperation) async throws -> ACPJSONValue {
+    if record.draft.kind == "workbench.importTask" {
+      return try await dispatchTaskImport(record)
+    }
     if Self.webOperationKinds.contains(record.draft.kind) {
       return .object(
         try Self.decodeObject(

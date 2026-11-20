@@ -30,7 +30,7 @@
       }
     }
   } catch (_) {}
-  var root = null, cells = [], menu = null, button = null, control = null, sentIDs = "[]";
+  var root = null, cells = [], layoutControl = null, sentIDs = "[]";
   saved.panes = saved.panes.map(function (key) { return typeof key === "string" && key !== "__draft__" ? key : null; });
   var context = { page: null, emit: null }, focusedIndex = 0, lastSelectedKey, drafts = [];
 
@@ -137,64 +137,71 @@
     return node;
   }
 
-  // The layout button sits in the window toolbar next to the other web workbench actions.
-  function ensureButton() {
-    var host = document.querySelector("#workspace-toolbar-actions .inspector-toolbar-actions");
-    if (!host) return;
-    if (control && control.parentNode === host) return;
-    control = S.node("span", "workbench-layout-control");
-    button = S.node("button", "button small workbench-layout-button");
-    button.type = "button"; button.title = "分屏布局"; button.setAttribute("aria-label", "分屏布局");
+  function createLayoutControl(onChoose, onVisibility) {
+    var control = S.node("span", "workbench-layout-control");
+    var button = S.node("button", "button small workbench-layout-button");
+    button.type = "button"; button.title = "分屏布局"; button.setAttribute("aria-label", button.title);
     button.setAttribute("aria-haspopup", "true");
-    button.addEventListener("click", function (event) {
-      if (event && event.stopPropagation) event.stopPropagation();
-      toggleMenu();
-    });
-    menu = S.node("div", "workbench-layout-menu");
+    var menu = S.node("div", "workbench-layout-menu");
     menu.setAttribute("role", "menu"); menu.hidden = true; menu.dataset.browserOccluder = "";
     menu.appendChild(S.node("p", "workbench-layout-menu-title", "填充与排列"));
-    var options = S.node("div", "workbench-layout-options");
-    LAYOUTS.forEach(function (item) {
+    var options = S.node("div", "workbench-layout-options"), current;
+    var items = LAYOUTS.map(function (item) {
       var option = S.node("button", "workbench-layout-option");
       option.type = "button"; option.title = item.title;
       option.setAttribute("role", "menuitemradio"); option.setAttribute("aria-label", item.title);
       option.dataset.layout = item.id;
       option.appendChild(glyph(item));
-      option.addEventListener("click", function () { choose(item.id); });
+      option.addEventListener("click", function () { setOpen(false); onChoose(item.id); button.focus(); });
       options.appendChild(option);
+      return option;
     });
     menu.appendChild(options);
     control.appendChild(button); control.appendChild(menu);
-    host.insertBefore(control, host.querySelector(".workbench-task-actions"));
-    if (typeof document !== "undefined" && document.addEventListener && !ensureButton.listening) {
-      ensureButton.listening = true;
-      document.addEventListener("click", function (event) {
-        if (!menu || menu.hidden || (event && event.target && control.contains(event.target))) return;
-        menu.hidden = true; updateButton();
-      });
+    function setOpen(open) {
+      if (open === !menu.hidden) return;
+      menu.hidden = !open; button.setAttribute("aria-expanded", String(open));
+      if (onVisibility) onVisibility();
     }
-  }
-
-  function updateButton() {
-    if (!button) return;
-    if (global.CodexBridgeDesktopPages && context && context.emit) {
-      global.CodexBridgeDesktopPages.measureBrowserViewport(context.emit);
-    }
-    S.clear(button);
-    button.appendChild(glyph(layout()));
-    button.setAttribute("aria-expanded", String(menu && !menu.hidden));
-    if (menu) menu.querySelectorAll(".workbench-layout-option").forEach(function (option) {
-      option.setAttribute("aria-checked", String(option.dataset.layout === saved.layout));
-      option.classList.toggle("is-selected", option.dataset.layout === saved.layout);
+    button.setAttribute("aria-expanded", "false");
+    button.addEventListener("click", function () { setOpen(menu.hidden); });
+    document.addEventListener("click", function (event) {
+      if (!menu.hidden && !control.contains(event.target)) setOpen(false);
     });
+    document.addEventListener("keydown", function (event) {
+      if (menu.hidden || event.key !== "Escape") return;
+      event.preventDefault(); setOpen(false); button.focus();
+    });
+    return { root: control, update: function (layoutID, visible) {
+      control.hidden = visible === false;
+      if (control.hidden) setOpen(false);
+      if (layoutID === current) return;
+      current = layoutID;
+      S.clear(button); button.appendChild(glyph(LAYOUTS.find(function (item) { return item.id === layoutID; })));
+      items.forEach(function (option) {
+        var selected = option.dataset.layout === layoutID;
+        option.setAttribute("aria-checked", String(selected));
+        option.classList.toggle("is-selected", selected);
+      });
+    } };
   }
 
-  function toggleMenu() { if (!menu) return; menu.hidden = !menu.hidden; updateButton(); }
+  function ensureButton() {
+    var host = document.querySelector("#workspace-toolbar-actions .inspector-toolbar-actions");
+    if (!host) return;
+    if (!layoutControl) layoutControl = createLayoutControl(choose, function () {
+      if (global.CodexBridgeDesktopPages && context.emit) {
+        global.CodexBridgeDesktopPages.measureBrowserViewport(context.emit);
+      }
+    });
+    if (layoutControl.root.parentNode !== host) host.insertBefore(layoutControl.root, host.querySelector(".workbench-task-actions"));
+    layoutControl.update(saved.layout);
+  }
+
   // The single view's draft tab steps aside in the split view, where drafts live in panes;
   // its text stays for when the single view returns.
   function choose(id) {
     saved.layout = id; persist();
-    if (menu) menu.hidden = true;
     if (id !== "single" && newTask().isOpen()) newTask().close();
     rerender();
   }
@@ -247,34 +254,20 @@
     cell.root.dataset.pane = String(index);
     cell.root.addEventListener("pointerdown", function () { focus(cell); });
     cell.root.addEventListener("focusin", function () { focus(cell); });
-    var header = S.node("div", "workbench-pane-header");
-    cell.picker = S.node("select", "workbench-pane-picker");
-    cell.picker.setAttribute("aria-label", "第 " + (index + 1) + " 格显示的会话");
-    cell.picker.addEventListener("change", function () {
-      var chosen = cell.picker.value;
-      if (!chosen) return;
+    cell.header = createPaneHeader(index, function (chosen) {
       // Picking a session shown elsewhere swaps the two panes.
       var list = slots(layout().count), other = list.indexOf(chosen);
       if (other >= 0 && other !== index) list[other] = list[index] === undefined ? null : list[index];
       list[index] = chosen; store(list);
-      // A session shown in a pane is an open session, so it also gets a tab.
       if (tabs()) tabs().open(context.page, chosen);
       rerender();
-    });
-    cell.status = S.node("span", "workbench-pane-status");
-    cell.close = S.node("button", "workbench-pane-close", "×");
-    cell.close.type = "button";
-    cell.close.addEventListener("click", function (event) {
-      if (event && event.stopPropagation) event.stopPropagation();
-      closePane(index);
-    });
-    header.appendChild(cell.picker); header.appendChild(cell.status); header.appendChild(cell.close);
+    }, function () { closePane(index); });
     cell.body = S.node("div", "workbench-pane-body");
     cell.body.addEventListener("scroll", function () {
       cell.following = cell.body.scrollHeight - cell.body.clientHeight - cell.body.scrollTop <= 40;
     }, { passive: true });
     cell.composer = S.node("div", "workbench-controls workbench-pane-composer");
-    cell.root.appendChild(header); cell.root.appendChild(cell.body); cell.root.appendChild(cell.composer);
+    cell.root.appendChild(cell.header.root); cell.root.appendChild(cell.body); cell.root.appendChild(cell.composer);
     return cell;
   }
 
@@ -329,36 +322,53 @@
     });
   }
 
-  // Every session is listed, grouped by project when there is more than one.
+  function createPaneHeader(index, onChoose, onClose) {
+    var root = S.node("div", "workbench-pane-header");
+    var picker = S.node("select", "workbench-pane-picker"), signature;
+    picker.setAttribute("aria-label", "第 " + (index + 1) + " 格显示的会话");
+    picker.addEventListener("change", function () { if (picker.value) onChoose(picker.value); });
+    var status = S.node("span", "workbench-pane-status");
+    var close = S.node("button", "workbench-pane-close", "×");
+    close.type = "button";
+    close.addEventListener("click", function (event) {
+      if (event && event.stopPropagation) event.stopPropagation();
+      onClose();
+    });
+    root.appendChild(picker); root.appendChild(status); root.appendChild(close);
+    return { root: root, update: function (groups, selected, statusText) {
+      var next = JSON.stringify(groups);
+      if (signature !== next) {
+        signature = next; S.clear(picker);
+        var placeholder = S.node("option", null, "新会话");
+        placeholder.value = ""; placeholder.disabled = true; placeholder.hidden = true;
+        picker.appendChild(placeholder);
+        groups.forEach(function (group) {
+          var target = picker;
+          if (group.title) { target = S.node("optgroup"); target.label = group.title; picker.appendChild(target); }
+          group.options.forEach(function (option) {
+            var node = S.node("option", null, option.title);
+            node.value = option.id;
+            node.hidden = !!option.hidden; node.disabled = !!option.disabled;
+            target.appendChild(node);
+          });
+        });
+      }
+      picker.value = selected || "";
+      status.textContent = statusText || "";
+      close.title = selected ? "关闭此会话" : "清空，重新开始";
+      close.setAttribute("aria-label", close.title);
+    } };
+  }
+
   function updatePicker(cell, page, row) {
     var rows = S.safeArray(page.tasks), projects = S.safeArray(page.projects);
     var groups = projects.length > 1 ? S.groupByProject(rows, projects, S.defaultProjectID(page),
       function (item) { return item.projectID; }, function (item) { return item.projectName; }) : [{ title: "", rows: rows }];
-    var grouped = groups.map(function (group) {
+    cell.header.update(groups.map(function (group) {
       return { title: group.title, options: group.rows.map(function (item) {
         return { id: keyOf(item), title: (item.title || "Agent 会话") + " · " + (item.provider || "") };
       }) };
-    });
-    var signature = JSON.stringify([grouped, projects.length > 1]);
-    if (cell.pickerSignature !== signature) {
-      cell.pickerSignature = signature;
-      S.clear(cell.picker);
-      function addOption(target, option) {
-        var node = S.node("option", null, option.title);
-        node.value = option.id;
-        target.appendChild(node);
-      }
-      // A draft pane shows the placeholder; it is not a choice of its own.
-      var placeholder = S.node("option", null, "新会话");
-      placeholder.value = ""; placeholder.disabled = true; placeholder.hidden = true;
-      cell.picker.appendChild(placeholder);
-      grouped.forEach(function (group) {
-        var target = cell.picker;
-        if (projects.length > 1) { target = S.node("optgroup"); target.label = group.title; cell.picker.appendChild(target); }
-        group.options.forEach(function (option) { addOption(target, option); });
-      });
-    }
-    cell.picker.value = row ? keyOf(row) : "";
+    }), row && keyOf(row), row && row.status);
   }
 
   function newTask() { return global.CodexBridgeDesktopWorkbenchNewTask; }
@@ -378,9 +388,6 @@
     var session = row && row !== "loading" ? row : null;
     updatePicker(cell, page, session);
     cell.root.classList.toggle("is-running", !!(session && session.isRunning));
-    cell.status.textContent = session ? session.status || "" : "";
-    cell.close.title = row ? "关闭此会话" : "清空，重新开始";
-    cell.close.setAttribute("aria-label", cell.close.title);
     var key = session ? keyOf(session) : row;
     if (cell.key !== key) {
       if (cell.blank === "draft") draftOf(cell.index).unmount();
@@ -440,7 +447,7 @@
   // Returns whether the split view owns the inspector this render.
   function render(page, emit) {
     context.page = page; context.emit = emit;
-    ensureButton(); updateButton();
+    ensureButton();
     var current = layout();
     // Pane drafts take their submission receipts even while the single view is shown.
     if (page) drafts.forEach(function (draft) { if (draft) draft.receive(page, emit); });
@@ -485,6 +492,8 @@
       return isSplit() && cell && typeof cell.key === "string" && cell.key.indexOf("s:") === 0 ? cell.key : null;
     },
     layouts: function () { return LAYOUTS.slice(); },
+    createLayoutControl: createLayoutControl,
+    createPaneHeader: createPaneHeader,
     choose: choose
   };
 }(window));

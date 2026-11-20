@@ -1,0 +1,381 @@
+{
+  "providers": [
+    {
+      "name": "OpenCode Zen Free",
+      "package": "@magpie-community/opencode-zen-free-auth",
+      "version": "0.1.28",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/zen-free",
+      "verified": false,
+      "accessMode": "公开免费接口",
+      "summary": "免注册接入 OpenCode Zen 提供的免费公开模型，开箱即用。",
+      "requirements": "无需个人账号或 API Key，使用官方公开凭证；可用模型与限流由上游决定。",
+      "usageSteps": [
+        "点击「安装」，安装完成后 Bridge 会自动建立公开连接。",
+        "等待模型同步完成后，即可在工作台模型选择器或「接入应用」中直接使用。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "安装后自动连接公开通道，无需手动输入密钥。仅列出插件支持转换为 Chat、Responses 或 Anthropic 协议的模型；可用名额与限流由上游服务决定。"
+    },
+    {
+      "name": "Qoder",
+      "package": "@magpie-community/opencode-qoder-auth",
+      "version": "0.2.71",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/qoder",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "通过官网授权接入 Qoder 国际版、Qoder 中国版、千问办公及其企业版订阅模型。",
+      "requirements": "需要对应站点的账号（4 个站点各自独立授权）；千问办公企业版还需填写企业域名。",
+      "usageSteps": [
+        "安装后，在已安装卡片中找到对应站点（qoder / qoder-cn / qwenwork / qwenwork-enterprise）。",
+        "点击「连接」，按提示在浏览器完成该站点的官网授权。",
+        "授权后自动拉取该账号可用模型，可在工作台选择或点击「额度」查看余量。"
+      ],
+      "limitSummary": "常规对话与工具正常；反代协议不支持少数高级参数（严格工具/结构化输出/停止词）及签到",
+      "compatibility": "partial",
+      "compatibilityDetails": "插件将 Qoder / 千问办公订阅私有接口转换为 OpenAI Chat 协议，支持日常对话与普通工具调用。采样参数由服务端托管；强制/指定工具调用、串行工具、严格工具定义、结构化输出和停止词暂不支持；工作台未接入插件签到功能。"
+    },
+    {
+      "name": "Cursor",
+      "package": "@magpie-community/opencode-cursor-auth",
+      "version": "0.2.48",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/cursor",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "通过 Cursor 后端协议反代调用 Cursor 订阅（Pro / Ultra / Teams）中的模型。",
+      "requirements": "需要 Cursor 账号和有效订阅；支持浏览器登录、API Key，或复用本机 cursor-agent 登录态。",
+      "usageSteps": [
+        "安装后点击「连接」，选择浏览器授权、API Key，或直接导入本机已登录的 cursor-agent 登录态。",
+        "连接完成后等待模型同步，即可在工作台或接入应用中使用订阅内模型。"
+      ],
+      "limitSummary": "支持常规编码对话与工具；仅支持内嵌图片，不支持强制/严格工具与结构化输出",
+      "compatibility": "partial",
+      "compatibilityDetails": "插件模拟 cursor-agent 协议接入 Cursor 订阅，支持浏览器、API Key 及本机 cursor-agent 登录态导入。图片仅支持内嵌数据；输出上限与采样参数由服务端控制；强制或指定工具调用、串行工具、严格工具定义、结构化输出和停止词暂不支持。"
+    },
+    {
+      "name": "Grok",
+      "package": "@magpie-community/opencode-grok-auth",
+      "version": "0.2.7",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/grok",
+      "verified": false,
+      "accessMode": "本机 CLI 复用",
+      "summary": "复用本机 Grok Build CLI 登录态，调用 SuperGrok 或 X Premium+ 订阅中的 Grok 模型。",
+      "requirements": "需要 SuperGrok 或 X Premium+ 订阅，以及本机已安装 Grok Build CLI。",
+      "environmentSetup": "需本机先安装 Grok Build CLI：macOS / Linux 运行 curl -fsSL https://x.ai/cli/install.sh | bash；Windows PowerShell 运行 irm https://x.ai/cli/install.ps1 | iex。若安装在自定义目录，请配置环境变量 GROK_BIN_DIR 或 GROK_HOME。",
+      "usageSteps": [
+        "先按上方命令在本机安装 Grok Build CLI（可先安装本插件后再配置环境）。",
+        "在已安装卡片点击「连接」，选择使用 Grok Build 设备码登录、复用现有 CLI 登录态，或导入 CPA JSON。",
+        "连接成功后走 OpenAI Responses 协议调用 Grok 模型，可在工作台直接使用。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "插件通过本机 Grok Build CLI 管理与续期登录凭证，并将请求按 CLI 签名发送至 cli-chat-proxy.grok.com（Responses 接口）。本机尚未安装 Grok Build CLI 时可先安装插件，配好 CLI 后再点击连接。"
+    },
+    {
+      "name": "Devin",
+      "package": "@magpie-community/opencode-devin-auth",
+      "version": "0.1.45",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/devin",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "接入 Devin 订阅账号提供的模型，支持 Chat 与 Anthropic 协议模型。",
+      "requirements": "需要 Devin 账号或 API Key；支持浏览器登录、API Key 或读取本机 Devin CLI 登录态。",
+      "usageSteps": [
+        "安装后点击「连接」，选择浏览器授权、填入 API Key，或导入本机 Devin CLI 登录态。",
+        "连接后自动同步账号可用模型，可在工作台与接入应用中使用。"
+      ],
+      "limitSummary": "仅支持内嵌图片；不支持少数高级工具参数及 Claude 签名思考历史",
+      "compatibility": "partial",
+      "compatibilityDetails": "支持浏览器、API Key 与本机 Devin CLI 登录态导入。目录拉取失败时插件可能回退内置模型表；图片只支持内嵌数据；不支持强制或指定工具调用、串行工具、严格工具定义、结构化输出、停止词及 Claude 签名推理历史。"
+    },
+    {
+      "name": "Zed",
+      "package": "@magpie-community/opencode-zed-auth",
+      "version": "0.1.19",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/zed",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "通过 Zed 订阅托管网关调用 Claude、GPT 与 Grok 等模型。",
+      "requirements": "需要 Zed 账号及相应付费套餐（Pro / Business / Student 等）。",
+      "usageSteps": [
+        "安装后点击「连接」，在浏览器中完成 Zed 账号授权。",
+        "同步模型后即可在工作台选择 Zed 托管的 Claude、GPT 和 Grok 模型。"
+      ],
+      "limitSummary": "跳过 Gemini 原生协议模型（Claude / GPT / Grok 正常可用）",
+      "compatibility": "partial",
+      "compatibilityDetails": "Bridge 协议转换器目前支持 Chat、Responses 和 Anthropic 协议，尚未内置 Google Gemini 原生协议转换器，因此 Zed 目录中的 Gemini 模型会自动跳过，其余 Claude / GPT / Grok 模型正常使用。"
+    },
+    {
+      "name": "Factory",
+      "package": "@magpie-community/opencode-factory-auth",
+      "version": "0.1.48",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/factory",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "接入 Factory (Droid) 订阅提供的模型，支持账号授权或 API Key。",
+      "requirements": "需要 Factory 账号或 API Key 及有效订阅；可用模型由套餐决定。",
+      "usageSteps": [
+        "安装后点击「连接」，选择浏览器授权登录 Factory 账号或输入 API Key。",
+        "等待模型同步后即可在工作台或接入应用中使用。"
+      ],
+      "limitSummary": "跳过 Gemini 原生协议模型（Claude / GPT 等模型正常可用）",
+      "compatibility": "partial",
+      "compatibilityDetails": "Bridge 协议转换器目前支持 Chat、Responses 和 Anthropic 协议，尚未内置 Google Gemini 原生协议转换器，因此 Factory 目录中的 Gemini 模型会自动跳过，其余模型正常使用。"
+    },
+    {
+      "name": "Command Code",
+      "package": "@magpie-community/opencode-commandcode-auth",
+      "version": "0.1.24",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/commandcode",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "通过 Command Code 订阅（Pro / Max / Ultra 等）接入旗下对话模型。",
+      "requirements": "需要 Command Code 账号或 API Key；支持浏览器、API Key 或读取本机 Command Code CLI 登录态。",
+      "usageSteps": [
+        "安装后点击「连接」，选择浏览器授权、填入 API Key，或复用本机 Command Code CLI 登录态。",
+        "连接完成后即可在工作台选择同步到的对话模型。"
+      ],
+      "limitSummary": "专用接口不支持少数高级工具与结构化参数；未接入 Jev 决策模型",
+      "compatibility": "partial",
+      "compatibilityDetails": "支持浏览器、API Key 和本机 Command Code CLI 登录态导入，仅列出对话模型。部分套餐走插件专用反代接口，因此强制或指定工具调用、串行工具、严格工具定义、结构化输出和停止词暂不支持，top_p 由服务端决定；Jev 决策模型和零数据保留开关未接入。"
+    },
+    {
+      "name": "Xiaomi MiMo",
+      "package": "@magpie-community/opencode-mimo-auth",
+      "version": "0.1.10",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/mimo",
+      "verified": false,
+      "accessMode": "官方接口",
+      "summary": "使用小米账号官方授权接入小米 MiMo Pro 与 MiMo Flash 模型。",
+      "requirements": "需要小米账号并开通对应 MiMo 服务或 Token Plan。",
+      "usageSteps": [
+        "安装后点击「连接」，通过小米账号在浏览器中完成授权。",
+        "授权后自动按账号区域路由并加载 MiMo Pro / Flash 模型。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "通过小米账号浏览器授权接入标准协议。Bridge 会按账号自动使用对应地区节点（新加坡、俄罗斯或印度）；遇到需要会员的拒绝时，插件可能自动改用该账号的 Token Plan。"
+    },
+    {
+      "name": "Kiro",
+      "package": "@magpie-community/opencode-kiro-auth",
+      "version": "0.1.40",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/kiro",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "使用 Kiro 个人或组织账号订阅调用模型，支持浏览器、API Key 或读取本机 Kiro CLI / IDE 登录态。",
+      "requirements": "需要 Kiro 个人账号、组织账号或 API Key；组织登录需填写起始地址和区域（自有 IdP 暂不支持）。",
+      "usageSteps": [
+        "安装后点击「连接」，选择浏览器授权、API Key，或直接导入本机 Kiro CLI / Kiro IDE 登录态。",
+        "连接成功后可用于纯文本 Chat / Responses 对话。"
+      ],
+      "limitSummary": "仅支持纯文本对话（暂不支持工具调用、图片与结构化输出）",
+      "compatibility": "partial",
+      "compatibilityDetails": "支持浏览器、API Key 与本机 Kiro CLI / IDE 登录态导入。受上游插件接口限制，目前仅支持纯文本 Chat 与 Responses 对话（工具调用、图片、结构化输出、停止词和 Anthropic Messages 暂不支持），输出上限与采样参数由 Kiro 决定，续写时需附带完整对话历史。"
+    },
+    {
+      "name": "MiniMax Code",
+      "package": "@magpie-community/opencode-minimax-auth",
+      "version": "0.2.9",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/minimax",
+      "verified": false,
+      "accessMode": "官方接口",
+      "summary": "通过官方设备码授权接入 MiniMax Code 国内版与国际版的文本对话模型。",
+      "requirements": "需要对应站点的 MiniMax Code 账号；国内版与国际版账号和额度独立。",
+      "usageSteps": [
+        "安装后在已安装卡片选择国内版（minimax-code）或国际版（minimax-code-global）。",
+        "点击「连接」，打开授权页输入设备码完成登录，即可载入文本对话模型并查看套餐额度。"
+      ],
+      "limitSummary": "仅接入文本对话模型（插件附带的媒体生成与搜索工具未接入）",
+      "compatibility": "partial",
+      "compatibilityDetails": "国内与国际站点各自通过官方浏览器设备码授权。仅提供文本对话模型；插件自带的媒体生成与搜索扩展工具未接入工作台；同一站点多次请求可能共用插件生成的会话编号。"
+    },
+    {
+      "name": "Cline",
+      "package": "@magpie-community/opencode-cline-auth",
+      "version": "0.1.15",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/cline",
+      "verified": false,
+      "accessMode": "官方接口",
+      "summary": "接入 Cline 官方网关的免费模型、按量计费模型或 ClinePass 订阅模型。",
+      "requirements": "需要 Cline 账号或 API Key；可用模型和计费方式由账号决定。",
+      "usageSteps": [
+        "安装后点击「连接」，选择 Cline 官网设备授权或直接填写 API Key。",
+        "授权后自动列出账号可用模型，走标准 OpenAI Chat 接口。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "通过官网设备授权或 API Key 接入标准 OpenAI Chat 接口。Bridge 不向插件提供跨请求的任务编号，也不单独提供固定上游线路开关。"
+    },
+    {
+      "name": "Trae",
+      "package": "@magpie-community/opencode-trae-auth",
+      "version": "0.2.43",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/trae",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "通过 Trae IDE 协议反代接入 Trae 中国版与国际版模型（含免费档位）。",
+      "requirements": "需要对应版本的 Trae 账号（trae-cn / trae-global 各自独立授权）。",
+      "usageSteps": [
+        "安装后在已安装卡片选择中国版（trae-cn）或国际版（trae-global）。",
+        "点击「连接」在浏览器完成 Trae 授权，即可使用对话与常规工具调用。"
+      ],
+      "limitSummary": "支持对话与常规工具；不支持严格工具/结构化输出，企业拒单时可能切个人额度",
+      "compatibility": "partial",
+      "compatibilityDetails": "插件将 Trae IDE 订阅接口转换为 OpenAI Chat 协议，支持对话和常规工具调用。top_p 由服务端决定，不支持严格工具定义、结构化输出和停止词；含工具调用的历史续写需保留工具定义；企业网关拒单时插件可能自动改用个人网关并消耗个人额度。"
+    },
+    {
+      "name": "Open Design",
+      "package": "@magpie-community/opencode-opendesign-auth",
+      "version": "0.1.13",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/opendesign",
+      "verified": false,
+      "accessMode": "官方接口",
+      "summary": "接入 Open Design Cloud 的 Design Plan 模型，支持 Chat、Responses 与 Anthropic 协议。",
+      "requirements": "需要 Open Design 账号或 API Key 及相应套餐。",
+      "usageSteps": [
+        "安装后点击「连接」，选择设备授权登录或填入 API Key。",
+        "连接完成后即可在工作台选择模型（设备授权支持查看额度）。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "支持官网设备授权或 API Key，按模型原生使用 Chat、Responses 或 Anthropic 接口。使用 API Key 登录时插件不提供额度查询。"
+    },
+    {
+      "name": "AWS Bedrock SSO",
+      "package": "magpie-aws-bedrock-sso",
+      "version": "0.4.0",
+      "license": "MIT",
+      "source": "https://github.com/HaroldLeo/magpie-aws-bedrock-sso",
+      "verified": false,
+      "accessMode": "本机 CLI 复用",
+      "summary": "通过本机 AWS CLI v2 SSO / IAM Profile 与 SigV4 签名直连 Amazon Bedrock 的 Claude 与 GPT 模型。",
+      "requirements": "需要本机安装 AWS CLI v2，并配置有 Bedrock 调用权限的 AWS Profile（无需 Bedrock API Key）。",
+      "environmentSetup": "需本机安装 AWS CLI v2 并完成配置（例如 aws configure sso / aws sso login --profile <名称>）。若 aws 不在默认 PATH 中，可通过环境变量 MAGPIE_BEDROCK_AWS_CLI 指定可执行路径，支持 AWS_PROFILE / AWS_CONFIG_FILE。",
+      "usageSteps": [
+        "先在本机安装 AWS CLI v2 并配置好有 Bedrock 权限的 Profile（可先安装本插件后再配置）。",
+        "在已安装卡片点击「连接」，输入你的 AWS Profile 名称与 Bedrock 区域（如 us-west-2）。",
+        "登录完成后自动读取该区域可见的 Claude（Anthropic 协议）与 GPT（Converse 转换）推理配置。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "插件调用本机 aws configure export-credentials 导出临时凭证并在本地进行 SigV4 签名，请求直连官方 bedrock-runtime 端点。Claude 走 Bedrock Anthropic Messages，GPT 经插件转换为 Bedrock Converse（GPT 路径不支持远程图片 URL、结构化输出与严格工具 schema）。"
+    },
+    {
+      "name": "Providers Hub",
+      "package": "magpie-providers-hub",
+      "version": "0.13.2",
+      "license": "MIT",
+      "source": "https://github.com/Gyl1219/magpie-providers-hub",
+      "verified": false,
+      "accessMode": "多渠道聚合",
+      "summary": "单插件聚合 12 个独立渠道（讯飞 AStudio / Loomy、阿里 Accio、有道 LobsterAI、超级麦吉、智谱 AutoClaw、MonkeyCode、七牛云、腾讯 Marvis）。",
+      "requirements": "按需连接要用的渠道即可，无需全连；各渠道账号、模型与额度完全独立。部分渠道支持读取本机桌面端或唤起 Chrome / Edge 隔离窗口登录。",
+      "usageSteps": [
+        "安装后展开已安装卡片中的渠道列表，只点你需要用的渠道右侧「连接」。",
+        "按渠道引导授权：AStudio / Loomy / MagiCrew / MonkeyCode 支持本机登录页，Accio / LobsterAI 走官网授权，七牛填 API Key，AutoClaw / Marvis 支持手动令牌或读取本机桌面端登录态。",
+        "连接成功的渠道会自动出现在顶部并同步模型到工作台。"
+      ],
+      "limitSummary": "部分反代渠道不支持高级工具与结构化参数；AutoClaw 桌面导入会刷新桌面会话",
+      "compatibility": "partial",
+      "compatibilityDetails": "12 个渠道全部开放授权与模型接入。注意：读取 AutoClaw 桌面端登录态会轮换一次性 refresh_token，导致 AutoClaw 桌面客户端需重新登录（也可改用手动粘贴令牌）；Marvis / MonkeyCode 浏览器登录需要本机已安装 Chrome 或 Edge。Accio / Loomy / MonkeyCode 的反代协议不支持强制或指定工具调用、串行工具与结构化输出；AutoClaw 输出上限由服务决定。"
+    },
+    {
+      "name": "Codar (科搭)",
+      "package": "magpie-plugin-codar",
+      "version": "0.3.0",
+      "license": "MIT",
+      "source": "https://github.com/MisonL/magpie-plugin-codar",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "通过科搭账号接入其提供的 Chat 与 Anthropic 模型，支持本机授权页或手动令牌。",
+      "requirements": "需要科搭账号；支持本机授权页登录、账号登录或手动粘贴账号令牌。",
+      "usageSteps": [
+        "安装后点击「连接」，选择本机授权页登录或直接粘贴科搭令牌。",
+        "连接后自动同步账号可用的 Chat 与 Anthropic 模型。"
+      ],
+      "limitSummary": "支持 Chat 与 Anthropic 模型（当前插件版本不列出 Responses 模型）",
+      "compatibility": "partial",
+      "compatibilityDetails": "支持科搭本机授权页、账号登录或手动输入令牌。模型走 Chat 与 Anthropic 协议；此固定版本插件不提供 Responses 模型。"
+    },
+    {
+      "name": "DeepAI Code",
+      "package": "magpie-deepaicode",
+      "version": "0.2.4",
+      "license": "MIT",
+      "source": "https://github.com/aqiu817/magpie-deepaicode",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "接入 DeepAI Code 模型，支持浏览器回调、API Key 或读取本机 DeepAI Code 桌面端凭据。",
+      "requirements": "需要 DeepAI Code 账号或 API Key；使用桌面端导入需本机已安装并登录 DeepAI Code。",
+      "usageSteps": [
+        "安装后点击「连接」，选择浏览器授权、手动填写 API Key，或直接读取本机 DeepAI Code 桌面端凭据。",
+        "连接完成后可在工作台选择 Chat 与部分 Responses 模型。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "支持浏览器回调、API Key 与本机桌面端凭据导入。请求会按插件协议携带生成的本机设备标识，支持 Chat 与部分 Responses 模型。"
+    },
+    {
+      "name": "TeleAgent 模型",
+      "package": "opencode-teleagent-auth",
+      "version": "0.2.0",
+      "license": "MIT",
+      "source": "https://github.com/anbulang/opencode-teleagent-auth",
+      "verified": false,
+      "accessMode": "本机桌面端复用",
+      "summary": "复用本机已登录的天翼 AI 星辰（TeleAgent）桌面端凭据，免 API Key 接入 5 个官方模型并查积分余额。",
+      "requirements": "仅支持 macOS 与 Windows；需本机安装并登录 TeleAgent 桌面端 2.7.1 或更高版本。",
+      "environmentSetup": "需先在 macOS 或 Windows 安装 TeleAgent（天翼 AI 星辰）桌面端 2.7.1+ 并完成登录；macOS 首次读取时请允许钥匙串授权。若安装在非默认路径，可设置环境变量 TELEAGENT_APP_PATH。",
+      "usageSteps": [
+        "先在本机安装并登录 TeleAgent 桌面端 2.7.1+（可先装好本插件再去装桌面端）。",
+        "在已安装卡片点击「连接」→ 选择「读取本机登录态」并在提示中选中账号。",
+        "连接后自动同步 5 个 OpenAI 兼容模型（支持流式与工具调用，chat-pro / chat-flash 支持图片）；凭据约 30 天到期后在桌面端重登再重新读取即可。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "插件读取本机 TeleAgent 桌面端磁盘凭据（macOS 钥匙串 / Windows DPAPI）并为每条请求现场签名，转为 OpenAI Chat 接口。桌面端无需一直保持打开，但登录态需有效；插件内置签到功能未接入工作台。"
+    },
+    {
+      "name": "讯飞星辰 MaaS",
+      "package": "opencode-xfyun-maas-auth",
+      "version": "0.1.1",
+      "license": "MIT",
+      "source": "https://github.com/linjicong/opencode-xfyun-maas-auth",
+      "verified": false,
+      "accessMode": "官方接口",
+      "summary": "通过官方 API Key 接入讯飞星辰 MaaS 的按量付费、Coding Plan 与 Token Plan 模型。",
+      "requirements": "需要讯飞星辰 MaaS 对应计费模式的 API Key 或套餐凭据。",
+      "usageSteps": [
+        "安装后在已安装卡片选择你开通的计费模式（按量付费 / Coding Plan / Token Plan）。",
+        "点击「连接」填入对应 API Key，即可通过标准 OpenAI Chat 接口使用模型。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "三种计费模式分别填入各自的 API Key，均走标准 OpenAI Chat 接口。若远端目录读取失败或返回空列表，插件可能展示内置列表，实际可用性以账号授权为准。"
+    },
+    {
+      "name": "Muse (Meta)",
+      "package": "magpie-muse-auth",
+      "version": "0.1.13",
+      "license": "MIT",
+      "source": "https://github.com/sonvivu/magpie-muse-auth",
+      "verified": false,
+      "accessMode": "订阅反代",
+      "summary": "通过设备码授权接入 Meta Muse 订阅中的 Wonder 与 Spark 模型。",
+      "requirements": "需要 Muse 账号。注意：名称以 -contributor 结尾的模型可能会将对话数据用于训练。",
+      "usageSteps": [
+        "安装后点击「连接」，按提示在浏览器通过设备码完成 Muse 账号授权。",
+        "授权后载入内置模型列表，走 Responses 协议进行纯文本对话。"
+      ],
+      "limitSummary": "仅纯对话（插件会自动注入自带工具，因此关闭普通外部工具请求）",
+      "compatibility": "partial",
+      "compatibilityDetails": "通过设备码授权并走 Responses 接口，模型来自插件内置目录。因插件会自动向工具列表注入自己的工具，Bridge 限制了普通外部工具请求；续写需发送完整对话内容，暂不支持引用历史响应编号或保留历史推理块；额度取自本次运行中的流式响应事件。"
+    }
+  ]
+}

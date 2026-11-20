@@ -90,11 +90,12 @@
     if (metadata) root.appendChild(metadata);
     var footer = node("div", "message-center-form-footer");
     var error = node("p", "message-center-form-error"); error.setAttribute("role", "status");
-    var submit = button(isNew ? "发送反馈" : "发送回复", "button primary small", function () {
+    var submitIdleLabel = isNew ? "发送反馈" : "发送回复";
+    var submit = button(submitIdleLabel, "button primary small", function () {
       handlers.submit(scope(), input.value, category ? category.value : null);
     });
     footer.appendChild(error); footer.appendChild(submit); root.appendChild(footer);
-    return { root: root, input: input, category: category, attachments: attachments, metadata: metadata, error: error, submit: submit };
+    return { root: root, input: input, category: category, attachments: attachments, metadata: metadata, error: error, submit: submit, submitIdleLabel: submitIdleLabel };
   }
   function makeRow(handlers, kind, item) {
     var row = button("", "message-center-row", function () { handlers.select(kind, item.id); });
@@ -258,6 +259,7 @@
     view.submit.disabled = busy || !trimmed || tooLong;
     view.input.setAttribute("aria-invalid", String(tooLong));
     view.submit.setAttribute("aria-busy", String(busy));
+    text(view.submit, busy ? "发送中…" : view.submitIdleLabel);
     text(view.error, tooLong ? "内容过长，请缩短后发送。" : errorVisible && !busy ? state.submissionError || "" : "");
     view.error.hidden = !view.error.textContent;
     updateAttachments(view.attachments, attachments, scope, handlers, busy);
@@ -272,6 +274,8 @@
     view.notices.classList.toggle("is-selected", noticeTab); view.feedbacks.classList.toggle("is-selected", !noticeTab);
     view.markAll.hidden = !noticeTab;
     view.retry.hidden = !state.error; view.retry.disabled = !!state.isRefreshing;
+    view.retry.setAttribute("aria-busy", String(!!state.isRefreshing));
+    text(view.retry, state.isRefreshing ? "刷新中…" : "重试");
     text(view.status, state.error || (state.isRefreshing ? "正在刷新…" : "")); view.status.hidden = !view.status.textContent;
     text(view.empty, noticeTab ? "暂无通知" : "暂无反馈"); view.empty.hidden = items.length > 0;
     var selected = context.selected[context.tab] || "";

@@ -48,6 +48,7 @@
       return codex.canEditExecutable === true;
     }
 
+    var pendingPathValue = null;
     function update(page, nextEmit) {
       context.emit = nextEmit;
       var codex = page || {};
@@ -57,9 +58,18 @@
       subtitle.hidden = context.connected;
       S.clear(facts);
       addFact(facts, "当前使用", resolvedLabel(codex));
-      draft.update({ path: typeof codex.executablePath === "string" ? codex.executablePath : "" });
+      var currentPath = typeof codex.executablePath === "string" ? codex.executablePath : "";
+      draft.update({ path: currentPath });
       var editable = executableEditable(codex);
       path.control.disabled = !editable;
+      S.setButtonPending(savePath, false, null, "保存路径");
+      S.setButtonPending(clearPath, false, null, "恢复自动发现");
+      if (pendingPathValue !== null) {
+        if (currentPath === pendingPathValue) {
+          S.flashButtonSuccess(pendingPathValue ? savePath : clearPath, pendingPathValue ? "已保存" : "已恢复");
+        }
+        pendingPathValue = null;
+      }
       savePath.disabled = !editable;
       clearPath.disabled = !editable || !codex.executablePath;
       S.clear(diagnostics);
@@ -76,20 +86,25 @@
         diagnostics.appendChild(S.node("div", "page-message error", "模型目录读取失败：" + codex.modelError));
       }
       refresh.textContent = context.connected ? "打开工作台" : codex.isRefreshing ? "连接中…" : "连接";
+      refresh.setAttribute("aria-busy", String(!context.connected && codex.isRefreshing === true));
       refresh.disabled = !context.connected && (codex.isRefreshing === true || codex.canRefresh !== true);
       reconnect.hidden = !context.connected;
+      reconnect.textContent = codex.isRefreshing ? "重连中…" : "重新连接";
+      reconnect.setAttribute("aria-busy", String(context.connected && codex.isRefreshing === true));
       reconnect.disabled = codex.isRefreshing === true || codex.canRefresh !== true;
     }
 
-    function emitPath(value) {
+    function emitPath(value, triggerBtn, pendingText, restoreText) {
+      pendingPathValue = value;
+      S.setButtonPending(triggerBtn, true, pendingText, restoreText);
       context.emit("setCodexExecutable", { path: value });
     }
 
     savePath.addEventListener("click", function () {
-      if (!savePath.disabled) emitPath(path.control.value.trim());
+      if (!savePath.disabled) emitPath(path.control.value.trim(), savePath, "保存中…", "保存路径");
     });
     clearPath.addEventListener("click", function () {
-      if (!clearPath.disabled) emitPath("");
+      if (!clearPath.disabled) emitPath("", clearPath, "恢复中…", "恢复自动发现");
     });
     refresh.addEventListener("click", function () {
       if (refresh.disabled) return;

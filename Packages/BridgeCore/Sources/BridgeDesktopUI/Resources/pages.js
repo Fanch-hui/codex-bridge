@@ -38,28 +38,34 @@
 
   function render(state, emit) {
     viewportEmitter = emit;
-    currentNavigation = state && state.selectedNavigation;
+    var lightweight = global.CodexBridgeDesktopLightweight;
+    var overlay = lightweight && lightweight.isOverlay(state);
+    currentNavigation = overlay ? "lightweight" : state && state.selectedNavigation;
     if (!preferencesSurface && global.CodexBridgeDesktopDSHWorkbench) {
       global.CodexBridgeDesktopDSHWorkbench.configure(state, emit);
       global.CodexBridgeDesktopDSHWorkbench.setActive(currentNavigation === "workbench", emit);
     }
-    pages.connections.setActive(!!state && state.selectedNavigation === "connections", emit);
+    pages.connections.setActive(!overlay && !!state && state.selectedNavigation === "connections", emit);
     var names = ["overview", "workbench", "projects", "logs", "connections", "settings"];
     names.forEach(function (name) {
       var section = document.getElementById(name + "-page");
-      if (section) section.hidden = !state || state.selectedNavigation !== name;
+      if (section) section.hidden = overlay || !state || state.selectedNavigation !== name;
     });
-    if (!preferencesSurface && (!state || state.selectedNavigation !== "workbench")) {
+    var lightweightPage = document.getElementById("lightweight-page");
+    if (lightweightPage) lightweightPage.hidden = !overlay;
+    if (!preferencesSurface && (overlay || !state || state.selectedNavigation !== "workbench")) {
       emitBrowserViewport(emit, { x: 0, y: 0, width: 0, height: 0, visible: false });
     }
     if (state) updateSettingsPage(state, emit);
+    if (overlay) { lightweight.render(state); return; }
+    if (lightweight) lightweight.deactivate();
     if (!state || state.selectedNavigation === "overview") return;
     var page = pages[state.selectedNavigation];
     if (page) page.render(state[state.selectedNavigation], emit, state.appUpdate, state);
     if (state.selectedNavigation === "workbench") {
       var development = global.CodexBridgeDesktopDSHWorkbench
         && global.CodexBridgeDesktopDSHWorkbench.mode() === "dsh";
-      if (!development && global.CodexBridgeDesktopNativeSessionDirectory) {
+      if (development && global.CodexBridgeDesktopNativeSessionDirectory) {
         global.CodexBridgeDesktopNativeSessionDirectory.render(state.workbench, emit);
       }
       if (!development && global.CodexBridgeDesktopWorkbenchSplit) global.CodexBridgeDesktopWorkbenchSplit.sync();

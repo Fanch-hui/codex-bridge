@@ -62,6 +62,9 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
     }
 
     var changes: [BridgeDesktopUIStatePatch.Change] = []
+    if old.selectedNavigation != new.selectedNavigation {
+      changes.append(.selectedNavigation(new.selectedNavigation))
+    }
     if old.overview != new.overview {
       changes.append(.overview(new.overview))
     }
@@ -132,7 +135,6 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
   ) -> Bool {
     old.hostContext == new.hostContext
       && old.navigation == new.navigation
-      && old.selectedNavigation == new.selectedNavigation
       && old.connectionLabel == new.connectionLabel
       && old.connectionTone == new.connectionTone
       && old.serviceConnected == new.serviceConnected
@@ -140,6 +142,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.feedback == new.feedback
       && old.settings == new.settings
       && old.messageCenter == new.messageCenter
+      && old.providerGatewayReceipts == new.providerGatewayReceipts
   }
 
   private func sameWorkbenchShell(

@@ -57,7 +57,9 @@ enum BridgeDesktopUIStateBuilder {
       connections: connectionsState,
       settings: settingsState,
       appUpdate: model.appUpdateState,
-      messageCenter: model.messageCenterState
+      messageCenter: model.messageCenterState,
+      providerGatewayReceipts: includeWorkbench
+        ? nil : model.embeddedDSHReceipts.filter { $0.requestID.hasPrefix("provider-") }
     )
     ConversationPerformanceRecorder.shared.record(
       ConversationPerformanceSample(

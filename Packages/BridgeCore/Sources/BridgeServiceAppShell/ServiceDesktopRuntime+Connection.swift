@@ -25,6 +25,14 @@ extension BridgeServiceAppModel {
     pollingTask?.cancel()
     pollingTask = nil
     await closeClient()
+    do {
+      try await registration.resumeTemporaryStopIfNeeded()
+    } catch {
+      connectionState = .unavailable
+      errorMessage = Self.message(error)
+      startPolling()
+      return
+    }
     await resolveRegistrationStatus()
     guard registrationStatus == .enabled else {
       connectionState =
@@ -47,13 +55,28 @@ extension BridgeServiceAppModel {
       do {
         let status = try await candidate.status()
         serviceStatus = status
+        applyServiceStatusMode(status)
+        var gatewayFailure: String?
+        if isLightweightMode == nil {
+          do {
+            try await refreshProviderGatewayModeStatus(using: candidate)
+          } catch {
+            isLightweightMode = nil
+            applicationModeTransition = nil
+            applicationModeError = nil
+            isModelGatewayEnabled = nil
+            lightweightModeDidChange()
+            gatewayFailure = "读取运行模式失败：\(Self.message(error))"
+          }
+        }
         applyWorkbenchPermissionMode(status.workbenchPermissionMode)
         client = candidate
         await observeServiceChanges(candidate)
         connectionState = .connected
         registrationStatus = .enabled
+        if messageCenterState?.error != nil { messageCenter.refresh() }
         lastRefreshAt = Date()
-        errorMessage = nil
+        errorMessage = gatewayFailure
         await workbenchSettingsController.refresh()
         if includeCollections {
           await refreshCollections(

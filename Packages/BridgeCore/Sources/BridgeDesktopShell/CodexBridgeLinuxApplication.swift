@@ -5,6 +5,8 @@
   import Foundation
 
   extension CodexBridgeDesktopApplication {
+    private static var isLinuxWindowVisible = true
+
     public static func main() async {
       let feedback = WindowsDesktopFeedbackStore()
       let model = WindowsWorkbenchModel(feedback: feedback)
@@ -21,11 +23,12 @@
         guard !model.isShuttingDown else { return }
         Task(priority: .utility) {
           await auxiliary.connections.refresh()
-          guard !model.isShuttingDown else { return }
+          guard !model.isShuttingDown, model.isLightweightMode == false else { return }
           await management.refreshAgents()
           guard !model.isShuttingDown else { return }
           await auxiliary.agentDefaults.refresh()
         }
+        guard model.isLightweightMode == false else { return }
         if selectedPage != .overview {
           refresh(page: selectedPage, model: model, management: management, auxiliary: auxiliary)
         }
@@ -48,7 +51,7 @@
       appUpdater?.cancel()
       messageCenter?.stop()
       model.stopSchedulingForApplicationExit()
-      if !auxiliary.settings.keepServiceRunningAfterExit {
+      if !completedServiceExit && !auxiliary.settings.keepServiceRunningAfterExit {
         do { try await LinuxServiceControl.shutdownAndWait() } catch {
           FileHandle.standardError.write(Data("后台服务尚未结束：\(error)\n".utf8))
         }
@@ -59,10 +62,13 @@
     static func updateWindowVisibility(_ visible: Bool, model: WindowsWorkbenchModel) {
       model.setWindowVisible(visible)
       messageCenter?.setForegroundVisible(visible)
+      isLinuxWindowVisible = visible
+      updateBrowserMemoryPolicy(model: model)
     }
 
     static func updateBrowserMemoryPolicy(model: WindowsWorkbenchModel) {
-      LinuxDesktopHost.setBrowserEnabled(model.isChatBrowserEnabled)
+      LinuxDesktopHost.setBrowserEnabled(
+        model.isChatBrowserEnabled && model.isLightweightMode == false)
     }
 
     nonisolated static func openChatExternally() {

@@ -23,7 +23,13 @@
 
   function icon(symbol) {
     var element = node("span", "icon");
-    element.dataset.symbol = symbol;
+    var name = symbol || "circle.dashed";
+    element.dataset.symbol = name;
+    var icons = global.CodexBridgeDesktopIcons;
+    if (icons) {
+      element.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+        + (icons[name] || icons["circle.dashed"]) + "</svg>";
+    }
     return element;
   }
 
@@ -193,7 +199,8 @@
         emit,
         busy
       ));
-      var dismiss = action("×", "deferAppUpdate", emit, false, lockActions);
+      var dismiss = action("", "deferAppUpdate", emit, false, lockActions);
+      dismiss.appendChild(icon("xmark"));
       dismiss.className = "icon-button app-update-dismiss";
       dismiss.setAttribute("aria-label", "关闭更新提示");
       dismiss.title = "关闭";

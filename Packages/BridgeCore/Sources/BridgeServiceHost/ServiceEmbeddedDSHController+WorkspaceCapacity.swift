@@ -47,7 +47,7 @@ extension ServiceEmbeddedDSHController {
       try await saveWorkspaceReservations(reservations, replacing: saved, projectID: projectID)
       return reserved
     }
-    guard reservations.count < 2 else {
+    guard reservations.count < (try await settings.projectWriteConcurrency()) else {
       try await saveWorkspaceReservations(reservations, replacing: saved, projectID: projectID)
       return .object(["state": .string("waiting")])
     }
@@ -71,8 +71,7 @@ extension ServiceEmbeddedDSHController {
     {
       return .object(["state": .string("unknown")])
     }
-    let mode = try await workspaceMode(rootID: rootID, childID: childID)
-    if let input, mode == "isolated" {
+    if let input {
       guard let status = input.status, status != .unknown else {
         return .object(["state": .string("unknown")])
       }
@@ -127,10 +126,6 @@ extension ServiceEmbeddedDSHController {
         requestID: reservation.requestID)
       if let input {
         guard input.status?.isTerminal != true else { continue }
-        guard
-          try await workspaceMode(rootID: reservation.rootID, childID: reservation.childID)
-            == "isolated"
-        else { continue }
         active.append(reservation)
       } else if let child = try await application.embeddedDSHSubagent(
         parentSessionID: reservation.rootID, childID: reservation.childID),
@@ -156,10 +151,6 @@ extension ServiceEmbeddedDSHController {
         parentSessionID: execution.sessionID)
       for child in children
       where child.currentTaskID != nil && child.currentStatus?.isTerminal != true {
-        guard
-          try await workspaceMode(rootID: execution.sessionID, childID: child.childID)
-            == "isolated"
-        else { continue }
         let reservation = WorkspaceReservation(
           rootID: execution.sessionID, childID: child.childID, requestID: child.currentRequestID)
         if !active.contains(reservation) { active.append(reservation) }

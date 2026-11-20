@@ -15,6 +15,7 @@ manifest = json.loads((runtime / "runtime.json").read_text(encoding="utf-8"))
 if manifest["platform"] != "linux" or manifest["architecture"] != sys.argv[2]:
     raise SystemExit("Embedded DSH platform or architecture mismatch")
 binaries.append(runtime / manifest["node"])
+binaries.append(runtime / "provider/model-protocol")
 binaries += list((root / "lib").glob("*.so*"))
 for path in binaries:
     with path.open("rb") as source:

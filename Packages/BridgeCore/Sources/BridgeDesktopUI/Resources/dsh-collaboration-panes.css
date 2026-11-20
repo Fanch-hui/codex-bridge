@@ -1,0 +1,325 @@
+.dsh-collaboration-tabs {
+  --workbench-content-inset: var(--dsh-content-inset);
+  padding-top: calc(6px + var(--app-toolbar-height, 52px));
+}
+:root:not([data-platform]) .dsh-collaboration-tabs,
+:root[data-platform="macos"] .dsh-collaboration-tabs {
+  padding-top: max(0px, calc(var(--app-toolbar-height, 52px) - 8px));
+}
+.dsh-collaboration-panes { --app-toolbar-height: 0px; min-width: 0; }
+.dsh-collaboration-panes[data-layout="single"] {
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  padding: 0;
+  background: var(--surface);
+}
+.dsh-collaboration-panes[data-layout="single"] > .workbench-pane { border: 0; border-radius: 0; }
+.dsh-collaboration-panes .workbench-pane[hidden],
+.dsh-collaboration-panes .workbench-pane-header[hidden],
+.dsh-collaboration-pane-body[hidden] { display: none; }
+.dsh-collaboration-pane-body { display: flex; flex: 1 1 0; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.dsh-collaboration-pane-body > .dsh-embedded-agent-session { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; padding: 10px; overflow: hidden; }
+.dsh-collaboration-pane-body .dsh-embedded-agent-body { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; overflow: hidden; }
+.dsh-collaboration-pane-body .dsh-embedded-agent-compose { flex: 0 0 auto; }
+.dsh-collaboration-pane-body .dsh-bridge-conversation { flex: 1 1 0; min-height: 0; }
+
+/* Split panes keep a compact composer so each conversation retains readable space. */
+.dsh-collaboration-panes:not([data-layout="single"]) {
+  --dsh-content-inset: 12px;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer {
+  bottom: 10px;
+  width: calc(100% - 24px);
+  max-height: max(80px, calc(100% - 96px));
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .message-composer-surface {
+  padding: 5px 8px;
+  border-radius: 12px;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .message-composer-surface .field.message-composer-input textarea {
+  min-height: 32px;
+  max-height: 80px;
+  padding: 4px 2px;
+  overflow-y: auto !important;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .message-composer-toolbar {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 0;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .message-composer-tools {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .dsh-composer-leading {
+  flex: 1 1 80px;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .dsh-composer-trailing {
+  flex: 0 1 auto;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .dsh-composer-model {
+  max-width: min(200px, 100%);
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .message-composer-tools .field select {
+  min-height: 28px;
+  padding: 2px 22px 2px 6px;
+  background-position: right 11px center, right 7px center;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .message-composer-tools .button:not(.primary):not(.danger) {
+  min-height: 28px;
+  padding: 2px 6px;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .message-composer-tools .button.message-composer-icon:not(.primary):not(.danger) {
+  width: 28px;
+  padding: 0;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-native-composer .button.message-composer-send {
+  flex-basis: 28px;
+  width: 28px;
+  min-height: 28px;
+  font-size: 18px;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-bridge-conversation-scroll {
+  padding-top: 12px;
+}
+
+/* Workbench tab add group and external-agent quick launcher. */
+.workbench-tab-add-group {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-left: 2px;
+  margin-bottom: 2px;
+}
+.workbench-tab-add-group > .workbench-tab-add { margin-bottom: 0; }
+.workbench-agent-launcher { position: relative; display: inline-flex; flex: 0 0 auto; }
+.workbench-tab-agent-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px 0 9px;
+  border: 1px solid var(--separator-strong);
+  border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+.workbench-tab-agent-menu-btn .icon { width: 11px; height: 11px; opacity: .78; }
+.workbench-tab-agent-menu-btn:hover,
+.workbench-tab-agent-menu-btn[aria-expanded="true"] {
+  color: var(--text);
+  border-color: var(--accent-border);
+  background: var(--surface-hover);
+}
+.workbench-tab-agent-menu-btn:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+.workbench-agent-launcher-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 216px;
+  max-width: 268px;
+  padding: 6px;
+  border: 1px solid var(--separator-strong);
+  border-radius: var(--radius);
+  background: var(--surface-elevated);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--shadow-popover);
+  transform-origin: top left;
+}
+.workbench-agent-launcher-menu.is-align-right { left: auto; right: 0; transform-origin: top right; }
+.workbench-agent-launcher-menu[hidden] { display: none; }
+.workbench-agent-launcher-header {
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--separator);
+  margin-bottom: 4px;
+}
+.workbench-agent-launcher-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.workbench-agent-launcher-subtitle {
+  margin: 2px 0 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+.workbench-agent-launcher-list { display: flex; flex-direction: column; gap: 2px; }
+.workbench-agent-launcher-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--control-radius-small);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.workbench-agent-launcher-item:hover { background: var(--surface-hover); }
+.workbench-agent-launcher-item:focus-visible { outline: 1px solid var(--focus-ring); outline-offset: -1px; }
+.workbench-agent-launcher-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workbench-agent-launcher-empty {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.workbench-tab.is-external .workbench-tab-title::after {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  opacity: .55;
+  vertical-align: middle;
+}
+.workbench-tab.is-external.is-active .workbench-tab-title::after {
+  background: var(--accent);
+  opacity: .8;
+}
+
+/* External-agent session pane and draft pane inside Workbench cells. */
+.dsh-external-pane,
+.dsh-agent-draft {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+}
+.dsh-external-pane-bar,
+.dsh-agent-draft-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--separator);
+  background: var(--surface-subtle);
+}
+.dsh-external-pane-meta,
+.dsh-external-pane-controls,
+.dsh-agent-draft-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dsh-external-pane-controls { flex-shrink: 0; }
+.dsh-external-pane-provider {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dsh-external-pane-status {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dsh-external-pane.is-running .dsh-external-pane-status { color: var(--accent); }
+.dsh-external-pane-body,
+.dsh-agent-draft-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px var(--dsh-content-inset, 20px);
+}
+.dsh-external-pane-remediation[hidden],
+.dsh-external-pane-card[hidden],
+.dsh-external-pane-composer[hidden],
+.dsh-agent-draft-greeting[hidden],
+.dsh-agent-draft-thread[hidden] { display: none; }
+.dsh-external-pane-remediation { margin-bottom: 12px; }
+.dsh-external-pane-card { width: 100%; max-width: var(--dsh-content-width, 760px); margin-inline: auto; }
+.dsh-external-pane-composer,
+.dsh-agent-draft-composer {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: calc(var(--dsh-content-width, 760px) + 16px);
+  margin-inline: auto;
+  padding: 8px 12px 12px;
+  box-sizing: border-box;
+}
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-external-pane-composer,
+.dsh-collaboration-panes:not([data-layout="single"]) .dsh-agent-draft-composer {
+  max-width: none;
+  padding: 6px 8px 8px;
+}
+.dsh-agent-draft-bar .field { margin: 0; }
+.dsh-agent-draft-bar .field select { min-height: 26px; font-size: 12px; }
+.dsh-agent-draft-switch { flex: 0 0 auto; color: var(--text-secondary); }
+.dsh-agent-draft-greeting {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+.dsh-agent-draft-thread { width: 100%; max-width: var(--dsh-content-width, 760px); margin-inline: auto; }
+
+/* Sidebar collapsible external-agent sessions section. */
+.dsh-external-sessions-section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--separator);
+}
+.dsh-external-sessions-section[hidden] { display: none; }
+.dsh-external-sessions-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px;
+  border-radius: var(--control-radius);
+  list-style: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+}
+.dsh-external-sessions-section > summary::-webkit-details-marker { display: none; }
+.dsh-external-sessions-section > summary:hover { background: var(--surface-hover); color: var(--text); }
+.dsh-external-sessions-list { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }

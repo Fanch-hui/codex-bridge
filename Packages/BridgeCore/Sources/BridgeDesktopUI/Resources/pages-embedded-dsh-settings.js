@@ -1,7 +1,6 @@
 (function (global) {
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport, D = global.CodexBridgeDesktopFormDraft;
-  var T = global.CodexBridgeDesktopEmbeddedDSHTransport;
   function mergeModelIDs(current, discovered) {
     var ids = String(current || "").split(/\r?\n/).concat(S.safeArray(discovered).map(function (model) {
       return model && model.id;
@@ -17,12 +16,15 @@
     }
     return model;
   }
-  function create(onModelsChanged, onRestart, onConnectionReady) {
+  function create(onModelsChanged, onRestart, onConnectionReady, options) {
+    options = options || {};
+    var T = options.transport || global.CodexBridgeDesktopEmbeddedDSHTransport;
+    var providersOnly = options.providersOnly === true;
     var root = S.node("div", "dsh-engine-settings-content"), active = false, state = {}, generation = 0;
     var navigation = S.node("nav", "dsh-settings-navigation"), body = S.node("div", "dsh-settings-body");
     navigation.setAttribute("aria-label", "工作台设置分类"); root.appendChild(navigation); root.appendChild(body);
     var category = "models", categories = [];
-    var sessionID = null, authTimer = null, mcpEditingID = null, mcpEnabled = true, wasAuthenticated = false;
+    var sessionID = null, authTimer = null, mcpEditingID = null, mcpEnabled = true, wasAuthenticated = providersOnly ? null : false;
     var setupMode = null, setupRevision = 0, apiProviderID = null, chatgptReady = false;
     var activations = {}, pluginInstaller = null, deferredApplyError = "";
     var retryKeyRequired = false, retryKeyURL = "", editingHasKey = false, editorRevision = 0;
@@ -32,19 +34,48 @@
       error: error, success: showNotice, revision: function () { return noticeRevision; },
       label: function (control, value) { return control === saveButton ? (setupMode ? "连接" : "保存连接") : value; }
     });
-    var modelSection = S.section(body, "模型连接"), accountRows = S.node("div", "settings-stack");
+    var modelSection = S.section(body, providersOnly ? "内置供应商" : "模型连接"), accountRows = S.node("div", "settings-stack");
     var activationLabels = {};
     function activationLabel(section, key) {
       var label = S.node("p", "hint"); label.hidden = true; label.setAttribute("role", "status");
       section.appendChild(label); activationLabels[key] = label;
     }
     activationLabel(modelSection, "models");
-    var chatHeading = S.node("div", "dsh-provider-heading"), chatStatus = S.node("p", "hint");
+    var chatPanel = providersOnly ? S.node("details", "agent-details provider-disclosure") : modelSection;
+    if (providersOnly) modelSection.appendChild(chatPanel);
+    var chatHeading = S.node(providersOnly ? "summary" : "div", providersOnly ? "provider-disclosure-summary" : "dsh-provider-heading"), chatStatus = S.node("p", "hint");
     var accountActions = S.node("div", "form-actions");
-    chatHeading.appendChild(S.node("span", null, "ChatGPT"));
+    chatHeading.appendChild(S.node("span", "provider-summary-title", "ChatGPT"));
     chatHeading.appendChild(S.helpTooltip("ChatGPT接入说明", "通过官方SIWC接口合规接入，不涉及反代"));
-    modelSection.appendChild(chatHeading); modelSection.appendChild(chatStatus);
-    modelSection.appendChild(accountRows); modelSection.appendChild(accountActions);
+    var chatSummaryBadge = S.badge("未连接", "neutral");
+    chatSummaryBadge.classList.add("provider-summary-badge");
+    chatHeading.appendChild(chatSummaryBadge);
+    var chatBody = providersOnly ? S.node("div", "dsh-provider-content") : chatPanel;
+    chatPanel.appendChild(chatHeading);
+    if (providersOnly) chatPanel.appendChild(chatBody);
+    chatBody.appendChild(chatStatus);
+    chatBody.appendChild(accountRows); chatBody.appendChild(accountActions);
+    var externalAccess = S.node("label", "check-field"), externalAccessInput = S.node("input");
+    externalAccessInput.type = "checkbox"; externalAccess.appendChild(externalAccessInput);
+    externalAccess.appendChild(S.node("span", null, "允许外部 Agent 调用 ChatGPT 模型"));
+    var externalAccessSaved = S.node("span", "field-saved-badge");
+    externalAccessSaved.appendChild(S.icon("check")); externalAccessSaved.appendChild(S.node("span", null, "已保存"));
+    externalAccess.appendChild(externalAccessSaved);
+    var externalAccessHint = S.node("p", "hint", "该授权仅用于模型请求，不授予文件或命令权限。");
+    chatBody.appendChild(externalAccess); chatBody.appendChild(externalAccessHint);
+    var externalSavedTimer = null;
+    externalAccessInput.addEventListener("change", function () {
+      externalAccessInput.disabled = true;
+      T.call("auth.setBackgroundAllowed", { allowed: externalAccessInput.checked }).then(function () {
+        if (externalSavedTimer) global.clearTimeout(externalSavedTimer);
+        externalAccessSaved.classList.add("is-visible");
+        externalSavedTimer = global.setTimeout(function () { externalAccessSaved.classList.remove("is-visible"); }, 1600);
+        return refreshSettings();
+      }).catch(function (failure) {
+        externalAccessInput.checked = !!(state.chatgpt && state.chatgpt.allowBackground);
+        error(failure);
+      }).finally(function () { externalAccessInput.disabled = false; });
+    });
     var login = button("使用 ChatGPT 登录", beginLogin, "auth");
     var addAccount = button("添加账号", beginAddAccount, "auth");
     var cancelLogin = button("取消登录", function () {
@@ -68,12 +99,23 @@
     var workbuddy = global.CodexBridgeDesktopEmbeddedDSHWorkBuddy.create(providerOptions);
     modelSection.appendChild(zcode.root); modelSection.appendChild(workbuddy.root);
 
-    var savedConnections = S.node("div", "settings-stack"); modelSection.appendChild(savedConnections);
-    var editor = S.node("details", "agent-details"); editor.appendChild(S.node("summary", null, "自定义 API"));
-    var form = S.node("div", "settings-stack"); editor.appendChild(form); modelSection.appendChild(editor);
+    var savedConnections = S.node("div", "settings-item-list"); modelSection.appendChild(savedConnections);
+    var editor = S.node("details", "agent-details provider-disclosure");
+    var editorSummary = S.node("summary", "provider-disclosure-summary");
+    editorSummary.appendChild(S.node("span", "provider-summary-title", "自定义 API"));
+    var customApiBadge = S.badge("未配置", "neutral");
+    customApiBadge.classList.add("provider-summary-badge");
+    editorSummary.appendChild(customApiBadge);
+    editor.appendChild(editorSummary);
+    var editorContent = S.node("div", "dsh-provider-content");
+    if (providersOnly) editorContent.appendChild(savedConnections);
+    var form = S.node("div", "settings-stack"); editorContent.appendChild(form);
+    editor.appendChild(editorContent); modelSection.appendChild(editor);
     var name = S.textField("连接名称", "", "例如：我的模型服务");
     var baseURL = S.textField("API 地址", "", "https://example.com/v1");
     var apiKey = S.textField("API Key", "", "留空保留已保存的密钥"); apiKey.control.type = "password";
+    var apiEndpointGrid = S.node("div", "form-grid");
+    apiEndpointGrid.appendChild(baseURL.wrapper); apiEndpointGrid.appendChild(apiKey.wrapper);
     var protocol = S.selectField("协议", "chat-completions", [
       { id: "chat-completions", title: "Chat Completions" }, { id: "responses", title: "Responses" }
     ], function () {});
@@ -85,7 +127,7 @@
     modelIDs.wrapper.insertBefore(modelHeader, modelIDs.control);
     var contextWindow = S.textField("上下文长度", "", "使用模型默认值"); contextWindow.control.inputMode = "numeric";
     contextWindow.control.addEventListener("input", function () { contextWindowDirty = true; });
-    [baseURL, apiKey, modelIDs].forEach(function (field) { form.appendChild(field.wrapper); });
+    form.appendChild(apiEndpointGrid); form.appendChild(modelIDs.wrapper);
     var modelDiscoveryStatus = S.node("p", "hint"); modelDiscoveryStatus.hidden = true;
     modelDiscoveryStatus.setAttribute("role", "status"); form.appendChild(modelDiscoveryStatus);
     var reasoningEditor = S.node("details", "agent-details"), reasoningRows = S.node("div", "settings-stack");
@@ -121,7 +163,7 @@
     [saveButton, newConnectionButton].forEach(function (item) { formActions.appendChild(item); });
     form.appendChild(formActions);
 
-    var pluginSection = S.section(body, "插件"), pluginList = S.node("div", "settings-stack");
+    var pluginSection = S.section(body, "插件"), pluginList = S.node("div", "settings-item-list");
     var pluginHeading = pluginSection.querySelector("h3");
     var pluginHeader = S.node("div", "dsh-api-model-header");
     if (pluginHeading) pluginHeader.appendChild(pluginHeading);
@@ -129,7 +171,7 @@
     var refreshPluginsButton = button("刷新", function () {
       return runAction(refreshPluginsButton, "plugin-refresh", "刷新中…", "插件列表已刷新。", refreshPlugins);
     }, "plugin-refresh");
-    var addPluginDialog = S.node("dialog", "component-dialog");
+    var addPluginDialog = S.node("dialog", "component-dialog dsh-add-plugin-dialog");
     addPluginDialog.setAttribute("aria-labelledby", "dsh-add-plugin-title");
     var addPluginDialogHeader = S.node("div", "dialog-header");
     var addPluginDialogTitle = S.node("h2", null, "添加插件");
@@ -138,7 +180,7 @@
     addPluginDialog.appendChild(addPluginDialogHeader);
     var addPluginDialogBody = S.node("div", "dialog-body settings-stack");
     var pluginSpec = S.textField("插件包", "", "输入插件包名称");
-    var addPluginError = S.node("p", "hint"); addPluginError.hidden = true;
+    var addPluginError = S.node("p", "page-message error"); addPluginError.hidden = true;
     addPluginDialogBody.appendChild(pluginSpec.wrapper);
     addPluginDialogBody.appendChild(addPluginError);
     addPluginDialog.appendChild(addPluginDialogBody);
@@ -156,6 +198,7 @@
       if (addPluginDialog.open) addPluginDialog.close();
       return pluginInstaller.begin(spec);
     }, "plugin-install");
+    installPluginButton.classList.add("primary");
     pluginSpec.control.addEventListener("keydown", function (event) {
       if (event.key === "Enter" && !global.CodexBridgeDesktopPageSupport.isIMEKeyEvent(event)) {
         event.preventDefault();
@@ -165,7 +208,7 @@
     addPluginDialogFooter.appendChild(cancelAddPluginDialog);
     addPluginDialogFooter.appendChild(installPluginButton);
     addPluginDialog.appendChild(addPluginDialogFooter);
-    var openAddPluginButton = S.button("添加插件", null, {}, null, "small");
+    var openAddPluginButton = S.button("添加插件", null, {}, null, "small primary");
     openAddPluginButton.addEventListener("click", function () {
       addPluginError.hidden = true;
       if (!addPluginDialog.open) addPluginDialog.showModal();
@@ -177,11 +220,13 @@
     pluginSection.insertBefore(pluginHeader, pluginSection.firstChild);
     pluginSection.appendChild(addPluginDialog);
     activationLabel(pluginSection, "plugins");
-    var pluginProgress = S.node("div", "form-actions"), pluginProgressText = S.node("span", "hint");
+    var pluginProgress = S.node("div", "lightweight-plugin-install-status dsh-plugin-progress"), pluginProgressText = S.node("p", "hint");
     pluginProgress.setAttribute("role", "status"); pluginProgress.appendChild(pluginProgressText);
+    var pluginProgressActions = S.node("div", "form-actions");
     var cancelPluginInstallButton = button("取消安装", function () { return pluginInstaller.cancel(); });
     var dismissPluginInstallButton = button("关闭进度", function () { pluginInstaller.dismiss(); });
-    pluginProgress.appendChild(cancelPluginInstallButton); pluginProgress.appendChild(dismissPluginInstallButton);
+    pluginProgressActions.appendChild(cancelPluginInstallButton); pluginProgressActions.appendChild(dismissPluginInstallButton);
+    pluginProgress.appendChild(pluginProgressActions);
     pluginSection.appendChild(pluginProgress);
     pluginSection.appendChild(pluginList);
     pluginInstaller = global.CodexBridgeDesktopEmbeddedDSHPluginInstall.create({
@@ -202,31 +247,35 @@
         });
       }
     });
-    var mcpSection = S.section(body, "MCP 服务"), mcpList = S.node("div", "settings-stack");
+    var mcpSection = S.section(body, "MCP 服务"), mcpList = S.node("div", "settings-item-list");
     activationLabel(mcpSection, "mcp");
     mcpSection.appendChild(mcpList);
-    var mcpEditor = S.node("details", "agent-details");
+    var mcpEditor = S.node("details", "agent-details provider-subdisclosure");
     mcpEditor.appendChild(S.node("summary", null, "添加 MCP 服务")); mcpSection.appendChild(mcpEditor);
-    var mcpForm = S.node("div", "settings-stack"); mcpEditor.appendChild(mcpForm);
+    var mcpForm = S.node("div", "settings-stack dsh-provider-content"); mcpEditor.appendChild(mcpForm);
+    var mcpTopGrid = S.node("div", "form-grid");
     var mcpName = S.textField("服务名称", "", "MCP 服务名称");
     var mcpTransport = S.selectField("传输方式", "stdio", [
       { id: "stdio", title: "本地程序" }, { id: "streamable-http", title: "HTTP" }
     ], function () { updateMCPFields(); });
+    mcpTopGrid.appendChild(mcpName.wrapper); mcpTopGrid.appendChild(mcpTransport.wrapper);
     var mcpCommand = S.textField("程序路径", "", "本地 MCP 程序");
     var mcpArgs = S.textAreaField("程序参数", "", "每行一个参数");
     var mcpURL = S.textField("服务地址", "", "https://example.com/mcp");
     var mcpEnv = S.textAreaField("环境变量", "", "JSON 对象，留空保留已有配置");
     var mcpHeaders = S.textAreaField("请求头", "", "JSON 对象，留空保留已有配置");
-    [mcpName, mcpTransport, mcpCommand, mcpArgs, mcpURL, mcpEnv, mcpHeaders].forEach(function (field) { mcpForm.appendChild(field.wrapper); });
+    mcpForm.appendChild(mcpTopGrid);
+    [mcpCommand, mcpArgs, mcpURL, mcpEnv, mcpHeaders].forEach(function (field) { mcpForm.appendChild(field.wrapper); });
     var mcpActions = S.node("div", "form-actions");
     var saveMCPButton = button("保存服务", function () {
       return runAction(saveMCPButton, "mcp-editor", "保存中…", "MCP 服务已保存。", saveMCP);
     }, "mcp-editor");
+    saveMCPButton.classList.add("primary");
     mcpActions.appendChild(saveMCPButton); mcpActions.appendChild(button("新建服务", clearMCP, "mcp-editor"));
     mcpForm.appendChild(mcpActions); updateMCPFields();
 
     var contextSection = S.section(body, "上下文"), contextEditor = null;
-    var skillSection = S.section(body, "技能"), skillList = S.node("div", "settings-stack");
+    var skillSection = S.section(body, "技能"), skillList = S.node("div", "settings-item-list");
     var refreshSkillsButton = button("刷新技能", function () {
       return runAction(refreshSkillsButton, "skills-refresh", "刷新中…", "技能列表已刷新。", refreshSkills);
     }, "skills-refresh");
@@ -236,13 +285,36 @@
     var skillActions = S.node("div", "form-actions");
     skillActions.appendChild(importSkillsButton); skillActions.appendChild(refreshSkillsButton);
     skillSection.appendChild(skillList); skillSection.appendChild(skillActions);
-    [["models", "模型连接", modelSection], ["context", "上下文", contextSection], ["skills", "技能", skillSection],
-     ["mcp", "MCP 服务", mcpSection], ["plugins", "插件", pluginSection]].forEach(function (item) {
+    var availableCategories = [["models", "模型连接", modelSection], ["context", "上下文", contextSection],
+      ["skills", "技能", skillSection], ["mcp", "MCP 服务", mcpSection], ["plugins", "插件", pluginSection]];
+    if (providersOnly) {
+      navigation.hidden = true;
+      availableCategories.slice(1).forEach(function (item) { item[2].hidden = true; });
+      availableCategories = availableCategories.slice(0, 1);
+    }
+    availableCategories.forEach(function (item) {
       var control = button(item[1], function () { selectCategory(item[0]); });
       control.classList.add("dsh-settings-category"); navigation.appendChild(control);
       categories.push({ id: item[0], section: item[2], control: control });
     });
-    var notice = S.node("p", "page-message"); notice.setAttribute("role", "status"); body.appendChild(notice);
+    var feedbackArea = providersOnly ? modelSection : body;
+    var notice = S.node("p", "page-message"); notice.setAttribute("role", "status"); feedbackArea.appendChild(notice);
+    var retryRead = S.button("重新读取供应商状态", null, {}, null, "small");
+    retryRead.hidden = true; feedbackArea.appendChild(retryRead);
+    retryRead.addEventListener("click", function () {
+      showNotice(""); if (settingsVisible()) refreshSettings(); if (providersActive) refreshProviders();
+    });
+    if (providersOnly) {
+      [chatPanel, editor].forEach(function (panel) {
+        panel.addEventListener("toggle", function () {
+          if (active && panel.open) refreshSettings();
+        });
+      });
+      chatStatus.textContent = "正在读取账号状态…";
+      accountActions.hidden = externalAccess.hidden = externalAccessHint.hidden = true;
+      zcode.root.addEventListener("toggle", updateProvidersActive);
+      workbuddy.root.addEventListener("toggle", updateProvidersActive);
+    }
     var restartButton = button("空闲后应用变更", function () {
       return runAction(restartButton, "restart", "正在安排…", null, function () {
         return T.call("runtime.applyWhenIdle", {}).then(function (result) {
@@ -275,8 +347,17 @@
     function runAction(control, group, progress, success, operation) {
       return actionFeedback.run(control, group, progress, success, operation);
     }
-    function showNotice(text) { noticeRevision++; notice.textContent = text; notice.hidden = !text; }
+    function showNotice(text) { retryRead.hidden = true; noticeRevision++; notice.textContent = text; notice.hidden = !text; }
     function error(value) { showNotice(value && value.message || "操作失败。"); }
+    function readError(failure) {
+      if (providersOnly && failure && failure.code === "busy" && failure.retryable) {
+        showNotice("后台正忙，暂时未能读取供应商状态。");
+        retryRead.hidden = false;
+      } else if (providersOnly) {
+        showNotice("内置供应商状态读取失败：" + (failure && failure.message || "服务未返回结果。"));
+        retryRead.hidden = false;
+      } else { error(failure); }
+    }
     function showModelDiscovery(text) {
       modelDiscoveryStatus.textContent = text; modelDiscoveryStatus.hidden = !text;
     }
@@ -306,7 +387,8 @@
       return T.read ? T.read("settings." + key, operation) : operation();
     }
     function updateProvidersActive() {
-      var enabled = active && category === "models" && !setupMode;
+      var enabled = active && category === "models" && !setupMode
+        && (!providersOnly || zcode.root.open || workbuddy.root.open);
       zcode.root.hidden = workbuddy.root.hidden = !!setupMode;
       if (enabled === providersActive) return;
       providersActive = enabled; zcode.setActive(enabled); workbuddy.setActive(enabled);
@@ -321,25 +403,25 @@
         if (value.workbuddy) workbuddy.update(value.workbuddy, workbuddyRevision);
         if (value.errors && value.errors.zcode) zcode.setError(value.errors.zcode);
         if (value.errors && value.errors.workbuddy) workbuddy.setError(value.errors.workbuddy);
-      }).catch(function (failure) { if (revision === providerRevision && providersActive) error(failure); });
+      }).catch(function (failure) { if (revision === providerRevision && providersActive) readError(failure); });
     }
     function refreshActivation() {
       return sharedRead("activation", "configuration.status").then(function (value) {
         ["models", "mcp", "plugins"].forEach(function (key) { setActivation(key, value && value[key]); });
-        pluginInstaller.adopt(value && value.pluginOperations);
+        if (!providersOnly) pluginInstaller.adopt(value && value.pluginOperations);
       }).catch(function (failure) { if (active) error(failure); return false; });
     }
-    function modelsChanged(providerID, force) {
+    function modelsChanged(providerID, force, fromEvent) {
       var revision = setupRevision;
-      return onModelsChanged ? Promise.resolve(onModelsChanged(providerID, force)).catch(function (failure) {
+      return onModelsChanged ? Promise.resolve(onModelsChanged(providerID, force, fromEvent)).catch(function (failure) {
         if (revision === setupRevision && active) error(failure);
         return null;
       }) : Promise.resolve(0);
     }
-    function connectionReady(kind, force) {
+    function connectionReady(kind, force, fromEvent) {
       var providerID = kind === "chatgpt" ? "chatgpt-siwc" : apiProviderID;
       var revision = setupRevision;
-      return modelsChanged(providerID, force).then(function (count) {
+      return modelsChanged(providerID, force, fromEvent).then(function (count) {
         if (revision !== setupRevision || !active || count === null) return false;
         if (count > 0) { if (onConnectionReady) onConnectionReady(kind, providerID); return true; }
         error(new Error("已连接，请刷新模型或填写模型 ID。")); return false;
@@ -359,51 +441,65 @@
         }
         return Promise.resolve(complete && complete(result)).then(function (completed) {
           if (/^auth\./.test(action)) { renderChat(result); refreshSettings(); }
-          if (/^(settings|mcp|plugins)\./.test(action)) refreshActivation();
+          if (!providersOnly && /^(settings|mcp|plugins)\./.test(action)) refreshActivation();
           return completed !== false;
         });
       }).catch(function (failure) { (onFailure || error)(failure); return false; });
     }
+    function settingsVisible() { return !providersOnly || chatPanel.open || editor.open; }
     function refreshSettings() {
       var request = ++generation;
       return sharedRead("models", "settings.get").then(function (result) {
         if (request !== generation) return;
+        if (providersOnly) accountActions.hidden = false;
+        if (!retryRead.hidden) showNotice("");
         state = result || {}; setActivation("models", state.activation); renderChat(state.chatgpt || {}); renderConnections();
-      }).catch(error);
+      }).catch(function (failure) { if (active && settingsVisible() && request === generation) readError(failure); });
     }
     function renderChat(chat) {
       chat = chat || {};
       var accounts = S.safeArray(chat.accounts), authenticated = chat.authenticated === true || chat.connected === true;
-      if (authenticated !== wasAuthenticated) modelsChanged();
+      if (wasAuthenticated !== null && authenticated !== wasAuthenticated) modelsChanged();
       wasAuthenticated = authenticated;
       if (chat.signingIn) chatStatus.textContent = "请在浏览器中完成授权。";
       else if (chat.error) chatStatus.textContent = chat.error;
       else if (authenticated && chat.planEnabled === false) chatStatus.textContent = "尚未授权模型访问，请切换账号。";
-      else chatStatus.textContent = authenticated ? "已连接" : "连接后可选择账号中的模型。";
+      else chatStatus.textContent = authenticated ? "已连接官方 SIWC 模型通道。" : "连接后可直接使用账号中的 ChatGPT 模型。";
+      chatSummaryBadge.textContent = chat.signingIn ? "等待授权" : authenticated ? "已连接" : chat.error ? "异常" : "未连接";
+      chatSummaryBadge.className = "status-badge provider-summary-badge "
+        + (chat.signingIn ? "warning" : authenticated ? "success" : chat.error ? "error" : "neutral");
       if (authTimer) { global.clearTimeout(authTimer); authTimer = null; }
       if (active && chat.signingIn) authTimer = global.setTimeout(refreshSettings, 1500);
       login.hidden = authenticated || chat.signingIn; addAccount.hidden = !authenticated || chat.signingIn;
       cancelLogin.hidden = !chat.signingIn; logout.hidden = !authenticated || chat.signingIn;
       refreshModelsButton.hidden = !authenticated || chat.signingIn;
+      externalAccess.hidden = externalAccessHint.hidden = !authenticated || setupMode === "api";
+      if (!externalAccessInput.disabled) externalAccessInput.checked = chat.allowBackground === true;
       S.clear(accountRows);
+      accountRows.className = "settings-item-list";
       accounts.forEach(function (account) {
-        var row = S.node("div", "form-actions"), selected = account.id === chat.activeAccountId;
-        row.appendChild(S.node("span", null, account.email || "ChatGPT 账号"));
-        row.appendChild(S.node("span", "hint", selected ? "当前账号" : ""));
+        var row = S.node("div", "settings-item-row"), selected = account.id === chat.activeAccountId;
+        var copy = S.node("div", "plugin-card-title-row");
+        copy.appendChild(S.node("strong", "plugin-card-title", account.email || "ChatGPT 账号"));
+        if (selected) copy.appendChild(S.badge("当前账号", "success"));
+        row.appendChild(copy);
+        var actions = S.node("div", "form-actions");
         if (!selected) {
           var switchAccount = button("切换", function () {
             return runAction(switchAccount, "auth", "切换中…", "已切换账号。", function () {
               return perform("auth.switchAccount", { accountId: account.id }, modelsChanged);
             });
           }, "auth");
-          row.appendChild(switchAccount);
+          actions.appendChild(switchAccount);
         }
         var removeAccount = button("移除", function () {
           return runAction(removeAccount, "auth", "移除中…", "账号已移除。", function () {
             return perform("auth.removeAccount", { accountId: account.id }, modelsChanged);
           });
         }, "auth");
-        row.appendChild(removeAccount);
+        removeAccount.classList.add("danger");
+        actions.appendChild(removeAccount);
+        row.appendChild(actions);
         accountRows.appendChild(row);
       });
     }
@@ -596,16 +692,28 @@
     }
     function renderConnections() {
       S.clear(savedConnections);
-      S.safeArray(state.connections).forEach(function (item) {
-        var row = S.node("div", "form-actions"), group = "connection:" + item.id;
-        row.appendChild(S.node("span", null, item.name || item.id));
-        row.appendChild(button("编辑", function () { editConnection(item); }, group));
+      var connections = S.safeArray(state.connections);
+      customApiBadge.textContent = connections.length ? connections.length + " 个已保存" : "未配置";
+      customApiBadge.className = "status-badge provider-summary-badge " + (connections.length ? "success" : "neutral");
+      connections.forEach(function (item) {
+        var row = S.node("div", "settings-item-row"), group = "connection:" + item.id;
+        var copy = S.node("div", "settings-item-copy"), titleRow = S.node("div", "plugin-card-title-row");
+        titleRow.appendChild(S.node("strong", "plugin-card-title", item.name || item.id));
+        var count = S.safeArray(item.models).length;
+        if (count) titleRow.appendChild(S.badge(count + " 个模型", "neutral"));
+        copy.appendChild(titleRow);
+        if (item.baseURL) copy.appendChild(S.node("span", "hint mono", item.baseURL));
+        row.appendChild(copy);
+        var actions = S.node("div", "form-actions");
+        actions.appendChild(button("编辑", function () { editConnection(item); }, group));
         var remove = button("移除", function () {
           return runAction(remove, group, "移除中…", "连接已移除。", function () {
             return perform("settings.remove", { id: item.id }, function () { return Promise.all([refreshSettings(), modelsChanged()]); });
           });
         }, group);
-        row.appendChild(remove);
+        remove.classList.add("danger");
+        actions.appendChild(remove);
+        row.appendChild(actions);
         savedConnections.appendChild(row);
       });
     }
@@ -617,17 +725,20 @@
           .concat(S.safeArray(value && value.plugins).map(function (item) { return { item: item, kind: "plugin" }; }));
         if (!items.length) pluginList.appendChild(S.node("p", "hint", "暂无插件。"));
         items.forEach(function (entry) {
-          var item = entry.item, id = item.entryId || item.id || item.name, row = S.node("div", "form-actions");
+          var item = entry.item, id = item.entryId || item.id || item.name, row = S.node("div", "settings-item-row");
           if (!id) return;
           var group = "plugin:" + entry.kind + ":" + id;
-          row.appendChild(S.node("span", null, item.displayName || item.name || item.moduleName || id));
-          row.appendChild(S.node("span", "hint", item.enabled ? "已启用" : "未启用"));
+          var copy = S.node("div", "plugin-card-title-row");
+          copy.appendChild(S.node("strong", "plugin-card-title", item.displayName || item.name || item.moduleName || id));
+          copy.appendChild(S.badge(item.enabled ? "已启用" : "未启用", item.enabled ? "success" : "neutral"));
+          row.appendChild(copy);
+          var actions = S.node("div", "form-actions");
           var toggle = button(item.enabled ? "停用" : "启用", function () {
             return runAction(toggle, group, item.enabled ? "停用中…" : "启用中…", item.enabled ? "插件已停用。" : "插件已启用。", function () {
               return perform("plugins.enable", { id: id, enabled: !item.enabled, kind: entry.kind }, refreshPlugins);
             });
           }, group, !!item.readOnlyReason || entry.kind === "bundle" && item.availability === "missing");
-          row.appendChild(toggle);
+          actions.appendChild(toggle);
           if (entry.kind === "bundle" && item.installed && item.removable) {
             var update = button("更新", function () {
               return pluginInstaller.begin((item.name || id) + "@latest");
@@ -641,8 +752,10 @@
                 return perform("plugins.remove", { name: item.name || id }, refreshPlugins);
               });
             }, group);
-            row.appendChild(update); row.appendChild(remove);
+            remove.classList.add("danger");
+            actions.appendChild(update); actions.appendChild(remove);
           }
+          row.appendChild(actions);
           pluginList.appendChild(row);
         });
       }).catch(function (failure) { error(failure); return false; });
@@ -702,9 +815,16 @@
         var servers = S.safeArray(value && value.servers);
         if (!servers.length) mcpList.appendChild(S.node("p", "hint", "暂无 MCP 服务。"));
         servers.forEach(function (item) {
-          var row = S.node("div", "form-actions"), group = "mcp:" + item.id;
-          row.appendChild(S.node("span", null, item.name || item.id));
-          row.appendChild(button("编辑", function () { editMCP(item); }, group));
+          var row = S.node("div", "settings-item-row"), group = "mcp:" + item.id;
+          var copy = S.node("div", "settings-item-copy"), titleRow = S.node("div", "plugin-card-title-row");
+          titleRow.appendChild(S.node("strong", "plugin-card-title", item.name || item.id));
+          titleRow.appendChild(S.badge(item.enabled !== false ? "已启用" : "已停用", item.enabled !== false ? "success" : "neutral"));
+          copy.appendChild(titleRow);
+          var detailText = item.transport === "streamable-http" ? item.url : item.command;
+          if (detailText) copy.appendChild(S.node("span", "hint mono", detailText));
+          row.appendChild(copy);
+          var actions = S.node("div", "form-actions");
+          actions.appendChild(button("编辑", function () { editMCP(item); }, group));
           var toggle = button(item.enabled ? "停用" : "启用", function () {
             return runAction(toggle, group, item.enabled ? "停用中…" : "启用中…", item.enabled ? "MCP 服务已停用。" : "MCP 服务已启用。", function () {
               return perform("mcp.setEnabled", { id: item.id, enabled: !item.enabled }, refreshMCP);
@@ -713,7 +833,9 @@
           var remove = button("移除", function () {
             return runAction(remove, group, "移除中…", "MCP 服务已移除。", function () { return perform("mcp.remove", { id: item.id }, refreshMCP); });
           }, group);
-          row.appendChild(toggle); row.appendChild(remove);
+          remove.classList.add("danger");
+          actions.appendChild(toggle); actions.appendChild(remove);
+          row.appendChild(actions);
           mcpList.appendChild(row);
         });
       }).catch(function (failure) { error(failure); return false; });
@@ -736,17 +858,23 @@
         S.clear(skillList);
         var skills = S.safeArray(value && value.skills);
         if (!skills.length) skillList.appendChild(S.node("p", "hint", "暂无技能。"));
-        skills.forEach(function (skill) { skillList.appendChild(S.node("div", null, skill.name || skill.id)); });
+        skills.forEach(function (skill) {
+          var row = S.node("div", "settings-item-row");
+          row.appendChild(S.node("strong", "plugin-card-title", skill.name || skill.id));
+          skillList.appendChild(row);
+        });
       }).catch(function (failure) { error(failure); return false; });
     }
     function setActive(value) {
       if (active === value) return;
       active = value;
       selectCategory(category);
-      pluginInstaller.setActive(value);
+      if (!providersOnly) pluginInstaller.setActive(value);
       updateProvidersActive();
       if (active) {
-        refreshSettings(); refreshActivation(); if (!setupMode) refreshAdvanced();
+        if (!retryRead.hidden) showNotice("");
+        if (settingsVisible()) refreshSettings();
+        if (!providersOnly) { refreshActivation(); if (!setupMode) refreshAdvanced(); }
         if (deferredApplyError) showNotice(deferredApplyError);
       }
       else {
@@ -766,13 +894,14 @@
       if (simple) selectCategory("models"); else selectCategory(category);
       renderActivation();
       chatStatus.hidden = accountRows.hidden = accountActions.hidden = setupMode === "api";
+      externalAccess.hidden = externalAccessHint.hidden = setupMode === "api" || !wasAuthenticated;
       savedConnections.hidden = simple;
       editor.hidden = setupMode === "chatgpt";
       newConnectionButton.hidden = simple;
       saveButton.textContent = simple ? "连接" : "保存连接";
       if (setupMode === "api") { clearEditor(); editor.open = true; baseURL.control.focus(); }
       updateProvidersActive();
-      if (active && !simple) refreshAdvanced();
+      if (active && !simple && !providersOnly) refreshAdvanced();
     }
     function receive(item) {
       if (!item) return;
@@ -796,9 +925,9 @@
       }
       if (item.type === "models.changed") {
         var providerID = item.payload && item.payload.providerID;
-        if (setupMode === "chatgpt" && chatgptReady && (!providerID || providerID === "chatgpt-siwc")) connectionReady("chatgpt");
-        else if (setupMode === "api" && apiProviderID && (!providerID || providerID === apiProviderID)) connectionReady("api");
-        else modelsChanged();
+        if (setupMode === "chatgpt" && chatgptReady && (!providerID || providerID === "chatgpt-siwc")) connectionReady("chatgpt", false, true);
+        else if (setupMode === "api" && apiProviderID && (!providerID || providerID === apiProviderID)) connectionReady("api", false, true);
+        else modelsChanged(providerID, false, true);
       }
       if (!active) return;
       if (/auth|model|settings/.test(item.type || "")) refreshSettings();

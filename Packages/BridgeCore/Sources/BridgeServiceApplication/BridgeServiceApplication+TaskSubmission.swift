@@ -52,7 +52,8 @@ extension BridgeServiceApplication {
     deadline: ContinuousClock.Instant,
     embeddedDSHSubagent: EmbeddedDSHSubagentIdentity? = nil
   ) async throws -> MCPServiceTaskSubmissionReceipt {
-    let admissionToken = try await workspaceGate.beginTaskAdmission()
+    let admissionToken = try await workspaceGate.beginTaskAdmission(
+      allowDuringModeTransition: embeddedDSHSubagent != nil)
     do {
       try Self.checkDeadline(deadline)
       let prepared = try await prepareTaskSubmission(

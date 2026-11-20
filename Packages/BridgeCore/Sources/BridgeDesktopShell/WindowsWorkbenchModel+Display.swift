@@ -195,7 +195,10 @@
           commandReceipt: workbenchCommandReceipt,
           embeddedDSHReceipts: embeddedDSHReceipts,
           workspace: workspaceModel.state,
-          paneTasks: paneTaskDetails(cached)
+          paneTasks: paneTaskDetails(cached),
+          applicationMode: applicationMode,
+          applicationModeTransition: applicationModeTransition,
+          applicationModeError: applicationModeError
         )
       )
     }

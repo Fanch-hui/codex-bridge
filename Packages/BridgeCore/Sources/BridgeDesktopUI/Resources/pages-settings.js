@@ -21,6 +21,8 @@
       navigation.clients.insertBefore(clientSection, navigation.clients.firstChild);
     }
     var workbenchEditor = workbenchCard(page, emit);
+    var modeEditor = global.CodexBridgeDesktopLightweight && global.CodexBridgeDesktopLightweight.modeCard();
+    if (modeEditor) navigation.application.appendChild(modeEditor.root);
     navigation.application.appendChild(workbenchEditor.root);
     var serviceEditor = serviceCard(page, emit);
     navigation.application.appendChild(serviceEditor.root);
@@ -54,6 +56,7 @@
         applyClients(latestClients, nextEmit);
         approvalEditor.update(next, nextEmit);
         workbenchEditor.update(next, nextEmit);
+        if (modeEditor) modeEditor.update(next);
         serviceEditor.update(next, nextEmit);
         status.textContent = next.statusMessage || "";
         status.hidden = !next.statusMessage;
@@ -79,9 +82,11 @@
     var card = S.node("section", "settings-subsection settings-approval");
     card.appendChild(S.node("h3", null, "审批"));
     var direct = S.selectField("Direct 操作", page.directApprovalMode, S.choices(page.directApprovalMode, page.directApprovalOptions), function (value) {
+      directStatus.markPending(value);
       context.emit("setDirectApprovalMode", { mode: value });
     }, "");
     var task = S.selectField("远程任务启动", page.taskStartApprovalMode, S.choices(page.taskStartApprovalMode, page.taskStartApprovalOptions), function (value) {
+      taskStatus.markPending(value);
       context.emit("setTaskStartApprovalMode", { mode: value });
     }, "");
     var concurrencyOptions = [
@@ -90,8 +95,12 @@
     ];
     var concurrencyValue = function (next) { return next.projectWriteConcurrency ? String(next.projectWriteConcurrency) : "4"; };
     var concurrency = S.selectField("同一项目同时运行的 Agent", concurrencyValue(page), S.choices(concurrencyValue(page), concurrencyOptions), function (value) {
+      concurrencyStatus.markPending(value);
       context.emit("setProjectWriteConcurrency", { limit: Number(value) });
     }, "");
+    var directStatus = S.trackFieldSave(direct.wrapper);
+    var taskStatus = S.trackFieldSave(task.wrapper);
+    var concurrencyStatus = S.trackFieldSave(concurrency.wrapper);
     var fields = S.node("div", "form-grid settings-policy-grid");
     fields.appendChild(direct.wrapper);
     fields.appendChild(task.wrapper);
@@ -106,6 +115,9 @@
       D.selectOptions(task.control, S.choices(next.taskStartApprovalMode, next.taskStartApprovalOptions));
       D.selectOptions(concurrency.control, S.choices(concurrencyValue(next), concurrencyOptions));
       draft.update({ direct: next.directApprovalMode || "", task: next.taskStartApprovalMode || "", concurrency: concurrencyValue(next) });
+      directStatus.confirm(next.directApprovalMode || "");
+      taskStatus.confirm(next.taskStartApprovalMode || "");
+      concurrencyStatus.confirm(concurrencyValue(next));
       direct.control.disabled = !next.canSaveApprovalModes;
       task.control.disabled = !next.canSaveApprovalModes;
       concurrency.control.disabled = !next.canSaveApprovalModes || !next.projectWriteConcurrency;

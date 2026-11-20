@@ -7,6 +7,17 @@ const quotaMessageAfter = String.raw`\u6062\u590D\u540E\u7EE7\u7EED\u5BF9\u8BDD\
 
 const patches = [
   {
+    path: 'lib/index.js',
+    sha256: '06749836da37e46e5b895764a9d6897fc89df32c0d4a64ac1ea77f8448313898',
+    replacements: [
+      ["        this.controller = new Controller(store, id => ctx.sessions.get(SessionId(id))?.header, async (block, signal) => {",
+        "        const bridgeSession = globalThis[Symbol.for('codex-bridge.provider-session')];\n" +
+        "        this.controller = new Controller(store, id => bridgeSession ? bridgeSession.header(id) : ctx.sessions.get(SessionId(id))?.header, async (block, signal) => {"],
+      ["            confirmedResponses: (options, context, observe) => confirmedResponses(ctx.sessions, options, context, observe),",
+        "            confirmedResponses: (options, context, observe) => bridgeSession ? bridgeSession.confirmedResponses(options, context) : confirmedResponses(ctx.sessions, options, context, observe),"]
+    ]
+  },
+  {
     path: 'lib/api/controller.js',
     sha256: '1efe2df983bcb41b3db1fce23246d5d7ed12e84375043507c8d77b4fb15d2247',
     replacements: [

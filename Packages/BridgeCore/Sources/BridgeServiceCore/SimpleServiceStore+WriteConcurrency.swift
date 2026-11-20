@@ -27,7 +27,7 @@ extension SimpleServiceStore {
     -> StandaloneWriteSlot
   {
     guard let group = try executionGroup(projectID: projectID, in: db) else { return .free }
-    guard group["root_session_id"] as String? == nil else { return .full }
+    guard try !hasExecutionRoots(group["group_id"], in: db) else { return .full }
     let limit = try projectWriteConcurrency(in: db)
     guard limit > 1 else { return .full }
     let groupID: String = group["group_id"]

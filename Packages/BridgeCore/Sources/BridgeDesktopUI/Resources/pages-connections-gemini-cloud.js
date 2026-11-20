@@ -114,9 +114,11 @@
       note.textContent = sites
         ? "需要可使用 ChatGPT Sites 的账号。按下方指南部署公开 Site，再保存网站根地址。连通后复制 Gemini 专用链接完成关联。"
         : "使用自己的 ngrok 账号，无需 ChatGPT Sites。先运行 ngrok，再保存其网站根地址，复制 Gemini 专用链接完成关联。";
+      S.setButtonPending(save, false, null, "保存并启用");
+      S.setButtonPending(stop, false, null, "停用云 MCP");
       save.disabled = !state.canConfigure || !validAddress();
       stop.disabled = !state.canConfigure || !state.enabled;
-      copySetup.textContent = sites ? "复制 Sites 托管配置" : "复制 ngrok 启动命令";
+      S.syncButtonLabel(copySetup, sites ? "复制 Sites 托管配置" : "复制 ngrok 启动命令");
       copySetup.disabled = !state.canExport;
       copyPrompt.hidden = !sites;
       copyEndpoint.disabled = !state.canExport || !state.enabled || !state.baseURL ||
@@ -127,26 +129,34 @@
     address.control.addEventListener("input", updateControls);
     save.addEventListener("click", function () {
       if (save.disabled) return;
+      S.setButtonPending(save, true, "保存中…", "保存并启用");
       context.emit("configureGeminiCloud", {
         mode: hosting.control.value, baseURL: address.control.value.trim(), enabled: true
       });
     });
     stop.addEventListener("click", function () {
       if (stop.disabled) return;
+      S.setButtonPending(stop, true, "停用中…", "停用云 MCP");
       context.emit("configureGeminiCloud", {
         mode: context.state.hosting, baseURL: context.state.baseURL, enabled: false
       });
     });
     copySetup.addEventListener("click", function () {
-      if (!copySetup.disabled) context.emit("copyGeminiCloudConfiguration", {
+      if (copySetup.disabled) return;
+      S.flashButtonSuccess(copySetup, "已复制");
+      context.emit("copyGeminiCloudConfiguration", {
         kind: hosting.control.value === "sites" ? "sitesEnvironment" : "ngrokCommand"
       });
     });
     copyPrompt.addEventListener("click", function () {
+      if (copyPrompt.disabled) return;
+      S.flashButtonSuccess(copyPrompt, "已复制");
       context.emit("copyGeminiCloudConfiguration", { kind: "sitesPrompt" });
     });
     copyEndpoint.addEventListener("click", function () {
-      if (!copyEndpoint.disabled) context.emit("copyGeminiCloudConfiguration", { kind: "endpoint" });
+      if (copyEndpoint.disabled) return;
+      S.flashButtonSuccess(copyEndpoint, "已复制");
+      context.emit("copyGeminiCloudConfiguration", { kind: "endpoint" });
     });
     return { root: root, update: function (state, nextEmit) {
       context.state = state || {}; context.emit = nextEmit;

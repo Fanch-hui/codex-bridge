@@ -44,6 +44,7 @@ public struct ServiceCompositionConfiguration: Sendable {
   public let mcpPort: Int
   public let appBundleURL: URL?
   public let legacyDataRootURL: URL?
+  public let providerResourceRoot: URL?
 
   public init(
     appVersion: String,
@@ -55,7 +56,8 @@ public struct ServiceCompositionConfiguration: Sendable {
     synchronizeCodexProjects: Bool = true,
     mcpPort: Int = 0,
     appBundleURL: URL? = ServiceBundleLocator.currentAppBundleURL(),
-    legacyDataRootURL: URL? = nil
+    legacyDataRootURL: URL? = nil,
+    providerResourceRoot: URL? = nil
   ) {
     precondition(!appVersion.isEmpty)
     precondition((0...65_535).contains(mcpPort))
@@ -69,5 +71,6 @@ public struct ServiceCompositionConfiguration: Sendable {
     self.mcpPort = mcpPort
     self.appBundleURL = appBundleURL?.standardizedFileURL
     self.legacyDataRootURL = legacyDataRootURL?.standardizedFileURL
+    self.providerResourceRoot = providerResourceRoot
   }
 }

@@ -24,6 +24,10 @@ public enum ServiceBundleLocator {
     }
   }
 
+  public static func currentExecutableURL() -> URL? {
+    executableURL()
+  }
+
   private static func executableURL() -> URL? {
     #if os(Windows)
       var buffer = [WCHAR](repeating: 0, count: 32_768)

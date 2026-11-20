@@ -1,0 +1,16 @@
+.dsh-collaboration-summary { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; padding: 0 2px 8px; color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.dsh-collaboration-count { display: inline-flex; align-items: center; gap: 4px; }
+.dsh-collaboration-count-icon { font-weight: 600; }
+.dsh-collaboration-row { display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; padding: 4px 0 6px; border-bottom: 1px solid var(--separator); transition: background-color var(--duration-fast) var(--ease-out); }
+.dsh-collaboration-row.is-active, .dsh-collaboration-row:has(.dsh-embedded-agent-item.is-active) { border-bottom-color: transparent; background: var(--selection); border-radius: var(--control-radius); }
+.dsh-workspace-pane .dsh-collaboration-row .button.dsh-embedded-agent-item { border: 0; border-radius: 6px; background: transparent; }
+.dsh-collaboration-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; padding: 0 12px; color: var(--text-secondary); font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.dsh-collaboration-dependencies { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; padding: 2px 12px; color: var(--text-secondary); font-size: 11px; }
+.dsh-workspace-pane .button.dsh-collaboration-dependency, .dsh-workspace-pane .button.dsh-collaboration-locate { min-height: 24px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--accent); font-size: 11px; text-align: left; }
+.dsh-workspace-pane .button.dsh-collaboration-dependency:hover, .dsh-workspace-pane .button.dsh-collaboration-locate:hover { text-decoration: underline; }
+.dsh-workspace-pane .button.dsh-collaboration-locate { align-self: flex-start; margin-inline: 12px; }
+.dsh-embedded-subagents.has-agent-detail .dsh-embedded-agent-list { flex: 0 1 auto; max-height: 35%; }
+.dsh-embedded-subagents.has-agent-detail .dsh-embedded-agent-detail { flex: 1 1 0; }
+@media (forced-colors: active) {
+  .dsh-collaboration-row.is-active, .dsh-collaboration-row:has(.dsh-embedded-agent-item.is-active) { outline: 1px solid Highlight; }
+}

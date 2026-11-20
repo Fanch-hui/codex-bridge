@@ -206,6 +206,7 @@ let package = Package(
     .target(
       name: "BridgeTunnel",
       dependencies: [
+        "BridgeProcess",
         "BridgeSecurity",
         .product(name: "Crypto", package: "swift-crypto"),
       ]
@@ -262,6 +263,19 @@ let package = Package(
       dependencies: [
         "BridgeACP", "BridgeAgentCore", "BridgeProcess", "BridgeSecurity",
         .product(name: "Crypto", package: "swift-crypto"),
+      ]
+    ),
+    .target(
+      name: "BridgeProviderRuntime",
+      dependencies: ["BridgeACP", "BridgeSecurity", "BridgeEmbeddedDSH", "BridgeProcess"]
+    ),
+    .target(
+      name: "BridgeModelGateway",
+      dependencies: [
+        "BridgeProviderRuntime", "BridgeACP", "BridgeSecurity",
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOHTTP1", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
       ]
     ),
     .target(
@@ -371,6 +385,7 @@ let package = Package(
     .target(
       name: "BridgeServiceHost",
       dependencies: [
+        "BridgeProviderRuntime", "BridgeModelGateway",
         "BridgeACP",
         "BridgeEmbeddedDSH",
         "BridgeAgentCore",

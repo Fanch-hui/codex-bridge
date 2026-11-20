@@ -17,7 +17,16 @@ extension ServiceEmbeddedDSHController {
     }
     if event.type == "workspace.writeAvailable", let rootID = event.sessionID {
       Task { await self.retryPendingWorkspaces(rootID: rootID) }
+      await subagentScheduler?.kick(rootID)
       return
+    }
+    if event.type == "workspace.externalLease", let rootID = event.sessionID {
+      await subagentScheduler?.kick(rootID)
+    }
+    // A host that failed took its leases and root holds with it; an explicit restart brings the
+    // scheduler back.
+    if event.type == "runtime.failed" {
+      await subagentScheduler?.adapterStopped()
     }
     if event.type == "plugin.install", let id = event.payload["requestId"]?.stringValue,
       ["completed", "failed", "cancelled", "unknown"].contains(

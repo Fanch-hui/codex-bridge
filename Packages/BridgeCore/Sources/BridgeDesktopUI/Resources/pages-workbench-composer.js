@@ -67,7 +67,7 @@
     var effort = choice("推理强度", function (value) { if (options.onEffort) options.onEffort(value); });
     trailing.appendChild(model.wrapper); trailing.appendChild(effort.wrapper);
     var action = S.button("", null, {}, null, "small primary message-composer-send dsh-composer-send workbench-composer-action");
-    var symbol = S.node("span", null, "↑"); symbol.setAttribute("aria-hidden", "true"); action.appendChild(symbol);
+    var symbol = S.icon("arrow.up", "composer-send-icon"); action.appendChild(symbol);
     action.addEventListener("click", function () {
       if (action.disabled) return;
       if (action.__mode === "stop") { if (options.onStop) options.onStop(); } else if (options.onSend) options.onSend();
@@ -95,7 +95,12 @@
     view.action.__mode = mode;
     view.action.disabled = !!disabled;
     view.action.classList.toggle("is-stop", stop);
-    view.symbol.textContent = stop ? "■" : "↑";
+    var iconName = stop ? "stop.fill" : "arrow.up";
+    if (view.symbol.dataset && view.symbol.dataset.symbol !== iconName) {
+      view.symbol.dataset.symbol = iconName;
+      var icons = global.CodexBridgeDesktopIcons;
+      if (icons) view.symbol.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (icons[iconName] || "") + "</svg>";
+    }
     var label = title || (stop ? "停止" : "发送");
     view.action.title = label + (stop ? "" : "（Enter）");
     view.action.setAttribute("aria-label", label);

@@ -30,9 +30,13 @@
       case .openBrowserExternally:
         onUI { openChatExternally() }
       case .setWorkbenchPanes:
-        let ids = (payload.taskIDs ?? []).prefix(WorkbenchPaneConversations.maximumPanes)
-          .compactMap { BridgeDesktopCommandValue.nonEmpty($0) }
-        model.setWorkbenchPanes(Array(ids))
+        if let panes = payload.panes {
+          model.setWorkbenchPaneDescriptors(panes)
+        } else {
+          let ids = (payload.taskIDs ?? []).prefix(WorkbenchPaneConversations.maximumPanes)
+            .compactMap { BridgeDesktopCommandValue.nonEmpty($0) }
+          model.setWorkbenchPanes(Array(ids))
+        }
       case .loadEarlierConversation:
         guard let taskID = BridgeDesktopCommandValue.nonEmpty(payload.taskID) else { return true }
         if model.selectedTaskID == taskID, let conversation = model.conversation,
@@ -120,6 +124,10 @@
         }
       case .workbenchWorkspace:
         Task { @MainActor in await model.performWorkbenchWorkspace(envelope) }
+      case .providerGateway:
+        Task { @MainActor in await model.performProviderGateway(envelope) }
+      case .providerGatewayCopyConnection:
+        Task { @MainActor in await model.copyProviderGatewayConnection(envelope) }
       case .embeddedDSH:
         if payload.action == "attachments.pick" {
           pickWorkbenchAttachment(envelope, model: model)

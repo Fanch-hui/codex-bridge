@@ -1,4 +1,6 @@
 import { CredentialProvider } from '@deepseek-ai/dsh-credentials';
+import { withFileLock } from '@deepseek-ai/dsh-atomic-write';
+import { join } from 'node:path';
 
 const rpc = () => globalThis[Symbol.for('codex-bridge.rpc')];
 const secret = (operation, key, value) => rpc().request('bridge/secret', { operation, key, ...(value === undefined ? {} : { value }) });
@@ -29,7 +31,8 @@ export default class BridgeCredentials extends CredentialProvider {
     return records.filter(x => x.record).map(x => ({ key: x.key, kind: x.record.kind }));
   }
   exclusive(fn) {
-    const result = this.queue.then(fn, fn);
+    const locked = () => withFileLock(join(process.env.DSH_HOME, 'bridge-credential-records'), fn);
+    const result = this.queue.then(locked, locked);
     this.queue = result.catch(() => {});
     return result;
   }

@@ -20,12 +20,14 @@
       connections = WindowsConnectionModel(client: client, feedback: feedback)
     }
 
-    func refreshAll() async {
+    func refreshAll(lightweight: Bool = false) async {
       await workspace.refresh()
       await logs.refresh()
       await connections.refresh()
-      await settings.refresh()
-      await agentDefaults.refresh()
+      await settings.refresh(includeModelCatalog: !lightweight)
+      if !lightweight {
+        await agentDefaults.refresh()
+      }
     }
 
   }

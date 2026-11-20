@@ -56,6 +56,12 @@ extension ServiceEmbeddedDSHController {
       try await finishAcceptedOperation(record)
       return
     }
+    if record.draft.kind == "workbench.importTask" {
+      guard try await mayResume(record) else { return }
+      let result = try await dispatchTaskImport(record)
+      try await acceptRecoveredOperation(record, result: result)
+      return
+    }
     if Self.webOperationKinds.contains(record.draft.kind) {
       if let result = try await application.reconcileWorkbenchTaskOperation(
         kind: record.draft.kind,
@@ -124,7 +130,7 @@ extension ServiceEmbeddedDSHController {
       message: "The continuation did not start. Send it again.")
   }
 
-  private func mayResume(_ record: ServiceWorkbenchOperation) async throws -> Bool {
+  func mayResume(_ record: ServiceWorkbenchOperation) async throws -> Bool {
     guard let current = try await store.workbenchOperation(id: record.draft.operationID),
       !current.cancelled, !current.phase.isTerminal
     else { return false }
@@ -144,6 +150,10 @@ extension ServiceEmbeddedDSHController {
       } catch ServiceStoreError.invalidArgument("embedded_dsh.cancellation_pending") {
         // Cancellation remains bound to the original input until its outcome is known.
       }
+      return
+    }
+    if dispatch["operation"]?.stringValue == "dispatch" {
+      try await reconcileDispatchOperation(record, dispatch: dispatch)
       return
     }
     guard dispatch["operation"]?.stringValue == "send",
@@ -241,7 +251,7 @@ extension ServiceEmbeddedDSHController {
     await publishOperation(current.draft.operationID)
   }
 
-  private func acceptRecoveredOperation(
+  func acceptRecoveredOperation(
     _ record: ServiceWorkbenchOperation,
     result: ACPJSONValue
   ) async throws {
@@ -273,6 +283,13 @@ extension ServiceEmbeddedDSHController {
     do {
       guard var record = try await store.workbenchOperation(id: id), !record.phase.isTerminal else {
         return
+      }
+      do {
+        if try await failRejectedDispatch(record, error: error) { return }
+      } catch {
+        await receive(
+          EmbeddedDSHEvent(type: "operations.reconciliationPending", payload: operationError(error))
+        )
       }
       if record.phase == .accepted, record.draft.kind == "session.prompt" {
         await receive(

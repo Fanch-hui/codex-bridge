@@ -75,27 +75,93 @@ final class AsyncMutex: @unchecked Sendable {
 }
 
 final class XPCRequestAdmission: @unchecked Sendable {
+  private struct Waiter {
+    let id: UUID
+    let background: Bool
+    let continuation: CheckedContinuation<Bool, Never>
+  }
+
   private let lock = NSLock()
   private let maximumConcurrent: Int
+  private let backgroundLimit: Int
   private var active = 0
+  private var waiters: [Waiter] = []
 
   init(maximumConcurrent: Int) {
     precondition(maximumConcurrent > 0)
     self.maximumConcurrent = maximumConcurrent
+    self.backgroundLimit = max(1, maximumConcurrent - 2)
   }
 
-  func acquire() -> Bool {
+  func acquire(background: Bool) async -> Bool {
+    let id = UUID()
+    return await withTaskCancellationHandler {
+      await withCheckedContinuation { continuation in
+        let queued = register(
+          id: id, background: background, continuation: continuation)
+        if queued {
+          DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(2)) { [weak self] in
+            self?.removeWaiter(id)
+          }
+        }
+      }
+    } onCancel: {
+      self.removeWaiter(id)
+    }
+  }
+
+  private func register(
+    id: UUID, background: Bool,
+    continuation: CheckedContinuation<Bool, Never>
+  ) -> Bool {
     lock.lock()
-    defer { lock.unlock() }
-    guard active < maximumConcurrent else { return false }
-    active += 1
+    if Task.isCancelled {
+      lock.unlock()
+      continuation.resume(returning: false)
+      return false
+    }
+    if active < maximumConcurrent && (!background || active < backgroundLimit) {
+      active += 1
+      lock.unlock()
+      continuation.resume(returning: true)
+      return false
+    }
+    guard waiters.count < 32 else {
+      lock.unlock()
+      continuation.resume(returning: false)
+      return false
+    }
+    waiters.append(Waiter(id: id, background: background, continuation: continuation))
+    lock.unlock()
     return true
+  }
+
+  private func removeWaiter(_ id: UUID) {
+    lock.lock()
+    guard let index = waiters.firstIndex(where: { $0.id == id }) else {
+      lock.unlock()
+      return
+    }
+    let waiter = waiters.remove(at: index)
+    lock.unlock()
+    waiter.continuation.resume(returning: false)
   }
 
   func release() {
     lock.lock()
-    defer { lock.unlock() }
     active -= 1
+    var ready: [Waiter] = []
+    while active < maximumConcurrent && !waiters.isEmpty {
+      let interactive = waiters.firstIndex(where: { !$0.background })
+      guard let index = interactive ?? (active < backgroundLimit ? waiters.indices.first : nil)
+      else {
+        break
+      }
+      ready.append(waiters.remove(at: index))
+      active += 1
+    }
+    lock.unlock()
+    for waiter in ready { waiter.continuation.resume(returning: true) }
   }
 }
 

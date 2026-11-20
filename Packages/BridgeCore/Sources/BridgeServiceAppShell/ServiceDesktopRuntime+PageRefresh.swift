@@ -52,6 +52,7 @@ extension BridgeServiceAppModel {
     do {
       let status = try await client.status()
       if serviceStatus != status { serviceStatus = status }
+      applyServiceStatusMode(status)
       applyWorkbenchPermissionMode(status.workbenchPermissionMode)
       if connectionState != .connected { connectionState = .connected }
       await refreshPageCollections(page, client: client)
@@ -96,6 +97,17 @@ extension BridgeServiceAppModel {
   }
 
   private func refreshOverviewCollections(client: any BridgeServiceClientProtocol) async {
+    if isLightweightMode != false {
+      if let value = try? await client.projectList() { applyProjectSnapshot(value) }
+      if let value = try? await client.pendingDirectApprovals() {
+        applyDirectApprovalSnapshot(value)
+      }
+      if let value = try? await client.mcpClients(), mcpClients != value { mcpClients = value }
+      if let value = try? await client.geminiCloudStatus(), geminiCloudStatus != value {
+        geminiCloudStatus = value
+      }
+      return
+    }
     async let projectResult = try? await client.projectList()
     async let agentResult = try? await client.agentCatalog()
     async let taskResult = try? await client.tasks(IPCTaskListRequest(limit: 200))
@@ -114,6 +126,7 @@ extension BridgeServiceAppModel {
   }
 
   private func refreshWorkbenchCollections(client: any BridgeServiceClientProtocol) async {
+    guard isLightweightMode == false else { return }
     async let projectResult = try? await client.projectList()
     async let taskResult = try? await client.tasks(IPCTaskListRequest(limit: 200))
     async let approvalResult = try? await client.approvals(taskID: nil)
@@ -132,6 +145,13 @@ extension BridgeServiceAppModel {
   }
 
   private func refreshConnectionCollections(client: any BridgeServiceClientProtocol) async {
+    if isLightweightMode != false {
+      if let value = try? await client.mcpClients(), mcpClients != value { mcpClients = value }
+      if let value = try? await client.geminiCloudStatus(), geminiCloudStatus != value {
+        geminiCloudStatus = value
+      }
+      return
+    }
     let scope = selectedAgentMCPScope
     async let agentResult = try? await client.agentCatalog()
     await refreshAgentSetups(client: client)

@@ -18,7 +18,7 @@ def _is_private_document(path):
 
 def is_public_path(path):
     pure = PurePosixPath(path)
-    if pure.name.endswith((".test.js", ".test.mjs", ".test.cjs", ".test.ts", ".test.tsx")):
+    if pure.name.endswith((".test.js", ".test.mjs", ".test.cjs", ".test.ts", ".test.tsx", "_test.go")):
         return False
     parts = pure.parts
     lowered = tuple(part.lower() for part in parts)
@@ -64,7 +64,9 @@ def is_public_path(path):
             }
         )
     if parts[:2] in {("Integrations", "MCPB"), ("Integrations", "GeminiSites"),
-                    ("Integrations", "EmbeddedDSH"), ("Integrations", "MessageCenterSites")}:
+                    ("Integrations", "EmbeddedDSH"), ("Integrations", "MessageCenterSites"),
+                    ("Integrations", "AgentConnections"), ("Integrations", "CommunityProviders"),
+                    ("Integrations", "ModelProtocol")}:
         return True
     if parts[:2] == (".github", "workflows"):
         return pure.name in {"windows.yml", "macos.yml", "linux.yml", "mcp-registry.yml"}

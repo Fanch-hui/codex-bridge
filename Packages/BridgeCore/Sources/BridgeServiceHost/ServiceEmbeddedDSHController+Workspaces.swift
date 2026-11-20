@@ -75,13 +75,6 @@ extension ServiceEmbeddedDSHController {
   private func requireUsableIsolatedWorkspace(
     id: String, projectID: ProjectID, providerID: String, continuation: Bool
   ) async throws {
-    if continuation, providerID == "codex", !CodexIsolatedLaunch.supportsFileOnlyExecution {
-      try await store.setSetting(
-        ServiceSettingRecord(
-          key: Self.workspaceReasonKey(id),
-          value: "此 Codex 副本保留原变更；处理完变更后，请新建共享目录任务。", updatedAt: Date()))
-      throw AgentWorkspaceError.workspaceUnavailable
-    }
     let isCodex = providerID == "codex"
     guard isCodex ? CodexIsolatedLaunch.isAvailable : WorkspaceProcessIsolation.isAvailable else {
       throw AgentWorkspaceError.workspaceUnavailable

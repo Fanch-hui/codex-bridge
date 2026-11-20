@@ -13,7 +13,7 @@
         let nextTasks = WorkbenchTaskHistorySearch.retainingSelection(
           in: recent, prior: tasks, selectedTaskID: selectedTaskID,
           historyTaskID: selectedHistoryTaskID)
-        guard !Task.isCancelled, !isShuttingDown else { return }
+        guard !Task.isCancelled, !isShuttingDown, isLightweightMode == false else { return }
         let tasksChanged = tasks != nextTasks
         let stateChanged = connectionState != .connected || errorMessage != nil
         if tasksChanged {

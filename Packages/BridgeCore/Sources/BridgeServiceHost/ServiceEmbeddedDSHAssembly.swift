@@ -45,11 +45,12 @@ enum ServiceEmbeddedDSHAssembly {
     desktop: DeepSeekHarnessDesktopController,
     secretStore: any SecretStore,
     dataRoot: URL,
+    resourceRoot: URL? = nil,
     workspaces: AgentWorkspaceStore
   ) -> ServiceEmbeddedDSHController {
     ServiceEmbeddedDSHController(
       application: application, projects: projects, store: store, settings: settings,
-      secretStore: secretStore, dataRoot: dataRoot,
+      secretStore: secretStore, dataRoot: dataRoot, resourceRoot: resourceRoot,
       workspaces: workspaces,
       externalWorkspaceReadiness: { providerID, installationID, snapshot, runtimeDirectory in
         let id = AgentProviderID(rawValue: providerID)

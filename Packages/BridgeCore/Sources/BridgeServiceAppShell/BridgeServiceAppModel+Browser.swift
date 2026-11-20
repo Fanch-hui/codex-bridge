@@ -13,19 +13,52 @@ extension BridgeServiceAppModel {
 
   public var chatBrowserSite: ChatBrowserSite { chatBrowserSessions.selectedSite }
 
+  var isChatBrowserActive: Bool {
+    isChatBrowserEnabled && isLightweightMode == false
+  }
+
   var chatBrowserResumeURL: URL { chatBrowserSessions.resumeURL }
+
+  var chatBrowserLoadError: String? {
+    get { chatBrowserViewport.loadError }
+    set {
+      guard chatBrowserViewport.loadError != newValue else { return }
+      objectWillChange.send()
+      chatBrowserViewport.loadError = newValue
+    }
+  }
+
+  func setChatBrowserLoadError(
+    _ message: String?,
+    for site: ChatBrowserSite,
+    generation: UInt64? = nil
+  ) {
+    guard site == chatBrowserSite else { return }
+    if let generation, chatBrowserSessions.generation != generation { return }
+    chatBrowserLoadError = message
+  }
+
+  func notifyChatBrowserNavigationChanged(
+    for site: ChatBrowserSite,
+    generation: UInt64? = nil
+  ) {
+    guard site == chatBrowserSite else { return }
+    if let generation, chatBrowserSessions.generation != generation { return }
+    objectWillChange.send()
+    chatBrowserViewport.loadError = nil
+  }
 
   func chatWebViewBinding(for site: ChatBrowserSite) -> Binding<WKWebView?> {
     let generation = chatBrowserSessions.generation
     return Binding(
       get: {
-        guard self.isChatBrowserEnabled, self.chatBrowserSessions.generation == generation else {
+        guard self.isChatBrowserActive, self.chatBrowserSessions.generation == generation else {
           return nil
         }
         return self.chatBrowserSessions.webView(for: site)
       },
       set: { webView in
-        guard self.isChatBrowserEnabled, self.chatBrowserSessions.generation == generation else {
+        guard self.isChatBrowserActive, self.chatBrowserSessions.generation == generation else {
           if let webView, self.chatBrowserSessions.webView(for: site) !== webView {
             ChatBrowserSessions.detach(webView)
           }
@@ -37,10 +70,11 @@ extension BridgeServiceAppModel {
   }
 
   private func setChatWebView(_ webView: WKWebView?, for site: ChatBrowserSite) {
-    guard isChatBrowserEnabled else {
+    guard isChatBrowserActive else {
       if let webView { ChatBrowserSessions.detach(webView) }
       return
     }
+    guard chatBrowserSessions.webView(for: site) !== webView else { return }
     objectWillChange.send()
     chatBrowserSessions.setWebView(webView, for: site)
     if webView != nil { updateChatBrowserVisibility() }
@@ -49,6 +83,7 @@ extension BridgeServiceAppModel {
   func selectChatBrowserSite(_ site: ChatBrowserSite) {
     guard site != chatBrowserSite else { return }
     objectWillChange.send()
+    chatBrowserViewport.loadError = nil
     chatBrowserSessions.select(site)
     updateChatBrowserVisibility()
   }
@@ -85,11 +120,13 @@ extension BridgeServiceAppModel {
   func reloadChatBrowser() {
     guard isChatBrowserEnabled else { return }
     cancelChatBrowserSleep()
+    chatBrowserViewport.loadError = nil
     chatBrowserReloadRequest &+= 1
   }
 
   func releaseChatWebView() {
     objectWillChange.send()
+    chatBrowserViewport.loadError = nil
     chatBrowserSessions.release()
   }
 }

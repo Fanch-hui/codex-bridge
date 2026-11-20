@@ -88,31 +88,46 @@
       row.appendChild(S.node("p", "native-session-meta", meta));
       var actions = S.node("div", "native-session-actions");
       if (supports("read")) {
-      actions.appendChild(S.button("查看", null, {}, null, "small", state.isLoading));
-      actions.lastChild.addEventListener("click", function () {
+      var readBtn = S.button("查看", null, {}, null, "small", state.isLoading);
+      readBtn.addEventListener("click", function () {
+        S.setButtonPending(readBtn, true, "读取中…", "查看");
         emit(emitCommand, "read", state, session.session_id, { offset: 0, limit: 50 });
       });
+      actions.appendChild(readBtn);
       }
       if (supports("index")) {
-      actions.appendChild(S.button(session.is_indexed ? "已导入" : "导入续写", null, {}, null, "small", session.is_indexed || state.isLoading));
-      actions.lastChild.addEventListener("click", function () {
+      var indexBtn = S.button(session.is_indexed ? "已导入" : "导入续写", null, {}, null, "small", session.is_indexed || state.isLoading);
+      indexBtn.addEventListener("click", function () {
+        S.setButtonPending(indexBtn, true, "导入中…", "导入续写");
         emit(emitCommand, "index", state, session.session_id);
       });
+      actions.appendChild(indexBtn);
       }
       if (supports("rename")) {
-      actions.appendChild(S.button("重命名", null, {}, null, "small", state.isLoading));
-      actions.lastChild.addEventListener("click", function () {
-        var title = global.prompt("新的会话名称", session.title || "");
-        if (title == null || !title.trim()) return;
-        emit(emitCommand, "rename", state, session.session_id, { name: title.trim() });
+      var renameBtn = S.button("重命名", null, {}, null, "small", state.isLoading);
+      renameBtn.addEventListener("click", function () {
+        S.promptDialog({
+          title: "重命名原生会话",
+          label: "会话名称",
+          initialValue: session.title || "",
+          placeholder: "输入新的会话名称",
+          submitTitle: "保存"
+        }).then(function (title) {
+          if (title == null || !title.trim()) return;
+          S.setButtonPending(renameBtn, true, "保存中…", "重命名");
+          emit(emitCommand, "rename", state, session.session_id, { name: title.trim() });
+        });
       });
+      actions.appendChild(renameBtn);
       }
       if (supports("delete")) {
-      actions.appendChild(S.button("删除原生会话", null, {}, null, "small danger", state.isLoading));
-      actions.lastChild.addEventListener("click", function () {
+      var deleteBtn = S.button("删除原生会话", null, {}, null, "small danger", state.isLoading);
+      deleteBtn.addEventListener("click", function () {
         if (!global.confirm("这会通过 Agent 官方接口永久删除原生会话，无法撤销。继续吗？")) return;
+        S.setButtonPending(deleteBtn, true, "删除中…", "删除原生会话");
         emit(emitCommand, "delete", state, session.session_id, { confirmed: true });
       });
+      actions.appendChild(deleteBtn);
       }
       if (supports("open")) {
         actions.appendChild(S.button("打开对应会话", "openDeepSeekHarnessSession", {
@@ -120,19 +135,28 @@
         }, emitCommand, "small", state.isLoading));
       }
       if (session.is_indexed && supports("continue")) {
-        actions.appendChild(S.button("续写", null, {}, null, "small primary", state.isLoading));
-        actions.lastChild.addEventListener("click", function () {
-          var prompt = global.prompt("输入要续写的内容");
-          if (prompt == null || !prompt.trim()) return;
-          var selectedInstallation = S.safeArray(state.installations).find(function (item) {
-            return item.installationID === state.installationID;
-          });
-          if (!selectedInstallation) return;
-          emitCommand("continueNativeAgentSession", {
-            projectID: state.projectID, providerID: selectedInstallation.providerID,
-            installationID: state.installationID, sessionID: session.session_id, input: prompt.trim()
+        var continueBtn = S.button("续写", null, {}, null, "small primary", state.isLoading);
+        continueBtn.addEventListener("click", function () {
+          S.promptDialog({
+            title: "续写原生会话",
+            label: "续写指令",
+            placeholder: "输入要继续交给 Agent 的内容…",
+            multiline: true,
+            submitTitle: "发送"
+          }).then(function (prompt) {
+            if (prompt == null || !prompt.trim()) return;
+            var selectedInstallation = S.safeArray(state.installations).find(function (item) {
+              return item.installationID === state.installationID;
+            });
+            if (!selectedInstallation) return;
+            S.setButtonPending(continueBtn, true, "发送中…", "续写");
+            emitCommand("continueNativeAgentSession", {
+              projectID: state.projectID, providerID: selectedInstallation.providerID,
+              installationID: state.installationID, sessionID: session.session_id, input: prompt.trim()
+            });
           });
         });
+        actions.appendChild(continueBtn);
       }
       row.appendChild(actions);
       list.appendChild(row);

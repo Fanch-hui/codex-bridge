@@ -48,7 +48,7 @@
       return control;
     }
     var filesTab = tab("文件", "files", filesPanel), changesTab = tab("变更", "changes", changesPanel),
-      agentsTab = tab("Agent", "agents", agentsPanel);
+      agentsTab = tab("协作", "agents", agentsPanel);
     var header = S.node("header", "dsh-workspace-heading"); filesPanel.appendChild(header);
     function button(title, action, parent, style) {
       var value = S.button(title, null, {}, null, style || "small"); value.addEventListener("click", action);
@@ -86,13 +86,14 @@
     }, gitHeader); changesPanel.appendChild(gitHeader);
     var changes = S.node("nav", "dsh-git-changes"); changes.setAttribute("aria-label", "Git 文件变更"); changesPanel.appendChild(changes);
     var diff = S.node("pre", "dsh-git-diff"); diff.setAttribute("aria-label", "Git Diff"); changesPanel.appendChild(diff);
-    var agentsEmpty = S.node("p", "hint dsh-workspace-agents-empty", "当前会话暂无调用的 Agent。");
+    var agentsEmpty = S.node("p", "hint dsh-workspace-agents-empty", "当前会话暂无子任务。");
     agentsPanel.appendChild(agentsEmpty);
     var subagentsNode = null;
     function syncSubagents() {
       agentsEmpty.hidden = !!(subagentsNode && !subagentsNode.hidden && subagentsNode.children.length);
     }
     function mountSubagents(node) {
+      if (subagentsNode && subagentsNode !== node) subagentsNode.remove();
       subagentsNode = node;
       if (node) agentsPanel.appendChild(node);
       syncSubagents();

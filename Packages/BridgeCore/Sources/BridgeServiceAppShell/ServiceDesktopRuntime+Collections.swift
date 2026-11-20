@@ -14,6 +14,7 @@ extension BridgeServiceAppModel {
     if workbenchSettingsController.state.enabled == nil || includeSettings {
       await workbenchSettingsController.refresh()
     }
+    let workbenchActive = isLightweightMode == false
     let catalogConnectionGeneration = codexModelCatalogRequests.connectionGeneration
     let managementVisible =
       includeCatalog || includeProjectResources || includeSettings
@@ -27,13 +28,15 @@ extension BridgeServiceAppModel {
     async let instructionsResult = optional(when: includeSettings && !includeCatalog) {
       try await client.customInstructions()
     }
-    let agentCatalogResult = await optional(when: managementVisible) {
+    let agentCatalogResult = await optional(when: managementVisible && workbenchActive) {
       try await client.agentCatalog()
     }
-    async let taskResult = optional {
+    async let taskResult = optional(when: workbenchActive) {
       try await client.tasks(IPCTaskListRequest(limit: 200))
     }
-    async let approvalResult = optional { try await client.approvals(taskID: nil) }
+    async let approvalResult = optional(when: workbenchActive) {
+      try await client.approvals(taskID: nil)
+    }
     async let directApprovalResult = optional { try await client.pendingDirectApprovals() }
     let directApprovalModeResult = await optional { try await client.directApprovalMode() }
     let taskStartApprovalModeResult = await optional {
@@ -66,18 +69,20 @@ extension BridgeServiceAppModel {
       projectDetails[projectID] = detail
     }
 
-    var shouldRefreshProjectResources = includeProjectResources || threadCatalogRefreshDue()
-    if let value = await taskResult {
+    var shouldRefreshProjectResources =
+      workbenchActive && (includeProjectResources || threadCatalogRefreshDue())
+    if let value = await taskResult, isLightweightMode == false {
       shouldRefreshProjectResources =
         shouldRefreshProjectResources || Self.taskCatalogChanged(from: tasks, to: value)
       applyTaskSnapshot(value)
     }
 
-    if shouldRefreshProjectResources, let projectID = selectedProjectID {
+    if shouldRefreshProjectResources, isLightweightMode == false, let projectID = selectedProjectID
+    {
       await refreshProjectResources(client: client, projectID: projectID)
     }
 
-    if let value = await approvalResult {
+    if let value = await approvalResult, isLightweightMode == false {
       applyApprovalSnapshot(value)
     }
     if let value = await directApprovalResult {
@@ -102,7 +107,7 @@ extension BridgeServiceAppModel {
     {
       deepSeekHarnessMCPServers = value.servers
     }
-    if includeCatalog {
+    if includeCatalog && workbenchActive {
       if catalogConnectionGeneration == codexModelCatalogRequests.connectionGeneration {
         await refreshModelCatalog(client: client, forceRefresh: forceCatalogRefresh)
       }

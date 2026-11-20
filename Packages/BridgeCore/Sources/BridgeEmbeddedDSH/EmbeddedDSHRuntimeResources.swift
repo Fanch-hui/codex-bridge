@@ -3,12 +3,13 @@ import BridgeSecurity
 import Crypto
 import Foundation
 
-struct EmbeddedDSHRuntimeResources: Sendable {
-  let root: URL
-  let node: SecureFileArtifactSnapshot
-  let entry: SecureFileArtifactSnapshot
+package struct EmbeddedDSHRuntimeResources: Sendable {
+  package let root: URL
+  package let node: SecureFileArtifactSnapshot
+  package let entry: SecureFileArtifactSnapshot
+  private let validator: ResourceValidator
 
-  static func load(root: URL) throws -> Self {
+  package static func load(root: URL) throws -> Self {
     let canonicalRoot = root.resolvingSymlinksInPath().standardizedFileURL
     let manifestURL = canonicalRoot.appendingPathComponent("runtime.json")
     let before: SecureFileArtifactSnapshot
@@ -43,10 +44,16 @@ struct EmbeddedDSHRuntimeResources: Sendable {
     guard let node = snapshots[validator.key(manifest.node)],
       let entry = snapshots[validator.key(manifest.entry)]
     else { throw EmbeddedDSHRuntimeError.invalidManifest }
-    return Self(root: canonicalRoot, node: node, entry: entry)
+    return Self(root: canonicalRoot, node: node, entry: entry, validator: validator)
   }
 
-  func validateEntrypoints() throws {
+  package func snapshotFile(
+    relativePath: String, requiresExecutable: Bool = false
+  ) throws -> SecureFileArtifactSnapshot {
+    try validator.snapshotFile(relativePath, requiresExecutable: requiresExecutable)
+  }
+
+  package func validateEntrypoints() throws {
     do {
       guard
         node
@@ -123,6 +130,13 @@ private struct ResourceValidator: Sendable {
   }
 
   func key(_ path: String) -> String { Self.pathKey(path) }
+
+  func snapshotFile(_ path: String, requiresExecutable: Bool) throws -> SecureFileArtifactSnapshot {
+    guard Self.validPath(path), let file = files[key(path)],
+      let snapshot = try validateFile(file, requiresExecutable: requiresExecutable)
+    else { throw EmbeddedDSHRuntimeError.invalidManifest }
+    return snapshot
+  }
 
   func validate() throws -> [String: SecureFileArtifactSnapshot] {
     try validateDirectoryContents()

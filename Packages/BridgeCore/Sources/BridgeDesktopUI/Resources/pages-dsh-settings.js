@@ -32,8 +32,9 @@
         list.appendChild(row);
       });
       empty.hidden = models.length > 0;
-      refresh.hidden = !next.canRefreshModels; refresh.disabled = !!next.isRefreshingModels;
-      refresh.textContent = next.isRefreshingModels ? "刷新中…" : "刷新模型列表";
+      refresh.hidden = !next.canRefreshModels;
+      S.setButtonPending(refresh, !!next.isRefreshingModels, "刷新中…", "刷新模型列表");
+      refresh.disabled = !!next.isRefreshingModels;
       error.textContent = next.errorMessage || ""; error.hidden = !error.textContent;
     }
     update(item, emit);
@@ -69,7 +70,10 @@
     root.appendChild(status);
 
     scan.addEventListener("click", function () {
-      if (!scan.disabled) { scan.disabled = true; context.emit("scanAgents", {}); }
+      if (!scan.disabled) {
+        S.setButtonPending(scan, true, "扫描中…", "扫描安装");
+        context.emit("scanAgents", {});
+      }
     });
 
     function schedule() {
@@ -105,9 +109,11 @@
           acceptReplacement: true
         }, nextEmit);
         registration.update(providers, connectionsPage.canRegisterAgent && !connectionsPage.isManagingAgents, nextEmit);
+        S.setButtonPending(scan, !!connectionsPage.isManagingAgents, "扫描中…", "扫描安装");
         scan.disabled = !connectionsPage.canScanAgents || !!connectionsPage.isManagingAgents;
         mcp.update(connectionsPage, nextEmit);
       } else {
+        S.setButtonPending(scan, false, null, "扫描安装");
         scan.disabled = true;
         registration.update([], false, nextEmit);
         mcp.update({}, nextEmit);

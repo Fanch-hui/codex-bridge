@@ -10,12 +10,17 @@
     private let path: String
     private let lock = NSLock()
     private var channel: LinuxSocketChannel?
-    private var pending: [Pending] = []
+    private var pendingFIFO: [Pending] = []
+    private var pendingTagged: [UInt64: Pending] = [:]
+    private var nextTag: UInt64 = 1
+    private var multiplexingEnabled: Bool
+    private var multiplexedConfirmed = false
     private var invalidated = false
     private var handler: (@Sendable (Data) -> Void)?
 
-    public init(path: String = LinuxServiceEndpoint.socketPath) {
+    public init(path: String = LinuxServiceEndpoint.socketPath, multiplexed: Bool = true) {
       self.path = path
+      self.multiplexingEnabled = multiplexed
     }
 
     deinit { invalidate() }
@@ -26,6 +31,18 @@
     }
 
     public func perform(_ data: Data) async throws -> Data {
+      let useMultiplexed = lock.withLock { multiplexingEnabled }
+      do {
+        return try await performOnce(data, multiplexed: useMultiplexed)
+      } catch BridgeServiceClientError.unavailable
+        where useMultiplexed && lock.withLock({ !multiplexingEnabled && !multiplexedConfirmed })
+        && ServiceMultiplexedFrame.allowsLegacyFallback(for: data)
+      {
+        return try await performOnce(data, multiplexed: false)
+      }
+    }
+
+    private func performOnce(_ data: Data, multiplexed: Bool) async throws -> Data {
       try await withCheckedThrowingContinuation { continuation in
         let active: LinuxSocketChannel
         do {
@@ -35,11 +52,33 @@
           return
         }
         var registered = false
+        let frameKind: UInt8
+        let wirePayload: Data
+        let allocatedTag: UInt64
+        if multiplexed {
+          allocatedTag = lock.withLock {
+            let tag = nextTag
+            nextTag &+= 1
+            if nextTag == 0 { nextTag = 1 }
+            return tag
+          }
+          frameKind = ServiceFrameKind.multiplexedRequest
+          wirePayload = ServiceMultiplexedFrame.encode(tag: allocatedTag, payload: data)
+        } else {
+          allocatedTag = 0
+          frameKind = ServiceFrameKind.legacyRequest
+          wirePayload = data
+        }
         do {
-          try active.writeFrame(kind: 0, payload: data) {
+          try active.writeFrame(kind: frameKind, payload: wirePayload) {
             try lock.withLock {
               guard !invalidated, channel === active else { throw LinuxSocketError.closed }
-              pending.append(Pending(channel: active, continuation: continuation))
+              let entry = Pending(channel: active, continuation: continuation)
+              if multiplexed {
+                pendingTagged[allocatedTag] = entry
+              } else {
+                pendingFIFO.append(entry)
+              }
               registered = true
             }
           }
@@ -86,15 +125,24 @@
       defer { retire(active) }
       while let frame = try? active.readFrame() {
         switch frame.kind {
-        case 1:
+        case ServiceFrameKind.legacyResponse:
           let response = lock.withLock { () -> Pending? in
-            guard let index = pending.firstIndex(where: { $0.channel === active }) else {
+            guard let index = pendingFIFO.firstIndex(where: { $0.channel === active }) else {
               return nil
             }
-            return pending.remove(at: index)
+            return pendingFIFO.remove(at: index)
           }
           response?.continuation.resume(returning: frame.payload)
-        case 2:
+        case ServiceFrameKind.multiplexedResponse:
+          guard let (tag, body) = ServiceMultiplexedFrame.decode(frame.payload) else { return }
+          let response = lock.withLock { () -> Pending? in
+            multiplexedConfirmed = true
+            guard channel === active, let entry = pendingTagged[tag], entry.channel === active
+            else { return nil }
+            return pendingTagged.removeValue(forKey: tag)
+          }
+          response?.continuation.resume(returning: body)
+        case ServiceFrameKind.streamPush:
           let callback = lock.withLock { channel === active ? handler : nil }
           callback?(frame.payload)
         default:
@@ -104,11 +152,21 @@
     }
 
     private func retire(_ active: LinuxSocketChannel) {
-      let failed = lock.withLock {
+      let failed = lock.withLock { () -> [Pending] in
         if channel === active { channel = nil }
-        let failed = pending.filter { $0.channel === active }
-        pending.removeAll { $0.channel === active }
-        return failed
+        let failedFIFO = pendingFIFO.filter { $0.channel === active }
+        pendingFIFO.removeAll { $0.channel === active }
+        var failedTagged: [Pending] = []
+        for (tag, entry) in pendingTagged where entry.channel === active {
+          failedTagged.append(entry)
+          pendingTagged.removeValue(forKey: tag)
+        }
+        if multiplexingEnabled && !multiplexedConfirmed && !active.receivedAnyFrame
+          && !failedTagged.isEmpty
+        {
+          multiplexingEnabled = false
+        }
+        return failedFIFO + failedTagged
       }
       active.close()
       for response in failed {

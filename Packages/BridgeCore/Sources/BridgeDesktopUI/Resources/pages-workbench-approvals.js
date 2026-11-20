@@ -3,8 +3,8 @@
   var S = global.CodexBridgeDesktopPageSupport;
   var N = global.CodexBridgeDesktopNativePermissions;
 
-  function render(page, emit) {
-    var container = document.getElementById("workbench-inspector-approvals");
+  function render(page, emit, target) {
+    var container = target || document.getElementById("workbench-inspector-approvals");
     var approvals = page.approvals || [];
     var drafts = container.__userInputDrafts || (container.__userInputDrafts = Object.create(null));
     var activeIDs = Object.create(null);
@@ -32,17 +32,27 @@
         if (appr.relativePaths && appr.relativePaths.length) addListBlock(body, "涉及路径", appr.relativePaths);
       }
       var actions = S.node("div", "approval-actions");
+      function lockCardActions(clickedButton) {
+        Array.prototype.forEach.call(actions.querySelectorAll("button"), function (btn) {
+          btn.disabled = true;
+        });
+        if (clickedButton) {
+          clickedButton.dataset.pending = "true";
+          clickedButton.setAttribute("aria-busy", "true");
+        }
+      }
       if (isUserInput) {
         var answerButton = S.button("提交回答", null, {}, emit, "small primary",
           appr.resolving || !answersComplete(appr, questions, drafts));
+        if (appr.resolving) answerButton.setAttribute("aria-busy", "true");
         function updateAnswerButton() {
-          answerButton.disabled = appr.resolving || !answersComplete(appr, questions, drafts);
+          answerButton.disabled = appr.resolving || answerButton.dataset.pending === "true" || !answersComplete(appr, questions, drafts);
         }
         body.addEventListener("input", updateAnswerButton);
         body.addEventListener("change", updateAnswerButton);
         answerButton.addEventListener("click", function () {
           if (!answersComplete(appr, questions, drafts)) return;
-          answerButton.disabled = true;
+          lockCardActions(answerButton);
           emit("resolveApproval", {
             approvalID: appr.approvalID,
             taskID: appr.taskID,
@@ -53,6 +63,7 @@
         actions.appendChild(answerButton);
         var cancelButton = S.button("取消提问", null, {}, emit, "small", appr.resolving);
         cancelButton.addEventListener("click", function () {
+          lockCardActions(cancelButton);
           emit("resolveApproval", {
             approvalID: appr.approvalID,
             taskID: appr.taskID,
@@ -72,9 +83,15 @@
         var normalized = dec.toLowerCase(), isDeny = normalized === "deny";
         var allowed = isDeny ? appr.canDeny : appr.canAllow;
         var cmd = appr.isDirect ? "resolveDirectApproval" : "resolveApproval";
-        actions.appendChild(S.button(decisionLabel(appr, dec), cmd,
-          { approvalID: appr.approvalID, taskID: appr.taskID, decision: dec }, emit,
-          isDeny ? "small danger" : "small primary", appr.resolving || !allowed));
+        var decButton = S.button(decisionLabel(appr, dec), null, {}, null,
+          isDeny ? "small danger" : "small primary", appr.resolving || !allowed);
+        if (appr.resolving && !isDeny) decButton.setAttribute("aria-busy", "true");
+        decButton.addEventListener("click", function () {
+          if (decButton.disabled) return;
+          lockCardActions(decButton);
+          emit(cmd, { approvalID: appr.approvalID, taskID: appr.taskID, decision: dec });
+        });
+        actions.appendChild(decButton);
       });
       var oneTimeButton = N && N.oneTimeApprovalButton(appr, emit);
       if (oneTimeButton) actions.appendChild(oneTimeButton);

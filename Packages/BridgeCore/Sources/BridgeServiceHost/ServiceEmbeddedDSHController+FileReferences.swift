@@ -5,6 +5,11 @@ import Foundation
 extension ServiceEmbeddedDSHController {
   func projectFileReferences(_ payload: [String: ACPJSONValue]) async throws -> ACPJSONValue {
     let projectID = try Self.requiredString(payload, "projectID")
+    if let sessionID = payload["sessionId"]?.stringValue,
+      try await storedProjectID(for: sessionID) != projectID
+    {
+      throw ServiceStoreError.invalidArgument("embedded_dsh.session_project")
+    }
     _ = try await registeredProject(projectID)
     let query = payload["query"]?.stringValue ?? ""
     guard query.utf8.count <= 2_048, !query.contains("\0"), !query.hasPrefix("/"),
@@ -18,9 +23,9 @@ extension ServiceEmbeddedDSHController {
     var cursor = payload["cursor"]?.stringValue
     var matches: [ACPJSONValue] = []
     for _ in 0..<5 {
-      let page = try await application.serviceListProjectDirectory(
+      let page = try await application.serviceWorkbenchListDirectory(
         projectID: projectID,
-        relativeDirectory: directory, depth: 1, kind: "all", cursor: cursor,
+        relativeDirectory: directory, cursor: cursor,
         limit: 20 - matches.count,
         deadline: .now.advanced(by: .seconds(10)))
       matches += page.entries.filter {

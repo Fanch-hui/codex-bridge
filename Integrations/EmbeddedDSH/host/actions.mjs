@@ -1,8 +1,10 @@
+import { RuntimeAdmission } from './runtime-admission.mjs';
 import { Events } from './events.mjs';
 import { ModelSettings } from './settings.mjs';
 import { Sessions } from './sessions.mjs';
 import { McpServers } from './mcp.mjs';
 import { BridgeAgents } from './bridge-agents.mjs';
+import { listingFor } from './agent-listing.mjs';
 import { AuthState } from './auth-state.mjs';
 import { ModelCatalog, ModelSelectionProvenance } from './model-catalog.mjs';
 import { randomUUID } from 'node:crypto';
@@ -20,19 +22,26 @@ import { ConfigurationActivation, pluginApplication } from './configuration-acti
 import { PluginOperations } from './plugin-operations.mjs';
 import { ScheduleOperations } from './schedule-operations.mjs';
 import { WorkspaceWrites } from './workspace-writes.mjs';
+import { ExternalWriteLeases } from './external-write-leases.mjs';
+import { ExternalRootHolds } from './external-root-holds.mjs';
 import { WorkspaceRecoveryActions } from './workspace-recovery-actions.mjs';
 import { ProviderConnections } from './provider-connections.mjs';
 import { ContextPolicy, contextPolicySymbol } from './context-policy.mjs';
 import { cancelNativeSubagentInput } from './native-subagent-inputs.mjs';
 import { stopWithScopes } from './session-stop.mjs';
+import { importTask } from './task-import.mjs';
+import { confirmedResponses } from '../node_modules/dsh-plugin-chatgpt-siwc/lib/provider/durability.js';
+
+const providerNamespaces = new Set(['llm-pi-ai', 'llm-deepseek', 'llm-deepseek-account', 'deepseek-account']);
 
 const nativePluginWrites = new Set(['pluginManager/installBundle', 'pluginManager/setBundleEnabled',
   'pluginManager/setPluginEnabled', 'pluginManager/removeBundle', 'pluginManager/setVersionExemption']);
 
 export class Actions {
-  constructor(ctx, rpc, home, contextPolicy) {
+  constructor(ctx, rpc, home, contextPolicy, sharedProviders) {
     this.ctx = ctx;
     this.rpc = rpc;
+    this.sharedProviders = sharedProviders;
     this.events = new Events(ctx, rpc);
     this.contextPolicy = contextPolicy ?? new ContextPolicy(ctx, home, () => {});
     this.contextPolicy.attach(ctx, (id, type, payload) => this.events.emit(id, type, payload));
@@ -45,15 +54,15 @@ export class Actions {
       (id, type, payload) => this.events.emit(id, type, payload));
     this.modelSelection = new ModelSelectionProvenance(ctx);
     this.settings = new ModelSettings(ctx);
-    this.connections = new ProviderConnections(ctx, this.settings, providerID => {
+    this.connections = sharedProviders ? { start() {}, invalidate() {}, dispose() {} } : new ProviderConnections(ctx, this.settings, providerID => {
       this.catalog.invalidate();
       this.events.emit(undefined, 'models.changed', { providerID: providerID ?? '' });
     });
-    this.catalog = new ModelCatalog(ctx, providerID => this.events.emit(undefined, 'models.changed', { providerID }),
+    this.catalog = sharedProviders ? { invalidate() {}, dispose() {} } : new ModelCatalog(ctx, providerID => this.events.emit(undefined, 'models.changed', { providerID }),
       { defaultIsExplicit: () => this.modelSelection.isExplicit(), modelDefaults: () => this.settings.modelDefaults(),
         prepareProvider: id => this.connections.prepareProvider(id),
         providerPending: id => this.connections.isProviderPending(id) });
-    this.auth = new AuthState(ctx.chatgptSiwc, state => {
+    this.auth = sharedProviders ? { stop() {} } : new AuthState(ctx.chatgptSiwc, state => {
       if (!state.signingIn) this.catalog.invalidate();
       this.events.emit(undefined, 'auth.changed', state);
     });
@@ -72,6 +81,10 @@ export class Actions {
       id => this.events.emit(id, 'workspace.writeAvailable', {}),
       (id, status) => this.events.emit(id, 'workspace.recovery.changed', { status }));
     this.sessions.writes = this.writes;
+    this.runtimeAdmission = new RuntimeAdmission(ctx, this.sessions);
+    this.writes.runtimeAdmission = this.runtimeAdmission;
+    this.externalLeases = new ExternalWriteLeases(this.writes, (id, type, payload) => this.events.emit(id, type, payload));
+    this.externalRoots = new ExternalRootHolds(this.sessions);
     this.writes.checkProjectWrite = sessionID => this.rpc.request('bridge/workspaceWrite', { sessionID });
     this.workspaceRecovery = new WorkspaceRecoveryActions(this.writes, this.sessions);
     this.contentCache = new SessionContentCache(home);
@@ -87,12 +100,36 @@ export class Actions {
       (id, type, payload) => this.events.emit(id, type, payload), this.scheduleOperations);
     this.clientEvents = new ClientEventResponder(ctx);
     this.mcp = new McpServers(ctx, rpc, home);
-    this.bridgeAgents = new BridgeAgents(ctx, rpc, home, this.events, this.sessions, this.writes);
+    this.bridgeAgents = new BridgeAgents(ctx, rpc, home, this.sessions);
     this.sessions.bridgeAgents = this.bridgeAgents;
     this.persistedQuestions = new PendingQuestions(ctx, home, (id, type, payload) => this.events.emit(id, type, payload));
   }
   async call(action, p = {}, signal) {
     const ctx = this.ctx;
+    if (this.sharedProviders) {
+      if (action === 'provider.refresh') return this.sharedProviders.refresh();
+      if (action === 'providerSession.confirmedResponses') {
+        if (!p.sessionID || p.options?.sessionId !== p.sessionID || !ctx.sessions.get(p.sessionID)) {
+          throw new Error('Workbench session is unavailable.');
+        }
+        return { ids: [...await confirmedResponses(ctx.sessions, { ...p.options, signal }, p.context)] };
+      }
+      if (action === 'configuration.status') {
+        await this.verifyRestartedPlugins();
+        const provider = await this.sharedProviders.call('settings.get', {}, signal);
+        return { ...this.activation.snapshot(), models: provider.activation,
+          activePluginInstalls: this.pluginOperations.activeCount(), pluginOperations: this.pluginOperations.recoverable() };
+      }
+      if (action === 'models.list') return this.listSharedModels(p, signal);
+      if (action.startsWith('connections.') || action.startsWith('auth.') ||
+          ['models.discover', 'settings.get', 'settings.save', 'settings.remove'].includes(action)) {
+        return this.sharedProviders.call(action, p, signal);
+      }
+      if (action === 'client.rpc' && (p.endpoint?.startsWith('settings/') || p.endpoint?.startsWith('credentials/'))) {
+        this.client.updateScope(p.scope);
+        return this.sharedClientRpc(p, signal);
+      }
+    }
     if (action.startsWith('connections.')) return this.connections.call(action, p);
     if (action.startsWith('workspace.recovery.')) return this.workspaceRecovery.call(action, p);
     if (action.startsWith('client.')) this.client.updateScope(p.scope);
@@ -119,10 +156,15 @@ export class Actions {
       case 'context.get': return this.contextPolicy.get(p, signal);
       case 'context.set': return this.contextPolicy.set(p);
       case 'context.bind': return this.contextPolicy.bind(p);
+      case 'runtime.reserve': return this.runtimeAdmission.reserve(p);
+      case 'runtime.release': return this.runtimeAdmission.cancel(p);
       case 'workspace.acquire': return this.writes.acquireForSession(p, signal);
       case 'workspace.release': return this.writes.releaseForSession(p);
       case 'workspace.cancel': return this.writes.cancelForSession(p);
       case 'workspace.status': return this.writes.statusForSession(p);
+      case 'subagent.lease': return this.externalLeases.call(p);
+      case 'subagent.root': return this.externalRoots.call(p);
+      case 'subagent.deliveries': return this.announceDeliveries(p);
       case 'pending.list': return this.pending(signal);
       case 'configuration.status': {
         await this.verifyRestartedPlugins();
@@ -137,6 +179,7 @@ export class Actions {
       case 'schedule.catchUp': return this.scheduleOperations.catchUp(p);
       case 'schedule.discardMissed': return this.scheduleOperations.discardMissed(p);
       case 'session.list': return this.sessions.list(signal);
+      case 'session.importTask': return importTask(ctx, this.contextPolicy, p);
       case 'session.create': {
         if (p.scope === 'chatOnly') await this.scopes.set(p.sessionId, p.scope);
         const result = await ctx.sessionController.create({ cwd: p.cwd, ...(p.sessionId ? { sessionId: p.sessionId } : {}),
@@ -225,6 +268,12 @@ export class Actions {
       case 'auth.switchAccount': return this.finishAuth(() => ctx.chatgptSiwc.switchAccount(p.accountId));
       case 'auth.removeAccount': return this.finishAuth(() => ctx.chatgptSiwc.removeAccount(p.accountId));
       case 'auth.refreshModels': return this.refreshAuth();
+      case 'auth.setBackgroundAllowed': {
+        if (typeof p.allowed !== 'boolean') throw new Error('Invalid background access choice.');
+        const status = await ctx.chatgptSiwc.setBackgroundAllowed(p.allowed);
+        this.auth.publish(status);
+        return status;
+      }
       case 'plugins.list': {
         await this.verifyRestartedPlugins();
         return { bundles: await ctx.pluginManager.listBundles(), plugins: await ctx.pluginManager.listPlugins(),
@@ -243,6 +292,7 @@ export class Actions {
       case 'question.answer': return this.answerQuestion(p);
       case 'subagents.list': return this.subagents(p.sessionId, signal);
       case 'subagents.history': return this.subagentHistory(p);
+      case 'subagents.agents': return this.bridgeAgents.agentsFor(await this.sessions.rootID(p.sessionId));
       case 'subagents.receipt': return this.bridgeAgents.receipt(p.sessionId, p.childId, p.requestId);
       case 'subagents.cancelInput': return this.cancelSubagentInput(p, signal);
       case 'subagents.control': return this.controlSubagent(p, signal, this.sessions.stopGate.revision(p.sessionId));
@@ -256,6 +306,48 @@ export class Actions {
       }
       default: throw new Error(`Unknown action: ${action}`);
     }
+  }
+  async listSharedModels(p, signal) {
+    if (p?.refresh === true) await this.sharedProviders.refresh();
+    const initialCommunity = this.sharedProviders.communityGroups();
+    const initialCommunityIDs = new Set(initialCommunity.map(group => group.id));
+    const request = typeof p?.priorityProvider === 'string'
+      && (initialCommunityIDs.has(p.priorityProvider) || p.priorityProvider.startsWith('community.'))
+      ? { ...p, priorityProvider: undefined } : p;
+    const result = await this.sharedProviders.call('models.list', request, signal);
+    const community = this.sharedProviders.communityGroups();
+    const communityIDs = new Set(community.map(group => group.id));
+    return {
+      ...result,
+      failures: Array.isArray(result.failures)
+        ? result.failures.filter(item => !communityIDs.has(item?.id))
+        : result.failures,
+      groups: [...result.groups, ...community],
+      routableProviders: [...result.routableProviders, ...community.map(group => group.id)],
+      default: { ...this.ctx.agentDefaultModel.currentSelection() },
+      defaultIsExplicit: await this.modelSelection.isExplicit()
+    };
+  }
+  async sharedClientRpc(p, signal) {
+    const { endpoint, payload, channel, scope } = p;
+    if (channel !== '/api' || scope?.globalOnly === true) return this.client.rpc(p, signal);
+    if (endpoint === 'settings/openSettingsDocument') throw new Error('请在 Bridge 中管理供应商设置。');
+    if (endpoint === 'settings/describe') {
+      const [local, remote] = await Promise.all([this.client.rpc(p, signal),
+        this.sharedProviders.call('provider.client.rpc', { endpoint, payload }, signal)]);
+      if (!local.ok || !remote.ok) return local.ok ? remote : local;
+      local.value.namespaces = [...local.value.namespaces.filter(item => !providerNamespaces.has(item.ns)),
+        ...remote.value.namespaces.filter(item => providerNamespaces.has(item.ns))];
+      return local;
+    }
+    if (endpoint.startsWith('credentials/') || endpoint.startsWith('settings/') && providerNamespaces.has(payload?.args?.ns)) {
+      const result = await this.sharedProviders.call('provider.client.rpc', { endpoint, payload }, signal);
+      if (result.ok && ['credentials/set', 'credentials/unset'].includes(endpoint)) {
+        this.ctx.credentials.notifyUpdated(payload.args.ref);
+      }
+      return result;
+    }
+    return this.client.rpc(p, signal);
   }
   async selectModel(params) {
     const result = await this.ctx.sessionController.selectModel(params);
@@ -311,13 +403,18 @@ export class Actions {
     }
   }
   async dispose() {
+    this.bridgeAgents.delivery.dispose();
+    this.bridgeAgents.removeNoticeHook?.();
     await this.activity.dispose();
     await this.contentCache.dispose();
     this.scopes.dispose();
+    this.externalLeases.dispose();
+    this.runtimeAdmission.dispose();
     this.writes.dispose();
     await this.persistedQuestions.dispose();
     await this.pluginOperations.dispose();
     await this.connections.dispose();
+    this.sharedProviders?.dispose();
     this.removeCatalogListener(); this.removeModelListener(); this.auth.stop(); this.catalog.dispose(); this.client.dispose(); this.clientEvents.dispose();
     this.removeContextModelListener();
     if (globalThis[contextPolicySymbol] === this.contextPolicy) delete globalThis[contextPolicySymbol];
@@ -329,9 +426,7 @@ export class Actions {
     try { return await this.ctx.pluginManager.installBundle(spec, { requestId }); }
     finally { signal.removeEventListener('abort', cancel); }
   }
-  reconcile(sessionId) {
-    void this.bridgeAgents.reconcile(sessionId).catch(error => process.stderr.write(`DSH subagent recovery failed: ${error.message}\n`));
-  }
+  reconcile(sessionId) { void this.bridgeAgents.reconcile(sessionId); }
   async pending(signal) {
     const items = [...this.events.pending.values()].map(({ sessionID, type, payload }) => ({ sessionID, type, payload }));
     items.push(...this.scopes.items());
@@ -360,23 +455,11 @@ export class Actions {
   }
   async subagents(id, signal) {
     const result = await this.sessions.listChildren(id, signal);
+    const connected = result.items.some(item => item.mode === 'external')
+      ? new Map((await this.bridgeAgents.list(id)).children.map(child => [child.childID, child])) : new Map();
     for (const item of result.items) {
-      const binding = this.bridgeAgents.starting.get(item.childId)?.binding ??
-        [...this.bridgeAgents.bindings].reverse().find(row => row.childID === item.childId && row.inputKind !== 'steer');
-      if (binding) Object.assign(item, { installationID: binding.installationID, taskID: binding.taskID,
-        status: binding.state, workspaceMode: binding.workspaceMode ?? 'shared',
-        admission: binding.admission, ...(binding.waitingReason ? { waitingReason: binding.waitingReason } : {}),
-        queuedCount: this.bridgeAgents.bindings.filter(row => row.childID === item.childId &&
-          row !== binding && row.admission === 'waiting').length,
-        ...(binding.runID ? { runID: binding.runID } : {}),
-        ...(binding.capabilities ? { capabilities: { ...binding.capabilities,
-          canQueue: ['completed', 'failed', 'interrupted', 'cancelled'].includes(binding.state)
-            ? binding.capabilities.canContinue === true || (binding.capabilities.supportsContinue === true &&
-                binding.workspaceMode === 'isolated' &&
-                [undefined, 'pending', 'conflict', 'validation_required', 'recovery_required'].includes(binding.workspaceStatus))
-            : binding.capabilities.supportsContinue === true } } : {}),
-        ...Object.fromEntries(['workspaceStatus', 'workspaceReason', 'changedFiles', 'conflicts', 'failureReason', 'canRepairWithAgent']
-          .filter(key => binding[key] !== undefined).map(key => [key, binding[key]])) });
+      const child = connected.get(item.childId);
+      if (child) Object.assign(item, listingFor(child));
       else {
         item.workspaceMode = 'shared';
         if (item.mode === 'continuable') item.capabilities = { canSend: true, canSteer: true,
@@ -385,11 +468,19 @@ export class Actions {
     }
     return result;
   }
+  /** The Service announced finished results of a root; they are handed to the session now. */
+  announceDeliveries(p) {
+    if (typeof p.rootSessionID !== 'string' || !p.rootSessionID) throw new Error('A root session is required');
+    this.reconcile(p.rootSessionID);
+    return { accepted: true };
+  }
   async subagentHistory(p) {
-    const binding = [...this.bridgeAgents.bindings].reverse().find(row => row.childID === p.childId &&
-      row.rootSessionID === p.sessionId && row.inputKind !== 'steer' && row.taskID && (!p.taskID || row.taskID === p.taskID));
-    if (!binding) throw new Error('Bridge subagent not found');
-    return this.rpc.request('bridge/subagent', { operation: 'get', ...binding,
+    const { rounds } = await this.bridgeAgents.list(p.sessionId);
+    const round = [...rounds].reverse().find(row => row.childID === p.childId && row.kind !== 'steer' &&
+      row.taskID && (!p.taskID || row.taskID === p.taskID));
+    if (!round) throw new Error('Bridge subagent not found');
+    return this.rpc.request('bridge/subagent', { operation: 'get', rootSessionID: p.sessionId,
+      childID: p.childId, requestID: round.requestID, taskID: round.taskID,
       ...(p.limit === undefined ? {} : { limit: p.limit }),
       ...(p.beforeMessageID === undefined ? {} : { beforeMessageID: p.beforeMessageID }) });
   }
@@ -397,11 +488,12 @@ export class Actions {
     if (![p.sessionId, p.childId, p.requestId].every(value => typeof value === 'string' && value)) {
       throw new Error('Session, child, and request IDs are required');
     }
-    if (this.bridgeAgents.bindings.some(row => row.rootSessionID === p.sessionId && row.childID === p.childId)) {
+    const child = (await this.sessions.listChildren(p.sessionId, signal)).items.find(item => item.childId === p.childId);
+    if (!child) {
+      const receipt = await this.bridgeAgents.receipt(p.sessionId, p.childId, p.requestId);
+      if (receipt.state === 'notFound') return { state: 'unknown' };
       return this.bridgeAgents.cancelInput(p.sessionId, p.childId, p.requestId);
     }
-    const child = (await this.sessions.listChildren(p.sessionId, signal)).items.find(item => item.childId === p.childId);
-    if (!child) return { state: 'unknown' };
     if (child.mode === 'external') return this.bridgeAgents.cancelInput(p.sessionId, p.childId, p.requestId);
     if (child.mode !== 'continuable') return { state: 'unknown' };
     return cancelNativeSubagentInput(this.ctx, this.sessions, p.childId, p.requestId);
@@ -419,35 +511,33 @@ export class Actions {
     return { presets: catalog.options.map(option => ({ id: option.value, name: option.name })),
       selected };
   }
+  async assertCurrentRun(p) {
+    const child = (await this.bridgeAgents.list(p.sessionId)).children.find(item => item.childID === p.childId);
+    if (!child?.taskID || (p.taskID && p.taskID !== child.taskID) || (p.runID && p.runID !== child.snapshot?.runID)) {
+      throw new Error('The subagent has moved to a different task or run');
+    }
+  }
   async controlSubagent(p, signal, revision) {
+    // The child does not exist yet: the user is handing a message to a connected agent.
+    if (p.operation === 'dispatch') return this.bridgeAgents.dispatch(p, revision);
     const items = (await this.sessions.listChildren(p.sessionId, signal)).items;
     const child = items.find(item => item.childId === p.childId);
     if (!child) throw new Error('Subagent not found');
     if (child.mode === 'external' && p.operation === 'send' && p.requestId &&
-        this.bridgeAgents.receipt(p.sessionId, p.childId, p.requestId).state !== 'notFound') {
+        (await this.bridgeAgents.receipt(p.sessionId, p.childId, p.requestId)).state !== 'notFound') {
       return this.bridgeAgents.send(p.childId, p.text, p.requestId, p.sessionId,
         { delivery: p.delivery, attachmentPaths: p.attachmentPaths, repairConflict: p.repairConflict,
           expectedTaskID: p.taskID, expectedRunID: p.runID });
     }
-    if (child.mode === 'external' && (p.taskID || p.runID)) {
-      const binding = this.bridgeAgents.starting.get(p.childId)?.binding ??
-        [...this.bridgeAgents.bindings].reverse().find(row => row.rootSessionID === p.sessionId &&
-          row.childID === p.childId && row.inputKind !== 'steer' && row.taskID);
-      if (!binding || (p.taskID && p.taskID !== binding.taskID) || (p.runID && p.runID !== binding.runID)) {
-        throw new Error('The subagent has moved to a different task or run');
-      }
-    }
+    // Before a stopped session resumes for a send, so a stale one does not wake it.
+    if (child.mode === 'external' && (p.taskID || p.runID)) await this.assertCurrentRun(p);
     if (p.operation === 'send') await this.sessions.stopGate.resume(p.sessionId, revision);
     if (child.mode === 'external') {
       if (p.operation === 'stop') return this.bridgeAgents.stop(p.childId, p.sessionId,
         { expectedTaskID: p.taskID, expectedRunID: p.runID });
-      if (p.operation === 'send') {
-        const result = await this.bridgeAgents.send(p.childId, p.text, p.requestId, p.sessionId,
-          { delivery: p.delivery, attachmentPaths: p.attachmentPaths, repairConflict: p.repairConflict,
-            expectedTaskID: p.taskID, expectedRunID: p.runID });
-        this.reconcile(p.sessionId);
-        return result;
-      }
+      if (p.operation === 'send') return this.bridgeAgents.send(p.childId, p.text, p.requestId, p.sessionId,
+        { delivery: p.delivery, attachmentPaths: p.attachmentPaths, repairConflict: p.repairConflict,
+          expectedTaskID: p.taskID, expectedRunID: p.runID });
     }
     if (p.operation === 'stop') {
       this.ctx.subagents.interrupt(p.childId, { kind: 'user', parentSessionId: child.parentSessionId });

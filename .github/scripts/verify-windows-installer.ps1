@@ -55,12 +55,13 @@ function Assert-InstalledPayload {
     throw "Installed version or architecture does not match the release."
   }
   $embeddedDSHRoot = Join-Path $installRoot "EmbeddedDSH"
-  & node (Join-Path $repoRoot "Scripts\verify-embedded-dsh-runtime.mjs") $embeddedDSHRoot "windows" $Architecture
+  & node (Join-Path $repoRoot "Scripts\verify-embedded-dsh-runtime.mjs") $embeddedDSHRoot "windows" $Architecture --execute
   if ($LASTEXITCODE -ne 0) { throw "Installed embedded DSH runtime verification failed." }
   $embeddedDSH = Get-Content -LiteralPath (Join-Path $embeddedDSHRoot "runtime.json") -Raw | ConvertFrom-Json
   $embeddedNode = Join-Path $embeddedDSHRoot ($embeddedDSH.node -replace "/", "\")
   $expectedMachine = if ($Architecture -eq "x64") { [UInt16]0x8664 } else { [UInt16]0xAA64 }
-  foreach ($executable in @($appPath, $servicePath, $embeddedNode, (Join-Path $installRoot "tunnel-client.exe"))) {
+  $protocolHelper = Join-Path $embeddedDSHRoot "provider\model-protocol.exe"
+  foreach ($executable in @($appPath, $servicePath, $embeddedNode, $protocolHelper, (Join-Path $installRoot "tunnel-client.exe"))) {
     if ((Get-PEMachine $executable) -ne $expectedMachine) { throw "Installed executable architecture mismatch." }
   }
   foreach ($line in Get-Content -LiteralPath (Join-Path $installRoot "SHA256SUMS.txt")) {

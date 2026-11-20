@@ -8,6 +8,7 @@ public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
   public let projectID: String
   public let projectName: String
   public let source: String
+  public let sourceKinds: [String]?
   public let provider: String
   public let providerID: String
   public let status: String
@@ -30,6 +31,7 @@ public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
     projectID: String,
     projectName: String,
     source: String,
+    sourceKinds: [String]? = nil,
     provider: String,
     providerID: String = "codex",
     status: String,
@@ -51,6 +53,7 @@ public struct BridgeDesktopTaskRow: Codable, Equatable, Sendable {
     self.projectID = projectID
     self.projectName = projectName
     self.source = source
+    self.sourceKinds = sourceKinds
     self.provider = provider
     self.providerID = providerID
     self.status = status

@@ -30,9 +30,13 @@ extension BridgeDesktopCommandRouter {
     case .openBrowserExternally:
       openBrowserExternally(model)
     case .setWorkbenchPanes:
-      let ids = (payload.taskIDs ?? []).prefix(WorkbenchPaneConversations.maximumPanes)
-        .compactMap { validatedID($0) }
-      model.setWorkbenchPanes(ids)
+      if let panes = payload.panes {
+        model.setWorkbenchPaneDescriptors(panes)
+      } else {
+        let ids = (payload.taskIDs ?? []).prefix(WorkbenchPaneConversations.maximumPanes)
+          .compactMap { validatedID($0) }
+        model.setWorkbenchPanes(ids)
+      }
     case .loadEarlierConversation:
       loadEarlier(payload.taskID, model: model)
     case .refreshConversation:
@@ -65,6 +69,10 @@ extension BridgeDesktopCommandRouter {
       model.submitAgentTask(envelope)
     case .embeddedDSH:
       model.performEmbeddedDSH(envelope)
+    case .providerGateway:
+      model.performProviderGateway(envelope)
+    case .providerGatewayCopyConnection:
+      model.copyProviderGatewayConnection(envelope)
     case .interruptTask:
       guard let task = task(payload.taskID, in: model),
         connected(model),

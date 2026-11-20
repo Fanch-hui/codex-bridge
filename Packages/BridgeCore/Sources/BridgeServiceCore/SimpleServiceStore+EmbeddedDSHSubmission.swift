@@ -47,15 +47,16 @@ extension SimpleServiceStore {
       guard task.source == .mcpClient, task.sourceClientID == identity.sourceClientID,
         task.clientRequestID != nil, !task.isQueued,
         let group = try executionGroup(projectID: task.projectID, in: db),
-        group["root_session_id"] as String? == identity.parentSessionID,
-        group["root_active"] as Int == 1,
-        group["root_closing"] as Int == 0
+        let root = try executionRoot(sessionID: identity.parentSessionID, in: db),
+        root["group_id"] as String == group["group_id"] as String,
+        root["root_active"] as Int == 1,
+        root["root_closing"] as Int == 0
       else {
         throw ServiceStoreError.invalidArgument("dsh.executionOwner")
       }
       guard
         task.permissionMode == .readOnly
-          || group["root_permission_mode"] as String == ServicePermissionMode.full.rawValue
+          || root["root_permission_mode"] as String == ServicePermissionMode.full.rawValue
       else { throw ServiceStoreError.invalidArgument("dsh.subagentPermission") }
       if let binding = try embeddedDSHBinding(
         parentSessionID: identity.parentSessionID, childID: identity.childID, in: db

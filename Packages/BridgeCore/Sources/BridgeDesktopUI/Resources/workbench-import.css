@@ -1,0 +1,6 @@
+.workbench-import-control { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.workbench-import-control[hidden], .workbench-import-feedback[hidden] { display: none; }
+.workbench-import-feedback { max-width: 200px; color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workbench-source-card { padding: 12px 16px; border: 1px solid var(--separator); border-radius: 10px; background: var(--surface-muted); }
+.workbench-source-card > summary { cursor: pointer; color: var(--text-secondary); }
+.workbench-source-card > pre { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

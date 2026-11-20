@@ -17,9 +17,9 @@
 
     var detail = S.node("section", "dsh-embedded-agent-session"); detail.hidden = true;
     var header = S.node("header", "dsh-embedded-agent-header");
-    var back = button("‹ 返回", function () { options.close(); });
+    var back = button("收起", function () { options.close(); });
     back.classList.add("dsh-embedded-agent-back");
-    back.setAttribute("aria-label", "返回 Agent 列表");
+    back.setAttribute("aria-label", "收起 Agent 详情");
     var detailLabel = S.node("span", "dsh-embedded-agent-detail-title");
     var detailStatus = S.node("span", "dsh-embedded-agent-status hint");
     header.appendChild(back); header.appendChild(detailLabel); header.appendChild(detailStatus);
@@ -127,6 +127,7 @@
       detailLabel: detailLabel, detailStatus: detailStatus, workspaceReason: workspaceReason, history: history, historyStatus: historyStatus,
       sessionID: null, taskID: null, runID: null, mode: "native", rawStatus: "", capabilities: {},
       childHistory: null, conflicts: [], canRepair: false, loadedOnce: false,
+      setPaneMode: function (value) { back.hidden = value; },
       syncControls: syncControls, renderWorkspace: renderWorkspace, invalidateControls: invalidateControls };
     syncControls();
     return result;

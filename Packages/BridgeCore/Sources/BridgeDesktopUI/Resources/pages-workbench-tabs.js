@@ -5,7 +5,7 @@
   // browser only; builds that kept one list per project (v1) are merged into the single list.
   var S = global.CodexBridgeDesktopPageSupport;
   var storageKey = "codexbridge.workbench.tabs.v2", legacyStorageKey = "codexbridge.workbench.tabs.v1";
-  var stored = [], draftTab = false, lastSelectedKey = null, closedKey = null, signature = null, root = null, strip = null;
+  var stored = [], draftTab = false, lastSelectedKey = null, closedKey = null, root = null, tabStrip = null;
   var context = { page: null, emit: null };
   try {
     var saved = JSON.parse(global.localStorage.getItem(storageKey) || "null");
@@ -88,11 +88,13 @@
     refresh();
   }
   function openDraft() {
-    var panes = split();
-    if (panes) { panes.openDraft(); return; }
+    var panel = newTask();
+    if (panel) panel.open({ projectID: context.page && context.page.selectedProjectID });
+  }
+  function showEmptyDraft() {
     draftTab = true;
     var panel = newTask();
-    if (panel) panel.open();
+    if (panel) panel.open({ inPlace: true });
     refresh();
   }
   function closeTask(key) {
@@ -110,7 +112,7 @@
     if (active) {
       closedKey = key;
       var neighbor = tabs[Math.min(index, tabs.length - 1)];
-      if (neighbor) select(neighbor); else openDraft();
+      if (neighbor) select(neighbor); else showEmptyDraft();
       return;
     }
     refresh();
@@ -153,44 +155,57 @@
       var selected = page.selectedTask;
       return selected && key === "t:" + selected.taskID ? selected : {};
     };
-    var showDraft = draftTab && !panes;
-    var next = JSON.stringify([tabs, drafting, showDraft, activeKey, tabs.map(function (key) {
+    var items = tabs.map(function (key) {
       var row = rowFor(key);
-      return [row.title, row.isRunning, row.status];
-    })]);
-    root.hidden = false;
-    if (next === signature) return;
-    signature = next;
-    S.clear(strip);
-    tabs.forEach(function (key) {
-      var row = rowFor(key), title = row.title || "Agent 会话";
-      var item = tab(title, activeKey === key,
-        function () { select(key); }, function () { closeTask(key); }, row.isRunning ? "is-running" : "");
-      if (row.provider) item.firstChild.title = title + " · " + row.provider;
-      strip.appendChild(item);
+      return { key: key, title: row.title || "Agent 会话", provider: row.provider, running: !!row.isRunning };
     });
-    if (showDraft) strip.appendChild(tab("新建任务", drafting, openDraft, closeDraft, "is-draft"));
-    var active = strip.querySelector(".workbench-tab.is-active");
-    if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (draftTab && !panes) items.push({ key: "__draft__", title: "新建任务", draft: true });
+    root.hidden = false;
+    tabStrip.update(items, drafting && !panes ? "__draft__" : activeKey);
+  }
+
+  function createStrip(host, options) {
+    var strip = S.node("div", "workbench-tab-strip"), signature;
+    strip.setAttribute("role", "tablist"); strip.setAttribute("aria-label", options.label);
+    var addGroup = S.node("div", "workbench-tab-add-group");
+    var add = S.node("button", "workbench-tab-add icon-button");
+    add.type = "button"; add.title = options.addLabel; add.setAttribute("aria-label", add.title);
+    add.appendChild(S.icon("plus"));
+    add.addEventListener("click", options.onAdd);
+    addGroup.appendChild(add);
+    if (options.extraAdd) addGroup.appendChild(options.extraAdd);
+    host.appendChild(strip); host.appendChild(addGroup);
+    return { update: function (items, activeKey) {
+      var next = JSON.stringify([items, activeKey]);
+      if (next === signature) return;
+      signature = next;
+      S.clear(strip);
+      items.forEach(function (row) {
+        var classes = [row.running ? "is-running" : row.draft ? "is-draft" : "",
+          row.external ? "is-external" : ""].filter(Boolean).join(" ");
+        var item = tab(row.title, activeKey === row.key,
+          function () { options.onSelect(row.key); }, function () { options.onClose(row.key); }, classes);
+        if (row.provider) item.firstChild.title = row.title + " · " + row.provider;
+        strip.appendChild(item);
+      });
+      var active = strip.querySelector(".workbench-tab.is-active");
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } };
   }
 
   function ensureRoot() {
     if (root) return root;
     root = document.getElementById("workbench-task-tabs");
     if (!root) return null;
-    strip = S.node("div", "workbench-tab-strip");
-    strip.setAttribute("role", "tablist"); strip.setAttribute("aria-label", "Agent 任务标签页");
-    var add = S.node("button", "workbench-tab-add icon-button");
-    add.type = "button"; add.title = "新建 Agent 任务"; add.setAttribute("aria-label", add.title);
-    add.appendChild(S.icon("plus"));
-    add.addEventListener("click", openDraft);
-    root.appendChild(strip); root.appendChild(add);
+    tabStrip = createStrip(root, { label: "Agent 任务标签页", addLabel: "在工作台新建任务", onAdd: openDraft,
+      onSelect: function (key) { if (key === "__draft__") showEmptyDraft(); else select(key); },
+      onClose: function (key) { if (key === "__draft__") closeDraft(); else closeTask(key); } });
     return root;
   }
   function refresh() { if (root && context.page) draw(); }
 
   var panel = newTask();
-  if (panel && panel.setOnAccepted) panel.setOnAccepted(function () { draftTab = false; signature = null; });
+  if (panel && panel.setOnAccepted) panel.setOnAccepted(function () { draftTab = false; });
 
   global.CodexBridgeDesktopWorkbenchTabs = {
     render: function (page, emit) {
@@ -201,13 +216,14 @@
     hide: function () { if (ensureRoot()) root.hidden = true; },
     openDraft: openDraft,
     sessionKey: sessionKey,
+    createStrip: createStrip,
     openKeys: function () { return tabsFor(); },
     close: closeTask,
     // Adds a session tab without selecting it, used when a split pane shows the session.
     open: function (_page, key) {
       var tabs = tabsFor();
       if (!key || tabs.indexOf(key) >= 0) return;
-      tabs.push(key); setTabs(tabs); signature = null;
+      tabs.push(key); setTabs(tabs);
     },
     root: function () { return ensureRoot(); }
   };

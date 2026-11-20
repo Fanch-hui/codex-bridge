@@ -7,42 +7,56 @@ public struct ChatGPTWebView: NSViewRepresentable {
   public let site: ChatBrowserSite
   public let initialURL: URL
   public let reloadRequest: UInt64
+  public let viewportSize: CGSize
   @Binding public var webViewReference: WKWebView?
+  let onLoadError: (@MainActor (String?) -> Void)?
+  let onNavigationChange: (@MainActor () -> Void)?
 
   public init(
     site: ChatBrowserSite = .chatGPT,
     initialURL: URL? = nil,
     reloadRequest: UInt64 = 0,
-    webViewReference: Binding<WKWebView?> = .constant(nil)
+    viewportSize: CGSize = .zero,
+    webViewReference: Binding<WKWebView?> = .constant(nil),
+    onLoadError: (@MainActor (String?) -> Void)? = nil,
+    onNavigationChange: (@MainActor () -> Void)? = nil
   ) {
     self.site = site
     self.initialURL = site.validatedURL(initialURL) ?? site.homeURL
     self.reloadRequest = reloadRequest
+    self.viewportSize = viewportSize
     self._webViewReference = webViewReference
+    self.onLoadError = onLoadError
+    self.onNavigationChange = onNavigationChange
   }
 
   public func makeCoordinator() -> Coordinator {
     Coordinator(self)
   }
 
+  public func sizeThatFits(
+    _ proposal: ProposedViewSize,
+    nsView: WKWebView,
+    context: Context
+  ) -> CGSize? {
+    proposal.replacingUnspecifiedDimensions()
+  }
+
   public func makeNSView(context: Context) -> WKWebView {
+    let initialFrame = Self.safeFrame(for: NSRect(origin: .zero, size: viewportSize))
+
     // Reuse an existing instance (kept alive by the app model) so that leaving
     // and re-entering this view does not reload the page or lose its state.
     if let existing = webViewReference {
-      Self.attachDelegates(to: existing, coordinator: context.coordinator)
+      prepareReusedWebView(existing, initialFrame: initialFrame, coordinator: context.coordinator)
       return existing
     }
 
-    let webView = Self.makeWebView(for: site)
+    context.coordinator.parent = self
+    let webView = Self.makeWebView(for: site, initialFrame: initialFrame)
     Self.attachDelegates(to: webView, coordinator: context.coordinator)
     webView.allowsBackForwardNavigationGestures = true
-
-    let request = URLRequest(
-      url: initialURL,
-      cachePolicy: .useProtocolCachePolicy,
-      timeoutInterval: 30
-    )
-    webView.load(request)
+    loadInitialURL(in: webView, coordinator: context.coordinator)
 
     DispatchQueue.main.async { [weak webView] in
       guard let webView else { return }
@@ -53,29 +67,86 @@ public struct ChatGPTWebView: NSViewRepresentable {
   }
 
   public func updateNSView(_ nsView: WKWebView, context: Context) {
-    Self.attachDelegates(to: nsView, coordinator: context.coordinator)
-    guard context.coordinator.consumeReloadRequest(reloadRequest) else { return }
-    if nsView.url == nil {
-      nsView.load(
-        URLRequest(
-          url: initialURL,
-          cachePolicy: .reloadRevalidatingCacheData,
-          timeoutInterval: 30
-        )
-      )
-    } else {
-      nsView.reloadFromOrigin()
+    updateWebView(nsView, coordinator: context.coordinator)
+  }
+
+  func prepareReusedWebView(
+    _ webView: WKWebView,
+    initialFrame: NSRect,
+    coordinator: Coordinator
+  ) {
+    coordinator.parent = self
+    Self.attachDelegates(to: webView, coordinator: coordinator)
+    webView.autoresizingMask = [.width, .height]
+    if webView.frame.size.width < 1 || webView.frame.size.height < 1 {
+      webView.frame = Self.safeFrame(for: initialFrame)
     }
+    if webView.url == nil && !webView.isLoading {
+      loadInitialURL(in: webView, coordinator: coordinator)
+    } else if webView.url != nil && !webView.isLoading {
+      Self.setDrawsBackground(true, on: webView)
+    }
+  }
+
+  func updateWebView(_ nsView: WKWebView, coordinator: Coordinator) {
+    coordinator.parent = self
+    Self.attachDelegates(to: nsView, coordinator: coordinator)
+    nsView.autoresizingMask = [.width, .height]
+    if nsView.frame.size.width < 1 || nsView.frame.size.height < 1 {
+      nsView.frame = Self.safeFrame(for: NSRect(origin: .zero, size: viewportSize))
+    }
+    if coordinator.consumeReloadRequest(reloadRequest) {
+      if nsView.url == nil {
+        loadInitialURL(
+          in: nsView,
+          coordinator: coordinator,
+          cachePolicy: .reloadRevalidatingCacheData
+        )
+      } else {
+        coordinator.resetLoadFailure()
+        nsView.reloadFromOrigin()
+      }
+      return
+    }
+    if nsView.url == nil && !nsView.isLoading && !coordinator.hasLoadFailure {
+      loadInitialURL(in: nsView, coordinator: coordinator)
+    }
+  }
+
+  func loadInitialURL(
+    in webView: WKWebView,
+    coordinator: Coordinator,
+    cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
+  ) {
+    coordinator.resetLoadFailure()
+    Self.setDrawsBackground(false, on: webView)
+    let request = URLRequest(
+      url: initialURL,
+      cachePolicy: cachePolicy,
+      timeoutInterval: 30
+    )
+    webView.load(request)
   }
 
   static func attachDelegates(to webView: WKWebView, coordinator: Coordinator) {
     webView.navigationDelegate = coordinator
     webView.uiDelegate = coordinator
+    if let browserWebView = webView as? ChatBrowserWKWebView {
+      browserWebView.onDidMoveToWindow = { [weak coordinator] attachedWebView in
+        guard let coordinator, attachedWebView.navigationDelegate === coordinator else { return }
+        attachedWebView.needsLayout = true
+        attachedWebView.needsDisplay = true
+        if attachedWebView.url == nil && !attachedWebView.isLoading && !coordinator.hasLoadFailure {
+          coordinator.parent.loadInitialURL(in: attachedWebView, coordinator: coordinator)
+        }
+      }
+    }
   }
 
   public final class Coordinator: NSObject, WKDownloadDelegate, WKNavigationDelegate, WKUIDelegate {
-    let parent: ChatGPTWebView
+    var parent: ChatGPTWebView
     private var handledReloadRequest: UInt64
+    private(set) var hasLoadFailure = false
     private var downloadDestinations: [ObjectIdentifier: DownloadDestination] = [:]
 
     private struct DownloadDestination {
@@ -86,6 +157,10 @@ public struct ChatGPTWebView: NSViewRepresentable {
     init(_ parent: ChatGPTWebView) {
       self.parent = parent
       handledReloadRequest = parent.reloadRequest
+    }
+
+    func resetLoadFailure() {
+      hasLoadFailure = false
     }
 
     func consumeReloadRequest(_ request: UInt64) -> Bool {
@@ -210,13 +285,71 @@ public struct ChatGPTWebView: NSViewRepresentable {
       try? FileManager.default.removeItem(at: destination.temporary)
     }
 
+    public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+      handleNavigationCommit(in: webView)
+    }
+
+    public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+      handleNavigationCommit(in: webView)
+    }
+
     public func webView(
       _ webView: WKWebView,
       didFailProvisionalNavigation navigation: WKNavigation!,
       withError error: any Error
     ) {
+      handleNavigationFailure(error, in: webView)
+    }
+
+    public func webView(
+      _ webView: WKWebView,
+      didFail navigation: WKNavigation!,
+      withError error: any Error
+    ) {
+      handleNavigationFailure(error, in: webView)
+    }
+
+    public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+      handleWebContentProcessDidTerminate(in: webView)
+    }
+
+    func handleNavigationCommit(in webView: WKWebView) {
+      hasLoadFailure = false
+      ChatGPTWebView.setDrawsBackground(true, on: webView)
+      parent.onLoadError?(nil)
+      parent.onNavigationChange?()
+    }
+
+    func handleNavigationFailure(_ error: any Error, in webView: WKWebView) {
+      guard !Self.shouldIgnoreNavigationError(error) else { return }
+      hasLoadFailure = true
+      ChatGPTWebView.setDrawsBackground(false, on: webView)
+      parent.onLoadError?(Self.loadErrorMessage(for: parent.site, error: error))
+    }
+
+    func handleWebContentProcessDidTerminate(in webView: WKWebView) {
+      hasLoadFailure = false
+      ChatGPTWebView.setDrawsBackground(false, on: webView)
+      parent.onLoadError?(nil)
+      if webView.url == nil {
+        parent.loadInitialURL(in: webView, coordinator: self)
+      } else {
+        webView.reload()
+      }
+    }
+
+    static func shouldIgnoreNavigationError(_ error: any Error) -> Bool {
       let nsError = error as NSError
-      if nsError.code == NSURLErrorCancelled { return }
+      if nsError.code == NSURLErrorCancelled { return true }
+      return nsError.domain == "WebKitErrorDomain" && nsError.code == 102
+    }
+
+    static func loadErrorMessage(for site: ChatBrowserSite, error: any Error) -> String {
+      let detail = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+      if detail.isEmpty {
+        return "无法加载 \(site.displayName)，请检查网络或代理后点击刷新或外部打开。"
+      }
+      return "无法加载 \(site.displayName)：\(detail)，请检查网络或代理后点击刷新或外部打开。"
     }
 
     static func safeFilename(_ suggestedFilename: String) -> String {

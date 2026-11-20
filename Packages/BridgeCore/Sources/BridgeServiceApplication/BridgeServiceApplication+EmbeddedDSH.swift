@@ -13,7 +13,7 @@ extension BridgeServiceApplication {
     do { try project.root.validateCurrentIdentity() } catch {
       throw BridgeMCPQueryError.pathChanged
     }
-    let taskToken = try await workspaceGate.beginTaskAdmission()
+    let taskToken = try await workspaceGate.beginTaskAdmission(workbenchSessionID: sessionID)
     let workspaceToken: String
     do {
       workspaceToken = try await workspaceGate.beginCodexAdmission(projectID: projectID)
@@ -65,19 +65,6 @@ extension BridgeServiceApplication {
     -> [EmbeddedDSHSubagentBinding]
   {
     try await tasks.embeddedDSHSubagents(parentSessionID: parentSessionID)
-  }
-
-  public func pendingEmbeddedDSHResults(parentSessionID: String) async throws
-    -> [EmbeddedDSHSubagentResult]
-  {
-    try await tasks.pendingEmbeddedDSHResults(parentSessionID: parentSessionID)
-  }
-
-  public func acknowledgeEmbeddedDSHResult(
-    parentSessionID: String, childID: String, requestID: String, taskID: TaskID
-  ) async throws {
-    try await tasks.acknowledgeEmbeddedDSHResult(
-      parentSessionID: parentSessionID, childID: childID, requestID: requestID, taskID: taskID)
   }
 
   /// The host verifies process exit and the original request outcome before calling this method.

@@ -212,18 +212,16 @@ export class Sessions {
     try { return await operation(agent); }
     finally { setImmediate(() => void this.settle(rootID, rootAgent, group, generation)); }
   }
-  async begin(id, agent) {
+  async begin(id, agent, { reserveRuntimeSlot = true } = {}) {
     if (this.stopGate.isStopped(id)) throw new Error('Session was stopped');
     let group = this.groups.get(id);
     if (group?.closing) {
       await group.closing;
-      return this.begin(id, agent);
+      return this.begin(id, agent, { reserveRuntimeSlot });
     }
     if (!group) {
-      group = { generation: 0, begin: this.rpc.request('bridge/execution', {
-        operation: 'begin', sessionID: id,
-        permissionMode: this.ctx.sandboxPolicy.resolve({ session: agent.session }).mode
-      }) };
+      group = { generation: 0 };
+      group.begin = this.beginGroup(id, agent, group, { reserveRuntimeSlot });
       this.groups.set(id, group);
     }
     const generation = ++group.generation;
@@ -241,10 +239,41 @@ export class Sessions {
       throw error;
     }
   }
+  async beginGroup(id, agent, group, { reserveRuntimeSlot }) {
+    const binding = await this.rpc.request('bridge/execution', {
+      operation: 'begin', sessionID: id,
+      permissionMode: this.ctx.sandboxPolicy.resolve({ session: agent.session }).mode
+    });
+    try {
+      if (binding?.workspaceID) {
+        this.writes?.domains.bind(id, binding.workspaceID);
+        const admission = this.writes?.runtimeAdmission;
+        if (admission) {
+          admission.restore(binding.workspaceID, binding.runtimeLimit,
+            binding.runtimeOwners ?? [], binding.runtimeLimitRevision);
+          if (reserveRuntimeSlot) {
+            const slot = { projectID: binding.workspaceID, limit: binding.runtimeLimit,
+              revision: binding.runtimeLimitRevision, owner: `native:${agent.id}` };
+            if (admission.reserve(slot).state !== 'reserved') {
+              throw new Error('project_capacity_reached: 项目已达到同时运行的 Agent 上限。');
+            }
+            group.runtimeSlot = slot;
+          }
+        }
+      }
+      return binding;
+    } catch (error) {
+      if (group.runtimeSlot) this.writes.runtimeAdmission.release(group.runtimeSlot);
+      await this.rpc.request('bridge/execution', { operation: 'end', sessionID: id,
+        ...(Number.isSafeInteger(binding?.executionGeneration) ? { executionGeneration: binding.executionGeneration } : {}) });
+      throw error;
+    }
+  }
   async endGroup(id, group) {
-    const binding = await group.begin;
     group.closing ??= (async () => {
+      const binding = await group.begin;
       await this.writes?.quiesce(id);
+      if (group.runtimeSlot) this.writes.runtimeAdmission.release(group.runtimeSlot);
       return this.rpc.request('bridge/execution', { operation: 'end', sessionID: id,
         ...(Number.isSafeInteger(binding?.executionGeneration) ? { executionGeneration: binding.executionGeneration } : {}) });
     })();
@@ -303,9 +332,10 @@ export class Sessions {
     const owners = [id, ...children.filter(child => child.kind === 'child').map(child => child.id)];
     const jobsActive = owners.some(owner => this.ctx.jobs.list(owner)
       .some(job => job.owner === owner && ['running', 'stopping'].includes(job.status)));
+    const connectedRunning = await this.bridgeAgents?.hasRunning(id) ?? false;
     return { stopped: this.stopGate.isStopped(id) && agent.status === 'idle' && !jobsActive
       && !children.some(child => child.kind === 'child' && this.ctx.agents.get(child.id)?.status === 'running')
-      && !this.bridgeAgents?.hasRunning(id) && !this.writes?.hasActiveProcesses(id),
+      && !connectedRunning && !this.writes?.hasActiveProcesses(id),
       stopping: (this.stopping.get(id) ?? 0) > 0,
       workspaceRecoveryRequired: this.writes?.requiresRecovery(id) ?? false };
   }

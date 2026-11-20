@@ -11,6 +11,21 @@ public struct WorkbenchSessionItem: Identifiable, Equatable, Sendable {
 
   public var latestTask: MCPServiceTaskSnapshot { tasks.last ?? tasks[0] }
   public var id: String { [projectID, providerID, sessionID].joined(separator: "\u{1F}") }
+  /// Keep the origin of a web conversation when the user continues it locally. A session
+  /// that began locally and later received a web turn is represented by both origins.
+  public var sourceKinds: [String] {
+    var values: [String] = []
+    for (index, task) in tasks.enumerated() {
+      let kind = task.workbenchSourceKind.rawValue
+      if kind == "local", index > 0,
+        values.contains(where: { ["chatgpt", "qwen", "gemini"].contains($0) })
+      {
+        continue
+      }
+      if !values.contains(kind) { values.append(kind) }
+    }
+    return values
+  }
   public var turnCount: Int { tasks.count }
   public var isTerminal: Bool { latestTask.isTerminal }
   public var isRunning: Bool { latestTask.isRunning }

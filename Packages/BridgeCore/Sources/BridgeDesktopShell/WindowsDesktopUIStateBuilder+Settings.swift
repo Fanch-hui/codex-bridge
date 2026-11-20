@@ -4,7 +4,10 @@
   extension WindowsDesktopUIStateBuilder {
     static func settingsPage(
       settings: WindowsSettingsDisplay?,
-      agentDefaults: WindowsAgentDefaultsDisplay?
+      agentDefaults: WindowsAgentDefaultsDisplay?,
+      applicationMode: String? = nil,
+      applicationModeTransition: String? = nil,
+      applicationModeError: String? = nil
     ) -> BridgeDesktopSettingsState? {
       guard let settings else { return nil }
       let canRefreshModels = !settings.busy
@@ -58,7 +61,10 @@
         canRefreshModels: canRefreshModels && !settings.isRefreshingModels,
         isRefreshingModels: settings.isRefreshingModels,
         modelError: settings.modelError,
-        direct: settings.direct
+        direct: settings.direct,
+        applicationMode: applicationMode,
+        applicationModeTransition: applicationModeTransition,
+        applicationModeError: applicationModeError
       )
     }
 

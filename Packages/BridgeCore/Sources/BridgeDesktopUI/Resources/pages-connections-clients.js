@@ -24,12 +24,14 @@
       row.appendChild(main);
       var controls = S.node("div", "client-settings-controls");
       var exposure = S.selectField("工具权限", client.exposureMode, client.exposureOptions, function (value) {
+        exposureSaved.markPending(value);
         context.emit("setMCPClientExposure", {
           clientID: row.dataset.clientID,
           exposureMode: value
         });
         exposure.control.setAttribute("aria-busy", "true");
       }, "client-exposure");
+      var exposureSaved = S.trackFieldSave(exposure.wrapper);
       if (!connectionOnly) controls.appendChild(exposure.wrapper);
       var permissionLink = S.button("客户端权限", null, {}, null, "small", false);
       permissionLink.hidden = !connectionOnly;
@@ -57,6 +59,8 @@
       var actions = S.node("div", "client-settings-actions");
       var copy = S.button("复制 Qwen JSON 配置", null, {}, null, "small", true);
       copy.addEventListener("click", function () {
+        if (copy.disabled) return;
+        S.flashButtonSuccess(copy, "已复制");
         context.emit("copyMCPClientConfiguration", { clientID: row.dataset.clientID });
       });
       actions.appendChild(copy);
@@ -85,6 +89,7 @@
         state: state,
         detail: detail,
         exposure: exposure.control,
+        exposureSaved: exposureSaved,
         toggle: toggle, checkbox: checkbox, toggleText: toggleText,
         draft: draft,
         copy: copy,
@@ -109,6 +114,7 @@
       row.detail.hidden = !row.detail.textContent;
       D.selectOptions(row.exposure, client.exposureOptions || [], false);
       row.draft.update({ exposure: client.exposureMode || "full", enabled: !!client.enabled });
+      row.exposureSaved.confirm(client.exposureMode || "full");
       row.exposure.disabled = !client.exposureOptions || !client.exposureOptions.length;
       row.checkbox.disabled = !client.canToggle;
       row.exposure.setAttribute("aria-busy", "false");
@@ -117,8 +123,8 @@
       row.state.hidden = permissionsOnly || connectionOnly && client.canToggle;
       var gemini = client.clientID === "google.gemini";
       row.toggleText.textContent = singleClient ? "启用连接" : "启用 " + client.displayName;
-      row.copy.textContent = gemini ? "复制本地启动命令" : "复制 Qwen JSON 配置";
-      row.rotate.textContent = gemini ? "重置连接" : "重新生成凭证";
+      S.syncButtonLabel(row.copy, gemini ? "复制本地启动命令" : "复制 Qwen JSON 配置");
+      S.syncButtonLabel(row.rotate, gemini ? "重置连接" : "重新生成凭证");
       row.copy.hidden = permissionsOnly || !client.canCopyConfiguration || options.hideCopy === true;
       row.rotate.hidden = permissionsOnly || !client.canRotateCredential;
       row.actions.hidden = row.copy.hidden;

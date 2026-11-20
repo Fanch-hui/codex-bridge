@@ -214,12 +214,15 @@
 
   /// One connected shell session: serves requests on a dedicated thread.
   private final class PipeConnection: @unchecked Sendable {
+    private static let maximumConcurrentRequests = 128
+
     private let handle: HANDLE
     private let io: NamedPipeOverlappedIO
     private let writer: PipeFrameWriter
     private let controller: BridgeServiceRequestController
     private let closeLock = NSLock()
     private var closed = false
+    private var inFlightTasks: [UInt64: Task<Void, Never>] = [:]
 
     init(
       handle: HANDLE,
@@ -249,22 +252,67 @@
       }
       while true {
         guard let (kind, payload) = readFrame() else { return }
-        guard kind == 0 else {
+        switch kind {
+        case ServiceFrameKind.legacyRequest:
+          let response = dispatchSync(payload)
+          guard writer.write(kind: ServiceFrameKind.legacyResponse, payload: response) else {
+            return
+          }
+          guard shouldRequestShutdown(request: payload, response: response) else { continue }
+          ServiceTerminationSignal.request()
+          return
+        case ServiceFrameKind.multiplexedRequest:
+          guard let (tag, body) = ServiceMultiplexedFrame.decode(payload),
+            body.count <= BridgeServiceIPC.maximumMessageBytes,
+            dispatchMultiplexed(tag: tag, payload: body)
+          else { return }
+        default:
           // Only requests are accepted from the shell.
           return
         }
-        let response = dispatchSync(payload)
-        guard writer.write(kind: 1, payload: response) else { return }
-        guard shouldRequestShutdown(request: payload, response: response) else { continue }
-        ServiceTerminationSignal.request()
-        return
       }
+    }
+
+    private func dispatchMultiplexed(tag: UInt64, payload: Data) -> Bool {
+      closeLock.lock()
+      guard !closed, inFlightTasks[tag] == nil,
+        inFlightTasks.count < Self.maximumConcurrentRequests
+      else {
+        closeLock.unlock()
+        return false
+      }
+      let controller = controller
+      let writer = writer
+      let task = Task { [weak self] in
+        defer { self?.finishTask(tag: tag) }
+        let response = await controller.dispatch(payload)
+        guard !Task.isCancelled else { return }
+        let encoded = ServiceMultiplexedFrame.encode(tag: tag, payload: response)
+        guard writer.write(kind: ServiceFrameKind.multiplexedResponse, payload: encoded) else {
+          self?.close()
+          return
+        }
+        if let self, self.shouldRequestShutdown(request: payload, response: response) {
+          ServiceTerminationSignal.request()
+          self.close()
+        }
+      }
+      inFlightTasks[tag] = task
+      closeLock.unlock()
+      return true
+    }
+
+    private func finishTask(tag: UInt64) {
+      closeLock.lock()
+      inFlightTasks.removeValue(forKey: tag)
+      closeLock.unlock()
     }
 
     private func shouldRequestShutdown(request: Data, response: Data) -> Bool {
       guard
         let decodedRequest = try? BridgeServiceIPCCodec.decodeRequest(request),
-        decodedRequest.operation == .shutdownService,
+        decodedRequest.operation == .shutdownService
+          || decodedRequest.operation == .shutdownServiceIfIdle,
         let decodedResponse = try? BridgeServiceIPCCodec.response(response)
       else { return false }
       return decodedResponse.error == nil
@@ -289,7 +337,7 @@
       let length = header.withUnsafeBytes { raw in
         raw.loadUnaligned(fromByteOffset: 1, as: UInt32.self).littleEndian
       }
-      guard length <= BridgeServiceIPC.maximumMessageBytes else { return nil }
+      guard Int(length) <= ServiceFrameKind.maximumPayloadBytes(for: kind) else { return nil }
       guard let payload = readFully(length) else { return nil }
       return (kind, payload)
     }
@@ -313,7 +361,10 @@
         return
       }
       closed = true
+      let pending = Array(inFlightTasks.values)
+      inFlightTasks.removeAll()
       closeLock.unlock()
+      for task in pending { task.cancel() }
       controller.stopStreaming()
       writer.close()
     }

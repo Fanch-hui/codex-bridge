@@ -297,6 +297,13 @@ public actor ServiceTaskManager {
     failureCode: String,
     summary: String
   ) async throws -> ServiceTaskRecord {
+    try await fail(taskID: taskID, failureCode: failureCode, summary: summary, expectedStatus: nil)
+  }
+
+  @discardableResult
+  package func fail(
+    taskID: TaskID, failureCode: String, summary: String, expectedStatus: ServiceTaskStatus?
+  ) async throws -> ServiceTaskRecord {
     return try await mutate(
       taskID: taskID,
       patch: StatePatch(
@@ -306,7 +313,8 @@ public actor ServiceTaskManager {
         failureCode: .set(failureCode)
       ),
       eventKind: .taskFailed,
-      summary: summary
+      summary: summary,
+      expectedStatus: expectedStatus
     )
   }
 
@@ -479,6 +487,40 @@ public actor ServiceTaskManager {
 
   public func taskAttachments(taskIDs: [TaskID]) async throws -> [TaskID: [AgentImageAttachment]] {
     try await store.taskAttachments(taskIDs: taskIDs)
+  }
+
+  @discardableResult
+  package func interruptIfQueued(taskID: TaskID, summary: String) async throws -> Bool {
+    try await finishBeforeStart(
+      taskID: taskID, expectedQueued: true, patch: StatePatch(status: .interrupted),
+      eventKind: .taskInterrupted, summary: summary)
+  }
+
+  @discardableResult
+  package func failBeforeStart(
+    taskID: TaskID, expectedQueued: Bool, failureCode: String, summary: String
+  ) async throws -> Bool {
+    try await finishBeforeStart(
+      taskID: taskID, expectedQueued: expectedQueued,
+      patch: StatePatch(
+        status: .failed, supervisorStatus: .failed, resultSummary: .set(summary),
+        failureCode: .set(failureCode)),
+      eventKind: .taskFailed, summary: summary)
+  }
+
+  private func finishBeforeStart(
+    taskID: TaskID, expectedQueued: Bool, patch: StatePatch,
+    eventKind: ServiceTaskEventKind, summary: String
+  ) async throws -> Bool {
+    try Task.checkCancellation()
+    let finished = try await store.finishTaskBeforeStart(
+      id: taskID, expectedQueued: expectedQueued,
+      event: ServiceTaskEventDraft(kind: eventKind, summary: summary, createdAt: now())
+    ) { task in
+      try Self.apply(patch, to: task)
+    }
+    if finished { changes.publish() }
+    return finished
   }
 
   @discardableResult

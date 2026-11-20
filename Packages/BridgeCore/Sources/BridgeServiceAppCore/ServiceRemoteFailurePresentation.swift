@@ -4,6 +4,18 @@ import Foundation
 
 enum ServiceRemoteFailurePresentation {
   static func message(_ error: BridgeServiceIPCError) -> String {
+    if error.code == "busy" {
+      switch error.message {
+      case "The service is busy.": return "后台请求较多，请稍后重试。"
+      case "The project already has an active write task.": return "项目正在执行写入任务，请在任务完成后重试。"
+      case "The service database is busy; please retry shortly.": return "服务正在保存数据，请稍后重试。"
+      default: break
+      }
+    }
+    if error.code.hasPrefix("community_provider_") {
+      let detail = OutboundContentSecurity.redactedSecrets(error.message, maximumUTF8Bytes: 2048)
+      if !detail.isEmpty { return "\(detail)（\(error.code)）" }
+    }
     let guidance = guidanceByCode[error.code]
     var lines = [guidance?.reason ?? "操作失败，具体原因未识别。"]
     let nextAction = guidance?.nextAction ?? "查看诊断详情与错误代码，结合服务日志定位原因。"
@@ -29,6 +41,18 @@ enum ServiceRemoteFailurePresentation {
   )
 
   private static let guidanceRows: [([String], String, String)] = [
+    (
+      ["external_configuration_conflict", "external_configuration_changed"],
+      "目标应用的配置已发生变化。", "检查目标应用配置，然后重新查看变更。"
+    ),
+    (
+      ["external_configuration_invalid"], "无法读取或编辑目标应用配置。",
+      "检查目标应用配置文件的格式，再重新查看变更。"
+    ),
+    (
+      ["external_configuration_unavailable"], "目标应用配置编辑器暂不可用。",
+      "检查后台服务状态后重试。"
+    ),
     (
       ["internal_error"], "后台服务处理操作时发生未识别的错误。",
       "查看服务日志；如诊断提供关联编号，使用该编号查找对应错误。"

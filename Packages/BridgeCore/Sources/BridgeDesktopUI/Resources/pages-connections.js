@@ -81,7 +81,8 @@
     var scanAgents = S.button("扫描 Agent", null, {}, null, "small", false);
     scanAgents.addEventListener("click", function () {
       if (scanAgents.disabled) return;
-      scanAgents.disabled = true; context.emit("scanAgents");
+      S.setButtonPending(scanAgents, true, "正在扫描…", "扫描 Agent");
+      context.emit("scanAgents");
     });
     var addMenu = S.node("details", "connection-add-menu");
     addMenu.dataset.popup = "";
@@ -175,6 +176,7 @@
         agentMCP.update(page, nextEmit);
         mcpEntry.update({ value: S.safeArray(page.deepSeekHarnessMCPServers).length + " 个服务" });
         manualEntry.update({ value: "按路径或选择文件" });
+        S.setButtonPending(scanAgents, !!page.isManagingAgents, "正在扫描…", "扫描 Agent");
         scanAgents.disabled = !page.canScanAgents || !!page.isManagingAgents;
         status.textContent = page.statusMessage || ""; status.hidden = !page.statusMessage;
       }
@@ -262,7 +264,9 @@
     var local = S.node("div", "connection-route"); root.appendChild(local);
     var copy = S.button("复制本地启动命令", null, {}, null, "small primary", true);
     copy.addEventListener("click", function () {
-      if (!copy.disabled) context.emit("copyMCPClientConfiguration", { clientID: "google.gemini" });
+      if (copy.disabled) return;
+      S.flashButtonSuccess(copy, "已复制命令");
+      context.emit("copyMCPClientConfiguration", { clientID: "google.gemini" });
     });
     local.appendChild(copy);
     var help = S.node("details", "connection-help");
@@ -318,11 +322,31 @@
     }
   }
 
+  function createChatClients(emit) {
+    currentEmit = emit;
+    var root = S.node("section", "page-section"), clients = [
+      { title: "ChatGPT", view: createChatGPT({ emit: emit }) },
+      { title: "Qwen Studio", view: createQwen() },
+      { title: "Gemini", view: createGemini() }
+    ];
+    root.appendChild(S.node("h3", null, "聊天客户端"));
+    clients.forEach(function (item) {
+      var detail = S.node("details", "agent-details"); detail.appendChild(S.node("summary", null, item.title));
+      detail.appendChild(item.view.root); root.appendChild(detail);
+      detail.addEventListener("toggle", function () { if (detail.open) emit("refreshMCPClients", {}); });
+    });
+    return { root: root, update: function (page, nextEmit) {
+      if (!page) return;
+      clients.forEach(function (item) { item.view.update(page, nextEmit); });
+    } };
+  }
+
   if (global.document && global.document.addEventListener) global.document.addEventListener("visibilitychange", function () {
     if (!active) return;
     if (!visible() && timer) { global.clearTimeout(timer); timer = null; }
     else if (visible()) watchClients();
   });
   global.CodexBridgeDesktopConnectionsPage = { render: render, setActive: setActive, openDetail: openDetail,
+    createChatClients: createChatClients,
     updateSettings: updateSettings, watchClients: watchClients };
 }(window));
