@@ -11,7 +11,7 @@
 1. 从 [Releases](https://github.com/Fanch-hui/codex-bridge/releases/latest) 安装对应平台版本。
 2. 打开 App，在「动态」页或侧栏底部状态区确认后台 Service 已连接。
 3. 在「项目 → 工作区」登记需要操作的本地目录（登记即授权完整访问），或直接使用自动创建的「默认工作区」。
-4. 委派 Agent 任务时，可在「网页工作台」或「连接 → 对应 Agent」中选择“只读”或“完整”权限。
+4. 若要委派 Agent，在「网页工作台」工具栏确认远程新任务的默认权限（“只读”或“完整”），选择所用 Agent 支持的权限。
 5. 在「连接 → ChatGPT」确认 Secure MCP 隧道的 Helper 显示“就绪”。发布安装包已包含 Helper。
 
 Bridge 自动运行随包 `tunnel-client`，并把收到的请求转发给本机 MCP 服务。正常使用不需要另开终端运行 Helper。
@@ -174,5 +174,5 @@ Codex Bridge 升级新版本后，ChatGPT 网页端可能会保留旧版的工�
 
 - 提交后先获得任务 ID，再用 `wait_task` 等待结果，默认最多 300 秒；完成、审批或补充信息会提前返回。到点仍在执行时，客户端自行决定何时用 `get_task` 查询状态和保存的结果。等待结束或连接断开不取消 Agent 任务。
 - Tunnel 暂时断线不等于本机任务失败；恢复后可继续查询。
-- 本机「工作台」和「网页工作台」可直接发起对话与 Agent 任务，不依赖 ChatGPT Tunnel。
+- 本机直接使用 Agent 不依赖 ChatGPT Tunnel：在「工作台」点击「+」新建内置对话，或点旁边的「外部 Agent」下拉菜单选择已连接的 Agent。ChatGPT 插件提交的任务在「网页工作台」查看和续写；要在内置对话中继续，可点「带到工作台」。
 - 使用与项目授权、Qwen、Gemini、模型选择相关的完整流程，见 [详细使用指南](./USER_GUIDE.md)。

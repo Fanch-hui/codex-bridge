@@ -35,13 +35,11 @@ Versions with the built-in updater check GitHub once at startup and show availab
 
 Captured on macOS; Windows and Linux use the same shared desktop UI.
 
-**Workbench**: Built-in model conversation workspace with main navigation and workspace-grouped sessions on the left, live conversation, performance/token/context metrics, and composer in the center, and a collapsible Files / Changes / Agents inspector on the right.
+**Workbench: start work locally.** Click **+** in the tab bar for a built-in conversation. To work directly with a local agent, open the **External Agent (外部 Agent)** menu next to **+** and choose a connected agent. Use **Split Layout (分屏布局)** to view built-in conversations, subagents, and external agent sessions side by side in up to four panes.
 
 <img src="./docs/assets/workbench.png" width="720" alt="Codex Bridge Workbench">
 
-**Web Workbench (4-pane split view)**: View up to four agent sessions side by side (OpenCode, Codex, Antigravity, and Qoder shown here), each with its own live conversation and composer, plus top tabs, permissions, history, built-in browser, and split-view controls.
-
-<img src="./docs/assets/web-workbench-split.jpg" width="720" alt="Codex Bridge Web Workbench 4-pane split view">
+**Web Workbench: follow tasks from ChatGPT, Qwen, or Gemini.** Filter by source, read output, continue a task, or handle approvals here. To continue locally, click **Bring to Workbench (带到工作台)** to import the context. The model does not run until you send the next message.
 
 <details>
 <summary>View Connections, Workbench Settings, and Global Settings</summary>
@@ -94,13 +92,27 @@ In Gemini, open **More → Customize → Connected apps → + Custom**, then cho
 
 **Workbench Settings → Model connections** supports ChatGPT, custom APIs, BigModel / Z.AI Coding Plan and Start Plan, and WorkBuddy CN and international accounts. Use browser sign-in for BigModel / Z.AI, or an API key for Coding Plan. WorkBuddy supports browser sign-in, API keys, desktop account import, account pool management, credits, and model filters. Select the connected provider and model in the conversation composer. The first-use screen provides a **More model connections** entry.
 
+### Use provider models in a local agent
+
+Use this path to call a model through Bridge **from the agent’s own CLI or desktop app**. It does not delegate a task to that agent. If you only want to chat in the Bridge Workbench, connect the provider and select its model in the composer; you do not need an external app grant or a running model gateway.
+
+1. Open **Providers (供应商)** in the sidebar and connect your account. For community models, install the plugin from the catalog and follow its authorization prompts. Installation alone does not give the account model quota.
+2. Open **App Access (接入应用) → Connected Apps (已接入应用) → Connect App (连接应用)**. Choose the CLI or desktop app you actually use. Under **Allowed models (允许使用的模型)**, keep only the models you want it to use. Click **Refresh model catalog (刷新模型目录)** if a model is missing.
+3. **For models only, leave MCP off.** Only if the app needs project access through Bridge, open **Advanced settings (高级设置)**, enable **Allow Bridge MCP (允许使用 Bridge MCP)**, and choose the projects. Command tools require a separate opt-in and remain subject to approval policy.
+4. Finish setup for the selected app, then start a new session there:
+   - **Codex CLI / Claude Code (CLI):** Click **Confirm configuration write (确认写入配置)**. To keep official sign-in available, first select **Keep official sign-in (保留官方登录态共存)**. Run `codex -p codex_bridge` for Bridge models or plain `codex` as before. In Claude Code, use `/model` to switch between official and Bridge models.
+   - **Codex Desktop:** Restart the app after Bridge writes the global configuration. There is no CLI-style profile switch in the desktop UI. To restore the previous configuration, choose **Revert configuration (撤销配置)** under **Applied configurations (已应用的配置)**.
+   - **Claude Desktop:** Click **Save authorization (保存授权)** (or **保存并写入 MCP 配置** if MCP is enabled), then **Copy 3P gateway configuration (复制 3P 网关配置)**. In Claude Desktop, enable **Help → Troubleshooting → Enable Developer Mode**, import or enter the settings under **Developer → Configure Third-Party Inference…**, and restart. Bridge does not write the model settings automatically; 3P mode cannot retain `claude.ai` sign-in in the same window.
+
+OpenCode 1 / 2 and Pi have dedicated configuration writers. For an app without one, select **Other app (其他应用)**, save the grant, and copy the connection settings. See the [model gateway compatibility table (Chinese)](./docs/MODEL_GATEWAY_COMPATIBILITY.md) for protocols and limits.
+
 ### Delegate agent tasks (optional)
 
 To delegate work to Codex, Claude Code, OpenCode, DeepSeek Harness, Antigravity, Pi, or Qoder, complete these additional steps. The selected agent's own sign-in or API configuration is separate from the chat client MCP connection.
 
 1. Bridge discovers existing agents on first initialization; click **Connect** on the Connections page to verify and enable them. The additional **One-click setup** action prepares missing software and dependencies, then guides you through native sign-in or API configuration. See the [setup guide (Chinese)](./docs/AGENT_SETUP_GUIDE.md). Codex uses the local Codex execution channel.
 2. Configure the default model, reasoning effort, and task permission (**Read Only** or **Full**) in **Connections** or **Settings → Accounts & Models**, or adjust them per task in the composer. Full includes writes and network tools; Read Only allows neither.
-3. Submit a task locally with **+** in the **Web Workbench**, delegate a subagent task from the **Workbench**, or call `submit_task` from a connected chat client. Follow output, tools, approvals, and structured questions in the Web Workbench.
+3. In the **Workbench**, send a task directly from the **External Agent** menu or ask a built-in conversation to delegate a subtask. For tasks submitted via `submit_task` from a connected chat client, follow output, tool calls, approvals, and structured questions in the **Web Workbench**.
 
 Existing DSH connections and one-click setup use ACP by default. To share official desktop sessions, explicitly select [native desktop mode (Chinese)](./docs/DSH_NATIVE_DESKTOP_GUIDE.md). It reuses Desktop sign-in and tools and supports Full text tasks on macOS and Windows x64. Model and reasoning selections in this mode also update the DSH Desktop default for future sessions.
 
@@ -118,8 +130,8 @@ After [connecting the ChatGPT plugin](./docs/CHATGPT_DEVELOPER_MODE.md), enable 
 
 ## Capabilities
 
-- **Workbench:** built-in model conversations (ChatGPT, BigModel / Z.AI, WorkBuddy, custom APIs), context window and auto-compaction management, skills and plugins, files/changes inspector, and external subagent delegation with isolated workspace three-way merge.
-- **Web Workbench:** external agent session tabs, up to 4-pane split view, local new agent tasks, built-in ChatGPT / Gemini browser, history search, failed-task retries, and cross-agent handoff.
+- **Workbench:** built-in conversations (including community provider models), split views for built-in and external agent sessions, context window and auto-compaction management, skills and plugins, files/changes inspector, and external subagent delegation with isolated workspace three-way merge.
+- **Web Workbench:** web-client task conversations, continuations and approvals, built-in ChatGPT / Gemini browser, history search, failed-task retries, cross-agent handoff, and bringing tasks into the Workbench.
 - **Codex:** Thread/Turn, streaming output, approvals, structured questions, steer, and interrupt; macOS recognizes both current and legacy bundled CLI layouts.
 - **Claude Code:** official CLI and Agent SDK integration, model and reasoning selection, native hooks enforcement, tool approvals, and session continuation.
 - **OpenCode:** ACP, model and reasoning options, permissions, and conversation continuation.

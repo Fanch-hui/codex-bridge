@@ -35,13 +35,11 @@ macOS 安装包使用 ad-hoc 签名，尚未经过 Apple 公证。若系统阻�
 
 以下画面为 macOS 实录，Windows 与 Linux 共用同一套桌面产品界面。
 
-**工作台**：应用内模型对话入口，左侧集中展示主导航与按工作区分组的会话，中央呈现对话、性能/Token/上下文统计与持久输入器，右侧为可收起的文件、变更与调用的 Agent 检查器。
+**工作台：从本机发起协作。** 标签栏的「+」新建内置会话；要直接交给本机 Agent，点「+」旁的「外部 Agent」下拉按钮，选择已连接的 Agent。用「分屏布局」可在最多四格中并排查看内置会话、子 Agent 和外部 Agent 会话。
 
 <img src="./docs/assets/workbench.png" width="720" alt="Codex Bridge 工作台界面">
 
-**网页工作台（四宫格分屏）**：支持单视图、左右两格、左一右二与四宫格分屏，每格可独立展示不同 Agent（图中为 OpenCode、Codex、Antigravity、Qoder）的实时对话与输入器，顶部工具栏提供标签页、权限、历史、内置浏览器与分屏切换。
-
-<img src="./docs/assets/web-workbench-split.jpg" width="720" alt="Codex Bridge 网页工作台四宫格分屏界面">
+**网页工作台：跟进 ChatGPT、Qwen 或 Gemini 发来的任务。** 在这里按来源筛选任务、查看输出、续写或处理审批。需要转到本机协作时，点「带到工作台」即可带入上下文；直到你发送下一条消息，模型才会运行。
 
 <details>
 <summary>查看连接页、工作台设置与全局设置界面</summary>
@@ -94,13 +92,27 @@ Gemini 的配置入口是 **更多 → 自定义 → 关联应用 → 右上角�
 
 「工作台设置 → 模型连接」支持 ChatGPT、自定义 API、智谱 / Z.AI 的 Coding Plan 与 Start Plan，以及 WorkBuddy 国内版和国际版。智谱 / Z.AI 可网页登录，Coding Plan 也可使用 API Key；WorkBuddy 提供网页登录、API Key 和导入桌面登录，并可管理账号池、积分与模型筛选。连接完成后在对话输入区选择对应来源和模型。首次使用可点击“更多模型连接”进入配置。
 
+### 让本机 Agent 使用供应商模型
+
+这条路径让你在 **Agent 自己的 CLI 或桌面应用**里用 Bridge 转发的模型，不是让 Bridge 委派任务。如果只在 Bridge 工作台聊天，连好供应商后在输入框选模型即可，不必接入外部应用或启动模型网关。
+
+1. 在侧栏打开「供应商」，连接所需账号。社区模型先从「插件目录」安装对应插件，再按提示授权；单是安装插件不代表账号有额度。
+2. 打开「接入应用」，在「已接入应用」点「连接应用」。选实际使用的「目标应用」，核对「允许使用的模型」，只勾选要提供给它的模型。模型没出现时点「刷新模型目录」。
+3. **只用模型就保持 MCP 关闭。** 需要让该应用通过 Bridge 访问项目时，才在「高级设置」勾选「允许使用 Bridge MCP」，选择项目；命令工具还要单独勾选，仍受审批策略约束。
+4. 按目标应用完成配置，再到该应用开始新会话：
+   - **Codex CLI / Claude Code (CLI)**：点「确认写入配置」。若要保留官方登录为另一种选择，先勾选「保留官方登录态共存」：Codex 用 `codex -p codex_bridge` 启用 Bridge，普通 `codex` 不变；Claude Code 用 `/model` 在官方与 Bridge 模型间切换。
+   - **Codex 桌面版**：写入全局配置后重启桌面版，不提供 CLI 的 profile 切换。要恢复原配置，在「已应用的配置」点「撤销配置」。
+   - **Claude 桌面版**：点「保存授权」（启用 MCP 时为「保存并写入 MCP 配置」），再点「复制 3P 网关配置」。在 Claude 桌面版打开 `Help → Troubleshooting → Enable Developer Mode`，进入 `Developer → Configure Third-Party Inference…` 导入或填写，重启生效。模型配置不会自动写入；3P 模式不能在同一窗口保留 `claude.ai` 登录。
+
+OpenCode 1 / 2 和 Pi 有专用写入入口；没有专用入口时选「其他应用」，保存授权后复制接入配置。各应用的协议和限制见[模型网关兼容表](./docs/MODEL_GATEWAY_COMPATIBILITY.md)。
+
 ### 委派 Agent 任务（可选）
 
 需要让 Codex、Claude Code、OpenCode、DeepSeek Harness、Antigravity、Pi 或 Qoder 等 Agent 执行任务时，再完成以下配置。Agent 自身的登录或 API 配置取决于所选引擎，与聊天客户端的 MCP 接入分别配置。
 
 1. **连接 Agent**：首次初始化自动发现已有安装，在「连接」页点击“连接”完成验证和启用。需要安装或补齐环境时，可以点击“一键配置”，按指引完成登录或填写 API Key，详见[一键配置指南](./docs/AGENT_SETUP_GUIDE.md)。Codex 使用本机 Codex 执行通道。
 2. **配置模型与权限**：在「连接」页对应 Agent 详情或「设置 → 账户与模型」中设置默认模型、推理强度和默认任务权限（“完整权限”允许写入和联网，“只读”不允许写入和工具联网）；新建或续写任务时也可在底部输入器单独调整。
-3. **执行任务**：在「网页工作台」点击「+」直接新建 Agent 任务、在「工作台」由模型委派子任务，或由已连接的聊天客户端调用 `submit_task`。任务输出、工具执行、审批和结构化提问在网页工作台显示。
+3. **执行任务**：在「工作台」用「外部 Agent」下拉按钮直接发任务，也可让内置会话委派子任务。由已连接的聊天客户端调用 `submit_task` 发起的任务，在「网页工作台」查看输出、工具执行、审批和结构化提问。
 
 DSH 提供两个独立连接：DSH ACP 使用 API 配置，一键配置准备 ACP；[DSH 桌面](./docs/DSH_NATIVE_DESKTOP_GUIDE.md)复用官方桌面的登录、工具配置和原生会话，支持 macOS、Windows x64 的完整权限文本任务。两者可以同时连接，模型和权限分别保存，新任务选择对应 Agent，已有任务保持原绑定。DSH 桌面的模型与推理强度选择会同步到桌面默认，影响后续新建会话。
 
@@ -120,8 +132,8 @@ DSH 提供两个独立连接：DSH ACP 使用 API 配置，一键配置准备 AC
 
 | 模块 | 功能 |
 | --- | --- |
-| 工作台 | 应用内模型对话（ChatGPT、智谱 / Z.AI、WorkBuddy、自定义 API）、上下文窗口与自动压缩管理、技能与插件、文件/变更检查器、委派外部子 Agent 与独立副本三方合并 |
-| 网页工作台 | 外部 Agent 会话标签页、最多四宫格分屏、本机新建 Agent 任务、内置 ChatGPT / Gemini 浏览器、历史搜索、失败任务重试与跨 Agent 交接 |
+| 工作台 | 应用内模型对话（含社区供应商）、内置与外部 Agent 会话分屏、上下文窗口与自动压缩管理、技能与插件、文件/变更检查器、委派外部子 Agent 与独立副本三方合并 |
+| 网页工作台 | 网页任务会话与续写、审批、内置 ChatGPT / Gemini 浏览器、历史搜索、失败任务重试、跨 Agent 交接与「带到工作台」 |
 | Codex | Thread/Turn、实时输出、审批、结构化提问、补充指令与中断；macOS 同时识别新版与旧版 App 内置 CLI 路径 |
 | Claude Code | 官方 CLI 与 Agent SDK 接入、模型与推理强度选择、原生 Hooks 校验、工具审批与会话继续 |
 | OpenCode | ACP 连接、模型与推理选项、权限回传、会话继续 |

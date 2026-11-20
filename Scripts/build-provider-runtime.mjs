@@ -24,7 +24,7 @@ export async function buildProviderRuntime({ root, stage, platform, architecture
     '--os', platform === 'windows' ? 'win32' : platform, '--cpu', architecture], editor);
   await cp(join(root, 'Integrations', 'ModelProtocol', 'LICENSE'), join(destination, 'MODEL_PROTOCOL_LICENSE'));
   const executable = join(destination, platform === 'windows' ? 'model-protocol.exe' : 'model-protocol');
-  await run(process.env.GO || 'go', ['build', '-trimpath', '-mod=readonly', '-o', executable, './cmd/model-protocol'],
+  await run(process.env.GO || 'go', ['build', '-buildvcs=false', '-trimpath', '-mod=readonly', '-o', executable, './cmd/model-protocol'],
     join(root, 'Integrations', 'ModelProtocol'), {
       CGO_ENABLED: '0', GOTOOLCHAIN: 'local', GOOS: platform === 'windows' ? 'windows' : platform,
       GOARCH: architecture === 'x64' ? 'amd64' : 'arm64'

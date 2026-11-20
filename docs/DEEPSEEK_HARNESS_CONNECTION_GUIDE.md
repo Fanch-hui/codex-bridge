@@ -30,17 +30,14 @@ deepseek-harness
 
 省略 `provider_id` 时 Bridge 使用 Codex，不会自动改用 DSH。
 
-## 在网页工作台使用外部 DSH ACP
+## 使用外部 DSH ACP
 
-外部 DeepSeek Harness ACP 的会话、历史搜索、多标签页、四宫格分屏、任务审批和跨 Agent 交接统一归属「网页工作台」：
-
-- 点击顶部标签栏「+」新建 Agent 任务，选择 DeepSeek Harness、模型、推理强度、目标项目与「完整」权限后本机直接提交，或选择已有会话继续。
-- 顶部工具栏支持单视图、左右分屏、左一右二、四宫格分屏，每格独立显示实时对话与底部输入器；续写达到同项目并发上限时自动排队。
-- 会话列表显示任务来源，支持历史搜索、处理审批、复制执行结果以及将任务交给其他 Agent。待处理审批也会在「动态」页显示。
+- **本机任务**：在「工作台」点标签栏「+」旁的「外部 Agent」下拉菜单，选择 DeepSeek Harness 和目标项目，核对模型、推理强度与「完整」权限后发送指令。「+」本身新建内置对话；使用工作台分屏可并排查看 DSH 与其他会话。
+- **网页任务**：通过 ChatGPT、Qwen 或 Gemini 提交后，到「网页工作台」查看输出、处理审批或续写；待处理审批也在「动态」页显示。要用内置对话继续，点「带到工作台」带入来源上下文，再发送下一条消息。网页任务续写达到同项目并发上限时自动排队。
 
 右侧检查器「文件 / 变更」提供目录浏览、带行号的文本预览和 Git Diff。完整且未脱敏的 UTF-8 文件支持编辑，保存前展示修改预览；确认后沿用 Direct 审批与工作区并发控制，按原内容摘要检查冲突。每次保存最多 256 KiB，并保留常规 LF/CRLF 换行和尾换行。Git 区展示项目当前全部变更，包含已有修改。
 
-ACP 会话可使用项目 Skill；支持图片的模型可从文件树逐张添加项目内 PNG、JPEG、WebP 图片，最多 8 张、合计 8 MiB。Bridge 按所选模型查询能力，并在执行时再次核对 ACP 的图片声明与原图片内容。协议依据官方 [ACP 内容实现](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts)，发送实际图像字节。
+ACP 任务可使用项目 Skill；支持图片的模型可接收项目内 PNG、JPEG、WebP 图片，最多 8 张、合计 8 MiB。Bridge 按所选模型查询能力，并在执行时再次核对 ACP 的图片声明与原图片内容。协议依据官方 [ACP 内容实现](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts)，发送实际图像字节。
 
 ChatGPT/Qwen/Gemini 使用同一个 `deepseek-harness` Provider 和既有任务工具，与网页工作台共享任务记录和审批。
 
@@ -321,7 +318,7 @@ Probe 验证本地安装、协议和基础 ACP Session。模型刷新还会访�
 3. 点击“刷新模型列表”。
 4. 选择 DSH 当前 ACP Session 返回的精确模型 ID。
 5. 选择当前所选模型的 ACP Session 返回的 `thought_level`/`reasoning_effort` effort 能力。模型 ID 和 effort 都必须使用当前 ACP Session 返回的精确值。
-6. 选择默认任务权限。DSH 当前支持“完整”；ChatGPT/Qwen/Gemini 新任务使用配置的默认权限，网页工作台新建任务可在底部输入器按需选择项目、模型、推理强度与权限。
+6. 选择默认任务权限。DSH 当前支持“完整”；ChatGPT/Qwen/Gemini 新任务使用配置的默认权限，本机任务可在工作台的外部 Agent 草稿中选择项目、模型、推理强度与权限。
 
 现代 DSH 的模型目录按以下顺序获得：
 

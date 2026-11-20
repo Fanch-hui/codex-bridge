@@ -24,17 +24,14 @@ deepseek-harness
 
 Omitting `provider_id` selects Codex, not DSH.
 
-## Use external DSH ACP in Web Workbench
+## Use external DSH ACP
 
-External DeepSeek Harness ACP sessions, history search, multi-tab navigation, up to 4-pane split views, task approvals, and cross-Agent handoff live in **Web Workbench**:
-
-- Click `+` in the top tab bar to create a new Agent task locally—select DeepSeek Harness, model, reasoning effort, target project (or **Default Workspace**), and **Full** permission in the bottom composer—or select an existing session to continue.
-- Use the toolbar split-view controls (single, two-column, 1-left-2-right, or 4-grid) to work across multiple sessions simultaneously. Continuations in Web Workbench automatically queue when the project reaches the configured concurrent Agent limit (1–4, default 4).
-- The session list shows task sources, searches Bridge history, and provides conversation, approval, continuation, result-copy, and Agent handoff controls. Pending approvals also appear in **Activity**.
+- **Local tasks:** In **Workbench**, open the **External Agent** dropdown next to `+`. Select DeepSeek Harness and the target project, check the model, reasoning effort and **Full** permission, then send your instruction. The `+` button itself starts a built-in conversation. Use split view in Workbench to see DSH alongside other sessions.
+- **Web tasks:** After submitting from ChatGPT, Qwen or Gemini, open **Web Workbench** to view output, handle approvals or continue the session. Pending approvals also appear in **Activity**. To continue in a built-in conversation, choose **Bring to Workbench** to import the source context, then send your next message. Follow-ups in Web Workbench queue when the project reaches its concurrency limit.
 
 The right inspector (**Files / Changes**) provides directory browsing, line-numbered text editing, and Git Diff. Complete, unredacted UTF-8 files support previewed saves up to 256 KiB. Saves use Direct approval and the workspace gate, check the original SHA-256, and preserve ordinary LF/CRLF and trailing newlines. Git shows all current project changes, including existing edits.
 
-New sessions accept project Skill names and project PNG/JPEG/WebP images for models that declare image input: up to eight images and 8 MiB total. Add individual images from the file tree. Bridge queries the selected model and rechecks the ACP declaration and image identity at execution. The wire content follows the official [ACP implementation](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts).
+ACP tasks accept project Skill names and project PNG/JPEG/WebP images for models that declare image input: up to eight images and 8 MiB total. Bridge queries the selected model and rechecks the ACP declaration and image identity at execution. The wire content follows the official [ACP implementation](https://github.com/deepseek-ai/deepseek-harness/blob/5badb15009ae1756c3afe0ae0cef1faafc290ccc/packages/acp/acp/src/content.ts).
 
 ChatGPT/Qwen/Gemini retain the same `deepseek-harness` provider and task tools, sharing task records and approvals with Web Workbench.
 

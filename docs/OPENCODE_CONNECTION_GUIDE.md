@@ -1,6 +1,6 @@
 # OpenCode 连接指南
 
-本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并让 ChatGPT、Qwen Studio、Gemini 或 Bridge 网页工作台提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
+本指南说明如何把本机已安装的 OpenCode 登记到 Bridge，并从工作台或已连接的 ChatGPT、Qwen Studio、Gemini 提交 OpenCode 任务。实际兼容范围以当前 Bridge 适配器的 Probe 结果为准。
 
 ## 自动发现与连接
 
@@ -104,7 +104,7 @@ Bridge 的自动发现只读取必要的安装元数据，首次连接仍由用�
 2. 点击“刷新模型列表”。模型目录来自 ACP `session/new.configOptions`，不是 `opencode models` CLI 的输出。
 3. 选择 ACP 返回的精确模型 ID。不要手动在 `opencode/...` 与其他 Provider 的名称之间改名或使用别名。
 4. 仅当当前模型通过 ACP 声明了 effort 选项时，才选择对应 effort；没有可用选项时使用 Provider 默认值。
-5. 保存 OpenCode 的默认模型、effort 和默认任务权限（“只读”或“完整”）。在「网页工作台」点击顶部标签栏「+」新建本机任务时，也可在底部输入器按需选择目标项目、模型、推理强度与权限。
+5. 保存 OpenCode 的默认模型、effort 和默认任务权限（“只读”或“完整”）。本机使用时，在「工作台」点「+」旁的「外部 Agent」下拉菜单，选择 OpenCode，核对目标项目、模型、推理强度与权限后发送指令。网页客户端提交的任务在「网页工作台」续写，也可点「带到工作台」转入内置对话。
 
 模型和 effort 的有效值以当前 ACP 返回的能力为准。刷新失败会保留已有列表和默认设置；如果 OpenCode 删除了当前默认模型或 effort，Bridge 会清空失效的默认值，并在连接详情或设置页显示错误或要求重新选择。
 

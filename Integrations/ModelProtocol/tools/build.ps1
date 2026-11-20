@@ -20,7 +20,7 @@ try {
   $env:GOTOOLCHAIN = 'local'
   Push-Location $modulePath
   try {
-    & $go build -trimpath -mod=readonly -o $outputPath ./cmd/model-protocol
+    & $go build -buildvcs=false -trimpath -mod=readonly -o $outputPath ./cmd/model-protocol
     if ($LASTEXITCODE -ne 0) { throw "Go build failed with exit code $LASTEXITCODE" }
   } finally {
     Pop-Location

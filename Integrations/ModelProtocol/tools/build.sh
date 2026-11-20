@@ -16,4 +16,4 @@ output=$3
 case "$output" in /*) ;; *) output=$(pwd)/$output ;; esac
 cd "$module"
 CGO_ENABLED=0 GOOS=$1 GOARCH=$2 GOTOOLCHAIN=local "$go_bin" build \
-  -trimpath -mod=readonly -o "$output" ./cmd/model-protocol
+  -buildvcs=false -trimpath -mod=readonly -o "$output" ./cmd/model-protocol
