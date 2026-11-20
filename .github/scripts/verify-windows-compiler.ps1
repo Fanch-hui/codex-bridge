@@ -20,21 +20,41 @@ let package = Package(name: "CompilerProbe", targets: [
     .target(name: "STL"), .target(name: "SwiftProbe", dependencies: ["STL"])
 ])
 '@ | Set-Content -LiteralPath "$probe/Package.swift"
-  Set-Content -LiteralPath "$probe/Sources/STL/probe.cpp" -Value '#include <memory>'
+  $version = Select-String -LiteralPath (Join-Path $msvc "yvals_core.h") `
+    -Pattern '^\s*#\s*define\s+_MSVC_STL_UPDATE\s+(\d+)' | Select-Object -First 1
+  if (-not $version) { throw "Cannot identify selected STL version under $msvc." }
+  Set-Content -LiteralPath "$probe/Sources/STL/probe.cpp" -Value @"
+#include <memory>
+static_assert(_MSVC_STL_UPDATE == $($version.Matches[0].Groups[1].Value), "Unexpected MSVC STL version");
+"@
   Set-Content -LiteralPath "$probe/Sources/SwiftProbe/probe.swift" -Value "import vcruntime`npublic let value: UInt32 = 1"
-  $output = @(& swift build --package-path $probe --target SwiftProbe -c release -v @arguments `
-    -Xswiftc -Rmodule-loading 2>&1)
+  $output = @(& swift build --package-path $probe --scratch-path "$probe/.build" --target SwiftProbe -c release -v @arguments 2>&1)
   if ($LASTEXITCODE -ne 0) {
     $output | ForEach-Object { Write-Host $_ }
     throw "Windows compiler probe failed ($Architecture). INCLUDE=$env:INCLUDE"
   }
-  $loaded = @($output | Select-String -SimpleMatch "loaded module 'vcruntime'; source:")
-  $expectedMap = (Join-Path $msvc "module.modulemap").Replace('\', '/')
-  if (-not $loaded -or -not (($loaded -join "`n").Replace('\', '/').Contains(
-        "source: '$expectedMap'", [StringComparison]::OrdinalIgnoreCase))) {
-    throw "Expected vcruntime from $expectedMap. Swift reported: $($loaded -join ' ')"
+  # Swift Build can suppress remarks for a successful compilation. Inspect its
+  # compiler-produced inputs instead of depending on a particular log message.
+  $files = @(Get-ChildItem "$probe/.build" -Recurse -File -Filter "*.d" | Where-Object { $_.FullName -like "*SwiftProbe.build*" })
+  $used = @($files | ForEach-Object {
+    (Get-Content -Raw -LiteralPath $_.FullName).Replace('\ ', ' ').Replace('\:', ':').Replace('\\', '\').Replace('\', '/')
+  }) -join "`n"
+  $headers = $msvc.Replace('\', '/')
+  if (-not $used.Contains("$headers/module.modulemap", [StringComparison]::OrdinalIgnoreCase) -and
+      -not $used.Contains("$headers/vcruntime.h", [StringComparison]::OrdinalIgnoreCase)) {
+    $clang = Join-Path (Split-Path (Get-Command swift).Source) "clang.exe"
+    $modules = @(Get-ChildItem "$probe/.build" -Recurse -File -Filter "vcruntime*.pcm")
+    if (-not $modules) { throw "Missing vcruntime module or dependencies for $headers. Dependencies: $used" }
+    foreach ($module in $modules) {
+      $info = @(& $clang -module-file-info $module.FullName 2>&1)
+      $map = $info | Select-String -Pattern '^\s*Module map file:\s*(.+?)\s*$' | Select-Object -First 1
+      if ($LASTEXITCODE -ne 0 -or -not $map -or
+          $map.Matches[0].Groups[1].Value.Replace('\', '/') -ine "$headers/module.modulemap") {
+        throw "Unexpected module map for $($module.FullName): $map (expected $headers/module.modulemap)"
+      }
+    }
   }
-  Write-Host "Verified C++ STL and Swift vcruntime ($expectedMap) for $Architecture."
+  Write-Host "Verified C++ STL and imported Swift vcruntime for $Architecture ($headers)."
 } finally {
   if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Recurse -Force }
 }
