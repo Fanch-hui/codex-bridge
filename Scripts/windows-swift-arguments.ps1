@@ -3,7 +3,8 @@ function Get-WindowsSwiftArguments {
     [Parameter(Mandatory)][string]$VcpkgInstalledRoot,
     [string]$TargetTriple = "",
     [string[]]$LibraryPaths = @(),
-    [string]$SDKRoot = $env:SDKROOT
+    [string]$SDKRoot = $env:SDKROOT,
+    [string[]]$IncludePaths = ($env:INCLUDE -split ';')
   )
 
   $triplet = Split-Path -Leaf $VcpkgInstalledRoot.TrimEnd('\', '/')
@@ -22,9 +23,20 @@ function Get-WindowsSwiftArguments {
     "-Xswiftc", "-Xcc", "-Xswiftc", "-I$includeDirectory",
     "-Xcc", "-DNOMINMAX",
     "-Xcc", "-I$includeDirectory",
+    "-Xcxx", "-I$includeDirectory",
     "--build-system", "swiftbuild",
     "--triple", $expectedTriple
   )
+  # Swift Build can rediscover the latest VS headers instead of inheriting INCLUDE.
+  # Keep Clang's builtin wrappers first, followed by the staged MSVC and SDK headers.
+  $systemIncludes = @($IncludePaths | Where-Object { $_ -and $_ -ne $includeDirectory })
+  if (-not $systemIncludes) {
+    throw "Selected MSVC and Windows SDK include paths are required."
+  }
+  $headerFlags = @("-nostdlibinc") + @($systemIncludes | ForEach-Object { "-idirafter$_" })
+  foreach ($flag in $headerFlags) {
+    $arguments += @("-Xcc", $flag, "-Xcxx", $flag, "-Xswiftc", "-Xcc", "-Xswiftc", $flag)
+  }
   if ($SDKRoot) {
     $arguments += @("--sdk", $SDKRoot)
   }
