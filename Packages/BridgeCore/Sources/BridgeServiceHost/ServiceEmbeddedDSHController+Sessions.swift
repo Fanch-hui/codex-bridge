@@ -23,6 +23,7 @@ extension ServiceEmbeddedDSHController {
       try await authorizeSession(id, requiresProject: false)
       prepared = try await preparePrompt(input, sessionID: id)
       try await synchronizeSessionScope(id)
+      await refreshSkillsIfDiskChanged(for: id)
     } catch {
       await application.endWorkbenchPromptAdmission(admission)
       throw WorkbenchTaskOperationNotDispatched(cause: error)

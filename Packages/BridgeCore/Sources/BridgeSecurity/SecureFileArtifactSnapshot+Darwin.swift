@@ -98,10 +98,12 @@
           throw SecureFileArtifactError.readFailed
         }
         bytesRead += UInt64(count)
-        hasher.update(data: Data(buffer.prefix(count)))
+        buffer.withUnsafeBytes {
+          hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0[..<count]))
+        }
       }
       guard bytesRead <= maximumBytes else { throw SecureFileArtifactError.fileTooLarge }
-      return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+      return hexDigest(hasher.finalize())
     }
 
     private static func sameSnapshot(_ first: stat, _ second: stat) -> Bool {

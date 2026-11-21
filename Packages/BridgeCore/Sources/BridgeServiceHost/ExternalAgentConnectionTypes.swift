@@ -10,6 +10,20 @@ public enum ExternalAgentConnectionAgent: String, Codable, Equatable, Sendable {
   case openCode2 = "opencode2"
 }
 
+/// Token limits and reasoning levels the gateway knows for a model; written into agent
+/// configurations that accept them.
+public struct ExternalAgentModelLimit: Equatable, Sendable {
+  public let contextWindow: Int?
+  public let maxOutputTokens: Int?
+  public let reasoningEfforts: [String]?
+
+  public init(contextWindow: Int?, maxOutputTokens: Int?, reasoningEfforts: [String]? = nil) {
+    self.contextWindow = contextWindow
+    self.maxOutputTokens = maxOutputTokens
+    self.reasoningEfforts = reasoningEfforts
+  }
+}
+
 public struct ExternalAgentConnectionPreview: Codable, Equatable, Sendable {
   public let id: UUID
   public let agent: ExternalAgentConnectionAgent

@@ -116,6 +116,21 @@
 .dsh-embedded-agent summary { display: flex; justify-content: space-between; gap: 8px; cursor: pointer; }
 .dsh-embedded-question p { margin-block: 8px; }
 .dsh-embedded-question-option { display: flex; align-items: baseline; gap: 8px; margin-block: 6px; }
+.dsh-embedded-request.dsh-question-card { display: grid; gap: 14px; margin-block: 8px; padding: 14px 16px; border: 1px solid var(--separator); border-radius: 12px; background: var(--surface-elevated); box-shadow: var(--shadow-card); }
+.dsh-request-source { margin: 0; color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.dsh-question-card .dsh-embedded-question { display: grid; gap: 8px; }
+.dsh-question-card .dsh-embedded-question p { margin: 0; }
+.dsh-question-card .dsh-question-text { color: var(--text); line-height: 1.55; }
+.dsh-question-options { display: grid; gap: 2px; }
+.dsh-question-card .dsh-embedded-question-option { align-items: flex-start; gap: 10px; margin: 0; padding: 7px 10px; border-radius: var(--control-radius); cursor: pointer; }
+.dsh-question-card .dsh-embedded-question-option:hover { background: var(--surface-hover); }
+.dsh-question-card .dsh-embedded-question-option:has(input:checked) { background: var(--accent-soft); }
+.dsh-question-card .dsh-embedded-question-option input { flex: 0 0 auto; margin: 3px 0 0; accent-color: var(--accent); }
+.dsh-question-option-copy { display: grid; gap: 2px; min-width: 0; }
+.dsh-question-option-title { color: var(--text); font-weight: 500; }
+.dsh-question-custom { box-sizing: border-box; width: 100%; min-height: var(--control-height); padding: 4px 10px; border: 1px solid var(--control-border); border-radius: var(--control-radius); color: var(--text); background: var(--control-bg); font: inherit; }
+.dsh-question-custom:focus { border-color: color-mix(in srgb, var(--accent) 52%, var(--separator-strong)); outline: none; box-shadow: 0 0 0 3px var(--focus-ring-soft); }
+.dsh-request-actions { display: flex; justify-content: flex-end; margin: 0; }
 .dsh-shared-conversation .inspector-pane { flex: 1 1 auto; }
 .dsh-shared-conversation .inspector-header[hidden], .dsh-shared-conversation .inspector-native-sessions[hidden] { display: none; }
 .dsh-shared-conversation .workbench-conversation-viewport > .inspector-content { padding: calc(28px + var(--conversation-top-inset)) max(var(--dsh-content-inset), calc((100% - var(--dsh-content-width)) / 2)) calc(var(--dsh-composer-height, 180px) + 44px); }

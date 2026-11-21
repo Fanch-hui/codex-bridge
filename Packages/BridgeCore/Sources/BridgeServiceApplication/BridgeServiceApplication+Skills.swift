@@ -16,7 +16,12 @@ extension BridgeServiceApplication {
       root = nil
     }
     do {
-      let manifests = try await skillScanner.scanSkills(for: root)
+      let manifests: [SkillManifest]
+      if let skillHub {
+        manifests = try await skillHub.activeManifests(for: root, projectID: projectID)
+      } else {
+        manifests = try await skillScanner.scanSkills(for: root)
+      }
       return MCPServiceSkillList(skills: manifests.map(MCPServiceSkill.init))
     } catch {
       throw Self.publicSkillError(error)
@@ -40,11 +45,27 @@ extension BridgeServiceApplication {
       root = nil
     }
     do {
-      let manifests = try await skillScanner.scanSkills(for: root)
-      guard let manifest = manifests.first(where: { $0.name == skillName }) else {
-        throw BridgeMCPQueryError.skillNotFound
+      let document: SkillDocument
+      if let skillHub {
+        guard
+          let resolved = try await skillHub.findActiveSkill(
+            named: skillName, projectRoot: root, projectID: projectID)
+        else {
+          throw BridgeMCPQueryError.skillNotFound
+        }
+        document = try SkillDocumentReader.readOccurrence(
+          resolved.winner,
+          slug: resolved.canonicalSlug,
+          subpath: subpath,
+          maximumBytes: SkillScanner.maximumDocumentBytes
+        )
+      } else {
+        let manifests = try await skillScanner.scanSkills(for: root)
+        guard let manifest = manifests.first(where: { $0.name == skillName }) else {
+          throw BridgeMCPQueryError.skillNotFound
+        }
+        document = try await skillScanner.readSkillDocument(manifest, subpath: subpath)
       }
-      let document = try await skillScanner.readSkillDocument(manifest, subpath: subpath)
       let safeContent = OutboundContentSecurity.redactedSecrets(
         document.content,
         maximumUTF8Bytes: SkillScanner.maximumDocumentBytes
@@ -62,5 +83,12 @@ extension BridgeServiceApplication {
     } catch {
       throw Self.publicSkillError(error)
     }
+  }
+}
+
+extension BridgeServiceApplication {
+  /// The current root of a registered project, after its directory identity is revalidated.
+  public func skillProjectRoot(_ projectID: String) async throws -> URL {
+    URL(fileURLWithPath: try await readableProject(projectID).root.canonicalPath, isDirectory: true)
   }
 }

@@ -24,6 +24,8 @@
 .dsh-bridge-metric-summary { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; box-sizing: border-box; padding: 2px 8px; border-radius: var(--control-radius-small); cursor: pointer; list-style: none; white-space: nowrap; transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out); }
 .dsh-bridge-metric-icon { width: 14px; height: 14px; flex: none; }
 .dsh-bridge-metric-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dsh-bridge-metric.is-model-limited > .dsh-bridge-metric-summary { color: var(--warning); }
+.dsh-bridge-metric-notice { margin: 8px 0 0; }
 .dsh-bridge-metric-summary::-webkit-details-marker { display: none; }
 .dsh-bridge-metric-summary:hover, .dsh-bridge-metric[open] > .dsh-bridge-metric-summary { color: var(--text); background: var(--surface-hover); }
 .dsh-bridge-metric-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

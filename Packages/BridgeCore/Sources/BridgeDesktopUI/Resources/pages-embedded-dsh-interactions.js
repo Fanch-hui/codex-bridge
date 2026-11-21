@@ -158,58 +158,66 @@
         fields.forEach(function (field) {
           if (field.secret) return;
           answers[field.id] = { custom: field.custom.value, selected: field.controls.filter(function (control) {
-            return control.type === "checkbox" ? control.checked : !!control.value;
+            return control.checked;
           }).map(function (control) { return control.value; }) };
         });
         if (Object.keys(answers).length) questionDrafts[draftKey(source, id)] = answers;
         else delete questionDrafts[draftKey(source, id)];
         saveQuestions();
       }
-      holder.appendChild(S.node("strong", null, "等待回答 · " + sourceLabel(source)));
-      S.safeArray(value.questions).forEach(function (item) {
+      holder.classList.add("dsh-question-card");
+      holder.appendChild(S.node("p", "dsh-request-source", "等待回答 · " + sourceLabel(source)));
+      S.safeArray(value.questions).forEach(function (item, index) {
         var section = S.node("div", "dsh-embedded-question");
-        section.appendChild(S.node("p", null, item.question || item.header || "请选择"));
+        section.appendChild(S.node("p", "dsh-question-text", item.question || item.header || "请选择"));
         if (item.detail) section.appendChild(S.node("p", "hint", item.detail));
-        var options = S.safeArray(item.options);
-        var controls = [];
-        if (options.length && item.multiSelect) {
-          options.forEach(function (option) {
-            var label = S.node("label", "dsh-embedded-question-option"), check = S.node("input");
-            check.type = "checkbox"; check.value = option.label;
-            label.appendChild(check); label.appendChild(S.node("span", null, option.label));
-            if (option.description) label.appendChild(S.node("span", "hint", option.description));
-            section.appendChild(label); controls.push(check);
-          });
-        } else if (options.length) {
-          var choices = [{ id: "", title: "请选择" }].concat(options.map(function (option) {
-            return { id: option.label, title: option.label, detail: option.description };
-          }));
-          var select = S.selectField("选择", "", choices, function () {});
-          section.appendChild(select.wrapper); controls.push(select.control);
-        }
-        var input = S.textField(options.length ? "其他回答（可选）" : "回答", "", "", "");
-        if (item.isSecret) input.control.type = "password";
-        section.appendChild(input.wrapper);
-        var field = { id: item.id, controls: controls, custom: input.control, multiSelect: !!item.multiSelect, secret: !!item.isSecret };
+        var options = S.safeArray(item.options), controls = [];
+        var list = S.node("div", "dsh-question-options");
+        list.setAttribute("role", item.multiSelect ? "group" : "radiogroup");
+        list.setAttribute("aria-label", item.question || item.header || "选项");
+        options.forEach(function (option) {
+          var label = S.node("label", "dsh-embedded-question-option"), choice = S.node("input");
+          choice.type = item.multiSelect ? "checkbox" : "radio";
+          choice.name = "dsh-question-" + key + "-" + index; choice.value = option.label;
+          var copy = S.node("span", "dsh-question-option-copy");
+          copy.appendChild(S.node("span", "dsh-question-option-title", option.label));
+          if (option.description) copy.appendChild(S.node("span", "hint", option.description));
+          label.appendChild(choice); label.appendChild(copy);
+          list.appendChild(label); controls.push(choice);
+        });
+        if (options.length) section.appendChild(list);
+        var custom = S.node("input", "dsh-question-custom");
+        custom.type = item.isSecret ? "password" : "text";
+        custom.placeholder = options.length ? "其他回答（可选）" : "输入回答";
+        custom.setAttribute("aria-label", options.length ? "其他回答" : "回答");
+        section.appendChild(custom);
+        var field = { id: item.id, controls: controls, custom: custom, multiSelect: !!item.multiSelect, secret: !!item.isSecret };
         fields.push(field);
         var saved = !field.secret && savedAnswers[field.id];
         if (saved) {
-          input.control.value = saved.custom || "";
-          controls.forEach(function (control) {
-            if (control.type === "checkbox") control.checked = S.safeArray(saved.selected).includes(control.value);
-            else control.value = S.safeArray(saved.selected)[0] || "";
-          });
+          custom.value = saved.custom || "";
+          controls.forEach(function (control) { control.checked = S.safeArray(saved.selected).includes(control.value); });
         }
-        input.control.addEventListener("input", saveAnswerDrafts);
-        controls.forEach(function (control) { control.addEventListener("change", saveAnswerDrafts); });
+        // A typed answer replaces a single choice, and picking a choice clears the typed one.
+        custom.addEventListener("input", function () {
+          if (!field.multiSelect && custom.value) controls.forEach(function (control) { control.checked = false; });
+          saveAnswerDrafts();
+        });
+        custom.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); submit.click(); }
+        });
+        controls.forEach(function (control) { control.addEventListener("change", function () {
+          if (!field.multiSelect && control.checked) custom.value = "";
+          saveAnswerDrafts();
+        }); });
         holder.appendChild(section);
       });
-      holder.appendChild(button("提交回答", function () {
+      var actions = S.node("div", "form-actions dsh-request-actions");
+      var submit = button("提交回答", function () {
         var answers = fields.map(function (field) {
           var custom = field.custom.value.trim();
-          var selected = field.controls.filter(function (control) {
-            return control.type === "checkbox" ? control.checked : !!control.value;
-          }).map(function (control) { return control.value; });
+          var selected = field.controls.filter(function (control) { return control.checked; })
+            .map(function (control) { return control.value; });
           if (custom && !field.multiSelect) selected = [];
           return custom ? { id: field.id, selected: selected, custom: custom } : { id: field.id, selected: selected };
         });
@@ -218,7 +226,9 @@
         }
         resolveRequest(id, "question.answer", { requestId: id, answers: answers }, holder, source);
         fields.forEach(function (field) { if (field.custom.type === "password") field.custom.value = ""; });
-      }));
+      });
+      submit.classList.add("primary");
+      actions.appendChild(submit); holder.appendChild(actions);
       interaction.appendChild(holder); requests.set(key, holder);
     }
     function clearRequests() { requests.forEach(function (holder) { holder.remove(); }); requests.clear(); }

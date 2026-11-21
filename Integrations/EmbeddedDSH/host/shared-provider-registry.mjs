@@ -51,7 +51,9 @@ export class SharedProviderRegistry {
     if (!community) return [];
     return [...community.adapter.routes.values()].map(route => ({
       id: route.id, name: route.name,
-      models: route.models.map(model => ({ id: model.id, name: model.name }))
+      models: route.models.map(model => ({ id: model.id, name: model.name,
+        ...(Number.isSafeInteger(model.contextWindow) && model.contextWindow > 0
+          ? { contextWindow: model.contextWindow } : {}) }))
     }));
   }
 

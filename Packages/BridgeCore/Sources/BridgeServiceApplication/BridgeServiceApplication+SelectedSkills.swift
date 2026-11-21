@@ -26,9 +26,45 @@ extension BridgeServiceApplication {
     guard !names.isEmpty else { return [] }
     try Self.checkDeadline(deadline)
     let root = URL(fileURLWithPath: project.root.canonicalPath)
-    let manifests = try await skillScanner.scanSkills(for: root)
     var result: [AgentSelectedSkill] = []
     result.reserveCapacity(names.count)
+    if let skillHub {
+      for name in names {
+        guard
+          let resolved = try await skillHub.findActiveSkill(
+            named: name, projectRoot: root, projectID: project.id.rawValue)
+        else {
+          throw BridgeMCPQueryError.skillNotFound
+        }
+        let files: [AgentSelectedSkillFile]
+        if resolved.winner.isFlatFile {
+          let doc = try SkillDocumentReader.readOccurrence(
+            resolved.winner,
+            slug: resolved.canonicalSlug,
+            subpath: "SKILL.md",
+            maximumBytes: SkillScanner.maximumDocumentBytes
+          )
+          let content = OutboundContentSecurity.redactedSecrets(
+            doc.content,
+            maximumUTF8Bytes: SkillScanner.maximumDocumentBytes
+          )
+          files = [try AgentSelectedSkillFile(relativePath: "SKILL.md", content: content)]
+        } else {
+          files = try await skillFiles(resolved.manifest)
+        }
+        let version = SHA256.hash(data: try JSONEncoder().encode(files))
+          .map { String(format: "%02x", $0) }.joined()
+        result.append(
+          try AgentSelectedSkill(
+            name: resolved.manifest.name,
+            source: resolved.manifest.scope == .project ? .project : .global,
+            contentVersion: version,
+            files: files
+          ))
+      }
+      return result
+    }
+    let manifests = try await skillScanner.scanSkills(for: root)
     for name in names {
       guard let manifest = manifests.first(where: { $0.name == name }) else {
         throw BridgeMCPQueryError.skillNotFound

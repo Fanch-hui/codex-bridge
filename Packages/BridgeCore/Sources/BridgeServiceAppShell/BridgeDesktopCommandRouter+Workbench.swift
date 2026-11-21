@@ -73,6 +73,8 @@ extension BridgeDesktopCommandRouter {
       model.performProviderGateway(envelope)
     case .providerGatewayCopyConnection:
       model.copyProviderGatewayConnection(envelope)
+    case .skillHub:
+      model.performSkillHub(envelope)
     case .interruptTask:
       guard let task = task(payload.taskID, in: model),
         connected(model),

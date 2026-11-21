@@ -31,7 +31,7 @@ extension BridgeServiceAppModel {
     }
   }
 
-  private func loadSkills(projectID: String) {
+  func loadSkills(projectID: String) {
     guard let client, connectionState == .connected else { return }
     Task { [weak self] in
       do {

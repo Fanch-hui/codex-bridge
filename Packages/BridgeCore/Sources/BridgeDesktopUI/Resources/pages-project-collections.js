@@ -6,7 +6,7 @@
   function renderReadonlyCollections(container, page, emit, kind) {
     if (!kind || kind === "verification") addValues(container, page.verificationCommands);
     if (!kind || kind === "sessions") addSessionRows(container, page.sessions, page.selectedProjectID, emit);
-    if (!kind || kind === "skills") addSkillRows(container, page.skills, page.selectedProjectID);
+    if (!kind || kind === "skills") addSkillRows(container, page.skills, page.selectedProjectID, emit);
   }
 
   function addSessionRows(container, sessions, projectID, emit) {
@@ -31,8 +31,20 @@
     container.appendChild(root);
   }
 
-  function addSkillRows(container, skills, projectID) {
+  function addSkillRows(container, skills, projectID, emit) {
     var values = S.safeArray(skills);
+    var actions = S.node("div", "form-actions");
+    var manageBtn = S.button("管理技能", null, {}, null, "small", false);
+    manageBtn.type = "button";
+    manageBtn.addEventListener("click", function () {
+      if (global.CodexBridgeDesktopSettingsPage) {
+        global.CodexBridgeDesktopSettingsPage.openDetail("extensions", emit);
+      } else if (emit) {
+        emit("selectPage", { navigation: "settings", kind: "settings-detail", value: "extensions" });
+      }
+    });
+    actions.appendChild(manageBtn);
+    container.appendChild(actions);
     var list = S.node("div", "project-skill-list");
     if (!values.length) {
       list.appendChild(S.node("div", "project-pane-empty", "此项目还没有技能。"));
@@ -42,7 +54,10 @@
         var heading = S.node("div", "skill-heading");
         var copy = S.node("div", "row-main");
         copy.appendChild(S.node("div", "row-title", skill.name || skill.skillID));
-        if (skill.scope) copy.appendChild(S.node("div", "row-detail", skill.scope));
+        if (skill.scope) {
+          var scopeLabel = skill.scope === "project" ? "项目" : skill.scope === "global" ? "全局" : skill.scope;
+          copy.appendChild(S.node("div", "row-detail", scopeLabel));
+        }
         heading.appendChild(copy);
         if (skill.actionCount) heading.appendChild(S.badge("动作 " + skill.actionCount, "neutral"));
         row.appendChild(heading);

@@ -58,6 +58,21 @@ actor ServiceProviderGateway {
     Dictionary(models.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
   }
 
+  func modelLimits() -> [String: ExternalAgentModelLimit] {
+    Dictionary(
+      models.compactMap { model in
+        model.contextWindow == nil && model.defaultMaxTokens == nil
+          && model.reasoningEfforts == nil
+          ? nil
+          : (
+            model.id,
+            ExternalAgentModelLimit(
+              contextWindow: model.contextWindow, maxOutputTokens: model.defaultMaxTokens,
+              reasoningEfforts: model.reasoningEfforts)
+          )
+      }, uniquingKeysWith: { first, _ in first })
+  }
+
   init(
     store: SimpleServiceStore, existing: ServiceExistingProviders, dataRoot: URL,
     resourceRoot: URL? = nil
@@ -74,9 +89,7 @@ actor ServiceProviderGateway {
     let root = try EmbeddedDSHRuntimeConfiguration(
       resourceRoot: resourceRoot, dataRoot: dataRoot
     ).resolveResourceRoot()
-    let loading = Task.detached(priority: .utility) {
-      try ProviderRuntimeResources.load(root: root)
-    }
+    let loading = Task { try await ProviderRuntimeResources.shared(root: root) }
     resourcesLoading = loading
     do {
       let value = try await loading.value
@@ -176,7 +189,13 @@ actor ServiceProviderGateway {
         discovered.append(
           ServiceGatewayModel(
             id: "builtin/" + provider + "/" + id, name: model["name"]?.stringValue ?? id,
-            providerID: provider, modelID: id, pluginID: nil, protocolName: "chat", account: nil))
+            providerID: provider, modelID: id, pluginID: nil, protocolName: "chat", account: nil,
+            contextWindow: model["contextWindow"]?.intValue.flatMap { $0 > 0 ? $0 : nil },
+            providerName: group["name"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            reasoningEfforts: ServiceGatewayModel.reasoningEfforts(
+              (model["reasoning"]?["efforts"]?.arrayValue ?? []).compactMap {
+                $0["id"]?.stringValue
+              })))
       }
     }
     // Failed providers retain their last usable model names; authentication is reported separately.

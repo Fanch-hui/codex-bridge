@@ -17,6 +17,7 @@ import { PendingQuestions } from './pending-questions.mjs';
 import { sessionContent } from './session-content.mjs';
 import { SessionContentCache } from './session-content-cache.mjs';
 import { importSkills } from './skill-import.mjs';
+import { invalidateBridgeSkills } from './bridge-skills.mjs';
 import { SessionSearch } from './session-search.mjs';
 import { ConfigurationActivation, pluginApplication } from './configuration-activation.mjs';
 import { PluginOperations } from './plugin-operations.mjs';
@@ -251,6 +252,7 @@ export class Actions {
       }, signal) };
       case 'skills.list': return ctx.sessionSkillCatalog.list({ sessionId: p.sessionId }, signal);
       case 'skills.import': return importSkills(p);
+      case 'skills.invalidate': invalidateBridgeSkills(); return { invalidated: true };
       case 'settings.get': return { ...await this.settings.get(), activation: this.activation.get('models') };
       case 'settings.save': return { ...await this.activation.run('models', () => this.updateModels(() => this.settings.save(p))),
         activation: this.activation.get('models') };

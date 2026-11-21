@@ -77,6 +77,11 @@ public struct ServiceDataPaths: Sendable {
       .appending(path: "Default", directoryHint: .isDirectory)
   }
 
+  /// Bridge-owned writable Skill Hub library directory.
+  public var skillsURL: URL {
+    rootURL.appending(path: "Skills", directoryHint: .isDirectory)
+  }
+
   /// Agents work inside the default workspace and may legitimately change its mode, so an
   /// existing directory is kept as is; only a missing (or non-directory) entry is rebuilt private.
   public func prepareDefaultWorkspace() throws {

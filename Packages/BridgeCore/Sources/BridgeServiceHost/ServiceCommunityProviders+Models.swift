@@ -161,7 +161,10 @@ extension ServiceCommunityProviders {
           defaultMaxTokens: value["output"]?.intValue.flatMap { $0 > 0 ? $0 : nil },
           supportsImages: value["inputsSaid"]?.boolValue == true
             ? value["inputs"]?.arrayValue?.contains(.string("image")) : nil,
-          supportsSampling: value["temperature"]?.boolValue)
+          supportsSampling: value["temperature"]?.boolValue,
+          providerName: row["name"]?.stringValue.nonEmpty,
+          reasoningEfforts: ServiceGatewayModel.reasoningEfforts(
+            (value["variants"]?.arrayValue ?? []).compactMap(\.stringValue)))
         result[model.id] = CommunityModelRoute(
           model: model, catalogID: catalogID, npm: npm, baseURL: base,
           concurrency: declared > 0 ? min(2, declared) : 2)

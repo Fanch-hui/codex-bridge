@@ -16,7 +16,8 @@
     var item = value.item && value.item.id === ids[1] ? value.item : { id: ids[1] };
     return { model: value.model, effort: value.effort || "", explicit: true,
       providerName: value.providerName || ids[0],
-      item: { id: ids[1], name: item.name || ids[1], ...(item.reasoning ? { reasoning: item.reasoning } : {}) } };
+      item: { id: ids[1], name: item.name || ids[1], ...(item.reasoning ? { reasoning: item.reasoning } : {}),
+        ...(item.contextWindow ? { contextWindow: item.contextWindow } : {}) } };
   }
   function cachedGroups(selection) {
     var ids = selection && selectionIDs(selection.model);
@@ -27,7 +28,8 @@
     var group = array(groups).find(function (item) { return item.id === model.provider; });
     var item = model.item;
     return { model: model.id, effort: effort || "", explicit: true, providerName: group && group.name || model.provider,
-      item: { id: item.id, name: item.name || item.id, ...(item.reasoning ? { reasoning: item.reasoning } : {}) } };
+      item: { id: item.id, name: item.name || item.id, ...(item.reasoning ? { reasoning: item.reasoning } : {}),
+        ...(item.contextWindow ? { contextWindow: item.contextWindow } : {}) } };
   }
   function mergedGroups(previous, result) {
     var groups = array(result && result.groups).slice(), failures = array(result && result.failures);
@@ -38,6 +40,14 @@
     });
     return groups;
   }
+  // Only windows below 1M are worth flagging in the picker; binary sizes read as the familiar 128K/256K.
+  function contextSuffix(contextWindow) {
+    if (typeof contextWindow !== "number" || !Number.isSafeInteger(contextWindow)
+      || contextWindow <= 0 || contextWindow >= 1000000) return "";
+    var thousands = contextWindow % 1000 !== 0 && contextWindow % 1024 === 0
+      ? contextWindow / 1024 : Math.round(contextWindow / 1000);
+    return " · " + thousands + "K";
+  }
   function choices(groups, failures, selected, auth, retainSelected) {
     var result = [], failed = new Set(array(failures).map(function (item) { return item.id; }));
     var chatUnavailable = auth.availability !== "ready" && auth.availability !== "usage-limited";
@@ -47,7 +57,8 @@
       array(group.models).forEach(function (model) {
         var unavailable = failed.has(group.id), pending = unavailable || group.cached === true;
         result.push({ id: JSON.stringify([group.id, model.id]), provider: group.id,
-          title: (group.name || group.id) + " · " + (model.name || model.id) + (unavailable ? " · 暂不可用" : ""),
+          title: (group.name || group.id) + " · " + (model.name || model.id) + contextSuffix(model.contextWindow)
+            + (unavailable ? " · 暂不可用" : ""),
           item: model, pending: pending });
       });
     });

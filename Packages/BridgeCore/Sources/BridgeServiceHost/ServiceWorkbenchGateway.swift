@@ -108,6 +108,9 @@ extension ServiceProviderGateway {
                 value["maxTokens"] = .integer(Int64(output))
               }
               if let images = model.supportsImages { value["images"] = .bool(images) }
+              if let efforts = model.reasoningEfforts {
+                value["efforts"] = .array(efforts.map(ACPJSONValue.string))
+              }
               return .object(value)
             }),
         ])

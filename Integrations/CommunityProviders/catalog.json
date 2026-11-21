@@ -376,6 +376,27 @@
       "limitSummary": "仅纯对话（插件会自动注入自带工具，因此关闭普通外部工具请求）",
       "compatibility": "partial",
       "compatibilityDetails": "通过设备码授权并走 Responses 接口，模型来自插件内置目录。因插件会自动向工具列表注入自己的工具，Bridge 限制了普通外部工具请求；续写需发送完整对话内容，暂不支持引用历史响应编号或保留历史推理块；额度取自本次运行中的流式响应事件。"
+    },
+    {
+      "name": "Antigravity（本机 agy）",
+      "package": "@magpie-community/opencode-agy-cli-auth",
+      "version": "0.1.108-bridge.2",
+      "license": "MIT",
+      "source": "https://github.com/magpie-community/plugins/tree/main/packages/agy-cli",
+      "bundled": "agy-cli",
+      "verified": false,
+      "accessMode": "本机 CLI 账号",
+      "summary": "通过本机 agy CLI 的 ACP 通道使用 Antigravity 订阅模型，工具由调用方执行。",
+      "requirements": "需先在「连接 → Antigravity」安装并登录 agy（≥ 1.4.12，图片输入需 1.5.0）。这是非官方接入，Google 的使用政策可能限制相关账号，风险由用户自行承担。",
+      "usageSteps": [
+        "先在「连接 → Antigravity」安装并登录 agy（≥ 1.4.12，图片输入需 1.5.0）；本插件不会自动下载或更新 agy。",
+        "点击「安装」，Bridge 使用随 App 内置的插件，无需联网下载。",
+        "在已安装卡片点击「连接」，选择「使用 Google 登录」；agy 已登录时直接沿用该账号，也可添加另一个 Google 账号。",
+        "连接后等待模型同步，即可在工作台模型选择器或「接入应用」中使用 Antigravity 订阅模型。"
+      ],
+      "limitSummary": "支持对话与工具调用；多个工具调用依次执行，每个约多 2 秒，且依赖本机 agy 的版本与登录状态",
+      "compatibility": "partial",
+      "compatibilityDetails": "插件通过本机 agy CLI 的 ACP 通道（agy acp）调用 Antigravity 订阅模型，登录态由本机 agy 保管。工具调用由调用方执行，模型一次发起多个工具调用时会依次执行，每个约多 2 秒；插件不会自动下载或更新 agy，需自行保持 1.4.12 及以上，图片输入需 1.5.0。这是非官方接入，Google 的使用政策可能限制账号，风险由用户自行承担。"
     }
   ]
 }

@@ -11,8 +11,11 @@ try {
   let result;
   if (request.action === 'prepareBun') result = await provisionBun(request.root);
   else if (request.action === 'install') {
-    const bun = await provisionBun(request.root);
-    result = await installProvider({ bun: bun.path, root: request.root, name: request.name, version: request.version });
+    // Bun is provisioned only when the package comes from npm; bundled plugins install offline.
+    result = await installProvider({
+      bun: async () => (await provisionBun(request.root)).path,
+      root: request.root, name: request.name, version: request.version
+    });
   } else if (request.action === 'remove') result = await removeProvider({ root: request.root, name: request.name });
   else if (request.action === 'latest') result = await latestProviderVersion(request.name);
   else throw new Error('Unknown provider installation action');

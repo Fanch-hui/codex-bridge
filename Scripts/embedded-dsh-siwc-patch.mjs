@@ -35,6 +35,12 @@ const patches = [
         "            throw new LlmError('ChatGPT 计划用量已达上限，请管理用量后刷新模型。', 'QUOTA');\n" +
         '        }\n',
         ''
+      ],
+      // The catalog's context_window is a default compaction window; max_context_window is the
+      // model capacity. Without an explicit override, report and plan against the capacity.
+      [
+        '                const effective = override ?? model.defaultContextWindow;\n',
+        '                const effective = override ?? model.maxContextWindow ?? model.defaultContextWindow;\n'
       ]
     ]
   },
@@ -48,6 +54,10 @@ const patches = [
       '                            }\n' +
       '                            this.dependencies.onSuccess?.(connection);\n' +
       '                        }\n                        else {'
+    ], [
+      '            ...(contextWindow === undefined ? {} : { context: { contextWindow } }),\n',
+      '            ...((contextWindow ?? selected.maxContextWindow) === undefined ? {} :\n' +
+      '                { context: { contextWindow: contextWindow ?? selected.maxContextWindow } }),\n'
     ]]
   },
   {

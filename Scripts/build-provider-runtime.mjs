@@ -13,6 +13,8 @@ export async function buildProviderRuntime({ root, stage, platform, architecture
   for (const file of ['catalog.json', 'install.mjs', 'provision-bun.mjs', 'cli.mjs']) {
     await cp(join(communitySource, file), join(community, file));
   }
+  // Plugins shipped with the app (catalog entries with a `bundled` directory) install from here without network access.
+  await cp(join(communitySource, 'bundled'), join(community, 'bundled'), { recursive: true });
   for (const file of ['host.js', 'bridge-secret.js', 'LICENSE']) {
     await cp(join(communitySource, 'vendor', 'magpie', file), join(community, file));
   }

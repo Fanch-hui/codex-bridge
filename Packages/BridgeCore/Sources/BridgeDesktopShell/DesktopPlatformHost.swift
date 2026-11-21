@@ -143,6 +143,28 @@
       #endif
     }
 
+    static func revealInFileManager(_ path: String) {
+      let cleanURL = URL(fileURLWithPath: path).standardizedFileURL
+      #if os(Windows)
+        let winPath = cleanURL.path.replacingOccurrences(of: "/", with: "\\")
+        "open".withCString(encodedAs: UTF16.self) { operation in
+          "explorer.exe".withCString(encodedAs: UTF16.self) { file in
+            "/select,\"\(winPath)\"".withCString(encodedAs: UTF16.self) { params in
+              _ = ShellExecuteW(
+                WindowsMainWindow.currentWindow(), operation, file, params, nil, SW_SHOWNORMAL)
+            }
+          }
+        }
+      #else
+        var isDir: ObjCBool = false
+        let target =
+          FileManager.default.fileExists(atPath: cleanURL.path, isDirectory: &isDir)
+            && isDir.boolValue
+          ? cleanURL : cleanURL.deletingLastPathComponent()
+        LinuxDesktopHost.openLocalImage(target)
+      #endif
+    }
+
     static func chooseConfigFile(
       title: String = "选择 Agent 配置文件",
       completion: @escaping @Sendable (String) -> Void

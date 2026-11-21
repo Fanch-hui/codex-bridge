@@ -8,7 +8,7 @@ import { clientRoster } from './client-roster.mjs';
 
 const hostDirectory = dirname(fileURLToPath(import.meta.url));
 
-export async function startEngine(home, { sharedProviders = false } = {}) {
+export async function startEngine(home, { sharedProviders = false, bridgeSkills = false } = {}) {
   process.env.DSH_HOME = home;
   process.env.DSH_TELEMETRY_DISABLED = '1';
   const profile = join(home, 'profiles', 'bridge');
@@ -20,10 +20,15 @@ export async function startEngine(home, { sharedProviders = false } = {}) {
     // Shared writers use the observed file version to reject stale edits.
     { id: 'fs-observation-policy', disabled: false },
     { id: 'session-query-sqlite', config: { path: ':memory:', openAt: 'first-search', persistedReadConcurrency: 2 } },
-    { id: 'skill-filesystem', config: { agentsHome: join(home, 'agents') } },
+    bridgeSkills
+      ? { id: 'skill-filesystem', disabled: true }
+      : { id: 'skill-filesystem', config: { agentsHome: join(home, 'agents') } },
     { id: 'tool-subagent-control', config: { interrupt: true } },
     { insert: [
       { id: 'bridge-credentials', name: pathToFileURL(join(hostDirectory, 'credentials.mjs')).href },
+      ...bridgeSkills
+        ? [{ id: 'bridge-skills', name: pathToFileURL(join(hostDirectory, 'bridge-skills.mjs')).href }]
+        : [],
       { id: 'workspace', name: '@deepseek-ai/dsh-workspace' },
       { id: 'tool-ask-user', name: '@deepseek-ai/dsh-tool-ask-user', config: { mode: 'timed' } },
       { id: 'session-stats', name: '@deepseek-ai/dsh-session-stats' },

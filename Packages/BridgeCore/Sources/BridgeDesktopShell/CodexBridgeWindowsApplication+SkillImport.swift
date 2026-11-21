@@ -21,9 +21,10 @@
               throw BridgeServiceClientError.unavailable
             }
             let payload = try JSONEncoder().encode(["path": path])
-            let response = try await model.client.embeddedDSH(
-              IPCEmbeddedDSHRequest(
-                action: "skills.import", payloadJSON: String(decoding: payload, as: UTF8.self)))
+            let response = try await model.client.skillHub(
+              IPCSkillHubRequest(
+                action: "importDirectory", payloadJSON: String(decoding: payload, as: UTF8.self)))
+            model.refreshSkillHubWorkspaceIfMutated(action: "importDirectory")
             model.appendEmbeddedDSHReceipt(
               .init(requestID: envelope.requestID, resultJSON: response.resultJSON))
           } catch {

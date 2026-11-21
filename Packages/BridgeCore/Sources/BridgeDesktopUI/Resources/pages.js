@@ -77,11 +77,15 @@
   // every host state is decoded afresh, so a changed value always arrives as a new reference.
   function updateSettingsPage(state, emit) {
     var clients = state.connections && state.connections.clients, previous = settingsInputs;
-    settingsInputs = { settings: state.settings, appUpdate: state.appUpdate, clients: clients, emit: emit };
+    var desktopChanged = !previous || previous.projects !== state.projects
+      || previous.serviceConnected !== state.serviceConnected
+      || previous.selectedNavigation !== state.selectedNavigation;
+    settingsInputs = { settings: state.settings, appUpdate: state.appUpdate, clients: clients, emit: emit,
+      projects: state.projects, serviceConnected: state.serviceConnected, selectedNavigation: state.selectedNavigation };
     var settingsChanged = !previous || previous.settings !== state.settings
       || previous.appUpdate !== state.appUpdate || previous.emit !== emit;
-    if (settingsChanged && pages.connections.updateSettings) {
-      pages.connections.updateSettings(state.settings, emit, state.appUpdate);
+    if ((settingsChanged || desktopChanged) && pages.connections.updateSettings) {
+      pages.connections.updateSettings(state.settings, emit, state.appUpdate, state);
     }
     if ((!previous || previous.clients !== clients || previous.emit !== emit)
       && pages.settings && pages.settings.updateClients) {

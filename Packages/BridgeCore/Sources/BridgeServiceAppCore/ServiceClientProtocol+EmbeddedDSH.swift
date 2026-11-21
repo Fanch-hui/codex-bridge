@@ -7,6 +7,10 @@ extension BridgeServiceClientProtocol {
     throw BridgeServiceClientError.unavailable
   }
 
+  public func skillHub(_ request: IPCSkillHubRequest) async throws -> IPCSkillHubResponse {
+    throw BridgeServiceClientError.unavailable
+  }
+
   public func embeddedDSH(_ request: IPCEmbeddedDSHRequest) async throws
     -> IPCEmbeddedDSHResponse
   {

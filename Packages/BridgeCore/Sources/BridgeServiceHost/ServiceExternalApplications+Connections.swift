@@ -59,7 +59,7 @@ extension ServiceExternalApplications {
       preview = try await editor.previewModel(
         agent: agent, configurationURL: path, endpoint: url, model: selectedModel,
         clientToken: token(id), compatibility: compatibility, models: models,
-        replacing: previousReceipt)
+        limits: await modelLimits(), replacing: previousReceipt)
       model = selectedModel
       gateway = url
     } else {

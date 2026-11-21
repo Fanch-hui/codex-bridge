@@ -93,3 +93,19 @@ public struct SecureFileArtifactSnapshot: Codable, Equatable, Sendable {
       }
   }
 }
+
+extension SecureFileArtifactSnapshot {
+  private static let hexDigits = Array("0123456789abcdef".utf8)
+
+  /// Lowercase hex without a per-byte `String(format:)`, which dominates hashing many small files.
+  static func hexDigest<Digest: Sequence>(_ digest: Digest) -> String
+  where Digest.Element == UInt8 {
+    var characters: [UInt8] = []
+    characters.reserveCapacity(64)
+    for byte in digest {
+      characters.append(hexDigits[Int(byte >> 4)])
+      characters.append(hexDigits[Int(byte & 0x0f)])
+    }
+    return String(decoding: characters, as: UTF8.self)
+  }
+}

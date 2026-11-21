@@ -4,6 +4,8 @@ import Foundation
   import WinSDK
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Darwin)
+  import Darwin
 #endif
 
 public struct FileSystemEntryMetadata: Sendable {
@@ -30,9 +32,10 @@ public struct FileSystemEntryMetadata: Sendable {
       isRegularFile = !isDirectory && !isSymbolicLink
       fileSize = Int(
         exactly: (UInt64(attributes.nFileSizeHigh) << 32) | UInt64(attributes.nFileSizeLow))
-    #elseif os(Linux)
+    #else
+      // `lstat` describes the entry itself, so a symbolic link is never followed.
       var metadata = stat()
-      guard url.path.withCString({ Glibc.lstat($0, &metadata) }) == 0 else {
+      guard url.path.withCString({ lstat($0, &metadata) }) == 0 else {
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
       }
       let type = metadata.st_mode & S_IFMT
@@ -40,14 +43,6 @@ public struct FileSystemEntryMetadata: Sendable {
       isRegularFile = type == S_IFREG
       isSymbolicLink = type == S_IFLNK
       fileSize = Int(exactly: metadata.st_size)
-    #else
-      let values = try url.resourceValues(forKeys: [
-        .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey,
-      ])
-      isDirectory = values.isDirectory == true
-      isRegularFile = values.isRegularFile == true
-      isSymbolicLink = values.isSymbolicLink == true
-      fileSize = values.fileSize
     #endif
   }
 }

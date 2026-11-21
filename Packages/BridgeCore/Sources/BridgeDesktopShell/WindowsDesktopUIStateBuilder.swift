@@ -147,7 +147,10 @@
           )
         },
         appUpdate: appUpdate,
-        messageCenter: messageCenter
+        messageCenter: messageCenter,
+        skillHubReceipts: workbench.embeddedDSHReceipts.filter {
+          $0.requestID.hasPrefix("skills-")
+        }
       )
       ConversationPerformanceRecorder.shared.record(
         ConversationPerformanceSample(

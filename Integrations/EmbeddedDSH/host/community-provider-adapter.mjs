@@ -8,6 +8,13 @@ const noCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 const retryPolicy = resolveRetryPolicy({ mode: 'normal', maxRetries: 0 }, 'community provider');
 // The service gateway owns request deadlines for these routes.
 const gatewayStreamIdleTimeoutMs = 2 ** 31 - 1;
+// pi-ai's levels; a community model offers only the ones its plugin declared as variants.
+const thinkingLevels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+const effortName = id => `${id.charAt(0).toUpperCase()}${id.slice(1)}`;
+
+function declaredEfforts(model) {
+  return Array.isArray(model.efforts) ? thinkingLevels.filter(level => level !== 'off' && model.efforts.includes(level)) : [];
+}
 
 export class CommunityProviderAdapter extends LlmAdapter {
   constructor(ctx, call, routes) {
@@ -52,8 +59,10 @@ export class CommunityProviderAdapter extends LlmAdapter {
   }
 
   modelInfo(provider, model) {
+    const efforts = declaredEfforts(model);
     return { provider, id: model.id, name: model.name,
       inputModalities: model.images ? ['text', 'image'] : ['text'],
+      ...(efforts.length ? { reasoning: { efforts: efforts.map(id => ({ id, name: effortName(id) })) } } : {}),
       ...(model.contextWindow ? { context: { contextWindow: model.contextWindow } } : {}),
       ...(model.maxTokens ? { defaultMaxTokens: model.maxTokens } : {}) };
   }
@@ -64,8 +73,14 @@ export class CommunityProviderAdapter extends LlmAdapter {
     const route = this.route(provider);
     const endpoint = await this.call('community.gateway.endpoint', {}, signal);
     signal?.throwIfAborted();
+    const efforts = declaredEfforts(model);
+    // Undeclared levels map to null so pi-ai refuses them instead of sending a level the plugin ignores;
+    // the gateway forwards the chosen level as OpenAI `reasoning_effort` and converts it per upstream protocol.
+    const reasoning = efforts.length ? { reasoning: true,
+      thinkingLevelMap: Object.fromEntries(thinkingLevels.map(level => [level, efforts.includes(level) ? level : null])) }
+      : { reasoning: false };
     const descriptor = { id, name: model.name, provider, api: 'openai-completions',
-      baseUrl: endpoint.baseURL, reasoning: false,
+      baseUrl: endpoint.baseURL, ...reasoning,
       input: model.images ? ['text', 'image'] : ['text'], cost: noCost,
       contextWindow: model.contextWindow ?? 1000000, maxTokens: model.maxTokens ?? 128000 };
     const piProvider = {

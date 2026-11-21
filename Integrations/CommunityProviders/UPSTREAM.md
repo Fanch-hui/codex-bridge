@@ -34,3 +34,20 @@ directory with Bun lifecycle scripts disabled; installing or loading a package
 does not verify its authentication or live model requests. Third-party packages
 run as local code. The service should treat plugin stderr as untrusted diagnostic
 output that may contain credentials or request data.
+
+`bundled/` holds community plugins that ship inside the app because they are
+not published to npm. `bundled/agy-cli` is
+`@magpie-community/opencode-agy-cli-auth` from
+[magpie-community/plugins](https://github.com/magpie-community/plugins/tree/main/packages/agy-cli)
+(MIT; origin and changes in its `NOTICE.md`). Bridge-specific changes are
+released as `<upstream version>-bridge.N`, and the directory's `package.json`
+version must equal its `catalog.json` entry. A catalog entry names the directory
+in `bundled`. `install.mjs` copies that directory to the same
+`packages/<name>/<version>/node_modules/<name>/` layout as an npm install,
+without Bun or network access; it only installs the catalog version, rejects
+links and unsupported entries, and checks the package name and version after
+copying. `latestProviderVersion` returns the catalog version for these packages.
+`Scripts/build-provider-runtime.mjs` copies `bundled/` into the runtime and
+`Scripts/verify-embedded-dsh-runtime.mjs` verifies every bundled catalog entry
+against its shipped `package.json`. Bundled files are verified with the rest of
+the runtime inventory.

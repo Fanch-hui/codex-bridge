@@ -203,8 +203,17 @@
     pageTitle.title = pageTitle.textContent;
   }
 
+  function syncSkillHubTransport() {
+    var hub = window.CodexBridgeDesktopSkillHubTransport;
+    if (!hub) return;
+    hub.configure(emit);
+    hub.setEnabled(!state || state.serviceConnected !== false);
+    hub.receive(state && (state.skillHubReceipts || (state.workbench && state.workbench.embeddedDSHReceipts)));
+  }
+
   function renderActivePage() {
     if (!state) return;
+    syncSkillHubTransport();
     updatePageTitle();
     var overlay = window.CodexBridgeDesktopLightweight && window.CodexBridgeDesktopLightweight.isOverlay(state);
     if (state.selectedNavigation === "overview" && window.CodexBridgeDesktopOverviewPage && !overlay) {
@@ -247,6 +256,7 @@
     if (newConvButton) newConvButton.disabled = !state;
     shell.dataset.state = state ? "ready" : "loading";
     if (window.CodexBridgeDesktopLightweight) window.CodexBridgeDesktopLightweight.configure(state, emit, refreshLightweight);
+    syncSkillHubTransport();
     if (!state) {
       ["workspace-navigator", "workspace-toolbar-context", "workspace-toolbar-actions"].forEach(function (id) {
         var node = document.getElementById(id);

@@ -482,7 +482,7 @@
       conversation.update(sessionID, project && project.title || "", transcript.records, transcript.streamText,
         visiblePending, transcript.streamReasoning, { projections: transcript.projections, running: running,
           streamTools: transcript.streamTools, hasMore: transcript.hasMore, loadingEarlier: history.loadingEarlier(), onLoadEarlier: loadEarlier });
-      actions.update({ sessionID: sessionID, connected: connected, running: running, pending: !!pending,
+      actions.update({ sessionID: sessionID, projectID: projectID, connected: connected, running: running, pending: !!pending,
         title: directory.label(sessionID) });
       validate();
       updateStartup();

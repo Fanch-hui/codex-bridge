@@ -49,6 +49,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case embeddedDSH
   case providerGateway
   case providerGatewayCopyConnection
+  case skillHub
   case workbenchWorkspace
   case searchTaskHistory
   case selectTaskHistory

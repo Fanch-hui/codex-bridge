@@ -143,6 +143,7 @@ public struct BridgeDesktopUIStatePatchBuilder: Sendable {
       && old.settings == new.settings
       && old.messageCenter == new.messageCenter
       && old.providerGatewayReceipts == new.providerGatewayReceipts
+      && old.skillHubReceipts == new.skillHubReceipts
   }
 
   private func sameWorkbenchShell(

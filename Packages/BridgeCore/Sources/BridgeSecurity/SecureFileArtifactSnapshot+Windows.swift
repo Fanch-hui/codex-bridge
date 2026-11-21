@@ -238,9 +238,12 @@
         if readBytes == 0 { break }
         bytesRead += UInt64(readBytes)
         guard bytesRead <= maximumBytes else { throw SecureFileArtifactError.fileTooLarge }
-        hasher.update(data: Data(buffer.prefix(Int(readBytes))))
+        let count = Int(readBytes)
+        buffer.withUnsafeBytes {
+          hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0[..<count]))
+        }
       }
-      return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+      return hexDigest(hasher.finalize())
     }
 
     private static func modificationTimeNanoseconds(_ fileTime: UInt64) throws -> Int64 {

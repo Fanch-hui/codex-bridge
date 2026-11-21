@@ -224,7 +224,11 @@ let package = Package(
     ),
     .target(
       name: "BridgeSkills",
-      dependencies: ["BridgeAgentCore", "BridgeSecurity"]
+      dependencies: [
+        "BridgeAgentCore",
+        "BridgeSecurity",
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
     ),
     .target(
       name: "BridgeLegacyImport",
@@ -408,6 +412,7 @@ let package = Package(
         "BridgeSecurity",
         "BridgeServiceApplication",
         "BridgeServiceCore",
+        "BridgeSkills",
         "BridgeTunnel",
         .product(name: "Crypto", package: "swift-crypto"),
       ]

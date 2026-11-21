@@ -33,6 +33,7 @@ public actor ExternalAgentConnection {
   public func previewModel(
     agent: ExternalAgentConnectionAgent, configurationURL: URL, endpoint: URL, model: String,
     clientToken: String, compatibility: [String: Bool] = [:], models: [String]? = nil,
+    limits: [String: ExternalAgentModelLimit] = [:],
     replacing receipt: ExternalAgentConnectionReceipt? = nil
   ) async throws -> ExternalAgentConnectionPreview {
     var options: [String: ACPJSONValue] = [
@@ -41,6 +42,18 @@ public actor ExternalAgentConnection {
       "compatibility": .object(compatibility.mapValues { .bool($0) }),
     ]
     if let models { options["models"] = .array(models.map(ACPJSONValue.string)) }
+    let configured = Set(models ?? [model])
+    let known = limits.filter { configured.contains($0.key) }.compactMapValues {
+      limit -> ACPJSONValue? in
+      var value: [String: ACPJSONValue] = [:]
+      if let context = limit.contextWindow { value["context"] = .integer(Int64(context)) }
+      if let output = limit.maxOutputTokens { value["output"] = .integer(Int64(output)) }
+      if let efforts = limit.reasoningEfforts, !efforts.isEmpty {
+        value["efforts"] = .array(efforts.map(ACPJSONValue.string))
+      }
+      return value.isEmpty ? nil : .object(value)
+    }
+    if !known.isEmpty { options["limits"] = .object(known) }
     return try await prepare(
       agent: agent, configurationURL: configurationURL, purpose: "model",
       options: .object(options), replacing: receipt)

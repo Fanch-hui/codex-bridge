@@ -39,6 +39,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
     -> IPCWorkbenchWorkspaceResponse
   func providerGateway(_ request: IPCProviderGatewayRequest) async throws
     -> IPCProviderGatewayResponse
+  func skillHub(_ request: IPCSkillHubRequest) async throws -> IPCSkillHubResponse
   func embeddedDSH(_ request: IPCEmbeddedDSHRequest) async throws -> IPCEmbeddedDSHResponse
   func workbenchSettings() async throws -> IPCWorkbenchSettings
   func setWorkbenchEnabled(_ enabled: Bool) async throws -> IPCWorkbenchSettings

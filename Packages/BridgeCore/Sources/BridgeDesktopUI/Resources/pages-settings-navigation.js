@@ -43,7 +43,7 @@
     return list;
   }
 
-  function categoryNavigation(sidebar, sections) {
+  function categoryNavigation(sidebar, sections, onSelect) {
     var entries = new Map(), selected = null;
 
     function add(id, title) {
@@ -74,6 +74,7 @@
         else entry.button.removeAttribute("aria-current");
       });
       try { global.localStorage.setItem(storageKey, id); } catch (_) {}
+      if (onSelect) onSelect(id);
       return true;
     }
 
@@ -90,7 +91,10 @@
     var refresh = S.button("", null, {}, null, "settings-sidebar-refresh", true);
     refresh.appendChild(S.icon("arrow.clockwise"));
     refresh.title = "刷新设置"; refresh.setAttribute("aria-label", refresh.title);
-    refresh.addEventListener("click", function () { context.emit("refresh", {}); });
+    refresh.addEventListener("click", function () {
+      context.emit("refresh", {});
+      if (categories && categories.selectedID() === "extensions" && skillsHub) skillsHub.refresh(true);
+    });
     sidebarFooter.appendChild(refresh);
     sidebar.appendChild(categoryList); sidebar.appendChild(sidebarFooter);
     var sections = S.node("div", "settings-panes");
@@ -100,7 +104,8 @@
     var storage = S.node("div", "settings-editor-storage"); storage.hidden = true;
     main.appendChild(sections); main.appendChild(status);
     container.appendChild(sidebar); container.appendChild(main); container.appendChild(storage);
-    var categories = categoryNavigation(categoryList, sections);
+    var skillsHub = null, lastDesktopState = null, lastSettingsNext = null, lastSettingsEmit = null;
+    var categories = categoryNavigation(categoryList, sections, function () { updateSkillsHub(lastDesktopState); });
 
     function openDSH(category) {
       if (document.documentElement.dataset.surface === "preferences") {
@@ -136,9 +141,16 @@
     execution.appendChild(direct.root);
     var instructions = global.CodexBridgeDesktopSettingsInstructions.create(page, emit);
     clients.appendChild(instructions.root);
+    if (global.CodexBridgeDesktopSettingsSkills) {
+      var skillsSection = S.node("section", "settings-subsection settings-skills-hub");
+      skillsSection.appendChild(S.node("h3", null, "技能中心"));
+      skillsHub = global.CodexBridgeDesktopSettingsSkills.create({});
+      skillsSection.appendChild(skillsHub.root);
+      extensions.appendChild(skillsSection);
+    }
     var extensionList = group(extensions, "工作台");
     [
-      ["技能", "skills"], ["MCP 服务", "mcp"], ["插件", "plugins"], ["原生权限", "permissions"]
+      ["MCP 服务", "mcp"], ["插件", "plugins"], ["原生权限", "permissions"]
     ].forEach(function (item) {
       extensionList.appendChild(linkRow(item[0], "", function () { openDSH(item[1]); }).root);
     });
@@ -149,15 +161,34 @@
     var logsSection = S.node("section", "settings-subsection");
     logsSection.appendChild(S.node("h3", null, "运行日志"));
     logsSection.appendChild(logs); diagnostics.appendChild(logsSection);
+    function updateSkillsHub(state) {
+      if (!skillsHub) return;
+      var effective = state || lastDesktopState;
+      var isPreferences = document.documentElement.dataset.surface === "preferences";
+      var settingsVisible = isPreferences || (effective && effective.selectedNavigation === "settings");
+      var projects = effective && effective.projects && effective.projects.rows;
+      var serviceConnected = !effective || effective.serviceConnected !== false;
+      skillsHub.update({
+        active: !!settingsVisible && categories.selectedID() === "extensions",
+        serviceConnected: serviceConnected,
+        projects: projects
+      });
+    }
     function update(next, nextEmit, state) {
       context.emit = nextEmit;
       if (state) {
+        lastDesktopState = state;
         refresh.disabled = !!state.isRefreshing;
         refresh.classList.toggle("is-refreshing", !!state.isRefreshing);
       }
-      agents.update(next, nextEmit);
-      direct.update(next.direct, nextEmit);
-      instructions.update(next, nextEmit);
+      if (lastSettingsNext !== next || lastSettingsEmit !== nextEmit) {
+        lastSettingsNext = next;
+        lastSettingsEmit = nextEmit;
+        agents.update(next, nextEmit);
+        direct.update(next.direct, nextEmit);
+        instructions.update(next, nextEmit);
+      }
+      updateSkillsHub(state);
     }
 
     function open(id) {

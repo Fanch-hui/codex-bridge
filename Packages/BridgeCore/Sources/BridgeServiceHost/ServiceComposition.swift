@@ -302,6 +302,11 @@ public actor ServiceComposition {
     }
     let desktopController: (any DeepSeekHarnessDesktopControlling)? =
       ServiceDeepSeekDesktopInstallation.isSupported ? deepSeekDesktopProvider.controller : nil
+    let skillHub = ServiceSkillHub(
+      settings: settings,
+      managedSkillsRoot: paths.skillsURL,
+      legacyEmbeddedSkillsRoot: embeddedDSHRoot.appendingPathComponent("skills", isDirectory: true)
+    )
     let application = BridgeServiceApplication(
       appVersion: configuration.appVersion,
       projects: projects,
@@ -320,7 +325,8 @@ public actor ServiceComposition {
       directCommands: DirectCommandSessionManager(
         orphanPIDFileURL: paths.supervisorScratchURL.appending(path: "direct-command-pids.txt"),
         historyFileURL: paths.rootURL.appending(path: "direct-command-history.json")
-      )
+      ),
+      skillHub: skillHub
     )
     let embeddedDSH = ServiceEmbeddedDSHAssembly.make(
       application: application, projects: projects, tasks: tasks, store: store, settings: settings,
@@ -330,6 +336,9 @@ public actor ServiceComposition {
       dataRoot: embeddedDSHRoot, resourceRoot: configuration.providerResourceRoot,
       workspaces: workspaces
     )
+    await skillHub.setOnCatalogChanged { [embeddedDSH] in
+      await embeddedDSH.notifySkillsInvalidated()
+    }
     let existingProviders = ServiceExistingProviders(
       workbench: embeddedDSH, dataRoot: embeddedDSHRoot,
       resourceRoot: configuration.providerResourceRoot)
@@ -374,7 +383,7 @@ public actor ServiceComposition {
     try await ServiceProviderGatewayAssembly.configure(
       gateway: providerGateway, mode: applicationMode, store: store,
       secrets: providerSecrets, clients: mcpClients, projects: projects,
-      configuration: configuration)
+      configuration: configuration, agentRegistry: agentRegistry)
     return ServiceComposition(
       configuration: configuration,
       executionAppServer: executionAppServer,

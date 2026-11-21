@@ -21,9 +21,10 @@ extension BridgeServiceAppModel {
       return
     }
     let payload = try JSONEncoder().encode(["path": url.standardizedFileURL.path])
-    let response = try await currentClient().embeddedDSH(
-      IPCEmbeddedDSHRequest(
-        action: "skills.import", payloadJSON: String(decoding: payload, as: UTF8.self)))
+    let response = try await currentClient().skillHub(
+      IPCSkillHubRequest(
+        action: "importDirectory", payloadJSON: String(decoding: payload, as: UTF8.self)))
+    refreshSelectedProjectSkillsIfMutated(action: "importDirectory")
     appendEmbeddedDSHReceipt(.init(requestID: requestID, resultJSON: response.resultJSON))
   }
 }

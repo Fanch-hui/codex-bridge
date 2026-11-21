@@ -217,4 +217,6 @@
     };
   };
   global.CodexBridgeDesktopProviderGatewayTransport = gateway;
+  global.CodexBridgeDesktopSkillHubTransport = create({ command: "skillHub", prefix: "skills-",
+    unavailable: "技能中心当前不可用。" });
 }(window));

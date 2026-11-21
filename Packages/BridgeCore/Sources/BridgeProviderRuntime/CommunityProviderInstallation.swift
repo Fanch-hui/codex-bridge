@@ -7,6 +7,8 @@ public struct CommunityProviderCatalogEntry: Codable, Sendable {
   public let version: String
   public let license: String
   public let source: String
+  /// Directory under the runtime's `community/bundled/` holding a plugin shipped with the app.
+  public let bundled: String?
   public let verified: Bool
   public let accessMode: String?
   public let summary: String?

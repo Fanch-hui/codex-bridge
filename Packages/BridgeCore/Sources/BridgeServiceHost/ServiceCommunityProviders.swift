@@ -46,6 +46,8 @@ actor ServiceCommunityProviders {
   let store: SimpleServiceStore
   let secrets: any SecretStore
   let resourceLoader: @Sendable () async throws -> ProviderRuntimeResources
+  /// Executable of the enabled, verified Antigravity (agy) installation, handed to plugins as `AGY_PATH`.
+  let antigravityExecutable: @Sendable () async throws -> String?
   let directory: URL
   var cachedResources: ProviderRuntimeResources?
   var installer: CommunityProviderInstallation?
@@ -74,11 +76,13 @@ actor ServiceCommunityProviders {
 
   init(
     store: SimpleServiceStore, secrets: any SecretStore, directory: URL,
-    resources: @escaping @Sendable () async throws -> ProviderRuntimeResources
+    resources: @escaping @Sendable () async throws -> ProviderRuntimeResources,
+    antigravityExecutable: @escaping @Sendable () async throws -> String? = { nil }
   ) {
     self.store = store
     self.secrets = secrets
     resourceLoader = resources
+    self.antigravityExecutable = antigravityExecutable
     self.directory = directory
   }
 

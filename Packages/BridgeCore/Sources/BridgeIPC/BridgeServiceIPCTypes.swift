@@ -40,6 +40,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setSupervisorEnabled = "set_supervisor_enabled"
   case listThreads = "list_threads"
   case listSkills = "list_skills"
+  case skillHub = "skill_hub"
   case readThread = "read_thread"
   case listTasks = "list_tasks"
   case getTask = "get_task"

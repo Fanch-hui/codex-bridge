@@ -118,6 +118,7 @@ actor ServiceExternalApplications {
   let homeDirectory: URL
   let endpoint: @Sendable () async throws -> URL
   let modelNames: @Sendable () async -> [String: String]
+  let modelLimits: @Sendable () async -> [String: ExternalAgentModelLimit]
   let authorizationChanged: @Sendable ([ServiceExternalGatewayCredential]) throws -> Void
   let mutationGate = AsyncMutex()
   var previews: [UUID: ServiceExternalConnectionRecord] = [:]
@@ -129,6 +130,7 @@ actor ServiceExternalApplications {
     homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
     endpoint: @escaping @Sendable () async throws -> URL,
     modelNames: @escaping @Sendable () async -> [String: String] = { [:] },
+    modelLimits: @escaping @Sendable () async -> [String: ExternalAgentModelLimit] = { [:] },
     authorizationChanged: @escaping @Sendable ([ServiceExternalGatewayCredential]) throws -> Void
   ) {
     self.store = store
@@ -140,6 +142,7 @@ actor ServiceExternalApplications {
     self.homeDirectory = homeDirectory
     self.endpoint = endpoint
     self.modelNames = modelNames
+    self.modelLimits = modelLimits
     self.authorizationChanged = authorizationChanged
   }
 

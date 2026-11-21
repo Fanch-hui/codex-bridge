@@ -214,11 +214,16 @@ public actor ServiceEmbeddedDSHController {
       result = try await subagentApprovals(payload)
     } else if action == "subagents.answer" {
       result = try await answerSubagent(payload)
+    } else if action == "skills.import" {
+      return try await importLegacyActionSkills(payload)
     } else {
       try Self.validateAction(action)
       if let sessionID = payload["sessionId"]?.stringValue {
         try await authorizeSession(sessionID, requiresProject: false)
         try await synchronizeSessionScope(sessionID)
+        if action == "skills.list" {
+          await refreshSkillsIfDiskChanged(for: sessionID)
+        }
       }
       if action == "session.updateQueue" { try Self.validateQueueUpdate(payload) }
       if action == "plugins.beginInstall" {
@@ -412,6 +417,7 @@ public actor ServiceEmbeddedDSHController {
         }
         return try await sharedProviders.workbenchCall(payload)
       case "bridge/secret": return try secret(payload)
+      case "bridge/skills": return try await handleSkillCallback(payload)
       case "bridge/agents": return try await agents(payload)
       case "bridge/agentModels": return try await agentModels(payload)
       case "bridge/subagent": return try await subagent(payload)

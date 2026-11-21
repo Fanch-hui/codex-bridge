@@ -1,0 +1,61 @@
+{
+  "name": "@magpie-community/opencode-agy-cli-auth",
+  "version": "0.1.108-bridge.2",
+  "description": "Codex Bridge build of the Magpie/OpenCode model provider that connects your local agy CLI through the Agent Client Protocol (agy acp), so Antigravity subscription models run through the real CLI",
+  "type": "module",
+  "main": "./opencode.mjs",
+  "exports": {
+    ".": "./opencode2.mjs"
+  },
+  "files": [
+    "proc.mjs",
+    "index.mjs",
+    "documents.mjs",
+    "opencode.mjs",
+    "opencode2.mjs",
+    "platform.mjs",
+    "login.mjs",
+    "mcp-server.mjs",
+    "step-usage.mjs",
+    "tool-schema.mjs", "tool-budget.mjs",
+    "usage.mjs",
+    "model-ids.mjs",
+    "signin.mjs",
+    "account.mjs",
+    "import.mjs",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    "NOTICE.md",
+    "re2-pattern.mjs",
+    "array-items.mjs",
+    "cloak.mjs",
+    "bridge-agy.mjs",
+    "bridge-tools.mjs",
+    "bridge-workspace.mjs"
+  ],
+  "keywords": [
+    "magpie",
+    "magpie-plugin",
+    "opencode",
+    "opencode-plugin",
+    "antigravity",
+    "agy",
+    "acp"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/magpie-community/plugins.git",
+    "directory": "packages/agy-cli"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "engines": {
+    "magpie": ">=0.1.4246"
+  },
+  "magpie": {
+    "maxConcurrency": 16
+  }
+}

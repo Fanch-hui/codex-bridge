@@ -78,6 +78,12 @@
       var context = [];
       if (hasUsage) context.push(["预计使用", exact(projected)]);
       if (number(capacity) && capacity > 0) context.push(["上下文容量", exact(capacity)]);
+      // The model is smaller than the workbench setting, so the window follows the model.
+      var configured = policy && (policy.override || policy.defaults) || {};
+      var modelLimit = policy && policy.limitedByModel && number(policy.modelContextWindow)
+        && number(configured.contextWindow) && policy.modelContextWindow < configured.contextWindow
+        ? policy.modelContextWindow : null;
+      if (modelLimit) context.push(["工作台设置", exact(configured.contextWindow)]);
       if (number(effective.autoCompactAt)) context.push(["自动压缩", exact(effective.autoCompactAt)]);
       var parts = [["systemTokens", "系统提示（估算）", "system"], ["toolsTokens", "工具（估算）", "tools"],
         ["messageTokens", "消息（估算）", "messages"]].filter(function (part) { return number(breakdown[part[0]]); });
@@ -86,7 +92,11 @@
       var segments = parts.length === 3 && totalBreakdown ? parts.map(function (part) {
         return [part[2], percent * breakdown[part[0]] / totalBreakdown];
       }) : [["total", percent]];
-      result.context = { label: hasUsage ? "上下文约 " + percent + "%" : "上下文", title: "上下文", rows: context, percent: percent, segments: segments };
+      var label = hasUsage ? "上下文约 " + percent + "%" : "上下文";
+      result.context = { label: modelLimit ? label + " · 模型上限 " + compact(modelLimit) : label,
+        title: "上下文", rows: context, percent: percent, segments: segments,
+        notice: modelLimit ? "当前模型上下文上限为 " + modelLimit.toLocaleString() + " tokens，低于工作台设置的 "
+          + configured.contextWindow.toLocaleString() + "，已按模型上限自动调整窗口与压缩阈值。" : "" };
     }
     return result;
   }
@@ -193,6 +203,16 @@
         if (!data) { details.open = false; return; }
         visible = true;
         if (details.__label.textContent !== data.label) details.__label.textContent = data.label;
+        if (key === "context" && details.__notice !== data.notice) {
+          details.__notice = data.notice;
+          details.classList.toggle("is-model-limited", !!data.notice);
+          if (data.notice) details.__summary.title = data.notice; else details.__summary.removeAttribute("title");
+          if (!details.__noticeNode) {
+            details.__noticeNode = S.node("p", "hint dsh-bridge-metric-notice");
+            details.__panel.insertBefore(details.__noticeNode, details.__list.nextSibling);
+          }
+          details.__noticeNode.textContent = data.notice; details.__noticeNode.hidden = !data.notice;
+        }
         if (key === "context" && details.__percent !== data.percent) {
           details.__icon.innerHTML = '<svg viewBox="0 0 24 24">' + symbols.context
             + '<circle cx="12" cy="12" r="8" pathLength="100" stroke-dasharray="' + data.percent

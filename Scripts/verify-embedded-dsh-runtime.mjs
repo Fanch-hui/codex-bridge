@@ -143,6 +143,18 @@ export async function verifyEmbeddedDSH(rootArgument, platform, architecture, { 
       throw new Error(`Embedded DSH plugin identity does not match: ${plugin.name}`);
     }
   }
+  const catalog = JSON.parse(await readFile(path.join(root, "provider/community/catalog.json"), "utf8"));
+  for (const entry of catalog.providers.filter(item => item.bundled !== undefined)) {
+    if (typeof entry.bundled !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(entry.bundled)) {
+      throw new Error(`Bundled community plugin location is invalid: ${entry.package}`);
+    }
+    const manifestPath = `provider/community/bundled/${entry.bundled}/package.json`;
+    if (expected.get(manifestPath) !== "file") throw new Error(`Bundled community plugin is missing: ${entry.package}`);
+    const installed = JSON.parse(await readFile(path.join(root, ...manifestPath.split("/")), "utf8"));
+    if (installed.name !== entry.package || installed.version !== entry.version) {
+      throw new Error(`Bundled community plugin identity does not match: ${entry.package}`);
+    }
+  }
   for (const [name, version] of [["@decimalturn/toml-patch", "3.3.3"], ["jsonc-parser", "3.3.1"]]) {
     const installed = JSON.parse(await readFile(path.join(root, "provider/agent-connections/node_modules", name, "package.json"), "utf8"));
     if (installed.name !== name || installed.version !== version) {

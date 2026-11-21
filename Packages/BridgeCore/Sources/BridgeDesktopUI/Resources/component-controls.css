@@ -252,7 +252,12 @@
 .message-composer-toolbar { display: flex; align-items: flex-end; gap: 8px; margin-top: 6px; }
 .message-composer-tools { display: flex; flex: 1 1 0; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .dsh-native-composer .dsh-composer-leading { flex: 1 1 auto; }
-.dsh-native-composer .dsh-composer-trailing { flex: 0 1 auto; justify-content: flex-end; }
+.dsh-native-composer .dsh-composer-trailing { flex: 0 1 auto; flex-wrap: nowrap; justify-content: flex-end; }
+/* A grid `auto` track grows to the measured select width and spills under the send button;
+   a shrinkable track lets the picker clip with an ellipsis instead. The model name gives way first. */
+.message-composer-tools > .field { grid-template-columns: minmax(0, 1fr); }
+.dsh-native-composer .dsh-composer-trailing > .field { flex-shrink: 0; }
+.dsh-native-composer .dsh-composer-trailing > .field.dsh-composer-model { flex-shrink: 1; }
 /* Pickers are as wide as the chosen option; pages-common.js measures it where field-sizing is missing. */
 .message-composer-tools .field select {
   width: auto;

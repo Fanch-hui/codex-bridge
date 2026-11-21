@@ -311,9 +311,9 @@
     details.open(pendingDetail.id, pendingDetail.options);
     if (details.selectedID() === pendingDetail.id) pendingDetail = null;
   }
-  function updateSettings(page, emit, updateState) {
+  function updateSettings(page, emit, updateState, desktopState) {
     if (global.CodexBridgeDesktopSettingsPage && page) {
-      global.CodexBridgeDesktopSettingsPage.render(page, emit, updateState);
+      global.CodexBridgeDesktopSettingsPage.render(page, emit, updateState, desktopState);
       var policy = page.nativePermissionPolicy;
       var signature = policy && policy.errorMessage
         ? [policy.providerID, policy.installationID, policy.errorMessage].join(":") : "";

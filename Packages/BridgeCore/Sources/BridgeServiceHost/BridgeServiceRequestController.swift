@@ -159,6 +159,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       let payload = try BridgeServiceIPCCodec.payload(IPCProviderGatewayRequest.self, from: request)
       let result = try await composition.providerGatewayRequest(payload)
       return try BridgeServiceIPCCodec.success(requestID: request.requestID, payload: result)
+    case .skillHub:
+      return try await handleSkillHub(request)
     case .embeddedDSH:
       return try await handleEmbeddedDSH(request)
     case .getWorkbenchSettings, .setWorkbenchEnabled:

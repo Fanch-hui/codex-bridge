@@ -128,6 +128,8 @@
         Task { @MainActor in await model.performProviderGateway(envelope) }
       case .providerGatewayCopyConnection:
         Task { @MainActor in await model.copyProviderGatewayConnection(envelope) }
+      case .skillHub:
+        Task { @MainActor in await model.performSkillHub(envelope) }
       case .embeddedDSH:
         if payload.action == "attachments.pick" {
           pickWorkbenchAttachment(envelope, model: model)

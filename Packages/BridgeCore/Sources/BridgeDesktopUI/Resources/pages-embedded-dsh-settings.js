@@ -275,16 +275,15 @@
     mcpForm.appendChild(mcpActions); updateMCPFields();
 
     var contextSection = S.section(body, "上下文"), contextEditor = null;
-    var skillSection = S.section(body, "技能"), skillList = S.node("div", "settings-item-list");
-    var refreshSkillsButton = button("刷新技能", function () {
-      return runAction(refreshSkillsButton, "skills-refresh", "刷新中…", "技能列表已刷新。", refreshSkills);
-    }, "skills-refresh");
-    var importSkillsButton = button("导入技能…", function () {
-      return runAction(importSkillsButton, "skills-refresh", "导入中…", null, importSkills);
-    }, "skills-refresh");
-    var skillActions = S.node("div", "form-actions");
-    skillActions.appendChild(importSkillsButton); skillActions.appendChild(refreshSkillsButton);
-    skillSection.appendChild(skillList); skillSection.appendChild(skillActions);
+    var skillSection = S.section(body, "技能");
+    var skillHub = global.CodexBridgeDesktopSettingsSkills
+      ? global.CodexBridgeDesktopSettingsSkills.create({ compact: true }) : null;
+    var skillContext = { projectID: null, projects: [], serviceConnected: true };
+    if (skillHub) {
+      skillSection.appendChild(skillHub.root);
+    } else {
+      skillSection.appendChild(S.node("p", "hint", "技能中心暂不可用。"));
+    }
     var availableCategories = [["models", "模型连接", modelSection], ["context", "上下文", contextSection],
       ["skills", "技能", skillSection], ["mcp", "MCP 服务", mcpSection], ["plugins", "插件", pluginSection]];
     if (providersOnly) {
@@ -327,6 +326,15 @@
     restartButton.hidden = true; body.appendChild(restartButton);
     selectCategory("models");
 
+    function updateSkillHub() {
+      if (!skillHub) return;
+      skillHub.update({
+        active: active && category === "skills",
+        serviceConnected: skillContext.serviceConnected !== false,
+        projects: skillContext.projects,
+        projectID: skillContext.projectID
+      });
+    }
     function selectCategory(value) {
       if (!categories.some(function (item) { return item.id === value; })) value = "models";
       category = value;
@@ -339,6 +347,7 @@
         contextSection.appendChild(contextEditor.root);
       }
       if (contextEditor) contextEditor.setActive(active && category === "context");
+      updateSkillHub();
       updateProvidersActive();
     }
     function button(label, onClick, group, disabled) {
@@ -459,15 +468,19 @@
     function renderChat(chat) {
       chat = chat || {};
       var accounts = S.safeArray(chat.accounts), authenticated = chat.authenticated === true || chat.connected === true;
+      // SIWC drops a credential the server revoked (invalid_grant) but keeps the account record.
+      var expired = !authenticated && !chat.signingIn && accounts.some(function (account) { return account.id === chat.activeAccountId; });
       if (wasAuthenticated !== null && authenticated !== wasAuthenticated) modelsChanged();
       wasAuthenticated = authenticated;
       if (chat.signingIn) chatStatus.textContent = "请在浏览器中完成授权。";
       else if (chat.error) chatStatus.textContent = chat.error;
       else if (authenticated && chat.planEnabled === false) chatStatus.textContent = "尚未授权模型访问，请切换账号。";
+      else if (expired) chatStatus.textContent = "当前账号的登录已失效，请点击“使用 ChatGPT 登录”重新授权。";
       else chatStatus.textContent = authenticated ? "已连接官方 SIWC 模型通道。" : "连接后可直接使用账号中的 ChatGPT 模型。";
-      chatSummaryBadge.textContent = chat.signingIn ? "等待授权" : authenticated ? "已连接" : chat.error ? "异常" : "未连接";
+      chatSummaryBadge.textContent = chat.signingIn ? "等待授权" : authenticated ? "已连接" : chat.error ? "异常"
+        : expired ? "需重新登录" : "未连接";
       chatSummaryBadge.className = "status-badge provider-summary-badge "
-        + (chat.signingIn ? "warning" : authenticated ? "success" : chat.error ? "error" : "neutral");
+        + (chat.signingIn || expired ? "warning" : authenticated ? "success" : chat.error ? "error" : "neutral");
       if (authTimer) { global.clearTimeout(authTimer); authTimer = null; }
       if (active && chat.signingIn) authTimer = global.setTimeout(refreshSettings, 1500);
       login.hidden = authenticated || chat.signingIn; addAccount.hidden = !authenticated || chat.signingIn;
@@ -481,7 +494,8 @@
         var row = S.node("div", "settings-item-row"), selected = account.id === chat.activeAccountId;
         var copy = S.node("div", "plugin-card-title-row");
         copy.appendChild(S.node("strong", "plugin-card-title", account.email || "ChatGPT 账号"));
-        if (selected) copy.appendChild(S.badge("当前账号", "success"));
+        if (selected) copy.appendChild(S.badge("当前账号", account.authenticated === false ? "neutral" : "success"));
+        if (account.authenticated === false) copy.appendChild(S.badge("需重新登录", "warning"));
         row.appendChild(copy);
         var actions = S.node("div", "form-actions");
         if (!selected) {
@@ -842,29 +856,6 @@
     }
     // The host shows the system folder picker and the service copies the chosen skills into the
     // workbench's global skill folder, which every session watches.
-    function importSkills() {
-      return T.call("skills.pick", {}, { timeoutMs: 3600000 }).then(function (result) {
-        if (!result || result.cancelled) return false;
-        var names = S.safeArray(result.imported).map(function (item) { return item.name; });
-        showNotice(names.length ? "已导入技能：" + names.join("、") + "。" : "没有导入任何技能。");
-        return refreshSkills();
-      });
-    }
-    function refreshSkills() {
-      if (!sessionID) { S.clear(skillList); skillList.appendChild(S.node("p", "hint", "创建会话后查看技能。")); return false; }
-      var current = sessionID;
-      return sharedRead("skills:" + current, "skills.list", { sessionId: current }).then(function (value) {
-        if (sessionID !== current) return;
-        S.clear(skillList);
-        var skills = S.safeArray(value && value.skills);
-        if (!skills.length) skillList.appendChild(S.node("p", "hint", "暂无技能。"));
-        skills.forEach(function (skill) {
-          var row = S.node("div", "settings-item-row");
-          row.appendChild(S.node("strong", "plugin-card-title", skill.name || skill.id));
-          skillList.appendChild(row);
-        });
-      }).catch(function (failure) { error(failure); return false; });
-    }
     function setActive(value) {
       if (active === value) return;
       active = value;
@@ -884,7 +875,7 @@
         if (authTimer) global.clearTimeout(authTimer); authTimer = null;
       }
     }
-    function refreshAdvanced() { refreshPlugins(); refreshMCP(); refreshSkills(); }
+    function refreshAdvanced() { refreshPlugins(); refreshMCP(); updateSkillHub(); }
     function setSetupMode(mode) {
       var nextMode = mode || null;
       if (setupMode === nextMode) { if (nextMode === "api") editor.open = true; return; }
@@ -936,9 +927,18 @@
     }
     function setSession(id) {
       if (sessionID === id) return;
-      sessionID = id; if (active) refreshSkills();
+      sessionID = id;
     }
-    return { root: root, setActive: setActive, setSession: setSession, receive: receive,
+    function setSkillContext(next) {
+      if (!next) return;
+      skillContext = {
+        projectID: next.projectID || null,
+        projects: next.projects || [],
+        serviceConnected: next.serviceConnected !== false
+      };
+      updateSkillHub();
+    }
+    return { root: root, setActive: setActive, setSession: setSession, setSkillContext: setSkillContext, receive: receive,
       refresh: function () { return Promise.all([refreshSettings(), providersActive ? refreshProviders() : null]); },
       setSetupMode: setSetupMode, selectCategory: selectCategory,
       focusSetup: function () { baseURL.control.focus(); }, beginLogin: beginLogin, beginAddAccount: beginAddAccount };

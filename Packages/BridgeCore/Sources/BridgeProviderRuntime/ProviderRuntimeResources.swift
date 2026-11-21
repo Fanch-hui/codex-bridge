@@ -14,7 +14,15 @@ public struct ProviderRuntimeResources: Sendable {
   private let snapshots: [SecureFileArtifactSnapshot]
 
   public static func load(root: URL) throws -> Self {
-    let runtime = try EmbeddedDSHRuntimeResources.load(root: root)
+    try make(runtime: EmbeddedDSHRuntimeResources.load(root: root))
+  }
+
+  /// Reuses the process-wide runtime validation shared with the embedded engine hosts.
+  public static func shared(root: URL) async throws -> Self {
+    try make(runtime: await EmbeddedDSHRuntimeResources.shared(root: root))
+  }
+
+  private static func make(runtime: EmbeddedDSHRuntimeResources) throws -> Self {
     #if os(Windows)
       let executable = "provider/model-protocol.exe"
     #else

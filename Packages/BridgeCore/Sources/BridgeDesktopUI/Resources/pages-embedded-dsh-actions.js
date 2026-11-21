@@ -4,22 +4,28 @@
   var T = global.CodexBridgeDesktopEmbeddedDSHTransport;
 
   function create(options) {
-    var context = { sessionID: null, connected: false, running: false, pending: false, title: "" };
+    var context = { sessionID: null, projectID: null, connected: false, running: false, pending: false, title: "" };
     var generation = 0, busy = false, controls = [];
     var menu = S.node("div", "dsh-chat-menu");
     menu.hidden = true;
     var root = S.node("div", "dsh-embedded-action-dialogs");
     var commandRows = [], commandScope = "", commandLoading = false, commandPicker = null;
+    var skillRows = [], skillScope = "", skillLoading = false;
 
     function update(next) {
       var previous = context;
-      context = { sessionID: next.sessionID || null, connected: !!next.connected, running: !!next.running,
+      context = { sessionID: next.sessionID || null, projectID: next.projectID || null,
+        connected: !!next.connected, running: !!next.running,
         pending: !!next.pending, title: next.title || "" };
-      if (previous.sessionID !== context.sessionID || previous.connected && !context.connected) {
-        generation++; commandRows = []; commandScope = ""; commandLoading = false;
+      if (previous.sessionID !== context.sessionID || previous.projectID !== context.projectID
+        || previous.connected && !context.connected) {
+        generation++;
+        commandRows = []; commandScope = ""; commandLoading = false;
+        skillRows = []; skillScope = ""; skillLoading = false;
         if (commandPicker) commandPicker.hide();
       }
       if (commandPicker && (context.running || context.pending || !context.connected)) commandPicker.hide();
+      if (context.connected && !commandScope && !commandLoading) loadCommands();
       syncControls();
     }
     function syncControls() {
@@ -59,10 +65,48 @@
         if (ticket === generation && id === context.sessionID) commandLoading = false;
       });
     }
+    function loadSkills() {
+      var id = context.sessionID, pid = context.projectID, ticket = generation;
+      var scope = JSON.stringify([id, pid, ticket]);
+      if (!context.connected) return Promise.resolve([]);
+      if (skillScope === scope && (skillRows.length || skillLoading)) return Promise.resolve(skillRows);
+      skillScope = scope; skillLoading = true;
+      var request;
+      if (id) {
+        request = T.call("skills.list", { sessionId: id }).then(function (value) {
+          return S.safeArray(value && value.skills).map(function (item) {
+            return { name: item.name, description: item.description || "", kind: "skill" };
+          });
+        });
+      } else {
+        var hub = global.CodexBridgeDesktopSkillHubTransport;
+        if (!hub) { skillLoading = false; return Promise.resolve([]); }
+        request = hub.call("snapshot", { projectID: pid || null }).then(function (snap) {
+          return S.safeArray(snap && snap.skills).filter(function (item) {
+            return item && item.effectiveUserInvocable !== false;
+          }).map(function (item) {
+            return { name: item.canonicalSlug, description: item.description || "", kind: "skill" };
+          });
+        });
+      }
+      return request.then(function (rows) {
+        if (ticket !== generation || id !== context.sessionID || pid !== context.projectID) return [];
+        skillRows = rows.filter(function (row) {
+          return row && typeof row.name === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.name);
+        });
+        return skillRows;
+      }).catch(function () {
+        if (ticket === generation && id === context.sessionID && pid === context.projectID) skillScope = "";
+        return [];
+      }).finally(function () {
+        if (ticket === generation && id === context.sessionID && pid === context.projectID) skillLoading = false;
+      });
+    }
+
     function isCommand(text) {
       var match = /^\/([a-z][a-z0-9_-]*)(?:\s+([\s\S]*))?$/.exec((text || "").trim());
       if (!match) return false;
-      return !commandRows.length || commandRows.some(function (row) { return row.name === match[1]; });
+      return commandRows.some(function (row) { return row.name === match[1]; });
     }
     function executeCommand(rawLine) {
       var line = (rawLine || "").trim();
@@ -131,30 +175,33 @@
       function renderList() {
         S.clear(list);
         if (!current) { list.hidden = true; return; }
-        var q = current.query;
-        filtered = commandRows.filter(function (row) { return !q || row.name.indexOf(q) === 0 || row.name.indexOf(q) >= 0; });
+        var q = current.query, seen = new Set(), merged = [];
+        commandRows.forEach(function (row) { seen.add(row.name); merged.push(row); });
+        skillRows.forEach(function (row) { if (!seen.has(row.name)) { seen.add(row.name); merged.push(row); } });
+        filtered = merged.filter(function (row) { return !q || row.name.indexOf(q) === 0 || row.name.indexOf(q) >= 0; });
         if (selected >= filtered.length) selected = 0;
         filtered.forEach(function (row, index) {
           var button = S.button("", null, {}, null, "small dsh-file-mention dsh-slash-command");
           button.setAttribute("role", "option"); button.setAttribute("aria-selected", String(index === selected));
           button.title = "/" + row.name + (row.description ? " · " + row.description : "");
           button.appendChild(S.node("span", "dsh-slash-command-name", "/" + row.name));
+          if (row.kind === "skill") button.appendChild(S.node("span", "skill-hub-source-tag", "技能"));
           if (row.description) button.appendChild(S.node("span", "dsh-slash-command-desc hint", row.description));
           button.addEventListener("mousedown", function (event) { event.preventDefault(); });
           button.addEventListener("click", function () { choose(row); });
           list.appendChild(button);
         });
-        if (!filtered.length && commandLoading) {
-          var status = S.node("div", "dsh-file-mention-status", "正在读取命令…");
+        if (!filtered.length && (commandLoading || skillLoading)) {
+          var status = S.node("div", "dsh-file-mention-status", "正在读取命令与技能…");
           status.setAttribute("role", "status"); list.appendChild(status);
         }
-        list.hidden = !filtered.length && !commandLoading;
+        list.hidden = !filtered.length && !commandLoading && !skillLoading;
       }
       function updateList() {
         var next = match();
         if (!next || !context.connected || context.running || context.pending) { hide(); return; }
         current = next; renderList();
-        loadCommands().then(function () { if (current) renderList(); });
+        Promise.all([loadCommands(), loadSkills()]).then(function () { if (current) renderList(); });
       }
       function keydown(event) {
         if (list.hidden || global.CodexBridgeDesktopPageSupport.isIMEKeyEvent(event)) return false;

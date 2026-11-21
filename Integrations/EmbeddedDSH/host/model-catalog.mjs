@@ -177,8 +177,10 @@ export class ModelCatalog {
           })),
           ...(resolved.reasoning.defaultEffort === undefined ? {} : { defaultEffort: resolved.reasoning.defaultEffort })
         };
+        const contextWindow = resolved.context?.contextWindow;
         return { id: model.id, name: model.name, ...(model.description === undefined ? {} : { description: model.description }),
-          ...(reasoning === undefined ? {} : { reasoning }) };
+          ...(reasoning === undefined ? {} : { reasoning }),
+          ...(Number.isSafeInteger(contextWindow) && contextWindow > 0 ? { contextWindow } : {}) };
       }));
       return { group: { id: provider.id, name: provider.name, models: entries } };
     } catch (error) {

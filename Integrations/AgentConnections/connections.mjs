@@ -3,6 +3,44 @@ import { edit, inspect, reverse } from './editor.mjs';
 const providerID = 'codex_bridge';
 const set = (path, value) => ({ path, after: { exists: true, value } });
 
+const effortLevels = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+// Optional per-model limits from the gateway: { [modelID]: { context?, output?, efforts? } }, where
+// efforts are the reasoning levels the gateway accepts as `reasoning_effort` for that model.
+function readLimits(value, modelIDs) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_model');
+  const valid = number => number === undefined || (Number.isSafeInteger(number) && number > 0);
+  const validEfforts = efforts => efforts === undefined || (Array.isArray(efforts) && efforts.length > 0 &&
+    efforts.every(effort => effortLevels.includes(effort)) && new Set(efforts).size === efforts.length);
+  for (const [id, limit] of Object.entries(value)) {
+    if (!modelIDs.includes(id) || !limit || typeof limit !== 'object' || Array.isArray(limit) ||
+        Object.keys(limit).some(key => !['context', 'output', 'efforts'].includes(key)) ||
+        !valid(limit.context) || !valid(limit.output) || !validEfforts(limit.efforts)) throw new Error('invalid_model');
+  }
+  return value;
+}
+
+// Pi: only the declared levels are selectable; `off` stays unavailable as it would only omit the field.
+function piReasoning(efforts) {
+  if (!efforts) return {};
+  return { reasoning: true, thinkingLevelMap: Object.fromEntries(['off', ...effortLevels]
+    .map(level => [level, efforts.includes(level) ? level : null])) };
+}
+
+// OpenCode sends a variant's `reasoningEffort` as the OpenAI-compatible `reasoning_effort`.
+function openCodeVariants(agent, efforts) {
+  if (agent === 'opencode1') {
+    return efforts ? { reasoning: true, variants: Object.fromEntries(efforts.map(effort => [effort, { reasoningEffort: effort }])) } : {};
+  }
+  return { variants: (efforts ?? []).map(effort => ({ id: effort, settings: { reasoningEffort: effort } })) };
+}
+
+// Compaction leaves room for one response, mirroring the workbench rule.
+function autoCompactAt({ context, output }) {
+  return context - Math.min(output ?? 19000, Math.floor(context / 2));
+}
+
 function modelChanges(agent, model, source) {
   if (agent === 'claude_desktop') throw new Error('unsupported_agent');
   if (!model || typeof model.endpoint !== 'string' || typeof model.model !== 'string' ||
@@ -25,13 +63,18 @@ function modelChanges(agent, model, source) {
         modelIDs.some(id => typeof id !== 'string' || !id) || new Set(modelIDs).size !== modelIDs.length) {
     throw new Error('invalid_model');
   }
+  const limits = readLimits(model.limits, modelIDs);
+  const selectedLimit = limits[model.model];
+  const codexLimits = selectedLimit?.context ? {
+    model_context_window: selectedLimit.context, model_auto_compact_token_limit: autoCompactAt(selectedLimit)
+  } : {};
   if (agent === 'codex' || agent === 'codex_desktop') {
     const provider = {
       name: 'Codex Bridge', base_url: model.endpoint, wire_api: 'responses',
       experimental_bearer_token: model.token, requires_openai_auth: false,
     };
     if (agent === 'codex' && compatibility.preserveOfficialLogin) {
-      const profile = { model: model.model, model_provider: providerID };
+      const profile = { model: model.model, model_provider: providerID, ...codexLimits };
       if (compatibility.disableWebSearch) profile.web_search = 'disabled';
       if (compatibility.disableMultiAgent) profile.features = { multi_agent: false };
       return [
@@ -43,6 +86,7 @@ function modelChanges(agent, model, source) {
       set(['model'], model.model), set(['model_provider'], providerID),
       set(['model_providers', providerID], provider),
     ];
+    for (const [key, value] of Object.entries(codexLimits)) changes.push(set([key], value));
     if (compatibility.disableWebSearch) changes.push(set(['web_search'], 'disabled'));
     if (compatibility.disableMultiAgent) changes.push(set(['features', 'multi_agent'], false));
     return changes;
@@ -88,16 +132,23 @@ function modelChanges(agent, model, source) {
   if (agent === 'pi') return [
     set(['providers', providerID], {
       baseUrl: model.endpoint, api: 'openai-completions', apiKey: model.token,
-      models: modelIDs.map(id => ({ id })),
+      models: modelIDs.map(id => ({ id,
+        ...(limits[id]?.context ? { contextWindow: limits[id].context } : {}),
+        ...(limits[id]?.output ? { maxTokens: limits[id].output } : {}),
+        ...piReasoning(limits[id]?.efforts) })),
     }),
   ];
   if (agent === 'opencode1' || agent === 'opencode2') {
     const models = Object.fromEntries([model.model, ...modelIDs.filter(id => id !== model.model)]
       .map(id => {
         const key = id === model.model ? 'bridge' : `m_${Buffer.from(id, 'utf8').toString('base64url')}`;
+        // OpenCode 1.x requires both values in `limit`; 2.x model limits are not written.
+        const limit = limits[id]?.context && limits[id]?.output
+          ? { limit: { context: limits[id].context, output: limits[id].output } } : {};
+        const variants = openCodeVariants(agent, limits[id]?.efforts);
         return [key, agent === 'opencode1'
-          ? { id, name: id }
-          : { modelID: id, name: id, variants: [] }];
+          ? { id, name: id, ...limit, ...variants }
+          : { modelID: id, name: id, ...variants }];
       }));
     if (agent === 'opencode1') return [
       set(['model'], `${providerID}/bridge`),

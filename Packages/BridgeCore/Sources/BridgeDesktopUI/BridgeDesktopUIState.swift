@@ -19,6 +19,7 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
   public let appUpdate: BridgeDesktopAppUpdateState?
   public let messageCenter: MessageCenterState?
   public let providerGatewayReceipts: [BridgeDesktopEmbeddedDSHReceipt]?
+  public let skillHubReceipts: [BridgeDesktopEmbeddedDSHReceipt]?
 
   public init(
     hostContext: BridgeDesktopHostContext? = nil,
@@ -37,7 +38,8 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
     settings: BridgeDesktopSettingsState? = nil,
     appUpdate: BridgeDesktopAppUpdateState? = nil,
     messageCenter: MessageCenterState? = nil,
-    providerGatewayReceipts: [BridgeDesktopEmbeddedDSHReceipt]? = nil
+    providerGatewayReceipts: [BridgeDesktopEmbeddedDSHReceipt]? = nil,
+    skillHubReceipts: [BridgeDesktopEmbeddedDSHReceipt]? = nil
   ) {
     self.hostContext = hostContext
     self.navigation = navigation
@@ -56,5 +58,6 @@ public struct BridgeDesktopUIState: Codable, Equatable, Sendable {
     self.appUpdate = appUpdate
     self.messageCenter = messageCenter
     self.providerGatewayReceipts = providerGatewayReceipts
+    self.skillHubReceipts = skillHubReceipts
   }
 }

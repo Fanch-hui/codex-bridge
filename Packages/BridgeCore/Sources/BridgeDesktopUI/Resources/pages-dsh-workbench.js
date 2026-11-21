@@ -518,6 +518,13 @@
             global.CodexBridgeDesktopEmbeddedDSHTransport) });
         view.settings.appendChild(view.embeddedSettings.root);
       }
+      if (view.embeddedSettings.setSkillContext) {
+        view.embeddedSettings.setSkillContext({
+          projectID: focusedEmbedded().currentProjectID ? focusedEmbedded().currentProjectID() : (context.page && context.page.selectedProjectID),
+          projects: context.page && context.page.projects,
+          serviceConnected: !(context.state && context.state.serviceConnected === false)
+        });
+      }
       view.embeddedSettings.setSession(focusedEmbedded().currentSessionID());
       view.embeddedSettings.setSetupMode(settingsPurpose);
       if (settingsCategory) { view.embeddedSettings.selectCategory(settingsCategory); settingsCategory = null; }

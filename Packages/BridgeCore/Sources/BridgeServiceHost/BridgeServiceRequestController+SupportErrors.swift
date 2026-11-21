@@ -8,6 +8,7 @@ import BridgeMCP
 import BridgeSecurity
 import BridgeServiceApplication
 import BridgeServiceCore
+import BridgeSkills
 import BridgeTunnel
 import Foundation
 
@@ -189,6 +190,14 @@ extension BridgeServiceRequestController {
     }
     if let error = error as? BridgeMCPQueryError {
       return mapMCPQueryError(error)
+    }
+    if let error = error as? SkillHubError {
+      switch error {
+      case .skillNotFound, .variantNotFound:
+        return .init(code: "skill_not_found", message: error.localizedDescription)
+      default:
+        return .init(code: "skill_hub_error", message: error.localizedDescription)
+      }
     }
     if let error = error as? TunnelConfigurationError {
       if error == .invalidHTTPProxy {

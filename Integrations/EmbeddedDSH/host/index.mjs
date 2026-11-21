@@ -20,6 +20,7 @@ let engine;
 const home = resolve(process.argv[homeIndex + 1]);
 const providerOnly = process.argv.includes('--providers-only');
 const sharedProviders = process.argv.includes('--shared-providers');
+const bridgeSkills = process.argv.includes('--bridge-skills');
 if (providerOnly && sharedProviders) throw new Error('Provider and workbench runtime roles are mutually exclusive');
 if (providerOnly) globalThis[providerSessionSymbol] = new ProviderSession(rpc);
 let releaseRuntime;
@@ -38,7 +39,7 @@ const startup = acquireProviderRuntime(home, sharedProviders ? 'shared-workbench
   const contextPolicy = new ContextPolicy(undefined, home, () => {});
   await contextPolicy.start();
   globalThis[contextPolicySymbol] = contextPolicy;
-  const value = await startEngine(home, { sharedProviders });
+  const value = await startEngine(home, { sharedProviders, bridgeSkills });
   engine = value;
   for (const name of ['sessionController', 'sessionSkillCatalog', 'settingsController',
     'credentials', 'llm', 'tools', 'subagents', 'sandboxPolicy', 'permissionPresets', 'jobs', 'userQuestions',

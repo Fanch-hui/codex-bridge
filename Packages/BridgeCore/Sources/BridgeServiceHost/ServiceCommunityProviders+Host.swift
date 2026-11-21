@@ -27,7 +27,8 @@ extension ServiceCommunityProviders {
     let (resources, installer) = try await runtime()
     let (client, loaded) = try await Self.launch(
       plugins: current, resources: resources, directory: directory,
-      installer: installer, secrets: secrets, fallback: nil)
+      installer: installer, secrets: secrets, fallback: nil,
+      antigravityExecutable: try await antigravityExecutable())
     do {
       for record in current {
         let ids = try Self.providerIDs(in: loaded, for: record, secrets: secrets)
@@ -49,7 +50,8 @@ extension ServiceCommunityProviders {
     let (resources, installer) = try await runtime()
     let (client, loaded) = try await Self.launch(
       plugins: [plugin], resources: resources, directory: directory,
-      installer: installer, secrets: secrets, fallback: id)
+      installer: installer, secrets: secrets, fallback: id,
+      antigravityExecutable: try await antigravityExecutable())
     do {
       let ids = try Self.providerIDs(in: loaded, for: plugin, secrets: secrets)
       guard await client.close() else { throw ServiceCommunityProviderError.stopped }
@@ -62,7 +64,8 @@ extension ServiceCommunityProviders {
 
   static func launch(
     plugins: [Plugin], resources: ProviderRuntimeResources, directory: URL,
-    installer: CommunityProviderInstallation, secrets: any SecretStore, fallback: UUID?
+    installer: CommunityProviderInstallation, secrets: any SecretStore, fallback: UUID?,
+    antigravityExecutable: String? = nil
   ) async throws -> (ProviderHostClient, ACPJSONValue) {
     let bun = try await installer.prepareBun()
     try resources.validateEntrypoints()
@@ -80,7 +83,8 @@ extension ServiceCommunityProviders {
     let router = ServiceCommunitySecrets(store: secrets, owners: owners, fallback: fallback)
     let configuration = ACPProcessTransportConfiguration(
       argv: [bun.path, resources.communityEntry.path], workingDirectory: directory.path,
-      environment: hostEnvironment(directory), maximumFrameBytes: 16 * 1_024 * 1_024,
+      environment: hostEnvironment(directory, antigravityExecutable: antigravityExecutable),
+      maximumFrameBytes: 16 * 1_024 * 1_024,
       maximumStandardErrorBytes: 64 * 1_024, maximumLifetime: .seconds(24 * 60 * 60))
     let client = ProviderHostClient(
       transport: try ACPProcessTransport.launch(configuration: configuration),
@@ -181,7 +185,8 @@ extension ServiceCommunityProviders {
 
   static func hostEnvironment(
     _ directory: URL,
-    inherited: [String: String] = ProcessInfo.processInfo.environment
+    inherited: [String: String] = ProcessInfo.processInfo.environment,
+    antigravityExecutable: String? = nil
   ) -> [String: String] {
     let resolvedHome: String = {
       if let home = try? AgentProviderEnvironment.homeDirectory(source: inherited), !home.isEmpty {
@@ -217,6 +222,19 @@ extension ServiceCommunityProviders {
       "TELEAGENT_APP_PATH", "TELEAGENT_DATA", "TELEAGENT_CONFIG",
     ]
     copyValidEnvironmentKeys(toolConfigKeys, from: inherited, into: &environment)
+    // The agy plugin runs the CLI registered as the Antigravity agent and never updates it.
+    environment["AGY_CLI_DISABLE_AUTO_UPDATE"] = "1"
+    // Session state stays in the service's own data; agy's working folders stay in the temp
+    // folder, where no ancestor holds the user's `.agents` customizations.
+    environment["AGY_BRIDGE_STATE_FILE"] =
+      directory.appendingPathComponent("agy-cli", isDirectory: true)
+      .appendingPathComponent("sessions.json").path
+    environment["AGY_BRIDGE_WORKSPACE_ROOT"] = "tmp"
+    if let antigravityExecutable, isValidEnvValue(antigravityExecutable),
+      AgentPathSemantics.isAbsolute(antigravityExecutable, style: .current)
+    {
+      environment["AGY_PATH"] = antigravityExecutable
+    }
     for key in ["HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY"] {
       if let value = firstValidValue(
         ["MAGPIE_\(key)", "MAGPIE_\(key.lowercased())", key, key.lowercased()], from: inherited)

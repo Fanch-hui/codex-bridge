@@ -696,6 +696,9 @@ details[open] > :is(.provider-disclosure-summary, .lightweight-client-card > .ag
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 10px 16px;
 }
+.lightweight-check-list.is-grouped { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.lightweight-check-group { display: grid; gap: 8px; min-width: 0; }
+.lightweight-check-group-title { margin: 0; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
 .lightweight-check {
   display: flex;
   align-items: center;

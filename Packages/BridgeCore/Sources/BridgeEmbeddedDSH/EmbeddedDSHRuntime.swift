@@ -115,14 +115,25 @@ public actor EmbeddedDSHRuntime {
     let onEvent = onEvent
     let prepareDependencies = prepareDependencies
     let task = Task { [weak self] in
-      // The shared workbench requests its provider snapshot during the readiness handshake.
-      try await prepareDependencies()
-      try Task.checkCancellation()
-      return try await Self.launch(
-        configuration: configuration, handler: handler, onEvent: onEvent,
-        onCreated: { [weak self] client in await self?.track(client, generation: attempt) },
-        onFailure: { [weak self] error in await self?.didFail(error, generation: attempt) }
-      )
+      // Dependencies start alongside resource validation and process launch; the shared
+      // workbench requests its provider snapshot during the readiness handshake, so the
+      // handshake waits for them (and its timeout excludes their startup).
+      let dependencies = Task { try await prepareDependencies() }
+      do {
+        return try await withTaskCancellationHandler {
+          try await Self.launch(
+            configuration: configuration, handler: handler, onEvent: onEvent,
+            beforeHandshake: { try await dependencies.value },
+            onCreated: { [weak self] client in await self?.track(client, generation: attempt) },
+            onFailure: { [weak self] error in await self?.didFail(error, generation: attempt) }
+          )
+        } onCancel: {
+          dependencies.cancel()
+        }
+      } catch {
+        dependencies.cancel()
+        throw error
+      }
     }
     opening = task
     do {
@@ -191,15 +202,14 @@ public actor EmbeddedDSHRuntime {
     configuration: EmbeddedDSHRuntimeConfiguration,
     handler: @escaping Handler,
     onEvent: @escaping EventHandler,
+    beforeHandshake: @escaping @Sendable () async throws -> Void,
     onCreated: @escaping @Sendable (EmbeddedDSHClient) async -> Void,
     onFailure: @escaping EmbeddedDSHClient.FailureHandler
   ) async throws -> EmbeddedDSHClient {
     let dataRoot = try configuration.validatedDataRoot()
     let recordRoot = try configuration.recordRoot()
     let root = try configuration.resolveResourceRoot()
-    let resources = try await Task.detached(priority: .utility) {
-      try EmbeddedDSHRuntimeResources.load(root: root)
-    }.value
+    let resources = try await EmbeddedDSHRuntimeResources.shared(root: root)
     try Task.checkCancellation()
     do {
       try FileManager.default.createDirectory(at: dataRoot, withIntermediateDirectories: true)
@@ -218,7 +228,7 @@ public actor EmbeddedDSHRuntime {
         configuration: ACPProcessTransportConfiguration(
           argv: [
             resources.node.canonicalPath, resources.entry.canonicalPath, "--home", dataRoot.path,
-          ] + (configuration.providersOnly ? ["--providers-only"] : [])
+          ] + (configuration.providersOnly ? ["--providers-only"] : ["--bridge-skills"])
             + (configuration.sharedProviders ? ["--shared-providers"] : []),
           workingDirectory: dataRoot.path,
           environment: environment,
@@ -239,6 +249,8 @@ public actor EmbeddedDSHRuntime {
       try record.running(identity: identity).save(in: recordRoot)
       try resources.validateEntrypoints()
       await client.start()
+      try await beforeHandshake()
+      try Task.checkCancellation()
       let status = try await client.request(
         action: "status", payload: .object([:]), timeout: configuration.requestTimeout)
       guard status["ready"]?.boolValue == true else {

@@ -93,6 +93,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case tunnelID = "tunnel.id"
   case tunnelEnabled = "tunnel.enabled"
   case tunnelHTTPProxy = "tunnel.http_proxy"
+  case skillHubPolicy = "skills.hub.policy"
 }
 
 public struct ServiceModelPreferences: Codable, Equatable, Sendable {

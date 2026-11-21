@@ -12,16 +12,28 @@ extension BridgeServiceApplication {
     guard request.arguments.count <= 128,
       request.arguments.allSatisfy({ $0.utf8.count <= 4_096 })
     else { throw BridgeMCPQueryError.contractRejected }
-    let manifests: [SkillManifest]
+    let manifest: SkillManifest
     do {
-      manifests = try await skillScanner.scanSkills(
-        for: URL(fileURLWithPath: project.root.canonicalPath)
-      )
+      let root = URL(fileURLWithPath: project.root.canonicalPath)
+      if let skillHub {
+        guard
+          let resolved = try await skillHub.findActiveSkill(
+            named: request.skillName, projectRoot: root, projectID: request.projectID)
+        else {
+          throw BridgeMCPQueryError.skillNotFound
+        }
+        manifest = resolved.manifest
+      } else {
+        let manifests = try await skillScanner.scanSkills(for: root)
+        guard let matched = manifests.first(where: { $0.name == request.skillName }) else {
+          throw BridgeMCPQueryError.skillNotFound
+        }
+        manifest = matched
+      }
+    } catch let error as BridgeMCPQueryError {
+      throw error
     } catch {
       throw Self.publicSkillError(error)
-    }
-    guard let manifest = manifests.first(where: { $0.name == request.skillName }) else {
-      throw BridgeMCPQueryError.skillNotFound
     }
     let launch: SkillScanner.SkillActionLaunch
     do {

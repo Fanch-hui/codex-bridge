@@ -18,10 +18,16 @@ extension ServiceProviderGateway {
     }
     if request.path == "/v1/models" {
       let visible = models.filter { allowed.contains($0.id) }.map { model in
-        ACPJSONValue.object([
+        var fields: [String: ACPJSONValue] = [
           "id": .string(model.id), "object": .string("model"),
           "owned_by": .string(model.providerID), "display_name": .string(model.name),
-        ])
+        ]
+        // Non-standard but widely read; clients that do not know these fields ignore them.
+        if let context = model.contextWindow { fields["context_window"] = .integer(Int64(context)) }
+        if let output = model.defaultMaxTokens {
+          fields["max_output_tokens"] = .integer(Int64(output))
+        }
+        return ACPJSONValue.object(fields)
       }
       try await sink.sendHead(status: 200, headers: ["content-type": "application/json"])
       try await sink.send(

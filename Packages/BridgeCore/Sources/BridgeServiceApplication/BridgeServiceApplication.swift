@@ -49,6 +49,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
   public let directCommands: DirectCommandSessionManager
   public let approvals: DirectActionApprovalCenter
   let skillScanner: SkillScanner
+  public nonisolated let skillHub: ServiceSkillHub?
   var taskQueueProcessor: Task<Void, Never>?
   var handoffOperations = Set<String>()
   var unscopedWorkbenchExecutions: [String: String] = [:]
@@ -80,7 +81,8 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     commandPolicy: DirectCommandPolicy = DirectCommandPolicy(),
     directCommands: DirectCommandSessionManager = DirectCommandSessionManager(),
     approvals: DirectActionApprovalCenter = DirectActionApprovalCenter(),
-    skillScanner: SkillScanner = SkillScanner()
+    skillScanner: SkillScanner = SkillScanner(),
+    skillHub: ServiceSkillHub? = nil
   ) {
     precondition(!appVersion.isEmpty)
     self.appVersion = appVersion
@@ -115,6 +117,7 @@ public actor BridgeServiceApplication: BridgeMCPServiceAPI {
     self.directCommands = directCommands
     self.approvals = approvals
     self.skillScanner = skillScanner
+    self.skillHub = skillHub
     self.taskQueueProcessor = nil
   }
 }

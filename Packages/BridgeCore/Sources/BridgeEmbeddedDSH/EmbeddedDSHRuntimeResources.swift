@@ -139,10 +139,10 @@ private struct ResourceValidator: Sendable {
   }
 
   func validate() throws -> [String: SecureFileArtifactSnapshot] {
-    try validateDirectoryContents()
+    let sizes = try validateDirectoryContents()
     for link in links.values { try validateLink(link) }
     let allFiles = Array(files.values)
-    let workers = min(4, max(1, ProcessInfo.processInfo.activeProcessorCount), allFiles.count)
+    let workers = min(8, max(1, ProcessInfo.processInfo.activeProcessorCount), allFiles.count)
     let results = ValidationResults()
     DispatchQueue.concurrentPerform(iterations: workers) { worker in
       do {
@@ -152,7 +152,8 @@ private struct ResourceValidator: Sendable {
         for index in start..<end {
           let file = allFiles[index]
           let executable = key(file.path) == key(manifest.node)
-          let snapshot = try validateFile(file, requiresExecutable: executable)
+          let snapshot = try validateFile(
+            file, requiresExecutable: executable, listedSize: sizes[key(file.path)])
           if executable || key(file.path) == key(manifest.entry) {
             guard let snapshot else { throw EmbeddedDSHRuntimeError.invalidManifest }
             entrypoints[key(file.path)] = snapshot
@@ -166,10 +167,14 @@ private struct ResourceValidator: Sendable {
     return try results.value()
   }
 
-  private func validateDirectoryContents() throws {
+  /// Returns the size of every listed regular file. The enumeration does not descend into
+  /// symbolic links, so each returned file sits under real directories inside the root.
+  private func validateDirectoryContents() throws -> [String: UInt64] {
     guard let enumerator = FileManager.default.enumerator(atPath: root.path) else {
       throw EmbeddedDSHRuntimeError.resourcesUnavailable
     }
+    var sizes: [String: UInt64] = [:]
+    sizes.reserveCapacity(files.count)
     var seenFiles = Set<String>()
     var seenLinks = Set<String>()
     while let path = enumerator.nextObject() as? String {
@@ -177,28 +182,27 @@ private struct ResourceValidator: Sendable {
       if normalized == "runtime.json" { continue }
       guard Self.validPath(normalized) else { throw EmbeddedDSHRuntimeError.invalidManifest }
       let url = root.appendingPathComponent(normalized)
-      let attributes: [FileAttributeKey: Any]
-      do { attributes = try FileManager.default.attributesOfItem(atPath: url.path) } catch {
+      let metadata: FileSystemEntryMetadata
+      do { metadata = try FileSystemEntryMetadata(at: url) } catch {
         throw EmbeddedDSHRuntimeError.resourceChanged(normalized)
       }
-      switch attributes[.type] as? FileAttributeType {
-      case .typeDirectory:
-        continue
-      case .typeRegular:
-        guard files[key(normalized)] != nil, seenFiles.insert(key(normalized)).inserted else {
-          throw EmbeddedDSHRuntimeError.resourceChanged(normalized)
-        }
-      case .typeSymbolicLink:
+      if metadata.isSymbolicLink {
         guard links[key(normalized)] != nil, seenLinks.insert(key(normalized)).inserted else {
           throw EmbeddedDSHRuntimeError.resourceChanged(normalized)
         }
-      default:
+      } else if metadata.isRegularFile {
+        guard files[key(normalized)] != nil, seenFiles.insert(key(normalized)).inserted,
+          let size = metadata.fileSize.flatMap(UInt64.init(exactly:))
+        else { throw EmbeddedDSHRuntimeError.resourceChanged(normalized) }
+        sizes[key(normalized)] = size
+      } else if !metadata.isDirectory {
         throw EmbeddedDSHRuntimeError.resourceChanged(normalized)
       }
     }
     guard seenFiles.count == files.count, seenLinks.count == links.count else {
       throw EmbeddedDSHRuntimeError.invalidManifest
     }
+    return sizes
   }
 
   private func validateLink(_ link: Manifest.Link) throws {
@@ -216,19 +220,27 @@ private struct ResourceValidator: Sendable {
     }
   }
 
+  /// `listedSize` comes from the directory pass, which already proved the entry is a regular
+  /// file inside the root; without it the path is resolved and checked here.
   private func validateFile(
-    _ file: Manifest.File, requiresExecutable: Bool
+    _ file: Manifest.File, requiresExecutable: Bool, listedSize: UInt64? = nil
   ) throws -> SecureFileArtifactSnapshot? {
     let url = root.appendingPathComponent(file.path)
-    let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+    let resolved = listedSize == nil ? url.resolvingSymlinksInPath().standardizedFileURL : url
     guard AgentPathSemantics.isContained(resolved.path, in: root.path) else {
       throw EmbeddedDSHRuntimeError.resourceChanged(file.path)
     }
     do {
-      let attributes = try FileManager.default.attributesOfItem(atPath: resolved.path)
-      guard attributes[.type] as? FileAttributeType == .typeRegular,
-        let size = (attributes[.size] as? NSNumber)?.uint64Value
-      else { throw EmbeddedDSHRuntimeError.resourceChanged(file.path) }
+      let size: UInt64
+      if let listedSize {
+        size = listedSize
+      } else {
+        let attributes = try FileManager.default.attributesOfItem(atPath: resolved.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+          let value = (attributes[.size] as? NSNumber)?.uint64Value
+        else { throw EmbeddedDSHRuntimeError.resourceChanged(file.path) }
+        size = value
+      }
       if size == 0 {
         guard !requiresExecutable, file.sha256 == Self.emptySHA256 else {
           throw EmbeddedDSHRuntimeError.resourceChanged(file.path)
@@ -240,7 +252,9 @@ private struct ResourceValidator: Sendable {
       }
       let snapshot = try SecureFileArtifactSnapshot.capture(
         at: resolved.path, requiresExecutable: requiresExecutable)
-      guard snapshot.sha256 == file.sha256 else {
+      guard snapshot.sha256 == file.sha256,
+        AgentPathSemantics.isContained(snapshot.canonicalPath, in: root.path)
+      else {
         throw EmbeddedDSHRuntimeError.resourceChanged(file.path)
       }
       return snapshot

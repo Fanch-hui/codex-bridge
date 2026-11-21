@@ -130,20 +130,34 @@
     function checkedValues(container) {
       return Array.from(container.querySelectorAll("input")).filter(function (input) { return input.type === "checkbox" && input.checked; }).map(function (input) { return input.value; });
     }
+    // Choices with a `group` are listed under that group's heading, in first-seen order, so the
+    // same model name from different suppliers stays distinguishable.
     function appendChoices(container, choices, selected, empty) {
       S.clear(container);
       if (!choices.length) container.appendChild(S.node("p", "hint", empty));
+      var lists = new Map();
       choices.forEach(function (item) {
+        var target = container;
+        if (item.group) {
+          target = lists.get(item.group);
+          if (!target) {
+            var section = S.node("section", "lightweight-check-group");
+            section.appendChild(S.node("h5", "lightweight-check-group-title", item.group));
+            target = S.node("div", "lightweight-check-list");
+            section.appendChild(target); container.appendChild(section); lists.set(item.group, target);
+          }
+        }
         var row = checkbox(item.title, selected.indexOf(item.id) !== -1); row.control.value = item.id;
-        container.appendChild(row.root);
+        target.appendChild(row.root);
       });
+      container.classList.toggle("is-grouped", lists.size > 0);
     }
     function availableModels(selected) {
       var models = S.safeArray(currentStatus && currentStatus.models).map(function (item) {
-        return { id: item.id, title: item.name || item.id };
+        return { id: item.id, title: item.name || item.id, group: item.providerName || item.providerID || "其他" };
       }).filter(function (item) { return !!item.id; });
       selected.forEach(function (id) {
-        if (!models.some(function (item) { return item.id === id; })) models.push({ id: id, title: id + "（目录暂不可用）" });
+        if (!models.some(function (item) { return item.id === id; })) models.push({ id: id, title: id, group: "目录暂不可用" });
       });
       return models;
     }
