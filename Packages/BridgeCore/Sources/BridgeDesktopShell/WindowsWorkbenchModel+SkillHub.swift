@@ -93,7 +93,8 @@
     func refreshSkillHubWorkspaceIfMutated(action: String) {
       let readOnly = ["snapshot", "preview", "diff"].contains(action)
       guard !readOnly else { return }
-      Task { await workspaceModel.loadSelectedWorkspace() }
+      guard let onSkillsMutated else { return }
+      Task { await onSkillsMutated() }
     }
   }
 #endif

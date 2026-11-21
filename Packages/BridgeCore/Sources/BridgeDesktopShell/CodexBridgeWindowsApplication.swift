@@ -22,6 +22,9 @@
         let management = WindowsManagementModel(client: model.client, feedback: feedback)
         let auxiliary = WindowsAuxiliaryRuntime(client: model.client, feedback: feedback)
         startAppUpdateCheck(model: model)
+        model.onSkillsMutated = { [weak auxiliary] in
+          await auxiliary?.workspace.loadSelectedWorkspace()
+        }
         model.onConnected = { [weak model, weak management, weak auxiliary] in
           guard let model, !model.isShuttingDown,
             let management, let auxiliary

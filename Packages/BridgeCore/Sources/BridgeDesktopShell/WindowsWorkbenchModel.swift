@@ -247,6 +247,8 @@
     var modelError: String?
     var connectionRefreshInProgress = false
     var onConnected: (@MainActor () async -> Void)?
+    /// Reloads the project skill list after the skill hub changes what is installed.
+    var onSkillsMutated: (@MainActor () async -> Void)?
     var isShuttingDown = false
     var taskPollingTask: Task<Void, Never>?
     var serviceChangesTask: Task<Void, Never>?
