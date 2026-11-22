@@ -482,7 +482,8 @@
       conversation.update(sessionID, project && project.title || "", transcript.records, transcript.streamText,
         visiblePending, transcript.streamReasoning, { projections: transcript.projections, running: running,
           streamTools: transcript.streamTools, hasMore: transcript.hasMore, loadingEarlier: history.loadingEarlier(), onLoadEarlier: loadEarlier });
-      actions.update({ sessionID: sessionID, projectID: projectID, connected: connected, running: running, pending: !!pending,
+      // A draft's session doesn't exist in the service until session.create returns; reading its commands earlier is refused.
+      actions.update({ sessionID: creatingSession() ? null : sessionID, projectID: projectID, connected: connected, running: running, pending: !!pending,
         title: directory.label(sessionID) });
       validate();
       updateStartup();
