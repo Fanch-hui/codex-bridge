@@ -49,11 +49,14 @@ export class SharedProviderRegistry {
   communityGroups() {
     const community = this.groups.get('bridge.community');
     if (!community) return [];
-    return [...community.adapter.routes.values()].map(route => ({
+    const { adapter } = community;
+    return [...adapter.routes.values()].map(route => ({
       id: route.id, name: route.name,
-      models: route.models.map(model => ({ id: model.id, name: model.name,
-        ...(Number.isSafeInteger(model.contextWindow) && model.contextWindow > 0
-          ? { contextWindow: model.contextWindow } : {}) }))
+      models: route.models.map(model => {
+        const { reasoning, context } = adapter.modelInfo(route.id, model);
+        return { id: model.id, name: model.name, ...(reasoning ? { reasoning } : {}),
+          ...(context ? { contextWindow: context.contextWindow } : {}) };
+      })
     }));
   }
 
