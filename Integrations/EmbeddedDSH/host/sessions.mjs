@@ -212,16 +212,16 @@ export class Sessions {
     try { return await operation(agent); }
     finally { setImmediate(() => void this.settle(rootID, rootAgent, group, generation)); }
   }
-  async begin(id, agent, { reserveRuntimeSlot = true } = {}) {
+  async begin(id, agent) {
     if (this.stopGate.isStopped(id)) throw new Error('Session was stopped');
     let group = this.groups.get(id);
     if (group?.closing) {
       await group.closing;
-      return this.begin(id, agent, { reserveRuntimeSlot });
+      return this.begin(id, agent);
     }
     if (!group) {
       group = { generation: 0 };
-      group.begin = this.beginGroup(id, agent, group, { reserveRuntimeSlot });
+      group.begin = this.beginGroup(id, agent);
       this.groups.set(id, group);
     }
     const generation = ++group.generation;
@@ -239,7 +239,7 @@ export class Sessions {
       throw error;
     }
   }
-  async beginGroup(id, agent, group, { reserveRuntimeSlot }) {
+  async beginGroup(id, agent) {
     const binding = await this.rpc.request('bridge/execution', {
       operation: 'begin', sessionID: id,
       permissionMode: this.ctx.sandboxPolicy.resolve({ session: agent.session }).mode
@@ -247,23 +247,12 @@ export class Sessions {
     try {
       if (binding?.workspaceID) {
         this.writes?.domains.bind(id, binding.workspaceID);
-        const admission = this.writes?.runtimeAdmission;
-        if (admission) {
-          admission.restore(binding.workspaceID, binding.runtimeLimit,
-            binding.runtimeOwners ?? [], binding.runtimeLimitRevision);
-          if (reserveRuntimeSlot) {
-            const slot = { projectID: binding.workspaceID, limit: binding.runtimeLimit,
-              revision: binding.runtimeLimitRevision, owner: `native:${agent.id}` };
-            if (admission.reserve(slot).state !== 'reserved') {
-              throw new Error('project_capacity_reached: 项目已达到同时运行的 Agent 上限。');
-            }
-            group.runtimeSlot = slot;
-          }
-        }
+        // Native DSH agents follow the engine's own limits; the project slots count connected Agents.
+        this.writes?.runtimeAdmission?.restore(binding.workspaceID, binding.runtimeLimit,
+          binding.runtimeOwners ?? [], binding.runtimeLimitRevision);
       }
       return binding;
     } catch (error) {
-      if (group.runtimeSlot) this.writes.runtimeAdmission.release(group.runtimeSlot);
       await this.rpc.request('bridge/execution', { operation: 'end', sessionID: id,
         ...(Number.isSafeInteger(binding?.executionGeneration) ? { executionGeneration: binding.executionGeneration } : {}) });
       throw error;
@@ -273,7 +262,6 @@ export class Sessions {
     group.closing ??= (async () => {
       const binding = await group.begin;
       await this.writes?.quiesce(id);
-      if (group.runtimeSlot) this.writes.runtimeAdmission.release(group.runtimeSlot);
       return this.rpc.request('bridge/execution', { operation: 'end', sessionID: id,
         ...(Number.isSafeInteger(binding?.executionGeneration) ? { executionGeneration: binding.executionGeneration } : {}) });
     })();

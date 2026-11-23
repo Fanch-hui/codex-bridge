@@ -1,15 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-const yieldingTools = new Set(['wait_agent', 'subagent', 'subagent_fork', 'ask_user_question',
-  'delegate_agent', 'send_agent_message', 'bridge_delegate', 'bridge_send_agent', 'job_output']);
-
-// Execution slots are shared by native steps and connected Agents. Session lifetime is not a slot.
+// Project execution slots count connected Agents only. Native DSH agents follow the engine's own
+// subagent limits; their steps only need an admitted root session.
 export class RuntimeAdmission {
   constructor(ctx, sessions) {
     this.ctx = ctx; this.sessions = sessions; this.pools = new Map();
     this.context = new AsyncLocalStorage(); this.closed = false; this.external = new Map();
     this.revoked = new Set(); this.seenExternal = new Set();
-    this.holds = new Map(); this.ownerHolds = new Map(); this.pendingHolds = new Map(); this.runs = new Map();
+    this.holds = new Map(); this.ownerHolds = new Map(); this.pendingHolds = new Map();
   }
   pool(projectID, limit, revision) {
     if (typeof projectID !== 'string' || !projectID ||
@@ -65,10 +63,10 @@ export class RuntimeAdmission {
     if (!this.hasHolds(slot)) return this.release(slot);
     return { state: 'released' };
   }
-  rejectWaiters(slot, error, suspension) {
+  rejectWaiters(slot, error) {
     const pool = this.pools.get(slot.projectID);
     if (pool) for (const waiter of [...pool.waiters]) {
-      if (waiter.owner !== slot.owner || (suspension && waiter.suspension !== suspension)) continue;
+      if (waiter.owner !== slot.owner) continue;
       pool.waiters.splice(pool.waiters.indexOf(waiter), 1);
       waiter.signal?.removeEventListener('abort', waiter.abort);
       waiter.reject(error);
@@ -76,10 +74,6 @@ export class RuntimeAdmission {
   }
   ownerKey(slot) { return JSON.stringify([slot.projectID, slot.owner]); }
   hasHolds(slot) { return (this.ownerHolds.get(this.ownerKey(slot)) ?? 0) > 0; }
-  otherRunning(slot, state) {
-    return [...(this.runs.get(this.ownerKey(slot)) ?? [])]
-      .some(run => run !== state && !run.ended && !run.suspended);
-  }
   beginHold(hold) {
     if (typeof hold !== 'string' || !hold) throw new Error('Workspace hold identity is required');
     let pending = this.pendingHolds.get(hold);
@@ -115,7 +109,7 @@ export class RuntimeAdmission {
     const count = this.ownerHolds.get(key) - 1;
     if (count) this.ownerHolds.set(key, count); else this.ownerHolds.delete(key);
     const state = slot.suspension;
-    if (!count && (state.ended || state.suspended || this.revoked.has(slot.owner)) && !this.otherRunning(slot, state)) {
+    if (!count && (state.suspended || this.revoked.has(slot.owner))) {
       this.release(slot);
     }
     this.cleanupExternal(slot, state);
@@ -152,7 +146,6 @@ export class RuntimeAdmission {
     slot.signal?.throwIfAborted();
     if (this.closed) throw new Error('Execution admission is closed');
     if (this.revoked.has(slot.owner)) throw new Error('Execution owner was cancelled');
-    if (slot.suspension?.ended) throw new Error('Execution step has ended');
     if (ticket?.invalidated) throw new Error('Workspace hold was released');
     const pool = this.pool(slot.projectID);
     if (this.tryReserve(pool, slot.owner)) return;
@@ -175,32 +168,7 @@ export class RuntimeAdmission {
       });
     } finally { if (ticket) ticket.abort = undefined; }
     if (this.revoked.has(slot.owner)) throw new Error('Execution owner was cancelled');
-    if (slot.suspension?.ended) throw new Error('Execution step has ended');
     if (ticket?.invalidated) throw new Error('Workspace hold was released');
-  }
-  async run(slot, next) {
-    const pool = this.pool(slot.projectID, slot.limit, slot.revision);
-    this.drain(pool);
-    const suspension = { suspended: 0, ended: false };
-    let acquired = false;
-    try {
-      await this.acquire(slot);
-      acquired = true;
-      slot.signal?.throwIfAborted();
-      const key = this.ownerKey(slot);
-      let runs = this.runs.get(key);
-      if (!runs) { runs = new Set(); this.runs.set(key, runs); }
-      runs.add(suspension);
-      return await this.context.run({ ...slot, suspension }, next);
-    } finally {
-      suspension.ended = true;
-      this.rejectWaiters(slot, new Error('Execution step has ended'), suspension);
-      const key = this.ownerKey(slot);
-      const runs = this.runs.get(key);
-      runs?.delete(suspension);
-      if (!runs?.size) this.runs.delete(key);
-      if (acquired && !this.hasHolds(slot) && !this.otherRunning(slot, suspension)) this.release(slot);
-    }
   }
   async suspend(next, { hold } = {}) {
     const slot = this.context.getStore();
@@ -208,14 +176,13 @@ export class RuntimeAdmission {
     slot.signal?.throwIfAborted();
     if (this.closed) throw new Error('Execution admission is closed');
     if (this.revoked.has(slot.owner)) throw new Error('Execution owner was cancelled');
-    if (slot.suspension?.ended) throw new Error('Execution step has ended');
     if (slot.yielding && hold === undefined) return next();
     const state = slot.suspension;
     const outer = !slot.yielding;
     const ticket = hold === undefined ? undefined : this.beginHold(hold);
     if (outer) {
       state.suspended++;
-      if (state.suspended === 1 && !this.hasHolds(slot) && !this.otherRunning(slot, state)) this.release(slot);
+      if (state.suspended === 1 && !this.hasHolds(slot)) this.release(slot);
     }
     let result; let succeeded = false;
     try {
@@ -231,29 +198,23 @@ export class RuntimeAdmission {
           await this.acquire(slot, shouldPin ? ticket : undefined);
           slot.signal?.throwIfAborted();
           if (this.revoked.has(slot.owner)) throw new Error('Execution owner was cancelled');
-          if (state.ended) throw new Error('Execution step has ended');
           if (shouldPin) this.pin(slot, hold, ticket);
         }
       } finally { if (ticket) this.finishHold(hold, ticket); }
     }
   }
   start() {
-    this.removeStep = this.ctx.on('agent/pre-step', async ({ agent, signal }, next) => {
+    this.removeStep = this.ctx.on('agent/pre-step', async ({ agent }, next) => {
       const rootID = await this.sessions.rootID(agent.session.id);
       const group = this.sessions.groups.get(rootID);
       if (!group) throw new Error('Agent execution has no admitted root');
-      const binding = await group.begin;
-      if (!binding?.workspaceID) return next();
-      const capacity = await this.sessions.rpc.request('bridge/execution', { operation: 'capacity', sessionID: rootID });
-      return this.run({ projectID: binding.workspaceID, limit: capacity.limit, revision: capacity.revision,
-        owner: `native:${agent.id}`, signal }, next);
+      await group.begin;
+      return next();
     }, { global: true });
-    this.removeTool = this.ctx.on('tools/execute', (exec, next) =>
-      yieldingTools.has(exec.name) ? this.suspend(next) : next(), { global: true, prepend: true });
   }
   dispose() {
     this.closed = true;
-    this.removeStep?.(); this.removeTool?.();
+    this.removeStep?.();
     for (const pool of this.pools.values()) for (const waiter of pool.waiters.splice(0)) {
       waiter.signal?.removeEventListener('abort', waiter.abort);
       waiter.reject(new Error('Execution admission is closed'));

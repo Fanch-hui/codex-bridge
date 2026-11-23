@@ -66,7 +66,7 @@
     keyBody.appendChild(key.wrapper); keyBody.appendChild(keyActions);
     keyDetails.addEventListener("toggle", function () { if (!keyDetails.open) key.control.value = ""; });
     root.addEventListener("toggle", function () { if (!root.open) key.control.value = ""; });
-    var preferences = S.node("div", "dsh-provider-options"), freeOnly = check("仅免费模型"), hideDsh = check("隐藏 DSH 模型");
+    var preferences = S.node("div", "dsh-provider-options"), freeOnly = check("仅免费模型"), hideDsh = check("隐藏引擎名称");
     preferences.appendChild(freeOnly.wrapper); preferences.appendChild(hideDsh.wrapper); body.appendChild(preferences);
     freeOnly.control.addEventListener("change", function () { return changeOptions("freeOnly", freeOnly.control.checked); });
     hideDsh.control.addEventListener("change", function () { return changeOptions("hideDsh", hideDsh.control.checked); });

@@ -6,7 +6,8 @@ import { parse } from 'yaml';
 const require = createRequire(import.meta.url);
 const upstream = dirname(require.resolve('@deepseek-ai/dsh-web-app/package.json'));
 const jsTag = { tag: 'tag:yaml.org,2002:js', resolve: value => value };
-const excluded = new Set(['client-hmr', 'ui-settings-models', 'ui-settings-account', 'ui-agent-preset']);
+const excluded = new Set(['client-hmr', 'ui-settings-models', 'ui-settings-account', 'ui-agent-preset',
+  'ui-settings-web-search']);
 
 export function clientRoster() {
   const patch = parse(readFileSync(join(upstream, 'cordis.patch.yml'), 'utf8'), { customTags: [jsTag] });

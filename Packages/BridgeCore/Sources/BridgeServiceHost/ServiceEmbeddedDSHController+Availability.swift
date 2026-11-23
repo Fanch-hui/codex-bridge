@@ -81,6 +81,8 @@ extension ServiceEmbeddedDSHController {
   }
 
   private func stopWorkbenchRuntime() async throws {
+    resetPendingCommunityProviderRefresh()
+    operationsRestoreTask?.cancel()
     await subagentScheduler?.shutdown()
     subagentScheduler = nil
     let engine = try engine()
@@ -93,7 +95,6 @@ extension ServiceEmbeddedDSHController {
     runtime = nil
     await communityGateway?.closeWorkbenchGateway()
     recovery = nil
-    operationsRestoreStarted = false
     workspaceMergeMonitor?.cancel()
     workspaceMergeMonitor = nil
   }

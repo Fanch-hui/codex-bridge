@@ -5,6 +5,7 @@ import { initProfile } from '@deepseek-ai/dsh-app-boot';
 import { createLaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment';
 import { runProfile } from '@deepseek-ai/dsh/lib/profile-boot.js';
 import { clientRoster } from './client-roster.mjs';
+import { WORKBENCH_PROMPT } from './workbench-prompt.mjs';
 
 const hostDirectory = dirname(fileURLToPath(import.meta.url));
 
@@ -17,6 +18,11 @@ export async function startEngine(home, { sharedProviders = false, bridgeSkills 
   mkdirSync(home, { recursive: true });
   const rows = [
     { id: 'credentials', disabled: true },
+    { id: 'system-prompt', config: { includeHarnessIdentity: false, personaPrefix: WORKBENCH_PROMPT } },
+    { id: 'web', config: { searchProvider: 'bridge-search', fetchProvider: 'http' } },
+    { id: 'web-search-deepseek', disabled: true },
+    { id: 'web-deepseek-api', disabled: true },
+    { id: 'tool-web', config: { searchMaxQueries: 1, searchMaxResults: 5 } },
     // Shared writers use the observed file version to reject stale edits.
     { id: 'fs-observation-policy', disabled: false },
     { id: 'session-query-sqlite', config: { path: ':memory:', openAt: 'first-search', persistedReadConcurrency: 2 } },
@@ -26,6 +32,7 @@ export async function startEngine(home, { sharedProviders = false, bridgeSkills 
     { id: 'tool-subagent-control', config: { interrupt: true } },
     { insert: [
       { id: 'bridge-credentials', name: pathToFileURL(join(hostDirectory, 'credentials.mjs')).href },
+      { id: 'bridge-search', name: pathToFileURL(join(hostDirectory, 'workbench-search.mjs')).href },
       ...bridgeSkills
         ? [{ id: 'bridge-skills', name: pathToFileURL(join(hostDirectory, 'bridge-skills.mjs')).href }]
         : [],

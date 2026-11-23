@@ -30,6 +30,7 @@ import { ProviderConnections } from './provider-connections.mjs';
 import { ContextPolicy, contextPolicySymbol } from './context-policy.mjs';
 import { cancelNativeSubagentInput } from './native-subagent-inputs.mjs';
 import { stopWithScopes } from './session-stop.mjs';
+import { setTeamMode } from './team-mode.mjs';
 import { importTask } from './task-import.mjs';
 import { confirmedResponses } from '../node_modules/dsh-plugin-chatgpt-siwc/lib/provider/durability.js';
 
@@ -150,7 +151,7 @@ export class Actions {
       case 'client.stream.send': return this.client.streams.send(p);
       case 'client.stream.close': return this.client.streams.close(p);
       case 'client.stream.poll': return this.client.streams.poll(p, signal);
-      case 'status': return { ready: true, engineVersion: '0.2.2-rc.3',
+      case 'status': return { ready: true, engineVersion: '0.2.2-rc.5',
         capabilities: { durableAdmission: globalThis[Symbol.for('codex-bridge.durable-session-admission')] === true,
           boundedContentRead: typeof ctx.get('sessionPersistence')?.bridgeReadEvent === 'function', titleSearch: true } };
       case 'events': return this.events.poll(p, signal);
@@ -229,6 +230,7 @@ export class Actions {
       case 'session.receipt': return this.sessions.receipt(p);
       case 'session.resumePending': return this.sessions.resumePending(p);
       case 'session.selectModel': return this.selectModel(p);
+      case 'session.setTeamMode': return setTeamMode(ctx, this.sessions, p);
       case 'session.updateQueue':
         return this.sessions.withExecution(p.sessionId, () => ctx.sessionController.updateQueue(p));
       case 'commands.list': return { items: ctx.commands.list(p.sessionId ? await this.sessions.agent(p.sessionId) : undefined) };

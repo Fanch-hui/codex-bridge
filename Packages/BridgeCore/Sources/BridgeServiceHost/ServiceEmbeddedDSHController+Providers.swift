@@ -47,19 +47,6 @@ extension ServiceEmbeddedDSHController {
     }
   }
 
-  func noteRuntimeRunning(_ engine: EmbeddedDSHRuntime) {
-    guard !isShuttingDown, runtime === engine else { return }
-    runtimeStarted = true
-    flushPendingCommunityProviderRefreshIfNeeded(for: engine)
-  }
-
-  func receiveRuntimeEvent(_ event: EmbeddedDSHEvent) async {
-    if event.type == "runtime.failed" {
-      runtimeStarted = false
-    }
-    await receive(event)
-  }
-
   func resetPendingCommunityProviderRefresh() {
     pendingCommunityRefreshGeneration &+= 1
     pendingCommunityRefreshTask?.cancel()
@@ -68,7 +55,7 @@ extension ServiceEmbeddedDSHController {
     runtimeStarted = false
   }
 
-  private func flushPendingCommunityProviderRefreshIfNeeded(for engine: EmbeddedDSHRuntime) {
+  func flushPendingCommunityProviderRefreshIfNeeded(for engine: EmbeddedDSHRuntime) {
     guard !isShuttingDown, runtime === engine, pendingCommunityProviderRefresh,
       pendingCommunityRefreshTask == nil
     else { return }
@@ -92,7 +79,6 @@ extension ServiceEmbeddedDSHController {
       do {
         guard try await engine.callIfRunning(action: "provider.refresh") != nil else {
           if !isShuttingDown, runtime === engine {
-            runtimeStarted = false
             pendingCommunityProviderRefresh = true
           }
           return

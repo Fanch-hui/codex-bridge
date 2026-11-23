@@ -3,6 +3,15 @@ import BridgeEmbeddedDSH
 import Foundation
 
 extension ServiceEmbeddedDSHController {
+  func receiveWorkbenchEngineEvent(_ event: EmbeddedDSHEvent) async {
+    if event.type == "runtime.failed" {
+      runtimeStarted = false
+      operationsRestoreTask?.cancel()
+      await subagentScheduler?.adapterStopped()
+    }
+    await receive(event)
+  }
+
   func receive(_ event: EmbeddedDSHEvent) async {
     if event.type == "workspace.recovery.changed" {
       Task {
@@ -22,11 +31,6 @@ extension ServiceEmbeddedDSHController {
     }
     if event.type == "workspace.externalLease", let rootID = event.sessionID {
       await subagentScheduler?.kick(rootID)
-    }
-    // A host that failed took its leases and root holds with it; an explicit restart brings the
-    // scheduler back.
-    if event.type == "runtime.failed" {
-      await subagentScheduler?.adapterStopped()
     }
     if event.type == "plugin.install", let id = event.payload["requestId"]?.stringValue,
       ["completed", "failed", "cancelled", "unknown"].contains(

@@ -9,21 +9,28 @@ extension ServiceEmbeddedDSHController {
   func restoreOperations() async {
     do {
       let operations = try await store.workbenchOperations(unresolvedOnly: true, limit: 500)
+      try Task.checkCancellation()
       for operation in operations { scheduleOperation(operation.draft.operationID) }
       for binding in try await store.pendingWorkbenchProjectBindings() {
+        try Task.checkCancellation()
         do {
           let generation = try await store.workbenchGeneration(sessionID: binding.logicalSessionID)
           if generation.closed { continue }
+          try Task.checkCancellation()
           _ = try await bindProject([
             "sessionId": .string(binding.logicalSessionID),
             "projectID": .string(binding.projectID), "requestId": .string(binding.requestID),
             "toolCallId": .string(binding.toolCallID),
           ])
+        } catch is CancellationError where Task.isCancelled {
+          return
         } catch {
           await receive(
             EmbeddedDSHEvent(type: "operations.recoveryFailed", payload: operationError(error)))
         }
       }
+    } catch is CancellationError {
+      return
     } catch {
       await receive(
         EmbeddedDSHEvent(type: "operations.recoveryFailed", payload: operationError(error)))

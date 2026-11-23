@@ -9,6 +9,7 @@ public actor EmbeddedDSHRuntime {
   private let configuration: EmbeddedDSHRuntimeConfiguration
   private let prepareDependencies: @Sendable () async throws -> Void
   private let handler: Handler
+  private let onStarted: @Sendable () async -> Void
   private let onEvent: EventHandler
   private var client: EmbeddedDSHClient?
   private var trackedClients: [UInt64: EmbeddedDSHClient] = [:]
@@ -23,11 +24,13 @@ public actor EmbeddedDSHRuntime {
     configuration: EmbeddedDSHRuntimeConfiguration,
     prepareDependencies: @escaping @Sendable () async throws -> Void = {},
     handler: @escaping Handler,
+    onStarted: @escaping @Sendable () async -> Void = {},
     onEvent: @escaping EventHandler
   ) {
     self.configuration = configuration
     self.prepareDependencies = prepareDependencies
     self.handler = handler
+    self.onStarted = onStarted
     self.onEvent = onEvent
   }
 
@@ -138,12 +141,13 @@ public actor EmbeddedDSHRuntime {
     opening = task
     do {
       let started = try await task.value
-      guard attempt == generation, !stopped else {
+      guard attempt == generation, !stopped, lastFailure == nil else {
         _ = await started.close()
-        throw EmbeddedDSHRuntimeError.stopped
+        throw lastFailure ?? EmbeddedDSHRuntimeError.stopped
       }
       opening = nil
       client = started
+      await onStarted()
       return started
     } catch {
       if attempt == generation {

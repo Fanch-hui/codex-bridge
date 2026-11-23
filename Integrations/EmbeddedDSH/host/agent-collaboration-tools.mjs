@@ -63,9 +63,12 @@ export function registerCollaborationTools(bridge) {
   }, async (args, exec) => {
     if (!exec.agent) throw new Error('Messaging a subagent requires an agent');
     const { id, mode } = await childRow(ctx, exec.agent, args.childID, false, exec.signal);
-    if (mode === 'external') return JSON.stringify(await bridge.send(id, args.prompt,
-      bridge.continuationID(bridge.rootOf(exec.agent), id, exec.callId), bridge.rootOf(exec.agent),
-      { delivery: args.delivery, attachmentPaths: args.attachmentPaths, repairConflict: args.repairConflict }));
+    if (mode === 'external') {
+      bridge.requireMainSession(exec.agent);
+      return JSON.stringify(await bridge.send(id, args.prompt,
+        bridge.continuationID(bridge.rootOf(exec.agent), id, exec.callId), bridge.rootOf(exec.agent),
+        { delivery: args.delivery, attachmentPaths: args.attachmentPaths, repairConflict: args.repairConflict }));
+    }
     if (args.attachmentPaths?.length || args.delivery === 'queue' || args.repairConflict) throw new Error('This native tool does not support queued messages, attachment paths, or workspace repair');
     const native = ctx.tools.get('send_message', exec.agent);
     if (!native) throw new Error('Native subagent messaging is unavailable');
@@ -89,7 +92,10 @@ export function registerBridgeTools(bridge) {
   }));
   register('bridge_agents', 'List available connected agents for delegation.', {}, async (_args, exec) => JSON.stringify(await bridge.agents(exec.agent)));
   register('bridge_agent_models', 'List models for a connected agent.', { installationID: { type: 'string', required: true } },
-    async (args, exec) => JSON.stringify(await bridge.rpc.request('bridge/agentModels', { sessionID: bridge.rootOf(exec.agent), installationID: args.installationID })));
+    async (args, exec) => {
+      bridge.requireMainSession(exec.agent);
+      return JSON.stringify(await bridge.rpc.request('bridge/agentModels', { sessionID: bridge.rootOf(exec.agent), installationID: args.installationID }));
+    });
   register('bridge_delegate', 'Legacy alias of delegate_agent; prefer delegate_agent. Start an independent connected agent. Include task-specific context only; do not include credentials, private reasoning, or MCP operating instructions. Its result and workspace status are delivered to you.', {
     installationID: { type: 'string', required: true }, description: { type: 'string', required: true },
     prompt: { type: 'string', required: true }, model: { type: 'string' }, effort: { type: 'string' }, ...handoffParameters
@@ -99,6 +105,7 @@ export function registerBridgeTools(bridge) {
     delivery: { type: 'string', enum: ['queue', 'steer'] }, attachmentPaths: handoffParameters.attachmentPaths,
     repairConflict: { type: 'boolean', description: 'Explicitly ask the child to repair its conflicted workspace.' }
   }, async (args, exec) => {
+    bridge.requireMainSession(exec.agent);
     const root = bridge.rootOf(exec.agent);
     return JSON.stringify(await bridge.send(args.childID, args.prompt, bridge.continuationID(root, args.childID, exec.callId), root,
       { delivery: args.delivery, attachmentPaths: args.attachmentPaths, repairConflict: args.repairConflict }));

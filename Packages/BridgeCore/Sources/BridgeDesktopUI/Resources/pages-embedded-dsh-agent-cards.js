@@ -3,12 +3,12 @@
   var S = global.CodexBridgeDesktopPageSupport;
 
   var queued = ["queued", "waiting-for-workspace", "awaiting_local_approval"];
-  var active = ["running", "starting", "created", "unknown"].concat(queued);
-  var statusText = { running: "运行中", starting: "启动中", created: "启动中", queued: "排队中", "waiting-for-workspace": "等待写入",
+  var active = ["running", "starting", "created", "stopping", "unknown"].concat(queued);
+  var statusText = { running: "运行中", starting: "启动中", created: "启动中", stopping: "停止中", queued: "排队中", "waiting-for-workspace": "等待写入",
     awaiting_local_approval: "等待批准", unknown: "待核对", idle: "已完成", inactive: "已完成", completed: "已完成",
     failed: "失败", interrupted: "已停止", stopped: "已停止", cancelled: "已停止" };
   var resultText = { completed: "已完成", failed: "失败", interrupted: "已停止" };
-  var workspaceText = { pending: "待合并", conflict: "有冲突", validation_required: "待验证", validating: "验证中",
+  var workspaceText = { pending: "待合并", merged: "已合并", conflict: "有冲突", validation_required: "待验证", validating: "验证中",
     recovery_required: "待恢复", merging: "合并中", failed: "合并失败", retained: "变更已保留" };
 
   function tone(status) {
@@ -24,7 +24,7 @@
     var result = entry.result || null, status = live && live.status || "";
     var summary = live ? statusText[status] || "" : result ? resultText[result.state] || "已结束" : "已交给 Agent";
     var state = live ? tone(status) : result ? tone(result.state) : "running";
-    if (live && live.stopping) { summary = "正在停止…"; state = "running"; }
+    if (live && live.stopping) { summary = statusText.stopping; state = "running"; }
     var workspace = live && workspaceText[live.workspaceStatus];
     return { name: name, state: state, status: [summary, workspace].filter(Boolean).join(" · "),
       canOpen: !!live, canStop: !!live && !live.stopping && live.canStop, stopping: !!live && live.stopping,
@@ -52,7 +52,7 @@
           if (!id) return;
           var status = item.status || (item.running ? "running" : "");
           next.set(id, { status: status, workspaceStatus: item.workspaceStatus || "", label: item.label || item.name || "",
-            canStop: canStop(item, status), stopping: !!(stopping && stopping(id)) });
+            canStop: canStop(item, status), stopping: status === "stopping" || !!(stopping && stopping(id)) });
         });
         publish(next);
       },

@@ -38,7 +38,7 @@
     menu.setAttribute("role", "menu"); menu.hidden = true; menu.dataset.browserOccluder = "";
     var header = appendAll(S.node("div", "workbench-agent-launcher-header"), [
       S.node("p", "workbench-agent-launcher-title", "直接打开外部 Agent"),
-      S.node("p", "workbench-agent-launcher-subtitle", "点 + 默认新建内置 DSH")
+      S.node("p", "workbench-agent-launcher-subtitle", "点 + 默认新建工作台对话")
     ]);
     var list = S.node("div", "workbench-agent-launcher-list");
     var root = appendAll(S.node("span", "workbench-agent-launcher"), [button, appendAll(menu, [header, list])]);
@@ -90,7 +90,7 @@
     agentField.control.id = "dsh-agent-draft-agent-" + slot;
     var projectField = C().choice("项目", function (v) { draft.projectID = v; syncUI(); }, "dsh-agent-draft-project");
     projectField.control.id = "dsh-agent-draft-project-" + slot; projectField.control.title = "任务所在的项目";
-    var switchButton = S.button("改用内置 DSH", null, {}, null, "small dsh-agent-draft-switch");
+    var switchButton = S.button("改用工作台", null, {}, null, "small dsh-agent-draft-switch");
     switchButton.addEventListener("click", function () { if (options.onSwitchToDSH) options.onSwitchToDSH(); });
     var bar = appendAll(S.node("div", "dsh-agent-draft-bar"), [
       appendAll(S.node("div", "dsh-agent-draft-controls"), [agentField.wrapper, projectField.wrapper]), switchButton
@@ -213,7 +213,7 @@
     var state = { page: null, emit: null, item: null, row: null, detail: null,
       key: "", inputs: null, form: null, following: true, remediationSig: "", sections: null };
     var providerPill = S.node("span", "dsh-external-pane-provider"), statusNode = S.node("span", "dsh-external-pane-status");
-    var importSlot = S.node("div", "workbench-import-control dsh-external-pane-import"); importSlot.title = "带入内置 DSH";
+    var importSlot = S.node("div", "workbench-import-control dsh-external-pane-import"); importSlot.title = "带入工作台";
     importSlot.addEventListener("pointerdown", function () {
       var imp = global.CodexBridgeDesktopWorkbenchImport;
       if (imp && state.detail) { imp.setActive(true); imp.attach(importSlot, state.detail); }

@@ -275,6 +275,7 @@
     mcpForm.appendChild(mcpActions); updateMCPFields();
 
     var contextSection = S.section(body, "上下文"), contextEditor = null;
+    var searchSection = S.section(body, "联网搜索"), searchEditor = null;
     var skillSection = S.section(body, "技能");
     var skillHub = global.CodexBridgeDesktopSettingsSkills
       ? global.CodexBridgeDesktopSettingsSkills.create({ compact: true }) : null;
@@ -285,6 +286,7 @@
       skillSection.appendChild(S.node("p", "hint", "技能中心暂不可用。"));
     }
     var availableCategories = [["models", "模型连接", modelSection], ["context", "上下文", contextSection],
+      ["search", "联网搜索", searchSection],
       ["skills", "技能", skillSection], ["mcp", "MCP 服务", mcpSection], ["plugins", "插件", pluginSection]];
     if (providersOnly) {
       navigation.hidden = true;
@@ -347,6 +349,11 @@
         contextSection.appendChild(contextEditor.root);
       }
       if (contextEditor) contextEditor.setActive(active && category === "context");
+      if (active && category === "search" && !searchEditor) {
+        searchEditor = global.CodexBridgeDesktopEmbeddedDSHWebSearchSettings.create(T);
+        searchSection.appendChild(searchEditor.root);
+      }
+      if (searchEditor) searchEditor.setActive(active && category === "search");
       updateSkillHub();
       updateProvidersActive();
     }
@@ -872,6 +879,7 @@
         setupRevision++;
         if (addPluginDialog.open) addPluginDialog.close();
         apiKey.control.value = ""; mcpEnv.control.value = ""; mcpHeaders.control.value = "";
+        if (searchEditor) searchEditor.clearSecret();
         if (authTimer) global.clearTimeout(authTimer); authTimer = null;
       }
     }

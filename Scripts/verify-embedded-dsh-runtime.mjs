@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const dshVersion = "0.2.2-rc.3";
-const dshCommit = "38a6a5c965aa99ab525161efb7cc5cf1fe62fced";
+const dshVersion = "0.2.2-rc.5";
+const dshCommit = "9c2670d3bce5275e0d1610272958121af87787bb";
 const bundledPlugins = [
   { name: "dsh-zcode", version: "0.2.1", files: [
     "lib/index.js", "lib/proxy/upstream.cjs", "vendor/zcode-api/LICENSE", "LICENSE", "THIRD_PARTY_NOTICES.md"

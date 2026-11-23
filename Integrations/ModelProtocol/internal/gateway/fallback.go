@@ -160,7 +160,7 @@ func namedStatusOf(errRaw []byte) int {
 		}
 		json.Unmarshal(e.Message, &msg)
 	}
-	if magpieSaid(msg) || tooLong(http.StatusBadRequest, msg) {
+	if gatewaySaid(msg) || tooLong(http.StatusBadRequest, msg) {
 		return 0
 	}
 	num := func(raw json.RawMessage) int {
@@ -185,7 +185,7 @@ func namedStatusOf(errRaw []byte) int {
 var httpSaid = lazyre.New(`[(（]\s*HTTP\s*(429|5\d\d)\s*[)）]`)
 
 func textStatus(msg string) int {
-	if magpieSaid(msg) || tooLong(http.StatusBadRequest, msg) {
+	if gatewaySaid(msg) || tooLong(http.StatusBadRequest, msg) {
 		return 0
 	}
 	m := httpSaid.FindStringSubmatch(msg)
@@ -196,6 +196,6 @@ func textStatus(msg string) int {
 	return n
 }
 
-func magpieSaid(msg string) bool {
+func gatewaySaid(msg string) bool {
 	return strings.Contains(msg, loopGuardSaid) || strings.Contains(msg, emptyReply) || strings.Contains(msg, reloopedError)
 }

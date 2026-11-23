@@ -67,7 +67,8 @@ export class WorkspaceWrites {
         if (row.workspaceID) this.domains.bind(row.rootID, row.workspaceID);
         const pool = this.pool(row.rootID);
         if (pool.holders.has(row.ownerID)) throw new Error('Duplicate workspace write lease');
-        pool.holders.set(row.ownerID, { ...row, persistent: true, refs: 1, workflows: 0,
+        // A recovered native write is unconfirmed, so it blocks every writer until it is checked.
+        pool.holders.set(row.ownerID, { ...row, persistent: true, refs: 1, workflows: 0, shared: false,
           recovered: row.ownerID.startsWith('tool:') });
       }
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -145,7 +146,7 @@ export class WorkspaceWrites {
     if (pool.revoked.has(ownerID)) throw new Error('Workspace write owner was cancelled');
     const existing = pool.holders.get(ownerID);
     if (existing) return existing.token;
-    const holder = { ownerID, token: randomUUID(), persistent: true, refs: 1, workflows: 0 };
+    const holder = { ownerID, token: randomUUID(), persistent: true, refs: 1, workflows: 0, shared: false };
     pool.holders.set(ownerID, holder);
     try { await this.persist(); } catch (error) { pool.holders.delete(ownerID); throw error; }
     return holder.token;
@@ -159,19 +160,19 @@ export class WorkspaceWrites {
     let token;
     const acquire = async () => { token = await this.acquireLease(rootID, ownerID, options); return token; };
     try {
-      if (!this.runtimeAdmission) return await acquire();
+      if (!this.runtimeAdmission || !options.runtimeSlot) return await acquire();
       const hold = JSON.stringify([rootID, ownerID]);
-      return options.runtimeSlot
-        ? await this.runtimeAdmission.suspendExternal({ ...options.runtimeSlot, signal: options.signal }, acquire, { hold })
-        : await this.runtimeAdmission.suspend(acquire, { hold });
+      return await this.runtimeAdmission.suspendExternal({ ...options.runtimeSlot, signal: options.signal }, acquire, { hold });
     } catch (error) {
       if (token && this.holder(rootID, ownerID)?.token === token) await this.release(rootID, ownerID, token);
       throw error;
     }
   }
 
+  // Native DSH tool calls share the workspace with each other and rely on the engine's file
+  // observation checks. Writers admitted by the Service (connected Agents, merges) are exclusive.
   async acquireLease(rootID, ownerID, { signal, persistent = false, reentrant = false, retainedAgent, retainedRuntime,
-    allowWorkflowWait = false } = {}) {
+    allowWorkflowWait = false, shared = false } = {}) {
     this.validate(rootID, ownerID);
     if (this.disposed) throw new Error('Workspace write coordinator is closed');
     signal?.throwIfAborted();
@@ -186,34 +187,34 @@ export class WorkspaceWrites {
       if (reentrant) owned.refs++;
       return owned.token;
     }
-    if (retainedAgent && !pool.waiters.length && !pool.clearing && pool.holders.size === 1) {
-      const holder = [...pool.holders.values()][0];
-      if (holder.refs === 0 && holder.retained?.agent === retainedAgent &&
-          holder.retained.runtimes.size === 1 && holder.retained.runtimes.has(retainedRuntime)) {
-        const previousOwner = holder.ownerID;
-        pool.holders.delete(previousOwner);
-        holder.ownerID = ownerID;
-        holder.refs = 1;
-        pool.holders.set(ownerID, holder);
-        if (holder.persistent) {
-          holder.ready = this.persist();
-          try { await holder.ready; } catch (error) {
-            pool.holders.delete(ownerID);
-            holder.ownerID = previousOwner;
-            holder.refs = 0;
-            pool.holders.set(previousOwner, holder);
-            throw error;
-          } finally { holder.ready = undefined; }
-        }
-        this.runtimeAdmission?.unpin(JSON.stringify([rootID, previousOwner]));
-        return holder.token;
+    const holder = retainedAgent && !pool.clearing && !this.domains.hasExclusiveWaiter(rootID) &&
+      [...pool.holders.values()].find(candidate => candidate.shared && candidate.refs === 0 &&
+        candidate.retained?.agent === retainedAgent && candidate.retained.runtimes.size === 1 &&
+        candidate.retained.runtimes.has(retainedRuntime));
+    if (holder) {
+      const previousOwner = holder.ownerID;
+      pool.holders.delete(previousOwner);
+      holder.ownerID = ownerID;
+      holder.refs = 1;
+      pool.holders.set(ownerID, holder);
+      if (holder.persistent) {
+        holder.ready = this.persist();
+        try { await holder.ready; } catch (error) {
+          pool.holders.delete(ownerID);
+          holder.ownerID = previousOwner;
+          holder.refs = 0;
+          pool.holders.set(previousOwner, holder);
+          throw error;
+        } finally { holder.ready = undefined; }
       }
+      this.runtimeAdmission?.unpin(JSON.stringify([rootID, previousOwner]));
+      return holder.token;
     }
-    if (!allowWorkflowWait && [...pool.holders.values()].some(holder => holder.workflows > 0)) {
+    if (!shared && !allowWorkflowWait && [...pool.holders.values()].some(holder => holder.workflows > 0)) {
       throw workflowBusy();
     }
     return new Promise((resolve, reject) => {
-      const waiter = { ownerID, persistent, signal, resolve, reject, allowWorkflowWait, order: ++this.nextWaiter };
+      const waiter = { ownerID, persistent, signal, resolve, reject, allowWorkflowWait, shared, order: ++this.nextWaiter };
       waiter.abort = () => {
         const index = pool.waiters.indexOf(waiter);
         if (index >= 0) pool.waiters.splice(index, 1);
@@ -228,42 +229,14 @@ export class WorkspaceWrites {
 
   drain(rootID) { this.domains.drain(rootID); }
 
-  drainRoot(rootID) {
+  // Gives the lease to the first waiter of one root; the domain decides when that is allowed.
+  grant(rootID) {
     const pool = this.pool(rootID);
-    if (this.disposed || pool.clearing || (!pool.waiters.length && !pool.notifyWhenFree && !pool.quiescence.length)) return;
-    if (pool.holders.size) {
-      if (pool.holders.size !== 1) return;
-      const holder = [...pool.holders.values()][0];
-      if (holder.refs || !holder.retained) return;
-      pool.clearing = true;
-      this.cleanupRetained(holder).then(async () => {
-        const retained = holder.retained;
-        holder.retained = undefined;
-        try { await this.release(rootID, holder.ownerID, holder.token); }
-        catch (error) { holder.retained = retained; throw error; }
-        pool.clearing = false;
-        this.settleQuiescence(rootID);
-        this.drain(rootID);
-      }).catch(error => {
-        pool.clearing = false;
-        for (const waiter of pool.quiescence.splice(0)) waiter.reject(error);
-        for (const waiter of pool.waiters.splice(0)) {
-          waiter.signal?.removeEventListener('abort', waiter.abort);
-          waiter.reject(error);
-        }
-      });
-      return;
-    }
-    if (!pool.waiters.length) {
-      this.settleQuiescence(rootID);
-      pool.notifyWhenFree = false;
-      this.onAvailable(rootID);
-      return;
-    }
     const waiter = pool.waiters.shift();
     waiter.signal?.removeEventListener('abort', waiter.abort);
-    if (waiter.signal?.aborted) { waiter.reject(waiter.signal.reason); this.drain(rootID); return; }
-    const holder = { ownerID: waiter.ownerID, token: randomUUID(), persistent: waiter.persistent, refs: 1, workflows: 0 };
+    if (waiter.signal?.aborted) { waiter.reject(waiter.signal.reason); return; }
+    const holder = { ownerID: waiter.ownerID, token: randomUUID(), persistent: waiter.persistent, refs: 1, workflows: 0,
+      shared: waiter.shared };
     pool.holders.set(waiter.ownerID, holder);
     const ready = holder.persistent ? this.persist() : Promise.resolve();
     holder.ready = ready;
@@ -281,6 +254,37 @@ export class WorkspaceWrites {
         } else waiter.reject(waiter.signal.reason);
       } else waiter.resolve(holder.token);
     }, error => { holder.ready = undefined; pool.holders.delete(holder.ownerID); waiter.reject(error); this.drain(rootID); });
+  }
+
+  // Stops the idle interpreters and terminals that still hold one root's lease.
+  clearRetained(rootID) {
+    const pool = this.pool(rootID);
+    pool.clearing = true;
+    Promise.all([...pool.holders.values()].map(async holder => {
+      await this.cleanupRetained(holder);
+      const retained = holder.retained;
+      holder.retained = undefined;
+      try { await this.release(rootID, holder.ownerID, holder.token); }
+      catch (error) { holder.retained = retained; throw error; }
+    })).then(() => {
+      pool.clearing = false;
+      this.settleQuiescence(rootID);
+      this.drain(rootID);
+    }).catch(error => {
+      pool.clearing = false;
+      for (const waiter of pool.quiescence.splice(0)) waiter.reject(error);
+      for (const waiter of pool.waiters.splice(0)) {
+        waiter.signal?.removeEventListener('abort', waiter.abort);
+        waiter.reject(error);
+      }
+    });
+  }
+
+  announceFree(rootID) {
+    const pool = this.pool(rootID);
+    this.settleQuiescence(rootID);
+    pool.notifyWhenFree = false;
+    this.onAvailable(rootID);
   }
 
   async release(rootID, ownerID, token) {
@@ -343,7 +347,7 @@ export class WorkspaceWrites {
     const pool = this.pool(rootID);
     const waiters = pool.waiters.splice(0);
     for (const waiter of waiters) {
-      if (waiter.allowWorkflowWait) { pool.waiters.push(waiter); continue; }
+      if (waiter.allowWorkflowWait || waiter.shared) { pool.waiters.push(waiter); continue; }
       waiter.signal?.removeEventListener('abort', waiter.abort);
       waiter.reject(workflowBusy());
     }
@@ -439,16 +443,9 @@ export class WorkspaceWrites {
     if (exec.name === 'wait_agent' && exec.rootCallId && exec.rootCallId !== exec.callId) {
       const rootID = await this.sessions.rootID(exec.agent.id);
       const holder = this.holder(rootID, `tool:${exec.agent.id}:${exec.rootCallId}`);
-      if (holder?.refs > 0) {
-        const peers = await this.ctx.subagents.listDescendants(rootID, exec.signal);
-        const active = id => {
-          const agent = this.ctx.agents.get(id);
-          return agent?.status === 'running' || agent?.inbox?.hasPending === true;
-        };
-        const otherActive = (rootID !== exec.agent.id && active(rootID)) ||
-          peers.some(peer => peer.id !== exec.agent.id && (peer.kind === 'diagnostic' || active(peer.id))) ||
-          await this.sessions.bridgeAgents?.hasRunning(rootID);
-        if (otherActive) throw new Error('Finish the current code step before waiting for another agent using this workspace.');
+      // Native peers share this lease; an exclusive writer could wait for this step while it waits for them.
+      if (holder?.refs > 0 && (this.domains.hasExclusiveWaiter(rootID) || await this.sessions.bridgeAgents?.hasRunning(rootID))) {
+        throw new Error('Finish the current code step before waiting for another agent using this workspace.');
       }
     }
     if (nonWritingTools.has(exec.name)) return next();
@@ -457,7 +454,7 @@ export class WorkspaceWrites {
     const retained = exec.name === 'run_code' && this.ctx.ptcRuntime?.config?.executionMode === 'persistent-in-memory';
     const terminalCall = ['terminal_open', 'terminal_send', 'terminal_signal', 'terminal_close'].includes(exec.name);
     const retainedRuntime = retained ? this.ctx.ptcRuntime : terminalCall ? this.terminalRuntime : undefined;
-    const token = await this.acquire(rootID, ownerID, { signal: exec.signal, reentrant: true, persistent: true,
+    const token = await this.acquire(rootID, ownerID, { signal: exec.signal, reentrant: true, persistent: true, shared: true,
       ...(retainedRuntime ? { retainedAgent: exec.agent, retainedRuntime } : {}) });
     const holder = this.holder(rootID, ownerID);
     const workflow = exec.name === 'workflow';

@@ -24,6 +24,14 @@ public struct WorkspaceIsolatedProcessConfiguration: Sendable {
 public enum WorkspaceProcessIsolation {
   public static var isAvailable: Bool { availability }
 
+  public static func isAvailable(denyProcessFork: Bool) -> Bool {
+    #if os(macOS)
+      return isAvailable
+    #else
+      return !denyProcessFork && isAvailable
+    #endif
+  }
+
   public static func prepare(
     executableURL: URL,
     arguments: [String],
@@ -33,7 +41,9 @@ public enum WorkspaceProcessIsolation {
     denyProcessFork: Bool = false
   ) throws -> WorkspaceIsolatedProcessConfiguration {
     #if os(macOS) || os(Linux)
-      guard isAvailable else { throw WorkspaceProcessIsolationError.unavailable }
+      guard isAvailable(denyProcessFork: denyProcessFork) else {
+        throw WorkspaceProcessIsolationError.unavailable
+      }
       guard executableURL.isFileURL, executableURL.path.hasPrefix("/"),
         !executableURL.path.contains("\0")
       else { throw WorkspaceProcessIsolationError.invalidExecutable }
@@ -88,7 +98,6 @@ public enum WorkspaceProcessIsolation {
             denyProcessFork: denyProcessFork),
         ] + command
       #else
-        guard !denyProcessFork else { throw WorkspaceProcessIsolationError.unavailable }
         return [
           "--ro-bind", "/", "/", "--unshare-user", "--unshare-pid", "--unshare-ipc",
           "--new-session",

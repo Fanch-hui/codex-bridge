@@ -59,7 +59,16 @@ export class BridgeAgents {
     }
     return session.id;
   }
-  agents(agent) { return this.agentsFor(this.rootOf(agent)); }
+  // Connected agents run on the user's own accounts, so only a main session may start or instruct them.
+  requireMainSession(agent) {
+    if (agent.session.header.origin === 'subagent') {
+      throw new Error('Native subagents cannot use connected agents. Only the main session can delegate to or message them.');
+    }
+  }
+  agents(agent) {
+    this.requireMainSession(agent);
+    return this.agentsFor(this.rootOf(agent));
+  }
   agentsFor(rootSessionID) { return this.rpc.request('bridge/agents', { sessionID: rootSessionID }); }
   continuationID(rootSessionID, childID, callID) { return stableID('continue', rootSessionID, childID, callID); }
   provider(installationID) {
@@ -77,6 +86,7 @@ export class BridgeAgents {
   /** Records the child's first round and returns the activation that settles with its first result. */
   async startExternal(installationID, request) {
     const parent = request.parent;
+    this.requireMainSession(parent);
     const rootSessionID = this.rootOf(parent);
     const toolCallID = request.agentOptions?.provider;
     if (!toolCallID) throw new Error('Missing delegation request identity');

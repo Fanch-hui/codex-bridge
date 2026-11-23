@@ -6,6 +6,7 @@
   var O = global.CodexBridgeDesktopEmbeddedDSHOperations;
   var AgentMentions = global.CodexBridgeDesktopEmbeddedDSHAgentMentions, Dispatch = global.CodexBridgeDesktopEmbeddedDSHDispatch;
   var AgentCards = global.CodexBridgeDesktopEmbeddedDSHAgentCards, noDispatch = { active: false, blocked: false };
+  var Team = global.CodexBridgeDesktopEmbeddedDSHTeam;
   var key = "codexbridge.dsh.embedded.v1";
   var startupSequence = 0;
   function readState(storageKey) {
@@ -152,6 +153,8 @@
     var view = global.CodexBridgeDesktopDSHComposerView.create({ detachedFeedback: true });
     root.appendChild(view.root);
     var queue = global.CodexBridgeDesktopEmbeddedDSHQueue.create(); view.queueSlot.appendChild(queue.root);
+    var team = Team ? Team.create({ transport: T, onError: showError }) : null;
+    if (team) view.teamSlot.appendChild(team.toggle);
     var mentions = global.CodexBridgeDesktopEmbeddedDSHMentions && global.CodexBridgeDesktopEmbeddedDSHMentions.create(
       view.input, root, function () { return { sessionID: sessionID, projectID: projectID, connected: connected }; },
       function () { saveDraft(); S.autoGrowTextArea(view.input); validate(); }, agentDirectory);
@@ -482,6 +485,9 @@
       conversation.update(sessionID, project && project.title || "", transcript.records, transcript.streamText,
         visiblePending, transcript.streamReasoning, { projections: transcript.projections, running: running,
           streamTools: transcript.streamTools, hasMore: transcript.hasMore, loadingEarlier: history.loadingEarlier(), onLoadEarlier: loadEarlier });
+      if (team) team.update({ sessionID: sessionID, root: !!sessionID && directory.ready() && (directory.get(sessionID) || {}).origin !== "subagent",
+        ready: connected && history.ready() && !creatingSession(), running: running,
+        projections: transcript.projections, records: transcript.records });
       // A draft's session doesn't exist in the service until session.create returns; reading its commands earlier is refused.
       actions.update({ sessionID: creatingSession() ? null : sessionID, projectID: projectID, connected: connected, running: running, pending: !!pending,
         title: directory.label(sessionID) });
@@ -1209,7 +1215,7 @@
       childItems: function () { return interactions.children ? interactions.children() : []; },
       mountChildPane: function (id, host) { return interactions.mountChild && interactions.mountChild(id, host); },
       releaseChildPane: function (id) { if (interactions.releaseChild) interactions.releaseChild(id); },
-      interaction: interaction, subagents: subagents };
+      interaction: interaction, subagents: subagents, teamBoard: team && team.board };
   }
   global.CodexBridgeDesktopEmbeddedDSH = { create: create, pauseSavedOperations: pauseSavedOperations };
 }(window));

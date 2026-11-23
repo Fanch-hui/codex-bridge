@@ -39,7 +39,7 @@ export class ExternalRootHolds {
     if (await this.sessions.rootID(rootID) !== rootID) throw new Error('The execution owner must be a root session');
     try {
       const agent = await this.sessions.agent(rootID);
-      const { group, generation } = await this.sessions.begin(rootID, agent, { reserveRuntimeSlot: false });
+      const { group, generation } = await this.sessions.begin(rootID, agent);
       this.holds.set(holdID, { rootID, agent, group, generation });
       return { held: true };
     } catch (error) {

@@ -66,8 +66,8 @@ enum ServiceRemoteFailurePresentation {
       "在 Codex 连接详情中查看具体诊断，检查后重试。"
     ),
     (
-      ["embedded_dsh_runtime"], "内置 DSH 请求未完成。",
-      "查看具体诊断；引擎已停止时，在开发台重启引擎。"
+      ["embedded_dsh_runtime"], "工作台请求未完成。",
+      "查看具体诊断；引擎已停止时，在工作台重启引擎。"
     ),
     (
       ["agent_connection_probe_failed", "agent_runtime_probe_failed", "agent_validation_failed"],

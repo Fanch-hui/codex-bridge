@@ -21,7 +21,14 @@ public struct AgentWorkspaceIsolationReadiness: Equatable, Sendable {
 
 /// Implemented only by providers that can verify their actual isolated launch.
 public protocol AgentWorkspaceIsolationProviding: AgentProvider {
+  /// A platform limitation known before an isolated workspace is created.
+  var isolatedWorkspaceUnsupportedReason: String? { get }
+
   func isolatedWorkspaceReadiness(
     installation: AgentInstallation, workspaceRoot: String, runtimeDirectory: String
   ) async throws -> AgentWorkspaceIsolationReadiness
+}
+
+extension AgentWorkspaceIsolationProviding {
+  public var isolatedWorkspaceUnsupportedReason: String? { nil }
 }

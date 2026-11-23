@@ -407,6 +407,7 @@
       document.getElementById("workspace-toolbar-context").appendChild(focused.toolbarContext);
       document.getElementById("workspace-toolbar-actions").appendChild(focused.toolbarActions);
       if (view.workspace) view.workspace.mountSubagents(focused.subagents);
+      if (view.workspace && focused.teamBoard) view.workspace.mountTeam(focused.teamBoard);
       focused.setSubagentsListener(function (_count, added) {
         if (view.workspace) view.workspace.syncSubagents();
         if (added && view.workspace) {

@@ -889,18 +889,18 @@ type cUsage struct {
 
 	Credit *float64 `json:"credit"`
 
-	MagpieDeferred *struct {
+	PluginDeferred *struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
 		CachedTokens     int `json:"cached_tokens"`
 		CacheWriteTokens int `json:"cache_write_tokens"`
 	} `json:"magpie_deferred,omitempty"`
 
-	MagpieCacheUnknown bool `json:"magpie_cache_unknown"`
+	PluginCacheUnknown bool `json:"magpie_cache_unknown"`
 }
 
 func (u cUsage) usage() Usage {
-	out := Usage{Output: u.CompletionTokens, cacheUnknown: u.MagpieCacheUnknown}
+	out := Usage{Output: u.CompletionTokens, cacheUnknown: u.PluginCacheUnknown}
 	if d := u.PromptTokensDetails; d != nil {
 		out.CacheRead, out.CacheWrite = d.CachedTokens, d.CacheWriteTokens
 	}
@@ -925,7 +925,7 @@ func (u cUsage) usage() Usage {
 	if c := u.Credit; c != nil && *c >= 0 {
 		out.Credits = c
 	}
-	if d := u.MagpieDeferred; d != nil && d.PromptTokens+d.CompletionTokens > 0 {
+	if d := u.PluginDeferred; d != nil && d.PromptTokens+d.CompletionTokens > 0 {
 		out.Deferred = &Usage{Input: max(d.PromptTokens-d.CachedTokens-d.CacheWriteTokens, 0), Output: d.CompletionTokens,
 			CacheRead: d.CachedTokens, CacheWrite: d.CacheWriteTokens}
 	}
@@ -1205,7 +1205,7 @@ func (d *chatDecoder) decode(data string, emit func(Event)) error {
 			emit(Event{Kind: KStop, Stop: stopFromChat(c.FinishReason)})
 		}
 	}
-	if ch.Usage != nil && (ch.Usage.PromptTokens > 0 || ch.Usage.CompletionTokens > 0 || ch.Usage.MagpieDeferred != nil || ch.Usage.Credit != nil) {
+	if ch.Usage != nil && (ch.Usage.PromptTokens > 0 || ch.Usage.CompletionTokens > 0 || ch.Usage.PluginDeferred != nil || ch.Usage.Credit != nil) {
 		emit(Event{Kind: KUsage, Usage: ch.Usage.usage()})
 	}
 	return nil

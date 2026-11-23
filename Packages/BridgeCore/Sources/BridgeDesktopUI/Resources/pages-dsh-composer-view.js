@@ -41,7 +41,8 @@
     permission.wrapper.hidden = true; project.wrapper.hidden = true;
     model.wrapper.classList.add("dsh-composer-model"); project.wrapper.classList.add("dsh-composer-project");
     project.control.title = "新对话所在的项目";
-    leading.appendChild(permission.wrapper); leading.appendChild(project.wrapper);
+    var teamSlot = S.node("div", "dsh-composer-team-slot");
+    leading.appendChild(permission.wrapper); leading.appendChild(project.wrapper); leading.appendChild(teamSlot);
     var queueSlot = S.node("div", "dsh-composer-queue-slot");
     trailing.appendChild(queueSlot); trailing.appendChild(mode.wrapper); trailing.appendChild(model.wrapper); trailing.appendChild(effort.wrapper);
     toolbar.appendChild(leading); toolbar.appendChild(trailing); toolbar.appendChild(send); surface.appendChild(toolbar);
@@ -92,7 +93,7 @@
     }
     return { root: root, input: input.control, send: send,
       permission: permission.control, permissionWrapper: permission.wrapper,
-      project: project.control, projectWrapper: project.wrapper,
+      project: project.control, projectWrapper: project.wrapper, teamSlot: teamSlot,
       model: model.control, effort: effort.control, effortWrapper: effort.wrapper,
       mode: mode.control, modeWrapper: mode.wrapper, queueSlot: queueSlot,
       attachmentSlot: attachments, attachmentList: attachmentList, feedback: feedback, recover: recover, edit: edit, recovery: recovery, hint: hint,

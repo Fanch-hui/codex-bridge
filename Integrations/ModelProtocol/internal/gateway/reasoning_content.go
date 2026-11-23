@@ -13,7 +13,7 @@ func reasoningWithText(item map[string]any) bool {
 	return len(parts) > 0
 }
 
-func magpieMadeReasoning(item map[string]any) map[string]any {
+func gatewayMadeReasoning(item map[string]any) map[string]any {
 	if !reasoningWithText(item) {
 		return nil
 	}
@@ -46,12 +46,12 @@ func magpieMadeReasoning(item map[string]any) map[string]any {
 		"summary": []map[string]any{{"type": "summary_text", "text": said}}}
 }
 
-func magpieMadeReasoningRaw(raw json.RawMessage, id string) json.RawMessage {
+func gatewayMadeReasoningRaw(raw json.RawMessage, id string) json.RawMessage {
 	var it map[string]any
 	if decodeJSON(raw, &it) != nil {
 		return raw
 	}
-	made := magpieMadeReasoning(it)
+	made := gatewayMadeReasoning(it)
 	if made == nil {
 		return raw
 	}

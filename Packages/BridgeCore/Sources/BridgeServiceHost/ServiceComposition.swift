@@ -707,7 +707,7 @@ public actor ServiceComposition {
         ServiceRuntimeStatusSnapshot(
           mcpState: current.mcpState, tunnelState: current.tunnelState,
           codexVersion: current.codexVersion, loginMode: current.loginMode,
-          degradations: current.degradations + ["内置 DSH 关闭未完成，执行组将在恢复时核对。"]
+          degradations: current.degradations + ["工作台引擎关闭未完成，执行组将在恢复时核对。"]
         ))
     }
     await coordinator.shutdown()

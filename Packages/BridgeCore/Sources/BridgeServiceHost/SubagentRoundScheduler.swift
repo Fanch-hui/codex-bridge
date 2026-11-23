@@ -66,6 +66,8 @@ actor SubagentRoundScheduler {
   private(set) var isShutDown = false
   /// Leases, root holds, dispatch and delivery wait for the adapter.
   private(set) var adapterReady: Bool
+  private(set) var adapterGeneration: UInt64 = 0
+  private var recoveredLeaseRoots: Set<String> = []
   /// The undelivered results the adapter was told about, by root.
   private var announcedResults: [String: Set<SubagentRoundKey>] = [:]
   private var resultNotices: Set<String> = []
@@ -98,25 +100,13 @@ actor SubagentRoundScheduler {
 
   // MARK: - Lifecycle
 
-  /// Picks up what a previous run left behind: runs a pass for every root that still has work
-  /// and, when the adapter is running, re-creates the leases of dispatched rounds first.
+  /// Runs a pass for every root that still has work. Each pass recovers leases before using
+  /// the adapter for that root.
   func start() async throws {
     guard !isStarted, !isShutDown else { return }
     isStarted = true
     do {
-      let roots = try await ledger.openRoots()
-      if adapterReady {
-        // An adapter can call startup from its import handshake. Awaiting a callback
-        // into that adapter here would deadlock the handshake.
-        adapterRecoveryTask = Task { [self] in
-          for rootID in roots {
-            await recoverLeases(rootID: rootID)
-            kick(rootID)
-          }
-        }
-      } else {
-        for rootID in roots { kick(rootID) }
-      }
+      for rootID in try await ledger.openRoots() { kick(rootID) }
     } catch {
       isStarted = false
       throw error
@@ -134,6 +124,9 @@ actor SubagentRoundScheduler {
   /// The adapter is going away; what it held (root holds, leases) goes with it.
   func adapterStopped() {
     adapterReady = false
+    adapterGeneration &+= 1
+    adapterRecoveryTask?.cancel()
+    recoveredLeaseRoots = []
     held = []
     announcedResults = [:]
     resultNotices = []
@@ -141,10 +134,12 @@ actor SubagentRoundScheduler {
 
   private func recoverOpenRoots() async {
     do {
-      for rootID in try await ledger.openRoots() {
-        await recoverLeases(rootID: rootID)
-        kick(rootID)
-      }
+      let roots = try await ledger.openRoots()
+      try Task.checkCancellation()
+      for rootID in roots { kick(rootID) }
+      clearReport("recover")
+    } catch is CancellationError {
+      return
     } catch {
       await reportOnce("recover", rootID: "", message: describe(error))
     }
@@ -302,16 +297,20 @@ actor SubagentRoundScheduler {
     }
   }
 
-  private func recoverLeases(rootID: String) async {
-    do {
-      try await withLane(rootID) {
-        for round in try await ledger.rounds(rootID: rootID) where Self.needsLeaseRecovery(round) {
-          try await leases.recover(rootID: rootID, ownerID: Self.leaseOwner(round.key))
-        }
-      }
-    } catch {
-      await reportOnce("recover:\(rootID)", rootID: rootID, message: describe(error))
+  func adapterIsReady(generation: UInt64?) -> Bool {
+    adapterReady && generation == adapterGeneration
+  }
+
+  /// Runs under the root's lane, before it can dispatch new work on this adapter.
+  func recoverLeases(rootID: String, rounds: [SubagentRound], generation: UInt64?) async throws {
+    guard adapterIsReady(generation: generation), !recoveredLeaseRoots.contains(rootID) else {
+      return
     }
+    for round in rounds where Self.needsLeaseRecovery(round) {
+      guard adapterIsReady(generation: generation) else { return }
+      try await leases.recover(rootID: rootID, ownerID: Self.leaseOwner(round.key))
+    }
+    if adapterIsReady(generation: generation) { recoveredLeaseRoots.insert(rootID) }
   }
 
   /// A dispatched shared writer owns a task-long lease that must exist again after a restart.

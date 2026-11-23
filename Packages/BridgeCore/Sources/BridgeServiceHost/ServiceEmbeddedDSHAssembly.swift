@@ -75,10 +75,12 @@ enum ServiceEmbeddedDSHAssembly {
       },
       externalWorkspaceSupport: { providerID in
         let id = AgentProviderID(rawValue: providerID)
-        let isolatable =
-          providers.first(where: { $0.descriptor.providerID == id })
-          is any AgentWorkspaceIsolationProviding
-        return isolatable ? nil : ServiceEmbeddedDSHController.isolationUnsupportedReason
+        guard
+          let provider =
+            providers.first(where: { $0.descriptor.providerID == id })
+            as? any AgentWorkspaceIsolationProviding
+        else { return ServiceEmbeddedDSHController.isolationUnsupportedReason }
+        return provider.isolatedWorkspaceUnsupportedReason
       },
       externalChildRecovery: { child in
         guard child.providerID == AgentProviderID.deepSeekHarnessDesktop.rawValue,

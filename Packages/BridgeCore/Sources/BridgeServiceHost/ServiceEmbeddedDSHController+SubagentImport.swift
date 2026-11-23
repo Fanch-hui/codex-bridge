@@ -27,7 +27,7 @@ extension ServiceEmbeddedDSHController {
         item.objectValue ?? [:], rootID: rootID, rootProject: rootProject, isFirst: isFirst,
         into: &tally)
     }
-    if tally.imported > 0 { try await ensureSubagentScheduler().kick(rootID) }
+    if tally.imported > 0 { try await ensureSubagentScheduler(engineRunning: false).kick(rootID) }
     return tally.json
   }
 

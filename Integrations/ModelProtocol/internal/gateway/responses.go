@@ -1757,11 +1757,11 @@ func (e *responsesEncoder) event(ev Event) {
 		raw := json.RawMessage(ev.Text)
 		if e.open == Thinking && !e.thinkNew && (ev.ID == "" || ev.ID == e.itemID || ev.ID == e.thinkUp) {
 
-			e.closeAs(magpieMadeReasoningRaw(raw, e.itemID))
+			e.closeAs(gatewayMadeReasoningRaw(raw, e.itemID))
 			break
 		}
 
-		raw = magpieMadeReasoningRaw(raw, "")
+		raw = gatewayMadeReasoningRaw(raw, "")
 		e.closeItem()
 		e.item++
 		e.thinkNew, e.thinkID = false, ""
@@ -1869,7 +1869,7 @@ func renderResponses(res Result, model string, named map[string]nsTool) []byte {
 		case Thinking:
 			if p.sealedBy(sealResponses) {
 
-				output = append(output, magpieMadeReasoningRaw(p.Sealed, ""))
+				output = append(output, gatewayMadeReasoningRaw(p.Sealed, ""))
 				continue
 			}
 			if p.sealedBy(sealAnthropic) {

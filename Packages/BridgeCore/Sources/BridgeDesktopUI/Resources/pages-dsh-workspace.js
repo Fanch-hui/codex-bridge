@@ -88,15 +88,21 @@
     var diff = S.node("pre", "dsh-git-diff"); diff.setAttribute("aria-label", "Git Diff"); changesPanel.appendChild(diff);
     var agentsEmpty = S.node("p", "hint dsh-workspace-agents-empty", "当前会话暂无子任务。");
     agentsPanel.appendChild(agentsEmpty);
-    var subagentsNode = null;
+    var subagentsNode = null, teamNode = null;
     function syncSubagents() {
       agentsEmpty.hidden = !!(subagentsNode && !subagentsNode.hidden && subagentsNode.children.length);
     }
     function mountSubagents(node) {
       if (subagentsNode && subagentsNode !== node) subagentsNode.remove();
       subagentsNode = node;
-      if (node) agentsPanel.appendChild(node);
+      if (node) agentsPanel.insertBefore(node, teamNode);
       syncSubagents();
+    }
+    // The team task board sits below the Agent list and shows itself only while the session has team mode on.
+    function mountTeam(node) {
+      if (teamNode && teamNode !== node) teamNode.remove();
+      teamNode = node || null;
+      if (node) agentsPanel.appendChild(node);
     }
     function retryableRead(command) {
       return ["listDirectory", "gitStatus"].includes(command.payload.action);
@@ -422,7 +428,7 @@
     }
     editor.select(null, null); renderTree(); renderGit(null);
     return { root: root, update: update, setActive: setActive, setSession: setSession, receive: receive,
-      selectTab: selectTab, mountSubagents: mountSubagents, syncSubagents: syncSubagents };
+      selectTab: selectTab, mountSubagents: mountSubagents, mountTeam: mountTeam, syncSubagents: syncSubagents };
   }
   global.CodexBridgeDesktopDSHWorkspace = { create: create };
 })(window);

@@ -13,11 +13,11 @@ extension ServiceEmbeddedDSHController {
     Task { await self.bootSubagentScheduler() }
   }
 
-  private func bootSubagentScheduler() async {
+  func bootSubagentScheduler() async {
     do {
       try await requireWorkbenchEnabled()
-      guard try await !store.rootsWithOpenSubagentRounds().isEmpty else { return }
-      _ = try await ensureSubagentScheduler(engineRunning: operationsRestoreStarted)
+      if subagentScheduler == nil, try await store.rootsWithOpenSubagentRounds().isEmpty { return }
+      _ = try await ensureSubagentScheduler(engineRunning: false)
     } catch is CancellationError {
       return
     } catch WorkbenchAvailabilityError.disabled {
@@ -33,13 +33,14 @@ extension ServiceEmbeddedDSHController {
   }
 
   /// The scheduler, created on first use and started once. Starting recovers open rounds. A
-  /// request the engine itself sent (`bridge/subagent`) proves the engine is running, and so does
-  /// a recovery that already started it.
+  /// request from a running adapter can also activate the scheduler. The startup import is
+  /// allowed to record rounds before the engine can answer calls.
   func ensureSubagentScheduler(engineRunning: Bool = true) async throws -> SubagentRoundScheduler {
     try await requireWorkbenchEnabled()
-    let scheduler = subagentScheduler ?? makeSubagentScheduler(engineRunning: engineRunning)
+    let adapterAvailable = engineRunning || runtimeStarted
+    let scheduler = subagentScheduler ?? makeSubagentScheduler(engineRunning: adapterAvailable)
     subagentScheduler = scheduler
-    if engineRunning { await scheduler.adapterStarted() }
+    if adapterAvailable { await scheduler.adapterStarted() }
     try await scheduler.start()
     return scheduler
   }

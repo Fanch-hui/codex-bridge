@@ -33,8 +33,8 @@ package struct EmbeddedDSHRuntimeResources: Sendable {
     }
 
     guard manifest.protocolVersion == 1,
-      manifest.dshVersion == "0.2.2-rc.3",
-      manifest.dshCommit == "38a6a5c965aa99ab525161efb7cc5cf1fe62fced",
+      manifest.dshVersion == "0.2.2-rc.5",
+      manifest.dshCommit == "9c2670d3bce5275e0d1610272958121af87787bb",
       manifest.platform == EmbeddedDSHRuntimeTarget.platform,
       manifest.architecture == EmbeddedDSHRuntimeTarget.architecture
     else { throw EmbeddedDSHRuntimeError.incompatibleRuntime }

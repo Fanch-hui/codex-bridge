@@ -61,7 +61,7 @@ export class ProviderActions {
     if (action.startsWith('provider.')) return this.shared.call(action, payload, signal);
     if (action.startsWith('connections.')) return this.connections.call(action, payload);
     switch (action) {
-      case 'status': return { ready: true, engineVersion: '0.2.2-rc.3', providerOnly: true };
+      case 'status': return { ready: true, engineVersion: '0.2.2-rc.5', providerOnly: true };
       case 'configuration.status': return { models: this.activation.get('models') };
       case 'runtime.applyWhenIdle': {
         await this.activation.operations.get('models');

@@ -2,7 +2,7 @@ import BridgeACP
 import BridgeSecurity
 import Foundation
 
-/// Magpie's provider-host wire format is JSONL, not an ACP JSON-RPC envelope.
+/// The community provider host's wire format is JSONL, not an ACP JSON-RPC envelope.
 public actor ProviderHostClient {
   public typealias SecretHandler = @Sendable (ACPJSONValue) async throws -> ACPJSONValue
   public typealias StreamHandler = @Sendable (ProviderResponseEvent) async throws -> Void

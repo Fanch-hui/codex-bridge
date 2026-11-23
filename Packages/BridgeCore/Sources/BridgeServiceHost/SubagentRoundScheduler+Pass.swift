@@ -7,21 +7,24 @@ extension SubagentRoundScheduler {
   /// before anything new starts, and what a round no longer needs is released before capacity is
   /// handed out again.
   func pass(_ rootID: String) async throws {
+    let generation = adapterReady ? adapterGeneration : nil
     var rounds = try await ledger.rounds(rootID: rootID)
     guard !rounds.isEmpty else {
       watch(rootID, needsTimer: false)
       return
     }
     let snapshots = await readSnapshots(rootID: rootID, rounds: Self.snapshotTargets(rounds))
+    try await recoverLeases(rootID: rootID, rounds: rounds, generation: generation)
     // Holding the root and deciding whether it is stopped are engine calls.
-    let stopped = adapterReady ? try await assertRoot(rootID, rounds: rounds) : false
+    let stopped =
+      adapterIsReady(generation: generation) ? try await assertRoot(rootID, rounds: rounds) : false
     let planner = SubagentRoundPlanner(rootID: rootID, rounds: rounds, snapshots: snapshots)
     await settleFinishedTasks(planner)
     await resolveUnconfirmed(planner, rootStopped: stopped)
     rounds = try await ledger.rounds(rootID: rootID)
     let current = SubagentRoundPlanner(rootID: rootID, rounds: rounds, snapshots: snapshots)
     await releaseUnneeded(current)
-    if adapterReady {
+    if adapterIsReady(generation: generation) {
       if stopped {
         await cancelQueued(rounds)
       } else {
@@ -33,7 +36,7 @@ extension SubagentRoundScheduler {
     let final = SubagentRoundPlanner(rootID: rootID, rounds: rounds, snapshots: snapshots)
     await releaseUnneeded(final)
     rounds = try await ledger.rounds(rootID: rootID)
-    if adapterReady {
+    if adapterIsReady(generation: generation) {
       try await releaseRootIfIdle(rootID, rounds: rounds)
       noteResults(final)
     }

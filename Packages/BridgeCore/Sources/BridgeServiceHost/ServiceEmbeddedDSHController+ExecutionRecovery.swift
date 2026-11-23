@@ -19,16 +19,15 @@ extension ServiceEmbeddedDSHController {
     return task
   }
 
-  /// Resumes unresolved operations and subagent rounds once per recovery. Only an engine call
-  /// triggers it: resuming either starts the engine, which the proactive recovery at service
-  /// start must not do.
-  func restoreOperationsOnce() {
-    guard !operationsRestoreStarted else { return }
-    operationsRestoreStarted = true
-    Task {
-      await self.subagentScheduler?.adapterStarted()
+  /// The engine can serve callbacks again after its readiness handshake.
+  func workbenchEngineStarted() async {
+    guard !isShuttingDown, !runtimeStarted else { return }
+    runtimeStarted = true
+    if let runtime { flushPendingCommunityProviderRefreshIfNeeded(for: runtime) }
+    operationsRestoreTask = Task {
       await self.restoreOperations()
     }
+    await bootSubagentScheduler()
   }
 
   /// Settles executions and children a previous run left behind, without waiting for the

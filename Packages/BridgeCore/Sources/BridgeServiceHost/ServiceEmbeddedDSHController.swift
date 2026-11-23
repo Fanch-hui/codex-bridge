@@ -15,6 +15,7 @@ public actor ServiceEmbeddedDSHController {
   let store: SimpleServiceStore
   let settings: ServiceSettings
   let secretStore: any SecretStore
+  let workbenchSearch: WorkbenchSearchService
   let dataRoot: URL
   let resourceRoot: URL?
   let workspaces: AgentWorkspaceStore
@@ -56,7 +57,7 @@ public actor ServiceEmbeddedDSHController {
   var events: [(cursor: Int, value: ACPJSONValue, bytes: Int)] = []
   var isShuttingDown = false
   var recovery: Task<Void, Error>?
-  var operationsRestoreStarted = false
+  var operationsRestoreTask: Task<Void, Never>?
   var operationTasks: [String: Task<Void, Never>] = [:]
   var operationGates: [String: AsyncMutex] = [:]
   let operationAdmission = WorkbenchOperationAdmission()
@@ -106,6 +107,7 @@ public actor ServiceEmbeddedDSHController {
     self.store = store
     self.settings = settings ?? ServiceSettings(store: store)
     self.secretStore = secretStore
+    workbenchSearch = WorkbenchSearchService(secretStore: secretStore)
     self.dataRoot = dataRoot
     self.resourceRoot = resourceRoot
     self.workspaces =
@@ -141,6 +143,8 @@ public actor ServiceEmbeddedDSHController {
       result = try await operationAction(request.action, payload: payload)
     } else if request.action.hasPrefix("attachments.") {
       result = try attachmentAction(request.action, payload: payload)
+    } else if request.action.hasPrefix("search.settings.") {
+      result = try await workbenchSearchSettings(request.action, input: decoded)
     } else {
       result = try await performAction(request.action, payload: payload)
     }
@@ -282,6 +286,7 @@ public actor ServiceEmbeddedDSHController {
     nativeWriteRecoveryTask = nil
     executionRecoveryTask?.cancel()
     executionRecoveryTask = nil
+    operationsRestoreTask?.cancel()
     await subagentScheduler?.shutdown()
     subagentScheduler = nil
     let merges = Array(workspaceMergeTasks.values)
@@ -316,11 +321,11 @@ public actor ServiceEmbeddedDSHController {
     if let engineCallOverride { return try await engineCallOverride(action, payload) }
     let engine = try engine()
     try await startedRecovery(engine: engine).value
-    restoreOperationsOnce()
     try await requireWorkbenchEnabled()
     let priority = [
       "session.prompt", "session.stop", "session.cancelBinding", "approval.answer",
-      "question.answer", "commands.execute", "session.selectModel", "permissions.set",
+      "question.answer", "commands.execute", "session.selectModel", "session.setTeamMode",
+      "permissions.set",
       "session.scope", "session.bindingSnapshot", "session.receipt", "session.stopStatus",
       "context.get", "context.set", "workspace.release", "workspace.cancel",
       "subagent.lease", "subagent.root", "subagent.deliveries",
@@ -332,9 +337,7 @@ public actor ServiceEmbeddedDSHController {
     let timeout: Duration? =
       waitsForWriter || ["plugins.install", "plugins.update"].contains(action)
       ? .seconds(315_360_000) : nil
-    let result = try await engine.call(action: action, payload: payload, timeout: timeout)
-    noteRuntimeRunning(engine)
-    return result
+    return try await engine.call(action: action, payload: payload, timeout: timeout)
   }
 
   private func finishPreviousExecutions() async throws {
@@ -349,13 +352,14 @@ public actor ServiceEmbeddedDSHController {
   func restartEngine() async throws -> ACPJSONValue {
     resetNativeClient()
     let engine = try engine()
-    await subagentScheduler?.adapterStopped()
     let executions = try await application.embeddedDSHExecutions()
     for execution in executions {
       try await application.closeEmbeddedDSHExecutionAdmission(
         sessionID: execution.sessionID, projectID: execution.projectID)
     }
     resetPendingCommunityProviderRefresh()
+    operationsRestoreTask?.cancel()
+    await subagentScheduler?.adapterStopped()
     await engine.shutdown()
     await toolWriteLeases.closeAll()
     guard await engine.confirmedStopped(), await engine.recoverPreviousHost() else {
@@ -366,15 +370,11 @@ public actor ServiceEmbeddedDSHController {
       try await application.stopEmbeddedDSHExecution(
         sessionID: execution.sessionID, projectID: execution.projectID)
     }
-    try await engine.restart()
-    noteRuntimeRunning(engine)
     await application.finishAllUnscopedWorkbenchExecutions()
     await finishAllPluginMaintenance()
     recovery = Task {}
-    await subagentScheduler?.adapterStarted()
-    let status = try await engine.call(action: "status", payload: .object([:]))
-    noteRuntimeRunning(engine)
-    return status
+    try await engine.restart()
+    return try await engine.call(action: "status", payload: .object([:]))
   }
 
   func engine() throws -> EmbeddedDSHRuntime {
@@ -390,8 +390,11 @@ public actor ServiceEmbeddedDSHController {
         guard let self else { throw CancellationError() }
         return try await self.callback(method: method, payload: payload)
       },
+      onStarted: { [weak self] in
+        await self?.workbenchEngineStarted()
+      },
       onEvent: { [weak self] event in
-        await self?.receiveRuntimeEvent(event)
+        await self?.receiveWorkbenchEngineEvent(event)
       }
     )
     liveExecutionRoots.removeAll()
@@ -417,6 +420,7 @@ public actor ServiceEmbeddedDSHController {
         }
         return try await sharedProviders.workbenchCall(payload)
       case "bridge/secret": return try secret(payload)
+      case "bridge/workbenchSearch": return try await workbenchSearchCallback(payload)
       case "bridge/skills": return try await handleSkillCallback(payload)
       case "bridge/agents": return try await agents(payload)
       case "bridge/agentModels": return try await agentModels(payload)
@@ -436,7 +440,7 @@ public actor ServiceEmbeddedDSHController {
   private static func validateAction(_ action: String) throws {
     let allowed: Set<String> = [
       "status", "session.prompt", "session.stop", "session.history",
-      "session.selectModel",
+      "session.selectModel", "session.setTeamMode",
       "session.rename", "session.fork", "session.archive", "session.unarchive", "session.delete",
       "auth.status", "settings.get", "settings.save", "settings.remove", "auth.begin",
       "context.get", "context.set",
@@ -465,7 +469,7 @@ public actor ServiceEmbeddedDSHController {
   private static func isMutationAction(_ action: String) -> Bool {
     ![
       "status", "events", "models.list", "auth.status", "settings.get", "permissions.get",
-      "context.get",
+      "context.get", "search.settings.get",
       "session.list",
       "session.history", "session.search", "session.content", "pending.list",
       "subagents.list", "subagents.agents",

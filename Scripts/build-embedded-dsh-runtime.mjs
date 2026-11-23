@@ -142,8 +142,8 @@ try {
     await command(join(stage, nodePath), ['-e', ptyCheck], stage);
   }
   const manifest = {
-    protocolVersion: 1, dshVersion: '0.2.2-rc.3',
-    dshCommit: '38a6a5c965aa99ab525161efb7cc5cf1fe62fced', node: nodePath,
+    protocolVersion: 1, dshVersion: '0.2.2-rc.5',
+    dshCommit: '9c2670d3bce5275e0d1610272958121af87787bb', node: nodePath,
     entry: 'host/index.mjs', platform, architecture, files: [], links: []
   };
   await inventory(stage, stage, manifest);

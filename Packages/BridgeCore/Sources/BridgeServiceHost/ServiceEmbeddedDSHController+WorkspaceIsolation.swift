@@ -55,12 +55,14 @@ extension ServiceEmbeddedDSHController {
     let isCodex = providerID == "codex"
     if continuation { return .shared(reason: "此会话沿用原来的项目目录。") }
     guard permissionMode == .full else { return .shared(reason: nil) }
+    if !isCodex {
+      guard installationID != nil else { return .shared(reason: Self.isolationUnverifiedReason) }
+      if let reason = externalWorkspaceSupport(providerID) { return .shared(reason: reason) }
+    }
     guard isCodex ? CodexIsolatedLaunch.isAvailable : WorkspaceProcessIsolation.isAvailable else {
       return .shared(reason: "当前平台的隔离检查未通过。")
     }
-    guard !isCodex else { return nil }
-    guard installationID != nil else { return .shared(reason: Self.isolationUnverifiedReason) }
-    return externalWorkspaceSupport(providerID).map { .shared(reason: $0) }
+    return nil
   }
 
   /// Copies the project, then asks the provider whether it can run inside the copy. A copy that

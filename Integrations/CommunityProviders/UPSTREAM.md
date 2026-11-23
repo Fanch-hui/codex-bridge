@@ -1,8 +1,8 @@
 # Community provider host
 
-`vendor/magpie/host.js` is based on `internal/plugin/host.js` from
+`vendor/provider-host/host.js` is based on `internal/plugin/host.js` from
 [Magpie commit f9492fd8ed2c6fd3c65f1dab00062771b551d7b5](https://github.com/yetone/magpie/tree/f9492fd8ed2c6fd3c65f1dab00062771b551d7b5),
-under the MIT license in `vendor/magpie/LICENSE`. `bridge-secret.js` replaces
+under the MIT license in `vendor/provider-host/LICENSE`. `bridge-secret.js` replaces
 its credential-file storage with service-owned, provider-scoped RPC. The host
 accepts provider operations only, selects header hooks for their owning plugin,
 and acknowledges fetch cancellation after the request actually ends. Upstream's
@@ -10,7 +10,7 @@ stream credit protocol and request implementations remain in use. The service
 must run only one host for an installation and wait for its exit before starting
 a replacement; this is the renewal ownership boundary.
 
-The host runs as `bun vendor/magpie/host.js`, with one JSON object per stdin or
+The host runs as `bun vendor/provider-host/host.js`, with one JSON object per stdin or
 stdout line. `init` accepts a private absolute `directory` and `plugins`, each
 with `spec`, absolute installed `target`, and optional `options`. Available
 operations are `providers`, `prompt`, `validate`, `authorize`, `callback`,

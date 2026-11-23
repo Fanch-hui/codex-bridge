@@ -14,6 +14,9 @@ import Foundation
 
 extension BridgeServiceRequestController {
   static func map(_ error: Error) -> BridgeServiceIPCError {
+    if let error = error as? WorkbenchSearchError {
+      return .init(code: error.code, message: error.message, retryable: error.retryable)
+    }
     if let error = error as? WorkbenchAvailabilityError {
       switch error {
       case .busy:

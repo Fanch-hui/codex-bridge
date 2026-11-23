@@ -4,11 +4,18 @@ import BridgeProcess
 import Foundation
 
 extension ClaudeSDKProvider: AgentWorkspaceIsolationProviding {
+  public var isolatedWorkspaceUnsupportedReason: String? {
+    guard WorkspaceProcessIsolation.isAvailable(denyProcessFork: true) else {
+      return "当前平台不支持 Claude Code 所需的进程隔离。"
+    }
+    return nil
+  }
+
   public func isolatedWorkspaceReadiness(
     installation: AgentInstallation, workspaceRoot: String, runtimeDirectory: String
   ) async throws -> AgentWorkspaceIsolationReadiness {
-    guard WorkspaceProcessIsolation.isAvailable else {
-      return .init(ready: false, reason: "当前平台的进程隔离不可用。")
+    if let reason = isolatedWorkspaceUnsupportedReason {
+      return .init(ready: false, reason: reason)
     }
     do {
       guard try await configuration.configuredMCPServerCount(installation) == 0 else {

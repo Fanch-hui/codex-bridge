@@ -88,7 +88,7 @@
       var empty = S.node("div", "workbench-empty-state");
       empty.appendChild(S.icon("sparkles", "empty-sparkle-icon"));
       empty.appendChild(S.node("h3", "empty-title", "选择 Agent 会话"));
-      empty.appendChild(S.node("p", "empty-desc", "在左侧 ChatGPT / Qwen / Gemini 发起远程任务，或前往工作台直接与内置 DSH 与外部 Agent 协作。"));
+      empty.appendChild(S.node("p", "empty-desc", "在左侧 ChatGPT / Qwen / Gemini 发起远程任务，或前往工作台与外部 Agent 直接协作。"));
       var start = S.button("前往工作台", null, {}, null, "small primary", false);
       start.addEventListener("click", function () {
         if (global.CodexBridgeDesktopDSHWorkbench && global.CodexBridgeDesktopDSHWorkbench.showDevelopment) {

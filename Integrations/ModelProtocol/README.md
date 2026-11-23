@@ -12,7 +12,10 @@ two fields belonging to Magpie's subscription runtime. The signature-cache
 directory is provided by Bridge instead of Magpie's configuration directory;
 two provider diagnostics use product-neutral wording. The extraction also
 preserves strict tool settings and structured-output semantics across protocols,
-and retains tool schemas as supplied.
+and retains tool schemas as supplied. Bridge-owned identifiers, comments, the
+fallback search tool name and the Claude reasoning seal prefix use neutral
+names; seals with the upstream prefix remain readable. Plugin-facing JSON
+fields keep their upstream names.
 
 ## Build
 

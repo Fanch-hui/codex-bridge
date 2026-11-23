@@ -1,11 +1,10 @@
 // Package lazyre holds a regular expression that is compiled the first
 // time it is used, not when its package starts.
 //
-// magpie is one binary, so every package's init runs on every launch,
-// `magpie statusline` (run by Claude Code on each message) included.
-// Hundreds of package-level regexp.MustCompile calls cost several MB and
+// Every package's init runs on each launch of the helper. Hundreds of
+// package-level regexp.MustCompile calls cost several MB and
 // milliseconds there for patterns that launch never reaches. An RE has
-// the methods of *regexp.Regexp that magpie calls; Regexp returns the
+// the methods of *regexp.Regexp that the gateway calls; Regexp returns the
 // compiled one. A bad pattern panics on first use, so TestAllCompile in
 // each converted package compiles every one before release.
 package lazyre

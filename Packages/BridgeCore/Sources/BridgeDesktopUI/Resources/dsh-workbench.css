@@ -159,6 +159,10 @@
 .dsh-composer-attachment-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 6px; }
 .dsh-composer-attachment-list[hidden] { display: none; }
 .dsh-composer-queue-slot:empty { display: none; }
+.dsh-composer-team-slot { display: contents; }
+.message-composer-tools .button.dsh-composer-team .icon { width: 16px; height: 16px; }
+.message-composer-tools .button.dsh-composer-team[aria-pressed="true"]:not(.primary):not(.danger) { color: var(--accent); background: var(--accent-soft); }
+.message-composer-tools .button.dsh-composer-team[aria-pressed="true"]:not(.primary):not(.danger):disabled { opacity: .6; }
 .dsh-composer-queue .dsh-queued-item { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; }
 .dsh-queued-item + .dsh-queued-item { border-top: 1px solid var(--separator); }
 .dsh-queued-text { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
