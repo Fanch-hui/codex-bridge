@@ -22,12 +22,12 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   private let lock = NSLock()
   private let inputLock = NSLock()
   private let outputLock = NSLock()
-  private let errorOutputLock = NSLock()
   private var terminationStorage: ManagedProcessTermination?
   private var identityStorage: ManagedProcessIdentity?
   private var inputClosed = false
   private var handlesClosed = false
   #if os(Windows)
+    private var outputMonitor: DispatchSourceTimer?
     private var windowsProcessHandle: HANDLE?
     private var windowsProcessJob: ManagedWindowsProcessJob?
   #else
@@ -216,14 +216,29 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     #endif
 
     if readOutput {
-      standardOutputHandle.readabilityHandler = { [weak self] handle in
-        guard let self else { return }
-        consumeAvailableData(handle, streamLock: outputLock, sink: standardOutputSink)
-      }
-      standardErrorHandle?.readabilityHandler = { [weak self] handle in
-        guard let self else { return }
-        consumeAvailableData(handle, streamLock: errorOutputLock, sink: standardErrorSink)
-      }
+      #if os(Windows)
+        // Windows 管道监视回调可能阻塞；每 10 ms 只读取已经到达的字节。
+        let monitor = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        monitor.setEventHandler { [weak self] in
+          guard let self else { return }
+          consumeAvailableData(standardOutputHandle, sink: standardOutputSink)
+          if let standardErrorHandle {
+            consumeAvailableData(standardErrorHandle, sink: standardErrorSink)
+          }
+        }
+        outputMonitor = monitor
+        monitor.schedule(deadline: .now(), repeating: .milliseconds(10))
+        monitor.resume()
+      #else
+        standardOutputHandle.readabilityHandler = { [weak self] handle in
+          guard let self else { return }
+          consumeAvailableData(handle, sink: standardOutputSink)
+        }
+        standardErrorHandle?.readabilityHandler = { [weak self] handle in
+          guard let self else { return }
+          consumeAvailableData(handle, sink: standardErrorSink)
+        }
+      #endif
     }
   }
 
@@ -469,15 +484,16 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     guard hasTerminated else { return }
 
     outputLock.lock()
-    errorOutputLock.lock()
     guard !handlesClosed else {
-      errorOutputLock.unlock()
       outputLock.unlock()
       return
     }
+    #if os(Windows)
+      outputMonitor?.cancel()
+      outputMonitor = nil
+    #endif
     standardOutputHandle.readabilityHandler = nil
     standardErrorHandle?.readabilityHandler = nil
-    errorOutputLock.unlock()
     outputLock.unlock()
 
     let deadline = ContinuousClock.now.advanced(by: timeout)
@@ -489,20 +505,21 @@ public final class ManagedStdioProcess: @unchecked Sendable {
 
   public func close() {
     outputLock.lock()
-    errorOutputLock.lock()
     guard !handlesClosed else {
-      errorOutputLock.unlock()
       outputLock.unlock()
       closeStdin()
       if isProcessTreeStopped() { ownershipRecord?.remove() }
       return
     }
     handlesClosed = true
+    #if os(Windows)
+      outputMonitor?.cancel()
+      outputMonitor = nil
+    #endif
     standardOutputHandle.readabilityHandler = nil
     standardErrorHandle?.readabilityHandler = nil
     standardOutputHandle.closeFile()
     standardErrorHandle?.closeFile()
-    errorOutputLock.unlock()
     outputLock.unlock()
     closeStdin()
     #if os(Windows)
@@ -530,16 +547,23 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     }
   #endif
 
-  /// 串行读取一个输出流；输入为管道、对应锁和回调，非空数据交给回调。
-  /// 每个流独立加锁，避免空闲 stderr 的阻塞读取挡住 stdout 回执。
-  /// 示例：consumeAvailableData(handle, streamLock: outputLock, sink: standardOutputSink)。
-  private func consumeAvailableData(
-    _ handle: FileHandle, streamLock: NSLock, sink: OutputHandler
-  ) {
-    streamLock.lock()
-    defer { streamLock.unlock() }
+  /// 读取一个输出流；输入为管道与接收回调，已到达的数据交给回调。
+  /// Windows 按当前缓冲区长度读取，避免空闲 stderr 阻塞回执。
+  /// 示例：consumeAvailableData(handle, sink: standardOutputSink)。
+  private func consumeAvailableData(_ handle: FileHandle, sink: OutputHandler) {
+    outputLock.lock()
+    defer { outputLock.unlock() }
     guard !handlesClosed else { return }
-    let data = handle.availableData
+    #if os(Windows)
+      // 与关闭、排空操作串行；取消后排队中的回调不能继续读管道。
+      guard outputMonitor != nil else { return }
+      var available: DWORD = 0
+      guard PeekNamedPipe(handle._handle, nil, 0, nil, &available, nil), available > 0
+      else { return }
+      let data = handle.readData(ofLength: Int(available))
+    #else
+      let data = handle.availableData
+    #endif
     if !data.isEmpty { sink(data) }
   }
 
