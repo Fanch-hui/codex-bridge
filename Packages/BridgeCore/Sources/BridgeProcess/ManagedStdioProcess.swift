@@ -22,6 +22,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
   private let lock = NSLock()
   private let inputLock = NSLock()
   private let outputLock = NSLock()
+  private let errorOutputLock = NSLock()
   private var terminationStorage: ManagedProcessTermination?
   private var identityStorage: ManagedProcessIdentity?
   private var inputClosed = false
@@ -217,11 +218,11 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     if readOutput {
       standardOutputHandle.readabilityHandler = { [weak self] handle in
         guard let self else { return }
-        consumeAvailableData(handle, sink: standardOutputSink)
+        consumeAvailableData(handle, streamLock: outputLock, sink: standardOutputSink)
       }
       standardErrorHandle?.readabilityHandler = { [weak self] handle in
         guard let self else { return }
-        consumeAvailableData(handle, sink: standardErrorSink)
+        consumeAvailableData(handle, streamLock: errorOutputLock, sink: standardErrorSink)
       }
     }
   }
@@ -468,12 +469,15 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     guard hasTerminated else { return }
 
     outputLock.lock()
+    errorOutputLock.lock()
     guard !handlesClosed else {
+      errorOutputLock.unlock()
       outputLock.unlock()
       return
     }
     standardOutputHandle.readabilityHandler = nil
     standardErrorHandle?.readabilityHandler = nil
+    errorOutputLock.unlock()
     outputLock.unlock()
 
     let deadline = ContinuousClock.now.advanced(by: timeout)
@@ -485,7 +489,9 @@ public final class ManagedStdioProcess: @unchecked Sendable {
 
   public func close() {
     outputLock.lock()
+    errorOutputLock.lock()
     guard !handlesClosed else {
+      errorOutputLock.unlock()
       outputLock.unlock()
       closeStdin()
       if isProcessTreeStopped() { ownershipRecord?.remove() }
@@ -496,6 +502,7 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     standardErrorHandle?.readabilityHandler = nil
     standardOutputHandle.closeFile()
     standardErrorHandle?.closeFile()
+    errorOutputLock.unlock()
     outputLock.unlock()
     closeStdin()
     #if os(Windows)
@@ -523,9 +530,14 @@ public final class ManagedStdioProcess: @unchecked Sendable {
     }
   #endif
 
-  private func consumeAvailableData(_ handle: FileHandle, sink: OutputHandler) {
-    outputLock.lock()
-    defer { outputLock.unlock() }
+  /// 串行读取一个输出流；输入为管道、对应锁和回调，非空数据交给回调。
+  /// 每个流独立加锁，避免空闲 stderr 的阻塞读取挡住 stdout 回执。
+  /// 示例：consumeAvailableData(handle, streamLock: outputLock, sink: standardOutputSink)。
+  private func consumeAvailableData(
+    _ handle: FileHandle, streamLock: NSLock, sink: OutputHandler
+  ) {
+    streamLock.lock()
+    defer { streamLock.unlock() }
     guard !handlesClosed else { return }
     let data = handle.availableData
     if !data.isEmpty { sink(data) }
