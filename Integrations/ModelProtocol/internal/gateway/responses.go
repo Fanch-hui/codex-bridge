@@ -224,13 +224,15 @@ func sentRaw(v json.RawMessage) json.RawMessage {
 	return v
 }
 
-func parseResponses(body []byte) (*Request, error) { return readResponses(body, false) }
-
-func readResponses(body []byte, facts bool) (*Request, error) {
-	return readResponsesFor(body, facts, false)
+func parseResponses(body []byte, reasoningScope string) (*Request, error) {
+	return readResponses(body, false, reasoningScope)
 }
 
-func readResponsesFor(body []byte, facts, keepInstructions bool) (*Request, error) {
+func readResponses(body []byte, facts bool, reasoningScope string) (*Request, error) {
+	return readResponsesFor(body, facts, false, reasoningScope)
+}
+
+func readResponsesFor(body []byte, facts, keepInstructions bool, reasoningScope string) (*Request, error) {
 	decode := decodeJSON
 	if facts {
 		decode = decodeJSONView
@@ -373,6 +375,15 @@ func readResponsesFor(body []byte, facts, keepInstructions bool) (*Request, erro
 				}
 				r.Messages = append(r.Messages, Message{Role: "user", Parts: []Part{part}})
 			case it.Type == "reasoning":
+				// A Responses history may contain opaque states from several providers.
+				if reasoningScope != "" {
+					prefix := codexReasoningMark + reasoningScope + ":"
+					unscoped, matches := strings.CutPrefix(it.EncryptedContent, prefix)
+					if !matches || !strings.HasPrefix(unscoped, claudeseal.Mark) {
+						continue
+					}
+					it.EncryptedContent = unscoped
+				}
 
 				var b strings.Builder
 				var content []rText
@@ -389,7 +400,9 @@ func readResponsesFor(body []byte, facts, keepInstructions bool) (*Request, erro
 				}
 				part := Part{Kind: Thinking, Text: b.String()}
 				if block, ours := claudeseal.Open(it.EncryptedContent); ours {
-
+					if reasoningScope != "" {
+						part = Part{Kind: Thinking}
+					}
 					part = claudePart(block, part)
 				} else if it.EncryptedContent != "" {
 
@@ -1478,6 +1491,7 @@ func saidError(failed map[string]any, said json.RawMessage) {
 type responsesEncoder struct {
 	w              *sseWriter
 	model          string
+	reasoningScope string
 	id             string
 	created        int64
 	seq            int
@@ -1645,7 +1659,7 @@ func (e *responsesEncoder) closeAs(sealed json.RawMessage) {
 		m := map[string]any{"id": e.itemID, "type": "reasoning", "status": "completed", "summary": summary}
 		if e.sig.Len() > 0 {
 
-			m["encrypted_content"] = claudeThinking(t, e.sig.String())
+			m["encrypted_content"] = scopeClaudeReasoning(claudeThinking(t, e.sig.String()), e.reasoningScope)
 		}
 		item = m
 		if sealed != nil {
@@ -1746,7 +1760,7 @@ func (e *responsesEncoder) event(ev Event) {
 			id := "rs_" + newID()
 			e.send("response.output_item.added", map[string]any{"output_index": e.item,
 				"item": map[string]any{"id": id, "type": "reasoning", "status": "in_progress", "summary": []any{}}})
-			item := map[string]any{"id": id, "type": "reasoning", "status": "completed", "summary": []any{}, "encrypted_content": claudeseal.Seal([]byte(ev.Text))}
+			item := map[string]any{"id": id, "type": "reasoning", "status": "completed", "summary": []any{}, "encrypted_content": scopeClaudeReasoning(claudeseal.Seal([]byte(ev.Text)), e.reasoningScope)}
 			e.send("response.output_item.done", map[string]any{"output_index": e.item, "item": item})
 			e.output = append(e.output, item)
 			break
@@ -1856,7 +1870,7 @@ func responsesSearchItem(query string, hits []Hit) map[string]any {
 	}
 }
 
-func renderResponses(res Result, model string, named map[string]nsTool) []byte {
+func renderResponses(res Result, model string, named map[string]nsTool, reasoningScope string) []byte {
 	output := []any{}
 	for _, p := range res.Parts {
 		switch p.Kind {
@@ -1875,7 +1889,7 @@ func renderResponses(res Result, model string, named map[string]nsTool) []byte {
 			if p.sealedBy(sealAnthropic) {
 
 				output = append(output, map[string]any{"id": "rs_" + newID(), "type": "reasoning", "status": "completed",
-					"summary": []any{}, "encrypted_content": claudeseal.Seal(p.Sealed)})
+					"summary": []any{}, "encrypted_content": scopeClaudeReasoning(claudeseal.Seal(p.Sealed), reasoningScope)})
 				continue
 			}
 			claude := p.SignedBy == sealAnthropic && p.Signature != ""
@@ -1888,7 +1902,7 @@ func renderResponses(res Result, model string, named map[string]nsTool) []byte {
 			}
 			item := map[string]any{"id": "rs_" + newID(), "type": "reasoning", "status": "completed", "summary": summary}
 			if claude {
-				item["encrypted_content"] = claudeThinking(p.Text, p.Signature)
+				item["encrypted_content"] = scopeClaudeReasoning(claudeThinking(p.Text, p.Signature), reasoningScope)
 			}
 			output = append(output, item)
 		case ToolCall:

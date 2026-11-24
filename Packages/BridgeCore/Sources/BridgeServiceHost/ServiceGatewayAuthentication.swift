@@ -9,6 +9,7 @@ final class ServiceGatewayAuthentication: @unchecked Sendable {
   private var generations: [String: UInt64] = [:]
   private var models: [String: [String]] = [:]
   private var anthropicPassthroughClients: Set<String> = []
+  private var codexPassthroughClients: Set<String> = []
 
   func publish(_ clients: [ServiceExternalGatewayCredential]) throws {
     let credentials = try clients.map {
@@ -22,6 +23,7 @@ final class ServiceGatewayAuthentication: @unchecked Sendable {
       models = Dictionary(uniqueKeysWithValues: clients.map { ($0.id, $0.models) })
       anthropicPassthroughClients = Set(
         clients.filter(\.allowsAnthropicPassthrough).map(\.id))
+      codexPassthroughClients = Set(clients.filter(\.allowsCodexPassthrough).map(\.id))
     }
   }
 
@@ -40,6 +42,14 @@ final class ServiceGatewayAuthentication: @unchecked Sendable {
     }
   }
 
+  func allowsCodexPassthrough(_ context: ModelGatewayClientContext) -> Bool {
+    guard context.authenticatedViaCodexGatewayHeader else { return false }
+    return lock.withLock {
+      generations[context.clientID] == context.generation
+        && codexPassthroughClients.contains(context.clientID)
+    }
+  }
+
   func replace(_ credentials: [MCPClientCredential], generations: [String: UInt64]) throws {
     let next = MCPClientCredentialAuthenticator()
     if !credentials.isEmpty { try next.replaceCredentials(credentials) }
@@ -47,10 +57,35 @@ final class ServiceGatewayAuthentication: @unchecked Sendable {
       authenticator = next
       self.generations = generations
       anthropicPassthroughClients = []
+      codexPassthroughClients = []
     }
   }
 
   func authenticate(_ credentials: ModelGatewayCredentials) -> ModelGatewayClientContext? {
+    guard credentials.authorization.count <= 1, credentials.apiKey.count <= 1,
+      credentials.bridgeToken.count <= 1, credentials.codexGatewayToken.count <= 1
+    else { return nil }
+    if let gatewayHeader = credentials.codexGatewayToken.first {
+      guard credentials.bridgeToken.isEmpty, credentials.apiKey.isEmpty,
+        gatewayHeader.hasPrefix("Bearer "), credentials.authorization.count == 1,
+        let authorization = credentials.authorization.first, authorization.hasPrefix("Bearer "),
+        gatewayHeader != authorization
+      else { return nil }
+      let token = String(gatewayHeader.dropFirst(7))
+      let upstreamToken = authorization.dropFirst(7)
+      guard !token.isEmpty, !upstreamToken.isEmpty,
+        !token.contains(where: { $0.isWhitespace || $0 == "," }),
+        !upstreamToken.contains(where: { $0.isWhitespace || $0 == "," })
+      else { return nil }
+      return lock.withLock {
+        guard let id = authenticator.authenticate([token]),
+          let generation = generations[id.rawValue],
+          codexPassthroughClients.contains(id.rawValue)
+        else { return nil }
+        return ModelGatewayClientContext(
+          clientID: id.rawValue, generation: generation, authenticatedViaCodexGatewayHeader: true)
+      }
+    }
     if credentials.bridgeToken.count == 1 {
       let token = credentials.bridgeToken[0]
       guard !token.isEmpty,

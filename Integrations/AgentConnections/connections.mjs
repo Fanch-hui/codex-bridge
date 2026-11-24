@@ -1,7 +1,17 @@
 import { edit, inspect, reverse } from './editor.mjs';
+import path from 'node:path';
 
 const providerID = 'codex_bridge';
+const codexHybridProviderID = 'codex_bridge_hybrid';
 const set = (path, value) => ({ path, after: { exists: true, value } });
+const remove = path => ({ path, after: { exists: false } });
+// Codex Desktop stores the picked model in `model`; revert puts back the original when the field
+// still names a Bridge gateway model, which would no longer resolve once the provider is gone.
+const gatewayModelSlugPrefix = 'bridge.';
+const reclaimModel = (source, path) => {
+  const state = inspect(source, 'toml', path);
+  return { path, after: state, reclaimPrefix: gatewayModelSlugPrefix };
+};
 
 const effortLevels = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -43,8 +53,9 @@ function autoCompactAt({ context, output }) {
 
 function modelChanges(agent, model, source) {
   if (agent === 'claude_desktop') throw new Error('unsupported_agent');
-  if (!model || typeof model.endpoint !== 'string' || typeof model.model !== 'string' ||
-      typeof model.token !== 'string' || !model.model || !model.token) throw new Error('invalid_model');
+  if (!model || typeof model.endpoint !== 'string' || typeof model.model !== 'string' || !model.model) {
+    throw new Error('invalid_model');
+  }
   const url = new URL(model.endpoint);
   if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
       !url.port || url.username || url.password || url.search || url.hash ||
@@ -52,12 +63,14 @@ function modelChanges(agent, model, source) {
   const compatibility = model.compatibility === undefined ? {} : model.compatibility;
   let allowed = [];
   if (agent === 'codex') allowed = ['disableWebSearch', 'disableMultiAgent', 'preserveOfficialLogin'];
-  if (agent === 'codex_desktop') allowed = ['disableWebSearch', 'disableMultiAgent'];
+  if (agent === 'codex_desktop') allowed = ['disableWebSearch', 'disableMultiAgent', 'preserveOfficialLogin'];
   if (agent === 'claude') allowed = ['disableThinking', 'preserveOfficialLogin'];
   if (!compatibility || typeof compatibility !== 'object' || Array.isArray(compatibility) ||
       Object.entries(compatibility).some(([key, value]) => !allowed.includes(key) || typeof value !== 'boolean')) {
     throw new Error('invalid_compatibility');
   }
+  const hybrid = agent === 'codex_desktop' && compatibility.preserveOfficialLogin === true;
+  if (!hybrid && (typeof model.token !== 'string' || !model.token)) throw new Error('invalid_model');
   const modelIDs = model.models ?? [model.model];
   if (!Array.isArray(modelIDs) || !modelIDs.includes(model.model) ||
         modelIDs.some(id => typeof id !== 'string' || !id) || new Set(modelIDs).size !== modelIDs.length) {
@@ -68,6 +81,42 @@ function modelChanges(agent, model, source) {
   const codexLimits = selectedLimit?.context ? {
     model_context_window: selectedLimit.context, model_auto_compact_token_limit: autoCompactAt(selectedLimit)
   } : {};
+  if (hybrid) {
+    if (compatibility.disableWebSearch || compatibility.disableMultiAgent ||
+        typeof model.credentialCommand !== 'string' || !path.isAbsolute(model.credentialCommand) ||
+        typeof model.credentialClientID !== 'string' || !model.credentialClientID) {
+      throw new Error('invalid_compatibility');
+    }
+    const changes = [
+      set(['model_provider'], codexHybridProviderID),
+      set(['model_providers', codexHybridProviderID], {
+        name: 'Codex Bridge', base_url: model.endpoint,
+        model_catalog_url: new URL('/codex/models', url).href,
+        wire_api: 'responses', requires_openai_auth: true, supports_websockets: true,
+        capabilities: { remote_compaction: 'unsupported' },
+        gateway_oauth: {
+          delivery: { kind: 'header', name: 'X-Bridge-Gateway-Token', scheme: 'Bearer' },
+          credential_export: {
+            command: model.credentialCommand,
+            args: ['--export-codex-gateway-token', model.credentialClientID],
+          },
+        },
+      }),
+    ];
+    if (inspect(source, 'toml', ['model_catalog_json']).exists) changes.push(remove(['model_catalog_json']));
+    changes.push(reclaimModel(source, ['model']));
+    const profile = inspect(source, 'toml', ['profile']);
+    if (profile.exists) {
+      if (typeof profile.value !== 'string' || !profile.value) throw new Error('invalid_configuration');
+      const modelPath = ['profiles', profile.value, 'model'];
+      if (inspect(source, 'toml', modelPath).exists) changes.push(reclaimModel(source, modelPath));
+      const providerPath = ['profiles', profile.value, 'model_provider'];
+      if (inspect(source, 'toml', providerPath).exists) changes.push(set(providerPath, codexHybridProviderID));
+      const catalogPath = ['profiles', profile.value, 'model_catalog_json'];
+      if (inspect(source, 'toml', catalogPath).exists) changes.push(remove(catalogPath));
+    }
+    return changes;
+  }
   if (agent === 'codex' || agent === 'codex_desktop') {
     const provider = {
       name: 'Codex Bridge', base_url: model.endpoint, wire_api: 'responses',
@@ -86,7 +135,26 @@ function modelChanges(agent, model, source) {
       set(['model'], model.model), set(['model_provider'], providerID),
       set(['model_providers', providerID], provider),
     ];
-    for (const [key, value] of Object.entries(codexLimits)) changes.push(set([key], value));
+    if (agent === 'codex_desktop') {
+      // The desktop model picker lists only the local catalog, so point it at Bridge's catalog
+      // of the authorized models; per-model context windows live in that catalog.
+      if (typeof model.catalogPath !== 'string' || !path.isAbsolute(model.catalogPath)) {
+        throw new Error('invalid_model');
+      }
+      changes.push(set(['model_catalog_json'], model.catalogPath));
+      const profile = inspect(source, 'toml', ['profile']);
+      if (profile.exists) {
+        if (typeof profile.value !== 'string' || !profile.value) throw new Error('invalid_configuration');
+        for (const key of ['model_provider', 'model_catalog_json']) {
+          const profilePath = ['profiles', profile.value, key];
+          if (inspect(source, 'toml', profilePath).exists) {
+            changes.push(set(profilePath, key === 'model_provider' ? providerID : model.catalogPath));
+          }
+        }
+      }
+    } else {
+      for (const [key, value] of Object.entries(codexLimits)) changes.push(set([key], value));
+    }
     if (compatibility.disableWebSearch) changes.push(set(['web_search'], 'disabled'));
     if (compatibility.disableMultiAgent) changes.push(set(['features', 'multi_agent'], false));
     return changes;
@@ -196,6 +264,9 @@ function configurationFormat(agent) {
   throw new Error('unsupported_agent');
 }
 
+const isReclaim = change => change?.reclaimPrefix !== undefined;
+const samePath = (left, right) => left.length === right.length && left.every((part, i) => part === right[i]);
+
 export function prepare({ agent, purpose, content, model, mcp, previousChanges }) {
   const format = configurationFormat(agent);
   let source = content === null ? (format === 'toml' ? '' : '{}\n') : content;
@@ -204,7 +275,8 @@ export function prepare({ agent, purpose, content, model, mcp, previousChanges }
   }
   if (previousChanges !== undefined) {
     if (!Array.isArray(previousChanges)) throw new Error('invalid_configuration');
-    const restored = reverse(source, format, previousChanges);
+    // The picked model stays as it is through an update; only the final revert reclaims it.
+    const restored = reverse(source, format, previousChanges.filter(change => !isReclaim(change)));
     if (restored.conflicts) return restored;
     source = restored.content;
   }
@@ -212,17 +284,21 @@ export function prepare({ agent, purpose, content, model, mcp, previousChanges }
     : purpose === 'mcp' ? mcpChanges(agent, mcp) : undefined;
   if (!changes) throw new Error('unsupported_purpose');
   for (const change of changes) {
-    change.before = inspect(source, format, change.path);
-    if (change.path.includes(providerID) && change.before.exists) throw new Error('owned_name_in_use');
+    const earlier = isReclaim(change) &&
+      previousChanges?.find(previous => isReclaim(previous) && samePath(previous.path, change.path));
+    change.before = earlier ? earlier.before : inspect(source, format, change.path);
+    if (change.path.some(part => part === providerID || part === codexHybridProviderID) &&
+        change.before.exists) throw new Error('owned_name_in_use');
   }
   const fields = [...(previousChanges ?? []), ...changes]
+    .filter(change => !isReclaim(change))
     .map(change => change.path)
-    .filter((path, index, paths) => paths.findIndex(other =>
-      other.length === path.length && other.every((part, i) => part === path[i])) === index);
+    .filter((path, index, paths) => paths.findIndex(other => samePath(other, path)) === index);
   return { content: edit(source, format, changes), changes, fields };
 }
 
-export function revert({ agent, content, changes }) {
-  if (typeof content !== 'string' || !Array.isArray(changes)) throw new Error('invalid_configuration');
-  return reverse(content, configurationFormat(agent), changes);
+export function revert({ agent, content, changes, keepDrifted }) {
+  if (typeof content !== 'string' || !Array.isArray(changes) ||
+      (keepDrifted !== undefined && typeof keepDrifted !== 'boolean')) throw new Error('invalid_configuration');
+  return reverse(content, configurationFormat(agent), changes, { keepDrifted });
 }

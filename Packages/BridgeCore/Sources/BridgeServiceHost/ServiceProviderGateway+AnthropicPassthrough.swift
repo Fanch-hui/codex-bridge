@@ -56,7 +56,7 @@ extension ServiceProviderGateway {
     do {
       let succeeded = try await withThrowingTaskGroup(of: Bool.self) { group in
         group.addTask {
-          try await AnthropicPassthroughRelay.stream(request: urlRequest, into: sink)
+          try await ModelGatewayUpstreamRelay.stream(request: urlRequest, into: sink)
         }
         group.addTask {
           try await Task.sleep(for: timeout)
@@ -134,115 +134,5 @@ extension ServiceProviderGateway {
       outgoing.setValue(apiKey, forHTTPHeaderField: "x-api-key")
     }
     return outgoing
-  }
-}
-
-private enum AnthropicPassthroughRelay {
-  private static let maxChunkBytes = 512 * 1024
-  private static let blockedResponseHeaders: Set<String> = [
-    "connection", "content-length", "content-encoding", "keep-alive",
-    "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade",
-  ]
-
-  enum Event: Sendable {
-    case head(status: Int, headers: [String: String])
-    case chunk(Data)
-  }
-
-  static func stream(request: URLRequest, into sink: ModelGatewayResponseSink) async throws -> Bool
-  {
-    let configuration = URLSessionConfiguration.ephemeral
-    configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-    configuration.urlCache = nil
-    configuration.httpCookieStorage = nil
-    configuration.urlCredentialStorage = nil
-    configuration.httpShouldSetCookies = false
-    configuration.timeoutIntervalForRequest = request.timeoutInterval
-    configuration.timeoutIntervalForResource = request.timeoutInterval
-    let delegate = Delegate()
-    let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
-    defer { session.invalidateAndCancel() }
-    let stream = delegate.start(session: session, request: request)
-    var status = 502
-    return try await withTaskCancellationHandler {
-      for try await event in stream {
-        try Task.checkCancellation()
-        switch event {
-        case .head(let code, let headers):
-          status = code
-          try await sink.sendHead(status: code, headers: headers)
-        case .chunk(let data):
-          var offset = data.startIndex
-          while offset < data.endIndex {
-            let end = min(offset + maxChunkBytes, data.endIndex)
-            try await sink.send(Data(data[offset..<end]))
-            offset = end
-          }
-        }
-      }
-      return (200...299).contains(status)
-    } onCancel: {
-      session.invalidateAndCancel()
-    }
-  }
-
-  private final class Delegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
-    private var continuation: AsyncThrowingStream<Event, any Error>.Continuation?
-
-    func start(session: URLSession, request: URLRequest) -> AsyncThrowingStream<Event, any Error> {
-      AsyncThrowingStream { continuation in
-        self.continuation = continuation
-        let task = session.dataTask(with: request)
-        continuation.onTermination = { _ in task.cancel() }
-        task.resume()
-      }
-    }
-
-    func urlSession(
-      _ session: URLSession, task: URLSessionTask,
-      willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
-      completionHandler: @escaping (URLRequest?) -> Void
-    ) {
-      completionHandler(nil)
-    }
-
-    func urlSession(
-      _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
-      completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
-    ) {
-      guard let http = response as? HTTPURLResponse else {
-        continuation?.finish(throwing: ProviderRuntimeError.remote("invalid_upstream_response"))
-        completionHandler(.cancel)
-        return
-      }
-      var headers: [String: String] = [:]
-      for (rawKey, rawValue) in http.allHeaderFields {
-        let name = String(describing: rawKey).lowercased()
-        guard !blockedResponseHeaders.contains(name) else { continue }
-        let value = String(describing: rawValue)
-        guard !value.contains("\r"), !value.contains("\n") else { continue }
-        headers[name] = value
-      }
-      let code =
-        (200...599).contains(http.statusCode) && http.statusCode != 204
-          && http.statusCode != 304 ? http.statusCode : 502
-      continuation?.yield(.head(status: code, headers: headers))
-      completionHandler(.allow)
-    }
-
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-      guard !data.isEmpty else { return }
-      continuation?.yield(.chunk(data))
-    }
-
-    func urlSession(
-      _ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?
-    ) {
-      if let error {
-        continuation?.finish(throwing: error)
-      } else {
-        continuation?.finish()
-      }
-    }
   }
 }

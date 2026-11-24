@@ -212,6 +212,7 @@
         if (fallback) return fallback.call(action, payload, options);
         return Promise.reject(new Error("当前页面不支持此操作。"));
       },
+      requestID: gateway.requestID,
       read: gateway.read,
       openExternalURL: gateway.openExternalURL
     };

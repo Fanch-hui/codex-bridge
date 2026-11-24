@@ -9,13 +9,28 @@ extension ModelGatewayHTTPHandler {
     "/v1/responses": .POST,
     "/v1/messages": .POST,
     "/v1/messages/count_tokens": .POST,
+    "/codex/models": .GET,
     "/api/hello": .HEAD,
   ]
 
   static func parseRoute(uri: String, method: HTTPMethod) -> (path: String, query: String?)? {
     let path: String
     let query: String?
-    if uri == "/v1/messages?beta=true" {
+    if uri.hasPrefix("/codex/models?") {
+      let prefix = "/codex/models?client_version="
+      guard uri.hasPrefix(prefix) else { return nil }
+      let version = uri.dropFirst(prefix.count)
+      let components = version.split(separator: ".", omittingEmptySubsequences: false)
+      guard version.utf8.count <= 40, components.count == 3,
+        components.allSatisfy({
+          !$0.isEmpty && $0.utf8.allSatisfy { (48...57).contains($0) }
+        })
+      else { return nil }
+      path = "/codex/models"
+      query = "client_version=\(version)"
+    } else if uri == "/codex/models" {
+      return nil
+    } else if uri == "/v1/messages?beta=true" {
       path = "/v1/messages"
       query = "beta=true"
     } else if uri == "/v1/messages/count_tokens?beta=true" {
@@ -42,6 +57,24 @@ extension ModelGatewayHTTPHandler {
     return origins.isEmpty || authorities.map { "http://\($0)" }.contains(origins[0].lowercased())
   }
 
+  static func authenticatedClient(
+    _ head: HTTPRequestHead, authenticate: ModelGatewayAuthenticate
+  ) -> ModelGatewayClientContext? {
+    let authorization = head.headers["authorization"]
+    let apiKey = head.headers["x-api-key"]
+    let bridgeToken = head.headers["x-codex-bridge-token"]
+    let codexGatewayToken = head.headers["x-bridge-gateway-token"]
+    let accountID = head.headers["chatgpt-account-id"]
+    guard authorization.count <= 1, apiKey.count <= 1, bridgeToken.count <= 1,
+      codexGatewayToken.count <= 1, accountID.count <= 1,
+      codexGatewayToken.isEmpty || accountID.allSatisfy({ !$0.isEmpty && !$0.contains(",") })
+    else { return nil }
+    return authenticate(
+      ModelGatewayCredentials(
+        authorization: authorization, apiKey: apiKey, bridgeToken: bridgeToken,
+        codexGatewayToken: codexGatewayToken))
+  }
+
   static func validLength(_ headers: HTTPHeaders, maximum: Int) -> Bool {
     let lengths = headers["content-length"]
     guard lengths.count <= 1 else { return false }
@@ -57,7 +90,9 @@ extension ModelGatewayHTTPHandler {
     var headers: [String: String] = [:]
     for (name, value) in input.head.headers {
       let name = name.lowercased()
-      guard name != "authorization", name != "x-api-key", name != "x-codex-bridge-token" else {
+      guard name != "authorization", name != "x-api-key", name != "x-codex-bridge-token",
+        name != "x-bridge-gateway-token", name != "chatgpt-account-id"
+      else {
         continue
       }
       if let previous = headers[name] {
@@ -67,10 +102,13 @@ extension ModelGatewayHTTPHandler {
       }
     }
     let upstreamAuth: ModelGatewayUpstreamAuth?
-    if input.client.authenticatedViaBridgeHeader {
+    if input.client.authenticatedViaBridgeHeader || input.client.authenticatedViaCodexGatewayHeader
+    {
       let auth = ModelGatewayUpstreamAuth(
         authorization: input.head.headers["authorization"].first,
-        apiKey: input.head.headers["x-api-key"].first)
+        apiKey: input.head.headers["x-api-key"].first,
+        chatGPTAccountID: input.client.authenticatedViaCodexGatewayHeader
+          ? input.head.headers["chatgpt-account-id"].first : nil)
       upstreamAuth = auth.hasCredential ? auth : nil
     } else {
       upstreamAuth = nil

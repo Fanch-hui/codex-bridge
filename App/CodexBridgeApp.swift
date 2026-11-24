@@ -10,6 +10,7 @@ struct CodexBridgeApp: App {
   @StateObject private var model: BridgeServiceAppModel
 
   init() {
+    CodexGatewayCredentialEntryPoint.runIfRequested()
     MCPStdioEntryPoint.runIfRequested()
     MacAppUpdateHelper.runIfRequested()
     MacConnectorUpdateEntryPoint.runIfRequested()

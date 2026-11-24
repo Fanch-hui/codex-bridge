@@ -28,6 +28,10 @@ enum ServiceProviderGatewayAssembly {
       },
       modelNames: { [weak gateway] in await gateway?.modelDisplayNames() ?? [:] },
       modelLimits: { [weak gateway] in await gateway?.modelLimits() ?? [:] },
+      codexTakeoverCatalog: { [weak gateway] models in
+        guard let gateway else { throw CancellationError() }
+        return try await gateway.codexTakeoverCatalog(models)
+      },
       authorizationChanged: { try authentication.publish($0) })
     let community = ServiceCommunityProviders(
       store: store, secrets: secrets,

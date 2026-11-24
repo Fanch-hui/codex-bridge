@@ -1,8 +1,11 @@
 import Foundation
 @preconcurrency import NIOCore
 @preconcurrency import NIOHTTP1
+@preconcurrency import NIOWebSocket
 
-final class ModelGatewayHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
+final class ModelGatewayHTTPHandler: ChannelInboundHandler, RemovableChannelHandler,
+  @unchecked Sendable
+{
   typealias InboundIn = HTTPServerRequestPart
   typealias OutboundOut = HTTPServerResponsePart
 
@@ -23,6 +26,7 @@ final class ModelGatewayHTTPHandler: ChannelInboundHandler, @unchecked Sendable 
   private let admission: ModelGatewayAdmission
   private let authenticate: ModelGatewayAuthenticate
   private let handler: ModelGatewayRequestHandler
+  private let upgradeState: ModelGatewayUpgradeState
   private var state = State.waiting
   private var lease: ModelGatewayLease?
   private var task: Task<Void, Never>?
@@ -30,12 +34,18 @@ final class ModelGatewayHTTPHandler: ChannelInboundHandler, @unchecked Sendable 
 
   init(
     configuration: ModelGatewayConfiguration, admission: ModelGatewayAdmission,
-    authenticate: @escaping ModelGatewayAuthenticate, handler: @escaping ModelGatewayRequestHandler
+    authenticate: @escaping ModelGatewayAuthenticate, handler: @escaping ModelGatewayRequestHandler,
+    upgradeState: ModelGatewayUpgradeState
   ) {
     self.configuration = configuration
     self.admission = admission
     self.authenticate = authenticate
     self.handler = handler
+    self.upgradeState = upgradeState
+  }
+
+  func handlerRemoved(context: ChannelHandlerContext) {
+    timeout?.cancel()
   }
 
   func channelActive(context: ChannelHandlerContext) {
@@ -64,6 +74,8 @@ final class ModelGatewayHTTPHandler: ChannelInboundHandler, @unchecked Sendable 
   }
 
   func errorCaught(context: ChannelHandlerContext, error: any Error) {
+    // A refused upgrade is reported first; the request then arrives here to get its status.
+    if error as? NIOWebSocketUpgradeError == .unsupportedWebSocketTarget { return }
     task?.cancel()
     context.close(promise: nil)
   }
@@ -74,6 +86,10 @@ final class ModelGatewayHTTPHandler: ChannelInboundHandler, @unchecked Sendable 
       return
     }
     timeout?.cancel()
+    if let status = upgradeState.takeRejectedStatus() {
+      reject(HTTPResponseStatus(statusCode: status), context: context)
+      return
+    }
     guard let route = Self.parseRoute(uri: head.uri, method: head.method) else {
       reject(.notFound, context: context)
       return
@@ -82,14 +98,7 @@ final class ModelGatewayHTTPHandler: ChannelInboundHandler, @unchecked Sendable 
       reject(.forbidden, context: context)
       return
     }
-    let authorization = head.headers["authorization"]
-    let apiKey = head.headers["x-api-key"]
-    let bridgeToken = head.headers["x-codex-bridge-token"]
-    guard authorization.count <= 1, apiKey.count <= 1, bridgeToken.count <= 1,
-      let client = authenticate(
-        ModelGatewayCredentials(
-          authorization: authorization, apiKey: apiKey, bridgeToken: bridgeToken))
-    else {
+    guard let client = Self.authenticatedClient(head, authenticate: authenticate) else {
       reject(.unauthorized, context: context)
       return
     }

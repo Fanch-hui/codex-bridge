@@ -4,6 +4,7 @@
   import Dispatch
   import ucrt
 
+  CodexGatewayCredentialEntryPoint.runIfRequested()
   MCPStdioEntryPoint.runIfRequested()
   let arguments = Array(CommandLine.arguments.dropFirst())
   if arguments == ["--ensure-service"] {

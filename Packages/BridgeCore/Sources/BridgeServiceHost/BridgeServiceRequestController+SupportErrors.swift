@@ -130,8 +130,21 @@ extension BridgeServiceRequestController {
     if let error = error as? AgentNativePermissionPolicyError {
       return mapAgentNativePermissionPolicyError(error)
     }
+    if error as? ServiceCodexGatewayCatalogError == .invalidLocalPromptCatalog {
+      return .init(
+        code: "external_codex_prompt_catalog_invalid",
+        message: "Codex 本地模型目录格式无效。请检查原模型目录后重新预览。")
+    }
     if let error = error as? ExternalAgentConnectionError {
       switch error {
+      case .activeCodexCoexistence:
+        return .init(
+          code: "external_codex_coexistence_active",
+          message: "请先撤销 Codex 桌面版的共存配置，再停用或撤销应用访问。")
+      case .unreadableCodexPromptCatalog:
+        return .init(
+          code: "external_codex_prompt_catalog_unreadable",
+          message: "无法读取 Codex 本地模型目录。请检查原文件是否存在且可读，再重新预览。")
       case .configurationChanged, .conflictingFields:
         return .init(
           code: "external_configuration_conflict",

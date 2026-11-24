@@ -28,6 +28,7 @@ type bridgeRequest struct {
 	request         *Request
 	stream          bool
 	plugin          bool
+	reasoningScope  string
 	decoder         func(string, func(Event)) error
 	encoder         bridgeEncoder
 	writer          *bridgeWriter
@@ -71,7 +72,7 @@ func bridgeProtocol(s string) (provider.Protocol, error) {
 	return "", fmt.Errorf("unsupported protocol %q", s)
 }
 
-func (c *BridgeConverter) Translate(id, from, to, model, host string, body []byte, plugin bool) ([]byte, bool, error) {
+func (c *BridgeConverter) Translate(id, from, to, model, host string, body []byte, plugin bool, scopes ...string) ([]byte, bool, error) {
 	if id == "" || model == "" {
 		return nil, false, errors.New("request id and model are required")
 	}
@@ -94,6 +95,18 @@ func (c *BridgeConverter) Translate(id, from, to, model, host string, body []byt
 	}
 	if f == t {
 		return nil, false, errors.New("same-protocol requests use passthrough")
+	}
+	var reasoningScope string
+	if len(scopes) > 1 {
+		return nil, false, errors.New("invalid reasoning scope")
+	}
+	if len(scopes) == 1 {
+		reasoningScope = scopes[0]
+	}
+	if reasoningScope != "" {
+		if f != provider.Responses || t != provider.Anthropic || !validReasoningScope(reasoningScope) {
+			return nil, false, errors.New("invalid reasoning scope")
+		}
 	}
 	if f == provider.Responses && hasUnportableCurrentImage(body) {
 		return nil, false, errors.New("image without URL cannot be translated")
@@ -122,7 +135,7 @@ func (c *BridgeConverter) Translate(id, from, to, model, host string, body []byt
 	case provider.Chat:
 		req, err = parseChat(body)
 	case provider.Responses:
-		req, err = parseResponses(body)
+		req, err = parseResponses(body, reasoningScope)
 	case provider.Anthropic:
 		req, err = parseAnthropic(body)
 	}
@@ -201,7 +214,7 @@ func (c *BridgeConverter) Translate(id, from, to, model, host string, body []byt
 			out = withFields(out, map[string]any{"speed": "fast"})
 		}
 	}
-	r := &bridgeRequest{from: f, to: t, request: req, stream: stream, plugin: plugin}
+	r := &bridgeRequest{from: f, to: t, request: req, stream: stream, plugin: plugin, reasoningScope: reasoningScope}
 	if f == provider.Chat {
 		var options struct {
 			StreamOptions struct {

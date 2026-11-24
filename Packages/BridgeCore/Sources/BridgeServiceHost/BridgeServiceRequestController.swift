@@ -288,6 +288,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleExportMCPClientConfiguration(request)
     case .getLocalMCPConnection:
       return try await handleGetLocalMCPConnection(request)
+    case .exportCodexGatewayCredential:
+      return try await handleExportCodexGatewayCredential(request)
     case .getGeminiCloudStatus, .configureGeminiCloud, .exportGeminiCloudConfiguration:
       return try await handleGeminiCloud(request)
     case .rotateMCPClientCredential:

@@ -15,6 +15,11 @@ Release builds may bundle OpenAI tunnel-client. Its pinned upstream LICENSE,
 NOTICE and supply manifest are copied into the application bundle under
 Contents/Resources/TunnelClient and are verified before packaging.
 
+The Codex desktop model catalog uses the standard coding-agent instructions
+from OpenAI Codex (Copyright 2025 OpenAI), licensed under Apache 2.0. The
+unmodified source is pinned to rust-v0.171.0-alpha.13 (codex-rs/models-manager/prompt.md):
+https://github.com/openai/codex/blob/rust-v0.171.0-alpha.13/codex-rs/models-manager/prompt.md
+
 The embedded dsh-zcode package includes zcode-api by TriDefender and
 contributors and adaptations of its proxy. Those components are licensed under
 CC BY-NC-SA 4.0, requiring attribution, noncommercial use and share-alike.

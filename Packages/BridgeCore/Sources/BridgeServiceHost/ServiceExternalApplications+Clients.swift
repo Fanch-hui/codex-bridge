@@ -49,6 +49,9 @@ extension ServiceExternalApplications {
     let client = try await parseClient(
       fields, id: id, generation: previous[index].generation + 1,
       previousPlatform: previous[index].platform)
+    if !client.enabled || !client.preserveOfficialLogin || client.platform != "codex_desktop" {
+      try await requireCodexCoexistenceReverted(previous[index])
+    }
     var disabled = mcpRecord(previous[index])
     disabled.enabled = false
     do {
@@ -80,6 +83,7 @@ extension ServiceExternalApplications {
     guard let index = previous.firstIndex(where: { $0.id == id }) else {
       throw ServiceStoreError.invalidArgument("external_application.id")
     }
+    try await requireCodexCoexistenceReverted(previous[index])
     var disabled = mcpRecord(previous[index])
     disabled.enabled = false
     do {
@@ -100,6 +104,15 @@ extension ServiceExternalApplications {
     try await mcpClients.removeExternal(id: id)
     try secrets.remove(tokenReference(id))
     return .object([:])
+  }
+
+  private func requireCodexCoexistenceReverted(_ client: ServiceExternalApplication) async throws {
+    guard client.platform == "codex_desktop", client.preserveOfficialLogin else { return }
+    let usesGatewayForOfficial = try await readConnections().contains {
+      $0.clientID == client.id && $0.agent == "codex_desktop" && $0.purpose == "model"
+        && $0.compatibility?["preserveOfficialLogin"] == true
+    }
+    if usesGatewayForOfficial { throw ExternalAgentConnectionError.activeCodexCoexistence }
   }
 
   func configuration(_ fields: [String: ACPJSONValue]) async throws -> ACPJSONValue {
@@ -214,7 +227,7 @@ extension ServiceExternalApplications {
       preserveOfficialLogin = false
     }
     if preserveOfficialLogin {
-      guard platform == "codex" || platform == "claude" else {
+      guard platform == "codex" || platform == "codex_desktop" || platform == "claude" else {
         throw ServiceStoreError.invalidArgument("external_application.configuration")
       }
     }

@@ -2,6 +2,7 @@
   "use strict";
   var S = global.CodexBridgeDesktopPageSupport;
   var T = global.CodexBridgeDesktopProviderGatewayTransport;
+  var U = global.CodexBridgeDesktopLightweightUsage;
   var titles = { service: "服务", suppliers: "供应商", clients: "接入应用", activity: "活动" };
   var current = "service", requested = false, status = null, modeStatus = null, lastHostModeKey = "";
   var failure = "", loading = false, mutating = false, statusFlight = null;
@@ -397,6 +398,8 @@
     var activity = S.node("div", "lightweight-service-grid"), live = S.node("p", "page-message"); activity.appendChild(live);
     var approvals = S.section(activity, "待审批"); approvals.classList.add("lightweight-service-card");
     var approvalList = S.node("div"); approvals.appendChild(approvalList);
+    var summary = S.section(activity, "近 7 天用量"); summary.classList.add("lightweight-service-card");
+    var summaryList = S.node("div", "lightweight-activity-list"); summary.appendChild(summaryList);
     var recent = S.section(activity, "最近活动"); recent.classList.add("lightweight-service-card");
     var recentList = S.node("div", "lightweight-activity-list"); recent.appendChild(recentList);
     root.appendChild(activity);
@@ -406,7 +409,8 @@
       gatewayAddress: gatewayAddress, gatewayAction: gatewayAction, mcpBadge: mcpBadge, mcpStatus: mcpStatus,
       suppliers: suppliers, supplierEditor: supplierEditor, pluginEditor: pluginEditor,
       clients: clients, clientEditor: clientEditor, activity: activity, live: live, approvals: approvals,
-      approvalList: approvalList, recentList: recentList, activitySignature: "" };
+      approvalList: approvalList, recentList: recentList, activitySignature: "",
+      summary: summary, summaryList: summaryList, summarySignature: "" };
   }
   function updateService() {
     var gateway = status.gateway || {};
@@ -434,14 +438,20 @@
     var direct = S.safeArray(hostState && hostState.workbench && hostState.workbench.approvals).filter(function (item) { return item.isDirect; });
     view.approvals.hidden = !direct.length;
     global.CodexBridgeDesktopWorkbenchApprovals.render({ approvals: direct }, emitter, view.approvalList);
-    var entries = S.safeArray(status.activity), signature = JSON.stringify(entries);
+    var names = U.labels(status.models), modelsSignature = JSON.stringify(S.safeArray(status.models));
+    var summarySignature = JSON.stringify(S.safeArray(status.activitySummary)) + modelsSignature;
+    if (view.summarySignature !== summarySignature) {
+      view.summarySignature = summarySignature;
+      view.summary.hidden = !U.renderSummary(view.summaryList, status.activitySummary, names);
+    }
+    var entries = S.safeArray(status.activity), signature = JSON.stringify(entries) + modelsSignature;
     if (view.activitySignature === signature) return;
     view.activitySignature = signature; S.clear(view.recentList);
     if (!entries.length) view.recentList.appendChild(S.node("p", "hint lightweight-empty-note", "暂无请求活动记录。"));
     entries.forEach(function (item) {
       var row = S.node("div", "lightweight-activity-row"), main = S.node("div", "lightweight-activity-main");
       var titleRow = S.node("div", "plugin-card-title-row");
-      titleRow.appendChild(S.node("strong", "plugin-card-title", item.model || item.title || "请求"));
+      titleRow.appendChild(S.node("strong", "plugin-card-title", names.model(item.model) || item.title || "请求"));
       var outcome = { completed: "已完成", failed: "失败", cancelled: "已取消", running: "运行中", queued: "排队中" }[item.state] || item.state;
       var tone = item.state === "completed" ? "success" : item.state === "failed" ? "error" : item.state === "running" ? "running" : "neutral";
       titleRow.appendChild(S.badge(outcome, tone));
@@ -457,12 +467,16 @@
             + "输入 " + (usage.inputTokens == null ? missingUsage : usage.inputTokens)
             + " · 输出 " + (usage.outputTokens == null ? missingUsage : usage.outputTokens) + " Token";
           if (usage.totalTokens != null) usageText += " · 合计 " + usage.totalTokens;
-          if (usage.cacheReadTokens != null) usageText += " · 缓存读取 " + usage.cacheReadTokens;
+          if (usage.cacheReadTokens != null) {
+            usageText += " · 缓存读取 " + usage.cacheReadTokens;
+            var rate = U.hitRate(usage.cacheReadTokens, usage.inputTokens);
+            if (rate) usageText += "（" + rate.replace("缓存命中 ", "命中 ") + "）";
+          }
           if (usage.cacheWriteTokens != null) usageText += " · 缓存写入 " + usage.cacheWriteTokens;
           if (usage.reasoningTokens != null) usageText += " · 推理 " + usage.reasoningTokens;
         }
       }
-      main.appendChild(S.node("span", "hint", [item.clientID, item.providerID, usageText].filter(Boolean).join(" · ")));
+      main.appendChild(S.node("span", "hint", [item.clientID, names.provider(item.providerID), usageText].filter(Boolean).join(" · ")));
       row.appendChild(main);
       var meta = S.node("span", "lightweight-activity-meta mono", [duration, item.date].filter(Boolean).join(" · "));
       row.appendChild(meta);

@@ -43,6 +43,8 @@ public enum ExternalAgentConnectionError: Error, Equatable, Sendable {
   case invalidConfiguration
   case invalidPreview
   case configurationChanged
+  case activeCodexCoexistence
+  case unreadableCodexPromptCatalog
   case conflictingFields([[String]])
   case editorFailed(String)
   case editorUnavailable

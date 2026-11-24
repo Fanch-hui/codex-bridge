@@ -15,6 +15,8 @@ enum ServiceCommunityRequestCompatibility: Sendable {
   case muse
   case standard
 
+  var supportsChatToolReplay: Bool { self != .kiro }
+
   func adaptOriginal(_ body: Data, source: String, supportsSampling: Bool? = nil) throws -> (
     body: Data, warnings: [String]
   ) {
@@ -185,18 +187,24 @@ extension ServiceCommunityProviders {
     guard let pluginID = model.pluginID,
       let plugin = try await records().first(where: { $0.id == pluginID && $0.isInstalled })
     else { throw ServiceCommunityProviderError.modelUnavailable }
+    return Self.requestCompatibility(for: plugin, provider: model.providerID)
+  }
+
+  static func requestCompatibility(for plugin: Plugin, provider: String)
+    -> ServiceCommunityRequestCompatibility
+  {
     switch (plugin.package, plugin.version) {
     case ("@magpie-community/opencode-qoder-auth", "0.2.71"): return .qoder
     case ("@magpie-community/opencode-cursor-auth", "0.2.48"): return .cursor
     case ("@magpie-community/opencode-devin-auth", "0.1.45"): return .devin
     case ("@magpie-community/opencode-trae-auth", "0.2.43"): return .trae
     case ("@magpie-community/opencode-commandcode-auth", "0.1.24"): return .commandCode
-    case ("magpie-providers-hub", "0.13.2") where model.providerID == "hub-loomy": return .loomy
-    case ("magpie-providers-hub", "0.13.2") where model.providerID == "hub-accio": return .accio
+    case ("magpie-providers-hub", "0.13.2") where provider == "hub-loomy": return .loomy
+    case ("magpie-providers-hub", "0.13.2") where provider == "hub-accio": return .accio
     case ("magpie-providers-hub", "0.13.2")
-    where ["hub-monkeycode", "hub-monkeycode-intl"].contains(model.providerID): return .monkeycode
+    where ["hub-monkeycode", "hub-monkeycode-intl"].contains(provider): return .monkeycode
     case ("magpie-providers-hub", "0.13.2")
-    where ["hub-autoclaw", "hub-autoclaw-cn"].contains(model.providerID): return .autoclaw
+    where ["hub-autoclaw", "hub-autoclaw-cn"].contains(provider): return .autoclaw
     case ("@magpie-community/opencode-kiro-auth", "0.1.40"): return .kiro
     case ("magpie-muse-auth", "0.1.13"): return .muse
     default: return .standard

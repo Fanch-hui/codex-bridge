@@ -115,6 +115,8 @@ extension ServiceCommunityProviders {
     }
     var result: [String: CommunityModelRoute] = [:]
     var incompatible = Set<String>()
+    let supportsChatToolReplay = Self.requestCompatibility(for: plugin, provider: provider)
+      .supportsChatToolReplay
     for account in accounts {
       guard let key = account["key"]?.stringValue, !key.isEmpty else { continue }
       let available = account["models"]?.arrayValue.map { Set($0.compactMap(\.stringValue)) }
@@ -162,6 +164,7 @@ extension ServiceCommunityProviders {
           supportsImages: value["inputsSaid"]?.boolValue == true
             ? value["inputs"]?.arrayValue?.contains(.string("image")) : nil,
           supportsSampling: value["temperature"]?.boolValue,
+          supportsChatToolReplay: supportsChatToolReplay,
           providerName: row["name"]?.stringValue.nonEmpty,
           reasoningEfforts: ServiceGatewayModel.reasoningEfforts(
             (value["variants"]?.arrayValue ?? []).compactMap(\.stringValue)))

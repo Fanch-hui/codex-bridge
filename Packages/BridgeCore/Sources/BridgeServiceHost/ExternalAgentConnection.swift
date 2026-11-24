@@ -5,12 +5,21 @@ import Foundation
 public actor ExternalAgentConnection {
   public typealias Editor = @Sendable (Data) async throws -> Data
 
+  /// A Bridge-owned file the configuration points at; written on apply, removed on revert.
+  public struct CompanionFile: Sendable {
+    let url: URL
+    let data: Data
+  }
+
   private struct Pending: Sendable {
     let agent: ExternalAgentConnectionAgent
     let url: URL
     let previous: Data?
     let next: Data
     let changes: [ACPJSONValue]
+    let companion: CompanionFile?
+    /// A companion written by the connection this preview replaces.
+    let replacedCompanionURL: URL?
   }
 
   private struct Journal: Codable, Sendable {
@@ -19,6 +28,7 @@ public actor ExternalAgentConnection {
     let changes: [ACPJSONValue]
     let previousSHA256: String?
     let nextSHA256: String?
+    var companionURL: URL? = nil
   }
 
   private let editor: Editor
@@ -33,15 +43,25 @@ public actor ExternalAgentConnection {
   public func previewModel(
     agent: ExternalAgentConnectionAgent, configurationURL: URL, endpoint: URL, model: String,
     clientToken: String, compatibility: [String: Bool] = [:], models: [String]? = nil,
-    limits: [String: ExternalAgentModelLimit] = [:],
+    limits: [String: ExternalAgentModelLimit] = [:], codexCatalog: CompanionFile? = nil,
+    credentialCommand: String? = nil, credentialClientID: String? = nil,
     replacing receipt: ExternalAgentConnectionReceipt? = nil
   ) async throws -> ExternalAgentConnectionPreview {
     var options: [String: ACPJSONValue] = [
       "endpoint": .string(endpoint.absoluteString), "model": .string(model),
-      "token": .string(clientToken),
       "compatibility": .object(compatibility.mapValues { .bool($0) }),
     ]
+    if agent == .codexDesktop && compatibility["preserveOfficialLogin"] == true {
+      guard let credentialCommand, let credentialClientID else {
+        throw ExternalAgentConnectionError.invalidConfiguration
+      }
+      options["credentialCommand"] = .string(credentialCommand)
+      options["credentialClientID"] = .string(credentialClientID)
+    } else {
+      options["token"] = .string(clientToken)
+    }
     if let models { options["models"] = .array(models.map(ACPJSONValue.string)) }
+    if let codexCatalog { options["catalogPath"] = .string(codexCatalog.url.path) }
     let configured = Set(models ?? [model])
     let known = limits.filter { configured.contains($0.key) }.compactMapValues {
       limit -> ACPJSONValue? in
@@ -56,7 +76,7 @@ public actor ExternalAgentConnection {
     if !known.isEmpty { options["limits"] = .object(known) }
     return try await prepare(
       agent: agent, configurationURL: configurationURL, purpose: "model",
-      options: .object(options), replacing: receipt)
+      options: .object(options), companion: codexCatalog, replacing: receipt)
   }
 
   public func previewMCP(
@@ -79,14 +99,18 @@ public actor ExternalAgentConnection {
     guard try read(pending.url) == pending.previous else {
       throw ExternalAgentConnectionError.configurationChanged
     }
+    try validateCodexPromptCatalog(
+      agent: pending.agent, configurationURL: pending.url, changes: pending.changes)
     let receipt = ExternalAgentConnectionReceipt(previewID: id)
     let reference = try SecretReference(validating: receipt.secretReference)
     let journal = Journal(
       agent: pending.agent, configurationURL: pending.url, changes: pending.changes,
       previousSHA256: pending.previous.map { SecureFileRevision.digest(of: $0).sha256 },
-      nextSHA256: SecureFileRevision.digest(of: pending.next).sha256)
+      nextSHA256: SecureFileRevision.digest(of: pending.next).sha256,
+      companionURL: pending.companion?.url ?? pending.replacedCompanionURL)
     try secrets.store(JSONEncoder().encode(journal), for: reference)
     do {
+      if let companion = pending.companion { try publish(companion.data, at: companion.url) }
       try publish(pending.next, at: pending.url)
     } catch let operationError {
       do { try secrets.remove(reference) } catch let cleanupError {
@@ -108,11 +132,10 @@ public actor ExternalAgentConnection {
       .object([
         "operation": .string("revert"), "agent": .string(journal.agent.rawValue),
         "content": .string(source), "changes": .array(journal.changes),
+        // The target app may rewrite fields Bridge set (Codex Desktop resets `model`); those
+        // now belong to it, so restore only what Bridge still owns.
+        "keepDrifted": .bool(true),
       ]))
-    if let conflicts = result["conflicts"]?.arrayValue {
-      let paths = try conflicts.map(Self.path)
-      throw ExternalAgentConnectionError.conflictingFields(paths)
-    }
     guard let content = result["content"]?.stringValue else {
       throw ExternalAgentConnectionError.invalidConfiguration
     }
@@ -120,10 +143,17 @@ public actor ExternalAgentConnection {
       throw ExternalAgentConnectionError.configurationChanged
     }
     try publish(Data(content.utf8), at: journal.configurationURL)
+    if let companion = journal.companionURL { try removeCompanion(companion) }
     do { try secrets.remove(SecretReference(validating: receipt.secretReference)) } catch {
       throw ExternalAgentConnectionCleanupFailure(
         operation: .revert, operationError: nil, cleanupError: error)
     }
+  }
+
+  func codexPromptCatalog(_ receipt: ExternalAgentConnectionReceipt) throws -> Data? {
+    let journal = try loadJournal(receipt)
+    return try Self.readCodexPromptCatalog(
+      agent: journal.agent, configurationURL: journal.configurationURL, changes: journal.changes)
   }
 
   enum InitialPublication {
@@ -194,6 +224,11 @@ public actor ExternalAgentConnection {
             options["disableMultiAgent"] = true
           }
         }
+        if journal.agent == .codexDesktop,
+          path == ["model_providers", "codex_bridge_hybrid"]
+        {
+          options["preserveOfficialLogin"] = true
+        }
       } else if journal.agent == .claude {
         if path == ["env", "CLAUDE_CODE_DISABLE_THINKING"], after?["value"]?.stringValue == "1" {
           options["disableThinking"] = true
@@ -208,7 +243,8 @@ public actor ExternalAgentConnection {
 
   private func prepare(
     agent: ExternalAgentConnectionAgent, configurationURL: URL, purpose: String,
-    options: ACPJSONValue, replacing receipt: ExternalAgentConnectionReceipt?
+    options: ACPJSONValue, companion: CompanionFile? = nil,
+    replacing receipt: ExternalAgentConnectionReceipt?
   ) async throws -> ExternalAgentConnectionPreview {
     guard configurationURL.isFileURL, previews.count < 16 else {
       throw ExternalAgentConnectionError.invalidConfiguration
@@ -227,8 +263,10 @@ public actor ExternalAgentConnection {
       "operation": .string("prepare"), "agent": .string(agent.rawValue),
       "purpose": .string(purpose), "content": source, purpose: options,
     ]
+    var replacedCompanionURL: URL?
     if let receipt {
       let journal = try loadJournal(receipt)
+      replacedCompanionURL = journal.companionURL
       guard journal.agent == agent,
         journal.configurationURL.standardizedFileURL == configurationURL.standardizedFileURL
       else { throw ExternalAgentConnectionError.invalidConfiguration }
@@ -241,6 +279,8 @@ public actor ExternalAgentConnection {
     guard let next = result["content"]?.stringValue,
       let changes = result["changes"]?.arrayValue
     else { throw ExternalAgentConnectionError.invalidConfiguration }
+    try validateCodexPromptCatalog(
+      agent: agent, configurationURL: configurationURL, changes: changes)
     let fields: [[String]]
     if let paths = result["fields"]?.arrayValue {
       fields = try paths.map(Self.path)
@@ -250,7 +290,7 @@ public actor ExternalAgentConnection {
     let id = UUID()
     previews[id] = Pending(
       agent: agent, url: configurationURL, previous: previous, next: Data(next.utf8),
-      changes: changes)
+      changes: changes, companion: companion, replacedCompanionURL: replacedCompanionURL)
     return ExternalAgentConnectionPreview(
       id: id, agent: agent, configurationURL: configurationURL, fields: fields)
   }
@@ -294,6 +334,50 @@ public actor ExternalAgentConnection {
       return try Data(contentsOf: url)
     } catch CocoaError.fileReadNoSuchFile {
       return nil
+    }
+  }
+
+  private func validateCodexPromptCatalog(
+    agent: ExternalAgentConnectionAgent, configurationURL: URL, changes: [ACPJSONValue]
+  ) throws {
+    if let data = try Self.readCodexPromptCatalog(
+      agent: agent, configurationURL: configurationURL, changes: changes)
+    {
+      try ServiceCodexGatewayCatalog.validateLocalPromptCatalog(data)
+    }
+  }
+
+  private static func readCodexPromptCatalog(
+    agent: ExternalAgentConnectionAgent, configurationURL: URL, changes: [ACPJSONValue]
+  ) throws -> Data? {
+    // The journal lists the active profile's override after the top-level setting.
+    guard agent == .codexDesktop,
+      let catalog = changes.last(where: { change in
+        change["path"]?.arrayValue?.last?.stringValue == "model_catalog_json"
+          && change["before"]?["exists"]?.boolValue == true
+          && change["after"]?["exists"]?.boolValue == false
+      })
+    else { return nil }
+    guard let path = catalog["before"]?["value"]?.stringValue, !path.isEmpty else {
+      throw ExternalAgentConnectionError.unreadableCodexPromptCatalog
+    }
+    let url = URL(fileURLWithPath: path, relativeTo: configurationURL.deletingLastPathComponent())
+    do {
+      return try url.standardizedFileURL.withUnsafeFileSystemRepresentation { path in
+        guard let path else { throw ExternalAgentConnectionError.unreadableCodexPromptCatalog }
+        return try SecureFileArtifactReader.read(
+          at: String(cString: path), maximumBytes: 8 * 1_024 * 1_024)
+      }
+    } catch {
+      throw ExternalAgentConnectionError.unreadableCodexPromptCatalog
+    }
+  }
+
+  private func removeCompanion(_ url: URL) throws {
+    do {
+      try FileManager.default.removeItem(at: url)
+    } catch CocoaError.fileNoSuchFile {
+      return
     }
   }
 

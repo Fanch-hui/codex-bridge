@@ -48,6 +48,7 @@ extension ServiceProviderGateway {
         "connections": .array(try await externalApplications.connections()),
         "activity": .array(Array(activeRequests.values) + (try await recentActivity())),
         "activityError": activityError.map(ACPJSONValue.string) ?? .null,
+        "activitySummary": try await activitySummary(),
       ])
     case "service.setDeadlines":
       guard !savingDeadlines else { throw ServiceStoreError.storageBusy }

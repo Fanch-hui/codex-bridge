@@ -39,7 +39,7 @@ func (c *BridgeConverter) Begin(id string) error {
 		case provider.Chat:
 			r.encoder = &chatEncoder{w: w, model: r.request.Model, includeUsage: r.includeUsage}
 		case provider.Responses:
-			r.encoder = &responsesEncoder{w: w, model: r.request.Model, named: r.request.Namespaced, requestFields: r.responseFields}
+			r.encoder = &responsesEncoder{w: w, model: r.request.Model, named: r.request.Namespaced, requestFields: r.responseFields, reasoningScope: r.reasoningScope}
 		case provider.Anthropic:
 			r.encoder = &anthropicEncoder{w: w, model: r.request.Model}
 		}
@@ -256,7 +256,7 @@ func (c *BridgeConverter) Finish(id string) ([]byte, error) {
 		}
 		return response, nil
 	case provider.Responses:
-		response := renderResponses(result, r.request.Model, r.request.Namespaced)
+		response := renderResponses(result, r.request.Model, r.request.Namespaced, r.reasoningScope)
 		fields := map[string]any{}
 		for key, value := range r.responseFields {
 			fields[key] = value

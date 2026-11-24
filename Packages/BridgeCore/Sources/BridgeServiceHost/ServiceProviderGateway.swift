@@ -14,6 +14,7 @@ actor ServiceProviderGateway {
   let resourceRoot: URL?
   let authentication = ServiceGatewayAuthentication()
   let scheduler = ModelGatewayRequestScheduler()
+  let conversionHost = ServiceModelConversionHost()
   var listener: ModelGatewayListener?
   var endpoint: ModelGatewayEndpoint?
   var enabled = false
@@ -24,6 +25,7 @@ actor ServiceProviderGateway {
   var savingDeadlines = false
   var activeRequests: [String: ACPJSONValue] = [:]
   var activityError: String?
+  var activitySummaryCache: ACPJSONValue?
   var communityModelTask: Task<ACPJSONValue, any Error>?
   var communityModelsInvalidated = false
   var communityModelError: String?
@@ -35,6 +37,8 @@ actor ServiceProviderGateway {
   var communityProviders: ServiceCommunityProviders?
   var workbenchGateway: ServiceWorkbenchGateway?
   var anthropicPassthroughBaseURL = URL(string: "https://api.anthropic.com")!
+  var codexUpstreamEndpoints = CodexUpstreamEndpoints.official
+  var codexOfficialModels = CodexOfficialModelCache()
 
   func attach(
     mode: ServiceApplicationModeController, applications: ServiceExternalApplications,
@@ -61,13 +65,13 @@ actor ServiceProviderGateway {
   func modelLimits() -> [String: ExternalAgentModelLimit] {
     Dictionary(
       models.compactMap { model in
-        model.contextWindow == nil && model.defaultMaxTokens == nil
+        model.knownContextWindow == nil && model.defaultMaxTokens == nil
           && model.reasoningEfforts == nil
           ? nil
           : (
             model.id,
             ExternalAgentModelLimit(
-              contextWindow: model.contextWindow, maxOutputTokens: model.defaultMaxTokens,
+              contextWindow: model.knownContextWindow, maxOutputTokens: model.defaultMaxTokens,
               reasoningEfforts: model.reasoningEfforts)
           )
       }, uniquingKeysWith: { first, _ in first })
@@ -145,6 +149,10 @@ actor ServiceProviderGateway {
         handler: { [weak self] request, sink in
           guard let self else { throw CancellationError() }
           try await self.handle(request, sink: sink)
+        },
+        webSocketHandler: { [weak self, authentication] request in
+          guard let self else { return .reject(status: 503) }
+          return await self.acceptCodexWebSocket(request, authentication: authentication)
         })
       let address = try await server.start()
       do {
@@ -166,6 +174,7 @@ actor ServiceProviderGateway {
       endpoint = nil
       enabled = false
       serviceError = nil
+      await conversionHost.stopWhenIdle()
     }
   }
 
@@ -269,6 +278,7 @@ actor ServiceProviderGateway {
     await scheduler.stopAccepting()
     await listener?.stopAccepting()
     await workbenchGateway?.stopAccepting()
+    await conversionHost.stopWhenIdle()
   }
 
   func shutdown() async throws {
@@ -280,8 +290,12 @@ actor ServiceProviderGateway {
     await listener?.shutdown()
     listener = nil
     endpoint = nil
+    // Requests are drained by now. Later teardown still runs when the helper's exit is unconfirmed.
+    var helperFailure: (any Error)?
+    do { try await conversionHost.stop() } catch { helperFailure = error }
     if let communityProviders { try await communityProviders.shutdown() }
     try await existing.shutdown()
+    if let helperFailure { throw helperFailure }
   }
 
   func save(_ key: String, _ value: String) async throws {

@@ -17,8 +17,21 @@ extension ServiceExternalApplications {
       !(agent == .claudeDesktop && purpose == "model"),
       !(agent == .codexDesktop && purpose == "model" && scope == "project")
     else { throw ServiceStoreError.invalidArgument("external_application.connection") }
-    let compatibility = try modelCompatibility(
+    var compatibility = try modelCompatibility(
       fields["compatibility"], agent: agent, purpose: purpose)
+    if agent == .codexDesktop && purpose == "model" {
+      if let requested = compatibility["preserveOfficialLogin"],
+        requested != client.preserveOfficialLogin
+      {
+        throw ServiceStoreError.invalidArgument("external_application.compatibility")
+      }
+      if client.preserveOfficialLogin {
+        guard compatibility["disableWebSearch"] != true,
+          compatibility["disableMultiAgent"] != true, appExecutable.isFileURL
+        else { throw ServiceStoreError.invalidArgument("external_application.compatibility") }
+        compatibility["preserveOfficialLogin"] = true
+      }
+    }
 
     let projectID = scope == "project" ? try required(fields, "projectID") : nil
     let directory = try await configurationDirectory(
@@ -56,10 +69,20 @@ extension ServiceExternalApplications {
       case .codex, .codexDesktop, .claude, .claudeDesktop:
         models = nil
       }
+      var takeoverCatalog: ExternalAgentConnection.CompanionFile?
+      if agent == .codexDesktop && !client.preserveOfficialLogin {
+        takeoverCatalog = .init(
+          url: path.deletingLastPathComponent().appendingPathComponent(
+            "codex-bridge-model-catalog.json"),
+          data: try await codexTakeoverCatalog(client.models))
+      }
       preview = try await editor.previewModel(
         agent: agent, configurationURL: path, endpoint: url, model: selectedModel,
-        clientToken: token(id), compatibility: compatibility, models: models,
-        limits: await modelLimits(), replacing: previousReceipt)
+        clientToken: client.preserveOfficialLogin && agent == .codexDesktop ? "" : token(id),
+        compatibility: compatibility, models: models,
+        limits: await modelLimits(), codexCatalog: takeoverCatalog,
+        credentialCommand: Self.nativeExecutablePath(appExecutable), credentialClientID: id,
+        replacing: previousReceipt)
       model = selectedModel
       gateway = url
     } else {
@@ -85,6 +108,20 @@ extension ServiceExternalApplications {
     var warnings: [ACPJSONValue] =
       purpose == "model" && scope == "project"
       ? [.string("项目配置包含 Bridge 访问凭据，请勿提交到版本库。")] : []
+    if agent == .codexDesktop && purpose == "model" && client.preserveOfficialLogin {
+      warnings.append(
+        .string("默认供应商配置会同时影响 Codex 桌面版和共用此配置的 CLI。"))
+      warnings.append(
+        .string("使用期间需保持 Bridge 后台服务运行，官方模型请求也会经过 Bridge。"))
+      if preview.fields.contains(where: { $0.last == "model_catalog_json" }) {
+        warnings.append(
+          .string("官方模型会沿用本地目录里同一模型的提示词。模型列表和能力以官方目录为准，撤销时恢复原目录。"))
+      }
+      warnings.append(
+        .string("选择其他供应商模型时，该供应商会收到对话历史、代码片段和工具结果。"))
+      warnings.append(
+        .string("其他 Codex 配置层可能影响最终生效结果；旧会话可能需要切回原供应商或创建分支。"))
+    }
     var disabled: [String] = []
     if compatibility["disableWebSearch"] == true { disabled.append("网页搜索") }
     if compatibility["disableMultiAgent"] == true { disabled.append("多 Agent 功能") }
@@ -117,6 +154,19 @@ extension ServiceExternalApplications {
     ])
   }
 
+  func codexPromptCatalog(clientID: String) async throws -> Data? {
+    await mutationGate.acquire()
+    defer { mutationGate.release() }
+    guard
+      let active = try await readConnections().last(where: {
+        $0.clientID == clientID && $0.agent == "codex_desktop" && $0.purpose == "model"
+          && $0.scope == "global" && $0.applied
+          && $0.compatibility?["preserveOfficialLogin"] == true
+      })
+    else { return nil }
+    return try await editor.codexPromptCatalog(connectionReceipt(active.receiptID))
+  }
+
   private func modelCompatibility(
     _ value: ACPJSONValue?, agent: ExternalAgentConnectionAgent, purpose: String
   ) throws -> [String: Bool] {
@@ -127,7 +177,8 @@ extension ServiceExternalApplications {
     let allowed: Set<String>
     switch agent {
     case .codex: allowed = ["disableWebSearch", "disableMultiAgent", "preserveOfficialLogin"]
-    case .codexDesktop: allowed = ["disableWebSearch", "disableMultiAgent"]
+    case .codexDesktop:
+      allowed = ["disableWebSearch", "disableMultiAgent", "preserveOfficialLogin"]
     case .claude: allowed = ["disableThinking", "preserveOfficialLogin"]
     case .claudeDesktop, .pi, .openCode1, .openCode2: allowed = []
     }

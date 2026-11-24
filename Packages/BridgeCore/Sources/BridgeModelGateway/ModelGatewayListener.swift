@@ -7,6 +7,7 @@ public actor ModelGatewayListener {
   private let configuration: ModelGatewayConfiguration
   private let authenticate: ModelGatewayAuthenticate
   private let handler: ModelGatewayRequestHandler
+  private let webSocketHandler: ModelGatewayWebSocketHandler?
   private let admission: ModelGatewayAdmission
   private var server: (any Channel)?
   private var group: MultiThreadedEventLoopGroup?
@@ -17,11 +18,13 @@ public actor ModelGatewayListener {
 
   public init(
     configuration: ModelGatewayConfiguration, authenticate: @escaping ModelGatewayAuthenticate,
-    handler: @escaping ModelGatewayRequestHandler
+    handler: @escaping ModelGatewayRequestHandler,
+    webSocketHandler: ModelGatewayWebSocketHandler? = nil
   ) {
     self.configuration = configuration
     self.authenticate = authenticate
     self.handler = handler
+    self.webSocketHandler = webSocketHandler
     admission = ModelGatewayAdmission(
       maximumConnections: configuration.maximumConnections,
       maximumRequests: configuration.maximumRequests)
@@ -42,6 +45,7 @@ public actor ModelGatewayListener {
     let admission = admission
     let authenticate = authenticate
     let handler = handler
+    let webSocketHandler = webSocketHandler
     let bootstrap = ServerBootstrap(group: group)
       .serverChannelOption(ChannelOptions.backlog, value: 64)
       #if os(Windows)
@@ -53,14 +57,20 @@ public actor ModelGatewayListener {
       #endif
       .childChannelInitializer { channel in
         guard admission.register(channel) else { return channel.close() }
+        let upgradeState = ModelGatewayUpgradeState()
+        let upgrader = ModelGatewayHTTPHandler.webSocketUpgrader(
+          configuration: configuration, state: upgradeState, admission: admission,
+          authenticate: authenticate, handler: webSocketHandler)
         return channel.pipeline.configureHTTPServerPipeline(
-          withPipeliningAssistance: false, withErrorHandling: true,
-          withDecoderLimitConfiguration: decoderLimits
+          withPipeliningAssistance: false,
+          withServerUpgrade: (upgraders: [upgrader], completionHandler: { _ in }),
+          withErrorHandling: true, withDecoderLimitConfiguration: decoderLimits
         ).flatMap {
           channel.pipeline.addHandler(
             ModelGatewayHTTPHandler(
               configuration: configuration, admission: admission,
-              authenticate: authenticate, handler: handler))
+              authenticate: authenticate, handler: handler, upgradeState: upgradeState),
+            name: ModelGatewayHTTPHandler.handlerName)
         }.flatMapError { error in
           admission.unregister(channel)
           return channel.close().flatMapThrowing { throw error }

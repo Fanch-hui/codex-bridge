@@ -17,16 +17,18 @@ struct ServiceExternalGatewayCredential: Sendable, CustomStringConvertible,
   let generation: UInt64
   let models: [String]
   let allowsAnthropicPassthrough: Bool
+  let allowsCodexPassthrough: Bool
 
   init(
     id: String, token: String, generation: UInt64, models: [String],
-    allowsAnthropicPassthrough: Bool = false
+    allowsAnthropicPassthrough: Bool = false, allowsCodexPassthrough: Bool = false
   ) {
     self.id = id
     self.token = token
     self.generation = generation
     self.models = models
     self.allowsAnthropicPassthrough = allowsAnthropicPassthrough
+    self.allowsCodexPassthrough = allowsCodexPassthrough
   }
 
   var description: String { "ServiceExternalGatewayCredential(id: \(id), token: <redacted>)" }
@@ -119,6 +121,7 @@ actor ServiceExternalApplications {
   let endpoint: @Sendable () async throws -> URL
   let modelNames: @Sendable () async -> [String: String]
   let modelLimits: @Sendable () async -> [String: ExternalAgentModelLimit]
+  let codexTakeoverCatalog: @Sendable ([String]) async throws -> Data
   let authorizationChanged: @Sendable ([ServiceExternalGatewayCredential]) throws -> Void
   let mutationGate = AsyncMutex()
   var previews: [UUID: ServiceExternalConnectionRecord] = [:]
@@ -131,6 +134,9 @@ actor ServiceExternalApplications {
     endpoint: @escaping @Sendable () async throws -> URL,
     modelNames: @escaping @Sendable () async -> [String: String] = { [:] },
     modelLimits: @escaping @Sendable () async -> [String: ExternalAgentModelLimit] = { [:] },
+    codexTakeoverCatalog: @escaping @Sendable ([String]) async throws -> Data = { _ in
+      Data(#"{"models":[]}"#.utf8)
+    },
     authorizationChanged: @escaping @Sendable ([ServiceExternalGatewayCredential]) throws -> Void
   ) {
     self.store = store
@@ -143,6 +149,7 @@ actor ServiceExternalApplications {
     self.endpoint = endpoint
     self.modelNames = modelNames
     self.modelLimits = modelLimits
+    self.codexTakeoverCatalog = codexTakeoverCatalog
     self.authorizationChanged = authorizationChanged
   }
 
@@ -229,7 +236,8 @@ actor ServiceExternalApplications {
       ServiceExternalGatewayCredential(
         id: client.id, token: try token(client.id), generation: client.generation,
         models: client.models,
-        allowsAnthropicPassthrough: client.platform == "claude" && client.preserveOfficialLogin)
+        allowsAnthropicPassthrough: client.platform == "claude" && client.preserveOfficialLogin,
+        allowsCodexPassthrough: client.platform == "codex_desktop" && client.preserveOfficialLogin)
     }
     try authorizationChanged(credentials)
   }

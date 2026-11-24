@@ -27,6 +27,7 @@
     ];
     var previousDefaultName = "";
     var selectNewModels = false, savedGrant = "", savedConfiguration = "", completedWrites = [], uncertainWrite = null;
+    var hybridChoicesActive = false, hiddenModelSelections = [];
     root.classList.add("lightweight-clients");
     var clientSignature = "", receiptSignature = "";
     var notice = S.node("p", "page-message"); notice.setAttribute("role", "status"); notice.hidden = true; root.appendChild(notice);
@@ -41,7 +42,9 @@
     var editor = S.node("section", "page-section lightweight-client-card"), editorTitle = S.node("h3");
     var editorBody = S.node("div", "lightweight-clients-editor");
     editor.appendChild(editorTitle); editor.appendChild(editorBody); root.appendChild(editor); editor.hidden = true;
-    var platform = S.selectField("目标应用", "", [{ id: "", title: "请选择应用" }].concat(platforms), changePlatform);
+    var platform = S.selectField("目标应用", "", [{ id: "", title: "请选择应用" }].concat(platforms), function (value) {
+      changePlatform(value); updateModelChoices();
+    });
     var name = S.textField("应用名称", "", "例如：我的应用"), enabled = checkbox("启用应用", true);
     var modelHeading = S.node("h4", null, "允许使用的模型"), modelList = S.node("div", "lightweight-check-list");
     var refreshModels = button("刷新模型目录", function () {
@@ -62,7 +65,9 @@
     var modelGroup = S.node("div", "lightweight-clients-group");
     var modelHeader = S.node("div", "lightweight-clients-group-heading");
     modelHeader.appendChild(modelHeading); modelHeader.appendChild(refreshModels);
-    modelGroup.appendChild(modelHeader); modelGroup.appendChild(modelList); modelGroup.appendChild(connectSuppliers);
+    var unavailableModels = S.node("p", "hint"); unavailableModels.hidden = true;
+    modelGroup.appendChild(modelHeader); modelGroup.appendChild(modelList);
+    modelGroup.appendChild(unavailableModels); modelGroup.appendChild(connectSuppliers);
     var siwcLimit = S.node("p", "hint", "ChatGPT 登录模型由供应商控制输出长度和采样。网关会过滤客户端传入的输出 Token 上限、temperature 和 top_p。");
     siwcLimit.hidden = true; modelGroup.appendChild(siwcLimit);
     var coexistenceGroup = S.node("div", "lightweight-clients-group");
@@ -71,7 +76,9 @@
     coexistenceGroup.appendChild(preserveOfficial.root);
     coexistenceGroup.appendChild(preserveOfficialHint);
     coexistenceGroup.hidden = true;
-    preserveOfficial.control.addEventListener("change", function () { syncPlatformHints(platform.control.value); });
+    preserveOfficial.control.addEventListener("change", function () {
+      syncPlatformHints(platform.control.value); updateModelChoices(); syncSaveButtonLabel();
+    });
     var mcpGroup = S.node("div", "lightweight-clients-group");
     mcpGroup.appendChild(S.node("h4", null, "MCP 授权")); mcpGroup.appendChild(mcp.root);
     var mcpFields = S.node("div", "lightweight-clients-mcp-fields");
@@ -95,7 +102,7 @@
     });
     advanced.appendChild(compatibilityGroup);
     advanced.appendChild(enabled.root); advanced.appendChild(mcpGroup);
-    [identityFields, modelGroup, coexistenceGroup, advanced].forEach(function (node) { editorBody.appendChild(node); });
+    [identityFields, coexistenceGroup, modelGroup, advanced].forEach(function (node) { editorBody.appendChild(node); });
     var writeHint = S.node("p", "hint", "确认后写入目标应用的全局配置，模型网关会按需启动。保留当前默认模型，未设置时使用首个选中模型。");
     editorBody.appendChild(writeHint);
     var editorActions = S.node("div", "form-actions"), save = button("确认写入配置", saveClient, "primary"), close = button("取消", closeEditor);
@@ -154,7 +161,8 @@
     }
     function availableModels(selected) {
       var models = S.safeArray(currentStatus && currentStatus.models).map(function (item) {
-        return { id: item.id, title: item.name || item.id, group: item.providerName || item.providerID || "其他" };
+        return { id: item.id, title: item.name || item.id, group: item.providerName || item.providerID || "其他",
+          codexCoexistenceEligible: item.codexCoexistenceEligible === true };
       }).filter(function (item) { return !!item.id; });
       selected.forEach(function (id) {
         if (!models.some(function (item) { return item.id === id; })) models.push({ id: id, title: id, group: "目录暂不可用" });
@@ -165,15 +173,53 @@
       siwcLimit.hidden = !checkedValues(modelList).some(function (id) { return id.startsWith("builtin/chatgpt-siwc/"); });
     }
     function updateModelChoices() {
-      var selected = checkedValues(modelList), choices = availableModels(selected);
+      var selected = checkedValues(modelList), hybrid = isDesktopHybrid();
+      var allChoices = availableModels(selected);
+      var catalogModels = S.safeArray(currentStatus && currentStatus.models).filter(function (item) { return !!item.id; });
+      if (hybrid && !hybridChoicesActive) {
+        hiddenModelSelections = selected.filter(function (id) {
+          return !allChoices.some(function (item) { return item.id === id && item.codexCoexistenceEligible; });
+        });
+      } else if (!hybrid && hybridChoicesActive) {
+        hiddenModelSelections.forEach(function (id) { if (selected.indexOf(id) === -1) selected.push(id); });
+        hiddenModelSelections = [];
+        allChoices = availableModels(selected);
+      }
+      if (hybrid) {
+        selected.forEach(function (id) {
+          var eligible = allChoices.some(function (item) { return item.id === id && item.codexCoexistenceEligible; });
+          if (!eligible && hiddenModelSelections.indexOf(id) === -1) hiddenModelSelections.push(id);
+        });
+        hiddenModelSelections = hiddenModelSelections.filter(function (id) {
+          var eligible = allChoices.some(function (item) { return item.id === id && item.codexCoexistenceEligible; });
+          if (eligible && selected.indexOf(id) === -1) selected.push(id);
+          return !eligible;
+        });
+      }
+      hybridChoicesActive = hybrid;
+      var choices = hybrid ? allChoices.filter(function (item) { return item.codexCoexistenceEligible; }) : allChoices;
       if (selectNewModels) selected = choices.map(function (item) { return item.id; });
-      var signature = JSON.stringify(choices);
+      var signature = JSON.stringify([hybrid, choices, catalogModels.length > 0]);
       if (modelList.dataset.choices !== signature) {
-        appendChoices(modelList, choices, selected, "还没有可授权的模型，请先配置供应商。");
+        var emptyModelsHint = "还没有可授权的模型，请先配置供应商。";
+        if (hybrid && catalogModels.length) emptyModelsHint = "已连接的模型暂不支持共存。";
+        appendChoices(modelList, choices, selected, emptyModelsHint);
         modelList.dataset.choices = signature;
       }
+      var unavailableCount = catalogModels.filter(function (item) { return item.codexCoexistenceEligible !== true; }).length;
+      unavailableModels.hidden = !hybrid || !choices.length || !unavailableCount;
+      unavailableModels.textContent = unavailableCount ? "另有 " + unavailableCount + " 个模型暂不支持共存。" : "";
       showModelLimit();
-      connectSuppliers.hidden = S.safeArray(currentStatus && currentStatus.models).some(function (item) { return !!item.id; });
+      connectSuppliers.hidden = catalogModels.length > 0;
+    }
+    function isDesktopHybrid() {
+      return platform.control.value === "codex_desktop" && preserveOfficial.control.checked;
+    }
+    function modelReceipt(clientID) {
+      return S.safeArray(currentStatus && currentStatus.connections).find(function (entry) {
+        return entry.clientID === clientID && entry.purpose === "model" && entry.scope === "global"
+          && (entry.state === "applied" || entry.state === "pending");
+      });
     }
     function projects() {
       return S.safeArray(desktopState && desktopState.projects && desktopState.projects.rows).map(function (item) {
@@ -183,6 +229,7 @@
     function saveTitleFor(value) {
       if (value === "other") return "保存授权";
       if (value === "claude_desktop") return mcp.control.checked ? "保存并写入 MCP 配置" : "保存授权";
+      if (value === "codex_desktop" && isDesktopHybrid()) return "保存授权并预览";
       return "确认写入配置";
     }
     function syncSaveButtonLabel() {
@@ -201,7 +248,7 @@
       return item && value !== "other" ? item.title : "";
     }
     function syncPlatformHints(value) {
-      var supportsCoexistence = value === "codex" || value === "claude";
+      var supportsCoexistence = value === "codex" || value === "codex_desktop" || value === "claude";
       coexistenceGroup.hidden = !supportsCoexistence;
       if (!supportsCoexistence) preserveOfficial.control.checked = false;
       var coexist = supportsCoexistence && preserveOfficial.control.checked;
@@ -210,6 +257,11 @@
         preserveOfficialHint.textContent = coexist
           ? "已开启共存：直接运行 codex 继续使用官方登录模型；运行 codex -p codex_bridge 使用 Bridge 模型，可同时开两个终端并行。"
           : "默认不开启：将设为 Codex 默认供应商；勾选后保留你的官方登录为默认，用 codex -p codex_bridge 启用 Bridge 模型。";
+      } else if (value === "codex_desktop") {
+        preserveOfficial.root.lastChild.textContent = "保留官方登录并合并模型";
+        preserveOfficialHint.textContent = preserveOfficial.control.disabled
+          ? "切换模式前请先在已应用的配置中选择「撤销配置」。"
+          : "在 Codex 原有模型列表中同时使用官方模型和所选 Bridge 模型。使用时需保持 Bridge 后台服务运行。";
       } else if (value === "claude") {
         preserveOfficial.root.lastChild.textContent = "保留官方登录态共存（不覆盖官方账号，同窗口可同时切官方与 Bridge 模型）";
         preserveOfficialHint.textContent = coexist
@@ -220,7 +272,9 @@
       if (value === "codex" && coexist) {
         writeHint.textContent = "确认后仅在 ~/.codex/config.toml 中添加 codex_bridge 供应商与配置组，不改动你的默认官方登录。";
       } else if (value === "codex_desktop") {
-        writeHint.textContent = "Codex 桌面版只读取全局 ~/.codex/config.toml，不支持在界面内切换 profile；写入后请重启 Codex 桌面版生效，想用回官方登录时点「撤销配置」即可还原。";
+        writeHint.textContent = coexist
+          ? "保存所选授权后预览配置更改；原有工具、MCP 和权限设置继续沿用。写入后重启 Codex 桌面版。"
+          : "将由 Bridge 接管 Codex 桌面版：不再使用 ChatGPT 账号，模型列表只显示所选的 Bridge 模型。写入后重启 Codex 桌面版，点「撤销配置」即可还原。";
       } else if (value === "claude" && coexist) {
         writeHint.textContent = "确认后写入本机网关地址与 Bridge 认证头，保留官方 claude.ai 登录态，并将所选 Bridge 模型加入 /model 列表。";
       } else if (value === "claude_desktop") {
@@ -232,6 +286,7 @@
       } else {
         writeHint.textContent = "确认后写入目标应用的全局配置，模型网关会按需启动。保留当前默认模型，未设置时使用首个选中模型。";
       }
+      compatibilityGroup.hidden = isDesktopHybrid() || (value !== "codex" && value !== "codex_desktop" && value !== "claude");
     }
     function changePlatform(value) {
       showModelLimit();
@@ -243,7 +298,6 @@
       name.wrapper.hidden = value !== "other";
       syncPlatformHints(value);
       S.syncButtonLabel(save, saveTitleFor(value));
-      compatibilityGroup.hidden = value !== "codex" && value !== "codex_desktop" && value !== "claude";
       disableSearch.root.hidden = disableAgents.root.hidden = value !== "codex" && value !== "codex_desktop";
       disableThinking.root.hidden = value !== "claude";
     }
@@ -253,14 +307,16 @@
       selectNewModels = !editing.id; savedGrant = ""; savedConfiguration = ""; completedWrites = []; uncertainWrite = null;
       checkResult.hidden = true; save.disabled = false; advanced.open = false;
       changeCompatibility.control.checked = false; compatibilityFields.hidden = true;
-      var applied = S.safeArray(currentStatus && currentStatus.connections).find(function (entry) {
-        return entry.clientID === editing.id && entry.purpose === "model" && entry.scope === "global" && entry.state === "applied";
-      });
+      var applied = modelReceipt(editing.id);
       var prior = applied && applied.compatibility || {};
       disableSearch.control.checked = !!prior.disableWebSearch;
       disableAgents.control.checked = !!prior.disableMultiAgent;
       disableThinking.control.checked = !!prior.disableThinking;
       preserveOfficial.control.checked = !!(editing.preserveOfficialLogin || prior.preserveOfficialLogin);
+      var lockedReceipt = editing.platform === "codex_desktop" && modelReceipt(editing.id);
+      preserveOfficial.control.disabled = !!lockedReceipt;
+      enabled.control.disabled = !!(lockedReceipt && (editing.preserveOfficialLogin
+        || (lockedReceipt.compatibility && lockedReceipt.compatibility.preserveOfficialLogin)));
       editorTitle.textContent = editing.id ? "修改连接" : "连接应用";
       platform.control.options[0].disabled = !!editing.platform || !editing.id;
       platform.control.value = editing.platform || ""; previousDefaultName = defaultName(platform.control.value);
@@ -268,6 +324,7 @@
       name.control.value = editing.name || ""; enabled.control.checked = true; enabled.root.hidden = !editing.id;
       changePlatform(platform.control.value);
       mcp.control.checked = !!editing.mcpEnabled; commands.control.checked = !!editing.allowCommands;
+      hybridChoicesActive = false; hiddenModelSelections = [];
       appendChoices(modelList, availableModels(S.safeArray(editing.models)), S.safeArray(editing.models), "还没有可授权的模型，请先配置供应商。");
       modelList.dataset.choices = "";
       updateModelChoices();
@@ -285,7 +342,7 @@
       var payload = { name: name.control.value.trim(), models: checkedValues(modelList), mcpEnabled: mcp.control.checked,
         projectIDs: checkedValues(projectList), allowCommands: commands.control.checked };
       if (platform.control.value) payload.platform = platform.control.value;
-      if (platform.control.value === "codex" || platform.control.value === "claude") {
+      if (platform.control.value === "codex" || platform.control.value === "codex_desktop" || platform.control.value === "claude") {
         payload.preserveOfficialLogin = preserveOfficial.control.checked;
       }
       if (editing.id) { payload.id = editing.id; payload.enabled = enabled.control.checked; }
@@ -319,7 +376,9 @@
       if (platformID === "codex" && coexist) {
         message = "连接成功，已保留官方登录态。直接运行 codex 继续使用官方模型，运行 codex -p codex_bridge 使用 Bridge 模型。";
       } else if (platformID === "codex_desktop") {
-        message = "连接成功，已写入全局配置。请重启 Codex 桌面版生效；想用回官方登录时点「撤销配置」即可还原。";
+        message = coexist
+          ? "已写入共存配置。重启 Codex 桌面版后，在模型列表中选择官方或 Bridge 模型。使用期间请保持 Bridge 后台服务运行。"
+          : "连接成功，已写入全局配置。请重启 Codex 桌面版生效；想用回原接入方式时点「撤销配置」即可还原。";
       } else if (platformID === "claude" && coexist) {
         message = "连接成功，已保留官方登录态。在 Claude Code 中使用 /model 可随时在官方 Claude 与 Bridge 模型间切换，必要时重启会话生效。";
       } else if (platformID === "claude_desktop") {
@@ -387,9 +446,29 @@
       var value = name.control.value.trim();
       if (!value) { inform("请填写应用名称。", "warning"); name.control.focus(); return; }
       var payload = grantPayload();
+      if (isDesktopHybrid() && payload.enabled !== false && !payload.models.length) {
+        inform("请选择至少一个支持共存的 Bridge 模型。", "warning"); modelHeading.scrollIntoView({ block: "nearest" }); return;
+      }
       if (payload.enabled !== false && !payload.models.length && !payload.mcpEnabled) {
         inform("请选择允许使用的模型，或启用 MCP 授权。", "warning"); modelHeading.scrollIntoView({ block: "nearest" }); return;
       }
+      writeClient(payload);
+    }
+    function confirmDesktopPreview(result, purpose) {
+      var fields = S.safeArray(result.fields).join("、");
+      var warnings = S.safeArray(result.warnings).join("；");
+      var selected = S.safeArray(editing.models);
+      var modelNames = availableModels(selected).filter(function (item) { return selected.indexOf(item.id) !== -1; })
+        .map(function (item) { return item.group + " / " + item.title; }).join("、");
+      return S.confirmDialog({
+        title: "预览 Codex " + (purpose === "model" ? "模型" : "MCP") + "配置",
+        message: "确认后写入配置，原有工具、MCP 和权限设置继续沿用。",
+        details: [["配置文件", result.configurationURL], ["授权的模型", modelNames], ["修改的配置项", fields], ["使用提示", warnings]],
+        note: "写入后请重启 Codex 桌面版。",
+        confirmTitle: "写入配置"
+      });
+    }
+    function writeClient(payload) {
       var requestedGrant = grantSignature(payload);
       var requestedConfiguration = JSON.stringify([requestedGrant, changeCompatibility.control.checked,
         preserveOfficial.control.checked, disableSearch.control.checked, disableAgents.control.checked,
@@ -400,8 +479,8 @@
       var originalReceipts = S.safeArray(currentStatus && currentStatus.connections).map(function (item) { return item.receiptID; });
       var stage = "gateway", purpose = "";
       var saveIdleLabel = saveTitleFor(platform.control.value);
-      var savePendingLabel = (platform.control.value === "other"
-        || (platform.control.value === "claude_desktop" && !mcp.control.checked)) ? "保存中…" : "写入中…";
+      var savePendingLabel = isDesktopHybrid() ? "预览中…" : ((platform.control.value === "other"
+        || (platform.control.value === "claude_desktop" && !mcp.control.checked)) ? "保存中…" : "写入中…");
       busy = true; editorBody.inert = true; close.disabled = true;
       S.setButtonPending(save, true, savePendingLabel, saveIdleLabel);
       inform("正在准备连接…");
@@ -432,8 +511,8 @@
             if (purpose === "model") {
               request.model = defaultModel(saved);
               var isCodex = saved.platform === "codex" || saved.platform === "codex_desktop";
-              var allowCoexist = (saved.platform === "codex" || saved.platform === "claude") && preserveOfficial.control.checked;
-              var allowCompat = (isCodex || saved.platform === "claude") && changeCompatibility.control.checked;
+              var allowCoexist = (isCodex || saved.platform === "claude") && preserveOfficial.control.checked;
+              var allowCompat = !isDesktopHybrid() && (isCodex || saved.platform === "claude") && changeCompatibility.control.checked;
               if (allowCoexist || allowCompat) {
                 request.compatibility = {};
                 if (allowCoexist) request.compatibility.preserveOfficialLogin = true;
@@ -444,10 +523,22 @@
                 }
               }
             }
-            inform("正在写入" + (purpose === "model" ? "模型" : "MCP") + "配置…");
+            inform("正在准备" + (purpose === "model" ? "模型" : "MCP") + "配置…");
             return options.run("connections.preview", request, { localError: true });
           }).then(function (result) {
             if (!result || !result.id) throw new Error("配置预览无效，请重新确认。");
+            if (saved.platform === "codex_desktop" && saved.preserveOfficialLogin) {
+              return confirmDesktopPreview(result, purpose).then(function (confirmed) {
+                if (!confirmed) {
+                  var cancelled = new Error("已取消写入，可继续预览或撤销授权。");
+                  cancelled.code = "preview_cancelled"; throw cancelled;
+                }
+                S.setButtonPending(save, true, "写入中…", saveIdleLabel);
+                return result;
+              });
+            }
+            return result;
+          }).then(function (result) {
             stage = "apply";
             return options.run("connections.apply", { id: result.id }, { localError: true });
           }).then(function (result) {
@@ -494,6 +585,17 @@
         S.setButtonPending(copyBtn, false, null, restoreLabel);
         inform(error.message || "复制失败。", "error");
       }).finally(function () { busy = false; if (copyBtn) copyBtn.disabled = false; });
+    }
+    function revertConnection(item, revertBtn) {
+      S.confirmDialog({
+        title: "撤销配置写入",
+        message: "确定撤销这项 Bridge 配置？目标应用中的其他设置会保留。",
+        confirmTitle: "撤销配置",
+        danger: true,
+        fallbackText: "撤销这项 Bridge 配置？其他设置会保留。"
+      }).then(function (confirmed) {
+        if (confirmed) operation("connections.revert", { receiptID: item.receiptID }, function () { inform("已撤销配置。"); }, revertBtn, "撤销中…");
+      });
     }
     function renderClients() {
       S.clear(list); var clients = S.safeArray(currentStatus && currentStatus.clients);
@@ -551,17 +653,24 @@
             operation("service.setEnabled", { enabled: true }, function () { inform(startedMessage); }, startBtn, "启动中…");
           }));
         }
-        actions.appendChild(button("撤销", function (revokeBtn) {
-          S.confirmDialog({
-            title: "撤销应用访问",
-            message: "确定撤销“" + item.name + "”的访问？该应用将无法继续使用对应凭据。",
-            confirmTitle: "撤销访问",
-            danger: true,
-            fallbackText: "撤销“" + item.name + "”的访问？该应用将无法继续使用对应凭据。"
-          }).then(function (confirmed) {
-            if (confirmed) operation("clients.revoke", { id: item.id }, function () { inform("已撤销应用访问。"); }, revokeBtn, "撤销中…");
-          });
-        }, "danger"));
+        var receipt = item.platform === "codex_desktop" && modelReceipt(item.id);
+        var hybridReceipt = receipt && (item.preserveOfficialLogin
+          || (receipt.compatibility && receipt.compatibility.preserveOfficialLogin));
+        if (hybridReceipt) {
+          actions.appendChild(button("撤销配置", function (revertBtn) { revertConnection(receipt, revertBtn); }));
+        } else {
+          actions.appendChild(button("撤销", function (revokeBtn) {
+            S.confirmDialog({
+              title: "撤销应用访问",
+              message: "确定撤销“" + item.name + "”的访问？该应用将无法继续使用对应凭据。",
+              confirmTitle: "撤销访问",
+              danger: true,
+              fallbackText: "撤销“" + item.name + "”的访问？该应用将无法继续使用对应凭据。"
+            }).then(function (confirmed) {
+              if (confirmed) operation("clients.revoke", { id: item.id }, function () { inform("已撤销应用访问。"); }, revokeBtn, "撤销中…");
+            });
+          }, "danger"));
+        }
         row.appendChild(description); row.appendChild(actions); list.appendChild(row);
       });
     }
@@ -585,15 +694,7 @@
         copy.appendChild(S.node("span", "hint", detailParts.join(" · ")));
         row.appendChild(copy);
         row.appendChild(button("撤销配置", function (revertBtn) {
-          S.confirmDialog({
-            title: "撤销配置写入",
-            message: "确定撤销这项 Bridge 配置？目标应用中的其他设置会保留。",
-            confirmTitle: "撤销配置",
-            danger: true,
-            fallbackText: "撤销这项 Bridge 配置？其他设置会保留。"
-          }).then(function (confirmed) {
-            if (confirmed) operation("connections.revert", { receiptID: item.receiptID }, function () { inform("已撤销配置。"); }, revertBtn, "撤销中…");
-          });
+          revertConnection(item, revertBtn);
         }));
         receiptList.appendChild(row);
       });

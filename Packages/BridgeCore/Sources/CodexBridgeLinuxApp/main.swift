@@ -4,6 +4,7 @@
   import Dispatch
   import Glibc
 
+  CodexGatewayCredentialEntryPoint.runIfRequested()
   MCPStdioEntryPoint.runIfRequested()
   let arguments = Array(CommandLine.arguments.dropFirst())
   Task { @MainActor in

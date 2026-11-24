@@ -17,14 +17,15 @@ type request struct {
 	ID     json.RawMessage `json:"id"`
 	Method string          `json:"method"`
 	Params struct {
-		RequestID string `json:"requestId"`
-		From      string `json:"from"`
-		To        string `json:"to"`
-		Model     string `json:"model"`
-		Host      string `json:"host"`
-		Body      string `json:"body"`
-		Plugin    bool   `json:"plugin"`
-		Data      string `json:"data"`
+		RequestID      string `json:"requestId"`
+		From           string `json:"from"`
+		To             string `json:"to"`
+		Model          string `json:"model"`
+		Host           string `json:"host"`
+		Body           string `json:"body"`
+		Plugin         bool   `json:"plugin"`
+		ReasoningScope string `json:"reasoningScope"`
+		Data           string `json:"data"`
 	} `json:"params"`
 }
 
@@ -42,7 +43,7 @@ func dispatch(c *gateway.BridgeConverter, req request) (any, error) {
 	p := req.Params
 	switch req.Method {
 	case "translateRequest":
-		body, stream, err := c.Translate(p.RequestID, p.From, p.To, p.Model, p.Host, []byte(p.Body), p.Plugin)
+		body, stream, err := c.Translate(p.RequestID, p.From, p.To, p.Model, p.Host, []byte(p.Body), p.Plugin, p.ReasoningScope)
 		if err != nil {
 			return nil, err
 		}
@@ -70,6 +71,11 @@ func dispatch(c *gateway.BridgeConverter, req request) (any, error) {
 		return map[string]any{"data": base64.StdEncoding.EncodeToString(out)}, nil
 	case "cancel":
 		return map[string]any{"cancelled": c.Cancel(p.RequestID)}, nil
+	case "abort":
+		// Frames are handled strictly in order, so the call being aborted has already finished
+		// by the time this one is read. The host only needs the acknowledgement to keep this
+		// shared process; per-request state is released with cancel.
+		return map[string]any{}, nil
 	default:
 		return nil, errors.New("unknown method")
 	}

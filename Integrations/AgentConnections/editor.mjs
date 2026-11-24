@@ -53,7 +53,9 @@ function tomlValue(object, path) {
 
 function tomlSet(object, path, state) {
   let value = object;
+  const parents = [];
   for (const key of path.slice(0, -1)) {
+    parents.push(value);
     if (!Object.hasOwn(value, key)) value[key] = {};
     value = value[key];
     if (!value || typeof value !== 'object' || Array.isArray(value) || value instanceof Date) {
@@ -61,8 +63,16 @@ function tomlSet(object, path, state) {
     }
   }
   const key = path.at(-1);
-  if (state.exists) value[key] = state.value;
-  else delete value[key];
+  if (state.exists) {
+    value[key] = state.value;
+    return;
+  }
+  delete value[key];
+  // A removed entry takes along the tables it leaves empty, such as `[model_providers]`.
+  for (let depth = parents.length - 1; depth >= 0 && Object.keys(value).length === 0; depth -= 1) {
+    delete parents[depth][path[depth]];
+    value = parents[depth];
+  }
 }
 
 export function inspect(source, format, path) {
@@ -87,11 +97,23 @@ export function edit(source, format, changes) {
   return output;
 }
 
-export function reverse(source, format, changes) {
-  const conflicts = changes.filter(change => !isDeepStrictEqual(
-    normalise(inspect(source, format, change.path)), normalise(change.after)));
-  if (conflicts.length) return { conflicts: conflicts.map(change => change.path) };
-  return { content: edit(source, format, changes.map(change => ({ path: change.path, after: change.before }))) };
+// With keepDrifted, fields another writer changed since Bridge applied them stay as they are
+// (reported in `kept`) instead of blocking the whole revert.
+// A change with `reclaimPrefix` never set its field; it restores `before` only while the field
+// holds a string with that prefix, and is otherwise left alone without counting as drift.
+export function reverse(source, format, changes, { keepDrifted = false } = {}) {
+  const current = change => normalise(inspect(source, format, change.path));
+  const reclaimed = changes.filter(change => change.reclaimPrefix !== undefined);
+  const tracked = changes.filter(change => change.reclaimPrefix === undefined);
+  const drifted = tracked.filter(change => !isDeepStrictEqual(current(change), normalise(change.after)));
+  if (drifted.length && !keepDrifted) return { conflicts: drifted.map(change => change.path) };
+  const owned = tracked.filter(change => !drifted.includes(change)).concat(reclaimed.filter(change => {
+    const state = current(change);
+    return typeof change.reclaimPrefix === 'string' && state.exists && typeof state.value === 'string' &&
+      state.value.startsWith(change.reclaimPrefix);
+  }));
+  const content = edit(source, format, owned.map(change => ({ path: change.path, after: change.before })));
+  return keepDrifted ? { content, kept: drifted.map(change => change.path) } : { content };
 }
 
 function normalise(value) {

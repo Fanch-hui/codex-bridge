@@ -57,4 +57,51 @@ extension SimpleServiceStore {
           """, arguments: [date.addingTimeInterval(-7 * 86400).timeIntervalSince1970])
     }
   }
+
+  /// Per provider and model totals over the retained window, newest models first.
+  public func gatewayActivitySummary(at date: Date = Date()) throws -> [GatewayActivitySummary] {
+    try database.read { db in
+      try Row.fetchAll(
+        db,
+        sql: """
+          SELECT json_extract(entry, '$.providerID') AS provider,
+            json_extract(entry, '$.model') AS model,
+            COUNT(*) AS requests,
+            SUM(json_extract(entry, '$.state') = 'failed') AS failed,
+            SUM(json_extract(entry, '$.usage.inputTokens') IS NOT NULL) AS measured,
+            COALESCE(SUM(json_extract(entry, '$.usage.inputTokens')), 0) AS input,
+            COALESCE(SUM(json_extract(entry, '$.usage.outputTokens')), 0) AS output,
+            COALESCE(SUM(json_extract(entry, '$.usage.reasoningTokens')), 0) AS reasoning,
+            COALESCE(SUM(CASE WHEN json_extract(entry, '$.usage.cacheReadTokens') IS NOT NULL
+              THEN json_extract(entry, '$.usage.inputTokens') END), 0) AS cacheableInput,
+            COALESCE(SUM(json_extract(entry, '$.usage.cacheReadTokens')), 0) AS cacheRead,
+            MAX(recorded_at) AS latest
+          FROM bridge_service_gateway_activity WHERE recorded_at >= ?
+          GROUP BY provider, model ORDER BY latest DESC LIMIT 64
+          """, arguments: [date.addingTimeInterval(-7 * 86400).timeIntervalSince1970]
+      ).map { row in
+        GatewayActivitySummary(
+          providerID: row["provider"] ?? "", model: row["model"] ?? "",
+          requests: row["requests"], failed: row["failed"], measured: row["measured"],
+          inputTokens: row["input"], outputTokens: row["output"],
+          reasoningTokens: row["reasoning"], cacheableInputTokens: row["cacheableInput"],
+          cacheReadTokens: row["cacheRead"])
+      }
+    }
+  }
+}
+
+public struct GatewayActivitySummary: Sendable, Equatable {
+  public let providerID: String
+  public let model: String
+  public let requests: Int
+  public let failed: Int
+  /// Requests whose provider reported token counts.
+  public let measured: Int
+  public let inputTokens: Int
+  public let outputTokens: Int
+  public let reasoningTokens: Int
+  /// Input tokens of requests that reported a cache read count, the base of the hit rate.
+  public let cacheableInputTokens: Int
+  public let cacheReadTokens: Int
 }

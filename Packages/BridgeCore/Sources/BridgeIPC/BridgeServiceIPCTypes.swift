@@ -84,6 +84,7 @@ public enum BridgeServiceIPCOperation: String, Codable, CaseIterable, Sendable {
   case setMCPClientExposureMode = "set_mcp_client_exposure_mode"
   case exportMCPClientConfiguration = "export_mcp_client_configuration"
   case getLocalMCPConnection = "get_local_mcp_connection"
+  case exportCodexGatewayCredential = "export_codex_gateway_credential"
   case getGeminiCloudStatus = "get_gemini_cloud_status"
   case configureGeminiCloud = "configure_gemini_cloud"
   case exportGeminiCloudConfiguration = "export_gemini_cloud_configuration"

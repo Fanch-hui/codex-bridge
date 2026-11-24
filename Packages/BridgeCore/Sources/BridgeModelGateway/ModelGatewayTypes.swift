@@ -34,11 +34,16 @@ public struct ModelGatewayClientContext: Sendable, Equatable {
   public let clientID: String
   public let generation: UInt64
   public let authenticatedViaBridgeHeader: Bool
+  public let authenticatedViaCodexGatewayHeader: Bool
 
-  public init(clientID: String, generation: UInt64, authenticatedViaBridgeHeader: Bool = false) {
+  public init(
+    clientID: String, generation: UInt64, authenticatedViaBridgeHeader: Bool = false,
+    authenticatedViaCodexGatewayHeader: Bool = false
+  ) {
     self.clientID = clientID
     self.generation = generation
     self.authenticatedViaBridgeHeader = authenticatedViaBridgeHeader
+    self.authenticatedViaCodexGatewayHeader = authenticatedViaCodexGatewayHeader
   }
 }
 
@@ -49,11 +54,16 @@ public struct ModelGatewayCredentials: Sendable, CustomStringConvertible,
   public let authorization: [String]
   public let apiKey: [String]
   public let bridgeToken: [String]
+  public let codexGatewayToken: [String]
 
-  public init(authorization: [String], apiKey: [String], bridgeToken: [String] = []) {
+  public init(
+    authorization: [String], apiKey: [String], bridgeToken: [String] = [],
+    codexGatewayToken: [String] = []
+  ) {
     self.authorization = authorization
     self.apiKey = apiKey
     self.bridgeToken = bridgeToken
+    self.codexGatewayToken = codexGatewayToken
   }
 
   public var description: String { "ModelGatewayCredentials(<redacted>)" }
@@ -66,10 +76,14 @@ public struct ModelGatewayUpstreamAuth: Sendable, Equatable, CustomStringConvert
 {
   public let authorization: String?
   public let apiKey: String?
+  public let chatGPTAccountID: String?
 
-  public init(authorization: String? = nil, apiKey: String? = nil) {
+  public init(
+    authorization: String? = nil, apiKey: String? = nil, chatGPTAccountID: String? = nil
+  ) {
     self.authorization = authorization
     self.apiKey = apiKey
+    self.chatGPTAccountID = chatGPTAccountID
   }
 
   public var hasCredential: Bool {
@@ -88,7 +102,7 @@ public struct ModelGatewayRequest: Sendable {
   public let headers: [String: String]
   public let body: Data
   public let client: ModelGatewayClientContext
-  /// Present only when authenticated via `X-Codex-Bridge-Token` for official passthrough.
+  /// Present only when authenticated with an authorized official-passthrough header.
   public let upstreamAuth: ModelGatewayUpstreamAuth?
 
   public init(

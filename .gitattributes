@@ -3,6 +3,7 @@ Packages/BridgeCore/Sources/BridgePiRPC/Resources/** -text
 Packages/BridgeCore/Sources/BridgeQoderSDK/Resources/** -text
 Packages/BridgeCore/Sources/BridgeClaudeSDK/Resources/** -text
 Packages/BridgeCore/Sources/BridgeDeepSeekHarnessDesktop/Resources/** -text
+Packages/BridgeCore/Sources/BridgeServiceHost/Resources/CodexBaseInstructions.md -text -whitespace
 Integrations/EmbeddedDSH/vendor/*.tgz -text
 Packages/BridgeCore/Sources/BridgeDesktopUI/EmbeddedDSHClient/** -text linguist-generated=true -whitespace
 Integrations/CommunityProviders/bundled/** -text

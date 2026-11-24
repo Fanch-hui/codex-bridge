@@ -35,7 +35,28 @@ extension ServiceProviderGateway {
     }
   }
 
+  /// Recomputed only after a new record, since status is read far more often than written.
+  func activitySummary() async throws -> ACPJSONValue {
+    if let activitySummaryCache { return activitySummaryCache }
+    let summary = ACPJSONValue.array(
+      try await store.gatewayActivitySummary().map { item in
+        .object([
+          "providerID": .string(item.providerID), "model": .string(item.model),
+          "requests": .integer(Int64(item.requests)), "failed": .integer(Int64(item.failed)),
+          "measured": .integer(Int64(item.measured)),
+          "inputTokens": .integer(Int64(item.inputTokens)),
+          "outputTokens": .integer(Int64(item.outputTokens)),
+          "reasoningTokens": .integer(Int64(item.reasoningTokens)),
+          "cacheableInputTokens": .integer(Int64(item.cacheableInputTokens)),
+          "cacheReadTokens": .integer(Int64(item.cacheReadTokens)),
+        ])
+      })
+    activitySummaryCache = summary
+    return summary
+  }
+
   func appendActivity(_ entry: ACPJSONValue) async {
+    activitySummaryCache = nil
     do {
       try await store.appendGatewayActivity(String(decoding: entry.encodedData(), as: UTF8.self))
       activityError = nil

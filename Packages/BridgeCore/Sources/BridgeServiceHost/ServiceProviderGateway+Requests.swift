@@ -16,6 +16,19 @@ extension ServiceProviderGateway {
       try await reject(sink, status: 401, code: "invalid_client")
       return
     }
+    let codexHybrid = authentication.allowsCodexPassthrough(request.client)
+    if request.path == "/codex/models" {
+      guard codexHybrid else {
+        try await reject(sink, status: 403, code: "codex_coexistence_required")
+        return
+      }
+      try await serveCodexCatalog(request, authentication: authentication, sink: sink)
+      return
+    }
+    if codexHybrid && request.path != "/v1/responses" {
+      try await reject(sink, status: 404, code: "not_found")
+      return
+    }
     if request.path == "/v1/models" {
       let visible = models.filter { allowed.contains($0.id) }.map { model in
         var fields: [String: ACPJSONValue] = [
@@ -23,7 +36,9 @@ extension ServiceProviderGateway {
           "owned_by": .string(model.providerID), "display_name": .string(model.name),
         ]
         // Non-standard but widely read; clients that do not know these fields ignore them.
-        if let context = model.contextWindow { fields["context_window"] = .integer(Int64(context)) }
+        if let context = model.knownContextWindow {
+          fields["context_window"] = .integer(Int64(context))
+        }
         if let output = model.defaultMaxTokens {
           fields["max_output_tokens"] = .integer(Int64(output))
         }
@@ -56,10 +71,27 @@ extension ServiceProviderGateway {
       return
     }
     guard var body = try? JSONDecoder().decode(ACPJSONValue.self, from: request.body).objectValue,
-      let id = body["model"]?.stringValue
+      let requestedID = body["model"]?.stringValue, !requestedID.isEmpty
     else {
       try await reject(sink, status: 400, code: "invalid_request")
       return
+    }
+    var id = requestedID
+    if codexHybrid {
+      guard requestedID.hasPrefix(ServiceCodexGatewayCatalog.slugPrefix) else {
+        try await forwardOfficialCodex(
+          request, modelID: requestedID, body: body, authentication: authentication, sink: sink)
+        return
+      }
+      guard
+        let selected = codexGatewayModels(allowed).first(where: {
+          ServiceCodexGatewayCatalog.slug(for: $0.id) == requestedID
+        })
+      else {
+        try await reject(sink, status: 403, code: "model_not_authorized")
+        return
+      }
+      id = selected.id
     }
     guard allowed.contains(id), let model = models.first(where: { $0.id == id }) else {
       if request.path == "/v1/messages",
@@ -79,6 +111,20 @@ extension ServiceProviderGateway {
       }
       try await reject(sink, status: 403, code: "model_not_authorized")
       return
+    }
+    let codexReplay: (scope: String, session: String?)?
+    if codexHybrid && model.protocolName == "anthropic" {
+      let client = request.client
+      let owner = "\(client.clientID):\(client.generation)"
+      let thread = ["thread-id", "session-id"].lazy.compactMap {
+        request.headers[$0].flatMap(UUID.init(uuidString:))
+      }.first
+      let session = thread.map { "\(owner):\($0.uuidString)" }
+      let scope = ServiceCommunityProviders.encodedID("\(session ?? owner):\(model.id)")
+      codexReplay = (scope, session)
+    } else {
+      codexReplay = nil
+      if codexHybrid { Self.projectCodexHistory(&body, official: false) }
     }
     body["model"] = .string(model.modelID)
     let input = try ACPJSONValue.object(body).encodedData()
@@ -111,7 +157,8 @@ extension ServiceProviderGateway {
             await self.markRunning(requestID)
             return try await self.forward(
               model: model, body: input, source: source, headers: request.headers,
-              stream: streamsResponse, sink: sink, usage: usage, timeout: timeout)
+              stream: streamsResponse, sink: sink, usage: usage, timeout: timeout,
+              codexReplay: codexReplay)
           }
         }
         group.addTask {
@@ -190,7 +237,8 @@ extension ServiceProviderGateway {
 
   private func forward(
     model: ServiceGatewayModel, body: Data, source: String, headers: [String: String], stream: Bool,
-    sink: ModelGatewayResponseSink, usage: ServiceGatewayUsage, timeout: Duration
+    sink: ModelGatewayResponseSink, usage: ServiceGatewayUsage, timeout: Duration,
+    codexReplay: (scope: String, session: String?)?
   ) async throws -> Bool {
     let compatibility: ServiceCommunityRequestCompatibility?
     if model.pluginID != nil, let communityProviders {
@@ -209,16 +257,18 @@ extension ServiceProviderGateway {
       conversion = nil
       upstreamBody = adapted.body
     } else {
-      let converter = try await ServiceModelConversion(
-        resources: try await resources(),
-        directory: dataRoot.appendingPathComponent("ProtocolState"))
+      let directory = dataRoot.appendingPathComponent("ProtocolState")
+      let converter = try await conversionHost.begin {
+        try await ServiceModelConversionHost.launchHelper(
+          resources: try await self.resources(), directory: directory)
+      }
       do {
         upstreamBody = try await converter.translate(
           body: adapted.body, from: source, to: model.protocolName, model: model.modelID,
-          host: "", plugin: model.pluginID != nil)
+          host: "", plugin: model.pluginID != nil, reasoningScope: codexReplay?.scope)
         conversion = converter
       } catch {
-        try await converter.close()
+        await converter.release()
         throw error
       }
     }
@@ -236,18 +286,21 @@ extension ServiceProviderGateway {
           model: model, body: upstreamBody, response: response, sink: sink,
           usage: usage, timeout: timeout)
       } else {
-        let anthropicHeaders =
+        var providerHeaders =
           source == "anthropic" && model.protocolName == source
           ? headers.filter { ["anthropic-beta", "anthropic-version"].contains($0.key) } : [:]
+        if model.providerID == "agy-cli", let session = codexReplay?.session {
+          providerHeaders["x-magpie-session"] = session
+        }
         completed = try await forwardCommunity(
-          model: model, body: upstream.body, headers: anthropicHeaders, response: response,
+          model: model, body: upstream.body, headers: providerHeaders, response: response,
           usage: usage, timeout: timeout)
       }
       if completed { try await response.finish() }
-      try await conversion?.close()
+      await conversion?.release()
       return completed
     } catch {
-      if let conversion { try await conversion.close() }
+      await conversion?.release()
       throw error
     }
   }
