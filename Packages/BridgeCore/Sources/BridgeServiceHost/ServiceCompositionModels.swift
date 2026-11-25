@@ -1,6 +1,17 @@
 import BridgeCodexRPC
 import BridgeMCP
+import BridgeServiceCore
 import Foundation
+
+@_exported import struct BridgeServiceApplication.ServiceExternalMCPClient
+@_exported import struct BridgeServiceApplication.ServiceMCPClientProfile
+@_exported import class BridgeServiceApplication.ServiceMCPClientRegistry
+@_exported import enum BridgeServiceApplication.ServiceMCPClientRegistryError
+@_exported import enum BridgeServiceApplication.ServiceMCPSecretError
+@_exported import class BridgeServiceApplication.ServiceMCPSecretProvider
+
+public typealias ServiceDataPaths = BridgeServiceCore.ServiceDataPaths
+public typealias ServiceDataPathsError = BridgeServiceCore.ServiceDataPathsError
 
 public enum ServiceLocalMCPError: Error, Equatable, Sendable {
   case localPortUnavailable(Int)

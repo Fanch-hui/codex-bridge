@@ -2,6 +2,7 @@ import BridgeIPC
 import Foundation
 
 #if os(Windows)
+  import BridgeProcess
   import WinSDK
 #elseif os(Linux)
   import Glibc

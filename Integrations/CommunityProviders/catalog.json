@@ -10,12 +10,33 @@
       "accessMode": "公开免费接口",
       "summary": "免注册接入 OpenCode Zen 提供的免费公开模型，开箱即用。",
       "requirements": "无需个人账号或 API Key，使用官方公开凭证；可用模型与限流由上游决定。",
+      "limitSummary": "仅支持匿名公开访问；如需填写个人 Zen API Key，可安装目录中的「OpenCode Zen Free（个人 Key 版）」。",
       "usageSteps": [
         "点击「安装」，安装完成后 Bridge 会自动建立公开连接。",
         "等待模型同步完成后，即可在工作台模型选择器或「接入应用」中直接使用。"
       ],
       "compatibility": "compatible",
       "compatibilityDetails": "安装后自动连接公开通道，无需手动输入密钥。仅列出插件支持转换为 Chat、Responses 或 Anthropic 协议的模型；可用名额与限流由上游服务决定。"
+    },
+    {
+      "name": "OpenCode Zen Free（个人 Key 版）",
+      "package": "dsh-opencode-free",
+      "version": "0.6.0-bridge.1",
+      "license": "MIT",
+      "source": "https://github.com/x5427876/dsh-opencode-free",
+      "bundled": "dsh-opencode-free",
+      "verified": false,
+      "accessMode": "官方接口",
+      "summary": "接入 OpenCode Zen 官方免费模型列表，支持填写自己的 Zen API Key（保留原始提示词与工具）或使用免费匿名访问。",
+      "requirements": "填写个人 Zen API Key（从 opencode.ai 获取），或选择免费匿名访问（public，无需账号和密钥）；可与内置匿名版插件并存使用。",
+      "limitSummary": "仅开放 Zen 官方免费对话模型，不会自动切到付费模型；个人 Key 模式不改写提示词或工具",
+      "usageSteps": [
+        "点击「安装」，Bridge 使用随 App 内置的适配版插件，无需联网下载。",
+        "在已安装卡片点击「连接」，选择「填写个人 OpenCode Zen API Key」输入你的密钥，或选择「免费匿名访问（public，无需 API Key）」。",
+        "等待免费模型目录同步完成后，即可在工作台或「接入应用」中使用。"
+      ],
+      "compatibility": "compatible",
+      "compatibilityDetails": "本插件为 dsh-opencode-free 的 Codex Bridge 网关适配版：使用官方 `/inference/v1/models` 目录实时筛选免费对话模型（跳过非对话或未开放协议的条目），拒绝调用目录之外的模型以避免误扣个人 Key 费用。填写个人 Zen API Key 时原样透传提示词、工具与采样参数；选择匿名模式时自动注入 OpenCode CLI 准入头、会话亲和标识及工具别名兼容层并过滤占位工具调用。"
     },
     {
       "name": "Qoder",

@@ -35,11 +35,16 @@ does not verify its authentication or live model requests. Third-party packages
 run as local code. The service should treat plugin stderr as untrusted diagnostic
 output that may contain credentials or request data.
 
-`bundled/` holds community plugins that ship inside the app because they are
-not published to npm. `bundled/agy-cli` is
-`@magpie-community/opencode-agy-cli-auth` from
+`bundled/` holds community plugins that ship inside the app either because they are
+not published to npm or because they are adapted for Bridge's provider host.
+`bundled/agy-cli` is `@magpie-community/opencode-agy-cli-auth` from
 [magpie-community/plugins](https://github.com/magpie-community/plugins/tree/main/packages/agy-cli)
-(MIT; origin and changes in its `NOTICE.md`). Bridge-specific changes are
+(MIT; origin and changes in its `NOTICE.md`).
+`bundled/dsh-opencode-free` is `dsh-opencode-free` from
+[x5427876/dsh-opencode-free](https://github.com/x5427876/dsh-opencode-free)
+(MIT; origin and changes in its `NOTICE.md`), adapted from its DSH Cordis package
+to run inside Bridge's OpenCode/Magpie community provider host with both personal
+Zen API Key and anonymous free-tier support. Bridge-specific changes are
 released as `<upstream version>-bridge.N`, and the directory's `package.json`
 version must equal its `catalog.json` entry. A catalog entry names the directory
 in `bundled`. `install.mjs` copies that directory to the same

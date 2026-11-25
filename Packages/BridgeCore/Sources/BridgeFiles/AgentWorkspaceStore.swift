@@ -164,13 +164,22 @@ public actor AgentWorkspaceStore {
     }
     try FileManager.default.createDirectory(
       at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-    let metadata = try FileSystemEntryMetadata(at: directory)
+    // resolvingSymlinksInPath cannot canonicalize a path that does not exist
+    // yet (on Windows an 8.3 short name then survives into `directory.path` and
+    // would never compare equal to the resolved canonical form below), so on
+    // Windows the directory must be re-canonicalized after it is created.
+    #if os(Windows)
+      let canonicalDirectory = directory.standardizedFileURL.resolvingSymlinksInPath()
+    #else
+      let canonicalDirectory = directory
+    #endif
+    let metadata = try FileSystemEntryMetadata(at: canonicalDirectory)
     guard metadata.isDirectory, !metadata.isSymbolicLink else {
       throw AgentWorkspaceError.invalidStorage
     }
-    let root = try RegisteredRoot(capturing: directory)
-    guard AgentPathSemantics.isContained(root.canonicalPath, in: directory.path),
-      AgentPathSemantics.isContained(directory.path, in: root.canonicalPath)
+    let root = try RegisteredRoot(capturing: canonicalDirectory)
+    guard AgentPathSemantics.isContained(root.canonicalPath, in: canonicalDirectory.path),
+      AgentPathSemantics.isContained(canonicalDirectory.path, in: root.canonicalPath)
     else { throw AgentWorkspaceError.invalidStorage }
     managementRoot = root
     return root

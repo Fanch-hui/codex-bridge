@@ -126,7 +126,8 @@ def _call_entries(array_text):
     end = _matching(array_text, opening, "[", "]") - 1
     result = []
     for entry in _split_entries(array_text[opening + 1 : end]):
-        match = re.match(r"\s*\.(\w+)\s*\(", entry)
+        # Leading line comments belong to the entry that follows them.
+        match = re.match(r"(?:\s*//[^\n]*\n)*\s*\.(\w+)\s*\(", entry)
         if not match:
             continue
         call_open = entry.find("(", match.start())

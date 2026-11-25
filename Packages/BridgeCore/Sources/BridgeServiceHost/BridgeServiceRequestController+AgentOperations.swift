@@ -1,4 +1,5 @@
 import BridgeAgentCore
+import BridgeAgentSetup
 import BridgeDeepSeekHarnessACP
 import BridgeIPC
 import BridgeMCP

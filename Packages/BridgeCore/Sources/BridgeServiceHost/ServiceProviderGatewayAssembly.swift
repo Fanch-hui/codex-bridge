@@ -1,11 +1,15 @@
 import BridgeAgentCore
 import BridgeSecurity
+import BridgeServiceApplication
 import BridgeServiceCore
+import BridgeServiceGateway
+import BridgeWorkbenchService
 import Foundation
 
 enum ServiceProviderGatewayAssembly {
   static func configure(
     gateway: ServiceProviderGateway, mode: ServiceApplicationModeController,
+    workbench: ServiceEmbeddedDSHController,
     store: SimpleServiceStore, secrets: any SecretStore, clients: ServiceMCPClientRegistry,
     projects: ServiceProjectService, configuration: ServiceCompositionConfiguration,
     agentRegistry: ServiceAgentRegistry
@@ -43,7 +47,7 @@ enum ServiceProviderGatewayAssembly {
       },
       antigravityExecutable: { try await antigravityExecutable(in: agentRegistry) })
     await gateway.attach(mode: mode, applications: applications, community: community)
-    await gateway.existing.workbench?.attachCommunityGateway(gateway)
+    await workbench.attachCommunityGateway(gateway)
     try await applications.initialize()
     try await gateway.restore()
   }

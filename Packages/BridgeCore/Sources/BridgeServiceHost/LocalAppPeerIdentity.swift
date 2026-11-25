@@ -43,6 +43,7 @@ import Foundation
     }
   }
 #elseif os(Windows)
+  import BridgeProcess
   import WinSDK
 
   enum LocalAppPeerIdentity {

@@ -1,0 +1,13 @@
+import BridgeServiceGateway
+
+public typealias ExternalAgentConnection = BridgeServiceGateway.ExternalAgentConnection
+public typealias ExternalAgentConnectionAgent = BridgeServiceGateway.ExternalAgentConnectionAgent
+public typealias ExternalAgentConnectionCleanupFailure =
+  BridgeServiceGateway.ExternalAgentConnectionCleanupFailure
+public typealias ExternalAgentConnectionEditor = BridgeServiceGateway.ExternalAgentConnectionEditor
+public typealias ExternalAgentConnectionError = BridgeServiceGateway.ExternalAgentConnectionError
+public typealias ExternalAgentConnectionPreview = BridgeServiceGateway
+  .ExternalAgentConnectionPreview
+public typealias ExternalAgentConnectionReceipt = BridgeServiceGateway
+  .ExternalAgentConnectionReceipt
+public typealias ExternalAgentModelLimit = BridgeServiceGateway.ExternalAgentModelLimit

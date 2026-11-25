@@ -1,12 +1,9 @@
 import BridgeServiceApplication
 import BridgeServiceCore
+import BridgeWorkbenchService
 import Foundation
 
-public struct ServiceApplicationModeStatus: Sendable, Equatable {
-  public let mode: ServiceApplicationMode
-  public let transition: String?
-  public let error: String?
-}
+public typealias ServiceApplicationModeStatus = BridgeServiceCore.ServiceApplicationModeStatus
 
 /// Coordinates the admission gate with the persisted mode and the workbench process.
 public actor ServiceApplicationModeController {

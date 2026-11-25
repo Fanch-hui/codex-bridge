@@ -1,0 +1,44 @@
+{
+  "name": "dsh-opencode-free",
+  "version": "0.6.0-bridge.1",
+  "description": "Codex Bridge build of dsh-opencode-free: OpenCode Zen free models with optional personal Zen API Key or anonymous access",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/x5427876/dsh-opencode-free.git"
+  },
+  "homepage": "https://github.com/x5427876/dsh-opencode-free",
+  "bugs": "https://github.com/x5427876/dsh-opencode-free/issues",
+  "type": "module",
+  "main": "./bridge-opencode.mjs",
+  "exports": {
+    ".": "./bridge-opencode.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "LICENSE",
+    "NOTICE.md",
+    "README.md",
+    "README.zh-TW.md",
+    "bridge-catalog.mjs",
+    "bridge-gate.mjs",
+    "bridge-response.mjs",
+    "bridge-opencode.mjs",
+    "lib/zen.js",
+    "lib/zen-tls.js",
+    "lib/zen-provider.js",
+    "lib/catalog.js"
+  ],
+  "keywords": [
+    "magpie",
+    "magpie-plugin",
+    "opencode",
+    "opencode-plugin",
+    "zen",
+    "free"
+  ],
+  "license": "MIT",
+  "magpie": {
+    "icon": "https://opencode.ai/favicon-v3.ico",
+    "maxConcurrency": 2
+  }
+}

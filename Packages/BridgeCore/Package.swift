@@ -387,9 +387,60 @@ let package = Package(
         .product(name: "Logging", package: "swift-log"),
       ]
     ),
+    // Minimal WinHTTP interop for the Windows upstream Codex WebSocket client:
+    // the toolchain's WinSDK module does not expose <winhttp.h>.
+    .target(
+      name: "BridgeWinHTTP",
+      linkerSettings: [.linkedLibrary("winhttp", .when(platforms: [.windows]))]
+    ),
+    .target(
+      name: "BridgeServiceGateway",
+      dependencies: [
+        "BridgeACP", "BridgeAgentCore", "BridgeDomain", "BridgeEmbeddedDSH", "BridgeIPC",
+        "BridgeMCP", "BridgeModelGateway", "BridgeProcess", "BridgeProviderRuntime",
+        "BridgeSecurity", "BridgeServiceApplication", "BridgeServiceCore",
+        .product(name: "Crypto", package: "swift-crypto"),
+        .target(name: "BridgeWinHTTP", condition: .when(platforms: [.windows])),
+      ],
+      resources: [.embedInCode("Resources/CodexBaseInstructions.md")]
+    ),
+    .target(
+      name: "BridgeAgentSetup",
+      dependencies: [
+        "BridgeACP", "BridgeAgentCore", "BridgeClaudeSDK", "BridgeDeepSeekHarnessACP",
+        "BridgeDeepSeekHarnessDesktop", "BridgeIPC", "BridgeOpenCodeACP", "BridgeProcess",
+        "BridgeQoderSDK", "BridgeSecurity", "BridgeServiceApplication", "BridgeServiceCore",
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
+    ),
+    .target(
+      name: "BridgeServiceTunnel",
+      dependencies: [
+        "BridgeSecurity", "BridgeServiceApplication", "BridgeServiceCore", "BridgeTunnel",
+      ]
+    ),
+    .target(
+      name: "BridgeWorkbenchService",
+      dependencies: [
+        "BridgeACP", "BridgeAgentCore", "BridgeCodexRPC", "BridgeCodexService",
+        "BridgeDeepSeekHarnessDesktop", "BridgeDomain", "BridgeEmbeddedDSH", "BridgeFiles",
+        "BridgeIPC", "BridgeMCP", "BridgeProcess", "BridgeSecurity",
+        "BridgeServiceApplication", "BridgeServiceCore", "BridgeSkills", "BridgeSubagentRounds",
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
+    ),
+    .target(
+      name: "BridgeSubagentRounds",
+      dependencies: ["BridgeACP", "BridgeDomain", "BridgeServiceCore"]
+    ),
     .target(
       name: "BridgeServiceHost",
       dependencies: [
+        "BridgeAgentSetup",
+        "BridgeServiceGateway",
+        "BridgeServiceTunnel",
+        "BridgeSubagentRounds",
+        "BridgeWorkbenchService",
         "BridgeProviderRuntime", "BridgeModelGateway",
         "BridgeACP",
         "BridgeEmbeddedDSH",
@@ -416,8 +467,7 @@ let package = Package(
         "BridgeSkills",
         "BridgeTunnel",
         .product(name: "Crypto", package: "swift-crypto"),
-      ],
-      resources: [.embedInCode("Resources/CodexBaseInstructions.md")]
+      ]
     ),
     .target(
       name: "BridgeServiceAppCore",

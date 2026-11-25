@@ -8,8 +8,11 @@ import BridgeMCP
 import BridgeSecurity
 import BridgeServiceApplication
 import BridgeServiceCore
+import BridgeServiceGateway
+import BridgeServiceTunnel
 import BridgeSkills
 import BridgeTunnel
+import BridgeWorkbenchService
 import Foundation
 
 extension BridgeServiceRequestController {

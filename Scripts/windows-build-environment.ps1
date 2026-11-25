@@ -67,13 +67,23 @@ function Get-WindowsBuildEnvironment {
   if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
     throw "Visual Studio vswhere.exe is required to resolve target libraries."
   }
-  $vsOutput = @(& $vswhere -latest -property installationPath)
-  $vsRoot = $vsOutput | Select-Object -First 1
-  if ($LASTEXITCODE -ne 0 -or -not $vsRoot) {
+  $vsRoots = @(& $vswhere -products * -property installationPath | Where-Object { $_ })
+  if ($LASTEXITCODE -ne 0 -or -not $vsRoots) {
     throw "Visual Studio installation was not found."
   }
-  $msvcRoot = Get-CompatibleWindowsMSVCRoot -Directory (Join-Path $vsRoot "VC\Tools\MSVC") `
-    -Architecture $Architecture
+  # Newer standalone Build Tools may sort first yet lack a compatible MSVC for the
+  # target; walk every installation until one provides it.
+  $msvcRoot = $null
+  foreach ($vsRoot in $vsRoots) {
+    $msvcDir = Join-Path $vsRoot "VC\Tools\MSVC"
+    if (Test-Path -LiteralPath $msvcDir -PathType Container) {
+      $msvcRoot = Get-CompatibleWindowsMSVCRoot -Directory $msvcDir `
+        -Architecture $Architecture
+      if ($msvcRoot) {
+        break
+      }
+    }
+  }
   if (-not $msvcRoot) {
     throw "MSVC 14.44 or earlier C++ headers and libraries for $Architecture are required for Swift 6.3.3."
   }

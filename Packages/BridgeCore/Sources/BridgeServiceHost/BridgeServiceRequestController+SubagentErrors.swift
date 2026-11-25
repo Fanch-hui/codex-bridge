@@ -1,5 +1,6 @@
 import BridgeIPC
 import BridgeServiceCore
+import BridgeSubagentRounds
 import Foundation
 
 extension BridgeServiceRequestController {

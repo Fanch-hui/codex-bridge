@@ -1,4 +1,5 @@
 import BridgeAgentCore
+@_exported import BridgeAgentSetup
 import BridgeAntigravityCLI
 import BridgeCodexRPC
 import BridgeCodexService
@@ -15,6 +16,9 @@ import BridgeQoderSDK
 import BridgeSecurity
 import BridgeServiceApplication
 import BridgeServiceCore
+import BridgeServiceGateway
+import BridgeServiceTunnel
+import BridgeWorkbenchService
 import Foundation
 
 public actor ServiceComposition {
@@ -334,7 +338,7 @@ public actor ServiceComposition {
       desktop: deepSeekDesktopProvider.controller,
       secretStore: providerSecrets,
       dataRoot: embeddedDSHRoot, resourceRoot: configuration.providerResourceRoot,
-      workspaces: workspaces
+      workspaces: workspaces, ipcProjection: .host
     )
     await skillHub.setOnCatalogChanged { [embeddedDSH] in
       await embeddedDSH.notifySkillsInvalidated()
@@ -381,7 +385,7 @@ public actor ServiceComposition {
       dataRoot: paths.rootURL.appendingPathComponent("ProviderGateway", isDirectory: true),
       resourceRoot: configuration.providerResourceRoot)
     try await ServiceProviderGatewayAssembly.configure(
-      gateway: providerGateway, mode: applicationMode, store: store,
+      gateway: providerGateway, mode: applicationMode, workbench: embeddedDSH, store: store,
       secrets: providerSecrets, clients: mcpClients, projects: projects,
       configuration: configuration, agentRegistry: agentRegistry)
     return ServiceComposition(

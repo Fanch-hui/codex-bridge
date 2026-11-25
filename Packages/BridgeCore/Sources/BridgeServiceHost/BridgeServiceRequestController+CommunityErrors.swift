@@ -1,6 +1,7 @@
 import BridgeIPC
 import BridgeProviderRuntime
 import BridgeSecurity
+import BridgeServiceGateway
 import Foundation
 
 extension BridgeServiceRequestController {

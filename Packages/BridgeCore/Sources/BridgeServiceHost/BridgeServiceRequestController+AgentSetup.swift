@@ -1,3 +1,4 @@
+import BridgeAgentSetup
 import BridgeIPC
 import Foundation
 

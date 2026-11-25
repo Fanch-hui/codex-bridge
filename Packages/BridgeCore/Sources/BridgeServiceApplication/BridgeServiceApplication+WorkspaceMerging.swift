@@ -24,7 +24,18 @@ extension BridgeServiceApplication {
         }
         return try await tasks.activeWriteTask(projectID: projectID)
       },
-      activeEmbeddedDSHSession: { nil },
+      activeEmbeddedDSHSession: {
+        guard let owner = try await tasks.activeEmbeddedDSHSession(projectID: projectID),
+          owner != sessionID
+        else { return nil }
+        // Multiple roots can share a project's execution group and serialize their merges.
+        if !sessionID.isEmpty,
+          try await tasks.embeddedDSHExecution(sessionID: sessionID)?.projectID == projectID
+        {
+          return nil
+        }
+        return owner
+      },
       permittingRecoveryID: permittingRecoveryID
     )
   }

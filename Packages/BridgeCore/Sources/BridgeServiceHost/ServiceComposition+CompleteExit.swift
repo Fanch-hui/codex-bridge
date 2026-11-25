@@ -1,5 +1,6 @@
 import BridgeACP
 import BridgeIPC
+import BridgeWorkbenchService
 import Foundation
 
 extension ServiceComposition {

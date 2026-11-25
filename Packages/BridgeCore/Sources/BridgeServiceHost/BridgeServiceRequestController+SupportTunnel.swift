@@ -1,6 +1,7 @@
 import BridgeIPC
 import BridgeMCP
 import BridgeServiceCore
+import BridgeServiceTunnel
 import BridgeTunnel
 import Foundation
 
