@@ -5,6 +5,7 @@ import ServiceManagement
 
 public enum BridgeServiceRegistrationError: Error, LocalizedError, Sendable {
   case executableNotFound
+  case bootstrapFailed(Int32)
   case temporaryStopFailed
   case temporaryRestoreFailed
 
@@ -12,6 +13,8 @@ public enum BridgeServiceRegistrationError: Error, LocalizedError, Sendable {
     switch self {
     case .executableNotFound:
       "App Bundle 中没有找到 Codex Bridge 后台 Service 可执行文件。"
+    case .bootstrapFailed(let code):
+      "launchctl 未能载入后台服务（退出码 \(code)）。"
     case .temporaryStopFailed:
       "无法临时停止后台服务，请检查服务状态后重试。"
     case .temporaryRestoreFailed:
@@ -85,10 +88,6 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
   }
 
   private func resolvedStatus(userLaunchAgentActive: Bool) -> BridgeServiceRegistrationStatus {
-    if userLaunchAgentActive {
-      return .enabled
-    }
-
     switch service.status {
     case .enabled:
       return .enabled
@@ -100,6 +99,8 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
       break
     }
 
+    if userLaunchAgentRequiresApproval { return .requiresApproval }
+    if userLaunchAgentActive { return .enabled }
     if locateServiceExecutable() != nil {
       return .notRegistered
     }
@@ -108,13 +109,20 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
   }
 
   public func register() throws {
+    guard service.status != .requiresApproval, !userLaunchAgentRequiresApproval else { return }
     do {
       try service.register()
       if service.status == .enabled || service.status == .requiresApproval {
         return
       }
     } catch {
-      // Fall through to user LaunchAgent fallback
+      let registrationError = error as NSError
+      if service.status == .requiresApproval
+        || (registrationError.domain == "SMAppServiceErrorDomain"
+          && registrationError.code == kSMErrorLaunchDeniedByUser)
+      {
+        throw error
+      }
     }
 
     guard let executable = locateServiceExecutable() else {
@@ -203,8 +211,26 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
 
   public func recoverUnavailableService() async throws -> Bool {
     guard await probeStatus() == .enabled else { return false }
-    try await unregister()
-    try register()
+    let label = machServiceName
+    let managed = service.status == .enabled
+    let needsAbsolutePath =
+      managed
+      ? await Task.detached { Self.hasBundleProgramLaunchFailure(label: label) }.value
+      : false
+    guard !managed || service.status == .enabled, !userLaunchAgentRequiresApproval else {
+      return false
+    }
+    if needsAbsolutePath {
+      guard let executable = locateServiceExecutable() else {
+        throw BridgeServiceRegistrationError.executableNotFound
+      }
+      // Re-registering the same BundleProgram repeats launchd's pre-exec failure.
+      try await service.unregister()
+      try registerUserLaunchAgent(executableURL: executable)
+    } else {
+      try await unregister()
+      try register()
+    }
     return await probeStatus() == .enabled
   }
 
@@ -274,22 +300,40 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
   private nonisolated static func isUserLaunchAgentActive(
     plistPath: String, label: String
   ) -> Bool {
-    guard FileManager.default.fileExists(atPath: plistPath) else {
-      return false
-    }
-    let uid = getuid()
+    FileManager.default.fileExists(atPath: plistPath) && isLaunchAgentActive(label: label)
+  }
+
+  private var userLaunchAgentRequiresApproval: Bool {
+    FileManager.default.fileExists(atPath: userLaunchAgentPlistURL.path)
+      && SMAppService.statusForLegacyPlist(at: userLaunchAgentPlistURL) == .requiresApproval
+  }
+
+  private nonisolated static func hasBundleProgramLaunchFailure(label: String) -> Bool {
     let process = Process()
+    let output = Pipe()
     process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-    process.arguments = ["print", "gui/\(uid)/\(label)"]
-    process.standardOutput = Pipe()
-    process.standardError = Pipe()
+    process.arguments = ["print", "gui/\(getuid())/\(label)"]
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
     do {
       try process.run()
-      process.waitUntilExit()
-      return process.terminationStatus == 0
     } catch {
       return false
     }
+    let report = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    return process.terminationStatus == 0
+      && isBundleProgramLaunchFailure(String(decoding: report, as: UTF8.self))
+  }
+
+  nonisolated static func isBundleProgramLaunchFailure(_ report: String) -> Bool {
+    let fields = report.split(whereSeparator: \.isNewline).map {
+      $0.trimmingCharacters(in: .whitespaces)
+    }
+    let program = "program identifier = Contents/Resources/CodexBridgeService"
+    return fields.contains("job state = spawn failed")
+      && fields.contains { $0 == "last exit code = 78" || $0 == "last exit code = 78: EX_CONFIG" }
+      && fields.contains { $0 == program || $0.hasPrefix(program + " (") }
   }
 
   private func registerUserLaunchAgent(executableURL: URL) throws {
@@ -317,19 +361,12 @@ public final class SystemBridgeServiceRegistration: BridgeServiceRegistrationMan
     let bootstrap = Process()
     bootstrap.executableURL = URL(fileURLWithPath: "/bin/launchctl")
     bootstrap.arguments = ["bootstrap", "gui/\(uid)", userLaunchAgentPlistURL.path]
-    bootstrap.standardOutput = Pipe()
-    bootstrap.standardError = Pipe()
-    try? bootstrap.run()
+    bootstrap.standardOutput = FileHandle.nullDevice
+    bootstrap.standardError = FileHandle.nullDevice
+    try bootstrap.run()
     bootstrap.waitUntilExit()
-
-    if bootstrap.terminationStatus != 0 {
-      let load = Process()
-      load.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-      load.arguments = ["load", "-w", userLaunchAgentPlistURL.path]
-      load.standardOutput = Pipe()
-      load.standardError = Pipe()
-      try? load.run()
-      load.waitUntilExit()
+    guard bootstrap.terminationStatus == 0 else {
+      throw BridgeServiceRegistrationError.bootstrapFailed(bootstrap.terminationStatus)
     }
   }
 

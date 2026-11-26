@@ -74,6 +74,7 @@ struct DesktopProjectsInput: Equatable {
   let tasksRevision: Int
   let projects: [MCPProjectSummary]
   let projectPaths: [String: String]
+  let projectRootChanges: [String: IPCProjectRootChange]
   let selectedProjectID: String?
   let selectedProjectDetail: MCPProjectDetail?
   let defaultProjectID: String?
@@ -90,6 +91,7 @@ struct DesktopProjectsInput: Equatable {
     self.tasksRevision = tasksRevision
     projects = model.projects
     projectPaths = model.projectPaths
+    projectRootChanges = model.projectRootChanges
     selectedProjectID = model.selectedProjectID
     selectedProjectDetail = model.selectedProjectID.flatMap { model.projectDetails[$0] }
     defaultProjectID = model.defaultProjectID

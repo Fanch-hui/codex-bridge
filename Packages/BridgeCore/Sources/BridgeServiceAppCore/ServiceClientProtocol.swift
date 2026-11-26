@@ -27,6 +27,7 @@ public protocol BridgeServiceClientProtocol: BridgeTaskConversationClient, Senda
   func projects() async throws -> [MCPProjectSummary]
   func projectList() async throws -> IPCProjectListResponse
   func registerProject(_ request: IPCProjectRegistrationRequest) async throws -> MCPProjectDetail
+  func confirmProjectRootChange(_ request: IPCProjectRootChangeRequest) async throws
   func projectCommands(projectID: String) async throws -> MCPProjectDetail
   func updateProjectCommands(
     projectID: String,
@@ -230,6 +231,10 @@ extension BridgeServiceClient: BridgeServiceClientProtocol {
 }
 
 extension BridgeServiceClientProtocol {
+  public func confirmProjectRootChange(_ request: IPCProjectRootChangeRequest) async throws {
+    throw BridgeServiceClientError.serviceRestartRequired
+  }
+
   public func messageCenterSecret(_ request: IPCMessageCenterSecretRequest) async throws
     -> IPCMessageCenterSecretResponse
   {

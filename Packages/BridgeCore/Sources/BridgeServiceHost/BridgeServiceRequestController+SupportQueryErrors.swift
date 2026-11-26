@@ -7,6 +7,11 @@ extension BridgeServiceRequestController {
     switch error {
     case .projectNotFound:
       return .init(code: "project_not_found", message: "The project is unavailable.")
+    case .projectRootIdentityChanged:
+      return .init(
+        code: "project_root_identity_changed",
+        message: "项目文件夹身份发生变化，请在项目页面检查。"
+      )
     case .skillNotFound:
       return .init(code: "skill_not_found", message: "The Skill is unavailable.")
     case .skillActionNotFound:

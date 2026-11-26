@@ -18,6 +18,11 @@ extension BridgeServiceClient {
     try await call(operation: .registerProject, payload: request)
   }
 
+  public func confirmProjectRootChange(_ request: IPCProjectRootChangeRequest) async throws {
+    let _: IPCMutationResponse = try await call(
+      operation: .confirmProjectRootChange, payload: request)
+  }
+
   public func removeProject(projectID: String) async throws {
     let _: IPCMutationResponse = try await call(
       operation: .removeProject,

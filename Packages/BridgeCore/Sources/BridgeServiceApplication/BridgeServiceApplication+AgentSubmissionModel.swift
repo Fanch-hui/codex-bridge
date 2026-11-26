@@ -31,7 +31,9 @@ extension BridgeServiceApplication {
           projectRoot: project.root.canonicalPath,
           selectedModelID: selectedCatalogModelID,
           requireSelectedModel: context.policy.providerID != .pi,
-          runtimeBinding: context.runtimeBinding
+          runtimeBinding: context.runtimeBinding,
+          validatedRecord: context.runtimeBinding?.connectionMode == .nativeDesktop
+            ? context.record : nil
         )
       } catch AgentRuntimeError.modelUnavailable where selectedCatalogModelID != nil {
         modelCatalog = try? await serviceAgentModelCatalog(
@@ -40,8 +42,12 @@ extension BridgeServiceApplication {
           projectRoot: project.root.canonicalPath,
           selectedModelID: nil,
           requireSelectedModel: false,
-          runtimeBinding: context.runtimeBinding
+          runtimeBinding: context.runtimeBinding,
+          validatedRecord: context.runtimeBinding?.connectionMode == .nativeDesktop
+            ? context.record : nil
         )
+      } catch is CancellationError {
+        throw CancellationError()
       } catch {
         modelCatalog = nil
       }

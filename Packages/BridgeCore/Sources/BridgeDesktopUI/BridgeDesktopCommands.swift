@@ -1,3 +1,4 @@
+import BridgeIPC
 import BridgeServiceAppCore
 import Foundation
 
@@ -67,6 +68,7 @@ public enum BridgeDesktopCommand: String, Codable, Sendable {
   case refreshProjects
   case registerProject
   case removeProject
+  case confirmProjectRootChange
   case setProjectCommandMode
   case saveProjectCommand
   case removeProjectCommand
@@ -152,6 +154,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
   public let sessionID: String?
   public let approvalID: String?
   public let projectID: String?
+  public let rootChange: IPCProjectRootChange?
   public let tunnelID: String?
   public let threadID: String?
   public let operationID: String?
@@ -230,6 +233,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     sessionID: String? = nil,
     approvalID: String? = nil,
     projectID: String? = nil,
+    rootChange: IPCProjectRootChange? = nil,
     tunnelID: String? = nil,
     threadID: String? = nil,
     operationID: String? = nil,
@@ -306,6 +310,7 @@ public struct BridgeDesktopCommandPayload: Codable, Equatable, Sendable {
     self.sessionID = sessionID
     self.approvalID = approvalID
     self.projectID = projectID
+    self.rootChange = rootChange
     self.tunnelID = tunnelID
     self.threadID = threadID
     self.operationID = operationID

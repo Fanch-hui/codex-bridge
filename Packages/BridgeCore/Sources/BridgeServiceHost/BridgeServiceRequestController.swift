@@ -147,6 +147,8 @@ public final class BridgeServiceRequestController: @unchecked Sendable {
       return try await handleRegisterProject(request)
     case .removeProject:
       return try await handleRemoveProject(request)
+    case .confirmProjectRootChange:
+      return try await handleConfirmProjectRootChange(request)
     case .getProjectCommands:
       return try await handleGetProjectCommands(request)
     case .updateProjectCommands:

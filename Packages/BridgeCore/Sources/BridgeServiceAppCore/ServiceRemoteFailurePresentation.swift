@@ -122,6 +122,10 @@ enum ServiceRemoteFailurePresentation {
       "等待当前任务、命令或文件操作结束，再执行本次操作。"
     ),
     (
+      ["project_root_identity_changed"], "项目文件夹身份发生变化。",
+      "在项目页面检查文件夹，确认无误后重新验证。"
+    ),
+    (
       ["path_denied", "path_forbidden"], "此路径受项目安全规则保护或超出注册项目范围。",
       "选择项目内的普通文件；敏感配置和越界路径无法通过工作台访问。"
     ),

@@ -1,3 +1,4 @@
+import BridgeIPC
 import BridgeServiceAppCore
 import Foundation
 
@@ -5,6 +6,7 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
   public let projectID: String
   public let name: String
   public let path: String?
+  public let rootChange: IPCProjectRootChange?
   public let detail: String?
   public let gitState: String?
   public let selected: Bool
@@ -15,6 +17,7 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
     projectID: String,
     name: String,
     path: String? = nil,
+    rootChange: IPCProjectRootChange? = nil,
     detail: String? = nil,
     gitState: String? = nil,
     selected: Bool = false,
@@ -23,6 +26,7 @@ public struct BridgeDesktopProjectRow: Codable, Equatable, Sendable {
     self.projectID = projectID
     self.name = name
     self.path = path
+    self.rootChange = rootChange
     self.detail = detail
     self.gitState = gitState
     self.selected = selected

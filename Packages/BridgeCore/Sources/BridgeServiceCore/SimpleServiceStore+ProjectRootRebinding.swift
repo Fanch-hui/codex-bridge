@@ -4,12 +4,43 @@ import GRDB
 
 extension SimpleServiceStore {
   /// Points an existing project at a replacement root while keeping its ID, tasks and settings.
-  /// Only for directories Bridge owns and recreated itself (the default workspace); user
-  /// projects keep the strict identity check and are never rebound this way.
+  /// For directories Bridge owns and recreated itself (the default workspace).
   public func rebindProjectRoot(
     projectID: ProjectID,
     expected: ServiceRootIdentity,
     replacement: ServiceRootIdentity
+  ) throws {
+    try replaceRoot(projectID: projectID, expected: expected, replacement: replacement) { _ in }
+  }
+
+  /// Accepts only the device change the user confirmed, for an idle project.
+  public func confirmProjectRootDeviceChange(
+    projectID: ProjectID, expected: ServiceRootIdentity, replacement: ServiceRootIdentity
+  ) throws {
+    guard expected.isDeviceOnlyChange(to: replacement) else {
+      throw ServiceStoreError.invalidArgument("project.rootRebind")
+    }
+    try replaceRoot(projectID: projectID, expected: expected, replacement: replacement) { db in
+      let path = URL(fileURLWithPath: expected.canonicalPath, isDirectory: true)
+      guard (try? ServiceRootIdentity(capturing: path)) == replacement else {
+        throw ServiceStoreError.invalidArgument("project.rootRebind")
+      }
+      let hasActiveTasks = try Bool.fetchOne(
+        db,
+        sql: """
+          SELECT EXISTS(SELECT 1 FROM bridge_service_tasks
+          WHERE project_id = ? AND \(ServiceStoreSchema.nonterminalTaskPredicate))
+          """,
+        arguments: [projectID.rawValue])
+      guard hasActiveTasks == false else {
+        throw ServiceStoreError.activeWriteTaskExists(projectID)
+      }
+    }
+  }
+
+  private func replaceRoot(
+    projectID: ProjectID, expected: ServiceRootIdentity, replacement: ServiceRootIdentity,
+    validate: (Database) throws -> Void
   ) throws {
     do {
       try database.write { db in
@@ -19,6 +50,7 @@ extension SimpleServiceStore {
         guard try Self.decodeProject(row).root == expected else {
           throw ServiceStoreError.invalidArgument("project.rootRebind")
         }
+        try validate(db)
         let occupied =
           try Int.fetchOne(
             db,

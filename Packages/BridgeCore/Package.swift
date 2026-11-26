@@ -151,7 +151,7 @@ let package = Package(
   targets: [
     .target(
       name: "BridgeDesktopUI",
-      dependencies: ["BridgeServiceAppCore", "BridgeAgentCore"],
+      dependencies: ["BridgeServiceAppCore", "BridgeAgentCore", "BridgeIPC"],
       resources: [.process("Resources")]
     ),
     .target(name: "BridgeDomain"),

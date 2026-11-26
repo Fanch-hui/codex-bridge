@@ -13,8 +13,26 @@ extension BridgeServiceRequestController {
       requestID: request.requestID,
       payload: IPCProjectListResponse(
         projects: result.projects, projectPaths: result.projectPaths,
-        defaultProjectID: result.defaultProjectID)
+        rootChanges: result.rootChanges.mapValues { change in
+          IPCProjectRootChange(
+            path: change.path, registeredDevice: change.registeredDevice,
+            registeredInode: change.registeredInode, currentDevice: change.currentDevice,
+            currentInode: change.currentInode, canRebind: change.canRebind)
+        }, defaultProjectID: result.defaultProjectID)
     )
+  }
+
+  func handleConfirmProjectRootChange(_ request: BridgeServiceIPCRequest) async throws -> Data {
+    let payload = try BridgeServiceIPCCodec.payload(IPCProjectRootChangeRequest.self, from: request)
+    let change = payload.change
+    try await composition.application.serviceConfirmProjectRootChange(
+      projectID: payload.projectID,
+      presented: .init(
+        path: change.path, registeredDevice: change.registeredDevice,
+        registeredInode: change.registeredInode, currentDevice: change.currentDevice,
+        currentInode: change.currentInode, canRebind: change.canRebind),
+      deadline: Self.deadline())
+    return try BridgeServiceIPCCodec.emptySuccess(requestID: request.requestID)
   }
 
   func handleRegisterProject(_ request: BridgeServiceIPCRequest) async throws -> Data {

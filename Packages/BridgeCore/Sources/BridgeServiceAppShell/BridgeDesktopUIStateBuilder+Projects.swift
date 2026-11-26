@@ -21,6 +21,7 @@ extension BridgeDesktopUIStateBuilder {
           projectID: project.projectID,
           name: project.name,
           path: model.projectPaths[project.projectID],
+          rootChange: model.projectRootChanges[project.projectID],
           gitState: project.gitState,
           selected: project.projectID == model.selectedProjectID,
           isDefault: project.projectID == model.defaultProjectID

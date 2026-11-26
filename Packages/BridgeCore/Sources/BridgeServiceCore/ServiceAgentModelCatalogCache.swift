@@ -27,6 +27,27 @@ extension ServiceAgentRegistry {
     requireSelectedModel: Bool = true,
     runtimeBinding: AgentRuntimeBinding? = nil
   ) async throws -> [AgentModelDescriptor] {
+    try await models(
+      installationID: installationID, projectRoot: projectRoot, selectedModelID: selectedModelID,
+      forceRefresh: forceRefresh, requireSelectedModel: requireSelectedModel,
+      runtimeBinding: runtimeBinding, validatedRecord: nil)
+  }
+
+  package func modelsForValidatedRuntimeBinding(
+    record: ServiceAgentInstallationRecord, projectRoot: String?, selectedModelID: String?,
+    requireSelectedModel: Bool, runtimeBinding: AgentRuntimeBinding
+  ) async throws -> [AgentModelDescriptor] {
+    try await models(
+      installationID: record.id, projectRoot: projectRoot, selectedModelID: selectedModelID,
+      forceRefresh: false, requireSelectedModel: requireSelectedModel,
+      runtimeBinding: runtimeBinding, validatedRecord: record)
+  }
+
+  private func models(
+    installationID: AgentInstallationID, projectRoot: String?, selectedModelID: String?,
+    forceRefresh: Bool, requireSelectedModel: Bool, runtimeBinding: AgentRuntimeBinding?,
+    validatedRecord: ServiceAgentInstallationRecord?
+  ) async throws -> [AgentModelDescriptor] {
     try Task.checkCancellation()
     let generation = modelCatalogGenerations[installationID, default: 0]
     guard let stored = try await store.agentInstallation(id: installationID) else {
@@ -43,6 +64,9 @@ extension ServiceAgentRegistry {
         throw ServiceAgentRegistryError.installationNeedsReview(installationID)
       }
       throw ServiceAgentRegistryError.installationUnavailable(installationID)
+    }
+    if let validatedRecord {
+      try await validateModelCatalogSnapshot(validatedRecord)
     }
 
     let storedKey = ServiceAgentModelCatalogCacheKey(
@@ -73,9 +97,14 @@ extension ServiceAgentRegistry {
           && runtimeBinding?.connectionMode != .nativeDesktop)
     }
 
-    let record = try await validateForRuntimeBinding(
-      installationID: installationID,
-      projectRoot: projectRoot, runtimeBinding: runtimeBinding)
+    let record: ServiceAgentInstallationRecord
+    if let validatedRecord {
+      record = validatedRecord
+    } else {
+      record = try await validateForRuntimeBinding(
+        installationID: installationID,
+        projectRoot: projectRoot, runtimeBinding: runtimeBinding)
+    }
     try await validateModelCatalogSnapshot(record)
     if generation != modelCatalogGenerations[installationID, default: 0] {
       // Execution validation may refresh an installation's runtime before its first catalog read.
@@ -161,6 +190,9 @@ extension ServiceAgentRegistry {
   ) async throws -> [AgentModelDescriptor] {
     try Task.checkCancellation()
     guard let selectedModelID else { return models }
+    if runtimeBinding?.connectionMode == .nativeDesktop {
+      return requireSelectedModel ? try requireModel(selectedModelID, in: models) : models
+    }
     let selected = AgentModelMatcher.match(selectedModelID, in: models)
     guard
       selected?.reasoningCapabilitiesAvailable == false

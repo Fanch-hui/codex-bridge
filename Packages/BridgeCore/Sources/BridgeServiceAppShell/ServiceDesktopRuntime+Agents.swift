@@ -8,7 +8,8 @@ extension BridgeServiceAppModel {
     displayName: String,
     executableURL: URL,
     configurationURL: URL? = nil,
-    qoderDistribution: String? = nil
+    qoderDistribution: String? = nil,
+    probeProjectID: String? = nil
   ) {
     runAgentMutation(
       operation: { client in
@@ -18,7 +19,8 @@ extension BridgeServiceAppModel {
             displayName: displayName,
             executablePath: executableURL.standardizedFileURL.path,
             configurationPath: configurationURL?.standardizedFileURL.path,
-            qoderDistribution: qoderDistribution
+            qoderDistribution: qoderDistribution,
+            probeProjectID: probeProjectID
           )
         )
       },

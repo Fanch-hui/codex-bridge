@@ -21,6 +21,7 @@ public enum ServiceWorkspaceOwner: Codable, Equatable, Sendable {
   case directFileOperation(operationID: String)
   case directCommand(sessionID: String)
   case directGitCommit(operationID: String)
+  case projectRootRebind(operationID: String)
 
   public var ownerCode: String {
     switch self {
@@ -30,6 +31,8 @@ public enum ServiceWorkspaceOwner: Codable, Equatable, Sendable {
       "direct_command"
     case .directGitCommit:
       "direct_git_commit"
+    case .projectRootRebind:
+      "project_root_rebind"
     }
   }
 
@@ -41,6 +44,8 @@ public enum ServiceWorkspaceOwner: Codable, Equatable, Sendable {
       .direct(owner: "direct_command", sessionID: sessionID)
     case .directGitCommit(let operationID):
       .direct(owner: "direct_git_commit", operationID: operationID)
+    case .projectRootRebind(let operationID):
+      .direct(owner: "project_root_rebind", operationID: operationID)
     }
   }
 }

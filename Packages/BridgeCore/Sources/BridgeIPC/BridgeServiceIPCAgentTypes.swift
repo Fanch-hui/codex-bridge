@@ -337,19 +337,22 @@ public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
   public let executablePath: String
   public let configurationPath: String?
   public let qoderDistribution: String?
+  public let probeProjectID: String?
 
   public init(
     providerID: String,
     displayName: String,
     executablePath: String,
     configurationPath: String? = nil,
-    qoderDistribution: String? = nil
+    qoderDistribution: String? = nil,
+    probeProjectID: String? = nil
   ) {
     self.providerID = providerID
     self.displayName = displayName
     self.executablePath = executablePath
     self.configurationPath = configurationPath
     self.qoderDistribution = qoderDistribution
+    self.probeProjectID = probeProjectID
   }
 
   private enum CodingKeys: String, CodingKey {
@@ -358,6 +361,7 @@ public struct IPCAgentRegistrationRequest: Codable, Equatable, Sendable {
     case executablePath = "executable_path"
     case configurationPath = "configuration_path"
     case qoderDistribution = "qoder_distribution"
+    case probeProjectID = "probe_project_id"
   }
 }
 

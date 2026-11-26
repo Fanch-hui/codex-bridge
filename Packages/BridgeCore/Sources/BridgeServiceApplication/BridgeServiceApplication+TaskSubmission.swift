@@ -73,6 +73,8 @@ extension BridgeServiceApplication {
       } else {
         request = prepared.request
       }
+      try Task.checkCancellation()
+      try Self.checkDeadline(deadline)
       let result = try await submitTaskWithAdmission(
         request,
         projectID: prepared.projectID,

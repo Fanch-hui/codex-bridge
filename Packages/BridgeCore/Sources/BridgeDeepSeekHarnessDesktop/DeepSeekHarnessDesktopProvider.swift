@@ -66,7 +66,7 @@ public struct DeepSeekHarnessDesktopProvider: AgentProvider, AgentNativeSessionD
       let client = try await controller.client(
         request.installation,
         profileID: request.runtimeBinding?.profileID)
-      _ = try await client.call("models/list")
+      _ = try await client.call("models/defaults")
       let resolved = try AgentInstallation(
         id: request.installation.id,
         providerID: request.installation.providerID,

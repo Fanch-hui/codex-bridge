@@ -123,6 +123,7 @@ extension BridgeServiceAppModel {
       serviceStatus = nil
       projects = []
       projectPaths = [:]
+      projectRootChanges = [:]
       defaultProjectID = nil
       agentProviders = []
       agentInstallations = []

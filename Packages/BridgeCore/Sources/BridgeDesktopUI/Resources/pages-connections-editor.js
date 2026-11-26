@@ -99,6 +99,12 @@
     var name = S.textField("显示名称", "", "Agent 名称");
     var executable = S.textField("可执行路径", "", "由系统弹窗选取，或手动输入绝对路径");
     var configuration = S.textField("配置路径", "", "需要配置时填写（如 cordis.yml）");
+    var probeProject = S.selectField("Claude 检查目录", "__keep__", [], function () {}, "");
+    function selectedProbeProject() {
+      if (provider.control.value !== "claude-code" || !probeProject.control.value
+        || probeProject.control.value === "__keep__") return null;
+      return probeProject.control.value === "__default__" ? "" : probeProject.control.value;
+    }
     var draft = D.bind({
       providerID: provider.control,
       qoderDistribution: qoderDistribution.control,
@@ -146,12 +152,14 @@
     grid.appendChild(name.wrapper);
     grid.appendChild(executable.wrapper);
     grid.appendChild(configuration.wrapper);
+    grid.appendChild(probeProject.wrapper);
     wrapper.appendChild(grid);
     wrapper.appendChild(guide);
     function updateProviderPresentation() {
       var selected = getProvider(provider.control.value);
       guide.textContent = guideText(selected);
       qoderDistribution.wrapper.hidden = !selected || selected.providerID !== "qoder";
+      probeProject.wrapper.hidden = !selected || selected.providerID !== "claude-code";
       var requiresConfiguration = !!(selected && selected.requiresConfiguration);
       configuration.control.disabled = !requiresConfiguration;
       configuration.control.placeholder = requiresConfiguration
@@ -177,7 +185,8 @@
       context.emit("beginAgentRegistration", {
         providerID: provider.control.value || null,
         qoderDistribution: provider.control.value === "qoder"
-          ? qoderDistribution.control.value : null
+          ? qoderDistribution.control.value : null,
+        projectID: selectedProbeProject()
       });
     });
     actions.appendChild(quickSelect);
@@ -187,7 +196,8 @@
       if (!values.executable) {
         context.emit("beginAgentRegistration", {
           providerID: values.providerID || null,
-          qoderDistribution: values.providerID === "qoder" ? values.qoderDistribution : null
+          qoderDistribution: values.providerID === "qoder" ? values.qoderDistribution : null,
+          projectID: selectedProbeProject()
         });
         return;
       }
@@ -199,14 +209,15 @@
         executable: values.executable,
         configurationPath: selected && selected.requiresConfiguration
           ? values.configurationPath || null : null,
-        qoderDistribution: values.providerID === "qoder" ? values.qoderDistribution : null
+        qoderDistribution: values.providerID === "qoder" ? values.qoderDistribution : null,
+        projectID: selectedProbeProject()
       });
     });
     actions.appendChild(register);
     wrapper.appendChild(actions);
     return {
       root: wrapper,
-      update: function (providers, enabled, nextEmit) {
+      update: function (providers, enabled, nextEmit, projects) {
         context.providers = S.safeArray(providers);
         context.enabled = !!enabled;
         context.emit = nextEmit;
@@ -214,6 +225,13 @@
         D.selectOptions(provider.control, context.providers.map(function (item) {
           return { id: item.providerID, title: item.displayName, detail: item.detail };
         }));
+        D.selectOptions(probeProject.control, [
+          { id: "__keep__", title: "沿用当前设置" },
+          { id: "__default__", title: "默认工作区" }
+        ].concat(S.safeArray(projects).filter(function (project) { return !project.isDefault; }).map(function (project) {
+          return { id: project.projectID, title: project.name, detail: project.path || "" };
+        })), false);
+        if (!probeProject.control.value) probeProject.control.value = "__keep__";
         D.selectOptions(qoderDistribution.control, [
           { id: "cn", title: "中国版 CN" },
           { id: "international", title: "国际版" }

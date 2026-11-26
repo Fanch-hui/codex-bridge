@@ -47,6 +47,16 @@
           synchronizeTaskProject(model: model, management: management, auxiliary: auxiliary)
           await auxiliary.workspace.refresh()
         }
+      case .confirmProjectRootChange:
+        guard payload.confirmed == true,
+          let projectID = BridgeDesktopCommandValue.nonEmpty(payload.projectID),
+          let change = payload.rootChange,
+          management.selectedProjectID == projectID,
+          management.projectRootChanges[projectID] == change, change.canRebind
+        else { return true }
+        Task { @MainActor in
+          await management.confirmProjectRootChange(projectID: projectID, change: change)
+        }
       case .setProjectCommandMode:
         guard let projectID = BridgeDesktopCommandValue.nonEmpty(payload.projectID),
           let mode = BridgeDesktopCommandValue.nonEmpty(payload.mode),

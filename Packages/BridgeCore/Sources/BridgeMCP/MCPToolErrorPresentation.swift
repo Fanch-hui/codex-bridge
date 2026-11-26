@@ -9,6 +9,11 @@ extension BridgeMCPQueryError {
         "project_not_found", .callerError, false, "list_projects",
         "The project is unavailable. Use the opaque project_id returned by list_projects."
       )
+    case .projectRootIdentityChanged:
+      return error(
+        "project_root_identity_changed", .stateConflict, false, "ask_local_user_to_check_project",
+        "The project folder identity changed. Ask the local user to review it in Bridge."
+      )
     case .threadNotFound:
       return error(
         "thread_not_found", .callerError, false, "list_threads",

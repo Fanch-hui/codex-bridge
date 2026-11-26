@@ -10,6 +10,7 @@ package struct ServiceAgentSetupService: Sendable {
   let paths: ServiceDataPaths
   let registry: ServiceAgentRegistry
   let settings: ServiceSettings
+  let projects: ServiceProjectService
   let application: BridgeServiceApplication
   let discovery: ServiceAgentDiscoveryCatalog
   let bindings: ServiceAgentSetupRuntimeBindings
@@ -19,6 +20,7 @@ package struct ServiceAgentSetupService: Sendable {
     paths: ServiceDataPaths,
     registry: ServiceAgentRegistry,
     settings: ServiceSettings,
+    projects: ServiceProjectService,
     application: BridgeServiceApplication,
     discovery: ServiceAgentDiscoveryCatalog,
     bindings: ServiceAgentSetupRuntimeBindings,
@@ -27,6 +29,7 @@ package struct ServiceAgentSetupService: Sendable {
     self.paths = paths
     self.registry = registry
     self.settings = settings
+    self.projects = projects
     self.application = application
     self.discovery = discovery
     self.bindings = bindings
@@ -83,6 +86,9 @@ package struct ServiceAgentSetupService: Sendable {
         executablePath: runtime.executablePath)
     let configuration = ClaudeSDKProviderConfiguration(
       runtimeBaseDirectory: paths.agentStateURL.appendingPathComponent("ClaudeSDK").path,
+      probeDirectory: { [projects, settings] in
+        try await ServiceClaudeAssembly.probeDirectory(projects: projects, settings: settings)
+      },
       runtimeConfiguration: { _ in
         ClaudeSDKRuntimeConfiguration(nodeExecutablePath: runtime.nodeExecutablePath)
       })

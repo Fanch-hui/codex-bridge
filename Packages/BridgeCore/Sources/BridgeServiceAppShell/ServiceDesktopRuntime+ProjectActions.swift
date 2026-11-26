@@ -76,6 +76,16 @@ extension BridgeServiceAppModel {
     }
   }
 
+  func confirmProjectRootChange(projectID: String, change: IPCProjectRootChange) {
+    runMutation { [weak self] client in
+      guard let self else { return }
+      try await client.confirmProjectRootChange(.init(projectID: projectID, change: change))
+      await self.refresh(silent: true, includeCatalog: false)
+      self.loadProjectDetail(projectID: projectID)
+      self.postToast("项目文件夹已重新验证")
+    }
+  }
+
   public func removeProject(_ projectID: String) {
     runMutation { [weak self] client in
       guard let self else { return }

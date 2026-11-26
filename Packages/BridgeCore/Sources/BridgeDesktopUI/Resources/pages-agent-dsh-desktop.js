@@ -19,7 +19,7 @@
       { value: "https://github.com/deepseek-ai/deepseek-harness/releases" }, emit, "small", false);
     panel.appendChild(download); root.appendChild(panel);
     function send(action) {
-      if (busy || pending || (!installationID && action !== "installConnector")) return;
+      if (busy || pending || (!installationID && action !== "installConnector" && action !== "discover")) return;
       var payload = { action: action };
       if (installationID) payload.installationID = installationID;
       else payload.providerID = "deepseek-harness-desktop";
@@ -47,6 +47,7 @@
       if (pending === "installConnector") return updateAvailable() ? "正在更新连接器"
         : installWasCurrent ? "正在重新安装连接器" : "正在安装连接器";
       if (pending === "connect") return "正在连接";
+      if (pending === "status" || pending === "discover") return "正在检测连接";
       if (connected()) return "已连接";
       if (failed()) return "连接失败";
       if (waitingPairing()) return "等待配对";
@@ -54,7 +55,8 @@
       if (hasDesktop() && state && state.connectorInstalled && notRunning()) return "DSH 桌面版未打开";
       if (!hasDesktop()) return provider.discoveryState === "failed" ? "查找失败"
         : provider.discoveryState === "not_found" ? "未发现" : "正在查找";
-      return state && state.connectorInstalled ? "待连接" : "待安装连接器";
+      if (!state) return "连接状态未知";
+      return state.connectorInstalled ? "待连接" : "待安装连接器";
     }
     function update(nextProvider, installations, nextBusy) {
       provider = nextProvider;
@@ -64,6 +66,7 @@
       busy = !!nextBusy;
       if (lastBusy && !busy) pending = null;
       lastBusy = busy;
+      if (!state && provider.desktop && (pending === "status" || pending === "discover")) pending = null;
       state = provider.desktop || null;
       installationID = state && state.installationID || (installations[0] && installations[0].installationID);
       needsReview = installations.some(function (item) {
@@ -86,21 +89,23 @@
         : failed() ? state.message || "桌面连接失败，请重新连接。"
         : waitingPairing() ? "在 DSH 桌面的 Bridge Connector 中核对确认码并确认配对，完成后将自动连接。"
         : !hasDesktop() ? provider.discoveryMessage || "本机未发现 DSH 桌面版。安装后扫描 Agent。"
+        : !state ? "无法读取连接状态，请检测桌面连接。"
         : updateAvailable() ? "请完全退出 DSH 桌面，然后更新连接器。"
-        : !state || !state.connectorInstalled ? "请完全退出 DSH 桌面，然后安装连接器。"
+        : !state.connectorInstalled ? "请完全退出 DSH 桌面，然后安装连接器。"
         : notRunning() ? "DSH 桌面版未打开。打开后保持在后台运行即可连接。"
         : "点击连接打开 DSH 桌面，在 Bridge Connector 中确认配对。";
     }
     function presentation() {
       var isConnected = connected(), waiting = waitingPairing();
-      var install = updateAvailable() || !state || !state.connectorInstalled;
+      var install = updateAvailable() || !!(state && !state.connectorInstalled);
       return { label: label(), tone: needsReview ? "warning" : pending ? "neutral" : isConnected ? "success" : failed() ? "error" : "neutral",
-        actionTitle: waiting ? "等待配对" : pending ? "处理中…" : updateAvailable() ? "更新连接器" : install ? "安装连接器"
+        actionTitle: waiting ? "等待配对" : pending ? "处理中…" : !state ? "检测连接" : updateAvailable() ? "更新连接器" : install ? "安装连接器"
           : notRunning() ? "打开并连接" : "连接",
         actionHidden: isConnected || !hasDesktop(),
         canAct: !busy && !pending && !waiting && !needsReview && hasDesktop()
-          && (install ? !state || state.canInstallConnector : !!installationID),
-        actionHint: waiting ? "配对成功后自动更新连接状态。" : updateAvailable() ? "更新时需要完全退出 DSH 桌面。"
+          && (!state || (install ? state.canInstallConnector : !!installationID)),
+        actionHint: waiting ? "配对成功后自动更新连接状态。" : !state ? "检测桌面及连接器状态。"
+          : updateAvailable() ? "更新时需要完全退出 DSH 桌面。"
           : install ? "安装时需要完全退出 DSH 桌面。"
           : "使用 DSH 桌面的账号和原生会话。",
         waiting: !isConnected && !failed() && !needsReview,
@@ -109,7 +114,11 @@
     return { root: root, maintenanceRoot: actions, update: update, isDesktop: function () { return desktopProvider; },
       presentation: presentation, connected: connected, connect: function () {
         if (!presentation().canAct) return;
-        send(updateAvailable() || !state || !state.connectorInstalled ? "installConnector" : "connect");
+        if (!state) {
+          send(installationID ? "status" : "discover");
+        } else {
+          send(updateAvailable() || !state.connectorInstalled ? "installConnector" : "connect");
+        }
       } };
   }
   global.CodexBridgeDesktopDSHDesktop = { create: create };

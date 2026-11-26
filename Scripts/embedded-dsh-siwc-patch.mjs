@@ -21,6 +21,16 @@ const patches = [
     path: 'lib/api/controller.js',
     sha256: '1efe2df983bcb41b3db1fce23246d5d7ed12e84375043507c8d77b4fb15d2247',
     replacements: [
+      ["this.error = 'ChatGPT 连接操作失败，请检查网络后重试。';",
+        "this.error = 'ChatGPT 连接操作失败，原因未识别。';"],
+      ['await this.browser(attempt.authorizationUrl);',
+        `await this.browser(attempt.authorizationUrl).catch(() => {
+                    throw new AuthError('browser_open_failed', '无法打开系统浏览器，请检查默认浏览器后重新登录。');
+                });`],
+      ['await this.store.connect(value);',
+        `await this.store.connect(value).catch(() => {
+                        throw new AuthError('credential_store_failed', 'ChatGPT 已授权，但无法保存登录凭据，请检查系统凭据存储后重新登录。');
+                    });`],
       [
         '            onUsage: (usage, connection) => this.recordUsage(usage, connection),\n',
         '            onUsage: (usage, connection) => this.recordUsage(usage, connection),\n' +

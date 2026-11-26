@@ -2,6 +2,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const availabilityValues = new Set(['ready', 'unavailable', 'usage-limited']);
 
+// Only fixed, user-facing diagnostics can cross the authentication event boundary.
+const loginDiagnostics = new Set([
+  '无法打开系统浏览器，请检查默认浏览器后重新登录。',
+  'ChatGPT 已授权，但无法保存登录凭据，请检查系统凭据存储后重新登录。',
+  '启动本机登录回调失败，请重试。',
+  '连接 OpenAI 登录服务失败，请重试。',
+  'OpenAI 拒绝了登录授权，请重新登录。',
+  '登录已超时，请重试。',
+  'ChatGPT 连接操作失败，原因未识别。'
+]);
+
 function presentation(status, error) {
   const authenticated = status?.authenticated === true;
   const value = {
@@ -13,7 +24,9 @@ function presentation(status, error) {
   };
   if (error) value.error = error;
   else if (status?.error) {
-    if (authenticated && status.availability === 'usage-limited') {
+    if (loginDiagnostics.has(status.error)) {
+      value.error = status.error;
+    } else if (authenticated && status.availability === 'usage-limited') {
       value.error = 'ChatGPT 额度已达上限，额度恢复后可继续对话。';
     } else {
       value.error = authenticated && status.availability !== 'ready'

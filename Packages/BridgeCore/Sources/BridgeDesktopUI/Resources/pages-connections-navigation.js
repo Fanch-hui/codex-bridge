@@ -166,6 +166,7 @@
         : desktop && desktop.pairingCode && !desktop.paired ? "等待配对"
         : found && desktop && desktop.connectorInstalled && desktop.errorCode === "desktop_not_running"
           ? "DSH 桌面版未打开"
+        : found && !desktop ? "连接状态未知"
         : found ? desktop && desktop.connectorInstalled ? "待连接" : "待安装连接器"
         : provider.discoveryState === "not_found" ? "未发现" : "正在查找",
         tone: connected ? "success" : failed ? "error" : "neutral" };

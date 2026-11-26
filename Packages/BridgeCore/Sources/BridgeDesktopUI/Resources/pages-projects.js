@@ -125,6 +125,28 @@
     var info = S.node("dl", "project-workspace-facts"), status = S.node("dd"), description = S.node("p", "project-workspace-description");
     info.appendChild(S.node("dt", null, "Git 状态")); info.appendChild(status);
     panes.overview.appendChild(info); panes.overview.appendChild(description);
+    var identity = S.node("div", "project-identity-warning");
+    var identityMessage = S.node("p"), identityDetails = S.node("p", "row-detail");
+    identity.appendChild(identityMessage); identity.appendChild(identityDetails);
+    var rebind = S.button("检查并重新验证…", null, {}, null, "small");
+    identity.appendChild(rebind); panes.overview.appendChild(identity);
+    rebind.addEventListener("click", function () {
+      if (rebind.disabled || !current.project.rootChange) return;
+      var change = current.project.rootChange;
+      S.confirmDialog({
+        title: "重新验证项目文件夹",
+        message: "请确认当前文件夹是原项目。项目会话和权限将保留。",
+        details: [["文件夹", change.path], ["原设备编号", change.registeredDevice],
+          ["当前设备编号", change.currentDevice], ["目录编号", change.currentInode]],
+        confirmTitle: "确认并重新验证",
+        fallbackText: "确认当前文件夹是原项目？\n" + change.path + "\n设备编号：" +
+          change.registeredDevice + " → " + change.currentDevice + "\n目录编号：" + change.currentInode
+      }).then(function (confirmed) {
+        if (!confirmed || !current.project || JSON.stringify(current.project.rootChange) !== JSON.stringify(change)) return;
+        S.setButtonPending(rebind, true, "验证中…", "检查并重新验证…");
+        context.emit("confirmProjectRootChange", { projectID: projectID, rootChange: change, confirmed: true });
+      });
+    });
     var commands = S.node("div", "project-verification"); panes.overview.appendChild(commands);
 
     function selectTab(key) {
@@ -145,17 +167,29 @@
     }
     return {
       root: root,
-      setAvailable: function (available) { remove.disabled = start.disabled = !available; },
+      setAvailable: function (available) { remove.disabled = start.disabled = rebind.disabled = !available; },
       update: function (page, project) {
         current.project = project; name.textContent = project.name;
         path.textContent = project.path || ""; path.title = project.path || ""; path.hidden = !project.path;
         var git = S.gitStateBadge(project.gitState);
         status.textContent = git ? git.label : "未检查";
         description.textContent = page.selectedProjectDetail || ""; description.hidden = !page.selectedProjectDetail;
+        identity.hidden = !project.rootChange;
+        if (project.rootChange) {
+          var change = project.rootChange;
+          identityMessage.textContent = change.canRebind ? "项目文件夹的设备编号发生变化，请确认当前文件夹。"
+            : "项目文件夹身份发生变化，请恢复原来的文件夹后刷新项目。";
+          identityDetails.textContent = "设备编号：" + change.registeredDevice + " → " + change.currentDevice
+            + " · 目录编号：" + change.registeredInode + " → " + change.currentInode;
+        }
+        rebind.hidden = !project.rootChange || !project.rootChange.canRebind || !!project.isDefault;
+        S.setButtonPending(rebind, false, null, "检查并重新验证…");
+        rebind.disabled = !page.canRegister;
         // The default workspace is managed by Bridge itself and cannot be removed.
         more.hidden = !!project.isDefault;
         S.setButtonPending(remove, false, null, "移除项目…");
-        remove.disabled = !page.canRemove || !!project.isDefault; start.disabled = !page.canRegister;
+        remove.disabled = !page.canRemove || !!project.isDefault;
+        start.disabled = !page.canRegister || !!project.rootChange;
         tabs.sessions.textContent = "会话 " + S.safeArray(page.sessions).length;
         tabs.skills.textContent = "技能 " + S.safeArray(page.skills).length;
         updateCollection("verification", commands, page, page.verificationCommands);

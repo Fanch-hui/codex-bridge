@@ -131,6 +131,7 @@
       executablePath: String,
       configurationPath: String?,
       qoderDistribution: String?,
+      probeProjectID: String?,
       management: WindowsManagementModel,
       auxiliary: WindowsAuxiliaryRuntime
     ) -> Bool {
@@ -140,7 +141,8 @@
           executablePath: executablePath,
           configurationPath: configurationPath ?? "",
           displayName: displayName,
-          qoderDistribution: qoderDistribution
+          qoderDistribution: qoderDistribution,
+          probeProjectID: probeProjectID
         )
         await auxiliary.agentDefaults.refresh()
       }
@@ -192,6 +194,7 @@
         executablePath: executablePath,
         configurationPath: BridgeDesktopCommandValue.nonEmpty(payload.configurationPath),
         qoderDistribution: distribution,
+        probeProjectID: providerID == "claude-code" ? payload.projectID : nil,
         management: management,
         auxiliary: auxiliary
       )
@@ -203,6 +206,7 @@
     ) -> Bool {
       let providerID = BridgeDesktopCommandValue.nonEmpty(payload.providerID)
       let distribution = BridgeDesktopCommandValue.qoderDistribution(payload.qoderDistribution)
+      let probeProjectID = providerID == "claude-code" ? payload.projectID : nil
       guard providerID != "qoder" || distribution != nil else { return true }
       let provider =
         providerID.flatMap { id in
@@ -222,7 +226,8 @@
               provider: provider,
               executablePath: executablePath,
               configurationPath: configurationPath,
-              qoderDistribution: distribution
+              qoderDistribution: distribution,
+              probeProjectID: probeProjectID
             )
           }
         } else {
@@ -230,7 +235,8 @@
             provider: provider,
             executablePath: executablePath,
             configurationPath: nil,
-            qoderDistribution: distribution
+            qoderDistribution: distribution,
+            probeProjectID: probeProjectID
           )
         }
       }
@@ -241,7 +247,8 @@
       provider: IPCAgentProviderSummary,
       executablePath: String,
       configurationPath: String?,
-      qoderDistribution: String?
+      qoderDistribution: String?,
+      probeProjectID: String?
     ) {
       DesktopPlatformHost.enqueueCommand(
         .registerAgentFromDesktop(
@@ -249,7 +256,8 @@
           displayName: provider.displayName,
           executablePath: executablePath,
           configurationPath: configurationPath,
-          qoderDistribution: qoderDistribution
+          qoderDistribution: qoderDistribution,
+          probeProjectID: probeProjectID
         ))
     }
   }

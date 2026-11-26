@@ -150,7 +150,8 @@ public actor ServiceComposition {
     }
     let agentProviders: [any AgentProvider] = [
       try ServiceClaudeAssembly.make(
-        stateDirectory: paths.agentStateURL, runtimeBindings: setupRuntimeBindings, mcp: agentMCP),
+        stateDirectory: paths.agentStateURL, projects: projects, settings: settings,
+        runtimeBindings: setupRuntimeBindings, mcp: agentMCP),
       try QoderSDKProvider(
         configuration: QoderSDKProviderConfiguration(
           runtimeBaseDirectory: paths.agentStateURL
@@ -490,7 +491,7 @@ public actor ServiceComposition {
       defaultRoot: paths.rootURL.appendingPathComponent("AgentTools", isDirectory: true),
       cacheURL: paths.agentStateURL.appendingPathComponent("agent-setup.json"),
       dependencies: ServiceAgentSetupService(
-        paths: paths, registry: agentRegistry, settings: settings,
+        paths: paths, registry: agentRegistry, settings: settings, projects: projects,
         application: application, discovery: agentDiscoveryCatalog,
         bindings: setupRuntimeBindings, tasks: tasks
       ).dependencies())

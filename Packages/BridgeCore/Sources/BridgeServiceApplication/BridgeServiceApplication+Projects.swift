@@ -6,6 +6,7 @@ import Foundation
 public struct ServiceManagedProjectList: Sendable {
   public let projects: [MCPProjectSummary]
   public let projectPaths: [String: String]
+  public let rootChanges: [String: ServiceProjectRootChange]
   public let defaultProjectID: String?
 }
 
@@ -49,6 +50,11 @@ extension BridgeServiceApplication {
       projects: await checkedProjectSummaries(registered, deadline: deadline),
       projectPaths: Dictionary(
         uniqueKeysWithValues: registered.map { ($0.id.rawValue, $0.root.canonicalPath) }),
+      rootChanges: Dictionary(
+        uniqueKeysWithValues: registered.compactMap { project in
+          guard let change = ServiceProjectRootChange.inspect(project.root) else { return nil }
+          return (project.id.rawValue, change)
+        }),
       defaultProjectID: defaultProjectID
     )
   }

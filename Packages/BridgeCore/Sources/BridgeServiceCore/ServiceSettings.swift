@@ -63,6 +63,7 @@ public enum ServiceSettingKey: String, CaseIterable, Sendable {
   case deepSeekHarnessMCPServers = "agent.deepseek-harness.mcp.servers"
   case piMCPServers = "agent.pi.mcp.servers"
   case claudeCodeMCPServers = "agent.claude-code.mcp.servers"
+  case claudeCodeProbeProjectID = "agent.claude-code.probe_project_id"
   case claudeCodeDefaultModel = "agent.claude-code.default_model"
   case claudeCodeDefaultPermissionMode = "agent.claude-code.default_permission_mode"
   case claudeCodeDefaultEffort = "agent.claude-code.default_effort"

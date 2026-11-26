@@ -109,6 +109,19 @@ public struct ServiceRootIdentity: Codable, Equatable, Hashable, Sendable {
     )
   }
 
+  public func matches(_ current: ServiceRootIdentity) -> Bool {
+    guard current.canonicalPath == canonicalPath, current.inode == inode else { return false }
+    if let volumeUUID { return current.volumeUUID == volumeUUID }
+    return current.device == device
+  }
+
+  /// A device-only remount requires confirmation when no stable volume identity is available.
+  public func isDeviceOnlyChange(to current: ServiceRootIdentity) -> Bool {
+    volumeUUID == nil && current.volumeUUID == nil
+      && canonicalPath == current.canonicalPath && inode == current.inode
+      && device != current.device
+  }
+
   public func validateCurrentIdentity() throws {
     let current = try RegisteredRoot(
       capturing: URL(fileURLWithPath: canonicalPath, isDirectory: true)

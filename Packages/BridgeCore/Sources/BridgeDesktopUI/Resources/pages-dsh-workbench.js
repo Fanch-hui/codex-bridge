@@ -564,6 +564,7 @@
       if (navigationTaskID === navigationTaskRequest.taskID) {
         navigationTaskID = null; navigationWebOnly = false;
       }
+      if (restoreRequested === navigationTaskRequest.taskID) restoreRequested = null;
       navigationTaskRequest = null;
     }
     if (receipt && receipt.command === "continueNativeAgentSession" && receipt.accepted === true
@@ -719,11 +720,12 @@
         if (context.state && context.state.selectedNavigation !== "workbench") {
           context.emit("selectPage", { navigation: "workbench" });
         }
-        context.emit("selectTask", { taskID: taskID });
+        var requestID = global.CodexBridgeDesktopEmbeddedDSHTransport.requestID();
+        context.emit("selectTaskHistory", { taskID: taskID }, requestID);
+        navigationTaskRequest = { taskID: taskID, requestID: requestID };
       }
       navigationTaskID = taskID;
       navigationWebOnly = true;
-      navigationTaskRequest = null;
       restoreRequested = taskID;
     },
     openCollaborationTask: function (taskID) {

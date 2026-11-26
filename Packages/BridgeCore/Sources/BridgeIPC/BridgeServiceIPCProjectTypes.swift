@@ -1,6 +1,37 @@
 import BridgeMCP
 import Foundation
 
+public struct IPCProjectRootChange: Codable, Equatable, Sendable {
+  public let path: String
+  public let registeredDevice: String
+  public let registeredInode: String
+  public let currentDevice: String
+  public let currentInode: String
+  public let canRebind: Bool
+
+  public init(
+    path: String, registeredDevice: String, registeredInode: String,
+    currentDevice: String, currentInode: String, canRebind: Bool
+  ) {
+    self.path = path
+    self.registeredDevice = registeredDevice
+    self.registeredInode = registeredInode
+    self.currentDevice = currentDevice
+    self.currentInode = currentInode
+    self.canRebind = canRebind
+  }
+}
+
+public struct IPCProjectRootChangeRequest: Codable, Equatable, Sendable {
+  public let projectID: String
+  public let change: IPCProjectRootChange
+
+  public init(projectID: String, change: IPCProjectRootChange) {
+    self.projectID = projectID
+    self.change = change
+  }
+}
+
 public struct IPCProjectRegistrationRequest: Codable, Equatable, Sendable {
   public let name: String
   public let absolutePath: String
@@ -183,21 +214,24 @@ public struct IPCWorkbenchPermissionModeRequest: Codable, Equatable, Sendable {
 public struct IPCProjectListResponse: Codable, Equatable, Sendable {
   public let projects: [MCPProjectSummary]
   public let projectPaths: [String: String]?
+  public let rootChanges: [String: IPCProjectRootChange]?
   /// Bridge-managed default workspace; new conversations use it when no project is chosen.
   public let defaultProjectID: String?
 
   public init(
     projects: [MCPProjectSummary], projectPaths: [String: String]? = nil,
-    defaultProjectID: String? = nil
+    rootChanges: [String: IPCProjectRootChange]? = nil, defaultProjectID: String? = nil
   ) {
     self.projects = projects
     self.projectPaths = projectPaths
+    self.rootChanges = rootChanges
     self.defaultProjectID = defaultProjectID
   }
 
   private enum CodingKeys: String, CodingKey {
     case projects
     case projectPaths = "project_paths"
+    case rootChanges = "root_changes"
     case defaultProjectID = "default_project_id"
   }
 }

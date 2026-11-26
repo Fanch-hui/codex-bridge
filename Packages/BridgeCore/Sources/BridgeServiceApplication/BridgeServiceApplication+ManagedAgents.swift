@@ -31,6 +31,7 @@ extension BridgeServiceApplication {
 
   public func serviceRegisterManagedAgent(
     _ request: ServiceAgentRegistrationRequest,
+    reprobeExisting: Bool = false,
     deadline: ContinuousClock.Instant
   ) async throws -> ServiceAgentInstallationRecord {
     try Self.checkDeadline(deadline)
@@ -51,7 +52,24 @@ extension BridgeServiceApplication {
         throw BridgeMCPQueryError.contractRejected
       }
     }
-    let record = try await requiredAgentRegistry().registerAndProbe(request)
+    let registry = try requiredAgentRegistry()
+    let record: ServiceAgentInstallationRecord
+    do {
+      record = try await registry.registerAndProbe(request)
+    } catch ServiceStoreError.duplicateAgentExecutable(let providerID, let path)
+      where request.providerID == .claudeCode && reprobeExisting
+    {
+      guard
+        let existing = try await registry.installations(providerID: providerID).first(where: {
+          $0.executableIdentity.canonicalPath == path
+        })
+      else {
+        throw ServiceStoreError.duplicateAgentExecutable(
+          providerID: providerID, canonicalPath: path)
+      }
+      record = try await registry.reprobe(
+        installationID: existing.id, projectRoot: request.projectRoot)
+    }
     try Self.checkDeadline(deadline)
     return record
   }
@@ -219,10 +237,12 @@ extension BridgeServiceApplication {
     guard installation.capabilities.effective.contains(.modelSelection) else {
       return []
     }
-    let projectRoot = try await agentModelProjectRoot(
-      projectID: projectID,
-      deadline: deadline
-    )
+    let projectRoot: String?
+    if installation.providerID == .claudeCode, projectID == nil {
+      projectRoot = nil
+    } else {
+      projectRoot = try await agentModelProjectRoot(projectID: projectID, deadline: deadline)
+    }
     try Self.checkDeadline(deadline)
     let selectedModelID: String?
     if let modelID {
@@ -269,8 +289,14 @@ extension BridgeServiceApplication {
     selectedModelID: String?,
     forceRefresh: Bool = false,
     requireSelectedModel: Bool = true,
-    runtimeBinding: AgentRuntimeBinding? = nil
+    runtimeBinding: AgentRuntimeBinding? = nil,
+    validatedRecord: ServiceAgentInstallationRecord? = nil
   ) async throws -> [AgentModelDescriptor] {
+    if let validatedRecord, let runtimeBinding, !forceRefresh {
+      return try await registry.modelsForValidatedRuntimeBinding(
+        record: validatedRecord, projectRoot: projectRoot, selectedModelID: selectedModelID,
+        requireSelectedModel: requireSelectedModel, runtimeBinding: runtimeBinding)
+    }
     guard try await registry.installation(id: installationID) != nil else {
       throw BridgeMCPQueryError.unavailable
     }

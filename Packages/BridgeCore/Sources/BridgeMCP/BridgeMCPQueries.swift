@@ -10,6 +10,7 @@ public enum MCPCommandDenialReason: String, Codable, Equatable, Sendable {
 
 public enum BridgeMCPQueryError: Error, Equatable, Sendable {
   case projectNotFound
+  case projectRootIdentityChanged
   case threadNotFound
   case pathDenied
   case pathNotFound

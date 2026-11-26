@@ -19,6 +19,8 @@ extension BridgeServiceApplication {
     }
     do {
       try project.root.validateCurrentIdentity()
+    } catch ServiceStoreError.invalidArgument("project.rootIdentity") {
+      throw BridgeMCPQueryError.projectRootIdentityChanged
     } catch {
       throw BridgeMCPQueryError.unavailable
     }

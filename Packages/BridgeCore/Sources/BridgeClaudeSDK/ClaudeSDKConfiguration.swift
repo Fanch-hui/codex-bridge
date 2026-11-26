@@ -26,6 +26,7 @@ public struct ClaudeSDKProviderConfiguration: Sendable {
   public let runtimeBaseDirectory: String
   public let sourceEnvironment: [String: String]
   public let hostDirectory: String?
+  public let probeDirectory: @Sendable () async throws -> String?
   public let runtimeConfiguration:
     @Sendable (AgentInstallation) async throws -> ClaudeSDKRuntimeConfiguration
   public let resources:
@@ -38,6 +39,7 @@ public struct ClaudeSDKProviderConfiguration: Sendable {
     runtimeBaseDirectory: String,
     sourceEnvironment: [String: String] = ToolDiscoveryEnvironment.current(),
     hostDirectory: String? = nil,
+    probeDirectory: @escaping @Sendable () async throws -> String? = { nil },
     runtimeConfiguration:
       @escaping @Sendable (AgentInstallation) async throws -> ClaudeSDKRuntimeConfiguration = {
         installation in
@@ -58,6 +60,7 @@ public struct ClaudeSDKProviderConfiguration: Sendable {
     self.runtimeBaseDirectory = runtimeBaseDirectory
     self.sourceEnvironment = sourceEnvironment
     self.hostDirectory = hostDirectory
+    self.probeDirectory = probeDirectory
     self.runtimeConfiguration = runtimeConfiguration
     self.resources = resources
     self.configuredMCPServerCount = configuredMCPServerCount

@@ -28,7 +28,7 @@
     "package": "dsh-plugin-chatgpt-siwc",
     "version": "0.9.7",
     "license": "licenses/SIWC-LICENSE",
-    "patch": "agent_name_hint is Codex Bridge; restore conversation after ChatGPT quota resets",
+    "patch": "agent_name_hint is Codex Bridge; restore conversation after ChatGPT quota resets; distinguish browser launch and credential storage failures",
     "backportCommit": "a7922c89e3672239da4304c0df31644fb92c114a"
   },
   "node": "24.11.1",

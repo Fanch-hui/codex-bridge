@@ -11,6 +11,11 @@ import Foundation
 
 extension BridgeServiceApplication {
   static func publicFileError(_ error: Error) -> BridgeMCPQueryError {
+    if let storeError = error as? ServiceStoreError,
+      case .invalidArgument("project.rootIdentity") = storeError
+    {
+      return .projectRootIdentityChanged
+    }
     if let value = error as? ProjectFileError {
       switch value {
       case .unknownProject:
@@ -60,6 +65,8 @@ extension BridgeServiceApplication {
       return .idempotencyConflict
     case .activeWriteTaskExists:
       return .busy
+    case .invalidArgument("project.rootIdentity"):
+      return .projectRootIdentityChanged
     case .invalidArgument, .invalidTaskTransition, .immutableTaskChanged,
       .duplicateAgentInstallation, .duplicateAgentExecutable, .unknownAgentInstallation:
       return .contractRejected
@@ -85,7 +92,9 @@ extension BridgeServiceApplication {
       return .projectNotFound
     case .threadUnavailable:
       return .threadNotFound
-    case .sessionUnavailable, .sessionEnded, .projectIdentityChanged, .turnUnavailable,
+    case .projectIdentityChanged:
+      return .projectRootIdentityChanged
+    case .sessionUnavailable, .sessionEnded, .turnUnavailable,
       .turnStartTimedOut, .approvalUnavailable, .protocolViolation, .processUnavailable:
       return .unavailable
     case .conversationPersistenceFailed:

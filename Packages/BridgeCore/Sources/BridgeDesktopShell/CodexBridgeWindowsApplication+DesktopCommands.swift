@@ -22,13 +22,15 @@
         let displayName,
         let executablePath,
         let configurationPath,
-        let qoderDistribution):
+        let qoderDistribution,
+        let probeProjectID):
         return registerAgentFromDesktop(
           providerID: providerID,
           displayName: displayName,
           executablePath: executablePath,
           configurationPath: configurationPath,
           qoderDistribution: qoderDistribution,
+          probeProjectID: probeProjectID,
           management: management,
           auxiliary: auxiliary
         )

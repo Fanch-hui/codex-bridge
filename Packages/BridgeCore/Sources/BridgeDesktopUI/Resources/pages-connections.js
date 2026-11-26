@@ -44,11 +44,11 @@
     }, setupsRunning ? 1500 : 3000);
   }
 
-  function render(page, emit) {
+  function render(page, emit, appUpdate, desktopState) {
     currentPage = page; currentEmit = emit; schedule();
     var container = document.getElementById("connections-content");
     if (!container.__connectionsPage) container.__connectionsPage = create(container, emit);
-    container.__connectionsPage.update(page, emit);
+    container.__connectionsPage.update(page, emit, desktopState);
     if (pendingDetail) deliverDetail(container);
   }
 
@@ -120,7 +120,7 @@
 
     return {
       details: navigation,
-      update: function (page, nextEmit) {
+      update: function (page, nextEmit, desktopState) {
         context.emit = nextEmit;
         content.hidden = !page; unavailable.hidden = !!page;
         if (!page) {
@@ -172,7 +172,8 @@
           canConnect: page.canRegisterAgent, busy: page.isManagingAgents === true,
           revision: page.agentOperationRevision, setupOperations: page.setupOperations, acceptReplacement: true
         }, nextEmit);
-        agentEditor.update(providers, page.canRegisterAgent && !page.isManagingAgents, nextEmit);
+        agentEditor.update(providers, page.canRegisterAgent && !page.isManagingAgents, nextEmit,
+          desktopState && desktopState.projects && desktopState.projects.rows);
         agentMCP.update(page, nextEmit);
         mcpEntry.update({ value: S.safeArray(page.deepSeekHarnessMCPServers).length + " 个服务" });
         manualEntry.update({ value: "按路径或选择文件" });

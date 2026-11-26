@@ -113,6 +113,13 @@ public actor ServiceProjectService {
       projectID: projectID, expected: expected, replacement: replacement)
   }
 
+  public func confirmRootDeviceChange(
+    projectID: ProjectID, expected: ServiceRootIdentity, replacement: ServiceRootIdentity
+  ) async throws {
+    try await store.confirmProjectRootDeviceChange(
+      projectID: projectID, expected: expected, replacement: replacement)
+  }
+
   public func remove(projectID: ProjectID) async throws {
     try await store.removeProject(id: projectID)
   }

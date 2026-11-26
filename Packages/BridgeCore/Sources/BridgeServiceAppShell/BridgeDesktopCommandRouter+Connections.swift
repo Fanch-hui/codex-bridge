@@ -210,7 +210,8 @@ extension BridgeDesktopCommandRouter {
       displayName: displayName,
       executableURL: executableURL,
       configurationURL: configurationURL,
-      qoderDistribution: distribution
+      qoderDistribution: distribution,
+      probeProjectID: providerID == "claude-code" ? payload.projectID : nil
     )
   }
 
@@ -356,7 +357,8 @@ extension BridgeDesktopCommandRouter {
       displayName: provider.displayName,
       executableURL: url,
       configurationURL: configurationURL,
-      qoderDistribution: distribution
+      qoderDistribution: distribution,
+      probeProjectID: provider.providerID == "claude-code" ? payload.projectID : nil
     )
   }
 }

@@ -121,6 +121,7 @@ public final class BridgeServiceAppModel: ObservableObject {
   @Published public internal(set) var serviceStatus: IPCServiceStatusResponse?
   @Published public internal(set) var projects: [MCPProjectSummary] = []
   @Published public internal(set) var projectPaths: [String: String] = [:]
+  @Published public internal(set) var projectRootChanges: [String: IPCProjectRootChange] = [:]
   @Published public internal(set) var projectDetails: [String: MCPProjectDetail] = [:]
   @Published var deepSeekDesktopStates: [String: BridgeDesktopDeepSeekHarnessDesktopState] = [:]
   @Published var deepSeekDesktopBusy = false

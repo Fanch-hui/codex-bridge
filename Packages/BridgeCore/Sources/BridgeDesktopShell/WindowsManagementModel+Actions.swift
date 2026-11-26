@@ -34,6 +34,20 @@
       }
     }
 
+    func confirmProjectRootChange(projectID: String, change: IPCProjectRootChange) async {
+      guard connectionState == .connected, !projectBusy else { return }
+      setProjectBusy(true)
+      defer { setProjectBusy(false) }
+      do {
+        try await client.confirmProjectRootChange(.init(projectID: projectID, change: change))
+        await refreshProjects()
+        reportProjectSuccess("项目文件夹已重新验证", projectID: projectID)
+      } catch {
+        reportProjectFailure(
+          "项目文件夹验证失败：\(BridgeServiceErrorMessage.message(error))", projectID: projectID)
+      }
+    }
+
     func removeSelectedProject(projectID requestedProjectID: String? = nil) async {
       guard let projectID = requestedProjectID ?? selectedProjectID,
         let project = projects.first(where: { $0.projectID == projectID })
@@ -130,7 +144,8 @@
       executablePath: String,
       configurationPath: String,
       displayName: String? = nil,
-      qoderDistribution: String? = nil
+      qoderDistribution: String? = nil,
+      probeProjectID: String? = nil
     ) async {
       let executable = executablePath.trimmingCharacters(in: .whitespacesAndNewlines)
       let configuration = configurationPath.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -166,7 +181,8 @@
             displayName: effectiveName,
             executablePath: executable,
             configurationPath: configuration.isEmpty ? nil : configuration,
-            qoderDistribution: qoderDistribution
+            qoderDistribution: qoderDistribution,
+            probeProjectID: probeProjectID
           )
         )
         selectedInstallationID = installation.installationID

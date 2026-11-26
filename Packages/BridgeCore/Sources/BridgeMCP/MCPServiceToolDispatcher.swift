@@ -1,3 +1,4 @@
+import BridgeAgentCore
 import BridgeFiles
 import BridgeSecurity
 import Foundation
@@ -10,28 +11,42 @@ public struct MCPServiceToolDeadlines: Sendable {
     // Submission resolves the model catalog before persisting the task; a cold
     // catalog fetch spawns codex app-server, so this needs read-level headroom.
     submit: .seconds(15),
+    desktopSubmit: .seconds(45),
     mutation: .seconds(10),
     projectChanges: .seconds(20)
   )
 
   public let read: ContinuousClock.Duration
   public let submit: ContinuousClock.Duration
+  public let desktopSubmit: ContinuousClock.Duration
   public let mutation: ContinuousClock.Duration
   public let projectChanges: ContinuousClock.Duration
 
   public init(
     read: ContinuousClock.Duration,
     submit: ContinuousClock.Duration,
+    desktopSubmit: ContinuousClock.Duration? = nil,
     mutation: ContinuousClock.Duration,
     projectChanges: ContinuousClock.Duration = .seconds(20)
   ) {
     precondition(
-      read > .zero && submit > .zero && mutation > .zero && projectChanges > .zero
+      read > .zero && submit > .zero && (desktopSubmit ?? submit) > .zero && mutation > .zero
+        && projectChanges > .zero
     )
     self.read = read
     self.submit = submit
+    self.desktopSubmit = desktopSubmit ?? submit
     self.mutation = mutation
     self.projectChanges = projectChanges
+  }
+
+  func submissionDuration(providerID: String?, threadID: String?) -> ContinuousClock.Duration {
+    if providerID == AgentProviderID.deepSeekHarnessDesktop.rawValue
+      || (providerID == AgentProviderID.deepSeekHarness.rawValue && threadID != nil)
+    {
+      return desktopSubmit
+    }
+    return submit
   }
 }
 

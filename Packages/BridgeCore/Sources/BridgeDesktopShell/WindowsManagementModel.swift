@@ -13,6 +13,7 @@
     private(set) var connectionState: WindowsWorkbenchDisplay.ConnectionState = .idle
     private(set) var projects: [MCPProjectSummary] = []
     private(set) var projectPaths: [String: String] = [:]
+    private(set) var projectRootChanges: [String: IPCProjectRootChange] = [:]
     private(set) var defaultProjectID: String?
     private(set) var agentProviders: [IPCAgentProviderSummary] = []
     private(set) var agentInstallations: [IPCAgentInstallationSummary] = []
@@ -103,6 +104,7 @@
         let snapshot = try await client.projectList()
         projects = snapshot.projects
         projectPaths = snapshot.projectPaths ?? [:]
+        projectRootChanges = snapshot.rootChanges ?? [:]
         defaultProjectID = snapshot.defaultProjectID
         connectionState = .connected
         reconcileProjectSelection()
@@ -175,6 +177,7 @@
           projectID: project.projectID,
           name: project.name,
           path: projectPaths[project.projectID],
+          rootChange: projectRootChanges[project.projectID],
           gitState: project.gitState,
           selected: project.projectID == selectedProjectID,
           isDefault: project.projectID == defaultProjectID

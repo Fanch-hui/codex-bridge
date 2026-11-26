@@ -28,7 +28,8 @@
       displayName: String,
       executablePath: String,
       configurationPath: String?,
-      qoderDistribution: String?
+      qoderDistribution: String?,
+      probeProjectID: String?
     )
   }
 #endif

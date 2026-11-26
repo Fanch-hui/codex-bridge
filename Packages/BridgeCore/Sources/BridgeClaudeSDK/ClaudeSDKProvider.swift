@@ -21,7 +21,9 @@ public struct ClaudeSDKProvider: AgentProvider, AgentInstallationArtifactProvidi
 
   public func probe(_ request: AgentProbeRequest) async -> AgentProbeResult {
     do {
-      let metadata = try await inspect(installation: request.installation, method: "claude/probe")
+      let metadata = try await inspect(
+        installation: request.installation, method: "claude/probe", projectRoot: request.projectRoot
+      )
       try Self.requireAuthenticated(metadata)
       let version = metadata["cliVersion"]?.stringValue
       guard let version, !version.isEmpty else { throw ACPError.invalidMessage }
@@ -78,8 +80,23 @@ public struct ClaudeSDKProvider: AgentProvider, AgentInstallationArtifactProvidi
   ) async throws -> ACPJSONValue {
     let profile = try await ClaudeRuntimeProfile.make(
       installation: installation, configuration: configuration)
-    let store = try ClaudeSessionStore(directory: configuration.runtimeBaseDirectory)
-    let cwd = projectRoot ?? store.directory
+    let cwd: String
+    if let projectRoot {
+      cwd = projectRoot
+    } else if let preferredDirectory = try await configuration.probeDirectory() {
+      cwd = preferredDirectory
+    } else {
+      let directory = URL(fileURLWithPath: configuration.runtimeBaseDirectory, isDirectory: true)
+        .appendingPathComponent("Probe", isDirectory: true)
+      #if os(Windows)
+        let attributes: [FileAttributeKey: Any]? = nil
+      #else
+        let attributes: [FileAttributeKey: Any]? = [.posixPermissions: 0o700]
+      #endif
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: true, attributes: attributes)
+      cwd = directory.resolvingSymlinksInPath().standardizedFileURL.path
+    }
     let client = try profile.client(cwd: cwd, factory: configuration.transportFactory)
     do {
       let result = try await client.request(
@@ -219,6 +236,9 @@ public struct ClaudeSDKProvider: AgentProvider, AgentInstallationArtifactProvidi
   private static func failureDescription(_ error: any Error) -> String {
     if error is ClaudeProcessStillRunning {
       return "Claude Code 后台进程尚未确认退出，请检查进程状态后重新连接。"
+    }
+    if case AgentRuntimeError.invalidRequest("claude.probe_project_unavailable") = error {
+      return "Claude Code 检查项目不可用，请在登记已有安装时重新选择项目。"
     }
     if case AgentRuntimeError.invalidRequest("claude.authentication_required") = error {
       return "Claude Code 尚未登录，请使用官方 CLI 登录后重新连接。"

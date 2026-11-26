@@ -26,6 +26,12 @@ extension BridgeDesktopCommandRouter {
         project(projectID, in: model) != nil
       else { return }
       model.removeProject(projectID)
+    case .confirmProjectRootChange:
+      guard connected(model), payload.confirmed == true,
+        let projectID = validatedID(payload.projectID), let change = payload.rootChange,
+        model.projectRootChanges[projectID] == change, change.canRebind
+      else { return }
+      model.confirmProjectRootChange(projectID: projectID, change: change)
     case .setProjectCommandMode:
       guard connected(model), let projectID = validatedID(payload.projectID),
         project(projectID, in: model) != nil,

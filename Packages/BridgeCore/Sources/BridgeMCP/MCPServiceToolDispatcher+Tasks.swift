@@ -107,7 +107,9 @@ extension MCPServiceToolDispatcher {
     sessionID: String
   ) async throws -> CallTool.Result {
     let submission = try parseSubmission(arguments)
-    let deadline = clock.now.advanced(by: deadlines.submit)
+    let deadline = clock.now.advanced(
+      by: deadlines.submissionDuration(
+        providerID: submission.providerID, threadID: submission.threadID))
     let receipt = try await withToolDeadline(until: deadline) {
       try await service.serviceSubmitTask(
         submission,

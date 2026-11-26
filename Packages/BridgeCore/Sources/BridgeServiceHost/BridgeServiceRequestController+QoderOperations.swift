@@ -39,6 +39,20 @@ extension BridgeServiceRequestController {
       executablePath: executablePath,
       configurationPath: payload.configurationPath
     )
+    var probeRoot: String?
+    if let selected = payload.probeProjectID {
+      guard providerID == .claudeCode else { throw BridgeMCPQueryError.contractRejected }
+      let projectID =
+        selected.isEmpty
+        ? try await composition.settings.string(for: .defaultWorkspaceProjectID) : selected
+      guard let projectID,
+        let project = try await composition.projects.projects().first(where: {
+          $0.id.rawValue == projectID
+        })
+      else { throw BridgeMCPQueryError.projectNotFound }
+      try project.root.validateCurrentIdentity()
+      probeRoot = project.root.canonicalPath
+    }
     let record = try await composition.application.serviceRegisterManagedAgent(
       try ServiceAgentRegistrationRequest(
         providerID: providerID,
@@ -47,11 +61,17 @@ extension BridgeServiceRequestController {
         trustProfile: policy?.registrationTrustProfile ?? .managed,
         securityProfileID: policy?.registrationSecurityProfileID,
         enableOnSuccess: false,
+        projectRoot: probeRoot,
         configurationPath: payload.configurationPath,
         artifacts: artifacts
       ),
+      reprobeExisting: payload.probeProjectID != nil,
       deadline: Self.deadline()
     )
+    if let selected = payload.probeProjectID {
+      try await composition.settings.set(
+        selected.isEmpty ? nil : selected, for: .claudeCodeProbeProjectID)
+    }
     if let distribution {
       try await composition.settings.setQoderInstallationDistribution(
         installationID: record.id.rawValue, distribution: distribution)

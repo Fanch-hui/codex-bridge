@@ -125,6 +125,8 @@ extension BridgeServiceAppModel {
     let value = snapshot.projects
     let paths = snapshot.projectPaths ?? [:]
     if projectPaths != paths { projectPaths = paths }
+    let changes = snapshot.rootChanges ?? [:]
+    if projectRootChanges != changes { projectRootChanges = changes }
     if defaultProjectID != snapshot.defaultProjectID {
       defaultProjectID = snapshot.defaultProjectID
     }

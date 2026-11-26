@@ -277,11 +277,12 @@ public actor EmbeddedDSHRuntime {
   }
 }
 
-private enum EmbeddedDSHRuntimeEnvironment {
-  static func make(nodePath: String, dataRoot: URL) -> [String: String] {
-    let source = ProcessInfo.processInfo.environment
+enum EmbeddedDSHRuntimeEnvironment {
+  static func make(
+    nodePath: String, dataRoot: URL, source: [String: String] = ProcessInfo.processInfo.environment
+  ) -> [String: String] {
     let allowed = [
-      "HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TMPDIR", "TMP", "TEMP",
+      "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TMPDIR", "TMP", "TEMP",
       "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
       "http_proxy", "https_proxy", "all_proxy", "no_proxy",
       "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS", "XDG_RUNTIME_DIR",
@@ -294,7 +295,7 @@ private enum EmbeddedDSHRuntimeEnvironment {
     }
     AgentProviderEnvironment.applyWindowsSystemEnvironment(to: &result, from: source)
     result["PATH"] = AgentProviderEnvironment.executableSearchPath(
-      executablePath: nodePath, source: result)
+      executablePath: nodePath, source: source)
     result["DSH_HOME"] = dataRoot.path
     return result
   }
